@@ -344,6 +344,39 @@ class TenantApiAdapter {
     return response.json();
   }
 
+  // --- Utility to unwrap { success: true, data: [...] } ---
+  private unwrapArray(res: any, key?: string): any[] {
+    let arr: any[] = [];
+    if (Array.isArray(res)) {
+      arr = res;
+    } else if (res && typeof res === 'object') {
+      if (key && Array.isArray(res[key])) arr = res[key];
+      else if (Array.isArray(res.data)) arr = res.data;
+      else if (Array.isArray(res.employees)) arr = res.employees;
+      else if (Array.isArray(res.services)) arr = res.services;
+      else if (Array.isArray(res.products)) arr = res.products;
+      else if (Array.isArray(res.messages)) arr = res.messages;
+      else if (Array.isArray(res.customers)) arr = res.customers;
+      else if (Array.isArray(res.appointments)) arr = res.appointments;
+      else if (Array.isArray(res.hotDeals)) arr = res.hotDeals;
+      else if (Array.isArray(res.reviews)) arr = res.reviews;
+      else if (Array.isArray(res.giftCards)) arr = res.giftCards;
+      else if (Array.isArray(res.transactions)) arr = res.transactions;
+    }
+    
+    // Fix photo URLs
+    const baseUrl = this.baseUrl.replace('/api/v1', '');
+    arr.forEach(item => {
+      if (item.photo && !item.photo.startsWith('http')) {
+        item.photo = `${baseUrl}/uploads/${item.photo.replace(/^\/+/, '')}`;
+      }
+      if (item.avatar && !item.avatar.startsWith('http')) {
+        item.avatar = `${baseUrl}/uploads/${item.avatar.replace(/^\/+/, '')}`;
+      }
+    });
+    return arr;
+  }
+
   async post<T = any>(endpoint: string, data?: any): Promise<T> {
     const response = await this.request(endpoint, {
       method: 'POST',
@@ -418,7 +451,8 @@ class TenantApiAdapter {
   }
 
   async getEmployees(): Promise<any[]> {
-    return this.get('/tenant/employees');
+    const res = await this.get('/tenant/employees');
+    return this.unwrapArray(res, 'employees');
   }
 
   async createEmployee(data: Record<string, any>): Promise<any> {
@@ -435,7 +469,8 @@ class TenantApiAdapter {
 
   // --- Products ---
   async getProducts(): Promise<any[]> {
-    return this.get('/tenant/products');
+    const res = await this.get('/tenant/products');
+    return this.unwrapArray(res, 'products');
   }
 
   async createProduct(data: any): Promise<any> {
@@ -472,7 +507,8 @@ class TenantApiAdapter {
   }
 
   async getMessages(): Promise<any[]> {
-    return this.get('/tenant/messages');
+    const res = await this.get('/tenant/messages');
+    return this.unwrapArray(res, 'messages');
   }
 
   async createMessage(data: Record<string, any>): Promise<any> {
@@ -484,7 +520,8 @@ class TenantApiAdapter {
   }
 
   async getServices(): Promise<any[]> {
-    return this.get('/tenant/services');
+    const res = await this.get('/tenant/services');
+    return this.unwrapArray(res, 'services');
   }
 
   async createService(data: any): Promise<any> {
@@ -530,7 +567,8 @@ class TenantApiAdapter {
         q.set(key, String(value));
       }
     });
-    return this.get(`/tenant/appointments${q.toString() ? `?${q.toString()}` : ''}`);
+    const res = await this.get(`/tenant/appointments${q.toString() ? `?${q.toString()}` : ''}`);
+    return this.unwrapArray(res, 'appointments');
   }
 
   async getAppointment(id: string): Promise<any> {
