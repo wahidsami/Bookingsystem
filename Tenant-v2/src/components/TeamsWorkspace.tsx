@@ -147,6 +147,71 @@ const presetAvatars = [
   'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'
 ];
 
+const defaultTeamMember: TeamMemberData = {
+  id: '',
+  nameEn: 'Unknown',
+  nameAr: 'غير معروف',
+  roleEn: 'Staff',
+  roleAr: 'موظف',
+  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+  rating: 5,
+  status: 'active',
+  email: '',
+  phone: '',
+  joinedDate: new Date().toISOString().split('T')[0],
+  bioEn: '',
+  bioAr: '',
+  experienceEn: '',
+  experienceAr: '',
+  nationalityAr: 'سعودية',
+  nationalityEn: 'Saudi',
+  gender: 'female',
+  position: 'service-provider',
+  specialtiesEn: [],
+  specialtiesAr: [],
+  languagesEn: ['English', 'Arabic'],
+  languagesAr: ['الإنجليزية', 'العربية'],
+  baseSalary: 0,
+  commissionRatePct: 0,
+  serviceCommissionEnabled: false,
+  productCommissionEnabled: false,
+  scheduleVisibilityWeeks: 2,
+  schedule: [],
+  dashboardPermissions: {
+    view_dashboard: true,
+    manage_appointments: false,
+    view_employees: false,
+    manage_financials: false,
+    view_reports: false,
+    manage_settings: false,
+    view_appointments: false,
+    view_schedules: false,
+    view_customers: false,
+    view_services: false,
+    view_products: false,
+    view_orders: false,
+    view_financial: false,
+    view_bills: false,
+    view_pos: false,
+    view_messages: false,
+    view_reviews: false,
+    view_hot_deals: false,
+    view_notifications: false,
+    view_payroll: false,
+    view_subscription: false,
+    view_settings: false,
+    manage_accounts: false
+  },
+  bookingsCount: 0,
+  utilizationRate: 0,
+  retentionRate: 0,
+  noShowCount: 0,
+  servicesSales: 0,
+  productSales: 0,
+  tips: 0,
+  reviewsList: []
+};
+
 export default function TeamsWorkspace({ 
   lang, 
   addEmployeeTrigger = 0, 
@@ -324,7 +389,7 @@ export default function TeamsWorkspace({
   }, [addEmployeeTrigger]);
 
   const activeMember = useMemo(() => {
-    return teamMembers.find(t => t.id === selectedMemberId) || teamMembers[0];
+    return teamMembers.find(t => t.id === selectedMemberId) || teamMembers[0] || defaultTeamMember;
   }, [teamMembers, selectedMemberId]);
 
   // Search & Filtered Directory List
