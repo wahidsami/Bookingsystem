@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ||
+  ((import.meta as any).env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ||
   'http://localhost:5000/api/v1';
 
 export const API_ORIGIN = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
@@ -100,6 +100,22 @@ class TenantApiAdapter {
 
   constructor(fetchImpl?: FetchLike) {
     this.fetchImpl = fetchImpl || window.fetch.bind(window);
+  }
+
+  private get baseUrl(): string {
+    return API_BASE_URL;
+  }
+
+  private getToken(): string | null {
+    return this.getAccessToken();
+  }
+
+  private async handleResponse(response: Response): Promise<any> {
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(data?.message || data?.error || 'Request failed');
+    }
+    return data;
   }
 
   getAccessToken(): string | null {
@@ -477,6 +493,97 @@ class TenantApiAdapter {
 
   async patchAppointment(id: string, data: Record<string, any>): Promise<any> {
     return this.patch(`/tenant/appointments/${id}`, data);
+  }
+
+  async updateAppointmentStatus(id: string, status: string, notes?: string): Promise<any> {
+    return this.request(`/tenant/appointments/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, notes, notifyCustomer: true })
+    });
+  }
+
+  async reassignAppointmentStaff(id: string, staffId: string): Promise<any> {
+    return this.patch(`/tenant/appointments/${id}/reassign-staff`, {
+      staffId
+    });
+  }
+
+  async reassignRescheduleAppointment(
+    id: string,
+    data: { staffId: string; startTime: string; notifyCustomer?: boolean }
+  ): Promise<any> {
+    return this.patch(`/tenant/appointments/${id}/reassign-reschedule`, {
+      ...data,
+      notifyCustomer: data.notifyCustomer ?? true
+    });
+  }
+
+  async getEmployeeShifts(employeeId: string): Promise<any> {
+    return this.request(`/tenant/employees/${employeeId}/shifts`);
+  }
+
+  async createEmployeeShift(employeeId: string, shiftData: {
+    dayOfWeek?: number | null;
+    specificDate?: string | null;
+    startTime: string;
+    endTime: string;
+    isRecurring?: boolean;
+    startDate?: string | null;
+    endDate?: string | null;
+    label?: string;
+  }): Promise<any> {
+    return this.request(`/tenant/employees/${employeeId}/shifts`, {
+      method: 'POST',
+      body: JSON.stringify(shiftData),
+    });
+  }
+
+  async updateEmployeeShift(employeeId: string, shiftId: string, shiftData: any): Promise<any> {
+    return this.request(`/tenant/employees/${employeeId}/shifts/${shiftId}`, {
+      method: 'PUT',
+      body: JSON.stringify(shiftData),
+    });
+  }
+
+  async deleteEmployeeShift(employeeId: string, shiftId: string): Promise<any> {
+    return this.request(`/tenant/employees/${employeeId}/shifts/${shiftId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getEmployeeBreaks(employeeId: string): Promise<any> {
+    return this.request(`/tenant/employees/${employeeId}/breaks`);
+  }
+
+  async createEmployeeBreak(employeeId: string, breakData: {
+    dayOfWeek?: number | null;
+    specificDate?: string | null;
+    startTime: string;
+    endTime: string;
+    type?: 'lunch' | 'prayer' | 'cleaning' | 'other';
+    label?: string;
+    isRecurring?: boolean;
+    startDate?: string | null;
+    endDate?: string | null;
+    referenceDate?: string | null;
+  }): Promise<any> {
+    return this.request(`/tenant/employees/${employeeId}/breaks`, {
+      method: 'POST',
+      body: JSON.stringify(breakData),
+    });
+  }
+
+  async updateEmployeeBreak(employeeId: string, breakId: string, breakData: any): Promise<any> {
+    return this.request(`/tenant/employees/${employeeId}/breaks/${breakId}`, {
+      method: 'PUT',
+      body: JSON.stringify(breakData),
+    });
+  }
+
+  async deleteEmployeeBreak(employeeId: string, breakId: string): Promise<any> {
+    return this.request(`/tenant/employees/${employeeId}/breaks/${breakId}`, {
+      method: 'DELETE',
+    });
   }
 
   async getDashboardStats(): Promise<any> {

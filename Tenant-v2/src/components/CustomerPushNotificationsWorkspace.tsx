@@ -164,7 +164,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
 
       // Fetch Dependencies (Customers & Services)
       const customersRes = await tenantApiAdapter.getCustomers({ limit: 1000 });
-      const customersMapped = (customersRes?.data?.customers || customersRes?.customers || []).map((c: any) => ({
+      const customersMapped = (customersRes?.customers || (customersRes as any)?.data?.customers || []).map((c: any) => ({
         ...c,
         name: c.nameEn || c.nameAr || 'Unknown',
         phone: c.phone || 'No Phone',

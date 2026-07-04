@@ -32,6 +32,8 @@ interface Stylist {
 
 interface Appointment {
   id: string;
+  customerId?: string;
+  serviceId?: string;
   customerNameEn: string;
   customerNameAr: string;
   serviceNameEn: string;
@@ -118,7 +120,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           categoryEn: s.category || 'Massage & Therapy'
         })));
 
-        const customers = custRes?.data?.customers || custRes?.customers || [];
+        const customers = custRes?.customers || (custRes as any)?.data?.customers || [];
         setLiveCustomers(customers.map((c: any) => ({
           id: c.id,
           name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Guest',
@@ -147,82 +149,103 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     fetchMasterData();
   }, []);
 
+  const mapBoardAppointment = (a: any, dateKey: string): Appointment => {
+    const startDate = new Date(a.startTime);
+    const startMins = startDate.getHours() * 60 + startDate.getMinutes() - 9 * 60;
+    return {
+      id: a.id,
+      customerId: a.user?.id || a.customerId,
+      serviceId: a.service?.id || a.serviceId,
+      customerNameEn: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : a.customerNameEn || 'Walk-in',
+      customerNameAr: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : a.customerNameAr || 'زائرة',
+      serviceNameEn: a.service?.name_en || a.serviceNameEn || 'Service',
+      serviceNameAr: a.service?.name_ar || a.serviceNameAr || 'الخدمة',
+      staffId: a.staffId,
+      startTime: startMins,
+      duration: a.service?.duration || a.duration || 60,
+      status: a.status,
+      paymentStatus: a.paymentStatus,
+      isGroupBooking: Boolean(a.isGroupBooking),
+      guestCount: a.guestCount,
+      hasNotes: !!a.notes,
+      notes: a.notes,
+      price: parseFloat(a.price || 0),
+      tags: Array.isArray(a.tags) ? a.tags : [],
+      customerPhone: a.user?.phone || a.customerPhone,
+      customerEmail: a.user?.email || a.customerEmail,
+      loyaltyTier: a.loyaltyTier,
+      walletBalance: a.walletBalance,
+      type: 'appointment',
+      serviceCategory: a.service?.category || a.serviceCategory || 'hair',
+      date: a.date || dateKey
+    };
+  };
+
+  const mapBoardBreak = (b: any): Appointment => {
+    const [h, m] = (b.startTime || '12:00').split(':');
+    const startMins = parseInt(h) * 60 + parseInt(m) - 9 * 60;
+    const [eh, em] = (b.endTime || '13:00').split(':');
+    const dur = (parseInt(eh) * 60 + parseInt(em)) - (parseInt(h) * 60 + parseInt(m));
+    return {
+      id: b.id,
+      customerNameEn: b.label || b.type,
+      customerNameAr: b.label || b.type,
+      serviceNameEn: 'Staff Break',
+      serviceNameAr: 'فترة راحة',
+      staffId: b.staffId,
+      startTime: startMins,
+      duration: dur,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      isGroupBooking: false,
+      hasNotes: false,
+      price: 0,
+      tags: ['Blocked'],
+      type: 'blocked',
+      blockedType: b.type
+    };
+  };
+
+  const loadBoardData = async () => {
+    setIsLoading(true);
+    try {
+      const dateStr = selectedDate.toLocaleDateString('en-CA');
+      const res = await tenantApiAdapter.getAppointmentsBoard(dateStr);
+      if (res && res.success) {
+        const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => mapBoardAppointment(a, dateStr));
+        const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => mapBoardBreak(b));
+        setAppointments([...mappedApts, ...mappedBreaks]);
+
+        const newStatuses: Record<string, 'active'|'break'|'off'> = {};
+        (res.breaks || []).forEach((b: any) => {
+          newStatuses[b.staffId] = 'break';
+        });
+        setStylistStatuses(prev => ({ ...prev, ...newStatuses }));
+      }
+    } catch (err) {
+      console.error('Failed to load board data', err);
+    } finally {
+      setTimeout(() => setIsLoading(false), 300);
+    }
+  };
+
+  const getSelectedDateKey = () => selectedDate.toISOString().split('T')[0];
+  const buildIsoFromMinutes = (dateKey: string, minutesFromNine: number) => {
+    const safeMinutes = Math.max(0, Math.round(minutesFromNine));
+    const base = new Date(`${dateKey}T00:00:00`);
+    base.setHours(9 + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
+    return base.toISOString();
+  };
+  const buildClockTime = (minutesFromNine: number) => {
+    const absoluteMinutes = 9 * 60 + Math.max(0, Math.round(minutesFromNine));
+    const hours = Math.floor(absoluteMinutes / 60);
+    const mins = absoluteMinutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  };
+
   // Board Data Fetch
   useEffect(() => {
-    const fetchBoard = async () => {
-      // Small artificial loader delay for UX premium feel
-      setIsLoading(true);
-      try {
-        const dateStr = selectedDate.toLocaleDateString('en-CA'); // YYYY-MM-DD local format
-        const res = await tenantApiAdapter.getAppointmentsBoard(dateStr);
-        if (res && res.success) {
-          const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => {
-            const startDate = new Date(a.startTime);
-            const startMins = startDate.getHours() * 60 + startDate.getMinutes() - 9 * 60;
-            return {
-              id: a.id,
-              customerNameEn: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : 'Walk-in',
-              customerNameAr: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : 'زائرة',
-              serviceNameEn: a.service?.name_en || 'Service',
-              serviceNameAr: a.service?.name_ar || 'الخدمة',
-              staffId: a.staffId,
-              startTime: startMins,
-              duration: a.service?.duration || a.duration || 60,
-              status: a.status,
-              paymentStatus: a.paymentStatus,
-              isGroupBooking: false,
-              hasNotes: !!a.notes,
-              notes: a.notes,
-              price: parseFloat(a.price || 0),
-              tags: [],
-              type: 'appointment',
-              serviceCategory: a.service?.category || 'hair',
-              date: dateStr
-            };
-          });
-          
-          const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => {
-            const [h, m] = (b.startTime || '12:00').split(':');
-            const startMins = parseInt(h) * 60 + parseInt(m) - 9 * 60;
-            const [eh, em] = (b.endTime || '13:00').split(':');
-            const dur = (parseInt(eh) * 60 + parseInt(em)) - (parseInt(h) * 60 + parseInt(m));
-            return {
-              id: b.id,
-              customerNameEn: b.label || b.type,
-              customerNameAr: b.label || b.type,
-              serviceNameEn: 'Staff Break',
-              serviceNameAr: 'فترة راحة',
-              staffId: b.staffId,
-              startTime: startMins,
-              duration: dur,
-              status: 'confirmed',
-              paymentStatus: 'paid',
-              isGroupBooking: false,
-              hasNotes: false,
-              price: 0,
-              tags: ['Blocked'],
-              type: 'blocked',
-              blockedType: b.type
-            };
-          });
-          
-          setAppointments([...mappedApts, ...mappedBreaks]);
-          
-          // Also set stylist statuses based on breaks
-          const newStatuses: Record<string, 'active'|'break'|'off'> = {};
-          (res.breaks || []).forEach((b: any) => {
-             // simplified logic: if there is a break today, mark them as on break. We'll rely on the actual board for accurate visualization anyway.
-             newStatuses[b.staffId] = 'break';
-          });
-          setStylistStatuses(prev => ({...prev, ...newStatuses}));
-        }
-      } catch (err) {
-        console.error('Failed to load board data', err);
-      } finally {
-        setTimeout(() => setIsLoading(false), 300);
-      }
-    };
-    fetchBoard();
+    void loadBoardData();
   }, [selectedDate]);
 
   // Interactive hover tracking
@@ -257,6 +280,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     originalStaffId: string;
     isResizing: boolean;
     startDuration: number;
+    lastDuration?: number;
   } | null>(null);
 
   // Split payments demo state
@@ -510,10 +534,31 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       // Handle resizing duration
       const newDuration = Math.max(15, dragState.startDuration + deltaMinutes); // min 15 minutes
       setAppointments(prev => prev.map(a => a.id === dragState.appointmentId ? { ...a, duration: newDuration } : a));
+      setDragState(prev => prev ? { ...prev, lastDuration: newDuration } : prev);
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = async () => {
+    if (dragState?.isResizing) {
+      const target = appointments.find(a => a.id === dragState.appointmentId);
+      const nextDuration = dragState.lastDuration ?? target?.duration ?? dragState.startDuration;
+      if (target && nextDuration !== dragState.startDuration) {
+        try {
+          await tenantApiAdapter.patchAppointment(dragState.appointmentId, {
+            duration: nextDuration
+          });
+          await loadBoardData();
+        } catch (err) {
+          console.error('Failed to persist resize change', err);
+          addLocalToast(
+            'تعذر حفظ تعديل مدة الموعد',
+            'Failed to save appointment resize',
+            'warning'
+          );
+          await loadBoardData();
+        }
+      }
+    }
     setDragState(null);
   };
 
@@ -587,7 +632,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         setIsShiftModalOpen(true);
       }
     } else if (actionType === 'refresh') {
-      triggerRefresh();
+      void loadBoardData();
     } else {
       addLocalToast(
         `تمت محاكاة الإجراء ${actionType.toUpperCase()} بنجاح.`,
@@ -599,7 +644,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   };
 
   // Open Details Drawer
-  const openAppointmentDetails = (apt: Appointment) => {
+  const openAppointmentDetails = async (apt: Appointment) => {
     if (apt.type === 'blocked') {
       // For blocked cards, open a simplified popup or handle beautifully
       addLocalToast(
@@ -609,7 +654,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       );
       return;
     }
-    setActiveAppointment(apt);
+    try {
+      const response = await tenantApiAdapter.getAppointment(apt.id);
+      const detail = response?.appointment || response?.data?.appointment || response?.data || response;
+      setActiveAppointment(detail?.id ? mapBoardAppointment(detail, apt.date || selectedDate.toISOString().split('T')[0]) : apt);
+    } catch (err) {
+      console.warn('Failed to load appointment detail, falling back to board row', err);
+      setActiveAppointment(apt);
+    }
     setSplitAmounts({ card: apt.price, cash: 0, wallet: 0 });
     setIsSplitActive(false);
     setCheckoutProducts([]);
@@ -678,6 +730,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       // Update appointment state in dashboard schedule
       setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, status: 'completed', paymentStatus: 'paid' } : a));
       setActiveAppointment(prev => prev ? { ...prev, status: 'completed', paymentStatus: 'paid' } : null);
+      await loadBoardData();
       
       addLocalToast(
         'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',
@@ -686,7 +739,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       );
     } catch (err) {
       console.error('Checkout failed', err);
-      addLocalToast('فشل إتمام الدفع', 'Checkout failed. Try again.', 'error');
+      addLocalToast('فشل إتمام الدفع', 'Checkout failed. Try again.', 'warning');
     }
   };
 
@@ -1057,7 +1110,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       );
     } catch (err) {
       console.error('POS Checkout failed', err);
-      addLocalToast('خطأ في إتمام الطلب', 'POS Checkout error', 'error');
+      addLocalToast('خطأ في إتمام الطلب', 'POS Checkout error', 'warning');
     }
   };
 
@@ -1875,14 +1928,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 if (aptId && dragOverStaffId && dragOverTime !== null) {
                                   setAppointments(prev => prev.map(a => {
                                     if (a.id === aptId) {
-                                      // Fire and forget patch
                                       if (!a.id.startsWith('block-')) {
-                                        const patchDate = new Date(selectedDate);
-                                        patchDate.setHours(9 + Math.floor(dragOverTime / 60), dragOverTime % 60, 0, 0);
-                                        // Account for local timezone offset if needed, or send as ISO.
-                                        tenantApiAdapter.patchAppointment(a.id, { 
-                                          staffId: dragOverStaffId, 
-                                          startTime: patchDate.toISOString() 
+                                        const patchDate = buildIsoFromMinutes(getSelectedDateKey(), dragOverTime);
+                                        tenantApiAdapter.reassignRescheduleAppointment(a.id, {
+                                          staffId: dragOverStaffId,
+                                          startTime: patchDate,
+                                          notifyCustomer: true
+                                        }).then(() => {
+                                          void loadBoardData();
                                         }).catch(err => console.error("Optimistic sync failed", err));
                                       }
                                       return {
@@ -2397,17 +2450,48 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         {/* Interactive Rebook / Reschedule tool buttons */}
                         <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
                           <button 
-                            onClick={() => {
-                              // Simulate adding a duplicate booking
-                              const clonedApt: Appointment = {
-                                ...activeAppointment,
-                                id: `apt-clone-${Date.now()}`,
-                                startTime: activeAppointment.startTime + 120, // Cloned offset
-                                status: 'confirmed',
-                                paymentStatus: 'unpaid'
-                              };
-                              setAppointments(prev => [...prev, clonedApt]);
-                              alert(isRtl ? 'تمت إضافة موعد مكرر بنجاح على الجدول بعد ساعتين!' : 'Service cloned successfully onto scheduled board +2 hours later!');
+                            onClick={async () => {
+                              const serviceId = activeAppointment.serviceId;
+                              if (!serviceId) {
+                                addLocalToast(
+                                  isRtl ? 'تعذر تكرار الموعد لأن الخدمة الأصلية غير متاحة.' : 'Unable to duplicate appointment because the source service is missing.',
+                                  isRtl ? 'Unable to duplicate appointment because the source service is missing.' : 'تعذر تكرار الموعد لأن الخدمة الأصلية غير متاحة.',
+                                  'warning'
+                                );
+                                return;
+                              }
+
+                              const baseDate = activeAppointment.date || getSelectedDateKey();
+                              const duplicateStart = buildIsoFromMinutes(baseDate, activeAppointment.startTime + 120);
+                              try {
+                                const response = await tenantApiAdapter.createAppointment({
+                                  serviceId,
+                                  staffId: activeAppointment.staffId,
+                                  startTime: duplicateStart,
+                                  notes: activeAppointment.notes,
+                                  notifyCustomer: false,
+                                  assignmentMode: 'tenant_reassigned',
+                                  customer: activeAppointment.customerId ? null : undefined,
+                                  platformUserId: activeAppointment.customerId || undefined
+                                });
+                                if (response?.success) {
+                                  await loadBoardData();
+                                  addLocalToast(
+                                    isRtl ? 'تمت إضافة نسخة جديدة من الموعد بعد ساعتين.' : 'Duplicate appointment created two hours later.',
+                                    isRtl ? 'Duplicate appointment created two hours later.' : 'تمت إضافة نسخة جديدة من الموعد بعد ساعتين.',
+                                    'success'
+                                  );
+                                } else {
+                                  throw new Error(response?.message || 'Failed to duplicate appointment');
+                                }
+                              } catch (err: any) {
+                                console.error('Failed to duplicate appointment', err);
+                                addLocalToast(
+                                  isRtl ? 'تعذر إنشاء النسخة المكررة.' : 'Unable to create duplicate appointment.',
+                                  isRtl ? 'Unable to create duplicate appointment.' : 'تعذر إنشاء النسخة المكررة.',
+                                  'warning'
+                                );
+                              }
                             }}
                             className="py-2 border border-slate-200 hover:border-zinc-900 hover:bg-zinc-900 hover:text-white bg-white rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
@@ -2416,10 +2500,28 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           </button>
                           
                           <button 
-                            onClick={() => {
-                              // Cancel simulation
-                              setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, status: 'cancelled' } : a));
-                              setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                            onClick={async () => {
+                              try {
+                                const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, 'cancelled', activeAppointment.notes);
+                                if (response?.success) {
+                                  await loadBoardData();
+                                  setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                                  addLocalToast(
+                                    isRtl ? 'تم إلغاء الموعد وحفظ الحالة على الخادم.' : 'Appointment cancelled and synced to the server.',
+                                    isRtl ? 'Appointment cancelled and synced to the server.' : 'تم إلغاء الموعد وحفظ الحالة على الخادم.',
+                                    'success'
+                                  );
+                                } else {
+                                  throw new Error(response?.message || 'Failed to cancel appointment');
+                                }
+                              } catch (err) {
+                                console.error('Failed to cancel appointment', err);
+                                addLocalToast(
+                                  isRtl ? 'تعذر إلغاء الموعد.' : 'Unable to cancel appointment.',
+                                  isRtl ? 'Unable to cancel appointment.' : 'تعذر إلغاء الموعد.',
+                                  'warning'
+                                );
+                              }
                             }}
                             className="py-2 border border-rose-200 hover:border-rose-500 hover:bg-rose-50 bg-white rounded-lg text-xs font-bold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
@@ -2497,15 +2599,29 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
                           <select
                             value={activeAppointment.staffId}
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const newStaffId = e.target.value;
-                              setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, staffId: newStaffId } : a));
-                              setActiveAppointment(prev => prev ? { ...prev, staffId: newStaffId } : null);
-                              addLocalToast(
-                                'تمت إعادة تعيين أخصائية التجميل بنجاح!',
-                                'Stylist successfully reassigned for this session!',
-                                'success'
-                              );
+                              try {
+                                const response = await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, newStaffId);
+                                if (response?.success) {
+                                  await loadBoardData();
+                                  setActiveAppointment(prev => prev ? { ...prev, staffId: newStaffId } : null);
+                                  addLocalToast(
+                                    'تمت إعادة تعيين أخصائية التجميل بنجاح!',
+                                    'Stylist successfully reassigned for this session!',
+                                    'success'
+                                  );
+                                } else {
+                                  throw new Error(response?.message || 'Failed to reassign stylist');
+                                }
+                              } catch (err) {
+                                console.error('Failed to reassign stylist', err);
+                                addLocalToast(
+                                  isRtl ? 'تعذر إعادة تعيين الموظفة.' : 'Unable to reassign stylist.',
+                                  isRtl ? 'Unable to reassign stylist.' : 'تعذر إعادة تعيين الموظفة.',
+                                  'warning'
+                                );
+                              }
                             }}
                             className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 cursor-pointer focus:ring-1 focus:ring-amber-500 outline-none"
                           >
@@ -2519,20 +2635,38 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-1">
                             <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
-                            <select
-                              value={activeAppointment.startTime}
-                              onChange={(e) => {
-                                const newTime = parseInt(e.target.value);
-                                setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, startTime: newTime } : a));
-                                setActiveAppointment(prev => prev ? { ...prev, startTime: newTime } : null);
+                          <select
+                            value={activeAppointment.startTime}
+                            onChange={async (e) => {
+                              const newTime = parseInt(e.target.value);
+                              try {
+                                const response = await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
+                                  staffId: activeAppointment.staffId,
+                                  startTime: buildIsoFromMinutes(activeAppointment.date || getSelectedDateKey(), newTime),
+                                  notifyCustomer: true
+                                });
+                                if (response?.success) {
+                                  await loadBoardData();
+                                  setActiveAppointment(prev => prev ? { ...prev, startTime: newTime } : null);
+                                  addLocalToast(
+                                    'تم تغيير موعد البدء بنجاح!',
+                                    'Appointment start time successfully updated!',
+                                    'success'
+                                  );
+                                } else {
+                                  throw new Error(response?.message || 'Failed to reschedule appointment');
+                                }
+                              } catch (err) {
+                                console.error('Failed to reschedule appointment', err);
                                 addLocalToast(
-                                  'تم تغيير موعد البدء بنجاح!',
-                                  'Appointment start time successfully updated!',
-                                  'success'
+                                  isRtl ? 'تعذر تعديل التوقيت.' : 'Unable to reschedule appointment.',
+                                  isRtl ? 'Unable to reschedule appointment.' : 'تعذر تعديل التوقيت.',
+                                  'warning'
                                 );
-                              }}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 cursor-pointer focus:ring-1 focus:ring-amber-500 outline-none"
-                            >
+                              }
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 cursor-pointer focus:ring-1 focus:ring-amber-500 outline-none"
+                          >
                               {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => {
                                 const totalMins = idx * 15;
                                 return (
@@ -2546,18 +2680,36 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
                           <div className="space-y-1">
                             <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
-                            <input
+                          <input
                               type="date"
                               value={activeAppointment.date || '2026-06-28'}
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 const newDateStr = e.target.value;
-                                setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, date: newDateStr } : a));
-                                setActiveAppointment(prev => prev ? { ...prev, date: newDateStr } : null);
-                                addLocalToast(
-                                  'تم تحديث تاريخ الحجز بنجاح!',
-                                  'Booking session date successfully updated!',
-                                  'success'
-                                );
+                                try {
+                                  const response = await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
+                                    staffId: activeAppointment.staffId,
+                                    startTime: buildIsoFromMinutes(newDateStr, activeAppointment.startTime),
+                                    notifyCustomer: true
+                                  });
+                                  if (response?.success) {
+                                    await loadBoardData();
+                                    setActiveAppointment(prev => prev ? { ...prev, date: newDateStr } : null);
+                                    addLocalToast(
+                                      'تم تحديث تاريخ الحجز بنجاح!',
+                                      'Booking session date successfully updated!',
+                                      'success'
+                                    );
+                                  } else {
+                                    throw new Error(response?.message || 'Failed to update booking date');
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to update booking date', err);
+                                  addLocalToast(
+                                    isRtl ? 'تعذر تحديث تاريخ الحجز.' : 'Unable to update booking date.',
+                                    isRtl ? 'Unable to update booking date.' : 'تعذر تحديث تاريخ الحجز.',
+                                    'warning'
+                                  );
+                                }
                               }}
                               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none"
                             />
@@ -3031,6 +3183,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         initialCreateMode={initialCreateMode}
         initialCartTab={initialCartTab}
         selectedDate={selectedDate}
+        onBoardChanged={loadBoardData}
       />
 
       {/* Render Roster / Employee Weekly Schedule Editor Modal */}
@@ -3044,6 +3197,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           : (liveStylists.find(s => s.id === selectedShiftStaffId)?.nameEn || selectedShiftStaffId)
         }
         addLocalToast={addLocalToast}
+        onBoardChanged={loadBoardData}
       />
 
       {/* SIMULATED THERMAL RECEIPT MODAL FOR APPOINTMENT CHECKOUT */}

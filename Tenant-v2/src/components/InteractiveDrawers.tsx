@@ -5,6 +5,7 @@ import {
   Trash, ChevronLeft, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle
 } from 'lucide-react';
 import { mockCustomers, mockServices, mockProducts } from '../data/mockData';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 // Reusable STYLISTS definitions matching those in Workspace
 const STYLISTS = [
@@ -31,6 +32,7 @@ interface InteractiveDrawersProps {
   initialCreateMode?: 'appointment' | 'blocked';
   initialCartTab?: 'products' | 'giftcards';
   selectedDate: Date;
+  onBoardChanged?: () => Promise<void> | void;
 }
 
 export interface GuestService {
@@ -99,7 +101,8 @@ export default function InteractiveDrawers({
   setCurrentStaffId,
   initialCreateMode,
   initialCartTab,
-  selectedDate
+  selectedDate,
+  onBoardChanged
 }: InteractiveDrawersProps) {
   
   // Create Modal Step
@@ -316,6 +319,21 @@ export default function InteractiveDrawers({
   // Receipt printed preview modal
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
 
+  const buildIsoFromMinutes = (date: Date, minutesFromNine: number) => {
+    const dateKey = date.toISOString().split('T')[0];
+    const safeMinutes = Math.max(0, Math.round(minutesFromNine));
+    const next = new Date(`${dateKey}T00:00:00`);
+    next.setHours(9 + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
+    return next.toISOString();
+  };
+
+  const buildClockTime = (minutesFromNine: number) => {
+    const absoluteMinutes = 9 * 60 + Math.max(0, Math.round(minutesFromNine));
+    const hours = Math.floor(absoluteMinutes / 60);
+    const minutes = absoluteMinutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  };
+
   // Auto pre-populate duration when service changes
   useEffect(() => {
     const srv = mockServices.find(s => s.id === currentServiceId);
@@ -354,7 +372,7 @@ export default function InteractiveDrawers({
     );
   };
 
-  const handleConfirmAppointmentCreation = () => {
+  const handleConfirmAppointmentCreation = async () => {
     let custNameEn = '';
     let custNameAr = '';
     let custPhone = '';
@@ -465,86 +483,118 @@ export default function InteractiveDrawers({
 
     const finalPrice = Math.max(0, totalRawPrice + guestAddonsPrice);
 
-    const newApt = {
-      id: `apt-created-${Date.now()}`,
-      customerNameEn: custNameEn,
-      customerNameAr: custNameAr,
-      serviceNameEn: serviceNamesEn.join(' + '),
-      serviceNameAr: serviceNamesAr.join(' + '),
+    const appointmentDateKey = selectedDate.toISOString().split('T')[0];
+    const items = finalStaged.map((item) => {
+      const service = mockServices.find(s => s.id === item.serviceId);
+      return {
+        serviceId: item.serviceId,
+        staffId: item.staffId,
+        startTime: buildIsoFromMinutes(selectedDate, item.startTime),
+        notes: item.notes || undefined,
+        duration: item.duration,
+        discountType: item.discountType,
+        discountValue: item.discountValue,
+        paymentMethod: createSplitActive || giftCardCodeInput ? 'paid' : 'unpaid',
+        assignmentMode: 'tenant_reassigned',
+        serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined
+      };
+    });
+
+    const payload = {
+      items,
       staffId: firstStaffId,
-      startTime: earliestStartTime,
-      duration: totalDuration,
-      status: 'confirmed',
-      paymentStatus: createSplitActive || giftCardCodeInput ? 'paid' : 'unpaid',
-      isGroupBooking: includeGroupGuests,
-      guestCount: includeGroupGuests ? guestCount : undefined,
-      guestsDetails: includeGroupGuests ? guestsList : undefined,
-      date: selectedDate.toISOString().split('T')[0],
-      hasNotes: sessionNotes !== '' || finalStaged.some(s => s.notes !== '') || (includeGroupGuests && guestsList.some(g => g.notes !== '')),
+      startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
       notes: sessionNotes || [
         ...finalStaged.map(s => s.notes),
         ...(includeGroupGuests ? guestsList.map(g => g.notes ? `${g.name}: ${g.notes}` : '') : [])
       ].filter(Boolean).join(' | '),
-      price: finalPrice,
-      tags: custMode === 'new' && newCustIsVip ? ['VIP', 'New'] : ['Live Booked'],
-      customerPhone: custPhone,
-      customerEmail: custEmail,
-      loyaltyTier: loyalty,
-      walletBalance: balance,
-      type: 'appointment',
-      serviceCategory: 'spa'
+      assignmentMode: 'tenant_reassigned',
+      notifyCustomer: notifyWhatsApp,
+      paymentMethod: createSplitActive || giftCardCodeInput ? 'paid' : 'unpaid',
+      paymentAllocations: createSplitActive
+        ? Object.entries(createSplitAmounts)
+            .filter(([, amount]) => Number(amount) > 0)
+            .map(([paymentMethod, amount]) => ({ paymentMethod, amount: Number(amount) }))
+        : undefined,
+      platformUserId: custMode === 'existing' ? selectedCustId : undefined,
+      customer: custMode === 'new' || custMode === 'walkin'
+        ? {
+            firstName: custNameEn.trim(),
+            lastName: '',
+            email: custEmail.trim(),
+            phone: custPhone.trim()
+          }
+        : null
     };
 
-    setAppointments(prev => [...prev, newApt]);
-    setIsCreateDrawerOpen(false);
-    
-    // Reset fields
-    setStagedServices([]);
-    setCreateStep(1);
-    setNewCustName('');
-    setNewCustPhone('');
-    setNewCustEmail('');
-    setSessionNotes('');
-    setGiftCardCodeInput('');
-    setCreateSplitActive(false);
-    setGuestsList([{ id: 'g-1', name: '', phone: '', services: [{ id: 'gs-1-1', serviceId: 'SRV-001', serviceName: 'Premium Manicure & Pedicure', serviceNameAr: 'باديكير ومانيكير فاخر', price: 150, discountType: 'none', discountValue: 0, finalPrice: 150, isFree: false, staffId: 'STF-001' }], notes: '', isFree: false }]);
-    setIncludeGroupGuests(false);
-    setGuestCount(1);
-
-    addLocalToast(
-      `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
-      `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
-      'success'
-    );
+    try {
+      const response = await tenantApiAdapter.createAppointment(payload);
+      if (!response?.success) {
+        throw new Error(response?.message || 'Failed to create appointment');
+      }
+      setIsCreateDrawerOpen(false);
+      setStagedServices([]);
+      setCreateStep(1);
+      setNewCustName('');
+      setNewCustPhone('');
+      setNewCustEmail('');
+      setSessionNotes('');
+      setGiftCardCodeInput('');
+      setCreateSplitActive(false);
+      setGuestsList([{ id: 'g-1', name: '', phone: '', services: [{ id: 'gs-1-1', serviceId: 'SRV-001', serviceName: 'Premium Manicure & Pedicure', serviceNameAr: 'باديكير ومانيكير فاخر', price: 150, discountType: 'none', discountValue: 0, finalPrice: 150, isFree: false, staffId: 'STF-001' }], notes: '', isFree: false }]);
+      setIncludeGroupGuests(false);
+      setGuestCount(1);
+      if (onBoardChanged) {
+        await onBoardChanged();
+      }
+      addLocalToast(
+        `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
+        `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to create appointment', err);
+      addLocalToast(
+        'تعذر إنشاء الموعد الجديد',
+        'Failed to create appointment',
+        'warning'
+      );
+    }
   };
 
-  const handleConfirmBlockCreation = () => {
-    const newBlock = {
-      id: `block-created-${Date.now()}`,
-      customerNameEn: blockTitleEn.toUpperCase(),
-      customerNameAr: blockTitleAr,
-      serviceNameEn: 'Reserved Operational Block Interval',
-      serviceNameAr: 'فترة حظر زمني محددة للصيانة/الراحة',
-      staffId: blockStaffId,
-      startTime: blockStartTime,
-      duration: blockDuration,
-      status: 'confirmed',
-      paymentStatus: 'paid',
-      isGroupBooking: false,
-      hasNotes: false,
-      price: 0,
-      tags: ['Blocked', blockType],
-      type: 'blocked',
-      blockedType: blockType
-    };
+  const handleConfirmBlockCreation = async () => {
+    try {
+      const response = await tenantApiAdapter.createEmployeeBreak(blockStaffId, {
+        specificDate: selectedDate.toISOString().split('T')[0],
+        startTime: buildClockTime(blockStartTime),
+        endTime: buildClockTime(blockStartTime + blockDuration),
+        type: (blockType === 'Meeting' ? 'other' : blockType.toLowerCase() as any),
+        label: blockTitleEn,
+        isRecurring: false,
+        referenceDate: selectedDate.toISOString().split('T')[0]
+      });
 
-    setAppointments(prev => [...prev, newBlock]);
-    setIsCreateDrawerOpen(false);
-    addLocalToast(
-      `تم حظر الفترة الزمنية (${blockTitleAr}) بنجاح للأخصائية المعنية`,
-      `Successfully blocked time (${blockTitleEn}) for the stylist`,
-      'success'
-    );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Failed to create blocked time');
+      }
+
+      setIsCreateDrawerOpen(false);
+      if (onBoardChanged) {
+        await onBoardChanged();
+      }
+      addLocalToast(
+        `تم حظر الفترة الزمنية (${blockTitleAr}) بنجاح للأخصائية المعنية`,
+        `Successfully blocked time (${blockTitleEn}) for the stylist`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to create blocked time', err);
+      addLocalToast(
+        'تعذر حفظ فترة الحظر',
+        'Failed to create blocked time',
+        'warning'
+      );
+    }
   };
 
   const handleRegenerateGiftCardCode = () => {
@@ -622,7 +672,7 @@ export default function InteractiveDrawers({
     ));
   };
 
-  const handleProcessPosCheckout = () => {
+  const handleProcessPosCheckout = async () => {
     if (cartItems.length === 0) {
       addLocalToast('سلة المبيعات فارغة، لا يمكن إتمام عملية الشراء', 'Sales cart is empty. Cannot checkout', 'warning');
       return;
@@ -663,6 +713,10 @@ export default function InteractiveDrawers({
     setCartItems([]);
     setPosSplitActive(false);
     setPosSplitAmounts({ card: 0, cash: 0, wallet: 0 });
+
+    if (onBoardChanged) {
+      await onBoardChanged();
+    }
 
     addLocalToast(
       'تمت فوترة المبيعات وتأكيد السداد بنجاح! 🧾',

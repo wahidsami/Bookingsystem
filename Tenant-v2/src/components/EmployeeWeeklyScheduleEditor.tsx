@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Calendar, Clock, Plus, Trash2, Check, AlertCircle, Save, Info, Sparkles
 } from 'lucide-react';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface SubShift {
   id: string;
@@ -29,6 +30,7 @@ interface EmployeeWeeklyScheduleEditorProps {
   staffName: string;
   addLocalToast: (msgAr: string, msgEn: string, type?: 'success' | 'info' | 'warning') => void;
   onSave?: (updatedShifts: DailySchedule[]) => void;
+  onBoardChanged?: () => Promise<void> | void;
 }
 
 const DEFAULT_WEEKLY_DAYS: Omit<DailySchedule, 'subShifts'>[] = [
@@ -41,6 +43,32 @@ const DEFAULT_WEEKLY_DAYS: Omit<DailySchedule, 'subShifts'>[] = [
   { dayOfWeek: 6, dayEn: 'Saturday', dayAr: 'السبت', status: 'working', startTime: '10:00 AM', endTime: '06:00 PM' },
 ];
 
+function to24HourTime(value: string) {
+  const match = `${value || ''}`.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) {
+    const raw = `${value || ''}`.trim();
+    return raw.length >= 5 ? raw.slice(0, 5) : raw;
+  }
+
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, '0')}:${minutes}`;
+}
+
+function to12HourTime(value: string) {
+  const raw = `${value || ''}`.trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return raw;
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${suffix}`;
+}
+
 export default function EmployeeWeeklyScheduleEditor({
   isOpen,
   onClose,
@@ -48,7 +76,8 @@ export default function EmployeeWeeklyScheduleEditor({
   staffId,
   staffName,
   addLocalToast,
-  onSave
+  onSave,
+  onBoardChanged
 }: EmployeeWeeklyScheduleEditorProps) {
   const [scheduleType, setScheduleType] = useState<'recurring' | 'onetime'>('recurring');
   const [schedule, setSchedule] = useState<DailySchedule[]>([]);
@@ -59,29 +88,58 @@ export default function EmployeeWeeklyScheduleEditor({
 
   // Load shifts for this staff member
   useEffect(() => {
-    if (isOpen) {
-      // In a real application, we would call GET /api/v1/tenant/employees/:id/shifts
-      // Here we pre-populate with mock details specific to the selected staff member
-      const initialSchedule: DailySchedule[] = DEFAULT_WEEKLY_DAYS.map(d => {
-        let status = d.status;
-        let subShifts: SubShift[] = [];
-        
-        // Let's customize Nadeen's schedule (st-1) to have a sub-shift as an example of loaded data
-        if (staffId === 'st-1' && d.dayOfWeek === 1) {
-          subShifts = [
-            { id: 'sub-1', label: 'Morning Shift', startTime: '09:00 AM', endTime: '01:00 PM' },
-            { id: 'sub-2', label: 'Restock & Prep', startTime: '01:00 PM', endTime: '02:00 PM' }
-          ];
+    if (!isOpen) return;
+
+    const loadLiveSchedule = async () => {
+      try {
+        const response = await tenantApiAdapter.getEmployeeShifts(staffId);
+        const shifts = Array.isArray(response?.shifts)
+          ? response.shifts
+          : Array.isArray(response?.data?.shifts)
+            ? response.data.shifts
+            : [];
+
+        if (shifts.length === 0) {
+          setSchedule(DEFAULT_WEEKLY_DAYS.map((day) => ({ ...day, subShifts: [] })));
+          return;
         }
-        
-        return {
-          ...d,
-          status,
-          subShifts
-        };
-      });
-      setSchedule(initialSchedule);
-    }
+
+        const initialSchedule: DailySchedule[] = DEFAULT_WEEKLY_DAYS.map((day) => {
+          const dayShifts = shifts
+            .filter((shift: any) => shift.dayOfWeek === day.dayOfWeek && shift.isActive !== false)
+            .sort((a: any, b: any) => `${a.startTime || ''}`.localeCompare(`${b.startTime || ''}`));
+
+          if (dayShifts.length === 0) {
+            return {
+              ...day,
+              status: 'off',
+              subShifts: []
+            };
+          }
+
+          const [primary, ...rest] = dayShifts;
+          return {
+            ...day,
+            status: 'working',
+            startTime: to12HourTime(primary.startTime || day.startTime),
+            endTime: to12HourTime(primary.endTime || day.endTime),
+            subShifts: rest.map((shift: any, index: number) => ({
+              id: shift.id || `sub-${day.dayOfWeek}-${index}`,
+              label: (shift.label as SubShift['label']) || 'Morning Shift',
+              startTime: to12HourTime(shift.startTime || day.startTime),
+              endTime: to12HourTime(shift.endTime || day.endTime)
+            }))
+          };
+        });
+
+        setSchedule(initialSchedule);
+      } catch (err) {
+        console.warn('Failed to load live weekly schedule, using defaults:', err);
+        setSchedule(DEFAULT_WEEKLY_DAYS.map((day) => ({ ...day, subShifts: [] })));
+      }
+    };
+
+    void loadLiveSchedule();
   }, [isOpen, staffId]);
 
   const handleToggleDay = (idx: number) => {
@@ -155,13 +213,53 @@ export default function EmployeeWeeklyScheduleEditor({
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    
-    // Simulate API calls:
-    // PUT /api/v1/tenant/employees/:id/shifts/:shiftId
-    // POST /api/v1/tenant/employees/:id/shifts
-    setTimeout(() => {
+    try {
+      const existingResponse = await tenantApiAdapter.getEmployeeShifts(staffId);
+      const existingShifts = Array.isArray(existingResponse?.shifts)
+        ? existingResponse.shifts
+        : Array.isArray(existingResponse?.data?.shifts)
+          ? existingResponse.data.shifts
+          : [];
+
+      await Promise.allSettled(existingShifts.map((shift: any) => tenantApiAdapter.deleteEmployeeShift(staffId, shift.id)));
+
+      const saveTasks: Promise<any>[] = [];
+      schedule.forEach((day) => {
+        if (day.status !== 'working') return;
+
+        const baseShift = {
+          dayOfWeek: day.dayOfWeek,
+          specificDate: null,
+          startTime: to24HourTime(day.startTime),
+          endTime: to24HourTime(day.endTime),
+          isRecurring: scheduleType === 'recurring',
+          startDate: scheduleType === 'recurring' ? (startDate || null) : null,
+          endDate: scheduleType === 'recurring' ? (endDate || null) : null,
+          label: `${staffName} Shift`
+        };
+
+        saveTasks.push(tenantApiAdapter.createEmployeeShift(staffId, {
+          ...baseShift,
+          specificDate: scheduleType === 'onetime' ? (startDate || null) : null
+        }));
+
+        day.subShifts.forEach((subShift) => {
+          saveTasks.push(tenantApiAdapter.createEmployeeShift(staffId, {
+            dayOfWeek: day.dayOfWeek,
+            specificDate: null,
+            startTime: to24HourTime(subShift.startTime),
+            endTime: to24HourTime(subShift.endTime),
+            isRecurring: scheduleType === 'recurring',
+            startDate: scheduleType === 'recurring' ? (startDate || null) : null,
+            endDate: scheduleType === 'recurring' ? (endDate || null) : null,
+            label: subShift.label
+          }));
+        });
+      });
+
+      await Promise.all(saveTasks);
       setIsSaving(false);
       addLocalToast(
         `تم تحديث وحفظ شيفتات عمل ${staffName} بنجاح ومزامنة الجدول!`,
@@ -171,8 +269,19 @@ export default function EmployeeWeeklyScheduleEditor({
       if (onSave) {
         onSave(schedule);
       }
+      if (onBoardChanged) {
+        await onBoardChanged();
+      }
       onClose();
-    }, 800);
+    } catch (err) {
+      console.error('Failed to save weekly shifts', err);
+      setIsSaving(false);
+      addLocalToast(
+        `تعذر حفظ جدول عمل ${staffName}`,
+        `Failed to save weekly schedule for ${staffName}`,
+        'warning'
+      );
+    }
   };
 
   // Summaries
