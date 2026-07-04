@@ -13,6 +13,7 @@ import { api } from '../api/client';
 import { getImageUrl } from '../api/client';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { parseGroupGuestFromNotes } from '../utils/groupGuest';
 
 type BookingGroup = {
   key: string;
@@ -26,34 +27,12 @@ type BookingGroup = {
   payableNowTotal: number;
 };
 
-type GroupGuestMeta = {
-  fullName: string;
-  phone?: string | null;
-};
-
 type AppointmentAuditEvent = {
   id: string;
   type: 'rescheduled' | 'cancelled';
   at: string;
   title: string;
   subtitle: string;
-};
-
-const parseGroupGuestFromNotes = (notes?: string | null): GroupGuestMeta | null => {
-  if (!notes) return null;
-  const markerPrefix = '[GROUP_GUEST]';
-  const lines = `${notes}`.split('\n').map((line) => line.trim()).filter(Boolean);
-  const markerLine = lines.find((line) => line.startsWith(markerPrefix));
-  if (!markerLine) return null;
-  const jsonPart = markerLine.slice(markerPrefix.length).trim();
-  if (!jsonPart) return null;
-  try {
-    const parsed = JSON.parse(jsonPart) as GroupGuestMeta;
-    if (!parsed?.fullName || !`${parsed.fullName}`.trim()) return null;
-    return { fullName: `${parsed.fullName}`.trim(), phone: parsed.phone ? `${parsed.phone}`.trim() : null };
-  } catch {
-    return null;
-  }
 };
 
 const extractAuditJsonEntries = (notes: string | null | undefined, marker: string): any[] => {
@@ -475,9 +454,11 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
           {guest ? (
             <View style={styles.guestCard}>
-            <Text style={styles.sectionTitle}>{language === 'ar' ? 'بيانات الضيف' : 'Guest Information'}</Text>
-            <Text style={styles.guestName}>{guest.fullName}</Text>
-            {!!guest.phone && <Text style={styles.guestPhone}>{guest.phone}</Text>}
+              <Text style={styles.sectionTitle}>{language === 'ar' ? 'بيانات الضيف' : 'Guest Information'}</Text>
+              <Text style={styles.guestName}>{guest.fullName}</Text>
+              {!!guest.phone && <Text style={styles.guestPhone}>{guest.phone}</Text>}
+              {!!guest.email && <Text style={styles.guestPhone}>{guest.email}</Text>}
+              {!!guest.birthDate && <Text style={styles.guestPhone}>{guest.birthDate}</Text>}
             </View>
           ) : null}
 

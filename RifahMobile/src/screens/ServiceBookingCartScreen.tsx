@@ -24,9 +24,14 @@ export function ServiceBookingCartScreen({ navigation }: any) {
     const sharedBookingReference = items.length > 0
         ? items[0].bookingReference || null
         : null;
+    const sharedGroupGuest = items.length > 0
+        ? items[0].groupGuest || null
+        : null;
     const hasSharedBookingSession = items.length > 0
         && items.every((item) => (item.bookingSessionId || null) === sharedBookingSessionId)
         && items.every((item) => (item.bookingReference || null) === sharedBookingReference);
+    const hasSharedGroupGuest = items.length > 0
+        && items.every((item) => JSON.stringify(item.groupGuest || null) === JSON.stringify(sharedGroupGuest));
 
     const groupedByPayment = useMemo(() => paymentGroups.filter((group) => group.count > 0), [paymentGroups]);
 
@@ -83,6 +88,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                 tenantId: cartTenantId || items[0]?.tenantId,
                 bookingSessionId: hasSharedBookingSession && sharedBookingSessionId ? sharedBookingSessionId : undefined,
                 bookingReference: hasSharedBookingSession && sharedBookingReference ? sharedBookingReference : undefined,
+                groupGuest: hasSharedGroupGuest ? sharedGroupGuest || undefined : undefined,
                 items: items.map((item) => ({
                     serviceId: item.service.id,
                     variantId: item.variant?.id || null,

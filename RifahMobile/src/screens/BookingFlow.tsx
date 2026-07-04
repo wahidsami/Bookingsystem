@@ -12,6 +12,7 @@ import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { ServiceBookingCartItem, useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { buildGroupGuestPayload } from '../utils/groupGuest';
 
 interface BookingProps {
     route: any;
@@ -91,7 +92,9 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const [includeGuest, setIncludeGuest] = useState(false);
     const [guestFirstName, setGuestFirstName] = useState('');
     const [guestLastName, setGuestLastName] = useState('');
+    const [guestEmail, setGuestEmail] = useState('');
     const [guestPhone, setGuestPhone] = useState('');
+    const [guestBirthDate, setGuestBirthDate] = useState('');
     const [paymentSettings, setPaymentSettings] = useState(tenant?.paymentSettings || DEFAULT_BOOKING_PAYMENT_SETTINGS);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<ServicePaymentChoice>('at-center');
     const editingCartItemId: string | null = route.params?.cartItemId || null;
@@ -332,6 +335,20 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             return;
         }
 
+        const groupGuest = includeGuest
+            ? buildGroupGuestPayload({
+                firstName: guestFirstName,
+                lastName: guestLastName,
+                email: guestEmail,
+                phone: guestPhone,
+                birthDate: guestBirthDate,
+                serviceId: service.id,
+                serviceName: language === 'ar' ? service.name_ar : service.name_en,
+                serviceIds: [service.id],
+                isFree: false,
+            })
+            : null;
+
         try {
             setLoading(true);
             const response = await api.post<{ success: boolean; appointment: { id: string; bookingNumber?: string | null; price: number } }>('/bookings/create', {
@@ -345,11 +362,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                 variantId: selectedVariant?.id || undefined,
                 bookingSessionId: bookingSessionId || undefined,
                 bookingReference: bookingReference || undefined,
-                groupGuest: includeGuest ? {
-                    firstName: guestFirstName.trim(),
-                    lastName: guestLastName.trim(),
-                    phone: guestPhone.trim() || undefined
-                } : undefined
+                groupGuest: groupGuest || undefined
             });
 
             const appointmentId = response.appointment?.id;
@@ -440,6 +453,17 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             paymentMethod: selectedPaymentMethod,
             bookingSessionId: bookingSessionId || undefined,
             bookingReference: bookingReference || undefined,
+            groupGuest: includeGuest ? buildGroupGuestPayload({
+                firstName: guestFirstName,
+                lastName: guestLastName,
+                email: guestEmail,
+                phone: guestPhone,
+                birthDate: guestBirthDate,
+                serviceId: service.id,
+                serviceName: language === 'ar' ? service.name_ar : service.name_en,
+                serviceIds: [service.id],
+                isFree: false,
+            }) : null,
             totalPrice: servicePrice,
             payableNowAmount: selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : selectedPaymentMethod === 'online-full' ? servicePrice : 0,
         };
@@ -675,11 +699,27 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                         />
                         <TextInput
                             style={styles.noteInput}
+                            value={guestEmail}
+                            onChangeText={setGuestEmail}
+                            placeholder={language === 'ar' ? 'البريد الإلكتروني للضيف (اختياري)' : 'Guest email (optional)'}
+                            placeholderTextColor={colors.textSecondary}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
+                        <TextInput
+                            style={styles.noteInput}
                             value={guestPhone}
                             onChangeText={setGuestPhone}
                             placeholder={language === 'ar' ? 'جوال الضيف (اختياري)' : 'Guest phone (optional)'}
                             placeholderTextColor={colors.textSecondary}
                             keyboardType="phone-pad"
+                        />
+                        <TextInput
+                            style={styles.noteInput}
+                            value={guestBirthDate}
+                            onChangeText={setGuestBirthDate}
+                            placeholder={language === 'ar' ? 'تاريخ الميلاد (YYYY-MM-DD) اختياري' : 'Birth date (YYYY-MM-DD) optional'}
+                            placeholderTextColor={colors.textSecondary}
                         />
                     </View>
                 ) : null}

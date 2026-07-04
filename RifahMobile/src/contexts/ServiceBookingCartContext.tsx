@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Service, ServiceVariant, Staff, Tenant } from '../api/client';
+import { GroupGuestPayload } from '../utils/groupGuest';
 
 export type ServiceBookingPaymentMethod = 'at-center' | 'online-full' | 'booking-fee';
 
@@ -15,6 +16,7 @@ export interface ServiceBookingCartItem {
     staffId?: string | null;
     bookingSessionId?: string | null;
     bookingReference?: string | null;
+    groupGuest?: GroupGuestPayload | null;
     startTime: string;
     notes?: string;
     paymentMethod: ServiceBookingPaymentMethod;

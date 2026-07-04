@@ -25,6 +25,7 @@ import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
 import { LinearGradient } from 'expo-linear-gradient';
+import { parseGroupGuestFromNotes } from '../utils/groupGuest';
 
 interface BookingGroup {
     key: string;
@@ -37,11 +38,6 @@ interface BookingGroup {
     totalPrice: number;
     payableNowTotal: number;
 }
-
-type GroupGuestMeta = {
-    fullName: string;
-    phone?: string | null;
-};
 
 export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
@@ -59,26 +55,6 @@ export function BookingsScreen({ navigation }: any) {
     const [rescheduleDate, setRescheduleDate] = useState('');
     const [rescheduleTime, setRescheduleTime] = useState('');
     const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
-
-    const parseGroupGuestFromNotes = (notes?: string | null): GroupGuestMeta | null => {
-        if (!notes) return null;
-        const markerPrefix = '[GROUP_GUEST]';
-        const lines = `${notes}`.split('\n').map((line) => line.trim()).filter(Boolean);
-        const markerLine = lines.find((line) => line.startsWith(markerPrefix));
-        if (!markerLine) return null;
-        const jsonPart = markerLine.slice(markerPrefix.length).trim();
-        if (!jsonPart) return null;
-        try {
-            const parsed = JSON.parse(jsonPart) as GroupGuestMeta;
-            if (!parsed?.fullName || !`${parsed.fullName}`.trim()) return null;
-            return {
-                fullName: `${parsed.fullName}`.trim(),
-                phone: parsed.phone ? `${parsed.phone}`.trim() : null,
-            };
-        } catch {
-            return null;
-        }
-    };
 
     useFocusEffect(
         React.useCallback(() => {
@@ -332,7 +308,12 @@ export function BookingsScreen({ navigation }: any) {
                     {groupGuest && activeTab === 'upcoming' && (
                         <View style={styles.staffRow}>
                             <Text style={styles.staffLabel}>{language === 'ar' ? 'الضيف' : 'Guest'}: </Text>
-                            <Text style={styles.staffName}>{groupGuest.fullName}</Text>
+                            <Text style={styles.staffName}>
+                                {groupGuest.fullName}
+                                {groupGuest.phone ? ` · ${groupGuest.phone}` : ''}
+                                {groupGuest.email ? ` · ${groupGuest.email}` : ''}
+                                {groupGuest.birthDate ? ` · ${groupGuest.birthDate}` : ''}
+                            </Text>
                         </View>
                     )}
                 </View>
@@ -850,7 +831,7 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(17, 24, 39, 0.55)',
+        backgroundColor: 'rgba(18, 13, 33, 0.55)',
         justifyContent: 'flex-end',
     },
     modalTitle: {
@@ -862,9 +843,16 @@ const styles = StyleSheet.create({
         width: '90%',
         alignSelf: 'center',
         backgroundColor: '#FFFFFF',
-        borderRadius: 18,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: '#E9DDFD',
         padding: spacing.lg,
         marginBottom: spacing.xl,
+        shadowColor: '#1F123F',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.18,
+        shadowRadius: 18,
+        elevation: 8,
     },
     rescheduleHint: {
         fontSize: fontSize.sm,
@@ -873,10 +861,11 @@ const styles = StyleSheet.create({
     },
     rescheduleInput: {
         borderWidth: 1,
-        borderColor: '#E7DFFA',
+        borderColor: '#E9DDFD',
         borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
+        backgroundColor: '#FAFAFF',
         color: colors.text,
         marginBottom: spacing.sm,
     },
@@ -889,11 +878,11 @@ const styles = StyleSheet.create({
     },
     rescheduleCancelBtn: {
         borderWidth: 1,
-        borderColor: '#E7DFFA',
+        borderColor: '#D8C7FA',
         borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#F4EEFF',
     },
     rescheduleCancelText: {
         color: colors.textSecondary,
