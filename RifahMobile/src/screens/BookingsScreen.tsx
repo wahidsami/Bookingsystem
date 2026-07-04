@@ -222,6 +222,8 @@ export function BookingsScreen({ navigation }: any) {
         const groupGuest = parseGroupGuestFromNotes(representative.notes);
         const dateDate = new Date(item.startTime);
         const serviceCount = item.items.length;
+        const hasCompletedReview = reviewedAppointmentIds.has(representative.id);
+        const canLeaveReview = item.status === 'completed' && !hasCompletedReview;
 
         const isRescheduled = item.items.some((booking) => hasRescheduleAudit(booking));
         return (
@@ -329,6 +331,20 @@ export function BookingsScreen({ navigation }: any) {
                         </Text>
                     </View>
                     <View style={styles.actions}>
+                        {canLeaveReview ? (
+                            <TouchableOpacity
+                                style={styles.reviewButton}
+                                onPress={() => setReviewBooking(representative)}
+                            >
+                                <AppIcon name="star" size={14} color={colors.textInverse} />
+                                <Text style={styles.reviewButtonText}>{t('leaveReview')}</Text>
+                            </TouchableOpacity>
+                        ) : hasCompletedReview ? (
+                            <View style={[styles.reviewButton, styles.reviewedButton]}>
+                                <AppIcon name="star" size={14} color={colors.accentDark} />
+                                <Text style={[styles.reviewButtonText, styles.reviewedButtonText]}>{language === 'ar' ? 'تم التقييم' : 'Reviewed'}</Text>
+                            </View>
+                        ) : null}
                         <TouchableOpacity
                             style={styles.payButton}
                             onPress={() => navigation.navigate('AppointmentDetails', { bookingGroup: item, activeTab })}

@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
@@ -19,6 +20,8 @@ import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
 
 type FullService = Service & { employees?: Staff[]; variants?: ServiceVariant[] };
+
+const FAVORITE_SERVICE_IDS_KEY = 'refah_favorite_service_ids_v1';
 
 export function ServiceDetailsScreen({ route, navigation }: any) {
     const { tenant, service, tenantId, bookingSessionId, bookingReference } = route.params;
@@ -56,6 +59,29 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
         };
         load();
     }, [service, tenant?.id, tenantId]);
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadFavoriteState = async () => {
+            try {
+                const raw = await AsyncStorage.getItem(FAVORITE_SERVICE_IDS_KEY);
+                const favoriteIds = raw ? JSON.parse(raw) : [];
+                if (!mounted) return;
+                setFavorite(Array.isArray(favoriteIds) && favoriteIds.includes(service.id));
+            } catch {
+                if (mounted) {
+                    setFavorite(false);
+                }
+            }
+        };
+
+        loadFavoriteState();
+
+        return () => {
+            mounted = false;
+        };
+    }, [service.id]);
 
     const resolvedService = details || service;
     const serviceName = isRTL ? resolvedService.name_ar : resolvedService.name_en;
@@ -98,6 +124,29 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
         } catch {}
     };
 
+    const handleToggleFavorite = async () => {
+        const nextFavorite = !favorite;
+        setFavorite(nextFavorite);
+
+        try {
+            const raw = await AsyncStorage.getItem(FAVORITE_SERVICE_IDS_KEY);
+            const favoriteIds = Array.isArray(raw ? JSON.parse(raw) : []) ? (raw ? JSON.parse(raw) : []) : [];
+            const normalizedIds = new Set<string>(
+                favoriteIds.filter((item: unknown): item is string => typeof item === 'string' && item.length > 0)
+            );
+
+            if (nextFavorite) {
+                normalizedIds.add(service.id);
+            } else {
+                normalizedIds.delete(service.id);
+            }
+
+            await AsyncStorage.setItem(FAVORITE_SERVICE_IDS_KEY, JSON.stringify(Array.from(normalizedIds)));
+        } catch (error) {
+            console.warn('Failed to update favorite service state:', error);
+        }
+    };
+
     const handleBook = (provider?: Staff | null, variant?: ServiceVariant | null) => {
         navigation.navigate('Booking', {
             service: resolvedService,
@@ -122,7 +171,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                                 <TouchableOpacity style={styles.glassButton} onPress={handleShare}>
                                     <AppIcon name="share" size={18} color={colors.text} />
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.glassButton} onPress={() => setFavorite((prev) => !prev)}>
+                                <TouchableOpacity style={styles.glassButton} onPress={handleToggleFavorite}>
                                     <AppIcon name="star" size={18} color={favorite ? colors.primary : colors.text} />
                                 </TouchableOpacity>
                             </View>
