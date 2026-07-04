@@ -20,6 +20,33 @@ export const navigateToNotificationDetail = (campaignId: string): boolean => {
     return true;
 };
 
+export const navigateToPurchases = (orderId?: string): boolean => {
+    if (!navigationRef.isReady()) {
+        return false;
+    }
+
+    navigationRef.navigate('MyPurchases', orderId ? { orderId } : undefined);
+    return true;
+};
+
+export const navigateToWalletBalanceDetails = (): boolean => {
+    if (!navigationRef.isReady()) {
+        return false;
+    }
+
+    navigationRef.navigate('WalletBalanceDetails');
+    return true;
+};
+
+export const navigateToProfile = (): boolean => {
+    if (!navigationRef.isReady()) {
+        return false;
+    }
+
+    navigationRef.navigate('Profile');
+    return true;
+};
+
 export const navigateToAppointmentInvite = (token: string): boolean => {
     if (!token || !navigationRef.isReady()) {
         return false;

@@ -16,7 +16,7 @@ import { ThemedAlertProvider } from './src/components/ThemedAlertProvider';
 import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
 import { consumePendingNotificationCampaignId, consumePendingNotificationInviteToken, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
-import { navigationRef, navigateToAppointmentInvite, navigateToGiftClaim, navigateToNotifications, navigateToReview } from './src/navigation/navigationService';
+import { navigationRef, navigateToAppointmentInvite, navigateToGiftClaim, navigateToNotifications, navigateToProfile, navigateToPurchases, navigateToReview, navigateToWalletBalanceDetails } from './src/navigation/navigationService';
 import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
 import { AuthInitialRoute, AuthNavigator } from './src/navigation/AuthNavigator';
 import { StaffRootNavigator } from './src/navigation/StaffRootNavigator';
@@ -24,6 +24,14 @@ import type { StaffProfile } from './src/api/client';
 
 type AppPhase = 'splash' | 'onboarding' | 'auth' | 'home';
 type AppMode = 'customer' | 'staff';
+type PendingDeepLink =
+  | { kind: 'booking'; token: string }
+  | { kind: 'order'; orderId?: string }
+  | { kind: 'gift'; token: string }
+  | { kind: 'wallet' }
+  | { kind: 'notification'; notificationId?: string; campaignId?: string }
+  | { kind: 'review'; appointmentId: string }
+  | { kind: 'profile' };
 
 // Load Cairo fonts
 const loadFonts = async () => {
@@ -51,9 +59,7 @@ function AppContent() {
   const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(null);
   const { setLanguage } = useLanguage();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
-  const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
-  const [pendingReviewAppointmentId, setPendingReviewAppointmentId] = useState<string | null>(null);
-  const [pendingGiftClaimToken, setPendingGiftClaimToken] = useState<string | null>(null);
+  const [pendingDeepLink, setPendingDeepLink] = useState<PendingDeepLink | null>(null);
   const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null);
 
   const flushDeferredDeepLinks = () => {
@@ -61,28 +67,58 @@ function AppContent() {
       return;
     }
 
-    if (pendingInviteToken) {
-      navigateToAppointmentInvite(pendingInviteToken);
-      setPendingInviteToken(null);
+    if (!pendingDeepLink) {
+      return;
     }
 
-    if (pendingReviewAppointmentId) {
-      navigateToReview(pendingReviewAppointmentId);
-      setPendingReviewAppointmentId(null);
+    switch (pendingDeepLink.kind) {
+      case 'booking':
+        navigateToAppointmentInvite(pendingDeepLink.token);
+        break;
+      case 'order':
+        navigateToPurchases(pendingDeepLink.orderId);
+        break;
+      case 'gift':
+        navigateToGiftClaim(pendingDeepLink.token);
+        break;
+      case 'wallet':
+        navigateToWalletBalanceDetails();
+        break;
+      case 'notification':
+        if (pendingDeepLink.notificationId) {
+          navigationRef.navigate('NotificationDetail', { notificationId: pendingDeepLink.notificationId });
+        } else if (pendingDeepLink.campaignId) {
+          navigationRef.navigate('NotificationDetail', { campaignId: pendingDeepLink.campaignId });
+        } else {
+          navigateToNotifications();
+        }
+        break;
+      case 'review':
+        navigateToReview(pendingDeepLink.appointmentId);
+        break;
+      case 'profile':
+        navigateToProfile();
+        break;
     }
 
-    if (pendingGiftClaimToken) {
-      navigateToGiftClaim(pendingGiftClaimToken);
-      setPendingGiftClaimToken(null);
-    }
+    setPendingDeepLink(null);
   };
 
   const extractInviteToken = (url: string | null | undefined): string | null => {
     if (!url) return null;
     const decoded = decodeURIComponent(url);
-    const deepLinkMatch = decoded.match(/appointment-invite\/([^/?#]+)/i);
+    const deepLinkMatch = decoded.match(/(?:booking|appointment-invite)\/([^/?#]+)/i);
     if (deepLinkMatch?.[1]) return deepLinkMatch[1];
     const queryMatch = decoded.match(/[?&]inviteToken=([^&#]+)/i) || decoded.match(/[?&]token=([^&#]+)/i);
+    return queryMatch?.[1] || null;
+  };
+
+  const extractOrderId = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    const decoded = decodeURIComponent(url);
+    const pathMatch = decoded.match(/(?:order|orders|purchase|purchases)\/([^/?#]+)/i);
+    if (pathMatch?.[1]) return pathMatch[1];
+    const queryMatch = decoded.match(/[?&]orderId=([^&#]+)/i);
     return queryMatch?.[1] || null;
   };
 
@@ -107,10 +143,40 @@ function AppContent() {
   const extractGiftClaimToken = (url: string | null | undefined): string | null => {
     if (!url) return null;
     const decoded = decodeURIComponent(url);
-    const pathMatch = decoded.match(/gift-claim\/([^/?#]+)/i);
+    const pathMatch = decoded.match(/(?:gift-claim|gift)\/([^/?#]+)/i);
     if (pathMatch?.[1]) return pathMatch[1];
     const queryMatch = decoded.match(/[?&]giftToken=([^&#]+)/i) || decoded.match(/[?&]token=([^&#]+)/i);
     return queryMatch?.[1] || null;
+  };
+
+  const extractNotificationDeepLink = (url: string | null | undefined): { notificationId?: string; campaignId?: string } | null => {
+    if (!url) return null;
+    const decoded = decodeURIComponent(url);
+    const pathMatch = decoded.match(/(?:notification|notifications)\/([^/?#]+)/i);
+    if (pathMatch?.[1]) {
+      return { notificationId: pathMatch[1] };
+    }
+    if (/(?:notification|notifications)(?:[/?#]|$)/i.test(decoded)) {
+      return {};
+    }
+    const notificationId = decoded.match(/[?&]notificationId=([^&#]+)/i)?.[1];
+    const campaignId = decoded.match(/[?&]campaignId=([^&#]+)/i)?.[1];
+    if (notificationId || campaignId) {
+      return { notificationId, campaignId };
+    }
+    return null;
+  };
+
+  const extractWalletDeepLink = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    const decoded = decodeURIComponent(url);
+    return /(?:^|[/?#&])(wallet|wallet-balance|wallet-balance-details)(?:[/?#]|$)/i.test(decoded);
+  };
+
+  const extractProfileDeepLink = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    const decoded = decodeURIComponent(url);
+    return /(?:^|[/?#&])profile(?:[/?#]|$)/i.test(decoded);
   };
 
   useEffect(() => {
@@ -137,19 +203,41 @@ function AppContent() {
 
       const token = extractInviteToken(url);
       if (token) {
-        setPendingInviteToken(token);
+        setPendingDeepLink({ kind: 'booking', token });
+        return;
+      }
+
+      const orderId = extractOrderId(url);
+      if (orderId || /(?:order|orders|purchase|purchases)(?:[/?#]|$)/i.test(decodeURIComponent(url || ''))) {
+        setPendingDeepLink({ kind: 'order', orderId: orderId || undefined });
+        return;
+      }
+
+      const notificationDeepLink = extractNotificationDeepLink(url);
+      if (notificationDeepLink) {
+        setPendingDeepLink({ kind: 'notification', ...notificationDeepLink });
         return;
       }
 
       const reviewAppointmentId = extractReviewAppointmentId(url);
       if (reviewAppointmentId) {
-        setPendingReviewAppointmentId(reviewAppointmentId);
+        setPendingDeepLink({ kind: 'review', appointmentId: reviewAppointmentId });
         return;
       }
 
       const giftClaimToken = extractGiftClaimToken(url);
       if (giftClaimToken) {
-        setPendingGiftClaimToken(giftClaimToken);
+        setPendingDeepLink({ kind: 'gift', token: giftClaimToken });
+        return;
+      }
+
+      if (extractWalletDeepLink(url)) {
+        setPendingDeepLink({ kind: 'wallet' });
+        return;
+      }
+
+      if (extractProfileDeepLink(url)) {
+        setPendingDeepLink({ kind: 'profile' });
       }
     };
 
@@ -209,15 +297,7 @@ function AppContent() {
 
   useEffect(() => {
     flushDeferredDeepLinks();
-  }, [pendingInviteToken, isAuthenticated, appPhase]);
-
-  useEffect(() => {
-    flushDeferredDeepLinks();
-  }, [pendingReviewAppointmentId, isAuthenticated, appPhase]);
-
-  useEffect(() => {
-    flushDeferredDeepLinks();
-  }, [pendingGiftClaimToken, isAuthenticated, appPhase]);
+  }, [pendingDeepLink, isAuthenticated, appPhase]);
 
   const loadFontsAndLanguage = async () => {
     await loadFonts();

@@ -24,7 +24,7 @@ import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
 import { LinearGradient } from 'expo-linear-gradient';
 
-export function PurchasesScreen({ navigation }: any) {
+export function PurchasesScreen({ navigation, route }: any) {
     const { t, language } = useLanguage();
     const isRTL = language === 'ar';
     const { showLogin } = useAppSession();
@@ -34,6 +34,7 @@ export function PurchasesScreen({ navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+    const deepLinkOrderId = `${route?.params?.orderId || ''}`.trim();
 
     useFocusEffect(
         React.useCallback(() => {
@@ -52,6 +53,12 @@ export function PurchasesScreen({ navigation }: any) {
             setIsAuthenticated(true);
             const data = await api.getOrders();
             setOrders(data);
+            if (deepLinkOrderId) {
+                const matchedOrder = data.find((item) => item.id === deepLinkOrderId || item.orderNumber === deepLinkOrderId);
+                if (matchedOrder) {
+                    setExpandedOrderId(matchedOrder.id);
+                }
+            }
         } catch (error: any) {
             if (error.status === 401 || error.message?.includes('unauthorized') || error.message?.includes('Invalid or expired token')) {
                 setIsAuthenticated(false);

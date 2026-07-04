@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { ImageBackground, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ImageBackground, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
 import { colors, fontSize, spacing } from '../theme/colors';
@@ -7,15 +7,79 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { LinearGradient } from 'expo-linear-gradient';
+import { api } from '../api/client';
 
 const HERO_IMAGE = require('../../assets/wallethero.jpg');
 
 export function CentersBalanceScreen({ navigation, route }: any) {
   const { language } = useLanguage();
   const { topInset, scrollBottomPadding } = useScreenSafeArea();
-  const centersBalance = Number(route?.params?.centersBalance || 0);
-  const history = Array.isArray(route?.params?.history) ? route.params.history : [];
+  const hasRouteCentersBalance = route?.params?.centersBalance !== undefined && route?.params?.centersBalance !== null;
+  const hasRouteHistory = Array.isArray(route?.params?.history);
+  const [centersBalance, setCentersBalance] = useState(Number(route?.params?.centersBalance || 0));
+  const [history, setHistory] = useState<Array<any>>(hasRouteHistory ? route.params.history : []);
+  const [summaryCenters, setSummaryCenters] = useState<Array<{ id: string; name: string; total: number; count: number }>>([]);
+  const [loading, setLoading] = useState(!(hasRouteCentersBalance && hasRouteHistory));
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCenters = async () => {
+      if (hasRouteCentersBalance && hasRouteHistory) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await api.get<{
+          success: boolean;
+          summary?: {
+            wallet?: { balance: number };
+            tenantGiftBalances?: Array<{
+              tenantId: string;
+              tenantName?: string | null;
+              balance: number;
+            }>;
+          };
+        }>('/users/wallet/summary');
+
+        if (cancelled) return;
+
+        const balances = response?.summary?.tenantGiftBalances || [];
+        setCentersBalance(hasRouteCentersBalance ? Number(route?.params?.centersBalance || 0) : Number(response?.summary?.wallet?.balance || 0));
+        setSummaryCenters(
+          balances.map((entry) => ({
+            id: entry.tenantId,
+            name: entry.tenantName || (language === 'ar' ? 'مركز' : 'Center'),
+            total: Number(entry.balance || 0),
+            count: 1,
+          }))
+        );
+        setHistory(hasRouteHistory ? route.params.history : []);
+      } catch {
+        if (!cancelled) {
+          setCentersBalance(Number(route?.params?.centersBalance || 0));
+          setSummaryCenters([]);
+          setHistory(hasRouteHistory ? route.params.history : []);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadCenters();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasRouteCentersBalance, hasRouteHistory, language, route?.params?.centersBalance, route?.params?.history]);
+
   const grouped = useMemo(() => {
+    if (!history.length && summaryCenters.length > 0) {
+      return summaryCenters;
+    }
     const map = new Map<string, { name: string; total: number; count: number }>();
     history.forEach((item: any) => {
       const id = item?.tenantId || 'unknown';
@@ -30,7 +94,15 @@ export function CentersBalanceScreen({ navigation, route }: any) {
       }
     });
     return Array.from(map.entries()).map(([id, v]) => ({ id, ...v }));
-  }, [history, language]);
+  }, [history, summaryCenters, language]);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingWrap}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -49,16 +121,20 @@ export function CentersBalanceScreen({ navigation, route }: any) {
             <Text style={styles.balanceAmount}>{formatRiyal(centersBalance, language)}</Text>
           </View>
           <Text style={styles.sectionTitle}>{language === 'ar' ? 'حسب المراكز' : 'By centers'}</Text>
-          {grouped.map((item) => (
-            <View key={item.id} style={styles.row}>
-              <View style={styles.storeIcon}><AppIcon name="storefront" size={14} color="#7A4F00" /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{item.name}</Text>
-                <Text style={styles.rowHint}>{language === 'ar' ? `${item.count} عمليات` : `${item.count} transactions`}</Text>
+          {grouped.length > 0 ? (
+            grouped.map((item) => (
+              <View key={item.id} style={styles.row}>
+                <View style={styles.storeIcon}><AppIcon name="storefront" size={14} color="#7A4F00" /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>{item.name}</Text>
+                  <Text style={styles.rowHint}>{language === 'ar' ? `${item.count} عمليات` : `${item.count} transactions`}</Text>
+                </View>
+                <Text style={styles.rowSub}>+{formatRiyal(Number(item.total), language)}</Text>
               </View>
-              <Text style={styles.rowSub}>+{formatRiyal(Number(item.total), language)}</Text>
-            </View>
-          ))}
+            ))
+          ) : (
+            <Text style={styles.emptyText}>{language === 'ar' ? 'لا توجد أرصدة موزعة.' : 'No distributed balances yet.'}</Text>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -67,6 +143,7 @@ export function CentersBalanceScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAF8FC' },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAF8FC' },
   hero: { minHeight: 250, paddingHorizontal: spacing.md, paddingBottom: spacing.lg, justifyContent: 'space-between' },
   heroImage: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
   backBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.24)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.38)' },
@@ -81,5 +158,6 @@ const styles = StyleSheet.create({
   storeIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF1D8' },
   rowTitle: { color: colors.text, fontWeight: '700' },
   rowHint: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
-  rowSub: { color: '#7A4F00', fontSize: 12, fontWeight: '700' }
+  rowSub: { color: '#7A4F00', fontSize: 12, fontWeight: '700' },
+  emptyText: { color: colors.textSecondary, fontSize: fontSize.sm }
 });
