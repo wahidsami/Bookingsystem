@@ -4,7 +4,6 @@ import {
   X, Calendar as CalendarIcon, User, Users, PlusCircle, Check, 
   Trash, ChevronLeft, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle
 } from 'lucide-react';
-import { mockCustomers, mockServices, mockProducts } from '../data/mockData';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 // Reusable STYLISTS definitions matching those in Workspace
@@ -32,6 +31,9 @@ interface InteractiveDrawersProps {
   initialCreateMode?: 'appointment' | 'blocked';
   initialCartTab?: 'products' | 'giftcards';
   selectedDate: Date;
+  customers: any[];
+  services: any[];
+  products: any[];
   onBoardChanged?: () => Promise<void> | void;
 }
 
@@ -102,6 +104,9 @@ export default function InteractiveDrawers({
   initialCreateMode,
   initialCartTab,
   selectedDate,
+  customers,
+  services,
+  products,
   onBoardChanged
 }: InteractiveDrawersProps) {
   
@@ -121,7 +126,7 @@ export default function InteractiveDrawers({
       setCartTab(initialCartTab);
     }
   }, [isCartDrawerOpen, initialCartTab]);
-  
+
   // Step 1: Customer Info
   const [custMode, setCustMode] = useState<'existing' | 'new' | 'walkin'>('existing');
   const [selectedCustId, setSelectedCustId] = useState<string>('CUST-001');
@@ -248,7 +253,7 @@ export default function InteractiveDrawers({
           if (s.id === serviceIdInGuest) {
             const updated = { ...s, ...fields };
             if (fields.serviceId) {
-              const catalogSrv = mockServices.find(srv => srv.id === fields.serviceId);
+              const catalogSrv = services.find(srv => srv.id === fields.serviceId);
               if (catalogSrv) {
                 updated.serviceName = catalogSrv.nameEn;
                 updated.category = catalogSrv.categoryEn;
@@ -281,6 +286,24 @@ export default function InteractiveDrawers({
   const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
   const [currentServiceNotes, setCurrentServiceNotes] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
+
+  useEffect(() => {
+    if (services.length > 0) {
+      const selectedServiceExists = services.some((service) => service.id === currentServiceId);
+      if (!selectedServiceExists) {
+        setCurrentServiceId(services[0].id);
+      }
+    }
+  }, [services, currentServiceId]);
+
+  useEffect(() => {
+    if (customers.length > 0) {
+      const selectedCustomerExists = customers.some((customer) => customer.id === selectedCustId);
+      if (!selectedCustomerExists) {
+        setSelectedCustId(customers[0].id);
+      }
+    }
+  }, [customers, selectedCustId]);
 
   // Step 3: Payments notes & custom checkout
   const [sessionNotes, setSessionNotes] = useState('');
@@ -336,14 +359,14 @@ export default function InteractiveDrawers({
 
   // Auto pre-populate duration when service changes
   useEffect(() => {
-    const srv = mockServices.find(s => s.id === currentServiceId);
+    const srv = services.find(s => s.id === currentServiceId);
     if (srv) {
       setCurrentDuration(srv.duration);
     }
-  }, [currentServiceId]);
+  }, [currentServiceId, services]);
 
   const handleAddStagedService = () => {
-    const srv = mockServices.find(s => s.id === currentServiceId);
+    const srv = services.find(s => s.id === currentServiceId);
     if (!srv) return;
 
     let nextStartTime = currentStartTime;
@@ -394,7 +417,7 @@ export default function InteractiveDrawers({
     }
 
     if (custMode === 'existing') {
-      const existing = mockCustomers.find(c => c.id === selectedCustId);
+      const existing = customers.find(c => c.id === selectedCustId);
       if (existing) {
         custNameEn = existing.name;
         custNameAr = existing.name;
@@ -423,7 +446,7 @@ export default function InteractiveDrawers({
 
     let finalStaged = [...stagedServices];
     if (finalStaged.length === 0) {
-      const srv = mockServices.find(s => s.id === currentServiceId);
+      const srv = services.find(s => s.id === currentServiceId);
       if (srv) {
         finalStaged.push({
           id: `stg-${Date.now()}`,
@@ -451,7 +474,7 @@ export default function InteractiveDrawers({
     let totalDuration = 0;
 
     finalStaged.forEach(item => {
-      const srv = mockServices.find(s => s.id === item.serviceId);
+      const srv = services.find(s => s.id === item.serviceId);
       if (srv) {
         let priceAfterDisc = srv.price;
         if (item.discountType === 'flat') {
@@ -485,7 +508,7 @@ export default function InteractiveDrawers({
 
     const appointmentDateKey = selectedDate.toISOString().split('T')[0];
     const items = finalStaged.map((item) => {
-      const service = mockServices.find(s => s.id === item.serviceId);
+      const service = services.find(s => s.id === item.serviceId);
       return {
         serviceId: item.serviceId,
         staffId: item.staffId,
@@ -680,7 +703,7 @@ export default function InteractiveDrawers({
 
     let buyerName = isRtl ? 'زائر مجهول / Walk-in' : 'Walk-in Guest / زائر مجهول';
     if (posCustMode === 'existing') {
-      const cust = mockCustomers.find(c => c.id === posSelectedCustId);
+      const cust = customers.find(c => c.id === posSelectedCustId);
       if (cust) buyerName = cust.name;
     }
 
@@ -850,12 +873,12 @@ export default function InteractiveDrawers({
                         {custMode === 'existing' && (
                           <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
                             <label className="text-[10px] font-bold text-slate-400 uppercase block">{isRtl ? 'البحث واختيار عميلة مسجلة' : 'Search & Associate Customer'}</label>
-                            <select
+                              <select
                                 value={selectedCustId}
                                 onChange={(e) => setSelectedCustId(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700"
                             >
-                              {mockCustomers.map(c => (
+                              {customers.map(c => (
                                 <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
                               ))}
                             </select>
@@ -1084,7 +1107,7 @@ export default function InteractiveDrawers({
                                                     onChange={(e) => updateGuestService(guest.id, gs.id, { serviceId: e.target.value })}
                                                     className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded text-xs font-black text-slate-700"
                                                   >
-                                                    {mockServices.map(s => (
+                                                    {services.map(s => (
                                                       <option key={s.id} value={s.id}>{isRtl ? s.nameAr : s.nameEn} ({s.price} SAR)</option>
                                                     ))}
                                                   </select>
@@ -1244,7 +1267,7 @@ export default function InteractiveDrawers({
                             <div>
                               <label className="text-slate-500 block mb-1">{isRtl ? 'الخدمة الفاخرة' : 'Select Service'}</label>
                               <select value={currentServiceId} onChange={(e) => setCurrentServiceId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold">
-                                {mockServices.map(s => (
+                                {services.map(s => (
                                   <option key={s.id} value={s.id}>{isRtl ? s.nameAr : s.nameEn} ({s.price} ر.س)</option>
                                 ))}
                               </select>
@@ -1285,7 +1308,7 @@ export default function InteractiveDrawers({
                           <div className="p-3 bg-slate-100 border rounded-xl space-y-2">
                             <span className="font-bold text-slate-700 block">{isRtl ? 'الخدمات المضافة للجلسة الكلية' : 'Staged Services'}</span>
                             {stagedServices.map((item, index) => {
-                              const s = mockServices.find(srv => srv.id === item.serviceId);
+                              const s = services.find(srv => srv.id === item.serviceId);
                               const staff = STYLISTS.find(st => st.id === item.staffId);
                               return (
                                 <div key={item.id} className="p-2 bg-white rounded-lg border flex items-center justify-between text-xs">
@@ -1311,7 +1334,7 @@ export default function InteractiveDrawers({
                           let primarySubtotal = 0;
                           let finalStaged = [...stagedServices];
                           if (finalStaged.length === 0) {
-                            const srv = mockServices.find(s => s.id === currentServiceId);
+                            const srv = services.find(s => s.id === currentServiceId);
                             if (srv) {
                               finalStaged.push({
                                 id: 'dummy',
@@ -1326,7 +1349,7 @@ export default function InteractiveDrawers({
                             }
                           }
                           finalStaged.forEach(item => {
-                            const srv = mockServices.find(s => s.id === item.serviceId);
+                            const srv = services.find(s => s.id === item.serviceId);
                             if (srv) primarySubtotal += srv.price;
                           });
 
@@ -1639,10 +1662,10 @@ export default function InteractiveDrawers({
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-3">
+                      <div className="flex-1 overflow-y-auto p-3">
                     {cartTab === 'products' ? (
                       <div className="grid grid-cols-2 gap-2 animate-fadeIn">
-                        {mockProducts.map(prod => (
+                        {products.map(prod => (
                           <div key={prod.id} className="p-2.5 border rounded-lg flex flex-col justify-between h-36 bg-white hover:border-amber-400">
                             <div>
                               <div className="flex justify-between items-center">
@@ -1734,7 +1757,7 @@ export default function InteractiveDrawers({
                       </div>
                       {posCustMode === 'existing' && (
                         <select value={posSelectedCustId} onChange={(e) => setPosSelectedCustId(e.target.value)} className="w-full bg-slate-50 p-1 text-[11px] font-bold rounded">
-                          {mockCustomers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                       )}
                     </div>

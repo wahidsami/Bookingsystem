@@ -2448,7 +2448,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         </div>
 
                         {/* Interactive Rebook / Reschedule tool buttons */}
-                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+                        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
                           <button 
                             onClick={async () => {
                               const serviceId = activeAppointment.serviceId;
@@ -2524,9 +2524,43 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                               }
                             }}
                             className="py-2 border border-rose-200 hover:border-rose-500 hover:bg-rose-50 bg-white rounded-lg text-xs font-bold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
+                            >
                             <Trash size={13} />
                             <span>{isRtl ? 'إلغاء الموعد' : 'Cancel Booking'}</span>
+                          </button>
+
+                          <button 
+                            onClick={async () => {
+                              try {
+                                const response = await tenantApiAdapter.updateAppointmentStatus(
+                                  activeAppointment.id,
+                                  'cancelled',
+                                  `${activeAppointment.notes || ''}${activeAppointment.notes ? ' | ' : ''}${isRtl ? 'إلغاء متأخر' : 'Late cancel'}`
+                                );
+                                if (response?.success) {
+                                  await loadBoardData();
+                                  setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                                  addLocalToast(
+                                    isRtl ? 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.' : 'Late cancel recorded and synced to the server.',
+                                    isRtl ? 'Late cancel recorded and synced to the server.' : 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.',
+                                    'success'
+                                  );
+                                } else {
+                                  throw new Error(response?.message || 'Failed to mark late cancel');
+                                }
+                              } catch (err) {
+                                console.error('Failed to mark late cancel', err);
+                                addLocalToast(
+                                  isRtl ? 'تعذر تسجيل الإلغاء المتأخر.' : 'Unable to mark late cancel.',
+                                  isRtl ? 'Unable to mark late cancel.' : 'تعذر تسجيل الإلغاء المتأخر.',
+                                  'warning'
+                                );
+                              }
+                            }}
+                            className="py-2 border border-amber-200 hover:border-amber-500 hover:bg-amber-50 bg-white rounded-lg text-xs font-bold text-amber-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <AlertTriangle size={13} />
+                            <span>{isRtl ? 'إلغاء متأخر' : 'Late Cancel'}</span>
                           </button>
                         </div>
                       </div>
@@ -3183,6 +3217,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         initialCreateMode={initialCreateMode}
         initialCartTab={initialCartTab}
         selectedDate={selectedDate}
+        customers={liveCustomers}
+        services={liveServices}
+        products={liveProducts}
         onBoardChanged={loadBoardData}
       />
 
