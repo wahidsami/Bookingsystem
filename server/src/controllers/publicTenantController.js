@@ -64,6 +64,39 @@ const normalizeGeneralSettings = (generalSettings = {}) => {
     };
 };
 
+const buildAppContentEntry = ({
+    key,
+    titleAr,
+    titleEn,
+    contentAr,
+    contentEn,
+    url = '',
+    iconKey = 'link',
+    metadata = {},
+    sortOrder = 0
+}) => ({
+    key,
+    titleAr,
+    titleEn,
+    contentAr,
+    contentEn,
+    url,
+    iconKey,
+    metadata,
+    publishedVersion: '1',
+    publishedAt: null,
+    updatedAt: null,
+    sortOrder
+});
+
+const normalizeSocialUrl = (value) => {
+    if (!value || typeof value !== 'string') {
+        return '';
+    }
+
+    return value.trim();
+};
+
 /**
  * Get all active tenants (public listing)
  */
@@ -217,6 +250,161 @@ exports.getPublicCategories = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch categories',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get customer app content blocks (public)
+ */
+exports.getCustomerAppContent = async (req, res) => {
+    try {
+        const [tenant, publicPageData] = await Promise.all([
+            db.Tenant.findOne({
+                where: {
+                    status: 'active'
+                },
+                attributes: [
+                    'id',
+                    'name',
+                    'name_en',
+                    'name_ar',
+                    'slug',
+                    'email',
+                    'phone',
+                    'mobile',
+                    'whatsapp',
+                    'facebookUrl',
+                    'instagramUrl',
+                    'twitterUrl',
+                    'linkedinUrl',
+                    'tiktokUrl',
+                    'youtubeUrl',
+                    'snapchatUrl',
+                    'pinterestUrl'
+                ],
+                order: [['createdAt', 'DESC']]
+            }),
+            db.PublicPageData.findOne({
+                attributes: ['generalSettings', 'aboutUs_storyEn', 'aboutUs_storyAr', 'contactUs_data']
+            })
+        ]);
+
+        const tenantNameEn = tenant?.name_en || tenant?.name || 'Refah';
+        const tenantNameAr = tenant?.name_ar || tenant?.name || 'رفاه';
+        const supportPhone = normalizeSocialUrl(tenant?.whatsapp || tenant?.mobile || tenant?.phone);
+        const supportEmail = normalizeSocialUrl(tenant?.email);
+        const contactData = publicPageData?.contactUs_data || {};
+        const aboutTextEn = publicPageData?.aboutUs_storyEn
+            || `Learn more about ${tenantNameEn} and the services we provide.`;
+        const aboutTextAr = publicPageData?.aboutUs_storyAr
+            || `تعرف على ${tenantNameAr} والخدمات التي نقدمها.`;
+        const supportTextEn = contactData?.supportMessageEn
+            || 'Reach out to us for help, support, or general questions.';
+        const supportTextAr = contactData?.supportMessageAr
+            || 'تواصل معنا للحصول على المساعدة أو الدعم أو أي استفسارات عامة.';
+        const privacyTextEn = contactData?.privacyTextEn
+            || 'Review our privacy and terms information before using the customer app.';
+        const privacyTextAr = contactData?.privacyTextAr
+            || 'يرجى مراجعة سياسة الخصوصية والشروط قبل استخدام تطبيق العملاء.';
+
+        const socialItems = [
+            ['instagram', tenant?.instagramUrl],
+            ['facebook', tenant?.facebookUrl],
+            ['twitter', tenant?.twitterUrl],
+            ['linkedin', tenant?.linkedinUrl],
+            ['tiktok', tenant?.tiktokUrl],
+            ['youtube', tenant?.youtubeUrl],
+            ['snapchat', tenant?.snapchatUrl],
+            ['website', tenant?.pinterestUrl]
+        ]
+            .map(([iconKey, url], index) => {
+                const normalizedUrl = normalizeSocialUrl(url);
+                if (!normalizedUrl) {
+                    return null;
+                }
+
+                return buildAppContentEntry({
+                    key: `${iconKey}`,
+                    titleAr: iconKey,
+                    titleEn: iconKey,
+                    contentAr: '',
+                    contentEn: '',
+                    url: normalizedUrl,
+                    iconKey,
+                    metadata: {
+                        platform: iconKey
+                    },
+                    sortOrder: index + 1
+                });
+            })
+            .filter(Boolean);
+
+        const appContent = {
+            appTarget: 'customer_app',
+            legal: {
+                about_refah: buildAppContentEntry({
+                    key: 'about_refah',
+                    titleAr: `عن ${tenantNameAr}`,
+                    titleEn: `About ${tenantNameEn}`,
+                    contentAr: aboutTextAr,
+                    contentEn: aboutTextEn,
+                    url: '',
+                    iconKey: 'sparkles',
+                    metadata: {
+                        section: 'about',
+                        tenantId: tenant?.id || null
+                    },
+                    sortOrder: 1
+                }),
+                privacy_terms: buildAppContentEntry({
+                    key: 'privacy_terms',
+                    titleAr: 'سياسة الخصوصية والشروط',
+                    titleEn: 'Privacy & Terms',
+                    contentAr: privacyTextAr,
+                    contentEn: privacyTextEn,
+                    url: '',
+                    iconKey: 'shield',
+                    metadata: {
+                        section: 'privacy',
+                        tenantId: tenant?.id || null
+                    },
+                    sortOrder: 2
+                })
+            },
+            support: {
+                help_support: buildAppContentEntry({
+                    key: 'help_support',
+                    titleAr: 'المساعدة والدعم',
+                    titleEn: 'Help & Support',
+                    contentAr: supportTextAr,
+                    contentEn: supportTextEn,
+                    url: '',
+                    iconKey: 'message',
+                    metadata: {
+                        section: 'support',
+                        tenantId: tenant?.id || null,
+                        email: supportEmail || null,
+                        phone: supportPhone || null
+                    },
+                    sortOrder: 1
+                })
+            },
+            social: socialItems,
+            store: {},
+            display: {}
+        };
+
+        return res.json({
+            success: true,
+            appContent
+        });
+    } catch (error) {
+        console.error('Get customer app content error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch customer app content',
             error: error.message
         });
     }

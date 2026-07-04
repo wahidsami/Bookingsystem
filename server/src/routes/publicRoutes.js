@@ -19,6 +19,9 @@ router.get('/providers/top', publicTenantController.getTopProviders);
 // Get tenant by slug
 router.get('/tenant/:slug', publicTenantController.getTenantBySlug);
 
+// Customer app content blocks
+router.get('/apps-center/customer-app', publicTenantController.getCustomerAppContent);
+
 // Get public page data
 router.get('/tenant/:tenantId/page-data', publicTenantController.getPublicPageData);
 
