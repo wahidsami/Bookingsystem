@@ -469,8 +469,8 @@ class TenantApiAdapter {
     return this.delete(`/tenant/services/${id}`);
   }
 
-  async getAppointmentsBoard(date: string): Promise<any> {
-    const query = this.buildQueryString({ date });
+  async getAppointmentsBoard(date: string, params?: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString({ date, ...(params || {}) });
     return this.get(`/tenant/appointments/board${query ? `?${query}` : ''}`);
   }
 

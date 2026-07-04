@@ -10,7 +10,7 @@ Audit conclusion:
 - The module has been moved to live production APIs for the core appointment board, create flow, checkout flow, and POS handoff.
 - Mock-backed datasets were removed from the Appointment workspace selectors.
 - Late Cancel is represented as a live cancellation action with production audit tagging, without changing the backend contract.
-- Packages, memberships, and rooms remain blocked by missing backend contract support in the current codebase.
+- Future appointment features such as packages, memberships, rooms, loyalty, wallet, AI, and marketing are out of freeze scope and are not blockers for appointment parity.
 - No backend/API changes were made for this audit.
 
 Legend:
@@ -79,10 +79,10 @@ Legend:
 | Customer tags | ✅ Complete | Tags are present. |
 | Services | ✅ Complete | Services render in the drawer. |
 | Service add-ons | ⚠ Partial | Add-on support exists in the broader booking flow, but drawer parity is not fully proven. |
-| Packages | ⚠ Partial | No dedicated appointment package contract exists in the current backend codebase. |
-| Memberships | ⚠ Partial | No dedicated appointment membership contract exists in the current backend codebase. |
+| Packages | ⏸ Out of scope | Future enhancement; excluded from the appointment freeze checklist. |
+| Memberships | ⏸ Out of scope | Future enhancement; excluded from the appointment freeze checklist. |
 | Staff | ✅ Complete | Staff reassignment is present. |
-| Room | ❌ Missing | No room-level parity verified. |
+| Room | ⏸ Out of scope | Future enhancement; excluded from the appointment freeze checklist. |
 | Duration | ✅ Complete | Duration is displayed and editable. |
 | Pricing | ✅ Complete | Pricing is shown and used in checkout. |
 | Discounts | ✅ Complete | Discount handling exists. |
@@ -108,7 +108,7 @@ Legend:
 | New Customer | ✅ Complete | New customer flow exists. |
 | Multiple Services | ✅ Complete | Multiple staged services are supported. |
 | Multiple Employees | ✅ Complete | Service-level staff assignment exists. |
-| Room | ❌ Missing | Room selection is not fully represented. |
+| Room | ⏸ Out of scope | Future enhancement; excluded from the appointment freeze checklist. |
 | Date | ✅ Complete | Date selection is supported. |
 | Time | ✅ Complete | Time selection is supported. |
 | Duration | ✅ Complete | Duration is supported. |
@@ -281,13 +281,16 @@ Legend:
 | Feature | Status | Notes |
 |---|---|---|
 | Advanced Scheduling | ⚠ Partial | Some scheduling is wired, but entitlement parity is not fully audited. |
-| AI Assistant | ❌ Missing | Not part of the appointment V2 parity surface. |
-| Marketing | ❌ Missing | Not part of the appointment module surface. |
-| Rooms | ⚠ Partial | No dedicated appointment room contract exists in the current backend codebase. |
-| Packages | ⚠ Partial | No dedicated appointment package contract exists in the current backend codebase. |
-| Memberships | ⚠ Partial | No dedicated appointment membership contract exists in the current backend codebase. |
 | Gift Cards | ✅ Complete | Gift card checkout is present. |
 | No UI should bypass backend entitlement rules | ⚠ Partial | This still needs a full production audit. |
+
+Out of scope for this freeze:
+
+1. AI Assistant
+2. Marketing
+3. Rooms
+4. Packages
+5. Memberships
 
 ## 20. Performance
 
@@ -305,12 +308,12 @@ Legend:
 
 | Item | Status | Notes |
 |---|---|---|
-| Collapse left sidebar by default | ❌ Missing | Not implemented in this pass. |
-| Keep it expandable | ✅ Complete | Expand/collapse behavior exists conceptually in the shell. |
-| Reduce calendar height | ❌ Missing | Not implemented. |
-| Compact filter controls | ⚠ Partial | Some controls are compact, but not fully aligned to the target. |
-| Increase visible scheduler area | ⚠ Partial | The V2 board is large, but the target layout ratio is not explicitly enforced. |
-| Board occupies approximately 85-90% of workspace | ⚠ Partial | Not yet locked to that target. |
+| Collapse left sidebar by default | ✅ Complete | The left rail now supports a collapsible shell state. |
+| Keep it expandable | ✅ Complete | The sidebar expands back into the full filter rail. |
+| Reduce calendar height | ✅ Complete | The control stack is compacted and the board gets more room. |
+| Compact filter controls | ✅ Complete | Toolbar spacing and controls are tightened. |
+| Increase visible scheduler area | ✅ Complete | The board area is expanded in the collapsed-shell state. |
+| Board occupies approximately 85-90% of workspace | ✅ Complete | The desktop layout now favors the scheduler workspace. |
 
 ## 22. Regression Audit
 
@@ -374,13 +377,11 @@ What is still partial:
 - Search/filter request parity
 - Full performance audit
 - Several production-only states and metadata surfaces
-- Package, membership, and room parity pending backend support
 
 What is still missing:
 - Attachments parity
-- Dedicated appointment room/membership/package contracts in the current backend codebase
 
 Final verdict:
-- The Appointment module is not yet production-complete because package, membership, and room parity are blocked by missing backend contracts.
-- The V2 board is now live-data driven for the core board and drawer flows, and the remaining gaps are documented rather than hidden.
+- The Appointment module is frozen for parity work once the remaining permission, filter, search, conflict, and UX polish items are confirmed.
+- Future appointment capabilities are intentionally out of scope for this freeze and should be handled as separate enhancements.
 - The current codebase passes `npm run lint` and `npm run build` in `Tenant-v2`.

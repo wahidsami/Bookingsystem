@@ -82,6 +82,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off'>>({});
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedStylistFilter, setSelectedStylistFilter] = useState<string>('all');
   const [serviceCategoryFilter, setServiceCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -210,7 +211,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setIsLoading(true);
     try {
       const dateStr = selectedDate.toLocaleDateString('en-CA');
-      const res = await tenantApiAdapter.getAppointmentsBoard(dateStr);
+      const res = await tenantApiAdapter.getAppointmentsBoard(dateStr, {
+        staffId: selectedStylistFilter === 'all' ? undefined : selectedStylistFilter,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: searchQuery.trim() || undefined
+      });
       if (res && res.success) {
         const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => mapBoardAppointment(a, dateStr));
         const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => mapBoardBreak(b));
@@ -246,7 +251,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   // Board Data Fetch
   useEffect(() => {
     void loadBoardData();
-  }, [selectedDate]);
+  }, [selectedDate, selectedStylistFilter, statusFilter, searchQuery]);
 
   // Interactive hover tracking
   const [hoveredSlot, setHoveredSlot] = useState<{ staffId?: string; date?: string; timeInMinutes: number } | null>(null);
@@ -309,6 +314,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setTimeout(() => {
       setLocalToasts(prev => prev.filter(t => t.id !== id));
     }, 4500);
+  };
+
+  const getSchedulingErrorToast = (err: unknown, fallbackAr: string, fallbackEn: string) => {
+    const raw = `${(err as any)?.message || err || ''}`.toLowerCase();
+    const isConflict = raw.includes('conflict') || raw.includes('overlap') || raw.includes('not available') || raw.includes('unavailable') || raw.includes('outside working hours') || raw.includes('time slot');
+    if (isConflict) {
+      return {
+        ar: 'تعذر حفظ التغيير بسبب تعارض في الجدول. جرّب وقتاً أو موظفاً آخر.',
+        en: 'Scheduling conflict detected. Try another time or staff member.'
+      };
+    }
+    return { ar: fallbackAr, en: fallbackEn };
   };
 
   // --- INTERACTIVE ADD APPOINTMENT / BLOCK TIME DRAWER ---
@@ -550,9 +567,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           await loadBoardData();
         } catch (err) {
           console.error('Failed to persist resize change', err);
+          const toast = getSchedulingErrorToast(err, 'تعذر حفظ تعديل مدة الموعد', 'Failed to save appointment resize');
           addLocalToast(
-            'تعذر حفظ تعديل مدة الموعد',
-            'Failed to save appointment resize',
+            toast.ar,
+            toast.en,
             'warning'
           );
           await loadBoardData();
@@ -1130,11 +1148,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     const matchesStaff = selectedStylistFilter === 'all' || apt.staffId === selectedStylistFilter;
     const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
     const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
-    const matchesSearch = searchQuery === '' || 
+      const matchesSearch = searchQuery === '' || 
       apt.customerNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
       apt.customerNameAr.includes(searchQuery) ||
       apt.serviceNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.serviceNameAr.includes(searchQuery);
+      apt.serviceNameAr.includes(searchQuery) ||
+      `${apt.customerPhone || ''}`.includes(searchQuery) ||
+      `${apt.id || ''}`.toLowerCase().includes(searchQuery.toLowerCase());
 
     const dateStr = apt.date || '2026-06-28';
     let matchesDate = false;
@@ -1157,33 +1177,33 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const draggedApt = draggedAptId ? appointments.find(a => a.id === draggedAptId) : null;
 
   return (
-    <div className="space-y-6 select-none font-sans" id="appointments-workspace">
+    <div className="space-y-4 select-none font-sans" id="appointments-workspace">
       
       {/* 1. COMPREHENSIVE CONTROL BAR & BOARD CONTROLS */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           
           {/* Unified Tool controls: Prev, Next, Today, Date Picker, Day / Week, Refresh */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             
             {/* Day Shift Segment */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
               <button 
                 onClick={() => handleDayShift(-1)} 
-                className="p-1.5 hover:bg-white rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
+                className="p-1 hover:bg-white rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
                 title="Previous Day"
               >
                 <ChevronLeft size={14} />
               </button>
               <button 
                 onClick={() => setSelectedDate(new Date(2026, 5, 28))} 
-                className="px-3 py-1 font-bold text-xs hover:bg-white rounded-md text-slate-700 transition-all"
+                className="px-2.5 py-1 font-bold text-xs hover:bg-white rounded-md text-slate-700 transition-all"
               >
                 {t.today}
               </button>
               <button 
                 onClick={() => handleDayShift(1)} 
-                className="p-1.5 hover:bg-white rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
+                className="p-1 hover:bg-white rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
                 title="Next Day"
               >
                 <ChevronRight size={14} />
@@ -1207,10 +1227,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             </div>
 
             {/* Day / Week / Agenda views tab */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
               <button 
                 onClick={() => setViewMode('day')}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                   viewMode === 'day' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -1218,7 +1238,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
               </button>
               <button 
                 onClick={() => setViewMode('week')}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                   viewMode === 'week' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -1226,7 +1246,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
               </button>
               <button 
                 onClick={() => setViewMode('agenda')}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                   viewMode === 'agenda' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -1237,10 +1257,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             {/* Refresh button with action */}
             <button 
               onClick={triggerRefresh}
-              className="p-2 bg-slate-100 hover:bg-slate-200 active:scale-95 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center justify-center cursor-pointer"
+              className="p-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center justify-center cursor-pointer"
               title="Refresh Schedule"
             >
               <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin text-amber-500' : ''}`} />
+            </button>
+
+            <button
+              onClick={() => setIsSidebarCollapsed((current) => !current)}
+              className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center justify-center cursor-pointer"
+              title={isSidebarCollapsed ? (isRtl ? 'توسيع الشريط الجانبي' : 'Expand sidebar') : (isRtl ? 'طي الشريط الجانبي' : 'Collapse sidebar')}
+            >
+              {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
 
             {/* Add Appointment Global Trigger */}
@@ -1273,7 +1301,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         </div>
 
         {/* SERVICE CATEGORY FILTER CHIPS */}
-        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+        <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mr-2">
             <Filter size={10} className="text-amber-500" />
             {isRtl ? 'تصنيف الخدمات:' : 'Category Filter:'}
@@ -1306,13 +1334,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       </div>
 
       {/* 2. GRID WORKSPACE: LEFT CONTROLLER & CENTER BOARD */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         
         {/* LEFT COLUMN: CONTROLS & DATE NAVIGATOR (col-span-3) */}
-        <div className="lg:col-span-3 space-y-5">
+        <div className={`${isSidebarCollapsed ? 'lg:col-span-1' : 'lg:col-span-3'} space-y-4`}>
           
           {/* Quick Date Indicator Widget */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{isRtl ? 'المخطط الزمني للتشغيل' : 'Daily Timeline Navigator'}</span>
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -1332,6 +1360,19 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             </div>
 
             {/* Quick mini-strip calendar mapping */}
+            {isSidebarCollapsed ? (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {isRtl ? 'الشريط مطوي' : 'Sidebar collapsed'}
+                </p>
+                <button
+                  onClick={() => setIsSidebarCollapsed(false)}
+                  className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-[11px] font-bold text-white"
+                >
+                  {isRtl ? 'توسيع الآن' : 'Expand now'}
+                </button>
+              </div>
+            ) : (
             <div className="grid grid-cols-7 gap-1 text-center">
               {[-3, -2, -1, 0, 1, 2, 3].map((offset) => {
                 const day = new Date(selectedDate);
@@ -1353,10 +1394,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                 );
               })}
             </div>
+            )}
           </div>
 
           {/* Search & liveStylists / Filters Panel */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+          {!isSidebarCollapsed && (
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Filter size={12} className="text-amber-500" />
@@ -1443,9 +1486,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
               </button>
             )}
           </div>
+          )}
 
           {/* Real-time ZATCA & Platform Status card */}
-          <div className="bg-zinc-950 text-white p-5 rounded-xl border border-zinc-800 space-y-3 shadow-md relative overflow-hidden">
+          <div className="bg-zinc-950 text-white p-4 rounded-xl border border-zinc-800 space-y-3 shadow-md relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <Scissors size={80} className="text-white" />
             </div>
@@ -1478,12 +1522,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         </div>
 
         {/* CENTER COLUMN: INTERACTIVE SCHEDULER BOARD (col-span-9) */}
-        <div className="lg:col-span-9">
+        <div className={`${isSidebarCollapsed ? 'lg:col-span-11' : 'lg:col-span-9'}`}>
           
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
             
             {/* Timeline Scheduler Navigation Bar */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="p-3.5 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">
@@ -1618,7 +1662,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                 </div>
               ) : (
                 /* 2. INTERACTIVE TIMELINE SATELLITE BOARD (Day or Week) */
-                <div className="min-w-[840px] relative flex flex-col" style={{ height: `${(TOTAL_HOURS * SLOT_HEIGHT) + 60}px` }}>
+                <div className="min-w-[920px] relative flex flex-col" style={{ height: `${(TOTAL_HOURS * SLOT_HEIGHT) + 60}px` }}>
                   
                   {/* Board Columns Header */}
                   <div className="grid grid-cols-12 bg-slate-50 border-b border-slate-200 sticky top-0 z-20 h-12 items-center text-center">
@@ -1930,13 +1974,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                     if (a.id === aptId) {
                                       if (!a.id.startsWith('block-')) {
                                         const patchDate = buildIsoFromMinutes(getSelectedDateKey(), dragOverTime);
-                                        tenantApiAdapter.reassignRescheduleAppointment(a.id, {
-                                          staffId: dragOverStaffId,
-                                          startTime: patchDate,
-                                          notifyCustomer: true
+                                      tenantApiAdapter.reassignRescheduleAppointment(a.id, {
+                                        staffId: dragOverStaffId,
+                                        startTime: patchDate,
+                                        notifyCustomer: true
                                         }).then(() => {
                                           void loadBoardData();
-                                        }).catch(err => console.error("Optimistic sync failed", err));
+                                        }).catch((err) => {
+                                          console.error("Optimistic sync failed", err);
+                                          const toast = getSchedulingErrorToast(err, 'تعذر نقل الموعد إلى الخانة الجديدة', 'Unable to move appointment to the new slot.');
+                                          addLocalToast(toast.ar, toast.en, 'warning');
+                                        });
                                       }
                                       return {
                                         ...a,
@@ -2650,9 +2698,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 }
                               } catch (err) {
                                 console.error('Failed to reassign stylist', err);
+                                const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر إعادة تعيين الموظفة.' : 'Unable to reassign stylist.', isRtl ? 'Unable to reassign stylist.' : 'تعذر إعادة تعيين الموظفة.');
                                 addLocalToast(
-                                  isRtl ? 'تعذر إعادة تعيين الموظفة.' : 'Unable to reassign stylist.',
-                                  isRtl ? 'Unable to reassign stylist.' : 'تعذر إعادة تعيين الموظفة.',
+                                  toast.ar,
+                                  toast.en,
                                   'warning'
                                 );
                               }
@@ -2692,9 +2741,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 }
                               } catch (err) {
                                 console.error('Failed to reschedule appointment', err);
+                                const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر تعديل التوقيت.' : 'Unable to reschedule appointment.', isRtl ? 'Unable to reschedule appointment.' : 'تعذر تعديل التوقيت.');
                                 addLocalToast(
-                                  isRtl ? 'تعذر تعديل التوقيت.' : 'Unable to reschedule appointment.',
-                                  isRtl ? 'Unable to reschedule appointment.' : 'تعذر تعديل التوقيت.',
+                                  toast.ar,
+                                  toast.en,
                                   'warning'
                                 );
                               }
@@ -2738,9 +2788,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                   }
                                 } catch (err) {
                                   console.error('Failed to update booking date', err);
+                                  const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر تحديث تاريخ الحجز.' : 'Unable to update booking date.', isRtl ? 'Unable to update booking date.' : 'تعذر تحديث تاريخ الحجز.');
                                   addLocalToast(
-                                    isRtl ? 'تعذر تحديث تاريخ الحجز.' : 'Unable to update booking date.',
-                                    isRtl ? 'Unable to update booking date.' : 'تعذر تحديث تاريخ الحجز.',
+                                    toast.ar,
+                                    toast.en,
                                     'warning'
                                   );
                                 }
@@ -2933,7 +2984,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           {isRtl ? 'إضافة منتجات التجميل للفاتورة 🧴' : 'ADD RETAIL PRODUCTS TO TICKET 🧴'}
                         </span>
                         
-                        {/* Inline list of available mock products to add */}
+                        {/* Inline list of available products to add */}
                         <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
                           {liveProducts.map(prod => (
                             <button
