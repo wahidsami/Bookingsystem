@@ -801,7 +801,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             </View>
 
             {giftPackages.length === 0 ? (
-                renderEmptyState(isRTL ? 'تجارب الهدايا قريباً ✨' : 'Gift experiences coming soon ✨')
+                renderEmptyState(isRTL ? 'لا تتوفر تجارب هدايا حالياً.' : 'No gift experiences are available right now.')
             ) : (
                 giftPackages.map((pkg, index) => {
                     const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
