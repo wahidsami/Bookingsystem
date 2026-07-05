@@ -13,6 +13,7 @@ import { Language, Product } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
 import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { AnalyticsDetailsDrawer } from './AnalyticsDetailsDrawer';
 
 interface AppointmentWorkspaceProps {
   lang: Language;
@@ -483,6 +484,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [customerProfileError, setCustomerProfileError] = useState<string | null>(null);
   const [customerProfileRefreshToken, setCustomerProfileRefreshToken] = useState(0);
   const [customerTransactionsExpanded, setCustomerTransactionsExpanded] = useState(false);
+  const [customerTransactionDetail, setCustomerTransactionDetail] = useState<any | null>(null);
+  const [customerTransactionDetailTab, setCustomerTransactionDetailTab] = useState('overview');
 
   const activeAppointmentServiceSources = Array.isArray(activeAppointment?.bookingSession?.appointments) && activeAppointment.bookingSession.appointments.length > 0
     ? activeAppointment.bookingSession.appointments
@@ -625,6 +628,41 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     return totalSpent / visits;
   })();
 
+  // Translate utilities
+  const t = {
+    today: isRtl ? 'اليوم' : 'Today',
+    allStaff: isRtl ? 'جميع خبيرات التجميل' : 'All Stylists',
+    allStatus: isRtl ? 'جميع الحالات' : 'All Statuses',
+    confirmed: isRtl ? 'مؤكد' : 'Confirmed',
+    arrived: isRtl ? 'وصلت المركز' : 'Arrived',
+    completed: isRtl ? 'اكتملت الخدمة' : 'Completed',
+    cancelled: isRtl ? 'ملغية' : 'Cancelled',
+    paid: isRtl ? 'مدفوعة' : 'Paid',
+    unpaid: isRtl ? 'غير مدفوعة' : 'Unpaid',
+    partial: isRtl ? 'جزئي' : 'Partial Paid',
+    riyal: isRtl ? 'ر.س' : 'SAR',
+    durationMin: isRtl ? 'دقيقة' : 'min',
+    newBooking: isRtl ? 'حجز موعد جديد' : 'New Appointment',
+    blockTime: isRtl ? 'حظر فترة زمنية' : 'Block Time',
+    editShift: isRtl ? 'تعديل نوبة العمل' : 'Edit Shift',
+    addBreak: isRtl ? 'إضافة استراحة غداء/قهوة' : 'Add Break',
+    pasteAppointment: isRtl ? 'لصق حجز منسوخ' : 'Paste Appointment',
+    refreshSchedule: isRtl ? 'تحديث الجدول والربط' : 'Refresh Schedule',
+    reschedule: isRtl ? 'إعادة جدولة الموعد' : 'Reschedule Appointment',
+    checkout: isRtl ? 'دفع سريع وخروج' : 'Checkout & Pay',
+    rebook: isRtl ? 'إعادة حجز فوري' : 'Instant Rebook',
+    walletText: isRtl ? 'محفظة العميل الرقمية' : 'Client Wallet Balance',
+    splitPayments: isRtl ? 'تقسيم المدفوعات' : 'Split Payments',
+    financeSummary: isRtl ? 'الملخص المالي للفاتورة' : 'Invoice Financial Summary',
+    timelineText: isRtl ? 'سجل تفاعل العميل' : 'Client Touchpoint Log',
+    reviewsText: isRtl ? 'تقييمات وملاحظات العميل' : 'Reviews & Comments',
+    quickActionsTitle: isRtl ? 'أدوات التحكم والجدولة' : 'Schedule Controller',
+    slotBookPrompt: isRtl ? '+ حجز في الساعة' : '+ Book at',
+    clearFilters: isRtl ? 'إعادة تعيين الفلاتر' : 'Reset Filters',
+    dragTip: isRtl ? 'اسحب الموعد لتغيير الخبيرة والوقت • اسحب المقبض السفلي لتعديل المدة' : 'Drag card to reschedule • Drag bottom handle to resize duration',
+    emptyStateText: isRtl ? 'لا توجد مواعيد تطابق خيارات البحث الحالية' : 'No appointments found matching filters'
+  };
+
   const getTransactionAmountLabel = (item: any) => {
     const amount = Number(item?.amount ?? item?.totalAmount ?? item?.value ?? item?.price ?? 0);
     return Number.isFinite(amount) && amount > 0 ? `${amount.toFixed(2)} ${t.riyal}` : '—';
@@ -644,6 +682,21 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     return 'bg-slate-50 text-slate-700 border-slate-200';
   };
 
+  const customerTransactionSummaryItems = customerTransactionDetail ? [
+    { label: isRtl ? 'النوع' : 'Type', value: customerTransactionDetail.typeLabel || '—' },
+    { label: isRtl ? 'المرجع' : 'Reference', value: customerTransactionDetail.reference || '—' },
+    { label: isRtl ? 'التاريخ' : 'Date', value: customerTransactionDetail.date ? new Date(customerTransactionDetail.date).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—' },
+    { label: isRtl ? 'طريقة الدفع' : 'Payment Method', value: customerTransactionDetail.paymentMethodLabel || '—' },
+    { label: isRtl ? 'المبلغ' : 'Amount', value: Number.isFinite(Number(customerTransactionDetail.amount)) ? `${Number(customerTransactionDetail.amount).toFixed(2)} ${t.riyal}` : '—' },
+    { label: isRtl ? 'الحالة' : 'Status', value: customerTransactionDetail.statusLabel || '—' }
+  ] : [];
+
+  const customerTransactionDetailTabs = customerTransactionDetail ? [
+    { id: 'overview', label: isRtl ? 'نظرة عامة' : 'Overview', description: isRtl ? 'ملخص المعاملة المالي' : 'Financial transaction summary' },
+    { id: 'linked', label: isRtl ? 'الارتباط' : 'Linked', description: isRtl ? 'الموعد أو الطلب المرتبط' : 'Linked appointment or order' },
+    { id: 'metadata', label: isRtl ? 'البيانات' : 'Metadata', description: isRtl ? 'الحقول الغنية من الخادم' : 'Rich backend fields' }
+  ] : [];
+
   const openCustomerTransactionRecord = async (item: any) => {
     const detailPath = `${item?.detailPath || ''}`;
     const appointmentMatch = detailPath.match(/\/dashboard\/appointments\/([^/?#]+)/);
@@ -652,37 +705,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       || item?.bookingSession?.appointments?.[0]?.id
       || (item?.referenceType === 'appointment' ? item?.referenceId : null)
       || null;
-
-    if (appointmentId) {
-      await openHistoricalAppointmentDetails({
-        ...item,
-        id: appointmentId,
-        date: item?.processedAt || item?.date || item?.createdAt || item?.time || item?.appointment?.startTime || item?.appointment?.date,
-        details: {
-          service: item?.appointment?.service || item?.bookingSession?.appointments?.[0]?.service || item?.details?.service || null,
-          staff: item?.appointment?.staff || item?.bookingSession?.appointments?.[0]?.staff || item?.details?.staff || null,
-          duration: item?.appointment?.service?.duration || item?.appointment?.duration || item?.details?.duration || 0,
-          startTime: item?.appointment?.startTime || item?.processedAt || item?.date || item?.createdAt || '',
-          notes: item?.notes || item?.subtitle || ''
-        }
-      });
-      return;
-    }
-
-    if (detailPath && detailPath.includes('/dashboard/orders/')) {
-      addLocalToast(
-        isRtl ? 'لا يوجد Drawer مالي مستقل لهذا السجل بعد.' : 'No standalone financial drawer is available for this record yet.',
-        isRtl ? 'يفتح السجل عبر المسار المرتبط عند توفره.' : 'The record opens through its linked path when available.',
-        'info'
-      );
-      return;
-    }
-
-    addLocalToast(
-      isRtl ? 'لا توجد تفاصيل مالية مرتبطة.' : 'No linked financial details are available.',
-      isRtl ? 'راجع المسار المرتبط من الخادم.' : 'Check the linked path from the backend.',
-      'info'
-    );
+    setCustomerTransactionDetail({
+      ...item,
+      appointmentId,
+      appointmentIdLinked: appointmentId,
+      orderId: detailPath.match(/\/dashboard\/orders\/([^/?#]+)/)?.[1] || item?.order?.id || null,
+      date: item?.processedAt || item?.date || item?.createdAt || item?.time || item?.appointment?.startTime || item?.appointment?.date || '',
+      amount: Number(item?.amount ?? item?.totalAmount ?? item?.value ?? item?.price ?? 0),
+      paymentMethodLabel: item?.paymentMethodLabel || item?.paymentMethod || item?.method || '—',
+      reference: item?.reference || item?.transactionRef || item?.invoiceNumber || item?.orderNumber || item?.bookingReference || item?.bookingSessionReference || item?.id || '—',
+      typeLabel: item?.title || item?.type || item?.kind || item?.source || item?.paymentMethodLabel || 'Transaction',
+      statusLabel: item?.status || item?.normalizedPaymentStatus || item?.paymentStatus || '—',
+      detailPath
+    });
+    setCustomerTransactionDetailTab('overview');
   };
 
   const compactAppointmentField = (value: any, fallback = '—') => {
@@ -1228,41 +1264,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     }, 600);
   };
 
-  // Translate utilities
-  const t = {
-    today: isRtl ? 'اليوم' : 'Today',
-    allStaff: isRtl ? 'جميع خبيرات التجميل' : 'All Stylists',
-    allStatus: isRtl ? 'جميع الحالات' : 'All Statuses',
-    confirmed: isRtl ? 'مؤكد' : 'Confirmed',
-    arrived: isRtl ? 'وصلت المركز' : 'Arrived',
-    completed: isRtl ? 'اكتملت الخدمة' : 'Completed',
-    cancelled: isRtl ? 'ملغية' : 'Cancelled',
-    paid: isRtl ? 'مدفوعة' : 'Paid',
-    unpaid: isRtl ? 'غير مدفوعة' : 'Unpaid',
-    partial: isRtl ? 'جزئي' : 'Partial Paid',
-    riyal: isRtl ? 'ر.س' : 'SAR',
-    durationMin: isRtl ? 'دقيقة' : 'min',
-    newBooking: isRtl ? 'حجز موعد جديد' : 'New Appointment',
-    blockTime: isRtl ? 'حظر فترة زمنية' : 'Block Time',
-    editShift: isRtl ? 'تعديل نوبة العمل' : 'Edit Shift',
-    addBreak: isRtl ? 'إضافة استراحة غداء/قهوة' : 'Add Break',
-    pasteAppointment: isRtl ? 'لصق حجز منسوخ' : 'Paste Appointment',
-    refreshSchedule: isRtl ? 'تحديث الجدول والربط' : 'Refresh Schedule',
-    reschedule: isRtl ? 'إعادة جدولة الموعد' : 'Reschedule Appointment',
-    checkout: isRtl ? 'دفع سريع وخروج' : 'Checkout & Pay',
-    rebook: isRtl ? 'إعادة حجز فوري' : 'Instant Rebook',
-    walletText: isRtl ? 'محفظة العميل الرقمية' : 'Client Wallet Balance',
-    splitPayments: isRtl ? 'تقسيم المدفوعات' : 'Split Payments',
-    financeSummary: isRtl ? 'الملخص المالي للفاتورة' : 'Invoice Financial Summary',
-    timelineText: isRtl ? 'سجل تفاعل العميل' : 'Client Touchpoint Log',
-    reviewsText: isRtl ? 'تقييمات وملاحظات العميل' : 'Reviews & Comments',
-    quickActionsTitle: isRtl ? 'أدوات التحكم والجدولة' : 'Schedule Controller',
-    slotBookPrompt: isRtl ? '+ حجز في الساعة' : '+ Book at',
-    clearFilters: isRtl ? 'إعادة تعيين الفلاتر' : 'Reset Filters',
-    dragTip: isRtl ? 'اسحب الموعد لتغيير الخبيرة والوقت • اسحب المقبض السفلي لتعديل المدة' : 'Drag card to reschedule • Drag bottom handle to resize duration',
-    emptyStateText: isRtl ? 'لا توجد مواعيد تطابق خيارات البحث الحالية' : 'No appointments found matching filters'
-  };
-
   // Conversions for layout
   const SLOT_HEIGHT = 100; // 100px per hour
   const START_HOUR = 9; // 9:00 AM
@@ -1459,6 +1460,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setAppointmentDetailsReadOnly(Boolean(options.readOnly));
     setIsCustomerProfileOpen(false);
     setCustomerTransactionsExpanded(false);
+    setCustomerTransactionDetail(null);
+    setCustomerTransactionDetailTab('overview');
     setCustomerProfile(null);
     setCustomerHistoryData(null);
     setCustomerProfileError(null);
@@ -1531,6 +1534,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setIsCustomerProfileOpen(false);
     setCustomerTransactionsExpanded(false);
     setCustomerDrawerTab('overview');
+    setCustomerTransactionDetail(null);
+    setCustomerTransactionDetailTab('overview');
     setCustomerProfileError(null);
     setDrawerOpen(true);
   };
@@ -4319,6 +4324,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       onClick={() => {
                         setIsCustomerProfileOpen(false);
                         setCustomerTransactionsExpanded(false);
+                        setCustomerTransactionDetail(null);
+                        setCustomerTransactionDetailTab('overview');
                       }}
                     />
 
@@ -4338,6 +4345,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                             onClick={() => {
                               setIsCustomerProfileOpen(false);
                               setCustomerTransactionsExpanded(false);
+                              setCustomerTransactionDetail(null);
+                              setCustomerTransactionDetailTab('overview');
                             }}
                             className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all shrink-0 cursor-pointer"
                             title={isRtl ? 'العودة لتفاصيل الحجز' : 'Back to appointment details'}
@@ -4942,6 +4951,176 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       </div>
                     </motion.div>
                   </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {customerTransactionDetail && (
+                  <AnalyticsDetailsDrawer
+                    open={Boolean(customerTransactionDetail)}
+                    title={customerTransactionDetail.typeLabel || customerTransactionDetail.title || (isRtl ? 'معاملة مالية' : 'Financial Transaction')}
+                    subtitle={customerTransactionDetail.reference || customerTransactionDetail.transactionRef || ''}
+                    onClose={() => {
+                      setCustomerTransactionDetail(null);
+                      setCustomerTransactionDetailTab('overview');
+                    }}
+                    summaryItems={customerTransactionSummaryItems}
+                    tabs={customerTransactionDetailTabs}
+                    activeTab={customerTransactionDetailTab}
+                    onTabChange={setCustomerTransactionDetailTab}
+                    tabPanels={{
+                      overview: (
+                        <div className="space-y-3">
+                          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                              {isRtl ? 'ملخص المعاملة' : 'Transaction Summary'}
+                            </h4>
+                            <p className="text-sm text-slate-700 leading-relaxed">
+                              {customerTransactionDetail.subtitle || customerTransactionDetail.notes || (isRtl ? 'بيانات مالية مباشرة من الخادم.' : 'Live financial data from the backend.')}
+                            </p>
+                          </section>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{isRtl ? 'المصدر' : 'Source'}</p>
+                              <p className="mt-1 text-sm font-bold text-slate-800">{customerTransactionDetail.source || '—'}</p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{isRtl ? 'الدفع' : 'Payment'}</p>
+                              <p className="mt-1 text-sm font-bold text-slate-800">{customerTransactionDetail.paymentMethodLabel || '—'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ),
+                      linked: (
+                        <div className="space-y-3">
+                          {customerTransactionDetail.appointmentIdLinked ? (
+                            <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+                              <h4 className="text-xs font-black text-emerald-900 uppercase tracking-wider">
+                                {isRtl ? 'موعد مرتبط' : 'Linked Appointment'}
+                              </h4>
+                              <p className="text-sm text-emerald-900/80">
+                                {isRtl ? 'يمكن فتح الموعد المرتبط مباشرة من هنا.' : 'You can open the linked appointment directly from here.'}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const linkedAppointment = {
+                                    id: customerTransactionDetail.appointmentIdLinked,
+                                    date: customerTransactionDetail.date || selectedDate.toISOString().split('T')[0],
+                                    details: {
+                                      service: customerTransactionDetail?.appointment?.service || customerTransactionDetail?.details?.service || null,
+                                      staff: customerTransactionDetail?.appointment?.staff || customerTransactionDetail?.details?.staff || null,
+                                      duration: customerTransactionDetail?.details?.duration || customerTransactionDetail?.appointment?.duration || 0,
+                                      startTime: customerTransactionDetail?.appointment?.startTime || customerTransactionDetail?.date || customerTransactionDetail?.createdAt || '',
+                                      notes: customerTransactionDetail?.notes || ''
+                                    },
+                                    serviceId: customerTransactionDetail?.appointment?.service?.id || customerTransactionDetail?.appointment?.serviceId || null,
+                                    serviceNameEn: customerTransactionDetail?.appointment?.service?.name_en || customerTransactionDetail?.appointment?.serviceName || customerTransactionDetail?.title || '',
+                                    serviceNameAr: customerTransactionDetail?.appointment?.service?.name_ar || customerTransactionDetail?.appointment?.serviceName || customerTransactionDetail?.title || '',
+                                    staffId: customerTransactionDetail?.appointment?.staff?.id || customerTransactionDetail?.appointment?.staffId || null,
+                                    staffName: customerTransactionDetail?.appointment?.staff?.name || customerTransactionDetail?.processorName || '',
+                                    customerId: activeAppointment?.customerId || undefined,
+                                    customerNameEn: activeAppointment?.customerNameEn || '',
+                                    customerNameAr: activeAppointment?.customerNameAr || '',
+                                    customerPhone: activeAppointment?.customerPhone || '',
+                                    customerEmail: activeAppointment?.customerEmail || '',
+                                    price: Number(customerTransactionDetail.amount || 0),
+                                    status: customerTransactionDetail?.appointment?.status || activeAppointment?.status || 'completed',
+                                    paymentStatus: customerTransactionDetail?.appointment?.paymentStatus || customerTransactionDetail.statusLabel || 'paid',
+                                    totalPaid: Number(customerTransactionDetail.amount || 0),
+                                    branchName: activeAppointment?.branchName || '',
+                                    invoiceStatus: customerTransactionDetail.statusLabel || 'paid',
+                                    notes: customerTransactionDetail?.notes || '',
+                                    services: customerTransactionDetail?.appointment?.service ? [customerTransactionDetail.appointment.service] : [],
+                                    serviceItems: customerTransactionDetail?.appointment?.service ? [{
+                                      service: customerTransactionDetail.appointment.service,
+                                      duration: customerTransactionDetail?.appointment?.service?.duration || customerTransactionDetail?.details?.duration || 0,
+                                      price: Number(customerTransactionDetail.amount || 0)
+                                    }] : [],
+                                    lineItems: [],
+                                    invoiceItems: [],
+                                    products: [],
+                                    productItems: [],
+                                    retailItems: [],
+                                    tags: []
+                                  } as any;
+                                  setCustomerTransactionDetail(null);
+                                  setCustomerTransactionDetailTab('overview');
+                                  await openHistoricalAppointmentDetails(linkedAppointment);
+                                }}
+                                className="inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                              >
+                                {isRtl ? 'فتح الموعد' : 'Open Appointment'}
+                              </button>
+                            </section>
+                          ) : (
+                            <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                              {isRtl ? 'لا يوجد موعد مرتبط مباشر لهذا السجل.' : 'No directly linked appointment exists for this record.'}
+                            </div>
+                          )}
+
+                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{isRtl ? 'مسار السجل' : 'Detail Path'}</p>
+                            <p className="mt-1 text-sm font-medium text-slate-800 break-all">
+                              {customerTransactionDetail.detailPath || '—'}
+                            </p>
+                          </section>
+                        </div>
+                      ),
+                      metadata: (
+                        <div className="space-y-3">
+                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                              {isRtl ? 'الحقول الغنية' : 'Rich Fields'}
+                            </h4>
+                            <div className="mt-3 grid grid-cols-1 gap-2">
+                              {Object.entries({
+                                normalizedPaymentStatus: customerTransactionDetail.normalizedPaymentStatus,
+                                appointmentOutstandingAmount: customerTransactionDetail.appointmentOutstandingAmount,
+                                appointmentPaidAmount: customerTransactionDetail.appointmentPaidAmount,
+                                paymentEvidenceSource: customerTransactionDetail.paymentEvidenceSource,
+                                transactionRef: customerTransactionDetail.transactionRef,
+                                processorName: customerTransactionDetail.processorName,
+                                source: customerTransactionDetail.source,
+                                entityType: customerTransactionDetail.entityType,
+                                entityId: customerTransactionDetail.entityId,
+                                referenceType: customerTransactionDetail.referenceType,
+                                referenceId: customerTransactionDetail.referenceId
+                              }).map(([key, value]) => (
+                                <div key={key} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{key}</p>
+                                  <p className="mt-1 text-sm font-semibold text-slate-800 break-all">{value === null || value === undefined || value === '' ? '—' : String(value)}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+                        </div>
+                      )
+                    }}
+                    actions={(
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerTransactionDetail(null);
+                          setCustomerTransactionDetailTab('overview');
+                        }}
+                        className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                      >
+                        {isRtl ? 'إغلاق' : 'Close'}
+                      </button>
+                    )}
+                    footer={null}
+                    sideNote={(
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold text-slate-800">
+                          {isRtl ? 'المعاملة المالية مرتبطة ببيانات الإنتاج الفعلية.' : 'The financial transaction is linked to live production data.'}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {isRtl ? 'يمكنك العودة إلى الموعد المرتبط دون مغادرة اللوحة.' : 'You can return to the linked appointment without leaving the board.'}
+                        </p>
+                      </div>
+                    )}
+                  />
                 )}
               </AnimatePresence>
 
