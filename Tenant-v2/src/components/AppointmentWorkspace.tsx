@@ -166,6 +166,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
         const services = srvRes?.services || [];
         setLiveServices(services.map((s: any) => ({
+          id: s.id,
+          serviceId: s.id,
           nameEn: s.name_en || s.name || '',
           nameAr: s.name_ar || s.name || '',
           duration: s.duration || 60,

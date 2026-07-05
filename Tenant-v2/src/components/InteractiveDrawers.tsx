@@ -380,7 +380,8 @@ export default function InteractiveDrawers({
   }, [currentServiceId, services]);
 
   const handleAddStagedService = () => {
-    const srv = services.find(s => s.id === currentServiceId);
+    const resolvedServiceId = `${currentServiceId || ''}`.trim();
+    const srv = services.find(s => s.id === resolvedServiceId);
     if (!srv) return;
 
     let nextStartTime = currentStartTime;
@@ -391,7 +392,7 @@ export default function InteractiveDrawers({
 
     const newItem: StagedService = {
       id: `stg-${Date.now()}`,
-      serviceId: currentServiceId,
+      serviceId: resolvedServiceId,
       staffId: currentStaffId,
       startTime: nextStartTime,
       duration: currentDuration,
@@ -460,11 +461,12 @@ export default function InteractiveDrawers({
 
     let finalStaged = [...stagedServices];
     if (finalStaged.length === 0) {
-      const srv = services.find(s => s.id === currentServiceId);
+      const resolvedServiceId = `${currentServiceId || ''}`.trim();
+      const srv = services.find(s => s.id === resolvedServiceId);
       if (srv) {
         finalStaged.push({
           id: `stg-${Date.now()}`,
-          serviceId: currentServiceId,
+          serviceId: resolvedServiceId,
           staffId: currentStaffId,
           startTime: currentStartTime,
           duration: currentDuration,
