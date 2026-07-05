@@ -643,6 +643,10 @@ class TenantApiAdapter {
     return this.patch(`/tenant/appointments/${id}/payment`, payload);
   }
 
+  async recordRemainderPayment(id: string, payload: any): Promise<any> {
+    return this.post(`/tenant/appointments/${id}/record-payment`, payload);
+  }
+
   async topUpCustomerWallet(id: string, payload: any): Promise<any> {
     return this.post(`/tenant/customers/${id}/wallet/topup`, payload);
   }

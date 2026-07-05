@@ -46,7 +46,7 @@ interface Appointment {
   staffId: string;
   startTime: number; // minutes from 9:00 AM (0 to 720 for 12 hours)
   duration: number; // minutes
-  status: 'pending' | 'confirmed' | 'arrived' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
+  status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
   paymentStatus: 'paid' | 'unpaid' | 'partial';
   isGroupBooking: boolean;
   guestCount?: number;
@@ -103,20 +103,17 @@ const API_COLORS = [
 
 const normalizeWorkspaceAppointmentStatus = (status: any): Appointment['status'] => {
   const raw = `${status || ''}`.toLowerCase();
-  if (raw === 'checked_in' || raw === 'in_service') return 'arrived';
-  if (raw === 'pending') return 'confirmed';
+  if (raw === 'arrived') return 'checked_in';
   if (raw === 'canceled') return 'cancelled';
   if (raw === 'no-show' || raw === 'noshow') return 'no_show';
-  if (raw === 'confirmed' || raw === 'arrived' || raw === 'completed' || raw === 'cancelled' || raw === 'no_show') {
+  if (['pending', 'confirmed', 'checked_in', 'in_service', 'completed', 'cancelled', 'no_show'].includes(raw)) {
     return raw as Appointment['status'];
   }
   return 'confirmed';
 };
 
-const normalizeApiAppointmentStatus = (status: any): string => {
-  const raw = `${status || ''}`.toLowerCase();
-  if (raw === 'arrived') return 'checked_in';
-  return raw;
+const displayAppointmentStatus = (status: any): string => {
+  return normalizeWorkspaceAppointmentStatus(status);
 };
 
 export default function AppointmentWorkspace({ lang, onQuickAction }: AppointmentWorkspaceProps) {
@@ -622,7 +619,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       if (['cancelled', 'canceled'].includes(rawStatus)) return 'cancelled';
       if (['no-show', 'noshow', 'no_show'].includes(rawStatus)) return 'no_show';
       if (['completed', 'done', 'served'].includes(rawStatus)) return 'completed';
-      if (isFuture || ['confirmed', 'scheduled', 'pending', 'arrived', 'in_progress', 'in progress', 'booked'].includes(rawStatus)) return 'upcoming';
+      if (isFuture || ['confirmed', 'scheduled', 'pending', 'checked_in', 'arrived', 'in_progress', 'in progress', 'booked'].includes(rawStatus)) return 'upcoming';
       return 'completed';
     })();
     return customerAppointmentHistoryFilter === 'all' || bucket === customerAppointmentHistoryFilter;
@@ -1052,6 +1049,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [appliedGiftCardAmount, setAppliedGiftCardAmount] = useState<number>(0);
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [checkoutReceiptData, setCheckoutReceiptData] = useState<any | null>(null);
+  const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<string | null>(null);
 
   const activeInvoiceLineItems = activeAppointment ? [
     {
@@ -1083,6 +1081,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const activeInvoiceVat = Number((activeInvoiceTaxable * 0.15).toFixed(2));
   const activeInvoiceTotal = Number((activeInvoiceTaxable + activeInvoiceVat).toFixed(2));
   const activeInvoiceRemaining = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0) - Number(splitAmounts.wallet || 0));
+  const currentPaymentStatus = `${activeAppointment?.paymentStatus || ''}`.toLowerCase();
+  const paymentDueAmount = activeInvoiceRemaining;
 
   // Skeletons / Refresh Simulation
   const [isLoading, setIsLoading] = useState(false);
@@ -1577,7 +1577,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     const discount = appliedGiftCardAmount;
     const taxableAmount = Math.max(0, subtotal - discount);
     const vat = taxableAmount * 0.15;
-    const total = taxableAmount + vat;
+    const total = paymentDueAmount > 0 ? paymentDueAmount : taxableAmount + vat;
 
     let paymentMethodSummary = isRtl ? 'بوابة مدى الرقمية المتكاملة' : 'Integrated Mada Card Terminal';
     if (isSplitActive) {
@@ -1590,12 +1590,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
     try {
       // 1. Mark appointment as paid
-      const paymentResponse = await tenantApiAdapter.updateAppointmentPaymentStatus(activeAppointment.id, {
-        paymentStatus: 'fully_paid',
-        paymentMethod: paymentMethodSummary,
-        splitAmounts: isSplitActive ? splitAmounts : undefined,
-        totalPaid: total
-      });
+      const isRemainderPayment = ['partial', 'deposit_paid'].includes(currentPaymentStatus) || Number(activeAppointment?.totalPaid ?? 0) > 0;
+      const paymentResponse = isRemainderPayment && paymentDueAmount > 0
+        ? await tenantApiAdapter.recordRemainderPayment(activeAppointment.id, {
+            amount: total,
+            paymentMethod: paymentMethodSummary,
+            notes: isRtl ? 'تحصيل المتبقي من داخل لوحة الموعد' : 'Collected remainder from appointment drawer',
+            paymentAllocations: isSplitActive ? Object.entries(splitAmounts)
+              .filter(([, amount]) => Number(amount) > 0)
+              .map(([paymentMethod, amount]) => ({ paymentMethod, amount: Number(amount) })) : undefined
+          })
+        : await tenantApiAdapter.updateAppointmentPaymentStatus(activeAppointment.id, {
+            paymentStatus: 'fully_paid',
+            paymentMethod: paymentMethodSummary,
+            splitAmounts: isSplitActive ? splitAmounts : undefined,
+            totalPaid: total
+          });
 
       // 2. Checkout any added products
       if (checkoutProducts.length > 0) {
@@ -1634,6 +1644,19 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           setActiveAppointment(mapBoardAppointment(confirmedData, selectedDate.toISOString().split('T')[0]));
         }
       }
+      if (pendingStatusAfterPayment) {
+        const statusResponse = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, pendingStatusAfterPayment, activeAppointment.notes);
+        if (!statusResponse?.success) {
+          throw new Error(statusResponse?.message || 'Failed to apply pending appointment status');
+        }
+        const refreshedStatus = await tenantApiAdapter.getAppointment(activeAppointment.id);
+        const statusData = refreshedStatus?.appointment || refreshedStatus?.data?.appointment || refreshedStatus?.data || refreshedStatus;
+        if (statusData) {
+          setActiveAppointment(mapBoardAppointment(statusData, selectedDate.toISOString().split('T')[0]));
+        }
+        await loadBoardData();
+      }
+      setPendingStatusAfterPayment(null);
       
       addLocalToast(
         'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',
@@ -1646,47 +1669,82 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     }
   };
 
-  const getAppointmentStatusOptions = () => [
-    { value: 'pending', label: isRtl ? 'محجوز' : 'Booked' },
-    { value: 'confirmed', label: isRtl ? 'مؤكد' : 'Confirmed' },
-    { value: 'checked_in', label: isRtl ? 'تم الوصول' : 'Arrived' },
-    { value: 'in_service', label: isRtl ? 'بدأت الخدمة' : 'In Service' },
-    { value: 'completed', label: isRtl ? 'مكتمل' : 'Completed' },
-    { value: 'no_show', label: isRtl ? 'عدم حضور' : 'No-show' },
-    { value: 'cancelled', label: isRtl ? 'ملغي' : 'Cancelled' }
-  ];
+  const getAppointmentStatusOptions = (currentStatus: Appointment['status']) => {
+    const options: Array<{ value: Appointment['status']; label: string }> = [];
+    const push = (value: Appointment['status'], label: string) => {
+      if (!options.some((option) => option.value === value)) {
+        options.push({ value, label });
+      }
+    };
 
-  const handleAppointmentStatusUpdate = async (nextStatus: string) => {
-    if (!activeAppointment || appointmentDetailsReadOnly) {
+    push('pending', isRtl ? 'محجوز' : 'Booked');
+    push('confirmed', isRtl ? 'مؤكد' : 'Confirmed');
+    push('checked_in', isRtl ? 'تم الوصول' : 'Arrived');
+    push('in_service', isRtl ? 'بدأت الخدمة' : 'Started');
+    push('completed', isRtl ? 'مكتمل' : 'Completed');
+    push('no_show', isRtl ? 'عدم حضور' : 'No-show');
+    push('cancelled', isRtl ? 'ملغي' : 'Cancelled');
+
+    if (['completed', 'cancelled', 'no_show'].includes(currentStatus)) {
+      return options.filter((option) => option.value === currentStatus);
+    }
+
+    return options;
+  };
+
+  const handleAppointmentStatusUpdate = async (nextStatus: Appointment['status']) => {
+    if (!activeAppointment || appointmentDetailsReadOnly || statusUpdating) {
       return;
     }
 
-    const normalizedCurrent = normalizeApiAppointmentStatus(activeAppointment.status);
-    const normalizedNext = normalizeApiAppointmentStatus(nextStatus);
+    const normalizedCurrent = normalizeWorkspaceAppointmentStatus(activeAppointment.status);
+    const normalizedNext = normalizeWorkspaceAppointmentStatus(nextStatus);
     if (normalizedCurrent === normalizedNext) {
+      return;
+    }
+
+    if (normalizedNext === 'pending') {
+      return;
+    }
+
+    if (normalizedNext === 'completed' && paymentDueAmount > 0) {
+      addLocalToast(
+        isRtl ? 'لا يمكنك تغيير الحالة إلى مكتمل إلا بعد سداد مبلغ الحجز بالكامل.' : 'You can not change to completed unless the booking amount is paid.',
+        isRtl ? 'You can not change to completed unless the booking amount is paid.' : 'لا يمكنك تغيير الحالة إلى مكتمل إلا بعد سداد مبلغ الحجز بالكامل.',
+        'warning'
+      );
+      return;
+    }
+
+    if (normalizedNext === 'checked_in' && paymentDueAmount > 0) {
+      setPendingStatusAfterPayment('checked_in');
+      addLocalToast(
+        isRtl ? 'أكمل تحصيل الدفع أولاً ثم سنثبت حالة الوصول.' : 'Collect payment first, then we will mark the appointment as arrived.',
+        isRtl ? 'Collect payment first, then we will mark the appointment as arrived.' : 'أكمل تحصيل الدفع أولاً ثم سنثبت حالة الوصول.',
+        'warning'
+      );
       return;
     }
 
     setStatusUpdating(true);
     try {
       const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, normalizedNext, activeAppointment.notes);
-      if (response?.success) {
-        await loadBoardData();
-        const updatedAppointment = response?.appointment || response?.data?.appointment || response?.data || null;
-        if (updatedAppointment) {
-          setActiveAppointment(mapBoardAppointment(updatedAppointment, getSelectedDateKey()));
-        } else {
-          setActiveAppointment(prev => prev ? { ...prev, status: normalizeWorkspaceAppointmentStatus(normalizedNext) } : null);
-        }
-        setCustomerProfileRefreshToken(token => token + 1);
-        addLocalToast(
-          isRtl ? 'تم تحديث حالة الموعد بنجاح.' : 'Appointment status updated successfully.',
-          isRtl ? 'Appointment status updated successfully.' : 'تم تحديث حالة الموعد بنجاح.',
-          'success'
-        );
-      } else {
+      if (!response?.success) {
         throw new Error(response?.message || 'Failed to update appointment status');
       }
+
+      await loadBoardData();
+      const refreshed = await tenantApiAdapter.getAppointment(activeAppointment.id);
+      const refreshedData = refreshed?.appointment || refreshed?.data?.appointment || refreshed?.data || refreshed;
+      if (refreshedData) {
+        setActiveAppointment(mapBoardAppointment(refreshedData, selectedDate.toISOString().split('T')[0]));
+      }
+      setCustomerProfileRefreshToken(token => token + 1);
+      addLocalToast(
+        isRtl ? 'تم تحديث حالة الموعد بنجاح.' : 'Appointment status updated successfully.',
+        isRtl ? 'Appointment status updated successfully.' : 'تم تحديث حالة الموعد بنجاح.',
+        'success'
+      );
     } catch (err) {
       console.error('Failed to update appointment status', err);
       addLocalToast(
@@ -2439,7 +2497,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                 {[
                   { id: 'all', label: t.allStatus },
                   { id: 'confirmed', label: t.confirmed },
-                  { id: 'arrived', label: t.arrived },
+                  { id: 'checked_in', label: t.arrived },
                   { id: 'completed', label: t.completed }
                 ].map(opt => (
                   <button
@@ -2563,12 +2621,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         const stylist = liveStylists.find(s => s.id === apt.staffId);
                         const statusBadgeColor = 
                           apt.status === 'confirmed' ? 'bg-amber-100 text-amber-700 border-amber-200/60' :
-                          apt.status === 'arrived' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                          apt.status === 'checked_in' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
                           apt.status === 'completed' ? 'bg-zinc-100 text-zinc-700 border-zinc-200' : 'bg-rose-100 text-rose-700 border-rose-200';
 
                         const statusText = 
                           apt.status === 'confirmed' ? t.confirmed :
-                          apt.status === 'arrived' ? t.arrived :
+                          apt.status === 'checked_in' ? t.arrived :
                           apt.status === 'completed' ? t.completed : (isRtl ? 'ملغي' : 'Cancelled');
 
                         return (
@@ -3113,7 +3171,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           // Color categories based on status
                           if (apt.status === 'confirmed') {
                             classNames = "bg-amber-50 text-amber-900 border-amber-200/80 shadow-xs hover:border-amber-300";
-                          } else if (apt.status === 'arrived') {
+                          } else if (apt.status === 'checked_in') {
                             classNames = "bg-emerald-50 text-emerald-900 border-emerald-200 shadow-xs hover:border-emerald-300";
                           } else if (apt.status === 'completed') {
                             classNames = "bg-zinc-100 text-zinc-700 border-zinc-200 shadow-xs opacity-90";
@@ -3335,15 +3393,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     {isRtl ? 'تفاصيل الحجز وإدارة العميل' : 'APPOINTMENT OPERATIONS CONTROL'}
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
                       normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'confirmed' ? 'bg-amber-100 text-amber-700' :
-                        normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'arrived' ? 'bg-emerald-100 text-emerald-700' :
+                        normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'checked_in' ? 'bg-emerald-100 text-emerald-700' :
                         normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'cancelled' ? 'bg-rose-100 text-rose-700' :
                         normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'no_show' ? 'bg-slate-100 text-slate-700' :
                         'bg-zinc-100 text-zinc-700'
                       }`}>
-                        {normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'confirmed' ? t.confirmed :
-                         normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'arrived' ? t.arrived :
-                         normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'cancelled' ? (isRtl ? 'ملغي' : 'Cancelled') :
-                         normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'no_show' ? (isRtl ? 'عدم حضور' : 'No-show') : t.completed}
+                        {displayAppointmentStatus(activeAppointment.status) === 'confirmed' ? t.confirmed :
+                         displayAppointmentStatus(activeAppointment.status) === 'checked_in' ? t.arrived :
+                         displayAppointmentStatus(activeAppointment.status) === 'cancelled' ? (isRtl ? 'ملغي' : 'Cancelled') :
+                         displayAppointmentStatus(activeAppointment.status) === 'no_show' ? (isRtl ? 'عدم حضور' : 'No-show') : t.completed}
                       </span>
                       {appointmentDetailsReadOnly && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-600 border border-slate-200">
@@ -3359,16 +3417,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         {isRtl ? 'حالة الموعد' : 'Status'}
                       </label>
                       <select
-                        value={normalizeApiAppointmentStatus(activeAppointment.status)}
+                        value={normalizeWorkspaceAppointmentStatus(activeAppointment.status)}
                         disabled={statusUpdating || appointmentDetailsReadOnly || ['completed', 'cancelled', 'no_show'].includes(normalizeWorkspaceAppointmentStatus(activeAppointment.status))}
                         onChange={(event) => {
-                          const nextStatus = event.target.value;
-                          if (nextStatus === normalizeApiAppointmentStatus(activeAppointment.status)) return;
+                          const nextStatus = event.target.value as Appointment['status'];
+                          if (nextStatus === normalizeWorkspaceAppointmentStatus(activeAppointment.status)) return;
                           void handleAppointmentStatusUpdate(nextStatus);
                         }}
                         className={`min-w-[170px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60 ${isRtl ? 'text-right' : 'text-left'}`}
                       >
-                        {getAppointmentStatusOptions().map((option) => (
+                        {getAppointmentStatusOptions(normalizeWorkspaceAppointmentStatus(activeAppointment.status)).map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>
