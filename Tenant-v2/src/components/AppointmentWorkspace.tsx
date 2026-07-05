@@ -159,8 +159,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       serviceId: a.service?.id || a.serviceId,
       customerNameEn: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : a.customerNameEn || 'Walk-in',
       customerNameAr: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : a.customerNameAr || 'زائرة',
-      serviceNameEn: a.service?.name_en || a.serviceNameEn || 'Service',
-      serviceNameAr: a.service?.name_ar || a.serviceNameAr || 'الخدمة',
+      serviceNameEn: a.service?.name_en || a.service?.nameEn || a.service?.name || a.serviceNameEn || 'Service',
+      serviceNameAr: a.service?.name_ar || a.service?.nameAr || a.service?.name || a.serviceNameAr || 'الخدمة',
       staffId: a.staffId,
       startTime: startMins,
       duration: a.service?.duration || a.duration || 60,
@@ -259,13 +259,73 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   // Selection / Detail Drawer State
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<'crm' | 'financials' | 'timeline' | 'reviews'>('crm');
+  const [drawerTab, setDrawerTab] = useState<'crm' | 'customer' | 'financials' | 'timeline' | 'reviews'>('crm');
   const [activeStylistMenuId, setActiveStylistMenuId] = useState<string | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<any | null>(null);
+  const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
+  const [customerProfileError, setCustomerProfileError] = useState<string | null>(null);
+
+  const activeServiceSummary = (() => {
+    const service = liveServices.find(s => s.id === activeAppointment?.serviceId);
+    const serviceNameEn = activeAppointment?.serviceNameEn && activeAppointment.serviceNameEn !== 'Service'
+      ? activeAppointment.serviceNameEn
+      : service?.nameEn || 'Service';
+    const serviceNameAr = activeAppointment?.serviceNameAr && activeAppointment.serviceNameAr !== 'الخدمة'
+      ? activeAppointment.serviceNameAr
+      : service?.nameAr || 'الخدمة';
+    return {
+      nameEn: serviceNameEn,
+      nameAr: serviceNameAr,
+      duration: activeAppointment?.duration || service?.duration || 60,
+      price: activeAppointment?.price || service?.price || 0,
+      categoryEn: service?.categoryEn || '',
+      categoryAr: service?.categoryAr || ''
+    };
+  })();
   
   // Custom Drag State & Interactive Preview
   const [draggedAptId, setDraggedAptId] = useState<string | null>(null);
   const [dragOverStaffId, setDragOverStaffId] = useState<string | null>(null);
   const [dragOverTime, setDragOverTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCustomerProfile = async () => {
+      if (!drawerOpen || !activeAppointment?.customerId) {
+        setCustomerProfile(null);
+        setCustomerProfileError(null);
+        setCustomerProfileLoading(false);
+        return;
+      }
+
+      setCustomerProfileLoading(true);
+      setCustomerProfileError(null);
+
+      try {
+        const response = await tenantApiAdapter.getCustomer(activeAppointment.customerId);
+        const profile = normalizeCustomerProfile(response);
+        if (!cancelled) {
+          setCustomerProfile(profile);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setCustomerProfileError(err?.message || 'Failed to load customer profile');
+          setCustomerProfile(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setCustomerProfileLoading(false);
+        }
+      }
+    };
+
+    void loadCustomerProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerOpen, drawerTab, activeAppointment?.customerId]);
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{
@@ -326,6 +386,50 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       };
     }
     return { ar: fallbackAr, en: fallbackEn };
+  };
+
+  const normalizeCustomerProfile = (payload: any) => {
+    const customer = payload?.customer || payload?.data?.customer || payload?.data || payload || {};
+    const firstName = customer.firstName || customer.first_name || '';
+    const lastName = customer.lastName || customer.last_name || '';
+    const fullName = customer.name || customer.fullName || `${firstName} ${lastName}`.trim() || activeAppointment?.customerNameEn || activeAppointment?.customerNameAr || 'Guest';
+    const reviews = Array.isArray(customer.reviews) ? customer.reviews : [];
+    const notes = Array.isArray(customer.notes)
+      ? customer.notes
+      : typeof customer.notes === 'string' && customer.notes.trim().length > 0
+        ? [customer.notes]
+        : [];
+
+    return {
+      id: customer.id || activeAppointment?.customerId || '',
+      nameEn: fullName,
+      nameAr: customer.nameAr || fullName,
+      email: customer.email || activeAppointment?.customerEmail || '',
+      phone: customer.phone || activeAppointment?.customerPhone || '',
+      gender: customer.gender || '',
+      birthdate: customer.birthdate || customer.birthDate || '',
+      preferredLanguage: customer.preferredLanguage || 'ar',
+      memberSince: customer.memberSince || customer.createdAt || '',
+      loyaltyTier: customer.loyaltyTier || activeAppointment?.loyaltyTier || 'Regular Member',
+      walletBalance: customer.walletBalance ?? activeAppointment?.walletBalance ?? 0,
+      appointmentsCount: customer.appointmentsCount ?? customer.totalBookings ?? 0,
+      totalSpent: customer.totalSpent ?? 0,
+      lastVisit: customer.lastVisit || '',
+      tags: Array.isArray(customer.tags) ? customer.tags : [],
+      notes,
+      reviews,
+      communication: Array.isArray(customer.communication) ? customer.communication : [],
+      history: Array.isArray(customer.history) ? customer.history : [],
+      assignedStylist: customer.assignedStylist || '',
+      assignedStylistAr: customer.assignedStylistAr || customer.assignedStylist || '',
+      customerType: customer.customerType || customer.type || '',
+      favServices: Array.isArray(customer.favServices) ? customer.favServices : [],
+      favServicesAr: Array.isArray(customer.favServicesAr) ? customer.favServicesAr : [],
+      visitsCount: customer.visitsCount ?? 0,
+      noShowsCount: customer.noShowsCount ?? 0,
+      documents: Array.isArray(customer.documents) ? customer.documents : [],
+      transactions: Array.isArray(customer.transactions) ? customer.transactions : []
+    };
   };
 
   // --- INTERACTIVE ADD APPOINTMENT / BLOCK TIME DRAWER ---
@@ -685,6 +789,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setCheckoutProducts([]);
     setAppliedGiftCardCode('');
     setAppliedGiftCardAmount(0);
+    setCustomerProfile(null);
+    setCustomerProfileError(null);
     setDrawerOpen(true);
   };
 
@@ -2370,6 +2476,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all cursor-pointer" title="Share Touchpoint">
                     <Share2 size={15} />
                   </button>
+                  <button
+                    onClick={() => setDrawerTab('customer')}
+                    className="px-3 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
+                    title={isRtl ? 'فتح ملف العميل' : 'Open customer profile'}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <User size={14} />
+                      <span>{isRtl ? 'ملف العميل' : 'Customer Profile'}</span>
+                    </div>
+                  </button>
                   <div className="h-5 w-px bg-slate-200 mx-1" />
                   <button 
                     onClick={() => setDrawerOpen(false)}
@@ -2453,6 +2569,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   {/* Sliding Tabs selector header */}
                   <div className="bg-white p-1 rounded-xl border border-slate-200/60 flex gap-1 shadow-2xs">
                     {[
+                      { id: 'customer', label: isRtl ? 'ملف العميل' : 'Customer Profile' },
                       { id: 'crm', label: isRtl ? 'الملخص والتحكم' : 'Interactive Hub' },
                       { id: 'timeline', label: isRtl ? 'الخط الزمني' : 'Timeline History' },
                       { id: 'reviews', label: isRtl ? 'التقييمات والآراء' : 'Reviews Log' }
@@ -2471,6 +2588,126 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     ))}
                   </div>
 
+                  {/* TAB 0: CUSTOMER PROFILE */}
+                  {drawerTab === 'customer' && (
+                    <div className="space-y-5">
+                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                              {isRtl ? 'ملف العميل الفعلي' : 'Live Customer Profile'}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {isRtl ? 'الملف المرتبط بالموعد الحالي' : 'Profile linked to the active appointment'}
+                            </p>
+                          </div>
+                          {customerProfileLoading && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">
+                              {isRtl ? 'جاري التحميل...' : 'Loading...'}
+                            </span>
+                          )}
+                        </div>
+
+                        {customerProfileError && (
+                          <div className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold">
+                            {customerProfileError}
+                          </div>
+                        )}
+
+                        {(() => {
+                          const fallbackCustomer = activeAppointment?.customerId
+                            ? liveCustomers.find(c => c.id === activeAppointment.customerId)
+                            : null;
+                          const profile = customerProfile || (fallbackCustomer ? normalizeCustomerProfile(fallbackCustomer) : null);
+
+                          if (!profile) {
+                            return (
+                              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                {isRtl ? 'لا يوجد ملف عميل مرتبط بالموعد الحالي.' : 'No customer profile is linked to the active appointment.'}
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-14 h-14 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center font-black text-amber-700 text-lg">
+                                    {profile.nameEn.slice(0, 2).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-bold text-slate-800">{isRtl ? profile.nameAr : profile.nameEn}</p>
+                                    <p className="text-[10px] text-slate-400 font-mono">ID: {profile.id || activeAppointment?.customerId || '-'}</p>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2 text-slate-600">
+                                  <div className="flex items-center gap-2">
+                                    <Phone size={13} className="text-slate-400" />
+                                    <span className="font-mono">{profile.phone || '-'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Mail size={13} className="text-slate-400" />
+                                    <span className="truncate">{profile.email || '-'}</span>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="rounded-lg bg-white border border-slate-200 p-2">
+                                    <p className="text-[9px] uppercase font-black text-slate-400">{isRtl ? 'الولاء' : 'Loyalty'}</p>
+                                    <p className="font-bold text-slate-800 mt-1">{profile.loyaltyTier || '-'}</p>
+                                  </div>
+                                  <div className="rounded-lg bg-white border border-slate-200 p-2">
+                                    <p className="text-[9px] uppercase font-black text-slate-400">{isRtl ? 'الرصيد' : 'Wallet'}</p>
+                                    <p className="font-bold text-slate-800 mt-1 font-mono">{profile.walletBalance || 0} {t.riyal}</p>
+                                  </div>
+                                  <div className="rounded-lg bg-white border border-slate-200 p-2">
+                                    <p className="text-[9px] uppercase font-black text-slate-400">{isRtl ? 'المواعيد' : 'Appointments'}</p>
+                                    <p className="font-bold text-slate-800 mt-1 font-mono">{profile.appointmentsCount || 0}</p>
+                                  </div>
+                                  <div className="rounded-lg bg-white border border-slate-200 p-2">
+                                    <p className="text-[9px] uppercase font-black text-slate-400">{isRtl ? 'آخر زيارة' : 'Last Visit'}</p>
+                                    <p className="font-bold text-slate-800 mt-1 truncate">{profile.lastVisit || '-'}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                                <div>
+                                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'الوسوم' : 'Tags'}</h5>
+                                  <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {(profile.tags || []).length > 0 ? profile.tags.map((tag: string, idx: number) => (
+                                      <span key={idx} className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                                        {tag}
+                                      </span>
+                                    )) : (
+                                      <span className="text-slate-400 text-xs">{isRtl ? 'لا توجد وسوم' : 'No tags available'}</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'ملاحظات' : 'Notes'}</h5>
+                                  <div className="mt-2 space-y-1">
+                                    {(profile.notes || []).length > 0 ? profile.notes.map((note: string, idx: number) => (
+                                      <div key={idx} className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-[11px]">
+                                        {note}
+                                      </div>
+                                    )) : (
+                                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs">
+                                        {isRtl ? 'لا توجد ملاحظات محفوظة.' : 'No notes saved.'}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
                   {/* TAB 1: CORE CRM & WALLET INTERFACE */}
                   {drawerTab === 'crm' && (
                     <div className="space-y-5">
@@ -2483,15 +2720,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                               {isRtl ? 'الخدمة الرئيسية النشطة' : 'ACTIVE SERVICE LINE'}
                             </span>
                             <h4 className="font-bold text-slate-800 text-base mt-2.5">
-                              {isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn}
+                              {isRtl ? activeServiceSummary.nameAr : activeServiceSummary.nameEn}
                             </h4>
                             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                               <Clock size={12} />
-                              <span>{activeAppointment.duration} {t.durationMin} • {isRtl ? 'مع خبيرة التجميل' : 'assigned to'} {isRtl ? liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameAr : liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameEn}</span>
+                              <span>{activeServiceSummary.duration} {t.durationMin} • {isRtl ? 'مع خبيرة التجميل' : 'assigned to'} {isRtl ? liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameAr : liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameEn}</span>
                             </p>
                           </div>
                           <span className="text-base font-black text-slate-900 font-mono">
-                            {activeAppointment.price} {t.riyal}
+                            {activeServiceSummary.price} {t.riyal}
                           </span>
                         </div>
 
@@ -2883,37 +3120,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       
                       {/* Timeline entries list */}
                       <div className="relative border-l border-slate-200 pl-4 space-y-5 py-2 text-xs">
-                        
-                        <div className="relative">
-                          {/* Circle dot marker */}
-                          <span className="absolute -left-6 top-1.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white" />
-                          <div>
-                            <p className="font-bold text-slate-800">{isRtl ? 'تم تأكيد الموعد رقمياً' : 'Automated System Confirmation'}</p>
-                            <p className="text-slate-500 text-[10px] mt-0.5">2026-06-27 • 04:30 PM</p>
-                            <p className="text-slate-500 mt-1 leading-relaxed">
-                              {isRtl ? 'تم إرسال رسالة الواتساب وتأكيد الزبونة المباشر.' : 'Instant WhatsApp alert sent. Authenticated by customer gateway.'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="relative">
-                          <span className="absolute -left-6 top-1.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" />
-                          <div>
-                            <p className="font-bold text-slate-800">{isRtl ? 'وصول العميل لصالون رفاه الملكي' : 'Lobby Portal Attendance registered'}</p>
-                            <p className="text-slate-500 text-[10px] mt-0.5">2026-06-27 • 09:12 AM</p>
-                            <p className="text-slate-500 mt-1 leading-relaxed">
-                              {isRtl ? 'تم الترحيب بالضيف وتقديم شاي الضيافة الملكي.' : 'Lounge receptionist check-in completed. Royal greeting service dispatched.'}
-                            </p>
-                          </div>
-                        </div>
-
                         <div className="relative">
                           <span className="absolute -left-6 top-1.5 w-3.5 h-3.5 rounded-full bg-slate-300 border-2 border-white" />
                           <div>
-                            <p className="font-bold text-slate-800">{isRtl ? 'ملاحظة تفضيل المنتجات الحساسة' : 'Skin Care Routine Filter Updated'}</p>
-                            <p className="text-slate-500 text-[10px] mt-0.5">2026-06-15 • 11:00 AM</p>
+                            <p className="font-bold text-slate-800">{isRtl ? 'السجل الزمني ما زال غير متصل' : 'Timeline log not yet connected'}</p>
+                            <p className="text-slate-500 text-[10px] mt-0.5">{isRtl ? 'البيانات الزمنية' : 'Timeline data'}</p>
                             <p className="text-slate-500 mt-1 leading-relaxed">
-                              {isRtl ? 'تفضل استخدام الألوفيرا الطبيعي وتجنب المنتجات العطرية.' : 'Customer highlighted high sensitivity. Prefer organic alternatives.'}
+                              {isRtl ? 'هذه التبويبة ما زالت تعرض محتوى ثابتاً ولم تُربط بعد بمصدر الأحداث الفعلي.' : 'This tab is still static content and has not yet been wired to the live event stream.'}
                             </p>
                           </div>
                         </div>
@@ -2928,40 +3141,44 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{t.reviewsText}</h4>
                       
                       <div className="space-y-3.5">
-                        
-                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2 text-xs">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-slate-800">{isRtl ? 'تنظيف بشرة هيدرافيشال' : 'HydraFacial Cleansing'}</span>
-                            <div className="flex text-amber-500 gap-0.5">
-                              <Star size={11} fill="currentColor" />
-                              <Star size={11} fill="currentColor" />
-                              <Star size={11} fill="currentColor" />
-                              <Star size={11} fill="currentColor" />
-                              <Star size={11} fill="currentColor" />
-                            </div>
-                          </div>
-                          <p className="text-slate-600 leading-relaxed italic">
-                            {isRtl ? '"الخدمة رائعة جداً ونظافة المكان خيالية، نادين خبيرة بكل تفاصيل عملها وتريح الزبونة."' : '"Absolutely phenomenal service. The spa atmosphere was deeply soothing, and Layla made the treatment very relaxing."'}
-                          </p>
-                          <p className="text-[10px] text-slate-400">Reviewed 2 weeks ago</p>
-                        </div>
+                        {(() => {
+                          const reviews = customerProfile?.reviews || [];
 
-                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2 text-xs">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-slate-800">{isRtl ? 'قص وتسريح بريميوم' : 'Premium Cut & Color'}</span>
-                            <div className="flex text-amber-500 gap-0.5">
-                              <Star size={11} fill="currentColor" />
-                              <Star size={11} fill="currentColor" />
-                              <Star size={11} fill="currentColor" />
-                              <Star size={11} fill="currentColor" />
-                              <Star size={11} fill="currentColor" />
+                          if (customerProfileLoading) {
+                            return (
+                              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                {isRtl ? 'جاري تحميل التقييمات من ملف العميل...' : 'Loading customer reviews from the live profile...'}
+                              </div>
+                            );
+                          }
+
+                          if (reviews.length === 0) {
+                            return (
+                              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                {isRtl ? 'لا توجد تقييمات مسجلة لهذا العميل حالياً.' : 'No customer reviews are linked to this appointment yet.'}
+                              </div>
+                            );
+                          }
+
+                          return reviews.map((review: any, idx: number) => (
+                            <div key={review.id || idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2 text-xs">
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-slate-800">{review.serviceName || review.title || (isRtl ? 'خدمة مرتبطة' : 'Linked Service')}</span>
+                                <div className="flex text-amber-500 gap-0.5">
+                                  {Array.from({ length: Math.max(1, Math.min(5, review.rating || 0)) }).map((_, starIdx) => (
+                                    <Star key={starIdx} size={11} fill="currentColor" />
+                                  ))}
+                                </div>
+                              </div>
+                              <p className="text-slate-600 leading-relaxed italic">
+                                {review.comment || review.text || (isRtl ? 'لا يوجد تعليق مسجل.' : 'No comment recorded.')}
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                {review.createdAt || review.reviewedAt || ''}
+                              </p>
                             </div>
-                          </div>
-                          <p className="text-slate-600 leading-relaxed italic">
-                            {isRtl ? '"قصة شعر مذهلة كالعادة، دقة عالية في المواعيد."' : '"Stunning haircut as always. Extremely punctual and hospitable team."'}
-                          </p>
-                          <p className="text-[10px] text-slate-400">Reviewed 1 month ago</p>
-                        </div>
+                          ));
+                        })()}
 
                       </div>
                     </div>
