@@ -34,6 +34,9 @@ interface Appointment {
   id: string;
   customerId?: string;
   serviceId?: string;
+  bookingSessionId?: string;
+  bookingReference?: string;
+  bookingItemIndex?: number;
   customerNameEn: string;
   customerNameAr: string;
   serviceNameEn: string;
@@ -177,27 +180,71 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const mapBoardAppointment = (a: any, dateKey: string): Appointment => {
     const startDate = new Date(a.startTime);
     const startMins = startDate.getHours() * 60 + startDate.getMinutes() - 9 * 60;
-    const services = Array.isArray(a.services) ? a.services : Array.isArray(a.serviceItems) ? a.serviceItems : (a.service ? [a.service] : []);
+    const sessionAppointments = Array.isArray(a.bookingSession?.appointments) ? a.bookingSession.appointments : [];
+    const services = sessionAppointments.length > 0
+      ? sessionAppointments
+      : Array.isArray(a.services)
+        ? a.services
+        : Array.isArray(a.serviceItems)
+          ? a.serviceItems
+          : (a.service ? [a.service] : []);
     const lineItems = Array.isArray(a.lineItems) ? a.lineItems : Array.isArray(a.invoiceItems) ? a.invoiceItems : [];
     const products = Array.isArray(a.products) ? a.products : Array.isArray(a.productItems) ? a.productItems : Array.isArray(a.retailItems) ? a.retailItems : [];
+    const normalizeServiceName = (item: any, key: 'en' | 'ar') => {
+      if (key === 'en') {
+        return item?.service?.name_en
+          || item?.service?.nameEn
+          || item?.service?.name
+          || item?.serviceNameEn
+          || item?.serviceName
+          || item?.nameEn
+          || item?.name
+          || item?.title
+          || '';
+      }
+      return item?.service?.name_ar
+        || item?.service?.nameAr
+        || item?.service?.name
+        || item?.serviceNameAr
+        || item?.serviceName
+        || item?.nameAr
+        || item?.name
+        || item?.title
+        || '';
+    };
+    const serviceNameEn = services.length > 1
+      ? services.map((item: any) => normalizeServiceName(item, 'en')).filter(Boolean).join(' + ')
+      : a.service?.name_en || a.service?.nameEn || a.service?.name || a.serviceNameEn || 'Service';
+    const serviceNameAr = services.length > 1
+      ? services.map((item: any) => normalizeServiceName(item, 'ar')).filter(Boolean).join(' + ')
+      : a.service?.name_ar || a.service?.nameAr || a.service?.name || a.serviceNameAr || 'الخدمة';
+    const duration = sessionAppointments.length > 0
+      ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.duration || item?.service?.duration || 0), 0)
+      : (a.service?.duration || a.duration || 60);
+    const price = sessionAppointments.length > 0
+      ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.price || item?.service?.price || 0), 0)
+      : parseFloat(a.price || 0);
     return {
       id: a.id,
       customerId: a.user?.id || a.customerId,
       serviceId: a.service?.id || a.serviceId,
+      bookingSessionId: a.bookingSession?.id || a.bookingSessionId || undefined,
+      bookingReference: a.bookingSession?.bookingReference || a.bookingReference || undefined,
+      bookingItemIndex: Number.isFinite(Number(a.bookingItemIndex)) ? Number(a.bookingItemIndex) : undefined,
       customerNameEn: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : a.customerNameEn || 'Walk-in',
       customerNameAr: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : a.customerNameAr || 'زائرة',
-      serviceNameEn: a.service?.name_en || a.service?.nameEn || a.service?.name || a.serviceNameEn || 'Service',
-      serviceNameAr: a.service?.name_ar || a.service?.nameAr || a.service?.name || a.serviceNameAr || 'الخدمة',
+      serviceNameEn,
+      serviceNameAr,
       staffId: a.staffId,
       startTime: startMins,
-      duration: a.service?.duration || a.duration || 60,
+      duration,
       status: a.status,
       paymentStatus: a.paymentStatus,
       isGroupBooking: Boolean(a.isGroupBooking),
       guestCount: a.guestCount,
       hasNotes: !!a.notes,
       notes: a.notes,
-      price: parseFloat(a.price || 0),
+      price,
       tags: Array.isArray(a.tags) ? a.tags : [],
       customerPhone: a.user?.phone || a.customerPhone,
       customerEmail: a.user?.email || a.customerEmail,
@@ -230,6 +277,113 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       serviceCategory: a.service?.category || a.serviceCategory || 'hair',
       date: a.date || dateKey
     };
+  };
+
+  const groupBoardAppointments = (items: Appointment[]) => {
+    const grouped = new Map<string, Appointment[]>();
+    const standalone: Appointment[] = [];
+
+    items.forEach((item) => {
+      if (item.type === 'blocked') {
+        standalone.push(item);
+        return;
+      }
+
+      const groupingKey = item.bookingSessionId || item.bookingReference;
+      if (!groupingKey) {
+        standalone.push(item);
+        return;
+      }
+
+      const bucket = grouped.get(groupingKey) || [];
+      bucket.push(item);
+      grouped.set(groupingKey, bucket);
+    });
+
+    const aggregateGroup = (group: Appointment[]): Appointment => {
+      if (group.length === 1) {
+        return group[0];
+      }
+
+      const primary = group[0];
+      const serviceEntries = group.flatMap((item) => {
+        if (Array.isArray(item.serviceItems) && item.serviceItems.length > 0) {
+          return item.serviceItems;
+        }
+        if (Array.isArray(item.services) && item.services.length > 0) {
+          return item.services;
+        }
+        if (item.serviceId || item.serviceNameEn || item.serviceNameAr) {
+          return [{
+            id: item.serviceId || `svc-${item.id}`,
+            nameEn: item.serviceNameEn,
+            nameAr: item.serviceNameAr,
+            duration: item.duration,
+            price: item.price
+          }];
+        }
+        return [];
+      });
+      const uniqueServiceEntries = serviceEntries.filter((entry, index, arr) => {
+        const entryKey = `${entry?.id || entry?.serviceId || entry?.nameEn || entry?.nameAr || index}`;
+        return arr.findIndex((candidate) => `${candidate?.id || candidate?.serviceId || candidate?.nameEn || candidate?.nameAr || ''}` === entryKey) === index;
+      });
+      const namesEn = uniqueServiceEntries
+        .map((entry: any) => entry?.service?.name_en || entry?.name_en || entry?.serviceNameEn || entry?.nameEn || entry?.name || '')
+        .filter(Boolean);
+      const namesAr = uniqueServiceEntries
+        .map((entry: any) => entry?.service?.name_ar || entry?.name_ar || entry?.serviceNameAr || entry?.nameAr || entry?.name || '')
+        .filter(Boolean);
+      const staffNames = Array.from(new Set(group.map((entry) => entry.assignedStaffName).filter(Boolean)));
+      const sumDuration = group.reduce((sum, entry) => sum + Number(entry.duration || 0), 0);
+      const sumPrice = group.reduce((sum, entry) => sum + Number(entry.price || 0), 0);
+      const sumPaid = group.reduce((sum, entry) => sum + Number(entry.totalPaid || 0), 0);
+      const sumRemainder = group.reduce((sum, entry) => sum + Number(entry.remainderAmount || 0), 0);
+      const combinedLineItems = group.flatMap((entry) => Array.isArray(entry.lineItems) ? entry.lineItems : Array.isArray(entry.invoiceItems) ? entry.invoiceItems : []);
+      const combinedProducts = group.flatMap((entry) => Array.isArray(entry.products) ? entry.products : Array.isArray(entry.productItems) ? entry.productItems : Array.isArray(entry.retailItems) ? entry.retailItems : []);
+      const combinedTags = Array.from(new Set(group.flatMap((entry) => Array.isArray(entry.tags) ? entry.tags : [])));
+
+      return {
+        ...primary,
+        id: primary.id,
+        serviceId: primary.serviceId || group.find((entry) => entry.serviceId)?.serviceId,
+        bookingSessionId: primary.bookingSessionId || undefined,
+        bookingReference: primary.bookingReference || undefined,
+        serviceNameEn: namesEn.length > 0 ? namesEn.join(' + ') : primary.serviceNameEn,
+        serviceNameAr: namesAr.length > 0 ? namesAr.join(' + ') : primary.serviceNameAr,
+        staffId: primary.staffId,
+        assignedStaffName: staffNames.length > 0 ? staffNames.join(' + ') : primary.assignedStaffName,
+        duration: sumDuration || primary.duration,
+        price: sumPrice || primary.price,
+        totalPaid: sumPaid || primary.totalPaid,
+        remainderAmount: sumRemainder || primary.remainderAmount,
+        hasNotes: group.some((entry) => entry.hasNotes),
+        notes: group.map((entry) => entry.notes).filter(Boolean).join(' | ') || primary.notes,
+        tags: combinedTags,
+        services: uniqueServiceEntries,
+        serviceItems: uniqueServiceEntries,
+        lineItems: combinedLineItems,
+        invoiceItems: combinedLineItems,
+        products: combinedProducts,
+        productItems: combinedProducts,
+        retailItems: combinedProducts,
+        paymentStatus: group.every((entry) => `${entry.paymentStatus || ''}` === 'paid')
+          ? 'paid'
+          : group.some((entry) => `${entry.paymentStatus || ''}` === 'partial')
+            ? 'partial'
+            : primary.paymentStatus,
+        invoiceStatus: group.every((entry) => `${entry.invoiceStatus || ''}` === 'paid' || `${entry.paymentStatus || ''}` === 'paid')
+          ? 'paid'
+          : group.some((entry) => `${entry.paymentStatus || ''}` === 'partial')
+            ? 'partial'
+            : primary.invoiceStatus,
+      };
+    };
+
+    return [
+      ...standalone,
+      ...Array.from(grouped.values()).map((group) => aggregateGroup(group))
+    ].sort((left, right) => left.startTime - right.startTime);
   };
 
   const mapBoardBreak = (b: any): Appointment => {
@@ -269,7 +423,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       if (res && res.success) {
         const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => mapBoardAppointment(a, dateStr));
         const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => mapBoardBreak(b));
-        setAppointments([...mappedApts, ...mappedBreaks]);
+        setAppointments([...groupBoardAppointments(mappedApts), ...mappedBreaks]);
 
         const newStatuses: Record<string, 'active'|'break'|'off'> = {};
         (res.breaks || []).forEach((b: any) => {
@@ -319,29 +473,71 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [customerProfileRefreshToken, setCustomerProfileRefreshToken] = useState(0);
   const [customerTransactionsExpanded, setCustomerTransactionsExpanded] = useState(false);
 
+  const activeAppointmentServiceSources = Array.isArray(activeAppointment?.bookingSession?.appointments) && activeAppointment.bookingSession.appointments.length > 0
+    ? activeAppointment.bookingSession.appointments
+    : Array.isArray(activeAppointment?.serviceItems) && activeAppointment.serviceItems.length > 0
+      ? activeAppointment.serviceItems
+      : Array.isArray(activeAppointment?.services) && activeAppointment.services.length > 0
+        ? activeAppointment.services
+        : [];
+
   const activeServiceSummary = (() => {
     const service = liveServices.find(s => s.id === activeAppointment?.serviceId);
-    const serviceNameEn = activeAppointment?.serviceNameEn && activeAppointment.serviceNameEn !== 'Service'
-      ? activeAppointment.serviceNameEn
-      : activeAppointment?.service?.name_en
-        || activeAppointment?.service?.nameEn
-        || activeAppointment?.service?.name
-        || activeAppointment?.serviceName
-        || activeAppointment?.requestedServiceName
-        || service?.nameEn
-        || 'Service';
-    const serviceNameAr = activeAppointment?.serviceNameAr && activeAppointment.serviceNameAr !== 'الخدمة'
-      ? activeAppointment.serviceNameAr
-      : activeAppointment?.service?.name_ar
-        || activeAppointment?.service?.nameAr
-        || activeAppointment?.service?.name
-        || activeAppointment?.serviceName
-        || activeAppointment?.requestedServiceNameAr
-        || service?.nameAr
-        || 'الخدمة';
+    if (activeAppointmentServiceSources.length > 0) {
+      const serviceNameEn = activeAppointmentServiceSources.map((item: any) => (
+        item?.service?.name_en
+        || item?.name_en
+        || item?.service?.nameEn
+        || item?.service?.name
+        || item?.serviceNameEn
+        || item?.serviceName
+        || item?.nameEn
+        || item?.name
+        || item?.title
+        || ''
+      )).filter(Boolean);
+      const serviceNameAr = activeAppointmentServiceSources.map((item: any) => (
+        item?.service?.name_ar
+        || item?.name_ar
+        || item?.service?.nameAr
+        || item?.service?.name
+        || item?.serviceNameAr
+        || item?.serviceName
+        || item?.nameAr
+        || item?.name
+        || item?.title
+        || ''
+      )).filter(Boolean);
+      const totalDuration = activeAppointmentServiceSources.reduce((sum: number, item: any) => sum + Number(item?.duration || item?.service?.duration || 0), 0);
+      const totalPrice = activeAppointmentServiceSources.reduce((sum: number, item: any) => sum + Number(item?.price || item?.service?.price || item?.subtotal || 0), 0);
+      return {
+        nameEn: serviceNameEn.length > 0 ? serviceNameEn.join(' + ') : activeAppointment?.serviceNameEn || service?.nameEn || service?.name || 'Service',
+        nameAr: serviceNameAr.length > 0 ? serviceNameAr.join(' + ') : activeAppointment?.serviceNameAr || service?.nameAr || service?.name || 'الخدمة',
+        duration: totalDuration || activeAppointment?.duration || service?.duration || 60,
+        price: totalPrice || activeAppointment?.price || service?.price || 0,
+        categoryEn: service?.categoryEn || '',
+        categoryAr: service?.categoryAr || ''
+      };
+    }
     return {
-      nameEn: serviceNameEn,
-      nameAr: serviceNameAr,
+      nameEn: activeAppointment?.serviceNameEn && activeAppointment.serviceNameEn !== 'Service'
+        ? activeAppointment.serviceNameEn
+        : activeAppointment?.service?.name_en
+          || activeAppointment?.service?.nameEn
+          || activeAppointment?.service?.name
+          || activeAppointment?.serviceName
+          || activeAppointment?.requestedServiceName
+          || service?.nameEn
+          || 'Service',
+      nameAr: activeAppointment?.serviceNameAr && activeAppointment.serviceNameAr !== 'الخدمة'
+        ? activeAppointment.serviceNameAr
+        : activeAppointment?.service?.name_ar
+          || activeAppointment?.service?.nameAr
+          || activeAppointment?.service?.name
+          || activeAppointment?.serviceName
+          || activeAppointment?.requestedServiceNameAr
+          || service?.nameAr
+          || 'الخدمة',
       duration: activeAppointment?.duration || service?.duration || 60,
       price: activeAppointment?.price || service?.price || 0,
       categoryEn: service?.categoryEn || '',
@@ -433,6 +629,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         const serviceNameEn = item?.serviceNameEn
           || item?.serviceName
           || item?.service?.name_en
+          || item?.name_en
           || item?.service?.nameEn
           || item?.service?.name
           || item?.service_title
@@ -443,6 +640,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         const serviceNameAr = item?.serviceNameAr
           || item?.serviceName
           || item?.service?.name_ar
+          || item?.name_ar
           || item?.service?.nameAr
           || item?.service?.name
           || item?.service_title_ar
@@ -1370,74 +1568,94 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       return;
     }
 
-    let totalRawPrice = 0;
-    let serviceNamesEn: string[] = [];
-    let serviceNamesAr: string[] = [];
     let firstStaffId = finalStaged[0].staffId;
     let earliestStartTime = finalStaged[0].startTime;
-    let totalDuration = 0;
-
-    finalStaged.forEach(item => {
+    const payloadItems = finalStaged.map((item) => {
       const srv = liveServices.find(s => s.id === item.serviceId);
-      if (srv) {
-        let priceAfterDisc = srv.price;
-        if (item.discountType === 'flat') {
-          priceAfterDisc = Math.max(0, srv.price - item.discountValue);
-        } else if (item.discountType === 'percent') {
-          priceAfterDisc = Math.max(0, srv.price - (srv.price * item.discountValue) / 100);
-        }
-        totalRawPrice += priceAfterDisc;
-        serviceNamesEn.push(srv.nameEn);
-        serviceNamesAr.push(srv.nameAr);
-        totalDuration += item.duration;
-      }
+      return {
+        serviceId: item.serviceId,
+        staffId: item.staffId,
+        requestedStaffId: item.staffId,
+        startTime: buildIsoFromMinutes(getSelectedDateKey(), item.startTime),
+        notes: item.notes || sessionNotes || null,
+        paymentMethod: createSplitActive || giftCardCodeInput ? 'paid' : 'at-center',
+        assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
+        duration: item.duration || srv?.duration || 60,
+        discountType: item.discountType,
+        discountValue: item.discountValue,
+        serviceName: isRtl ? (srv?.nameAr || srv?.name || '') : (srv?.nameEn || srv?.name || '')
+      };
     });
 
-    const finalPrice = Math.max(0, totalRawPrice);
+    void (async () => {
+      try {
+        const response = await tenantApiAdapter.createAppointment({
+          items: payloadItems,
+          staffId: firstStaffId,
+          startTime: buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime),
+          notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
+          assignmentMode: 'tenant_reassigned',
+          notifyCustomer: true,
+          paymentMethod: createSplitActive || giftCardCodeInput ? 'paid' : 'at-center',
+          paymentAllocations: createSplitActive
+            ? Object.entries(splitAmounts)
+                .filter(([, amount]) => Number(amount) > 0)
+                .map(([paymentMethod, amount]) => ({ paymentMethod, amount: Number(amount) }))
+            : undefined,
+          platformUserId: custMode === 'existing' ? selectedCustId : undefined,
+          customer: custMode === 'new' || custMode === 'walkin'
+            ? {
+                firstName: custNameEn.trim(),
+                lastName: '',
+                email: custEmail.trim(),
+                phone: custPhone.trim()
+              }
+            : null
+        });
 
-    const newApt: Appointment = {
-      id: `apt-created-${Date.now()}`,
-      customerNameEn: custNameEn,
-      customerNameAr: custNameAr,
-      serviceNameEn: serviceNamesEn.join(' + '),
-      serviceNameAr: serviceNamesAr.join(' + '),
-      staffId: firstStaffId,
-      startTime: earliestStartTime,
-      duration: totalDuration,
-      status: 'confirmed',
-      paymentStatus: createSplitActive || giftCardCodeInput ? 'paid' : 'unpaid',
-      isGroupBooking: custMode === 'walkin' && includeGroupGuests,
-      guestCount: custMode === 'walkin' ? guestCount : undefined,
-      hasNotes: sessionNotes !== '' || finalStaged.some(s => s.notes !== ''),
-      notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
-      price: finalPrice,
-      tags: custMode === 'new' && newCustIsVip ? ['VIP', 'New'] : ['Live Booked'],
-      customerPhone: custPhone,
-      customerEmail: custEmail,
-      loyaltyTier: loyalty,
-      walletBalance: balance,
-      type: 'appointment',
-      serviceCategory: 'spa'
-    };
+        if (!response?.success) {
+          throw new Error(response?.message || 'Failed to create appointment');
+        }
 
-    setAppointments(prev => [...prev, newApt]);
-    setIsCreateDrawerOpen(false);
-    
-    // Reset fields
-    setStagedServices([]);
-    setCreateStep(1);
-    setNewCustName('');
-    setNewCustPhone('');
-    setNewCustEmail('');
-    setSessionNotes('');
-    setGiftCardCodeInput('');
-    setCreateSplitActive(false);
+        setIsCreateDrawerOpen(false);
+        setStagedServices([]);
+        setCreateStep(1);
+        setNewCustName('');
+        setNewCustPhone('');
+        setNewCustEmail('');
+        setSessionNotes('');
+        setGiftCardCodeInput('');
+        setCreateSplitActive(false);
 
-    addLocalToast(
-      `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
-      `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
-      'success'
-    );
+        await loadBoardData();
+        const createdAppointment = response?.appointment || response?.appointments?.[0] || null;
+        if (createdAppointment) {
+          const createdSessionSeed = {
+            ...createdAppointment,
+            bookingSession: {
+              ...(createdAppointment.bookingSession || {}),
+              appointments: Array.isArray(response?.appointments) ? response.appointments : (createdAppointment.bookingSession?.appointments || []),
+              id: createdAppointment.bookingSession?.id || createdAppointment.bookingSessionId || response?.bookingSession?.id || createdAppointment.bookingSession?.bookingReference || createdAppointment.bookingReference || undefined,
+              bookingReference: createdAppointment.bookingSession?.bookingReference || createdAppointment.bookingReference || response?.bookingSession?.bookingReference || undefined
+            }
+          };
+          setActiveAppointment(mapBoardAppointment(createdSessionSeed, getSelectedDateKey()));
+        }
+
+        addLocalToast(
+          `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
+          `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
+          'success'
+        );
+      } catch (err) {
+        console.error('Failed to create appointment', err);
+        addLocalToast(
+          'تعذر إنشاء الموعد الجديد',
+          'Failed to create appointment',
+          'warning'
+        );
+      }
+    })();
   };
 
   const handleConfirmBlockCreation = () => {
