@@ -40,6 +40,7 @@ interface Reply {
 
 interface MessageThread {
   id: string;
+  recipientId?: string | null;
   senderNameAr: string;
   senderNameEn: string;
   senderRoleAr: string;
@@ -47,8 +48,11 @@ interface MessageThread {
   senderAvatar: string;
   titleAr: string;
   titleEn: string;
+  subject?: string | null;
   body: string;
   timestamp: string;
+  createdAt?: string;
+  sentAt?: string;
   isPinned: boolean;
   isArchived: boolean;
   category: 'broadcast' | 'dm' | 'inbox'; // Message categories
@@ -221,11 +225,48 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
 
   const normalizeMessageThread = (thread: any): MessageThread => ({
     ...thread,
+    recipientId: thread?.recipientId ?? thread?.recipient_id ?? null,
+    subject: thread?.subject ?? thread?.titleAr ?? thread?.titleEn ?? null,
+    titleAr: thread?.titleAr ?? thread?.subject ?? thread?.title ?? thread?.body ?? '',
+    titleEn: thread?.titleEn ?? thread?.subject ?? thread?.title ?? thread?.body ?? '',
+    timestamp: thread?.timestamp ?? thread?.createdAt ?? thread?.sentAt ?? thread?.date ?? '',
+    createdAt: thread?.createdAt ?? thread?.timestamp ?? thread?.sentAt ?? thread?.date ?? '',
+    sentAt: thread?.sentAt ?? thread?.createdAt ?? thread?.timestamp ?? thread?.date ?? '',
+    recipientType: thread?.recipientType
+      || (thread?.recipientId === null || thread?.recipientId === 'all' ? 'all_staff' : thread?.recipientId ? 'employee' : 'unknown'),
+    recipientNameAr: thread?.recipientNameAr ?? thread?.recipient?.nameAr ?? thread?.recipient?.name ?? thread?.recipient?.fullNameAr ?? '',
+    recipientNameEn: thread?.recipientNameEn ?? thread?.recipient?.nameEn ?? thread?.recipient?.name ?? thread?.recipient?.fullNameEn ?? '',
     replies: Array.isArray(thread?.replies) ? thread.replies : [],
     attachments: Array.isArray(thread?.attachments) ? thread.attachments : [],
     reactions: Array.isArray(thread?.reactions) ? thread.reactions : [],
     recipientStatuses: Array.isArray(thread?.recipientStatuses) ? thread.recipientStatuses : []
   });
+
+  const getMessageRecipientLabel = (message: MessageThread | undefined) => {
+    if (!message) return '—';
+    if (message.recipientType === 'all_staff' || message.recipientId === null || message.recipientId === 'all') {
+      return isRtl ? t.recipients.all_staff : t.recipients.all_staff;
+    }
+    if (message.recipientType === 'employee') {
+      return isRtl
+        ? (message.recipientNameAr || 'موظف')
+        : (message.recipientNameEn || 'Employee');
+    }
+    return isRtl ? pt.unknownRecipient : pt.unknownRecipient;
+  };
+
+  const getMessageDateLabel = (message: MessageThread | undefined) => {
+    if (!message) return '—';
+    const rawDate = message.createdAt || message.timestamp || message.sentAt;
+    if (!rawDate) return '—';
+    const date = new Date(rawDate);
+    if (Number.isNaN(date.getTime())) return rawDate;
+    return date.toLocaleString(isRtl ? 'ar-SA' : 'en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+  };
+
   const [mentionDropdownSearch, setMentionDropdownSearch] = useState<string>('');
   const [mentionTargetInput, setMentionTargetInput] = useState<'compose' | 'reply' | null>(null);
   const [composeAttachments, setComposeAttachments] = useState<Attachment[]>([]);
@@ -1224,13 +1265,16 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                                 <span>{pt.unknownRecipient}</span>
                               </>
                             )}
+                            {!selectedMessage.recipientType && (
+                              <span>{getMessageRecipientLabel(selectedMessage)}</span>
+                            )}
                           </span>
                         </div>
 
                         <div>
                           <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider block mb-0.5">{pt.createdDate}</span>
                           <span className="text-neutral-700 dark:text-zinc-300 font-bold font-mono">
-                            {selectedMessage.timestamp}
+                            {getMessageDateLabel(selectedMessage)}
                           </span>
                         </div>
                       </div>
