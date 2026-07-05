@@ -5309,6 +5309,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         setCurrentStartTime={setCurrentStartTime}
         currentStaffId={currentStaffId}
         setCurrentStaffId={setCurrentStaffId}
+        stylists={liveStylists}
         initialCreateMode={initialCreateMode}
         initialCartTab={initialCartTab}
         selectedDate={selectedDate}

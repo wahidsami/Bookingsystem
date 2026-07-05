@@ -6,8 +6,7 @@ import {
 } from 'lucide-react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
-// Reusable STYLISTS definitions matching those in Workspace
-const STYLISTS = [
+const FALLBACK_STYLISTS = [
   { id: 'st-1', nameAr: 'نادين الحربي', nameEn: 'Nadeen Al-Harbi', roleAr: 'خبير صبغات وتصفيف', roleEn: 'Colorist & Master Stylist' },
   { id: 'st-2', nameAr: 'ليلى سيف', nameEn: 'Layla Saif', roleAr: 'أخصائية العناية بالبشرة', roleEn: 'Skincare Specialist' },
   { id: 'st-3', nameAr: 'إيلينا كوزلوفا', nameEn: 'Elena Kozlova', roleAr: 'خبير المساج والاستجمام', roleEn: 'Massage & Spa therapist' },
@@ -34,6 +33,7 @@ interface InteractiveDrawersProps {
   customers: any[];
   services: any[];
   products: any[];
+  stylists: any[];
   onBoardChanged?: () => Promise<void> | void;
 }
 
@@ -107,6 +107,7 @@ export default function InteractiveDrawers({
   customers,
   services,
   products,
+  stylists,
   onBoardChanged
 }: InteractiveDrawersProps) {
   
@@ -127,6 +128,8 @@ export default function InteractiveDrawers({
     }
   }, [isCartDrawerOpen, initialCartTab]);
 
+  const availableStylists = stylists.length > 0 ? stylists : FALLBACK_STYLISTS;
+
   // Step 1: Customer Info
   const [custMode, setCustMode] = useState<'existing' | 'new' | 'walkin'>('existing');
   const [selectedCustId, setSelectedCustId] = useState<string>('CUST-001');
@@ -139,6 +142,12 @@ export default function InteractiveDrawers({
   const [includeGroupGuests, setIncludeGroupGuests] = useState(false);
   const [guestCount, setGuestCount] = useState<number>(1);
   const [guestNames, setGuestNames] = useState('');
+
+  useEffect(() => {
+    if (availableStylists.length > 0 && !availableStylists.some((stylist) => stylist.id === currentStaffId)) {
+      setCurrentStaffId(availableStylists[0].id);
+    }
+  }, [availableStylists, currentStaffId, setCurrentStaffId]);
 
   // Structured Guest State
   const [guestsList, setGuestsList] = useState<GuestProfile[]>([
@@ -157,7 +166,7 @@ export default function InteractiveDrawers({
           serviceName: 'Royal Swedish Massage with Aromatherapy',
           category: 'Massage & Therapy',
           duration: 90,
-          staffId: 'st-1',
+          staffId: availableStylists[0]?.id || 'st-1',
           startTime: 540,
           basePrice: 450,
           discountType: 'none',
@@ -191,7 +200,7 @@ export default function InteractiveDrawers({
                   serviceName: 'Royal Swedish Massage with Aromatherapy',
                   category: 'Massage & Therapy',
                   duration: 90,
-                  staffId: 'st-1',
+                  staffId: availableStylists[0]?.id || 'st-1',
                   startTime: 540,
                   basePrice: 450,
                   discountType: 'none',
@@ -208,7 +217,7 @@ export default function InteractiveDrawers({
         return next;
       });
     }
-  }, [guestCount]);
+  }, [guestCount, availableStylists]);
 
   const addGuestService = (guestId: string) => {
     setGuestsList(prev => prev.map(g => {
@@ -220,7 +229,7 @@ export default function InteractiveDrawers({
           serviceName: 'Royal Swedish Massage with Aromatherapy',
           category: 'Massage & Therapy',
           duration: 90,
-          staffId: 'st-1',
+          staffId: availableStylists[0]?.id || 'st-1',
           startTime: 540,
           basePrice: 450,
           discountType: 'none',
@@ -1120,7 +1129,7 @@ export default function InteractiveDrawers({
                                                     onChange={(e) => updateGuestService(guest.id, gs.id, { staffId: e.target.value })}
                                                     className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded text-xs font-bold text-slate-700"
                                                   >
-                                                    {STYLISTS.map(st => (
+                                                    {availableStylists.map(st => (
                                                       <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
                                                     ))}
                                                   </select>
@@ -1275,7 +1284,7 @@ export default function InteractiveDrawers({
                             <div>
                               <label className="text-slate-500 block mb-1">{isRtl ? 'أخصائية التجميل' : 'Assign Stylist'}</label>
                               <select value={currentStaffId} onChange={(e) => setCurrentStaffId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold">
-                                {STYLISTS.map(st => (
+                                {availableStylists.map(st => (
                                   <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
                                 ))}
                               </select>
@@ -1309,7 +1318,7 @@ export default function InteractiveDrawers({
                             <span className="font-bold text-slate-700 block">{isRtl ? 'الخدمات المضافة للجلسة الكلية' : 'Staged Services'}</span>
                             {stagedServices.map((item, index) => {
                               const s = services.find(srv => srv.id === item.serviceId);
-                              const staff = STYLISTS.find(st => st.id === item.staffId);
+                              const staff = availableStylists.find(st => st.id === item.staffId);
                               return (
                                 <div key={item.id} className="p-2 bg-white rounded-lg border flex items-center justify-between text-xs">
                                   <div>
@@ -1574,7 +1583,7 @@ export default function InteractiveDrawers({
                       <div>
                         <label className="text-[10px] text-slate-400 block mb-1">{isRtl ? 'أخصائية التجميل' : 'Stylist Column'}</label>
                         <select value={blockStaffId} onChange={(e) => setBlockStaffId(e.target.value)} className="w-full border p-1.5 rounded font-bold">
-                          {STYLISTS.map(st => (
+                                                    {availableStylists.map(st => (
                             <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
                           ))}
                         </select>
