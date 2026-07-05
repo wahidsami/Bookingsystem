@@ -690,17 +690,22 @@ const refundPayment = async (appointmentId, refundData) => {
             }, { transaction });
 
             if (resolvedPaymentMethod === 'wallet') {
-                const walletUser = await db.PlatformUser.findByPk(targetAppointment.platformUserId, {
-                    transaction,
-                    lock: transaction.LOCK.UPDATE
-                });
-
-                if (!walletUser) {
-                    throw new Error('Customer wallet account not found');
-                }
-
-                await walletUser.increment('walletBalance', {
-                    by: targetRefund,
+                await walletService.creditWallet({
+                    platformUserId: targetAppointment.platformUserId,
+                    amount: targetRefund,
+                    type: 'refund_credit',
+                    referenceType: 'appointment',
+                    referenceId: targetAppointment.id,
+                    metadata: {
+                        source: 'appointment_refund',
+                        paymentMethod: resolvedPaymentMethod,
+                        paymentTransactionRef: targetAppointments.length > 1
+                            ? `${refundTransactionRef}-${index + 1}`
+                            : refundTransactionRef,
+                        refundAmount: targetRefund,
+                        notes: reason || null,
+                        bookingSessionId: bookingSession?.id || null
+                    },
                     transaction
                 });
             }
@@ -761,11 +766,147 @@ const refundPayment = async (appointmentId, refundData) => {
     });
 };
 
+const collectAppointmentStatusCharge = async ({
+    appointmentId,
+    amount,
+    paymentMethod = 'cash',
+    reason = null,
+    transactionRef = null,
+    source = 'tenant_appointment_status_charge',
+    transaction = null
+}) => {
+    const numericAmount = roundMoney(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        return null;
+    }
+
+    const shouldCommit = !transaction;
+    const dbTransaction = transaction || await db.sequelize.transaction();
+
+    try {
+        const context = await loadAppointmentPaymentContext(appointmentId, {
+            transaction: dbTransaction,
+            lock: true
+        });
+        if (!context?.appointment) {
+            throw new Error('Appointment not found');
+        }
+
+        const { appointment } = context;
+        const totalPaidBefore = roundMoney(Number(appointment.totalPaid || 0));
+        const totalPrice = roundMoney(Number(appointment.price || 0));
+        const nextTotalPaid = roundMoney(Math.min(totalPrice, totalPaidBefore + numericAmount));
+        const resolvedPaymentMethod = resolveLedgerPaymentMethod(paymentMethod || appointment.paymentMethod || 'cash', 'cash');
+        const feeRef = transactionRef || `APT-FEE-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`;
+        const platformFee = roundMoney(numericAmount * 0.025);
+        const tenantRevenue = roundMoney(numericAmount - platformFee);
+
+        if (resolvedPaymentMethod === 'wallet') {
+            await walletService.debitWallet({
+                platformUserId: appointment.platformUserId,
+                amount: numericAmount,
+                type: 'service_payment_debit',
+                referenceType: 'appointment',
+                referenceId: appointment.id,
+                metadata: {
+                    source,
+                    reason,
+                    appointmentId: appointment.id
+                },
+                transaction: dbTransaction
+            });
+        }
+
+        await createAppointmentTransaction({
+            appointmentId: appointment.id,
+            type: totalPaidBefore > 0 ? 'remainder' : 'full',
+            amount: numericAmount,
+            paymentMethod: resolvedPaymentMethod,
+            status: 'completed',
+            transactionRef: feeRef,
+            processedBy: null,
+            processedAt: new Date(),
+            notes: reason,
+            metadata: {
+                source,
+                reason,
+                statusCharge: true
+            }
+        }, { transaction: dbTransaction });
+
+        await db.Transaction.create({
+            platformUserId: appointment.platformUserId,
+            tenantId: appointment.tenantId,
+            appointmentId: appointment.id,
+            amount: numericAmount,
+            currency: 'SAR',
+            type: 'booking',
+            status: 'completed',
+            platformFee,
+            tenantRevenue,
+            metadata: {
+                source,
+                reason,
+                paymentMethod: resolvedPaymentMethod,
+                statusCharge: true,
+                transactionRef: feeRef
+            }
+        }, { transaction: dbTransaction });
+
+        await appointment.update({
+            paymentMethod: resolvedPaymentMethod,
+            totalPaid: nextTotalPaid,
+            paymentStatus: nextTotalPaid >= totalPrice ? 'fully_paid' : 'deposit_paid',
+            depositPaid: nextTotalPaid > 0,
+            remainderAmount: roundMoney(Math.max(totalPrice - nextTotalPaid, 0)),
+            remainderPaid: nextTotalPaid >= totalPrice,
+            paidAt: nextTotalPaid >= totalPrice ? (appointment.paidAt || new Date()) : appointment.paidAt
+        }, { transaction: dbTransaction });
+
+        if (appointment.platformUserId) {
+            await db.PlatformUser.increment('totalSpent', {
+                by: numericAmount,
+                where: { id: appointment.platformUserId },
+                transaction: dbTransaction
+            });
+
+            if (appointment.tenantId) {
+                await db.CustomerInsight.increment('totalSpent', {
+                    by: numericAmount,
+                    where: { platformUserId: appointment.platformUserId, tenantId: appointment.tenantId },
+                    transaction: dbTransaction
+                });
+            }
+        }
+
+        if (shouldCommit) {
+            await dbTransaction.commit();
+        }
+
+        const invoice = await ensureAppointmentInvoice(appointment.id, {
+            transaction: shouldCommit ? null : dbTransaction,
+            triggerSource: source
+        });
+
+        return {
+            amount: numericAmount,
+            paymentMethod: resolvedPaymentMethod,
+            invoiceId: invoice?.id || null
+        };
+    } catch (error) {
+        if (shouldCommit && dbTransaction && !dbTransaction.finished) {
+            await dbTransaction.rollback();
+        }
+        throw error;
+    }
+};
+
 module.exports = {
     calculateSplitPayment,
     createAppointmentPaymentTransactions,
     normalizePaymentAllocations,
     recordRemainderPayment,
     getPaymentSummary,
-    refundPayment
+    refundPayment,
+    collectAppointmentStatusCharge
 };

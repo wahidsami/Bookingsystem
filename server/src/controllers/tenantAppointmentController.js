@@ -16,7 +16,8 @@ const { createStaffAppointmentMessage } = require('../services/staffNotification
 const {
     calculateSplitPayment,
     createAppointmentPaymentTransactions,
-    normalizePaymentAllocations
+    normalizePaymentAllocations,
+    collectAppointmentStatusCharge
 } = require('../services/splitPaymentService');
 const userService = require('../services/userService');
 const {
@@ -1907,6 +1908,12 @@ exports.updateAppointmentStatus = async (req, res) => {
             transaction
         });
 
+        const tenantSettings = await db.TenantSettings.findOne({
+            where: { tenantId },
+            attributes: ['id', 'cancellationHours'],
+            transaction
+        });
+
         if (!appointment) {
             await transaction.rollback();
             return res.status(404).json({
@@ -1975,6 +1982,34 @@ exports.updateAppointmentStatus = async (req, res) => {
             occurredAt: new Date(),
             transaction
         });
+
+        const totalPrice = parseFloat(appointment.price || 0);
+        const currentPaid = parseFloat(appointment.totalPaid || 0);
+        const outstandingAmount = Math.max(0, parseFloat((totalPrice - currentPaid).toFixed(2)));
+        const cancellationWindowHours = Number(tenantSettings?.cancellationHours || 24);
+        const appointmentStartTime = appointment.startTime ? new Date(appointment.startTime).getTime() : null;
+        const nowTime = Date.now();
+        const lateCancelWindowStart = appointmentStartTime
+            ? appointmentStartTime - (cancellationWindowHours * 60 * 60 * 1000)
+            : null;
+        const shouldChargeCancellationFee = normalizedStatus === 'cancelled'
+            ? Boolean(lateCancelWindowStart && nowTime >= lateCancelWindowStart)
+            : normalizedStatus === 'no_show';
+
+        if (shouldChargeCancellationFee && outstandingAmount > 0.01) {
+            await collectAppointmentStatusCharge({
+                appointmentId: appointment.id,
+                amount: outstandingAmount,
+                reason: normalizedStatus === 'no_show'
+                    ? 'No-show charge'
+                    : 'Late cancellation fee',
+                source: normalizedStatus === 'no_show'
+                    ? 'tenant_no_show_charge'
+                    : 'tenant_late_cancellation_fee',
+                transaction
+            });
+        }
+
         await transaction.commit();
 
         try {

@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const db = require('../models');
 const { ACTIVE_APPOINTMENT_STATUSES, APPOINTMENT_STATUS } = require('../utils/appointmentStatus');
 const customerNotificationService = require('./customerNotificationService');
+const { collectAppointmentStatusCharge } = require('./splitPaymentService');
 
 const DEFAULT_APPOINTMENT_NOTIFICATION_SETTINGS = Object.freeze({
     remindRemainderToCollect: true,
@@ -147,6 +148,18 @@ const autoMarkNoShowForAppointment = async (appointment, settings, now = new Dat
         status: APPOINTMENT_STATUS.NO_SHOW,
         noShowMarkedAt: now
     });
+
+    const totalPrice = Number(appointment.price || 0);
+    const totalPaid = Number(appointment.totalPaid || 0);
+    const outstandingAmount = Math.max(0, Number((totalPrice - totalPaid).toFixed(2)));
+    if (outstandingAmount > 0.01) {
+        await collectAppointmentStatusCharge({
+            appointmentId: appointment.id,
+            amount: outstandingAmount,
+            reason: 'No-show charge',
+            source: 'tenant_automation_no_show_charge'
+        });
+    }
 
     if (appointment.platformUserId) {
         const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'your appointment';

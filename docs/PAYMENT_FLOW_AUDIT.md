@@ -13,6 +13,8 @@ One persistence gap was identified and fixed:
 - Wallet-funded appointment payments now create a real `WalletLedgerEntry` record instead of only decrementing `PlatformUser.walletBalance`.
 - Customer history and transaction endpoints now return wallet movements, so the customer drawer and history views stay consistent after refresh.
 - The appointment workspace now waits for backend confirmation and re-fetches the appointment before reflecting the final paid state.
+- Wallet refunds now also create a ledger entry instead of only incrementing the balance.
+- Late cancellation and no-show status changes now propagate an outstanding-balance charge through finance, reports, analytics, and history.
 
 No SQL migration scripts were required.
 
@@ -30,6 +32,7 @@ No SQL migration scripts were required.
 10. Appointment details refresh from the backend after payment.
 11. Page refresh continues to show the persisted state.
 12. No success toast is shown before backend confirmation.
+13. Late cancellation and no-show charges now create persisted finance rows.
 
 ## Payment Mutation Chain
 
@@ -147,4 +150,3 @@ Now includes wallet transactions in addition to appointments and orders.
 - No backend contract changes were introduced.
 - No database column additions were required.
 - The payment flow now relies on persisted backend state rather than local UI assumptions.
-
