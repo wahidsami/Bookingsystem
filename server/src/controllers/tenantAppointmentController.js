@@ -1983,9 +1983,9 @@ exports.updateAppointmentStatus = async (req, res) => {
             transaction
         });
 
-        const totalPrice = parseFloat(appointment.price || 0);
+        const appointmentTotalPrice = parseFloat(appointment.price || 0);
         const currentPaid = parseFloat(appointment.totalPaid || 0);
-        const outstandingAmount = Math.max(0, parseFloat((totalPrice - currentPaid).toFixed(2)));
+        const outstandingAmount = Math.max(0, parseFloat((appointmentTotalPrice - currentPaid).toFixed(2)));
         const cancellationWindowHours = Number(tenantSettings?.cancellationHours || 24);
         const appointmentStartTime = appointment.startTime ? new Date(appointment.startTime).getTime() : null;
         const nowTime = Date.now();
@@ -2465,9 +2465,9 @@ exports.updatePaymentStatus = async (req, res) => {
                 appointment.remainderAmount = splitPayment.remainderAmount;
                 appointment.totalPaid = splitPayment.depositAmount;
             }
-            const totalPrice = parseFloat(appointment.price || 0);
+            const appointmentTotalPrice = parseFloat(appointment.price || 0);
             const totalPaid = parseFloat(appointment.totalPaid || 0);
-            const fullyCovered = Number.isFinite(totalPrice) && Number.isFinite(totalPaid) && totalPrice > 0 && totalPaid >= totalPrice;
+            const fullyCovered = Number.isFinite(appointmentTotalPrice) && Number.isFinite(totalPaid) && appointmentTotalPrice > 0 && totalPaid >= appointmentTotalPrice;
             if (fullyCovered) {
                 appointment.paymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
                 appointment.remainderAmount = 0;
