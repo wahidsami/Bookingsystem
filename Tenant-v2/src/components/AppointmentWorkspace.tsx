@@ -4091,7 +4091,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       animate={{ x: 0, opacity: 1 }}
                       exit={{ x: isRtl ? -32 : 32, opacity: 0 }}
                       transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-                      className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-full md:w-[min(44vw,560px)] bg-white shadow-2xl overflow-y-auto`}
+                      className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-full md:w-[min(88vw,1120px)] bg-white shadow-2xl overflow-y-auto`}
                       style={isRtl ? { borderRight: '1px solid rgb(226 232 240)' } : { borderLeft: '1px solid rgb(226 232 240)' }}
                       onClick={(e) => e.stopPropagation()}
                     >
