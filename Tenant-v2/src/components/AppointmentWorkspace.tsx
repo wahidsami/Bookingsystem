@@ -474,6 +474,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [drawerTab, setDrawerTab] = useState<'overview' | 'financials' | 'timeline' | 'reviews'>('overview');
   const [activeStylistMenuId, setActiveStylistMenuId] = useState<string | null>(null);
   const [isCustomerProfileOpen, setIsCustomerProfileOpen] = useState(false);
+  const [customerDrawerTab, setCustomerDrawerTab] = useState<'overview' | 'wallet' | 'appointments' | 'transactions' | 'reviews' | 'notes'>('overview');
   const [customerProfile, setCustomerProfile] = useState<any | null>(null);
   const [customerHistoryData, setCustomerHistoryData] = useState<any | null>(null);
   const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
@@ -575,6 +576,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const customerWalletHistory = Array.isArray(customerHistoryData?.walletTransactions) ? customerHistoryData.walletTransactions : [];
   const customerGiftHistory = Array.isArray(customerHistoryData?.giftActivity) ? customerHistoryData.giftActivity : [];
   const customerReviewHistory = Array.isArray(customerHistoryData?.reviews) ? customerHistoryData.reviews : [];
+  const customerLiveReviews = Array.isArray(customerProfile?.reviews) && customerProfile.reviews.length > 0
+    ? customerProfile.reviews
+    : customerReviewHistory;
   const customerNoteHistory = Array.isArray(customerProfile?.notes) ? customerProfile.notes : [];
   const customerFirstVisit = [...customerAppointmentHistory]
     .sort((a: any, b: any) => new Date(a.startTime || a.date || a.createdAt || 0).getTime() - new Date(b.startTime || b.date || b.createdAt || 0).getTime())[0];
@@ -636,6 +640,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         }
         const serviceNameEn = item?.serviceNameEn
           || item?.serviceName
+          || item?.requestedServiceName
+          || item?.serviceVariantName
           || item?.service?.name_en
           || item?.name_en
           || item?.service?.nameEn
@@ -647,6 +653,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           || activeServiceSummary.nameEn;
         const serviceNameAr = item?.serviceNameAr
           || item?.serviceName
+          || item?.requestedServiceNameAr
+          || item?.serviceVariantNameAr
           || item?.service?.name_ar
           || item?.name_ar
           || item?.service?.nameAr
@@ -3683,13 +3691,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   )}
 
                   {/* TAB 3: REVIEWS LOG */}
-                  {drawerTab === 'reviews' && (
+                      {drawerTab === 'reviews' && (
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{t.reviewsText}</h4>
                       
                       <div className="space-y-3.5">
                         {(() => {
-                          const reviews = customerProfile?.reviews || [];
+                          const reviews = customerLiveReviews;
 
                           if (customerProfileLoading) {
                             return (
@@ -3710,7 +3718,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           return reviews.map((review: any, idx: number) => (
                             <div key={review.id || idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2 text-xs">
                               <div className="flex justify-between items-center">
-                                <span className="font-bold text-slate-800">{review.serviceName || review.title || (isRtl ? 'خدمة مرتبطة' : 'Linked Service')}</span>
+                                <span className="font-bold text-slate-800">{review.serviceName || review.title || review.service?.name_en || (isRtl ? 'خدمة مرتبطة' : 'Linked Service')}</span>
                                 <div className="flex text-amber-500 gap-0.5">
                                   {Array.from({ length: Math.max(1, Math.min(5, review.rating || 0)) }).map((_, starIdx) => (
                                     <Star key={starIdx} size={11} fill="currentColor" />
@@ -4114,23 +4122,23 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         </span>
                       </header>
 
-                      <div className="p-4 space-y-3.5">
+                      <div className="p-4 space-y-4">
                         {customerProfileError && (
                           <div className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs">
                             {customerProfileError}
                           </div>
                         )}
 
-                        <div className="grid grid-cols-1 gap-3.5">
-                          <section className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                              <div className="flex items-start gap-3 min-w-0">
-                                <div className="w-12 h-12 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center font-black text-amber-700 text-base shrink-0">
-                                  {(activeCustomerName || 'GU').slice(0, 2).toUpperCase()}
-                                </div>
-                                <div className="min-w-0 space-y-1">
+                        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+                          <div className="xl:col-span-5 space-y-4 xl:sticky xl:top-[76px]">
+                            <section className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4 shadow-xs">
+                              <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
+                                <div className="flex items-start gap-3 min-w-0">
+                                  <div className="w-12 h-12 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center font-black text-amber-700 text-base shrink-0">
+                                    {(activeCustomerName || 'GU').slice(0, 2).toUpperCase()}
+                                  </div>
                                   <div className="min-w-0">
-                                    <p className="text-base font-bold text-slate-800 truncate">{activeCustomerName}</p>
+                                    <p className="text-sm font-black text-slate-800 truncate">{activeCustomerName}</p>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
                                         {activeCustomerTier || '—'}
@@ -4140,315 +4148,525 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                       </span>
                                     </div>
                                   </div>
-                                  <div className="flex flex-col gap-1 text-xs text-slate-600">
-                                    <div className="flex items-center gap-2">
-                                      <Phone size={12} className="text-slate-400 shrink-0" />
-                                      <span className="font-mono font-bold truncate">{activeCustomerPhone || '—'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Mail size={12} className="text-slate-400 shrink-0" />
-                                      <span className="font-mono font-bold truncate">{activeCustomerEmail || '—'}</span>
-                                    </div>
+                                </div>
+                                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                                  {isRtl ? 'العميل الحالي' : 'Current customer'}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-2 text-xs text-slate-700">
+                                <div className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Phone size={12} className="text-slate-400 shrink-0" />
+                                    <span className="font-bold">{isRtl ? 'Phone' : 'Phone'}</span>
                                   </div>
+                                  <span className="font-mono font-bold truncate text-slate-600">{activeCustomerPhone || '—'}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Mail size={12} className="text-slate-400 shrink-0" />
+                                    <span className="font-bold">{isRtl ? 'Email' : 'Email'}</span>
+                                  </div>
+                                  <span className="font-mono font-bold truncate text-slate-600">{activeCustomerEmail || '—'}</span>
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (activeCustomerPhone) {
-                                      window.location.href = `tel:${activeCustomerPhone}`;
-                                    }
-                                  }}
-                                  disabled={!activeCustomerPhone}
-                                  className="px-3 py-2 rounded-lg text-xs font-bold bg-zinc-900 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                  {isRtl ? 'اتصال' : 'Call'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (!activeCustomerPhone) {
-                                      return;
-                                    }
-                                    const phoneDigits = `${activeCustomerPhone}`.replace(/[^\d]/g, '');
-                                    if (!phoneDigits) {
-                                      return;
-                                    }
-                                    window.open(`https://wa.me/${phoneDigits}`, '_blank', 'noopener,noreferrer');
-                                  }}
-                                  disabled={!activeCustomerPhone}
-                                  className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                  {isRtl ? 'واتساب' : 'WhatsApp'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    const payload = [
-                                      activeCustomerName,
-                                      activeCustomerPhone,
-                                      activeCustomerEmail,
-                                      activeAppointment?.id ? `Appointment: ${activeAppointment.id}` : ''
-                                    ].filter(Boolean).join(' | ');
-                                    if (navigator.clipboard?.writeText && payload) {
-                                      await navigator.clipboard.writeText(payload);
-                                    }
-                                  }}
-                                  className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700"
-                                >
-                                  {isRtl ? 'نسخ' : 'Copy'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    document.getElementById('customer-notes-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                  }}
-                                  className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700"
-                                >
-                                  {isRtl ? 'ملاحظات' : 'Notes'}
-                                </button>
+                              <div className="grid grid-cols-2 gap-2">
+                                {[
+                                  {
+                                    label: isRtl ? 'اتصال' : 'Call',
+                                    action: () => {
+                                      if (activeCustomerPhone) window.location.href = `tel:${activeCustomerPhone}`;
+                                    },
+                                    disabled: !activeCustomerPhone,
+                                    tone: 'bg-zinc-900 text-white'
+                                  },
+                                  {
+                                    label: isRtl ? 'واتساب' : 'WhatsApp',
+                                    action: () => {
+                                      if (!activeCustomerPhone) return;
+                                      const phoneDigits = `${activeCustomerPhone}`.replace(/[^\d]/g, '');
+                                      if (!phoneDigits) return;
+                                      window.open(`https://wa.me/${phoneDigits}`, '_blank', 'noopener,noreferrer');
+                                    },
+                                    disabled: !activeCustomerPhone,
+                                    tone: 'bg-slate-100 text-slate-700'
+                                  },
+                                  {
+                                    label: isRtl ? 'نسخ' : 'Copy',
+                                    action: async () => {
+                                      const payload = [
+                                        activeCustomerName,
+                                        activeCustomerPhone,
+                                        activeCustomerEmail,
+                                        activeAppointment?.id ? `Appointment: ${activeAppointment.id}` : ''
+                                      ].filter(Boolean).join(' | ');
+                                      if (navigator.clipboard?.writeText && payload) {
+                                        await navigator.clipboard.writeText(payload);
+                                      }
+                                    },
+                                    disabled: false,
+                                    tone: 'bg-slate-100 text-slate-700'
+                                  },
+                                  {
+                                    label: isRtl ? 'ملاحظات' : 'Notes',
+                                    action: () => setCustomerDrawerTab('notes'),
+                                    disabled: false,
+                                    tone: 'bg-slate-100 text-slate-700'
+                                  }
+                                ].map((item) => (
+                                  <button
+                                    key={item.label}
+                                    type="button"
+                                    onClick={item.action}
+                                    disabled={item.disabled}
+                                    className={`px-3 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${item.tone}`}
+                                  >
+                                    {item.label}
+                                  </button>
+                                ))}
                               </div>
-                            </div>
-                          </section>
+                            </section>
 
-                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                            <div className="flex items-center justify-between gap-3">
+                            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
                               <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                {isRtl ? 'زيارة اليوم' : 'Today\'s Visit'}
+                                {isRtl ? 'مخزون المحفظة' : 'Wallet Summary'}
                               </h4>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                activeAppointment.invoiceStatus === 'paid' || activeAppointment.paymentStatus === 'paid'
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : activeAppointment.paymentStatus === 'partial'
-                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                    : 'bg-rose-50 text-rose-700 border border-rose-200'
-                              }`}>
-                                {activeAppointment.invoiceStatus || activeAppointment.paymentStatus || '—'}
-                              </span>
-                            </div>
-
-                            <div className="space-y-2">
-                              {activeVisitServiceEntries.length === 0 ? (
-                                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
-                                  {isRtl ? 'لا توجد خدمات مسجلة في هذا الموعد.' : 'No booked services were found on this appointment.'}
+                              <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                                <div className="rounded-xl bg-amber-50/70 border border-amber-100 p-3">
+                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'الرصيد' : 'Wallet'}</p>
+                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{activeCustomerWallet.toFixed(2)} {t.riyal}</p>
                                 </div>
-                              ) : (
-                                activeVisitServiceEntries.map((item: any) => (
-                                  <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs space-y-2">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <p className="font-bold text-slate-800 truncate">{isRtl ? item.nameAr : item.nameEn}</p>
-                                        <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                                          {isRtl ? 'الموظفة:' : 'Employee:'} {isRtl ? item.assignedEmployeeAr || '—' : item.assignedEmployeeEn || '—'}
-                                        </p>
-                                      </div>
-                                      <div className="text-right shrink-0">
-                                        <p className="font-black text-slate-800 font-mono">{Number(item.price || 0).toFixed(2)} {t.riyal}</p>
-                                        <p className="text-[10px] text-slate-400">{item.status || '—'}</p>
-                                      </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600">
-                                      <div className="bg-white border border-slate-200 rounded-lg px-2 py-1.5">
-                                        <p className="uppercase font-bold text-slate-400">{isRtl ? 'المدة' : 'Duration'}</p>
-                                        <p className="font-bold text-slate-800">{Number(item.duration || 0)} {t.durationMin}</p>
-                                      </div>
-                                      <div className="bg-white border border-slate-200 rounded-lg px-2 py-1.5">
-                                        <p className="uppercase font-bold text-slate-400">{isRtl ? 'وقت الموعد' : 'Appointment Time'}</p>
-                                        <p className="font-bold text-slate-800">{item.appointmentTime || '—'}</p>
-                                      </div>
-                                      <div className="bg-white border border-slate-200 rounded-lg px-2 py-1.5">
-                                        <p className="uppercase font-bold text-slate-400">{isRtl ? 'حالة الفاتورة' : 'Invoice Status'}</p>
-                                        <p className="font-bold text-slate-800 truncate">{item.invoiceStatus || '—'}</p>
-                                      </div>
-                                      <div className="bg-white border border-slate-200 rounded-lg px-2 py-1.5">
-                                        <p className="uppercase font-bold text-slate-400">{isRtl ? 'الفرع' : 'Branch'}</p>
-                                        <p className="font-bold text-slate-800 truncate">{item.branch || '—'}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))
-                              )}
+                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'إجمالي الإنفاق' : 'Total Spent'}</p>
+                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{Number(customerProfile?.totalSpent || 0).toFixed(2)} {t.riyal}</p>
+                                </div>
+                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'المواعيد' : 'Appointments'}</p>
+                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{customerAppointmentHistory.length}</p>
+                                </div>
+                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'المعاملات' : 'Transactions'}</p>
+                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{customerRecentTransactions.length}</p>
+                                </div>
+                              </div>
+                            </section>
 
-                              {activeVisitProductEntries.length > 0 && (
-                                <div className="pt-1">
-                                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
-                                    {isRtl ? 'المنتجات المضافة' : 'Retail products attached'}
-                                  </p>
-                                  <div className="space-y-2">
-                                    {activeVisitProductEntries.map((item: any) => (
-                                      <div key={item.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs space-y-2">
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div className="min-w-0">
-                                            <p className="font-bold text-slate-800 truncate">{isRtl ? item.nameAr : item.nameEn}</p>
-                                            <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                                              {isRtl ? 'الموظفة:' : 'Employee:'} {isRtl ? item.assignedEmployeeAr || '—' : item.assignedEmployeeEn || '—'}
+                            <section id="customer-notes-section" className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                  {isRtl ? 'الملاحظات الداخلية' : 'Internal Notes'}
+                                </h4>
+                                <button
+                                  type="button"
+                                  onClick={() => setCustomerDrawerTab('notes')}
+                                  className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-700"
+                                >
+                                  {isRtl ? 'فتح القسم' : 'Open section'}
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-1 gap-2">
+                                {customerInternalNotes.map((note) => (
+                                  <div key={note.label} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{note.label}</p>
+                                    <p className="leading-relaxed">{note.value || '—'}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </section>
+                          </div>
+
+                          <div className="xl:col-span-7 space-y-4">
+                            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-4 shadow-xs">
+                              <div className="flex flex-col gap-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                      {isRtl ? 'سجل التفاعل والنشاط' : 'Customer Interaction Workspace'}
+                                    </h4>
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                      {isRtl ? 'عرض سياقي مرتبط بالموعد الحالي فقط.' : 'Contextually scoped to the currently opened appointment.'}
+                                    </p>
+                                  </div>
+                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                                    {isRtl ? 'وضع المشغل' : 'Operator mode'}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200 overflow-x-auto max-w-full">
+                                  {[
+                                    { id: 'overview', labelEn: 'Overview', labelAr: 'نظرة عامة' },
+                                    { id: 'wallet', labelEn: 'Wallet', labelAr: 'المحفظة' },
+                                    { id: 'appointments', labelEn: 'Appointments', labelAr: 'الحجوزات' },
+                                    { id: 'transactions', labelEn: 'Transactions', labelAr: 'الفواتير' },
+                                    { id: 'reviews', labelEn: 'Reviews', labelAr: 'التقييمات' },
+                                    { id: 'notes', labelEn: 'Notes', labelAr: 'الملاحظات' }
+                                  ].map(tab => (
+                                    <button
+                                      key={tab.id}
+                                      type="button"
+                                      onClick={() => setCustomerDrawerTab(tab.id as any)}
+                                      className={`text-[11px] px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition-all cursor-pointer ${
+                                        customerDrawerTab === tab.id
+                                          ? 'bg-zinc-900 text-amber-400 text-white shadow-xs'
+                                          : 'text-slate-500 hover:text-zinc-900'
+                                      }`}
+                                    >
+                                      {isRtl ? tab.labelAr : tab.labelEn}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <AnimatePresence mode="wait">
+                                {customerDrawerTab === 'overview' && (
+                                  <motion.div key="customer-overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+                                    <section className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                          {isRtl ? 'زيارة اليوم' : 'Today\'s Visit'}
+                                        </h4>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                          activeAppointment.invoiceStatus === 'paid' || activeAppointment.paymentStatus === 'paid'
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                            : activeAppointment.paymentStatus === 'partial'
+                                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                        }`}>
+                                          {activeAppointment.invoiceStatus || activeAppointment.paymentStatus || '—'}
+                                        </span>
+                                      </div>
+                                      <div className="space-y-2">
+                                        {activeVisitServiceEntries.length === 0 ? (
+                                          <div className="p-3 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs">
+                                            {isRtl ? 'لا توجد خدمات مسجلة في هذا الموعد.' : 'No booked services were found on this appointment.'}
+                                          </div>
+                                        ) : (
+                                          activeVisitServiceEntries.map((item: any) => (
+                                            <div key={item.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs space-y-2">
+                                              <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                  <p className="font-bold text-slate-800 truncate">{isRtl ? item.nameAr : item.nameEn}</p>
+                                                  <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                                    {isRtl ? 'الموظفة:' : 'Employee:'} {isRtl ? item.assignedEmployeeAr || '—' : item.assignedEmployeeEn || '—'}
+                                                  </p>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                  <p className="font-black text-slate-800 font-mono">{Number(item.price || 0).toFixed(2)} {t.riyal}</p>
+                                                  <p className="text-[10px] text-slate-400">{item.status || '—'}</p>
+                                                </div>
+                                              </div>
+                                              <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600">
+                                                <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
+                                                  <p className="uppercase font-bold text-slate-400">{isRtl ? 'المدة' : 'Duration'}</p>
+                                                  <p className="font-bold text-slate-800">{Number(item.duration || 0)} {t.durationMin}</p>
+                                                </div>
+                                                <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
+                                                  <p className="uppercase font-bold text-slate-400">{isRtl ? 'وقت الموعد' : 'Appointment Time'}</p>
+                                                  <p className="font-bold text-slate-800">{item.appointmentTime || '—'}</p>
+                                                </div>
+                                                <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
+                                                  <p className="uppercase font-bold text-slate-400">{isRtl ? 'حالة الفاتورة' : 'Invoice Status'}</p>
+                                                  <p className="font-bold text-slate-800 truncate">{item.invoiceStatus || '—'}</p>
+                                                </div>
+                                                <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
+                                                  <p className="uppercase font-bold text-slate-400">{isRtl ? 'الفرع' : 'Branch'}</p>
+                                                  <p className="font-bold text-slate-800 truncate">{item.branch || '—'}</p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))
+                                        )}
+
+                                        {activeVisitProductEntries.length > 0 && (
+                                          <div className="pt-1">
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                                              {isRtl ? 'المنتجات المضافة' : 'Retail products attached'}
                                             </p>
+                                            <div className="space-y-2">
+                                              {activeVisitProductEntries.map((item: any) => (
+                                                <div key={item.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs space-y-2">
+                                                  <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                      <p className="font-bold text-slate-800 truncate">{isRtl ? item.nameAr : item.nameEn}</p>
+                                                      <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                                        {isRtl ? 'الموظفة:' : 'Employee:'} {isRtl ? item.assignedEmployeeAr || '—' : item.assignedEmployeeEn || '—'}
+                                                      </p>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                      <p className="font-black text-slate-800 font-mono">{Number(item.subtotal || 0).toFixed(2)} {t.riyal}</p>
+                                                      <p className="text-[10px] text-slate-400">{item.status || '—'}</p>
+                                                    </div>
+                                                  </div>
+                                                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600">
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
+                                                      <p className="uppercase font-bold text-slate-400">{isRtl ? 'الكمية' : 'Qty'}</p>
+                                                      <p className="font-bold text-slate-800">{Number(item.quantity || 0)}</p>
+                                                    </div>
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
+                                                      <p className="uppercase font-bold text-slate-400">{isRtl ? 'سعر الوحدة' : 'Unit Price'}</p>
+                                                      <p className="font-bold text-slate-800">{Number(item.unitPrice || 0).toFixed(2)} {t.riyal}</p>
+                                                    </div>
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
+                                                      <p className="uppercase font-bold text-slate-400">{isRtl ? 'الوقت' : 'Appointment Time'}</p>
+                                                      <p className="font-bold text-slate-800">{item.appointmentTime || '—'}</p>
+                                                    </div>
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
+                                                      <p className="uppercase font-bold text-slate-400">{isRtl ? 'حالة الفاتورة' : 'Invoice Status'}</p>
+                                                      <p className="font-bold text-slate-800 truncate">{item.invoiceStatus || '—'}</p>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
-                                          <div className="text-right shrink-0">
-                                            <p className="font-black text-slate-800 font-mono">{Number(item.subtotal || 0).toFixed(2)} {t.riyal}</p>
-                                            <p className="text-[10px] text-slate-400">{item.status || '—'}</p>
+                                        )}
+                                      </div>
+                                    </section>
+
+                                    <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                        {isRtl ? 'ملخص العميل' : 'Customer Summary'}
+                                      </h4>
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        {[
+                                          { label: isRtl ? 'المحفظة' : 'Wallet', value: `${activeCustomerWallet.toFixed(2)} ${t.riyal}` },
+                                          { label: isRtl ? 'إجمالي الإنفاق' : 'Total Spent', value: `${Number(customerProfile?.totalSpent || 0).toFixed(2)} ${t.riyal}` },
+                                          { label: isRtl ? 'الحجوزات' : 'Appointments', value: `${customerAppointmentHistory.length}` },
+                                          { label: isRtl ? 'المكتملة' : 'Completed', value: `${customerCompletedAppointments}` },
+                                          { label: isRtl ? 'الملغاة' : 'Cancelled', value: `${customerCancelledAppointments}` },
+                                          { label: isRtl ? 'عدم الحضور' : 'No Shows', value: `${customerNoShowAppointments}` },
+                                          { label: isRtl ? 'أول زيارة' : 'First Visit', value: customerFirstVisit ? new Date(customerFirstVisit.startTime || customerFirstVisit.date || customerFirstVisit.createdAt || 0).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium' }) : '—' },
+                                          { label: isRtl ? 'آخر زيارة' : 'Last Visit', value: customerLastVisit ? new Date(customerLastVisit.startTime || customerLastVisit.date || customerLastVisit.createdAt || 0).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium' }) : '—' },
+                                          { label: isRtl ? 'المصفف المفضل' : 'Preferred Stylist', value: customerPreferredStylist || '—' },
+                                          { label: isRtl ? 'الخدمة المفضلة' : 'Preferred Service', value: customerPreferredService || '—' },
+                                          { label: isRtl ? 'متوسط الإنفاق' : 'Average Spend', value: `${customerAverageSpend.toFixed(2)} ${t.riyal}` }
+                                        ].map((item) => (
+                                          <div key={item.label} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                                            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{item.label}</p>
+                                            <p className="text-slate-800 font-bold mt-1 truncate">{item.value}</p>
                                           </div>
+                                        ))}
+                                      </div>
+                                    </section>
+                                  </motion.div>
+                                )}
+
+                                {customerDrawerTab === 'wallet' && (
+                                  <motion.div key="customer-wallet" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+                                    <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                        {isRtl ? 'محفظة العميل' : 'Customer Wallet'}
+                                      </h4>
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                                          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'الرصيد' : 'Balance'}</p>
+                                          <p className="text-base font-black text-slate-800 mt-1 font-mono">{activeCustomerWallet.toFixed(2)} {t.riyal}</p>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600">
-                                          <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                            <p className="uppercase font-bold text-slate-400">{isRtl ? 'الكمية' : 'Qty'}</p>
-                                            <p className="font-bold text-slate-800">{Number(item.quantity || 0)}</p>
-                                          </div>
-                                          <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                            <p className="uppercase font-bold text-slate-400">{isRtl ? 'سعر الوحدة' : 'Unit Price'}</p>
-                                            <p className="font-bold text-slate-800">{Number(item.unitPrice || 0).toFixed(2)} {t.riyal}</p>
-                                          </div>
-                                          <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                            <p className="uppercase font-bold text-slate-400">{isRtl ? 'الوقت' : 'Appointment Time'}</p>
-                                            <p className="font-bold text-slate-800">{item.appointmentTime || '—'}</p>
-                                          </div>
-                                          <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                            <p className="uppercase font-bold text-slate-400">{isRtl ? 'حالة الفاتورة' : 'Invoice Status'}</p>
-                                            <p className="font-bold text-slate-800 truncate">{item.invoiceStatus || '—'}</p>
-                                          </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                                          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'العمليات' : 'Transactions'}</p>
+                                          <p className="text-base font-black text-slate-800 mt-1 font-mono">{customerRecentTransactions.length}</p>
                                         </div>
                                       </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </section>
+                                    </section>
+                                    <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                          {isRtl ? 'سجل المحفظة' : 'Wallet Ledger'}
+                                        </h4>
+                                        <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-700">
+                                          {isRtl ? 'يعرض بيانات مباشرة' : 'Live data'}
+                                        </span>
+                                      </div>
+                                      <div className="space-y-2">
+                                        {customerRecentTransactions.length === 0 ? (
+                                          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                            {isRtl ? 'لا توجد معاملات محفظة متاحة.' : 'No wallet ledger entries are available yet.'}
+                                          </div>
+                                        ) : (
+                                          customerRecentTransactions.map((item: any, idx: number) => {
+                                            const amount = Number(item.amount ?? item.totalAmount ?? item.value ?? item.price ?? 0);
+                                            const label = item.invoiceNumber || item.orderNumber || item.type || item.method || item.paymentMethod || `TX-${idx + 1}`;
+                                            const dateLabel = item.date || item.createdAt || item.time || '';
+                                            const category = `${item.type || item.kind || item.status || item.paymentStatus || item.method || 'transaction'}`.toLowerCase();
+                                            return (
+                                              <div key={`${label}-${idx}`} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[10px]">
+                                                <div className="min-w-0">
+                                                  <p className="font-bold text-slate-800 truncate">{label}</p>
+                                                  <p className="text-slate-400 truncate">
+                                                    {dateLabel ? new Date(dateLabel).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+                                                  </p>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-500 uppercase">
+                                                    {category}
+                                                  </span>
+                                                  <span className="font-mono font-black text-slate-700 whitespace-nowrap">
+                                                    {amount ? `${amount.toFixed(2)} ${t.riyal}` : '—'}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            );
+                                          })
+                                        )}
+                                      </div>
+                                    </section>
+                                  </motion.div>
+                                )}
 
-                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                              {isRtl ? 'ملخص العميل' : 'Customer Summary'}
-                            </h4>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              {[
-                                { label: isRtl ? 'المحفظة' : 'Wallet', value: `${activeCustomerWallet.toFixed(2)} ${t.riyal}` },
-                                { label: isRtl ? 'إجمالي الإنفاق' : 'Total Spent', value: `${Number(customerProfile?.totalSpent || 0).toFixed(2)} ${t.riyal}` },
-                                { label: isRtl ? 'الحجوزات' : 'Appointments', value: `${customerAppointmentHistory.length}` },
-                                { label: isRtl ? 'المكتملة' : 'Completed', value: `${customerCompletedAppointments}` },
-                                { label: isRtl ? 'الملغاة' : 'Cancelled', value: `${customerCancelledAppointments}` },
-                                { label: isRtl ? 'عدم الحضور' : 'No Shows', value: `${customerNoShowAppointments}` },
-                                { label: isRtl ? 'أول زيارة' : 'First Visit', value: customerFirstVisit ? new Date(customerFirstVisit.startTime || customerFirstVisit.date || customerFirstVisit.createdAt || 0).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium' }) : '—' },
-                                { label: isRtl ? 'آخر زيارة' : 'Last Visit', value: customerLastVisit ? new Date(customerLastVisit.startTime || customerLastVisit.date || customerLastVisit.createdAt || 0).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium' }) : '—' },
-                                { label: isRtl ? 'المصفف المفضل' : 'Preferred Stylist', value: customerPreferredStylist || '—' },
-                                { label: isRtl ? 'الخدمة المفضلة' : 'Preferred Service', value: customerPreferredService || '—' },
-                                { label: isRtl ? 'متوسط الإنفاق' : 'Average Spend', value: `${customerAverageSpend.toFixed(2)} ${t.riyal}` }
-                              ].map((item) => (
-                                <div key={item.label} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{item.label}</p>
-                                  <p className="text-slate-800 font-bold mt-1 truncate">{item.value}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </section>
+                                {customerDrawerTab === 'appointments' && (
+                                  <motion.div key="customer-appointments" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+                                    <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                        {isRtl ? 'الحجوزات الأخيرة' : 'Recent Appointments'}
+                                      </h4>
+                                      <div className="space-y-2">
+                                        {customerAppointmentHistory.length === 0 ? (
+                                          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                            {isRtl ? 'لا توجد حجوزات مسجلة لهذا العميل.' : 'No appointment history is available for this customer.'}
+                                          </div>
+                                        ) : (
+                                          customerAppointmentHistory.map((item: any) => (
+                                            <div key={item.id || `${item.startTime || item.date || Math.random()}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs space-y-1">
+                                              <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                  <p className="font-bold text-slate-800 truncate">{item.service?.name_en || item.serviceName || item.serviceNameEn || item.title || (isRtl ? 'Appointment' : 'Appointment')}</p>
+                                                  <p className="text-[10px] text-slate-400 truncate">
+                                                    {item.status || item.paymentStatus || '—'}
+                                                  </p>
+                                                </div>
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
+                                                  {item.startTime || item.date || '—'}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
+                                    </section>
+                                  </motion.div>
+                                )}
 
-                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                              {isRtl ? 'الخط الزمني' : 'Recent Timeline'}
-                            </h4>
-                            {customerTimelineEntries.length === 0 ? (
-                              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
-                                {isRtl ? 'لا توجد أحداث زمنية حالياً.' : 'No timeline events available yet.'}
-                              </div>
-                            ) : (
-                              <div className="space-y-2.5">
-                                {customerTimelineEntries.map((entry: any) => (
-                                  <div key={entry.id} className="flex gap-3 items-start">
-                                    <span className={`mt-1.5 h-2.5 w-2.5 rounded-full shrink-0 ${
-                                      entry.kind === 'appointment' ? 'bg-blue-400' :
-                                      entry.kind === 'order' ? 'bg-emerald-400' :
-                                      entry.kind === 'wallet' ? 'bg-amber-400' :
-                                      entry.kind === 'gift' ? 'bg-pink-400' :
-                                      'bg-slate-300'
-                                    }`} />
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-bold text-slate-800">{isRtl ? entry.titleAr : entry.titleEn}</p>
-                                      <p className="text-[10px] text-slate-500">{isRtl ? entry.subtitleAr : entry.subtitleEn}</p>
-                                      {entry.date && (
-                                        <p className="text-[10px] text-slate-400 mt-0.5">
-                                          {new Date(entry.date).toLocaleString(isRtl ? 'ar-SA' : 'en-US', {
-                                            dateStyle: 'medium',
-                                            timeStyle: 'short'
-                                          })}
-                                        </p>
+                                {customerDrawerTab === 'transactions' && (
+                                  <motion.div key="customer-transactions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+                                    <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                          {isRtl ? 'العمليات الأخيرة' : 'Recent Transactions'}
+                                        </h4>
+                                        <button
+                                          type="button"
+                                          onClick={() => setCustomerTransactionsExpanded(prev => !prev)}
+                                          className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-700"
+                                        >
+                                          {isRtl ? 'عرض الكل' : 'View All'}
+                                        </button>
+                                      </div>
+                                      <div className="space-y-2">
+                                        {customerRecentTransactions.length === 0 ? (
+                                          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                            {isRtl ? 'لا توجد عمليات مالية مسجلة.' : 'No recent financial activity found.'}
+                                          </div>
+                                        ) : (
+                                          customerRecentTransactions.map((item: any, idx: number) => {
+                                            const amount = Number(item.amount ?? item.totalAmount ?? item.value ?? item.price ?? 0);
+                                            const label = item.invoiceNumber || item.orderNumber || item.type || item.method || item.paymentMethod || `TX-${idx + 1}`;
+                                            const dateLabel = item.date || item.createdAt || item.time || '';
+                                            const category = `${item.type || item.kind || item.status || item.paymentStatus || item.method || 'transaction'}`.toLowerCase();
+                                            return (
+                                              <div key={`${label}-${idx}`} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[10px]">
+                                                <div className="min-w-0">
+                                                  <p className="font-bold text-slate-800 truncate">{label}</p>
+                                                  <p className="text-slate-400 truncate">
+                                                    {dateLabel ? new Date(dateLabel).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+                                                  </p>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-500 uppercase">
+                                                    {category}
+                                                  </span>
+                                                  <span className="font-mono font-black text-slate-700 whitespace-nowrap">
+                                                    {amount ? `${amount.toFixed(2)} ${t.riyal}` : '—'}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            );
+                                          })
+                                        )}
+                                      </div>
+                                    </section>
+                                  </motion.div>
+                                )}
+
+                                {customerDrawerTab === 'reviews' && (
+                                  <motion.div key="customer-reviews" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+                                    <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                        {isRtl ? 'التقييمات' : 'Reviews'}
+                                      </h4>
+                                      <div className="space-y-2">
+                                        {customerProfileLoading ? (
+                                          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                            {isRtl ? 'جاري تحميل التقييمات من الملف الفعلي...' : 'Loading customer reviews from live data...'}
+                                          </div>
+                                        ) : customerLiveReviews.length === 0 ? (
+                                          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                            {isRtl ? 'لا توجد تقييمات مسجلة لهذا العميل حالياً.' : 'No customer reviews are linked to this appointment yet.'}
+                                          </div>
+                                        ) : (
+                                          customerLiveReviews.map((review: any, idx: number) => (
+                                            <div key={review.id || idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2 text-xs">
+                                              <div className="flex justify-between items-center gap-3">
+                                                <span className="font-bold text-slate-800 truncate">{review.serviceName || review.title || review.service?.name_en || (isRtl ? 'خدمة مرتبطة' : 'Linked Service')}</span>
+                                                <div className="flex text-amber-500 gap-0.5 shrink-0">
+                                                  {Array.from({ length: Math.max(1, Math.min(5, review.rating || 0)) }).map((_, starIdx) => (
+                                                    <Star key={starIdx} size={11} fill="currentColor" />
+                                                  ))}
+                                                </div>
+                                              </div>
+                                              <p className="text-slate-600 leading-relaxed italic">
+                                                {review.comment || review.text || (isRtl ? 'لا يوجد تعليق مسجل.' : 'No comment recorded.')}
+                                              </p>
+                                              <p className="text-[10px] text-slate-400">
+                                                {review.createdAt || review.reviewedAt || ''}
+                                              </p>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
+                                    </section>
+                                  </motion.div>
+                                )}
+
+                                {customerDrawerTab === 'notes' && (
+                                  <motion.div key="customer-notes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+                                    <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                        {isRtl ? 'ملاحظات الصالون' : 'Internal Notes'}
+                                      </h4>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {customerInternalNotes.map((note) => (
+                                          <div key={note.label} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{note.label}</p>
+                                            <p className="leading-relaxed">{note.value || '—'}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {customerNoteHistory.length > 0 && (
+                                        <div className="space-y-2 pt-1">
+                                          {customerNoteHistory.map((note: any, idx: number) => (
+                                            <div key={`${note.id || idx}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">
+                                              {note.text || note.note || note}
+                                            </div>
+                                          ))}
+                                        </div>
                                       )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </section>
-
-                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                {isRtl ? 'العمليات الأخيرة' : 'Recent Transactions'}
-                              </h4>
-                              <button
-                                type="button"
-                                onClick={() => setCustomerTransactionsExpanded(prev => !prev)}
-                                className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-700"
-                              >
-                                {isRtl ? 'عرض الكل' : 'View All'}
-                              </button>
-                            </div>
-                            <div className="space-y-2">
-                              {customerRecentTransactions.length === 0 ? (
-                                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
-                                  {isRtl ? 'لا توجد عمليات مالية مسجلة.' : 'No recent financial activity found.'}
-                                </div>
-                              ) : (
-                                customerRecentTransactions.map((item: any, idx: number) => {
-                                  const amount = Number(item.amount ?? item.totalAmount ?? item.value ?? item.price ?? 0);
-                                  const label = item.invoiceNumber || item.orderNumber || item.type || item.method || item.paymentMethod || `TX-${idx + 1}`;
-                                  const dateLabel = item.date || item.createdAt || item.time || '';
-                                  const category = `${item.type || item.kind || item.status || item.paymentStatus || item.method || 'transaction'}`.toLowerCase();
-                                  return (
-                                    <div key={`${label}-${idx}`} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[10px]">
-                                      <div className="min-w-0">
-                                        <p className="font-bold text-slate-800 truncate">{label}</p>
-                                        <p className="text-slate-400 truncate">
-                                          {dateLabel ? new Date(dateLabel).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
-                                        </p>
-                                      </div>
-                                      <div className="flex flex-col items-end gap-1 shrink-0">
-                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-500 uppercase">
-                                          {category}
-                                        </span>
-                                        <span className="font-mono font-black text-slate-700 whitespace-nowrap">
-                                          {amount ? `${amount.toFixed(2)} ${t.riyal}` : '—'}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </section>
-
-                          <section id="customer-notes-section" className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                              {isRtl ? 'الملاحظات الداخلية' : 'Internal Notes'}
-                            </h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {customerInternalNotes.map((note) => (
-                                <div key={note.label} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
-                                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{note.label}</p>
-                                  <p className="leading-relaxed">{note.value || '—'}</p>
-                                </div>
-                              ))}
-                            </div>
-                            {customerNoteHistory.length > 0 && (
-                              <div className="space-y-2 pt-1">
-                                {customerNoteHistory.map((note: any, idx: number) => (
-                                  <div key={`${note.id || idx}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">
-                                    {note.text || note.note || note}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </section>
+                                    </section>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </section>
+                          </div>
                         </div>
                       </div>
                     </motion.div>
