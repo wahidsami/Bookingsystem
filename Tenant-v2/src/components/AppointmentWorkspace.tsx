@@ -309,36 +309,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const activeCustomerWallet = Number(customerProfile?.walletBalance ?? activeAppointment?.walletBalance ?? 0);
   const activeCustomerBranch = activeAppointment?.branchName || activeAppointment?.branch?.name || '';
   const activeAppointmentTime = activeAppointment ? buildClockTime(activeAppointment.startTime) : '';
-  const activeInvoiceLineItems = activeAppointment ? [
-    {
-      id: `svc-${activeAppointment.id}`,
-      nameEn: activeServiceSummary.nameEn,
-      nameAr: activeServiceSummary.nameAr,
-      stylistEn: activeAppointment.assignedStaffName || activeStylist?.nameEn || '',
-      stylistAr: activeAppointment.assignedStaffName || activeStylist?.nameAr || '',
-      quantity: 1,
-      unitPrice: Number(activeServiceSummary.price || 0),
-      subtotal: Number(activeServiceSummary.price || 0),
-      type: 'service'
-    },
-    ...checkoutProducts.map((product) => ({
-      id: `prd-${product.id}`,
-      nameEn: product.nameEn,
-      nameAr: product.nameAr,
-      stylistEn: activeAppointment.assignedStaffName || activeStylist?.nameEn || '',
-      stylistAr: activeAppointment.assignedStaffName || activeStylist?.nameAr || '',
-      quantity: product.quantity,
-      unitPrice: Number(product.price || 0),
-      subtotal: Number(product.price || 0) * Number(product.quantity || 0),
-      type: 'product'
-    }))
-  ] : [];
-  const activeInvoiceSubtotal = activeInvoiceLineItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const activeInvoiceDiscount = Number(appliedGiftCardAmount || 0);
-  const activeInvoiceTaxable = Math.max(0, activeInvoiceSubtotal - activeInvoiceDiscount);
-  const activeInvoiceVat = Number((activeInvoiceTaxable * 0.15).toFixed(2));
-  const activeInvoiceTotal = Number((activeInvoiceTaxable + activeInvoiceVat).toFixed(2));
-  const activeInvoiceRemaining = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0) - Number(splitAmounts.wallet || 0));
 
   const customerAppointmentHistory = Array.isArray(customerHistoryData?.recentAppointments) ? customerHistoryData.recentAppointments : [];
   const customerOrderHistory = Array.isArray(customerHistoryData?.recentOrders) ? customerHistoryData.recentOrders : [];
@@ -516,6 +486,37 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [appliedGiftCardAmount, setAppliedGiftCardAmount] = useState<number>(0);
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [checkoutReceiptData, setCheckoutReceiptData] = useState<any | null>(null);
+
+  const activeInvoiceLineItems = activeAppointment ? [
+    {
+      id: `svc-${activeAppointment.id}`,
+      nameEn: activeServiceSummary.nameEn,
+      nameAr: activeServiceSummary.nameAr,
+      stylistEn: activeAppointment.assignedStaffName || activeStylist?.nameEn || '',
+      stylistAr: activeAppointment.assignedStaffName || activeStylist?.nameAr || '',
+      quantity: 1,
+      unitPrice: Number(activeServiceSummary.price || 0),
+      subtotal: Number(activeServiceSummary.price || 0),
+      type: 'service'
+    },
+    ...checkoutProducts.map((product) => ({
+      id: `prd-${product.id}`,
+      nameEn: product.nameEn,
+      nameAr: product.nameAr,
+      stylistEn: activeAppointment.assignedStaffName || activeStylist?.nameEn || '',
+      stylistAr: activeAppointment.assignedStaffName || activeStylist?.nameAr || '',
+      quantity: product.quantity,
+      unitPrice: Number(product.price || 0),
+      subtotal: Number(product.price || 0) * Number(product.quantity || 0),
+      type: 'product'
+    }))
+  ] : [];
+  const activeInvoiceSubtotal = activeInvoiceLineItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const activeInvoiceDiscount = Number(appliedGiftCardAmount || 0);
+  const activeInvoiceTaxable = Math.max(0, activeInvoiceSubtotal - activeInvoiceDiscount);
+  const activeInvoiceVat = Number((activeInvoiceTaxable * 0.15).toFixed(2));
+  const activeInvoiceTotal = Number((activeInvoiceTaxable + activeInvoiceVat).toFixed(2));
+  const activeInvoiceRemaining = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0) - Number(splitAmounts.wallet || 0));
 
   // Skeletons / Refresh Simulation
   const [isLoading, setIsLoading] = useState(false);
