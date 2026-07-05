@@ -13,6 +13,7 @@ const {
     createAppointmentTransaction,
     resolveLedgerPaymentMethod
 } = require('./paymentTransactionLedgerService');
+const walletService = require('./walletService');
 const { ensureAppointmentInvoice } = require('./customerInvoiceService');
 const { sendCustomerInvoiceLifecycleEmail } = require('./customerInvoiceEmailService');
 
@@ -269,28 +270,21 @@ const decrementCustomerWalletBalance = async (appointment, amount, transaction) 
     if (!appointment?.platformUserId) {
         throw new Error('Customer wallet account not found');
     }
-
-    const walletUser = await db.PlatformUser.findByPk(appointment.platformUserId, {
-        transaction,
-        lock: transaction.LOCK.UPDATE
-    });
-
-    if (!walletUser) {
-        throw new Error('Customer wallet account not found');
-    }
-
-    const walletBalanceBefore = parseFloat(walletUser.walletBalance || 0);
     const numericAmount = parseFloat(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
         throw new Error('Invalid wallet amount');
     }
 
-    if (walletBalanceBefore + 0.01 < numericAmount) {
-        throw new Error('Insufficient wallet balance');
-    }
-
-    await walletUser.decrement('walletBalance', {
-        by: numericAmount,
+    await walletService.debitWallet({
+        platformUserId: appointment.platformUserId,
+        amount: numericAmount,
+        type: 'service_payment_debit',
+        referenceType: 'appointment',
+        referenceId: appointment.id,
+        metadata: {
+            source: 'tenant_dashboard_payment_collection',
+            appointmentId: appointment.id
+        },
         transaction
     });
 };

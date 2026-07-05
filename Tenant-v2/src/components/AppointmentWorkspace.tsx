@@ -551,7 +551,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       ...(customerHistoryData?.transactions || []),
       ...(customerHistoryData?.walletTransactions || [])
     ];
+    const seen = new Set<string>();
     return rows
+      .filter((entry: any) => {
+        const key = `${entry?.source || 'unknown'}:${entry?.id || entry?.referenceId || entry?.transactionRef || JSON.stringify(entry)}`;
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
       .slice()
       .sort((a: any, b: any) => new Date(b.date || b.createdAt || b.time || 0).getTime() - new Date(a.date || a.createdAt || a.time || 0).getTime())
       .slice(0, customerTransactionsExpanded ? 12 : 4);
@@ -1142,7 +1151,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
     try {
       // 1. Mark appointment as paid
-      await tenantApiAdapter.updateAppointmentPaymentStatus(activeAppointment.id, {
+      const paymentResponse = await tenantApiAdapter.updateAppointmentPaymentStatus(activeAppointment.id, {
         paymentStatus: 'paid',
         paymentMethod: paymentMethodSummary,
         splitAmounts: isSplitActive ? splitAmounts : undefined,
@@ -1176,10 +1185,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       setCheckoutReceiptData(receipt);
       setShowReceiptModal(true);
 
-      // Update appointment state in dashboard schedule
-      setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, status: 'completed', paymentStatus: 'paid' } : a));
-      setActiveAppointment(prev => prev ? { ...prev, status: 'completed', paymentStatus: 'paid' } : null);
       await loadBoardData();
+      const confirmedAppointmentId = paymentResponse?.appointment?.id || paymentResponse?.data?.appointment?.id || activeAppointment.id;
+      if (confirmedAppointmentId) {
+        const refreshedAppointment = await tenantApiAdapter.getAppointment(confirmedAppointmentId);
+        const confirmedData = refreshedAppointment?.appointment || refreshedAppointment?.data?.appointment || refreshedAppointment?.data || refreshedAppointment;
+        if (confirmedData) {
+          setActiveAppointment(mapBoardAppointment(confirmedData, selectedDate.toISOString().split('T')[0]));
+        }
+      }
       
       addLocalToast(
         'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',

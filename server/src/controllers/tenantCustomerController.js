@@ -143,6 +143,63 @@ function formatTransactionSubtitle(record, locale = 'en') {
     return record.reference || '';
 }
 
+function formatWalletTransactionTitle(record, locale = 'en') {
+    const direction = `${record.direction || ''}`.toLowerCase();
+    const type = `${record.type || ''}`.toLowerCase();
+
+    if (direction === 'debit') {
+        if (type === 'service_payment_debit') {
+            return locale === 'ar' ? 'دفع خدمة من المحفظة' : 'Service wallet payment';
+        }
+        if (type === 'product_payment_debit') {
+            return locale === 'ar' ? 'دفع منتج من المحفظة' : 'Product wallet payment';
+        }
+        if (type === 'gift_sent_debit') {
+            return locale === 'ar' ? 'إهداء من المحفظة' : 'Gift wallet transfer';
+        }
+        return locale === 'ar' ? 'خصم من المحفظة' : 'Wallet debit';
+    }
+
+    if (type === 'refund_credit') {
+        return locale === 'ar' ? 'استرداد إلى المحفظة' : 'Wallet refund';
+    }
+
+    if (type === 'topup') {
+        return locale === 'ar' ? 'شحن المحفظة' : 'Wallet top up';
+    }
+
+    if (type === 'gift_received_credit') {
+        return locale === 'ar' ? 'رصيد هدية' : 'Gift wallet credit';
+    }
+
+    return locale === 'ar' ? 'حركة محفظة' : 'Wallet transaction';
+}
+
+function formatWalletTransactionSubtitle(record, locale = 'en') {
+    const referenceType = `${record.referenceType || ''}`.toLowerCase();
+    const referenceId = record.referenceId || record.id;
+
+    if (referenceType === 'appointment') {
+        return locale === 'ar'
+            ? `مرتبطة بالموعد ${referenceId}`
+            : `Linked to appointment ${referenceId}`;
+    }
+
+    if (referenceType === 'order') {
+        return locale === 'ar'
+            ? `مرتبطة بالطلب ${referenceId}`
+            : `Linked to order ${referenceId}`;
+    }
+
+    if (referenceType === 'gift_card') {
+        return locale === 'ar'
+            ? `مرتبطة ببطاقة الهدية ${referenceId}`
+            : `Linked to gift card ${referenceId}`;
+    }
+
+    return record.referenceType || record.referenceId || '';
+}
+
 function mapCustomerTransactionRecord(record, locale = 'en') {
   const appointment = record.appointment || null;
   const order = record.order || null;
@@ -163,9 +220,9 @@ function mapCustomerTransactionRecord(record, locale = 'en') {
       ? normalizeAppointmentPaymentState(appointment, record.source || 'transaction')
       : null;
 
-  return {
-    id: record.id,
-    source: record.source || 'transaction',
+    return {
+        id: record.id,
+        source: record.source || 'transaction',
         entityType,
         entityId: record.entityId || bookingSession?.id || appointment?.id || order?.id || null,
         reference,
@@ -192,6 +249,41 @@ function mapCustomerTransactionRecord(record, locale = 'en') {
             : order?.id
                 ? `/dashboard/orders/${order.id}`
                 : null
+    };
+}
+
+function mapWalletLedgerRecord(record, locale = 'en') {
+    return {
+        id: record.id,
+        source: 'wallet_ledger',
+        entityType: 'wallet',
+        entityId: record.referenceId || record.id,
+        reference: record.referenceId || record.id,
+        title: formatWalletTransactionTitle(record, locale),
+        subtitle: formatWalletTransactionSubtitle(record, locale),
+        amount: parseFloat(record.amount || 0),
+        currency: record.currency || 'SAR',
+        type: record.type || 'wallet',
+        status: 'completed',
+        paymentMethod: 'wallet',
+        paymentMethodLabel: formatPaymentMethodLabel('wallet'),
+        normalizedPaymentStatus: null,
+        appointmentOutstandingAmount: null,
+        appointmentPaidAmount: null,
+        paymentEvidenceSource: 'wallet_ledger',
+        transactionRef: record.referenceId || null,
+        notes: record.metadata?.note || record.metadata?.notes || null,
+        processedAt: record.createdAt,
+        processorName: null,
+        detailPath: record.referenceType === 'appointment' && record.referenceId
+            ? `/dashboard/appointments/${record.referenceId}`
+            : record.referenceType === 'order' && record.referenceId
+                ? `/dashboard/orders/${record.referenceId}`
+                : null,
+        direction: record.direction || null,
+        referenceType: record.referenceType || null,
+        referenceId: record.referenceId || null,
+        metadata: record.metadata || {}
     };
 }
 
@@ -596,10 +688,9 @@ exports.getCustomer = async (req, res) => {
         });
 
         const [walletLedgerEntries, giftCardTransactions] = await Promise.all([
-            db.TenantWalletLedgerEntry.findAll({
+            db.WalletLedgerEntry.findAll({
                 where: {
                     platformUserId: id,
-                    tenantId
                 },
                 order: [['createdAt', 'DESC']],
                 ...(walletHistoryMode ? {} : { limit: 10 })
@@ -1189,6 +1280,14 @@ exports.getCustomerHistory = async (req, res) => {
             limit: type === 'appointment' ? 0 : parseInt(limit)
         });
 
+        const walletTransactions = await db.WalletLedgerEntry.findAll({
+            where: {
+                platformUserId: id
+            },
+            order: [['createdAt', 'DESC']],
+            limit: parseInt(limit)
+        });
+
         // Combine and sort by date
         const history = [];
 
@@ -1240,6 +1339,23 @@ exports.getCustomerHistory = async (req, res) => {
             });
         });
 
+        walletTransactions.forEach((entry) => {
+            history.push({
+                type: 'wallet',
+                id: entry.id,
+                date: entry.createdAt,
+                status: entry.direction === 'credit' ? 'completed' : 'completed',
+                paymentStatus: entry.direction === 'credit' ? 'credited' : 'debited',
+                amount: parseFloat(entry.amount || 0),
+                details: {
+                    direction: entry.direction,
+                    referenceType: entry.referenceType || null,
+                    referenceId: entry.referenceId || null,
+                    metadata: entry.metadata || {}
+                }
+            });
+        });
+
         // Sort by date (most recent first)
         history.sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -1253,10 +1369,25 @@ exports.getCustomerHistory = async (req, res) => {
             success: true,
             data: {
                 history: history.slice(0, parseInt(limit)),
+                walletTransactions: walletTransactions.map((entry) => ({
+                    id: entry.id,
+                    source: 'wallet_ledger',
+                    type: entry.type,
+                    direction: entry.direction,
+                    amount: parseFloat(entry.amount || 0),
+                    currency: entry.currency || 'SAR',
+                    balanceBefore: parseFloat(entry.balanceBefore || 0),
+                    balanceAfter: parseFloat(entry.balanceAfter || 0),
+                    referenceType: entry.referenceType || null,
+                    referenceId: entry.referenceId || null,
+                    metadata: entry.metadata || {},
+                    createdAt: entry.createdAt
+                })),
                 summary: {
                     totalInteractions: history.length,
                     totalAppointments: appointments.length,
                     totalOrders: orders.length,
+                    totalWalletTransactions: walletTransactions.length,
                     totalSpent: appointmentSpending + orderSpending,
                     appointmentSpending: appointmentSpending,
                     orderSpending: orderSpending,
@@ -1510,12 +1641,25 @@ exports.getCustomerTransactions = async (req, res) => {
                 order: [['processedAt', 'DESC']]
             })
         ]);
+        const walletLedgerTransactions = await db.WalletLedgerEntry.findAll({
+            where: {
+                platformUserId: id,
+                ...(appointmentStart || appointmentEnd ? {
+                    createdAt: {
+                        ...(appointmentStart ? { [Op.gte]: appointmentStart } : {}),
+                        ...(appointmentEnd ? { [Op.lte]: appointmentEnd } : {})
+                    }
+                } : {})
+            },
+            order: [['createdAt', 'DESC']]
+        });
         logTenantAppointmentAudit('customer_transactions_payment_records_loaded', {
             requestId,
             tenantId,
             customerId: id,
             gatewayTransactionsCount: gatewayTransactions.length,
-            ledgerTransactionsCount: ledgerTransactions.length
+            ledgerTransactionsCount: ledgerTransactions.length,
+            walletLedgerTransactionsCount: walletLedgerTransactions.length
         });
 
         const transactions = [];
@@ -1618,6 +1762,17 @@ exports.getCustomerTransactions = async (req, res) => {
             }, locale));
         });
 
+        walletLedgerTransactions.forEach((transaction) => {
+            const key = `wallet:${transaction.referenceType || 'wallet'}:${transaction.referenceId || transaction.id}:${transaction.type}:${transaction.amount}:${transaction.direction}`;
+
+            if (seenRecords.has(key)) {
+                return;
+            }
+
+            seenRecords.add(key);
+            transactions.push(mapWalletLedgerRecord(transaction, locale));
+        });
+
         appointments.forEach((appointment) => {
             const normalizedPaymentStatus = (appointment.paymentStatus || '').toLowerCase();
             const isPaidAppointment = ['deposit_paid', 'fully_paid', 'paid', 'refunded', 'partially_refunded'].includes(normalizedPaymentStatus);
@@ -1707,7 +1862,8 @@ exports.getCustomerTransactions = async (req, res) => {
                     refundedTotal: parseFloat(refundedTotal.toFixed(2)),
                     netTotal: parseFloat((completedTotal - refundedTotal).toFixed(2)),
                     appointmentCount: pagedTransactions.filter((item) => item.entityType === 'appointment').length,
-                    orderCount: pagedTransactions.filter((item) => item.entityType === 'order').length
+                    orderCount: pagedTransactions.filter((item) => item.entityType === 'order').length,
+                    walletCount: pagedTransactions.filter((item) => item.entityType === 'wallet').length
                 }
             }
         });
