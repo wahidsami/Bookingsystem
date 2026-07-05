@@ -116,6 +116,11 @@ const displayAppointmentStatus = (status: any): string => {
   return normalizeWorkspaceAppointmentStatus(status);
 };
 
+const toMoney = (value: any) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
 export default function AppointmentWorkspace({ lang, onQuickAction }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
   
@@ -164,7 +169,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           nameEn: s.name_en || s.name || '',
           nameAr: s.name_ar || s.name || '',
           duration: s.duration || 60,
-          price: s.finalPrice || s.price || 0,
+          price: toMoney(s.finalPrice ?? s.price ?? 0),
           categoryAr: s.category || 'علاجات ومساج',
           categoryEn: s.category || 'Massage & Therapy'
         })));

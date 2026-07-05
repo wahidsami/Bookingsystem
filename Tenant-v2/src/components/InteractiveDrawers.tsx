@@ -13,6 +13,11 @@ const FALLBACK_STYLISTS = [
   { id: 'st-4', nameAr: 'منى الراجحي', nameEn: 'Mona Al-Rajhi', roleAr: 'أخصائي العناية بالأظافر', roleEn: 'Nail Artist' },
 ];
 
+const toMoney = (value: any) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
 interface InteractiveDrawersProps {
   isRtl: boolean;
   isCreateDrawerOpen: boolean;
@@ -267,15 +272,15 @@ export default function InteractiveDrawers({
                 updated.serviceName = catalogSrv.nameEn;
                 updated.category = catalogSrv.categoryEn;
                 updated.duration = catalogSrv.duration;
-                updated.basePrice = catalogSrv.price;
-                updated.finalPrice = catalogSrv.price;
+                updated.basePrice = toMoney(catalogSrv.price);
+                updated.finalPrice = toMoney(catalogSrv.price);
               }
             }
-            let priceAfterDiscount = updated.basePrice;
+            let priceAfterDiscount = toMoney(updated.basePrice);
             if (updated.discountType === 'flat') {
-              priceAfterDiscount = Math.max(0, updated.basePrice - updated.discountValue);
+              priceAfterDiscount = Math.max(0, toMoney(updated.basePrice) - toMoney(updated.discountValue));
             } else if (updated.discountType === 'percent') {
-              priceAfterDiscount = Math.max(0, updated.basePrice * (1 - updated.discountValue / 100));
+              priceAfterDiscount = Math.max(0, toMoney(updated.basePrice) * (1 - toMoney(updated.discountValue) / 100));
             }
             updated.finalPrice = updated.isFree || g.isFree ? 0 : priceAfterDiscount;
             return updated;
@@ -1277,7 +1282,7 @@ export default function InteractiveDrawers({
                               <label className="text-slate-500 block mb-1">{isRtl ? 'الخدمة الفاخرة' : 'Select Service'}</label>
                               <select value={currentServiceId} onChange={(e) => setCurrentServiceId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold">
                                 {services.map(s => (
-                                  <option key={s.id} value={s.id}>{isRtl ? s.nameAr : s.nameEn} ({s.price} ر.س)</option>
+                                  <option key={s.id} value={s.id}>{isRtl ? s.nameAr : s.nameEn} ({toMoney(s.price).toFixed(2)} ر.س)</option>
                                 ))}
                               </select>
                             </div>
@@ -1359,13 +1364,13 @@ export default function InteractiveDrawers({
                           }
                           finalStaged.forEach(item => {
                             const srv = services.find(s => s.id === item.serviceId);
-                            if (srv) primarySubtotal += srv.price;
+                            if (srv) primarySubtotal += toMoney(srv.price);
                           });
 
                           // Guest group cost calculation
                           let guestsSubtotal = 0;
                           if (includeGroupGuests) {
-                            guestsSubtotal = guestsList.reduce((acc, g) => acc + (g.isFree ? 0 : (g.services || []).reduce((sum, gs) => sum + (gs.isFree ? 0 : gs.finalPrice), 0)), 0);
+                            guestsSubtotal = guestsList.reduce((acc, g) => acc + (g.isFree ? 0 : (g.services || []).reduce((sum, gs) => sum + (gs.isFree ? 0 : toMoney(gs.finalPrice)), 0)), 0);
                           }
 
                           subtotal = primarySubtotal + guestsSubtotal;
@@ -1383,24 +1388,24 @@ export default function InteractiveDrawers({
                               <div className="space-y-1.5 text-xs text-slate-600 border-b pb-2">
                                 <div className="flex justify-between">
                                   <span className="font-bold text-slate-700">{isRtl ? 'العميل الرئيسي' : 'Primary Session Customer'}</span>
-                                  <span className="font-mono">{primarySubtotal.toFixed(2)} ر.س</span>
+                                  <span className="font-mono">{toMoney(primarySubtotal).toFixed(2)} ر.س</span>
                                 </div>
                                 {includeGroupGuests && (
                                   <div className="space-y-1 pl-2.5 border-l-2 border-amber-500/30 pr-2.5">
                                     <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">{isRtl ? 'تفصيل خدمات الضيوف:' : 'GROUP GUESTS BREAKDOWN'}</p>
                                     {guestsList.map((g, idx) => {
-                                      const guestSub = (g.services || []).reduce((acc, gs) => acc + (g.isFree || gs.isFree ? 0 : gs.finalPrice), 0);
+                                      const guestSub = (g.services || []).reduce((acc, gs) => acc + (g.isFree || gs.isFree ? 0 : toMoney(gs.finalPrice)), 0);
                                       return (
                                         <div key={g.id} className="space-y-0.5 text-[11px] border-b border-dashed border-slate-100 pb-1 mb-1">
                                           <div className="flex justify-between font-bold">
                                             <span>{g.name || `${isRtl ? 'مرافق' : 'Guest'} ${idx + 1}`}</span>
-                                            <span className="font-mono">{g.isFree ? '0.00' : guestSub.toFixed(2)} ر.س</span>
+                                            <span className="font-mono">{g.isFree ? '0.00' : toMoney(guestSub).toFixed(2)} ر.س</span>
                                           </div>
                                           <div className="pl-2 text-[10px] text-slate-400">
                                             {(g.services || []).map(gs => (
                                               <div key={gs.id} className="flex justify-between">
                                                 <span>- {gs.serviceName}</span>
-                                                <span>{gs.finalPrice.toFixed(2)} ر.س</span>
+                                                <span>{toMoney(gs.finalPrice).toFixed(2)} ر.س</span>
                                               </div>
                                             ))}
                                           </div>
@@ -1413,15 +1418,15 @@ export default function InteractiveDrawers({
 
                               <div className="flex justify-between">
                                 <span>{isRtl ? 'مجموع الخدمات' : 'Services Subtotal'}</span>
-                                <span className="font-mono">{subtotal.toFixed(2)} ر.س</span>
+                                <span className="font-mono">{toMoney(subtotal).toFixed(2)} ر.س</span>
                               </div>
                               <div className="flex justify-between">
                                 <span>{isRtl ? 'الضريبة المضافة ZATCA (15%)' : 'Tax VAT (15%)'}</span>
-                                <span className="font-mono">{vat.toFixed(2)} ر.س</span>
+                                <span className="font-mono">{toMoney(vat).toFixed(2)} ر.س</span>
                               </div>
                               <div className="flex justify-between font-black text-amber-600 text-sm border-t pt-1.5">
                                 <span>{isRtl ? 'المبلغ المستحق النهائي' : 'Grand Total Due'}</span>
-                                <span className="font-mono">{total.toFixed(2)} ر.س</span>
+                                <span className="font-mono">{toMoney(total).toFixed(2)} ر.س</span>
                               </div>
 
                               {/* Dedicated Guest Group Summary Card in checkout step */}
