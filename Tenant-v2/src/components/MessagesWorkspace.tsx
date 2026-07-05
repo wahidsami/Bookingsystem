@@ -160,7 +160,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
           tenantApiAdapter.getEmployees()
         ]);
         if (active) {
-          const loadedMessages = messagesData?.data || [];
+          const loadedMessages = (messagesData?.data || []).map(normalizeMessageThread);
           setMessages(loadedMessages);
           setStaffMembers(employeesData?.employees || []);
           if (loadedMessages.length > 0) {
@@ -218,6 +218,14 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week'>('all');
   const [composeEmployeeQuery, setComposeEmployeeQuery] = useState<string>('');
   const [mentionDropdownOpen, setMentionDropdownOpen] = useState<boolean>(false);
+
+  const normalizeMessageThread = (thread: any): MessageThread => ({
+    ...thread,
+    replies: Array.isArray(thread?.replies) ? thread.replies : [],
+    attachments: Array.isArray(thread?.attachments) ? thread.attachments : [],
+    reactions: Array.isArray(thread?.reactions) ? thread.reactions : [],
+    recipientStatuses: Array.isArray(thread?.recipientStatuses) ? thread.recipientStatuses : []
+  });
   const [mentionDropdownSearch, setMentionDropdownSearch] = useState<string>('');
   const [mentionTargetInput, setMentionTargetInput] = useState<'compose' | 'reply' | null>(null);
   const [composeAttachments, setComposeAttachments] = useState<Attachment[]>([]);
@@ -410,8 +418,11 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
 
   // Selected Message Thread object
   const selectedMessage = useMemo(() => {
-    return messages.find(m => m.id === selectedMessageId);
+    const message = messages.find(m => m.id === selectedMessageId);
+    return message ? normalizeMessageThread(message) : undefined;
   }, [messages, selectedMessageId]);
+  const selectedMessageReplies = Array.isArray(selectedMessage?.replies) ? selectedMessage.replies : [];
+  const selectedMessageRecipientStatuses = Array.isArray(selectedMessage?.recipientStatuses) ? selectedMessage.recipientStatuses : [];
 
   // Handle selection and mark as read
   const selectMessage = (id: string) => {
@@ -486,7 +497,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
         tenantApiAdapter.getMessages(),
         tenantApiAdapter.getEmployees()
       ]);
-      const loadedMessages = messagesData?.data || [];
+      const loadedMessages = (messagesData?.data || []).map(normalizeMessageThread);
       setMessages(loadedMessages);
       setStaffMembers(employeesData?.employees || []);
       if (loadedMessages.length > 0) {
@@ -635,7 +646,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
         if (msg.id === selectedMessageId) {
           return {
             ...msg,
-            replies: [...msg.replies, newReply]
+            replies: [...(Array.isArray(msg.replies) ? msg.replies : []), newReply]
           };
         }
         return msg;
@@ -653,11 +664,11 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
       setMessages(prev => prev.map(msg => {
         if (msg.id === id) {
           // Reset status values to 'unread' to simulate dispatching again
-          const updatedStatuses = msg.recipientStatuses ? msg.recipientStatuses.map(status => ({
+          const updatedStatuses = (Array.isArray(msg.recipientStatuses) ? msg.recipientStatuses : []).map(status => ({
             ...status,
             status: 'unread' as const,
             readTime: undefined
-          })) : [];
+          }));
           return {
             ...msg,
             timestamp: isRtl ? 'الآن' : 'Just now',
@@ -1266,8 +1277,8 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                         <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-widest block leading-tight">{pt.readCount}</span>
                         <span className="text-xs font-black text-neutral-800 dark:text-zinc-100 font-mono">
                           {selectedMessage.recipientType === 'all_staff' 
-                            ? (selectedMessage.recipientStatuses ? selectedMessage.recipientStatuses.filter(s => s.status === 'read').length : 3)
-                            : (selectedMessage.recipientStatuses && selectedMessage.recipientStatuses[0]?.status === 'read' ? 1 : 0)
+                            ? selectedMessageRecipientStatuses.filter(s => s.status === 'read').length
+                            : (selectedMessageRecipientStatuses[0]?.status === 'read' ? 1 : 0)
                           }
                         </span>
                       </div>
@@ -1276,8 +1287,8 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                         <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-widest block leading-tight">{pt.unreadCount}</span>
                         <span className="text-xs font-black text-rose-500 font-mono">
                           {selectedMessage.recipientType === 'all_staff' 
-                            ? (selectedMessage.recipientStatuses ? selectedMessage.recipientStatuses.filter(s => s.status === 'unread').length : 1)
-                            : (selectedMessage.recipientStatuses && selectedMessage.recipientStatuses[0]?.status === 'unread' ? 1 : 0)
+                            ? selectedMessageRecipientStatuses.filter(s => s.status === 'unread').length
+                            : (selectedMessageRecipientStatuses[0]?.status === 'unread' ? 1 : 0)
                           }
                         </span>
                       </div>
@@ -1295,8 +1306,8 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                       {selectedMessage.recipientType === 'all_staff' ? (
                         /* Broadcast recipient list template */
                         <div className="space-y-2.5">
-                          {selectedMessage.recipientStatuses && selectedMessage.recipientStatuses.length > 0 ? (
-                            selectedMessage.recipientStatuses.map((rec) => (
+                          {selectedMessageRecipientStatuses.length > 0 ? (
+                            selectedMessageRecipientStatuses.map((rec) => (
                               <div key={rec.employeeId} className="flex items-center justify-between gap-2 text-[11px] border-b border-neutral-200/40 dark:border-zinc-800/30 pb-2 last:border-0 last:pb-0">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <img src={rec.avatar} alt={rec.nameEn} className="w-6.5 h-6.5 rounded-full object-cover shrink-0" />
@@ -1338,8 +1349,8 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                       ) : selectedMessage.recipientType === 'employee' ? (
                         /* Direct message detailed recipient view */
                         <div className="space-y-3.5">
-                          {selectedMessage.recipientStatuses && selectedMessage.recipientStatuses.length > 0 ? (
-                            selectedMessage.recipientStatuses.map((rec) => {
+                          {selectedMessageRecipientStatuses.length > 0 ? (
+                            selectedMessageRecipientStatuses.map((rec) => {
                               const isRead = rec.status === 'read';
                               return (
                                 <div key={rec.employeeId} className="space-y-3">
@@ -1491,12 +1502,12 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                   {/* REPLIES / COMMENT FEED & REPLY FORM - RE-USED FOR PREMIUM FULLNESS */}
                   <div className="space-y-4 border-t border-neutral-100 dark:border-zinc-800/60 pt-5">
                     <h4 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
-                      {pt.replies} ({selectedMessage.replies.length})
+                      {pt.replies} ({selectedMessageReplies.length})
                     </h4>
 
-                    {selectedMessage.replies.length > 0 ? (
+                    {selectedMessageReplies.length > 0 ? (
                       <div className="space-y-3">
-                        {selectedMessage.replies.map((rep) => (
+                        {selectedMessageReplies.map((rep) => (
                           <div key={rep.id} className="flex gap-2.5 items-start bg-neutral-50 dark:bg-zinc-950/20 p-2.5 rounded-lg border border-neutral-100 dark:border-zinc-850/50">
                             <img src={rep.senderAvatar} alt="Reply avatar" className="w-6.5 h-6.5 rounded-full object-cover shrink-0" />
                             <div className="flex-1 min-w-0">
