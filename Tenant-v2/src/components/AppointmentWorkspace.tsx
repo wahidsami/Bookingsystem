@@ -1992,14 +1992,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     let firstStaffId = finalStaged[0].staffId;
     let earliestStartTime = finalStaged[0].startTime;
     const payloadItems = finalStaged.map((item) => {
-      const srv = liveServices.find(s => s.id === item.serviceId);
+      const resolvedServiceId = `${item.serviceId || ''}`.trim();
+      const srv = liveServices.find(s => s.id === resolvedServiceId);
       return {
-        serviceId: item.serviceId,
+        serviceId: resolvedServiceId,
         staffId: item.staffId,
         requestedStaffId: item.staffId,
         startTime: buildIsoFromMinutes(getSelectedDateKey(), item.startTime),
         notes: item.notes || sessionNotes || null,
-        paymentMethod: createSplitActive || giftCardCodeInput ? 'paid' : 'at-center',
+        paymentMethod: 'at-center',
         assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
         duration: item.duration || srv?.duration || 60,
         discountType: item.discountType,
@@ -2008,16 +2009,27 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       };
     });
 
+    const resolvedPrimaryServiceId = `${payloadItems[0]?.serviceId || currentServiceId || ''}`.trim();
+    const resolvedPrimaryStaffId = `${firstStaffId || currentStaffId || ''}`.trim();
+    if (!resolvedPrimaryServiceId) {
+      addLocalToast(
+        isRtl ? 'يرجى اختيار خدمة صحيحة قبل تأكيد الحجز.' : 'Please choose a valid service before confirming the booking.',
+        isRtl ? 'Please choose a valid service before confirming the booking.' : 'يرجى اختيار خدمة صحيحة قبل تأكيد الحجز.',
+        'warning'
+      );
+      return;
+    }
+
     void (async () => {
       try {
         const response = await tenantApiAdapter.createAppointment({
           items: payloadItems,
-          staffId: firstStaffId,
+          staffId: resolvedPrimaryStaffId,
           startTime: buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime),
           notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
           assignmentMode: 'tenant_reassigned',
           notifyCustomer: true,
-          paymentMethod: createSplitActive || giftCardCodeInput ? 'paid' : 'at-center',
+          paymentMethod: 'at-center',
           paymentAllocations: createSplitActive
             ? Object.entries(splitAmounts)
                 .filter(([, amount]) => Number(amount) > 0)

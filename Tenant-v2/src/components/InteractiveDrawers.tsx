@@ -522,26 +522,35 @@ export default function InteractiveDrawers({
 
     const finalPrice = Math.max(0, totalRawPrice + guestAddonsPrice);
 
-    const appointmentDateKey = selectedDate.toISOString().split('T')[0];
     const items = finalStaged.map((item) => {
-      const service = services.find(s => s.id === item.serviceId);
+      const resolvedServiceId = `${item.serviceId || ''}`.trim();
+      const service = services.find(s => s.id === resolvedServiceId);
       return {
-        serviceId: item.serviceId,
+        serviceId: resolvedServiceId,
         staffId: item.staffId,
+        requestedStaffId: item.staffId,
         startTime: buildIsoFromMinutes(selectedDate, item.startTime),
         notes: item.notes || undefined,
         duration: item.duration,
         discountType: item.discountType,
         discountValue: item.discountValue,
-        paymentMethod: createSplitActive || giftCardCodeInput ? 'paid' : 'unpaid',
+        paymentMethod: 'at-center',
         assignmentMode: 'tenant_reassigned',
+        variantId: undefined,
         serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined
       };
     });
 
+    const resolvedPrimaryServiceId = `${items[0]?.serviceId || currentServiceId || ''}`.trim();
+    const resolvedPrimaryStaffId = `${firstStaffId || currentStaffId || ''}`.trim();
+    if (!resolvedPrimaryServiceId) {
+      addLocalToast('يرجى اختيار خدمة صحيحة قبل تأكيد الحجز', 'Please choose a valid service before confirming the booking', 'warning');
+      return;
+    }
+
     const payload = {
       items,
-      staffId: firstStaffId,
+      staffId: resolvedPrimaryStaffId,
       startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
       notes: sessionNotes || [
         ...finalStaged.map(s => s.notes),
@@ -549,7 +558,7 @@ export default function InteractiveDrawers({
       ].filter(Boolean).join(' | '),
       assignmentMode: 'tenant_reassigned',
       notifyCustomer: notifyWhatsApp,
-      paymentMethod: createSplitActive || giftCardCodeInput ? 'paid' : 'unpaid',
+      paymentMethod: 'at-center',
       paymentAllocations: createSplitActive
         ? Object.entries(createSplitAmounts)
             .filter(([, amount]) => Number(amount) > 0)
