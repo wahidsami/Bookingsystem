@@ -34,6 +34,7 @@ interface Appointment {
   id: string;
   customerId?: string;
   serviceId?: string;
+  service?: any;
   bookingSessionId?: string;
   bookingReference?: string;
   bookingItemIndex?: number;
@@ -62,6 +63,10 @@ interface Appointment {
   branch?: { name?: string };
   invoiceStatus?: string;
   assignedStaffName?: string;
+  serviceName?: string;
+  nameEn?: string;
+  nameAr?: string;
+  name?: string;
   paymentAllocations?: any[];
   services?: any[];
   serviceItems?: any[];
@@ -316,8 +321,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         if (item.serviceId || item.serviceNameEn || item.serviceNameAr) {
           return [{
             id: item.serviceId || `svc-${item.id}`,
+            service: item.service || null,
             nameEn: item.serviceNameEn,
             nameAr: item.serviceNameAr,
+            serviceNameEn: item.serviceNameEn || item.service?.name_en || item.service?.nameEn || item.service?.name || item.nameEn || item.name || '',
+            serviceNameAr: item.serviceNameAr || item.service?.name_ar || item.service?.nameAr || item.service?.name || item.nameAr || item.name || '',
             duration: item.duration,
             price: item.price
           }];

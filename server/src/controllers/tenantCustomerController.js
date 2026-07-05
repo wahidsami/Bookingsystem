@@ -716,6 +716,37 @@ exports.getCustomer = async (req, res) => {
             })
         ]);
 
+        const reviews = await db.Review.findAll({
+            where: {
+                tenantId,
+                platformUserId: id,
+                isVisible: true
+            },
+            include: [
+                {
+                    model: db.Staff,
+                    as: 'staff',
+                    attributes: ['id', 'name', 'photo'],
+                    required: false
+                },
+                {
+                    model: db.Appointment,
+                    as: 'appointment',
+                    attributes: ['id', 'status', 'startTime', 'serviceName', 'serviceVariantName'],
+                    required: false,
+                    include: [
+                        {
+                            model: db.Service,
+                            as: 'service',
+                            attributes: ['id', 'name_en', 'name_ar', 'nameEn', 'nameAr', 'duration'],
+                            required: false
+                        }
+                    ]
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
         // Get or create customer insight
         let insight = await db.CustomerInsight.findOne({
             where: { platformUserId: id, tenantId }
@@ -890,6 +921,28 @@ exports.getCustomer = async (req, res) => {
             },
             walletLedgerEntries: mappedWalletLedgerEntries,
             giftCardTransactions: mappedGiftCardTransactions,
+            reviews: reviews.map((review) => ({
+                id: review.id,
+                rating: review.rating,
+                comment: review.comment || '',
+                text: review.comment || '',
+                title: review.appointment?.service?.name_en || review.appointment?.service?.name_ar || review.appointment?.serviceName || review.appointment?.serviceVariantName || 'Review',
+                serviceName: review.appointment?.service?.name_en || review.appointment?.service?.name_ar || review.appointment?.serviceName || review.appointment?.serviceVariantName || 'Review',
+                staff: review.staff ? {
+                    id: review.staff.id,
+                    name: review.staff.name,
+                    photo: review.staff.photo || null
+                } : null,
+                appointmentId: review.appointmentId || null,
+                appointment: review.appointment ? {
+                    id: review.appointment.id,
+                    status: review.appointment.status,
+                    startTime: review.appointment.startTime,
+                    serviceName: review.appointment.serviceName || review.appointment.serviceVariantName || review.appointment?.service?.name_en || review.appointment?.service?.name_ar || null
+                } : null,
+                createdAt: review.createdAt,
+                reviewedAt: review.createdAt
+            })),
             // All appointments (complete history)
             allAppointments: appointments.map(a => ({
                 ...normalizeAppointmentPaymentState(a, 'appointment'),
