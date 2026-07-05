@@ -474,7 +474,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [drawerTab, setDrawerTab] = useState<'overview' | 'financials' | 'timeline' | 'reviews'>('overview');
   const [activeStylistMenuId, setActiveStylistMenuId] = useState<string | null>(null);
   const [isCustomerProfileOpen, setIsCustomerProfileOpen] = useState(false);
+  const [appointmentDetailsReadOnly, setAppointmentDetailsReadOnly] = useState(false);
   const [customerDrawerTab, setCustomerDrawerTab] = useState<'overview' | 'wallet' | 'appointments' | 'transactions' | 'reviews' | 'notes'>('overview');
+  const [customerAppointmentHistoryFilter, setCustomerAppointmentHistoryFilter] = useState<'all' | 'upcoming' | 'completed' | 'cancelled' | 'no_show'>('all');
   const [customerProfile, setCustomerProfile] = useState<any | null>(null);
   const [customerHistoryData, setCustomerHistoryData] = useState<any | null>(null);
   const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
@@ -571,15 +573,38 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     || activeAppointment?.membershipTier
     || '';
 
-  const customerAppointmentHistory = Array.isArray(customerHistoryData?.recentAppointments) ? customerHistoryData.recentAppointments : [];
-  const customerOrderHistory = Array.isArray(customerHistoryData?.recentOrders) ? customerHistoryData.recentOrders : [];
+  const customerHistoryEntries = Array.isArray(customerHistoryData?.history) ? customerHistoryData.history : [];
+  const customerSummaryData = customerHistoryData?.summary || {};
+  const customerAppointmentHistory = customerHistoryEntries.filter((item: any) => {
+    const kind = `${item?.type || item?.entityType || item?.kind || ''}`.toLowerCase();
+    return kind === 'appointment' || kind === 'booking_session' || Boolean(item?.details?.service || item?.appointment || item?.service);
+  });
+  const customerOrderHistory = customerHistoryEntries.filter((item: any) => `${item?.type || item?.entityType || item?.kind || ''}`.toLowerCase() === 'order');
   const customerWalletHistory = Array.isArray(customerHistoryData?.walletTransactions) ? customerHistoryData.walletTransactions : [];
-  const customerGiftHistory = Array.isArray(customerHistoryData?.giftActivity) ? customerHistoryData.giftActivity : [];
-  const customerReviewHistory = Array.isArray(customerHistoryData?.reviews) ? customerHistoryData.reviews : [];
+  const customerGiftHistory = customerHistoryEntries.filter((item: any) => {
+    const kind = `${item?.type || item?.entityType || item?.kind || ''}`.toLowerCase();
+    return kind === 'gift' || kind === 'gift_card';
+  });
+  const customerReviewHistory = Array.isArray(customerProfile?.reviews) ? customerProfile.reviews : [];
   const customerLiveReviews = Array.isArray(customerProfile?.reviews) && customerProfile.reviews.length > 0
     ? customerProfile.reviews
     : customerReviewHistory;
   const customerNoteHistory = Array.isArray(customerProfile?.notes) ? customerProfile.notes : [];
+  const customerAppointmentHistoryRows = [...customerAppointmentHistory]
+    .sort((a: any, b: any) => new Date(b?.details?.startTime || b?.date || b?.createdAt || 0).getTime() - new Date(a?.details?.startTime || a?.date || a?.createdAt || 0).getTime());
+  const customerAppointmentHistoryCards = customerAppointmentHistoryRows.filter((item: any) => {
+    const rawStatus = `${item?.status || item?.paymentStatus || ''}`.toLowerCase();
+    const appointmentStart = new Date(item?.details?.startTime || item?.date || item?.createdAt || 0).getTime();
+    const isFuture = Number.isFinite(appointmentStart) && appointmentStart > Date.now();
+    const bucket = (() => {
+      if (['cancelled', 'canceled'].includes(rawStatus)) return 'cancelled';
+      if (['no-show', 'noshow', 'no_show'].includes(rawStatus)) return 'no_show';
+      if (['completed', 'done', 'served'].includes(rawStatus)) return 'completed';
+      if (isFuture || ['confirmed', 'scheduled', 'pending', 'arrived', 'in_progress', 'in progress', 'booked'].includes(rawStatus)) return 'upcoming';
+      return 'completed';
+    })();
+    return customerAppointmentHistoryFilter === 'all' || bucket === customerAppointmentHistoryFilter;
+  });
   const customerFirstVisit = [...customerAppointmentHistory]
     .sort((a: any, b: any) => new Date(a.startTime || a.date || a.createdAt || 0).getTime() - new Date(b.startTime || b.date || b.createdAt || 0).getTime())[0];
   const customerLastVisit = [...customerAppointmentHistory]
@@ -592,13 +617,73 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     ? customerProfile.favServices[0]
     : activeAppointment?.serviceNameEn || '';
   const customerAverageSpend = (() => {
-    const totalSpent = Number(customerProfile?.totalSpent ?? 0);
-    const visits = Number(customerProfile?.appointmentsCount ?? customerAppointmentHistory.length ?? 0);
+    const totalSpent = Number(customerProfile?.totalSpent ?? customerSummaryData.totalSpent ?? 0);
+    const visits = Number(customerProfile?.appointmentsCount ?? customerSummaryData.totalAppointments ?? customerAppointmentHistory.length ?? 0);
     if (!visits) {
       return 0;
     }
     return totalSpent / visits;
   })();
+
+  const getTransactionAmountLabel = (item: any) => {
+    const amount = Number(item?.amount ?? item?.totalAmount ?? item?.value ?? item?.price ?? 0);
+    return Number.isFinite(amount) && amount > 0 ? `${amount.toFixed(2)} ${t.riyal}` : '—';
+  };
+
+  const getTransactionStatusTone = (statusValue: any) => {
+    const status = `${statusValue || ''}`.toLowerCase();
+    if (['paid', 'completed', 'success', 'captured', 'fully_paid', 'deposit_paid'].includes(status)) {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    }
+    if (['pending', 'processing', 'in_progress', 'partially_paid'].includes(status)) {
+      return 'bg-amber-50 text-amber-700 border-amber-200';
+    }
+    if (['failed', 'cancelled', 'canceled', 'void', 'refunded', 'partially_refunded'].includes(status)) {
+      return 'bg-rose-50 text-rose-700 border-rose-200';
+    }
+    return 'bg-slate-50 text-slate-700 border-slate-200';
+  };
+
+  const openCustomerTransactionRecord = async (item: any) => {
+    const detailPath = `${item?.detailPath || ''}`;
+    const appointmentMatch = detailPath.match(/\/dashboard\/appointments\/([^/?#]+)/);
+    const appointmentId = appointmentMatch?.[1]
+      || item?.appointment?.id
+      || item?.bookingSession?.appointments?.[0]?.id
+      || (item?.referenceType === 'appointment' ? item?.referenceId : null)
+      || null;
+
+    if (appointmentId) {
+      await openHistoricalAppointmentDetails({
+        ...item,
+        id: appointmentId,
+        date: item?.processedAt || item?.date || item?.createdAt || item?.time || item?.appointment?.startTime || item?.appointment?.date,
+        details: {
+          service: item?.appointment?.service || item?.bookingSession?.appointments?.[0]?.service || item?.details?.service || null,
+          staff: item?.appointment?.staff || item?.bookingSession?.appointments?.[0]?.staff || item?.details?.staff || null,
+          duration: item?.appointment?.service?.duration || item?.appointment?.duration || item?.details?.duration || 0,
+          startTime: item?.appointment?.startTime || item?.processedAt || item?.date || item?.createdAt || '',
+          notes: item?.notes || item?.subtitle || ''
+        }
+      });
+      return;
+    }
+
+    if (detailPath && detailPath.includes('/dashboard/orders/')) {
+      addLocalToast(
+        isRtl ? 'لا يوجد Drawer مالي مستقل لهذا السجل بعد.' : 'No standalone financial drawer is available for this record yet.',
+        isRtl ? 'يفتح السجل عبر المسار المرتبط عند توفره.' : 'The record opens through its linked path when available.',
+        'info'
+      );
+      return;
+    }
+
+    addLocalToast(
+      isRtl ? 'لا توجد تفاصيل مالية مرتبطة.' : 'No linked financial details are available.',
+      isRtl ? 'راجع المسار المرتبط من الخادم.' : 'Check the linked path from the backend.',
+      'info'
+    );
+  };
 
   const compactAppointmentField = (value: any, fallback = '—') => {
     if (Array.isArray(value)) {
@@ -851,11 +936,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         if (!cancelled) {
           setCustomerProfile(profile);
           setCustomerHistoryData({
-            recentAppointments: Array.isArray(historyPayload.recentAppointments) ? historyPayload.recentAppointments : Array.isArray(historyPayload.appointments) ? historyPayload.appointments : [],
-            recentOrders: Array.isArray(historyPayload.recentOrders) ? historyPayload.recentOrders : Array.isArray(historyPayload.orders) ? historyPayload.orders : [],
-            walletTransactions: Array.isArray(historyPayload.walletTransactions) ? historyPayload.walletTransactions : Array.isArray(historyPayload.transactions) ? historyPayload.transactions : [],
-            giftActivity: Array.isArray(historyPayload.giftActivity) ? historyPayload.giftActivity : Array.isArray(historyPayload.giftCards) ? historyPayload.giftCards : [],
-            reviews: Array.isArray(historyPayload.reviews) ? historyPayload.reviews : profile.reviews || [],
+            history: Array.isArray(historyPayload.history) ? historyPayload.history : [],
+            summary: historyPayload.summary || {},
+            walletTransactions: Array.isArray(historyPayload.walletTransactions) ? historyPayload.walletTransactions : [],
             notes: Array.isArray(profile.notes) ? profile.notes : [],
             transactions: Array.isArray(transactionsPayload) ? transactionsPayload : Array.isArray(transactionsPayload.transactions) ? transactionsPayload.transactions : []
           });
@@ -1350,7 +1433,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   };
 
   // Open Details Drawer
-  const openAppointmentDetails = async (apt: Appointment) => {
+  const openAppointmentDetails = async (apt: Appointment, options: { readOnly?: boolean } = {}) => {
     if (apt.type === 'blocked') {
       // For blocked cards, open a simplified popup or handle beautifully
       addLocalToast(
@@ -1373,6 +1456,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setCheckoutProducts([]);
     setAppliedGiftCardCode('');
     setAppliedGiftCardAmount(0);
+    setAppointmentDetailsReadOnly(Boolean(options.readOnly));
     setIsCustomerProfileOpen(false);
     setCustomerTransactionsExpanded(false);
     setCustomerProfile(null);
@@ -1381,8 +1465,86 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setDrawerOpen(true);
   };
 
+  const openHistoricalAppointmentDetails = async (historyItem: any) => {
+    if (!historyItem?.id) {
+      return;
+    }
+
+    const historyDate = historyItem?.date || historyItem?.details?.startTime || selectedDate.toISOString().split('T')[0];
+    const fallbackAppointment = mapBoardAppointment({
+      id: historyItem.id,
+      customerId: activeAppointment?.customerId,
+      customerNameEn: activeAppointment?.customerNameEn || historyItem?.customerNameEn || activeCustomerName || 'Guest',
+      customerNameAr: activeAppointment?.customerNameAr || historyItem?.customerNameAr || activeCustomerName || 'زائرة',
+      customerPhone: activeCustomerPhone || '',
+      customerEmail: activeCustomerEmail || '',
+      service: historyItem?.details?.service || null,
+      serviceId: historyItem?.details?.service?.id || historyItem?.service?.id || null,
+      serviceNameEn: historyItem?.details?.service?.name_en || historyItem?.details?.service?.nameEn || historyItem?.details?.service?.name || historyItem?.serviceName || historyItem?.title || 'Service',
+      serviceNameAr: historyItem?.details?.service?.name_ar || historyItem?.details?.service?.nameAr || historyItem?.details?.service?.name || historyItem?.serviceName || historyItem?.title || 'الخدمة',
+      staff: historyItem?.details?.staff || null,
+      staffId: historyItem?.details?.staff?.id || historyItem?.staffId || null,
+      staffName: historyItem?.details?.staff?.name || historyItem?.staffName || '',
+      startTime: historyItem?.details?.startTime || historyItem?.date || activeAppointment?.startTime || 0,
+      duration: historyItem?.details?.duration || historyItem?.duration || activeAppointment?.duration || 60,
+      status: historyItem?.status || 'completed',
+      paymentStatus: historyItem?.paymentStatus || historyItem?.normalizedPaymentStatus || 'paid',
+      totalPaid: Number(historyItem?.paidAmount ?? historyItem?.amount ?? 0),
+      price: Number(historyItem?.amount ?? 0),
+      branchName: activeAppointment?.branchName || activeCustomerBranch || '',
+      invoiceStatus: historyItem?.paymentStatus || historyItem?.normalizedPaymentStatus || 'paid',
+      notes: historyItem?.details?.notes || '',
+      services: historyItem?.details?.service ? [historyItem.details.service] : [],
+      serviceItems: historyItem?.details?.service ? [{
+        service: historyItem.details.service,
+        duration: historyItem?.details?.duration || 0,
+        price: Number(historyItem?.amount ?? 0)
+      }] : [],
+      lineItems: [],
+      invoiceItems: [],
+      products: [],
+      productItems: [],
+      retailItems: [],
+      tags: []
+    }, historyDate);
+
+    try {
+      const response = await tenantApiAdapter.getAppointment(historyItem.id);
+      const detail = response?.appointment || response?.data?.appointment || response?.data || response;
+      setActiveAppointment(
+        detail?.id
+          ? mapBoardAppointment(detail, detail.date || historyDate)
+          : fallbackAppointment
+      );
+    } catch (err) {
+      console.warn('Failed to load historical appointment detail, using history snapshot', err);
+      setActiveAppointment(fallbackAppointment);
+    }
+
+    setSplitAmounts({ card: Number(historyItem?.amount ?? historyItem?.paidAmount ?? 0), cash: 0, wallet: 0 });
+    setIsSplitActive(false);
+    setCheckoutProducts([]);
+    setAppliedGiftCardCode('');
+    setAppliedGiftCardAmount(0);
+    setDrawerTab('overview');
+    setAppointmentDetailsReadOnly(true);
+    setIsCustomerProfileOpen(false);
+    setCustomerTransactionsExpanded(false);
+    setCustomerDrawerTab('overview');
+    setCustomerProfileError(null);
+    setDrawerOpen(true);
+  };
+
   const handleCheckoutPayment = async () => {
     if (!activeAppointment) return;
+    if (appointmentDetailsReadOnly) {
+      addLocalToast(
+        isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+        isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+        'info'
+      );
+      return;
+    }
     
     // Calculate totals
     const serviceSubtotal = activeAppointment.price;
@@ -1463,6 +1625,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const handleAddWalletBalance = async () => {
     const amount = parseFloat(simulatedWalletTopUp);
     if (!isNaN(amount) && amount > 0 && activeAppointment) {
+      if (appointmentDetailsReadOnly) {
+        addLocalToast(
+          isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+          isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+          'info'
+        );
+        return;
+      }
       try {
         if (!activeAppointment.customerId) {
           throw new Error('Missing customer id for wallet top-up');
@@ -3094,6 +3264,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         {activeAppointment.status === 'confirmed' ? t.confirmed :
                          activeAppointment.status === 'arrived' ? t.arrived : t.completed}
                       </span>
+                      {appointmentDetailsReadOnly && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-600 border border-slate-200">
+                          {isRtl ? 'وضع قراءة' : 'Read only'}
+                        </span>
+                      )}
                     </h2>
                     <p className="text-[10px] text-slate-400 font-semibold mt-1">
                       {isRtl ? 'معتمد عبر الفاتورة الإلكترونية هيئة الزكاة والضريبة والجمارك' : 'ZATCA Cryptographic Stamp Compliant • ID: ' + activeAppointment.id}
@@ -3248,6 +3423,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
                           <button 
                             onClick={async () => {
+                              if (appointmentDetailsReadOnly) {
+                                addLocalToast(
+                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                  'info'
+                                );
+                                return;
+                              }
                               const serviceId = activeAppointment.serviceId;
                               if (!serviceId) {
                                 addLocalToast(
@@ -3299,6 +3482,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           
                           <button 
                             onClick={async () => {
+                              if (appointmentDetailsReadOnly) {
+                                addLocalToast(
+                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                  'info'
+                                );
+                                return;
+                              }
                               try {
                                 const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, 'cancelled', activeAppointment.notes);
                                 if (response?.success) {
@@ -3330,6 +3521,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
                           <button 
                             onClick={async () => {
+                              if (appointmentDetailsReadOnly) {
+                                addLocalToast(
+                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                  'info'
+                                );
+                                return;
+                              }
                               try {
                                 const response = await tenantApiAdapter.updateAppointmentStatus(
                                   activeAppointment.id,
@@ -4321,118 +4520,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                               <AnimatePresence mode="wait">
                                 {customerDrawerTab === 'overview' && (
                                   <motion.div key="customer-overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                                    <section className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-                                      <div className="flex items-center justify-between gap-3">
-                                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                          {isRtl ? 'زيارة اليوم' : 'Today\'s Visit'}
-                                        </h4>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                          activeAppointment.invoiceStatus === 'paid' || activeAppointment.paymentStatus === 'paid'
-                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                            : activeAppointment.paymentStatus === 'partial'
-                                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                              : 'bg-rose-50 text-rose-700 border border-rose-200'
-                                        }`}>
-                                          {activeAppointment.invoiceStatus || activeAppointment.paymentStatus || '—'}
-                                        </span>
-                                      </div>
-                                      <div className="space-y-2">
-                                        {activeVisitServiceEntries.length === 0 ? (
-                                          <div className="p-3 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs">
-                                            {isRtl ? 'لا توجد خدمات مسجلة في هذا الموعد.' : 'No booked services were found on this appointment.'}
-                                          </div>
-                                        ) : (
-                                          activeVisitServiceEntries.map((item: any) => (
-                                            <div key={item.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs space-y-2">
-                                              <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                  <p className="font-bold text-slate-800 truncate">{isRtl ? item.nameAr : item.nameEn}</p>
-                                                  <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                                                    {isRtl ? 'الموظفة:' : 'Employee:'} {isRtl ? item.assignedEmployeeAr || '—' : item.assignedEmployeeEn || '—'}
-                                                  </p>
-                                                </div>
-                                                <div className="text-right shrink-0">
-                                                  <p className="font-black text-slate-800 font-mono">{Number(item.price || 0).toFixed(2)} {t.riyal}</p>
-                                                  <p className="text-[10px] text-slate-400">{item.status || '—'}</p>
-                                                </div>
-                                              </div>
-                                              <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600">
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                                  <p className="uppercase font-bold text-slate-400">{isRtl ? 'المدة' : 'Duration'}</p>
-                                                  <p className="font-bold text-slate-800">{Number(item.duration || 0)} {t.durationMin}</p>
-                                                </div>
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                                  <p className="uppercase font-bold text-slate-400">{isRtl ? 'وقت الموعد' : 'Appointment Time'}</p>
-                                                  <p className="font-bold text-slate-800">{item.appointmentTime || '—'}</p>
-                                                </div>
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                                  <p className="uppercase font-bold text-slate-400">{isRtl ? 'حالة الفاتورة' : 'Invoice Status'}</p>
-                                                  <p className="font-bold text-slate-800 truncate">{item.invoiceStatus || '—'}</p>
-                                                </div>
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                                  <p className="uppercase font-bold text-slate-400">{isRtl ? 'الفرع' : 'Branch'}</p>
-                                                  <p className="font-bold text-slate-800 truncate">{item.branch || '—'}</p>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ))
-                                        )}
-
-                                        {activeVisitProductEntries.length > 0 && (
-                                          <div className="pt-1">
-                                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
-                                              {isRtl ? 'المنتجات المضافة' : 'Retail products attached'}
-                                            </p>
-                                            <div className="space-y-2">
-                                              {activeVisitProductEntries.map((item: any) => (
-                                                <div key={item.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs space-y-2">
-                                                  <div className="flex items-start justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                      <p className="font-bold text-slate-800 truncate">{isRtl ? item.nameAr : item.nameEn}</p>
-                                                      <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                                                        {isRtl ? 'الموظفة:' : 'Employee:'} {isRtl ? item.assignedEmployeeAr || '—' : item.assignedEmployeeEn || '—'}
-                                                      </p>
-                                                    </div>
-                                                    <div className="text-right shrink-0">
-                                                      <p className="font-black text-slate-800 font-mono">{Number(item.subtotal || 0).toFixed(2)} {t.riyal}</p>
-                                                      <p className="text-[10px] text-slate-400">{item.status || '—'}</p>
-                                                    </div>
-                                                  </div>
-                                                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600">
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                                      <p className="uppercase font-bold text-slate-400">{isRtl ? 'الكمية' : 'Qty'}</p>
-                                                      <p className="font-bold text-slate-800">{Number(item.quantity || 0)}</p>
-                                                    </div>
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                                      <p className="uppercase font-bold text-slate-400">{isRtl ? 'سعر الوحدة' : 'Unit Price'}</p>
-                                                      <p className="font-bold text-slate-800">{Number(item.unitPrice || 0).toFixed(2)} {t.riyal}</p>
-                                                    </div>
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                                      <p className="uppercase font-bold text-slate-400">{isRtl ? 'الوقت' : 'Appointment Time'}</p>
-                                                      <p className="font-bold text-slate-800">{item.appointmentTime || '—'}</p>
-                                                    </div>
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                                      <p className="uppercase font-bold text-slate-400">{isRtl ? 'حالة الفاتورة' : 'Invoice Status'}</p>
-                                                      <p className="font-bold text-slate-800 truncate">{item.invoiceStatus || '—'}</p>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </section>
-
                                     <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
                                       <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
                                         {isRtl ? 'ملخص العميل' : 'Customer Summary'}
                                       </h4>
+                                      <p className="text-[10px] text-slate-400">
+                                        {isRtl ? 'ملخص CRM طويل المدى فقط بدون تكرار بيانات الموعد الحالي.' : 'Long-term CRM summary only, without repeating the current appointment.'}
+                                      </p>
                                       <div className="grid grid-cols-2 gap-2 text-xs">
                                         {[
                                           { label: isRtl ? 'المحفظة' : 'Wallet', value: `${activeCustomerWallet.toFixed(2)} ${t.riyal}` },
-                                          { label: isRtl ? 'إجمالي الإنفاق' : 'Total Spent', value: `${Number(customerProfile?.totalSpent || 0).toFixed(2)} ${t.riyal}` },
-                                          { label: isRtl ? 'الحجوزات' : 'Appointments', value: `${customerAppointmentHistory.length}` },
+                                          { label: isRtl ? 'إجمالي الإنفاق' : 'Total Spent', value: `${Number(customerProfile?.totalSpent ?? customerSummaryData.totalSpent ?? 0).toFixed(2)} ${t.riyal}` },
+                                          { label: isRtl ? 'إجمالي المواعيد' : 'Total Appointments', value: `${Number(customerSummaryData.totalAppointments ?? customerAppointmentHistory.length ?? 0)}` },
                                           { label: isRtl ? 'المكتملة' : 'Completed', value: `${customerCompletedAppointments}` },
                                           { label: isRtl ? 'الملغاة' : 'Cancelled', value: `${customerCancelledAppointments}` },
                                           { label: isRtl ? 'عدم الحضور' : 'No Shows', value: `${customerNoShowAppointments}` },
@@ -4517,30 +4616,124 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 {customerDrawerTab === 'appointments' && (
                                   <motion.div key="customer-appointments" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
                                     <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                        {isRtl ? 'الحجوزات الأخيرة' : 'Recent Appointments'}
-                                      </h4>
+                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                        <div>
+                                          <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                            {isRtl ? 'سجل الحجوزات' : 'Appointment History'}
+                                          </h4>
+                                          <p className="text-[10px] text-slate-400 mt-1">
+                                            {isRtl ? 'أحدث الحجوزات أولاً مع تفاصيل الفوترة والموظف.' : 'Newest appointments first with service, staff, and payment details.'}
+                                          </p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {[
+                                            { id: 'all', labelEn: 'All', labelAr: 'الكل' },
+                                            { id: 'upcoming', labelEn: 'Upcoming', labelAr: 'القادمة' },
+                                            { id: 'completed', labelEn: 'Completed', labelAr: 'مكتملة' },
+                                            { id: 'cancelled', labelEn: 'Cancelled', labelAr: 'ملغاة' },
+                                            { id: 'no_show', labelEn: 'No Show', labelAr: 'عدم الحضور' }
+                                          ].map((filter) => (
+                                            <button
+                                              key={filter.id}
+                                              type="button"
+                                              onClick={() => setCustomerAppointmentHistoryFilter(filter.id as any)}
+                                              className={`text-[10px] font-bold px-2.5 py-1 rounded-md border transition-all ${
+                                                customerAppointmentHistoryFilter === filter.id
+                                                  ? 'bg-zinc-900 text-white border-zinc-900'
+                                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                              }`}
+                                            >
+                                              {isRtl ? filter.labelAr : filter.labelEn}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
                                       <div className="space-y-2">
-                                        {customerAppointmentHistory.length === 0 ? (
-                                          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
-                                            {isRtl ? 'لا توجد حجوزات مسجلة لهذا العميل.' : 'No appointment history is available for this customer.'}
+                                        {customerAppointmentHistoryCards.length === 0 ? (
+                                          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                            {isRtl ? 'لا توجد حجوزات تطابق هذا الفلتر.' : 'No appointments match the selected filter.'}
                                           </div>
                                         ) : (
-                                          customerAppointmentHistory.map((item: any) => (
-                                            <div key={item.id || `${item.startTime || item.date || Math.random()}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs space-y-1">
-                                              <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                  <p className="font-bold text-slate-800 truncate">{item.service?.name_en || item.serviceName || item.serviceNameEn || item.title || (isRtl ? 'Appointment' : 'Appointment')}</p>
-                                                  <p className="text-[10px] text-slate-400 truncate">
-                                                    {item.status || item.paymentStatus || '—'}
-                                                  </p>
+                                          customerAppointmentHistoryCards.map((item: any) => {
+                                            const serviceName = item?.details?.service?.name_en
+                                              || item?.details?.service?.nameEn
+                                              || item?.details?.service?.name
+                                              || item?.serviceName
+                                              || item?.title
+                                              || (isRtl ? 'خدمة' : 'Service');
+                                            const employeeName = item?.details?.staff?.name
+                                              || item?.assignedStaffName
+                                              || item?.staffName
+                                              || '—';
+                                            const dateValue = item?.details?.startTime || item?.date || item?.createdAt || '';
+                                            const dateLabel = dateValue ? new Date(dateValue).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+                                            const timeLabel = dateValue ? new Date(dateValue).toLocaleTimeString(isRtl ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : '—';
+                                            const durationLabel = `${Number(item?.details?.duration ?? item?.duration ?? 0) || 0} ${isRtl ? 'دقيقة' : 'Minutes'}`;
+                                            const paymentStatusLabel = `${item?.normalizedPaymentStatus || item?.paymentStatus || '—'}`;
+                                            const statusTone = (() => {
+                                              const status = `${item?.status || ''}`.toLowerCase();
+                                              if (['completed', 'done', 'served'].includes(status)) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                              if (['cancelled', 'canceled'].includes(status)) return 'bg-rose-50 text-rose-700 border-rose-200';
+                                              if (['no-show', 'noshow', 'no_show'].includes(status)) return 'bg-amber-50 text-amber-700 border-amber-200';
+                                              return 'bg-slate-50 text-slate-700 border-slate-200';
+                                            })();
+                                            const paymentTone = (() => {
+                                              const paymentStatus = `${item?.normalizedPaymentStatus || item?.paymentStatus || ''}`.toLowerCase();
+                                              if (['paid', 'completed', 'fully_paid', 'deposit_paid'].includes(paymentStatus)) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                              if (['pending', 'partial', 'partially_paid'].includes(paymentStatus)) return 'bg-amber-50 text-amber-700 border-amber-200';
+                                              if (['refunded', 'partially_refunded'].includes(paymentStatus)) return 'bg-rose-50 text-rose-700 border-rose-200';
+                                              return 'bg-slate-50 text-slate-700 border-slate-200';
+                                            })();
+                                            const totalPaid = Number(item?.paidAmount ?? item?.amount ?? 0);
+                                            const branchLabel = item?.details?.branch?.name || item?.branchName || activeCustomerBranch || '—';
+                                            return (
+                                              <button
+                                                key={item.id || `${dateValue || Math.random()}`}
+                                                type="button"
+                                                onClick={() => void openHistoricalAppointmentDetails(item)}
+                                                className="w-full text-left rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 hover:bg-white hover:border-amber-200 transition-all shadow-xs"
+                                              >
+                                                <div className="flex items-start justify-between gap-3">
+                                                  <div className="min-w-0 space-y-1">
+                                                    <p className="text-sm font-black text-slate-900 truncate">{serviceName}</p>
+                                                    <p className="text-[11px] text-slate-500 truncate">{employeeName}</p>
+                                                    <div className="flex flex-wrap gap-2 pt-1">
+                                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusTone}`}>
+                                                        {item?.status || '—'}
+                                                      </span>
+                                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${paymentTone}`}>
+                                                        {paymentStatusLabel}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                  <div className="text-right shrink-0 space-y-1">
+                                                    <p className="text-sm font-black text-slate-900 font-mono whitespace-nowrap">
+                                                      {totalPaid ? `${totalPaid.toFixed(2)} ${t.riyal}` : '—'}
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-400">#{item?.id?.slice?.(0, 8) || '—'}</p>
+                                                  </div>
                                                 </div>
-                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
-                                                  {item.startTime || item.date || '—'}
-                                                </span>
-                                              </div>
-                                            </div>
-                                          ))
+                                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-3 text-[11px]">
+                                                  <div className="rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'التاريخ' : 'Date'}</p>
+                                                    <p className="text-slate-800 font-bold mt-1">{dateLabel}</p>
+                                                  </div>
+                                                  <div className="rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'الوقت' : 'Time'}</p>
+                                                    <p className="text-slate-800 font-bold mt-1">{timeLabel}</p>
+                                                  </div>
+                                                  <div className="rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'المدة' : 'Duration'}</p>
+                                                    <p className="text-slate-800 font-bold mt-1">{durationLabel}</p>
+                                                  </div>
+                                                  <div className="rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'الفرع' : 'Branch'}</p>
+                                                    <p className="text-slate-800 font-bold mt-1 truncate">{branchLabel}</p>
+                                                  </div>
+                                                </div>
+                                              </button>
+                                            );
+                                          })
                                         )}
                                       </div>
                                     </section>
@@ -4551,9 +4744,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                   <motion.div key="customer-transactions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
                                     <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
                                       <div className="flex items-center justify-between">
-                                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                          {isRtl ? 'العمليات الأخيرة' : 'Recent Transactions'}
-                                        </h4>
+                                        <div>
+                                          <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                            {isRtl ? 'المعاملات المالية' : 'Financial Transactions'}
+                                          </h4>
+                                          <p className="text-[10px] text-slate-400 mt-1">
+                                            {isRtl ? 'بطاقات مالية كاملة مع رقم المرجع والحالة.' : 'Rich financial cards with reference, payment method, and status.'}
+                                          </p>
+                                        </div>
                                         <button
                                           type="button"
                                           onClick={() => setCustomerTransactionsExpanded(prev => !prev)}
@@ -4570,26 +4768,62 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                         ) : (
                                           customerRecentTransactions.map((item: any, idx: number) => {
                                             const amount = Number(item.amount ?? item.totalAmount ?? item.value ?? item.price ?? 0);
-                                            const label = item.invoiceNumber || item.orderNumber || item.type || item.method || item.paymentMethod || `TX-${idx + 1}`;
-                                            const dateLabel = item.date || item.createdAt || item.time || '';
-                                            const category = `${item.type || item.kind || item.status || item.paymentStatus || item.method || 'transaction'}`.toLowerCase();
+                                            const referenceNumber = item.reference || item.transactionRef || item.invoiceNumber || item.orderNumber || item.bookingReference || item.bookingSessionReference || item.id || `TX-${idx + 1}`;
+                                            const transactionType = item.title || item.type || item.kind || item.source || item.paymentMethodLabel || 'Transaction';
+                                            const dateValue = item.processedAt || item.date || item.createdAt || item.time || '';
+                                            const paymentMethod = item.paymentMethodLabel || item.paymentMethod || item.method || '—';
+                                            const statusLabel = item.status || item.normalizedPaymentStatus || item.paymentStatus || '—';
+                                            const statusTone = getTransactionStatusTone(item.status || item.normalizedPaymentStatus || item.paymentStatus);
+                                            const detailHint = item.subtitle || item.notes || '';
+                                            const detailPath = `${item.detailPath || ''}`;
+                                            const isLinked = Boolean(detailPath);
                                             return (
-                                              <div key={`${label}-${idx}`} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[10px]">
-                                                <div className="min-w-0">
-                                                  <p className="font-bold text-slate-800 truncate">{label}</p>
-                                                  <p className="text-slate-400 truncate">
-                                                    {dateLabel ? new Date(dateLabel).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
-                                                  </p>
+                                              <button
+                                                key={`${referenceNumber}-${idx}`}
+                                                type="button"
+                                                onClick={() => void openCustomerTransactionRecord(item)}
+                                                className="w-full text-left rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 hover:bg-white hover:border-amber-200 transition-all shadow-xs"
+                                              >
+                                                <div className="flex items-start justify-between gap-3">
+                                                  <div className="min-w-0 space-y-1">
+                                                    <p className="text-sm font-black text-slate-900 truncate">{transactionType}</p>
+                                                    <p className="text-[11px] text-slate-500 truncate">
+                                                      {referenceNumber}
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-400 truncate">
+                                                      {dateValue ? new Date(dateValue).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+                                                    </p>
+                                                  </div>
+                                                  <div className="text-right shrink-0 space-y-1">
+                                                    <p className="text-sm font-black text-slate-900 font-mono whitespace-nowrap">
+                                                      {amount ? `${amount.toFixed(2)} ${t.riyal}` : '—'}
+                                                    </p>
+                                                    <span className={`inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusTone}`}>
+                                                      {statusLabel}
+                                                    </span>
+                                                  </div>
                                                 </div>
-                                                <div className="flex flex-col items-end gap-1 shrink-0">
-                                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-500 uppercase">
-                                                    {category}
-                                                  </span>
-                                                  <span className="font-mono font-black text-slate-700 whitespace-nowrap">
-                                                    {amount ? `${amount.toFixed(2)} ${t.riyal}` : '—'}
-                                                  </span>
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-[11px]">
+                                                  <div className="rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'طريقة الدفع' : 'Payment Method'}</p>
+                                                    <p className="text-slate-800 font-bold mt-1 truncate">{paymentMethod}</p>
+                                                  </div>
+                                                  <div className="rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'النوع' : 'Type'}</p>
+                                                    <p className="text-slate-800 font-bold mt-1 truncate">{item.type || item.entityType || '—'}</p>
+                                                  </div>
+                                                  <div className="rounded-xl bg-white border border-slate-200 px-3 py-2">
+                                                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'المرجع' : 'Reference'}</p>
+                                                    <p className="text-slate-800 font-bold mt-1 truncate">{isLinked ? 'Linked' : 'Standalone'}</p>
+                                                  </div>
                                                 </div>
-                                              </div>
+                                                {(detailHint || isLinked) && (
+                                                  <div className="flex items-center justify-between gap-3 mt-3 text-[10px] text-slate-500">
+                                                    <span className="truncate">{detailHint || (isRtl ? 'مرتبط بتفاصيل فعلية من الخادم' : 'Linked to live production data')}</span>
+                                                    <span className="font-black text-slate-900">{isRtl ? 'فتح' : 'Open'} ›</span>
+                                                  </div>
+                                                )}
+                                              </button>
                                             );
                                           })
                                         )}
