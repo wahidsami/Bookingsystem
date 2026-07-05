@@ -168,6 +168,7 @@ router.get('/customers/:id/history', tenantCustomerController.getCustomerHistory
 router.get('/customers/:id/transactions', tenantCustomerController.getCustomerTransactions);
 router.patch('/customers/:id/profile', tenantCustomerController.updateCustomerProfile);
 router.patch('/customers/:id/notes', tenantCustomerController.updateCustomerNotes);
+router.post('/customers/:id/wallet/topup', tenantCustomerController.topUpCustomerWallet);
 
 // Order management
 router.get('/orders', checkTenantFeature('hasProductsAndOrders'), tenantOrderController.getOrders);

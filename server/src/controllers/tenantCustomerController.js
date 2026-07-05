@@ -6,6 +6,7 @@
 const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { buildPublicAssetUrl } = require('../utils/url');
+const walletService = require('../services/walletService');
 const TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED = process.env.TENANT_APPOINTMENT_AUDIT_LOGS === '1';
 
 function logTenantAppointmentAudit(event, payload = {}) {
@@ -1403,6 +1404,117 @@ exports.getCustomerHistory = async (req, res) => {
             success: false,
             message: 'Failed to fetch customer history',
             error: error.message
+        });
+    }
+};
+
+/**
+ * Top up a customer's wallet from the tenant workspace.
+ */
+exports.topUpCustomerWallet = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+
+    try {
+        const tenantId = req.tenant?.id || req.tenantId;
+        const actorUserId = req.userId || req.user?.id || null;
+        const { id } = req.params;
+        const amount = parseFloat(req.body?.amount);
+        const appointmentId = req.body?.appointmentId || null;
+        const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+
+        if (!id) {
+            await transaction.rollback().catch(() => undefined);
+            return res.status(400).json({
+                success: false,
+                message: 'Customer id is required'
+            });
+        }
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            await transaction.rollback().catch(() => undefined);
+            return res.status(400).json({
+                success: false,
+                message: 'Amount must be greater than 0'
+            });
+        }
+
+        const customer = await db.PlatformUser.findByPk(id, {
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'walletBalance']
+        });
+
+        if (!customer) {
+            await transaction.rollback().catch(() => undefined);
+            return res.status(404).json({
+                success: false,
+                message: 'Customer not found'
+            });
+        }
+
+        const walletResult = await walletService.creditWallet({
+            platformUserId: id,
+            amount,
+            type: 'topup',
+            referenceType: 'tenant_customer_wallet_topup',
+            referenceId: appointmentId || null,
+            metadata: {
+                source: 'tenant_appointment_drawer',
+                tenantId: tenantId || null,
+                actorUserId,
+                appointmentId,
+                note: note || null
+            },
+            transaction
+        });
+
+        const [walletTransaction, refreshedCustomer] = await Promise.all([
+            db.Transaction.create({
+                platformUserId: id,
+                tenantId: tenantId || null,
+                appointmentId: appointmentId || null,
+                amount,
+                currency: 'SAR',
+                type: 'wallet_topup',
+                status: 'completed',
+                metadata: {
+                    source: 'tenant_customer_wallet_topup',
+                    actorUserId,
+                    appointmentId,
+                    note: note || null,
+                    walletLedgerEntryId: walletResult.ledgerEntry.id
+                }
+            }, { transaction }),
+            db.PlatformUser.findByPk(id, {
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'walletBalance'],
+                transaction
+            })
+        ]);
+
+        await transaction.commit();
+
+        logTenantAppointmentAudit('customer_wallet_topup', {
+            tenantId,
+            actorUserId,
+            customerId: id,
+            appointmentId,
+            amount
+        });
+
+        res.json({
+            success: true,
+            message: 'Customer wallet topped up',
+            transaction: walletTransaction,
+            walletLedgerEntry: walletResult.ledgerEntry,
+            walletBalance: Number(refreshedCustomer?.walletBalance ?? walletResult.balanceAfter ?? 0),
+            customer: refreshedCustomer
+        });
+    } catch (error) {
+        if (transaction && !transaction.finished) {
+            await transaction.rollback().catch(() => undefined);
+        }
+        console.error('Top up customer wallet error:', error);
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to top up customer wallet'
         });
     }
 };

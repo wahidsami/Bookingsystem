@@ -640,6 +640,10 @@ class TenantApiAdapter {
   async updateAppointmentPaymentStatus(id: string, payload: any): Promise<any> {
     return this.patch(`/tenant/appointments/${id}/payment`, payload);
   }
+
+  async topUpCustomerWallet(id: string, payload: any): Promise<any> {
+    return this.post(`/tenant/customers/${id}/wallet/topup`, payload);
+  }
 }
 
 export const tenantApiAdapter = new TenantApiAdapter();

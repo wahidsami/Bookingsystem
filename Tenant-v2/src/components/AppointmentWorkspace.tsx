@@ -316,16 +316,29 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [customerHistoryData, setCustomerHistoryData] = useState<any | null>(null);
   const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
   const [customerProfileError, setCustomerProfileError] = useState<string | null>(null);
+  const [customerProfileRefreshToken, setCustomerProfileRefreshToken] = useState(0);
   const [customerTransactionsExpanded, setCustomerTransactionsExpanded] = useState(false);
 
   const activeServiceSummary = (() => {
     const service = liveServices.find(s => s.id === activeAppointment?.serviceId);
     const serviceNameEn = activeAppointment?.serviceNameEn && activeAppointment.serviceNameEn !== 'Service'
       ? activeAppointment.serviceNameEn
-      : service?.nameEn || 'Service';
+      : activeAppointment?.service?.name_en
+        || activeAppointment?.service?.nameEn
+        || activeAppointment?.service?.name
+        || activeAppointment?.serviceName
+        || activeAppointment?.requestedServiceName
+        || service?.nameEn
+        || 'Service';
     const serviceNameAr = activeAppointment?.serviceNameAr && activeAppointment.serviceNameAr !== 'الخدمة'
       ? activeAppointment.serviceNameAr
-      : service?.nameAr || 'الخدمة';
+      : activeAppointment?.service?.name_ar
+        || activeAppointment?.service?.nameAr
+        || activeAppointment?.service?.name
+        || activeAppointment?.serviceName
+        || activeAppointment?.requestedServiceNameAr
+        || service?.nameAr
+        || 'الخدمة';
     return {
       nameEn: serviceNameEn,
       nameAr: serviceNameAr,
@@ -405,12 +418,38 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       .map((item: any, idx: number) => {
         const itemType = `${item?.type || item?.itemType || item?.kind || item?.lineType || ''}`.toLowerCase();
         const isProduct = itemType.includes('product') || itemType.includes('retail') || Boolean(item?.productId || item?.sku || item?.isProduct);
-        const looksLikeService = itemType.includes('service') || Boolean(item?.serviceId || item?.serviceName || item?.serviceNameEn || item?.serviceNameAr);
+        const looksLikeService = itemType.includes('service') || Boolean(
+          item?.serviceId
+          || item?.serviceName
+          || item?.serviceNameEn
+          || item?.serviceNameAr
+          || item?.service?.id
+          || item?.service?.name_en
+          || item?.service?.name_ar
+        );
         if (isProduct || !looksLikeService) {
           return null;
         }
-        const serviceNameEn = item?.serviceNameEn || item?.serviceName || item?.nameEn || item?.name || item?.title || activeServiceSummary.nameEn;
-        const serviceNameAr = item?.serviceNameAr || item?.serviceName || item?.nameAr || item?.name || item?.title || activeServiceSummary.nameAr;
+        const serviceNameEn = item?.serviceNameEn
+          || item?.serviceName
+          || item?.service?.name_en
+          || item?.service?.nameEn
+          || item?.service?.name
+          || item?.service_title
+          || item?.nameEn
+          || item?.name
+          || item?.title
+          || activeServiceSummary.nameEn;
+        const serviceNameAr = item?.serviceNameAr
+          || item?.serviceName
+          || item?.service?.name_ar
+          || item?.service?.nameAr
+          || item?.service?.name
+          || item?.service_title_ar
+          || item?.nameAr
+          || item?.name
+          || item?.title
+          || activeServiceSummary.nameAr;
         return {
           id: item?.id || item?.serviceId || `svc-${idx}`,
           nameEn: serviceNameEn,
@@ -431,7 +470,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       return mapped;
     }
 
-    if (activeAppointment?.serviceId || activeAppointment?.serviceNameEn || activeAppointment?.serviceNameAr) {
+    if (activeAppointment?.serviceId || activeAppointment?.serviceNameEn || activeAppointment?.serviceNameAr || activeAppointment?.serviceName || activeAppointment?.requestedServiceName) {
       return [{
         id: `svc-${activeAppointment.id}`,
         nameEn: activeServiceSummary.nameEn,
@@ -625,7 +664,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     return () => {
       cancelled = true;
     };
-  }, [drawerOpen, activeAppointment?.customerId]);
+  }, [drawerOpen, activeAppointment?.customerId, customerProfileRefreshToken]);
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{
@@ -1186,6 +1225,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       setShowReceiptModal(true);
 
       await loadBoardData();
+      setCustomerProfileRefreshToken(token => token + 1);
       const confirmedAppointmentId = paymentResponse?.appointment?.id || paymentResponse?.data?.appointment?.id || activeAppointment.id;
       if (confirmedAppointmentId) {
         const refreshedAppointment = await tenantApiAdapter.getAppointment(confirmedAppointmentId);
@@ -1206,18 +1246,38 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     }
   };
 
-  const handleAddWalletBalance = () => {
+  const handleAddWalletBalance = async () => {
     const amount = parseFloat(simulatedWalletTopUp);
     if (!isNaN(amount) && amount > 0 && activeAppointment) {
-      const updatedBalance = (activeAppointment.walletBalance || 0) + amount;
-      setAppointments(prev => prev.map(a => a.id === activeAppointment.id ? { ...a, walletBalance: updatedBalance } : a));
-      setActiveAppointment(prev => prev ? { ...prev, walletBalance: updatedBalance } : null);
-      setSimulatedWalletTopUp('');
-      addLocalToast(
-        `تم شحن محفظة العميل بقيمة ${amount} ر.س بنجاح!`,
-        `Successfully recharged customer wallet with ${amount} SAR!`,
-        'success'
-      );
+      try {
+        if (!activeAppointment.customerId) {
+          throw new Error('Missing customer id for wallet top-up');
+        }
+
+        const response = await tenantApiAdapter.topUpCustomerWallet(activeAppointment.customerId, {
+          amount,
+          appointmentId: activeAppointment.id,
+          note: 'Appointment drawer wallet recharge'
+        });
+        const nextBalance = Number(response?.walletBalance ?? response?.newBalance ?? response?.customer?.walletBalance ?? activeAppointment.walletBalance ?? 0);
+        setSimulatedWalletTopUp('');
+        setActiveAppointment(prev => prev ? { ...prev, walletBalance: nextBalance } : null);
+        setCustomerProfile(prev => prev ? { ...prev, walletBalance: nextBalance } : prev);
+        setCustomerProfileRefreshToken(token => token + 1);
+        await loadBoardData();
+        addLocalToast(
+          `تم شحن محفظة العميل بقيمة ${amount} ر.س بنجاح!`,
+          `Successfully recharged customer wallet with ${amount} SAR!`,
+          'success'
+        );
+      } catch (err) {
+        console.error('Customer wallet top-up failed', err);
+        addLocalToast(
+          isRtl ? 'تعذر شحن المحفظة.' : 'Unable to recharge the wallet.',
+          isRtl ? 'Unable to recharge the wallet.' : 'تعذر شحن المحفظة.',
+          'warning'
+        );
+      }
     }
   };
 
@@ -2979,6 +3039,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 });
                                 if (response?.success) {
                                   await loadBoardData();
+                                  setCustomerProfileRefreshToken(token => token + 1);
                                   addLocalToast(
                                     isRtl ? 'تمت إضافة نسخة جديدة من الموعد بعد ساعتين.' : 'Duplicate appointment created two hours later.',
                                     isRtl ? 'Duplicate appointment created two hours later.' : 'تمت إضافة نسخة جديدة من الموعد بعد ساعتين.',
@@ -3009,6 +3070,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 if (response?.success) {
                                   await loadBoardData();
                                   setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                                  setCustomerProfileRefreshToken(token => token + 1);
                                   addLocalToast(
                                     isRtl ? 'تم إلغاء الموعد وحفظ الحالة على الخادم.' : 'Appointment cancelled and synced to the server.',
                                     isRtl ? 'Appointment cancelled and synced to the server.' : 'تم إلغاء الموعد وحفظ الحالة على الخادم.',
@@ -3043,6 +3105,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 if (response?.success) {
                                   await loadBoardData();
                                   setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                                  setCustomerProfileRefreshToken(token => token + 1);
                                   addLocalToast(
                                     isRtl ? 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.' : 'Late cancel recorded and synced to the server.',
                                     isRtl ? 'Late cancel recorded and synced to the server.' : 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.',
@@ -3143,6 +3206,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 if (response?.success) {
                                   await loadBoardData();
                                   setActiveAppointment(prev => prev ? { ...prev, staffId: newStaffId } : null);
+                                  setCustomerProfileRefreshToken(token => token + 1);
                                   addLocalToast(
                                     'تمت إعادة تعيين أخصائية التجميل بنجاح!',
                                     'Stylist successfully reassigned for this session!',
@@ -3186,6 +3250,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 if (response?.success) {
                                   await loadBoardData();
                                   setActiveAppointment(prev => prev ? { ...prev, startTime: newTime } : null);
+                                  setCustomerProfileRefreshToken(token => token + 1);
                                   addLocalToast(
                                     'تم تغيير موعد البدء بنجاح!',
                                     'Appointment start time successfully updated!',
@@ -3230,13 +3295,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                     startTime: buildIsoFromMinutes(newDateStr, activeAppointment.startTime),
                                     notifyCustomer: true
                                   });
-                                  if (response?.success) {
-                                    await loadBoardData();
-                                    setActiveAppointment(prev => prev ? { ...prev, date: newDateStr } : null);
-                                    addLocalToast(
-                                      'تم تحديث تاريخ الحجز بنجاح!',
-                                      'Booking session date successfully updated!',
-                                      'success'
+                                if (response?.success) {
+                                  await loadBoardData();
+                                  setActiveAppointment(prev => prev ? { ...prev, date: newDateStr } : null);
+                                  setCustomerProfileRefreshToken(token => token + 1);
+                                  addLocalToast(
+                                    'تم تحديث تاريخ الحجز بنجاح!',
+                                    'Booking session date successfully updated!',
+                                    'success'
                                     );
                                   } else {
                                     throw new Error(response?.message || 'Failed to update booking date');

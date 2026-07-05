@@ -13,6 +13,7 @@ One persistence gap was identified and fixed:
 - Wallet-funded appointment payments now create a real `WalletLedgerEntry` record instead of only decrementing `PlatformUser.walletBalance`.
 - Customer history and transaction endpoints now return wallet movements, so the customer drawer and history views stay consistent after refresh.
 - The appointment workspace now waits for backend confirmation and re-fetches the appointment before reflecting the final paid state.
+- Appointment drawer wallet recharge now uses a tenant customer wallet top-up endpoint instead of local-only balance mutation.
 - Wallet refunds now also create a ledger entry instead of only incrementing the balance.
 - Late cancellation and no-show status changes now propagate an outstanding-balance charge through finance, reports, analytics, and history.
 
@@ -116,6 +117,10 @@ Persisted through the canonical `transactions` table, which is the source for fi
 
 Persisted through `WalletLedgerEntry` and `PlatformUser.walletBalance`.
 
+### Customer wallet top-up
+
+Persisted through `POST /api/v1/tenant/customers/:id/wallet/topup`, which creates both a wallet ledger entry and a finance transaction row.
+
 ### Customer history
 
 Now includes wallet transactions in addition to appointments and orders.
@@ -134,6 +139,7 @@ Now includes wallet transactions in addition to appointments and orders.
 |---|---|---|
 | `PATCH /api/v1/tenant/appointments/:id/payment` | Primary payment mutation | Pass |
 | `POST /api/v1/tenant/cart/products/purchase` | Retail checkout companion | Pass |
+| `POST /api/v1/tenant/customers/:id/wallet/topup` | Appointment drawer wallet recharge | Pass |
 | `GET /api/v1/tenant/appointments/:id` | Appointment rehydration | Pass |
 | `GET /api/v1/tenant/appointments/board` | Board refresh | Pass |
 | `GET /api/v1/tenant/customers/:id` | Customer profile snapshot | Pass |
@@ -147,6 +153,6 @@ Now includes wallet transactions in addition to appointments and orders.
 
 ## Notes
 
-- No backend contract changes were introduced.
 - No database column additions were required.
+- A tenant-only wallet top-up endpoint was added to remove the appointment drawer simulator path.
 - The payment flow now relies on persisted backend state rather than local UI assumptions.
