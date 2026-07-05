@@ -46,7 +46,7 @@ interface Appointment {
   staffId: string;
   startTime: number; // minutes from 9:00 AM (0 to 720 for 12 hours)
   duration: number; // minutes
-  status: 'confirmed' | 'arrived' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'arrived' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
   paymentStatus: 'paid' | 'unpaid' | 'partial';
   isGroupBooking: boolean;
   guestCount?: number;
@@ -100,6 +100,24 @@ const API_COLORS = [
   'border-indigo-500 bg-indigo-500/10 text-indigo-900',
   'border-purple-500 bg-purple-500/10 text-purple-900'
 ];
+
+const normalizeWorkspaceAppointmentStatus = (status: any): Appointment['status'] => {
+  const raw = `${status || ''}`.toLowerCase();
+  if (raw === 'checked_in' || raw === 'in_service') return 'arrived';
+  if (raw === 'pending') return 'confirmed';
+  if (raw === 'canceled') return 'cancelled';
+  if (raw === 'no-show' || raw === 'noshow') return 'no_show';
+  if (raw === 'confirmed' || raw === 'arrived' || raw === 'completed' || raw === 'cancelled' || raw === 'no_show') {
+    return raw as Appointment['status'];
+  }
+  return 'confirmed';
+};
+
+const normalizeApiAppointmentStatus = (status: any): string => {
+  const raw = `${status || ''}`.toLowerCase();
+  if (raw === 'arrived') return 'checked_in';
+  return raw;
+};
 
 export default function AppointmentWorkspace({ lang, onQuickAction }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
@@ -244,7 +262,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       staffId: a.staffId,
       startTime: startMins,
       duration,
-      status: a.status,
+      status: normalizeWorkspaceAppointmentStatus(a.status),
       paymentStatus: a.paymentStatus,
       isGroupBooking: Boolean(a.isGroupBooking),
       guestCount: a.guestCount,
@@ -486,6 +504,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [customerTransactionsExpanded, setCustomerTransactionsExpanded] = useState(false);
   const [customerTransactionDetail, setCustomerTransactionDetail] = useState<any | null>(null);
   const [customerTransactionDetailTab, setCustomerTransactionDetailTab] = useState('overview');
+  const [statusUpdating, setStatusUpdating] = useState(false);
 
   const activeAppointmentServiceSources = Array.isArray(activeAppointment?.bookingSession?.appointments) && activeAppointment.bookingSession.appointments.length > 0
     ? activeAppointment.bookingSession.appointments
@@ -1572,7 +1591,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     try {
       // 1. Mark appointment as paid
       const paymentResponse = await tenantApiAdapter.updateAppointmentPaymentStatus(activeAppointment.id, {
-        paymentStatus: 'paid',
+        paymentStatus: 'fully_paid',
         paymentMethod: paymentMethodSummary,
         splitAmounts: isSplitActive ? splitAmounts : undefined,
         totalPaid: total
@@ -1624,6 +1643,59 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     } catch (err) {
       console.error('Checkout failed', err);
       addLocalToast('فشل إتمام الدفع', 'Checkout failed. Try again.', 'warning');
+    }
+  };
+
+  const getAppointmentStatusOptions = () => [
+    { value: 'pending', label: isRtl ? 'محجوز' : 'Booked' },
+    { value: 'confirmed', label: isRtl ? 'مؤكد' : 'Confirmed' },
+    { value: 'checked_in', label: isRtl ? 'تم الوصول' : 'Arrived' },
+    { value: 'in_service', label: isRtl ? 'بدأت الخدمة' : 'In Service' },
+    { value: 'completed', label: isRtl ? 'مكتمل' : 'Completed' },
+    { value: 'no_show', label: isRtl ? 'عدم حضور' : 'No-show' },
+    { value: 'cancelled', label: isRtl ? 'ملغي' : 'Cancelled' }
+  ];
+
+  const handleAppointmentStatusUpdate = async (nextStatus: string) => {
+    if (!activeAppointment || appointmentDetailsReadOnly) {
+      return;
+    }
+
+    const normalizedCurrent = normalizeApiAppointmentStatus(activeAppointment.status);
+    const normalizedNext = normalizeApiAppointmentStatus(nextStatus);
+    if (normalizedCurrent === normalizedNext) {
+      return;
+    }
+
+    setStatusUpdating(true);
+    try {
+      const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, normalizedNext, activeAppointment.notes);
+      if (response?.success) {
+        await loadBoardData();
+        const updatedAppointment = response?.appointment || response?.data?.appointment || response?.data || null;
+        if (updatedAppointment) {
+          setActiveAppointment(mapBoardAppointment(updatedAppointment, getSelectedDateKey()));
+        } else {
+          setActiveAppointment(prev => prev ? { ...prev, status: normalizeWorkspaceAppointmentStatus(normalizedNext) } : null);
+        }
+        setCustomerProfileRefreshToken(token => token + 1);
+        addLocalToast(
+          isRtl ? 'تم تحديث حالة الموعد بنجاح.' : 'Appointment status updated successfully.',
+          isRtl ? 'Appointment status updated successfully.' : 'تم تحديث حالة الموعد بنجاح.',
+          'success'
+        );
+      } else {
+        throw new Error(response?.message || 'Failed to update appointment status');
+      }
+    } catch (err) {
+      console.error('Failed to update appointment status', err);
+      addLocalToast(
+        isRtl ? 'تعذر تحديث حالة الموعد.' : 'Unable to update appointment status.',
+        isRtl ? 'Unable to update appointment status.' : 'تعذر تحديث حالة الموعد.',
+        'warning'
+      );
+    } finally {
+      setStatusUpdating(false);
     }
   };
 
@@ -3258,16 +3330,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   <span className="p-2 bg-zinc-900 rounded-lg text-amber-400">
                     <CheckCircle2 size={18} />
                   </span>
-                  <div>
-                    <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 leading-none">
-                      {isRtl ? 'تفاصيل الحجز وإدارة العميل' : 'APPOINTMENT OPERATIONS CONTROL'}
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                        activeAppointment.status === 'confirmed' ? 'bg-amber-100 text-amber-700' :
-                        activeAppointment.status === 'arrived' ? 'bg-emerald-100 text-emerald-700' :
+                <div>
+                  <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 leading-none">
+                    {isRtl ? 'تفاصيل الحجز وإدارة العميل' : 'APPOINTMENT OPERATIONS CONTROL'}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                      normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'confirmed' ? 'bg-amber-100 text-amber-700' :
+                        normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'arrived' ? 'bg-emerald-100 text-emerald-700' :
+                        normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'cancelled' ? 'bg-rose-100 text-rose-700' :
+                        normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'no_show' ? 'bg-slate-100 text-slate-700' :
                         'bg-zinc-100 text-zinc-700'
                       }`}>
-                        {activeAppointment.status === 'confirmed' ? t.confirmed :
-                         activeAppointment.status === 'arrived' ? t.arrived : t.completed}
+                        {normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'confirmed' ? t.confirmed :
+                         normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'arrived' ? t.arrived :
+                         normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'cancelled' ? (isRtl ? 'ملغي' : 'Cancelled') :
+                         normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'no_show' ? (isRtl ? 'عدم حضور' : 'No-show') : t.completed}
                       </span>
                       {appointmentDetailsReadOnly && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-600 border border-slate-200">
@@ -3278,6 +3354,25 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     <p className="text-[10px] text-slate-400 font-semibold mt-1">
                       {isRtl ? 'معتمد عبر الفاتورة الإلكترونية هيئة الزكاة والضريبة والجمارك' : 'ZATCA Cryptographic Stamp Compliant • ID: ' + activeAppointment.id}
                     </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {isRtl ? 'حالة الموعد' : 'Status'}
+                      </label>
+                      <select
+                        value={normalizeApiAppointmentStatus(activeAppointment.status)}
+                        disabled={statusUpdating || appointmentDetailsReadOnly || ['completed', 'cancelled', 'no_show'].includes(normalizeWorkspaceAppointmentStatus(activeAppointment.status))}
+                        onChange={(event) => {
+                          const nextStatus = event.target.value;
+                          if (nextStatus === normalizeApiAppointmentStatus(activeAppointment.status)) return;
+                          void handleAppointmentStatusUpdate(nextStatus);
+                        }}
+                        className={`min-w-[170px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60 ${isRtl ? 'text-right' : 'text-left'}`}
+                      >
+                        {getAppointmentStatusOptions().map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
