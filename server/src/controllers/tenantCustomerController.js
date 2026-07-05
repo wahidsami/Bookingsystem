@@ -732,13 +732,13 @@ exports.getCustomer = async (req, res) => {
                 {
                     model: db.Appointment,
                     as: 'appointment',
-                    attributes: ['id', 'status', 'startTime', 'serviceName', 'serviceVariantName'],
+                    attributes: ['id', 'status', 'startTime', 'serviceVariantName', 'serviceVariantDuration'],
                     required: false,
                     include: [
                         {
                             model: db.Service,
                             as: 'service',
-                            attributes: ['id', 'name_en', 'name_ar', 'nameEn', 'nameAr', 'duration'],
+                            attributes: ['id', 'name_en', 'name_ar', 'duration'],
                             required: false
                         }
                     ]
