@@ -13,7 +13,7 @@ import { Language, Product } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
 import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
-import { AnalyticsDetailsDrawer } from './AnalyticsDetailsDrawer';
+import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
 
 interface AppointmentWorkspaceProps {
   lang: Language;
@@ -500,7 +500,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [customerProfileRefreshToken, setCustomerProfileRefreshToken] = useState(0);
   const [customerTransactionsExpanded, setCustomerTransactionsExpanded] = useState(false);
   const [customerTransactionDetail, setCustomerTransactionDetail] = useState<any | null>(null);
-  const [customerTransactionDetailTab, setCustomerTransactionDetailTab] = useState('overview');
   const [statusUpdating, setStatusUpdating] = useState(false);
 
   const activeAppointmentServiceSources = Array.isArray(activeAppointment?.bookingSession?.appointments) && activeAppointment.bookingSession.appointments.length > 0
@@ -592,11 +591,78 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     || activeAppointment?.membershipTier
     || '';
 
-  const customerHistoryEntries = Array.isArray(customerHistoryData?.history) ? customerHistoryData.history : [];
+  const getArrayFromPayload = (payload: any, key: string) => {
+    if (!payload) return [];
+    if (Array.isArray(payload)) {
+      return ['history', 'transactions', 'walletTransactions', 'walletHistory'].includes(key) ? payload : [];
+    }
+    const candidates = [
+      payload?.[key],
+      payload?.data?.[key],
+      payload?.customer?.[key],
+      payload?.history?.[key],
+      payload?.result?.[key]
+    ];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate;
+      }
+    }
+    return [];
+  };
+
+  const getHistoryTimestamp = (item: any) => {
+    const timestamp = item?.details?.startTime
+      || item?.startTime
+      || item?.date
+      || item?.processedAt
+      || item?.createdAt
+      || item?.updatedAt
+      || item?.timestamp
+      || item?.time
+      || 0;
+    const parsed = new Date(timestamp).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const getHistoryStatus = (item: any) => `${item?.status || item?.appointmentStatus || item?.bookingStatus || item?.normalizedStatus || item?.details?.status || item?.paymentStatus || ''}`.toLowerCase();
+
+  const customerHistoryEntries = (() => {
+    const combined = [
+      ...getArrayFromPayload(customerHistoryData, 'history'),
+      ...getArrayFromPayload(customerHistoryData, 'appointments'),
+      ...getArrayFromPayload(customerHistoryData, 'records'),
+      ...getArrayFromPayload(customerHistoryData, 'items'),
+      ...getArrayFromPayload(customerHistoryData, 'timeline'),
+      ...getArrayFromPayload(customerProfile, 'history')
+    ];
+    const seen = new Set<string>();
+    return combined.filter((item: any) => {
+      const key = `${item?.id || item?.appointmentId || item?.bookingReference || item?.referenceId || item?.transactionRef || item?.date || JSON.stringify(item)}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  })();
   const customerSummaryData = customerHistoryData?.summary || {};
   const customerAppointmentHistory = customerHistoryEntries.filter((item: any) => {
-    const kind = `${item?.type || item?.entityType || item?.kind || ''}`.toLowerCase();
-    return kind === 'appointment' || kind === 'booking_session' || Boolean(item?.details?.service || item?.appointment || item?.service);
+    const kind = `${item?.type || item?.entityType || item?.kind || item?.recordType || item?.sourceType || ''}`.toLowerCase();
+    const isTransactionLike = ['transaction', 'wallet', 'payment', 'invoice', 'refund', 'ledger'].includes(kind);
+    const hasService = Boolean(
+      item?.details?.service
+      || item?.appointment?.service
+      || item?.service
+      || item?.serviceId
+      || item?.serviceName
+      || item?.serviceNameEn
+      || item?.serviceNameAr
+      || item?.details?.serviceName
+      || item?.details?.serviceNameEn
+      || item?.details?.serviceNameAr
+    );
+    return !isTransactionLike && (['appointment', 'booking_session', 'booking', 'visit', 'session'].includes(kind) || hasService);
   });
   const customerOrderHistory = customerHistoryEntries.filter((item: any) => `${item?.type || item?.entityType || item?.kind || ''}`.toLowerCase() === 'order');
   const customerWalletHistory = Array.isArray(customerHistoryData?.walletTransactions) ? customerHistoryData.walletTransactions : [];
@@ -610,10 +676,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     : customerReviewHistory;
   const customerNoteHistory = Array.isArray(customerProfile?.notes) ? customerProfile.notes : [];
   const customerAppointmentHistoryRows = [...customerAppointmentHistory]
-    .sort((a: any, b: any) => new Date(b?.details?.startTime || b?.date || b?.createdAt || 0).getTime() - new Date(a?.details?.startTime || a?.date || a?.createdAt || 0).getTime());
+    .sort((a: any, b: any) => getHistoryTimestamp(b) - getHistoryTimestamp(a));
   const customerAppointmentHistoryCards = customerAppointmentHistoryRows.filter((item: any) => {
-    const rawStatus = `${item?.status || item?.paymentStatus || ''}`.toLowerCase();
-    const appointmentStart = new Date(item?.details?.startTime || item?.date || item?.createdAt || 0).getTime();
+    const rawStatus = getHistoryStatus(item);
+    const appointmentStart = getHistoryTimestamp(item);
     const isFuture = Number.isFinite(appointmentStart) && appointmentStart > Date.now();
     const bucket = (() => {
       if (['cancelled', 'canceled'].includes(rawStatus)) return 'cancelled';
@@ -625,12 +691,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     return customerAppointmentHistoryFilter === 'all' || bucket === customerAppointmentHistoryFilter;
   });
   const customerFirstVisit = [...customerAppointmentHistory]
-    .sort((a: any, b: any) => new Date(a.startTime || a.date || a.createdAt || 0).getTime() - new Date(b.startTime || b.date || b.createdAt || 0).getTime())[0];
+    .sort((a: any, b: any) => getHistoryTimestamp(a) - getHistoryTimestamp(b))[0];
   const customerLastVisit = [...customerAppointmentHistory]
-    .sort((a: any, b: any) => new Date(b.startTime || b.date || b.createdAt || 0).getTime() - new Date(a.startTime || a.date || a.createdAt || 0).getTime())[0];
-  const customerCompletedAppointments = customerAppointmentHistory.filter((item: any) => `${item.status || ''}`.toLowerCase() === 'completed').length;
-  const customerCancelledAppointments = customerAppointmentHistory.filter((item: any) => `${item.status || ''}`.toLowerCase() === 'cancelled').length;
-  const customerNoShowAppointments = customerAppointmentHistory.filter((item: any) => `${item.status || ''}`.toLowerCase() === 'no-show' || `${item.status || ''}`.toLowerCase() === 'noshow').length;
+    .sort((a: any, b: any) => getHistoryTimestamp(b) - getHistoryTimestamp(a))[0];
+  const customerCompletedAppointments = customerAppointmentHistory.filter((item: any) => ['completed', 'done', 'served'].includes(getHistoryStatus(item))).length;
+  const customerCancelledAppointments = customerAppointmentHistory.filter((item: any) => ['cancelled', 'canceled'].includes(getHistoryStatus(item))).length;
+  const customerNoShowAppointments = customerAppointmentHistory.filter((item: any) => ['no-show', 'noshow', 'no_show'].includes(getHistoryStatus(item))).length;
   const customerPreferredStylist = customerProfile?.assignedStylist || activeStylist?.nameEn || '';
   const customerPreferredService = Array.isArray(customerProfile?.favServices) && customerProfile.favServices.length > 0
     ? customerProfile.favServices[0]
@@ -698,21 +764,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     return 'bg-slate-50 text-slate-700 border-slate-200';
   };
 
-  const customerTransactionSummaryItems = customerTransactionDetail ? [
-    { label: isRtl ? 'النوع' : 'Type', value: customerTransactionDetail.typeLabel || '—' },
-    { label: isRtl ? 'المرجع' : 'Reference', value: customerTransactionDetail.reference || '—' },
-    { label: isRtl ? 'التاريخ' : 'Date', value: customerTransactionDetail.date ? new Date(customerTransactionDetail.date).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—' },
-    { label: isRtl ? 'طريقة الدفع' : 'Payment Method', value: customerTransactionDetail.paymentMethodLabel || '—' },
-    { label: isRtl ? 'المبلغ' : 'Amount', value: Number.isFinite(Number(customerTransactionDetail.amount)) ? `${Number(customerTransactionDetail.amount).toFixed(2)} ${t.riyal}` : '—' },
-    { label: isRtl ? 'الحالة' : 'Status', value: customerTransactionDetail.statusLabel || '—' }
-  ] : [];
-
-  const customerTransactionDetailTabs = customerTransactionDetail ? [
-    { id: 'overview', label: isRtl ? 'نظرة عامة' : 'Overview', description: isRtl ? 'ملخص المعاملة المالي' : 'Financial transaction summary' },
-    { id: 'linked', label: isRtl ? 'الارتباط' : 'Linked', description: isRtl ? 'الموعد أو الطلب المرتبط' : 'Linked appointment or order' },
-    { id: 'metadata', label: isRtl ? 'البيانات' : 'Metadata', description: isRtl ? 'الحقول الغنية من الخادم' : 'Rich backend fields' }
-  ] : [];
-
   const openCustomerTransactionRecord = async (item: any) => {
     const detailPath = `${item?.detailPath || ''}`;
     const appointmentMatch = detailPath.match(/\/dashboard\/appointments\/([^/?#]+)/);
@@ -729,12 +780,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       date: item?.processedAt || item?.date || item?.createdAt || item?.time || item?.appointment?.startTime || item?.appointment?.date || '',
       amount: Number(item?.amount ?? item?.totalAmount ?? item?.value ?? item?.price ?? 0),
       paymentMethodLabel: item?.paymentMethodLabel || item?.paymentMethod || item?.method || '—',
+      paymentMethod: item?.paymentMethod || item?.method || item?.paymentMethodLabel || null,
       reference: item?.reference || item?.transactionRef || item?.invoiceNumber || item?.orderNumber || item?.bookingReference || item?.bookingSessionReference || item?.id || '—',
       typeLabel: item?.title || item?.type || item?.kind || item?.source || item?.paymentMethodLabel || 'Transaction',
       statusLabel: item?.status || item?.normalizedPaymentStatus || item?.paymentStatus || '—',
+      customerId: item?.customerId || activeAppointment?.customerId || null,
+      customerNameEn: item?.customerNameEn || activeAppointment?.customerNameEn || '',
+      customerNameAr: item?.customerNameAr || activeAppointment?.customerNameAr || '',
+      serviceLabel: item?.serviceLabel || item?.appointment?.service?.name_en || item?.appointment?.service?.name || item?.service?.name_en || item?.service?.name || item?.serviceName || item?.title || '—',
+      employeeLabel: item?.employeeLabel || item?.appointment?.staff?.name || item?.processorName || item?.staffName || '—',
+      branchLabel: item?.branchLabel || item?.appointment?.branchName || activeAppointment?.branchName || activeCustomerBranch || '—',
+      invoiceNumber: item?.invoiceNumber || item?.invoice?.number || item?.invoice?.invoiceNumber || item?.reference || null,
+      invoiceId: item?.invoiceId || item?.invoice?.id || null,
+      productLabel: item?.productLabel || item?.productName || item?.order?.productName || '',
+      appointmentStatus: item?.appointment?.status || item?.appointmentStatus || item?.status || 'completed',
       detailPath
     });
-    setCustomerTransactionDetailTab('overview');
   };
 
   const compactAppointmentField = (value: any, fallback = '—') => {
@@ -983,16 +1044,50 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           tenantApiAdapter.getCustomerTransactions(activeAppointment.customerId, { limit: 20 })
         ]);
         const profile = normalizeCustomerProfile(profileResponse);
-        const historyPayload = historyResponse?.history || historyResponse?.data?.history || historyResponse?.data || historyResponse || {};
-        const transactionsPayload = transactionsResponse?.transactions || transactionsResponse?.data?.transactions || transactionsResponse?.data || transactionsResponse || [];
+        const historyPayload = historyResponse?.data || historyResponse || {};
+        const transactionsPayload = transactionsResponse?.data || transactionsResponse || [];
+        const historyEntries = [
+          ...getArrayFromPayload(historyPayload, 'history'),
+          ...getArrayFromPayload(historyPayload, 'appointments'),
+          ...getArrayFromPayload(historyPayload, 'records'),
+          ...getArrayFromPayload(historyPayload, 'items'),
+          ...getArrayFromPayload(historyPayload, 'timeline'),
+          ...getArrayFromPayload(historyResponse, 'history'),
+          ...getArrayFromPayload(historyResponse, 'appointments'),
+          ...getArrayFromPayload(historyResponse, 'records'),
+          ...getArrayFromPayload(historyResponse, 'items'),
+          ...getArrayFromPayload(historyResponse, 'timeline'),
+          ...getArrayFromPayload(profile, 'history')
+        ];
+        const summaryPayload = historyPayload?.summary || historyPayload?.metrics || historyResponse?.summary || historyResponse?.metrics || {};
+        const walletTransactionsPayload = [
+          ...getArrayFromPayload(historyPayload, 'walletTransactions'),
+          ...getArrayFromPayload(historyPayload, 'walletHistory'),
+          ...getArrayFromPayload(historyResponse, 'walletTransactions'),
+          ...getArrayFromPayload(historyResponse, 'walletHistory')
+        ];
+        const historyTransactions = [
+          ...getArrayFromPayload(historyPayload, 'transactions'),
+          ...getArrayFromPayload(historyResponse, 'transactions')
+        ];
+        const transactionRows = [
+          ...historyTransactions,
+          ...getArrayFromPayload(transactionsPayload, 'transactions'),
+          ...getArrayFromPayload(transactionsPayload, 'items'),
+          ...getArrayFromPayload(transactionsPayload, 'records'),
+          ...(Array.isArray(transactionsPayload) ? transactionsPayload : [])
+        ];
         if (!cancelled) {
           setCustomerProfile(profile);
           setCustomerHistoryData({
-            history: Array.isArray(historyPayload.history) ? historyPayload.history : [],
-            summary: historyPayload.summary || {},
-            walletTransactions: Array.isArray(historyPayload.walletTransactions) ? historyPayload.walletTransactions : [],
+            history: historyEntries,
+            appointments: getArrayFromPayload(historyPayload, 'appointments').length > 0 ? getArrayFromPayload(historyPayload, 'appointments') : getArrayFromPayload(historyResponse, 'appointments'),
+            records: getArrayFromPayload(historyPayload, 'records').length > 0 ? getArrayFromPayload(historyPayload, 'records') : getArrayFromPayload(historyResponse, 'records'),
+            items: getArrayFromPayload(historyPayload, 'items').length > 0 ? getArrayFromPayload(historyPayload, 'items') : getArrayFromPayload(historyResponse, 'items'),
+            summary: summaryPayload,
+            walletTransactions: walletTransactionsPayload,
             notes: Array.isArray(profile.notes) ? profile.notes : [],
-            transactions: Array.isArray(transactionsPayload) ? transactionsPayload : Array.isArray(transactionsPayload.transactions) ? transactionsPayload.transactions : []
+            transactions: transactionRows
           });
         }
       } catch (err: any) {
@@ -1480,7 +1575,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setIsCustomerProfileOpen(false);
     setCustomerTransactionsExpanded(false);
     setCustomerTransactionDetail(null);
-    setCustomerTransactionDetailTab('overview');
     setCustomerProfile(null);
     setCustomerHistoryData(null);
     setCustomerProfileError(null);
@@ -1554,7 +1648,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setCustomerTransactionsExpanded(false);
     setCustomerDrawerTab('overview');
     setCustomerTransactionDetail(null);
-    setCustomerTransactionDetailTab('overview');
     setCustomerProfileError(null);
     setDrawerOpen(true);
   };
@@ -4478,7 +4571,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         setIsCustomerProfileOpen(false);
                         setCustomerTransactionsExpanded(false);
                         setCustomerTransactionDetail(null);
-                        setCustomerTransactionDetailTab('overview');
                       }}
                     />
 
@@ -4499,7 +4591,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                               setIsCustomerProfileOpen(false);
                               setCustomerTransactionsExpanded(false);
                               setCustomerTransactionDetail(null);
-                              setCustomerTransactionDetailTab('overview');
                             }}
                             className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all shrink-0 cursor-pointer"
                             title={isRtl ? 'العودة لتفاصيل الحجز' : 'Back to appointment details'}
@@ -4857,10 +4948,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                             const serviceName = item?.details?.service?.name_en
                                               || item?.details?.service?.nameEn
                                               || item?.details?.service?.name
+                                              || item?.service?.name_en
+                                              || item?.service?.nameEn
+                                              || item?.service?.name
+                                              || item?.serviceNameEn
                                               || item?.serviceName
                                               || item?.title
                                               || (isRtl ? 'خدمة' : 'Service');
                                             const employeeName = item?.details?.staff?.name
+                                              || item?.employee?.name
+                                              || item?.staff?.name
                                               || item?.assignedStaffName
                                               || item?.staffName
                                               || '—';
@@ -4883,8 +4980,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                               if (['refunded', 'partially_refunded'].includes(paymentStatus)) return 'bg-rose-50 text-rose-700 border-rose-200';
                                               return 'bg-slate-50 text-slate-700 border-slate-200';
                                             })();
-                                            const totalPaid = Number(item?.paidAmount ?? item?.amount ?? 0);
-                                            const branchLabel = item?.details?.branch?.name || item?.branchName || activeCustomerBranch || '—';
+                                            const totalPaid = Number(item?.paidAmount ?? item?.amount ?? item?.totalPaid ?? item?.totalAmount ?? 0);
+                                            const branchLabel = item?.details?.branch?.name || item?.branch?.name || item?.branchName || activeCustomerBranch || '—';
                                             return (
                                               <button
                                                 key={item.id || `${dateValue || Math.random()}`}
@@ -5109,170 +5206,85 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
               <AnimatePresence>
                 {customerTransactionDetail && (
-                  <AnalyticsDetailsDrawer
+                  <TransactionDetailsDrawer
                     open={Boolean(customerTransactionDetail)}
-                    title={customerTransactionDetail.typeLabel || customerTransactionDetail.title || (isRtl ? 'معاملة مالية' : 'Financial Transaction')}
-                    subtitle={customerTransactionDetail.reference || customerTransactionDetail.transactionRef || ''}
+                    transaction={customerTransactionDetail}
+                    isRtl={isRtl}
+                    currencyLabel={t.riyal}
                     onClose={() => {
                       setCustomerTransactionDetail(null);
-                      setCustomerTransactionDetailTab('overview');
                     }}
-                    summaryItems={customerTransactionSummaryItems}
-                    tabs={customerTransactionDetailTabs}
-                    activeTab={customerTransactionDetailTab}
-                    onTabChange={setCustomerTransactionDetailTab}
-                    tabPanels={{
-                      overview: (
-                        <div className="space-y-3">
-                          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
-                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                              {isRtl ? 'ملخص المعاملة' : 'Transaction Summary'}
-                            </h4>
-                            <p className="text-sm text-slate-700 leading-relaxed">
-                              {customerTransactionDetail.subtitle || customerTransactionDetail.notes || (isRtl ? 'بيانات مالية مباشرة من الخادم.' : 'Live financial data from the backend.')}
-                            </p>
-                          </section>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{isRtl ? 'المصدر' : 'Source'}</p>
-                              <p className="mt-1 text-sm font-bold text-slate-800">{customerTransactionDetail.source || '—'}</p>
-                            </div>
-                            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{isRtl ? 'الدفع' : 'Payment'}</p>
-                              <p className="mt-1 text-sm font-bold text-slate-800">{customerTransactionDetail.paymentMethodLabel || '—'}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ),
-                      linked: (
-                        <div className="space-y-3">
-                          {customerTransactionDetail.appointmentIdLinked ? (
-                            <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
-                              <h4 className="text-xs font-black text-emerald-900 uppercase tracking-wider">
-                                {isRtl ? 'موعد مرتبط' : 'Linked Appointment'}
-                              </h4>
-                              <p className="text-sm text-emerald-900/80">
-                                {isRtl ? 'يمكن فتح الموعد المرتبط مباشرة من هنا.' : 'You can open the linked appointment directly from here.'}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const linkedAppointment = {
-                                    id: customerTransactionDetail.appointmentIdLinked,
-                                    date: customerTransactionDetail.date || selectedDate.toISOString().split('T')[0],
-                                    details: {
-                                      service: customerTransactionDetail?.appointment?.service || customerTransactionDetail?.details?.service || null,
-                                      staff: customerTransactionDetail?.appointment?.staff || customerTransactionDetail?.details?.staff || null,
-                                      duration: customerTransactionDetail?.details?.duration || customerTransactionDetail?.appointment?.duration || 0,
-                                      startTime: customerTransactionDetail?.appointment?.startTime || customerTransactionDetail?.date || customerTransactionDetail?.createdAt || '',
-                                      notes: customerTransactionDetail?.notes || ''
-                                    },
-                                    serviceId: customerTransactionDetail?.appointment?.service?.id || customerTransactionDetail?.appointment?.serviceId || null,
-                                    serviceNameEn: customerTransactionDetail?.appointment?.service?.name_en || customerTransactionDetail?.appointment?.serviceName || customerTransactionDetail?.title || '',
-                                    serviceNameAr: customerTransactionDetail?.appointment?.service?.name_ar || customerTransactionDetail?.appointment?.serviceName || customerTransactionDetail?.title || '',
-                                    staffId: customerTransactionDetail?.appointment?.staff?.id || customerTransactionDetail?.appointment?.staffId || null,
-                                    staffName: customerTransactionDetail?.appointment?.staff?.name || customerTransactionDetail?.processorName || '',
-                                    customerId: activeAppointment?.customerId || undefined,
-                                    customerNameEn: activeAppointment?.customerNameEn || '',
-                                    customerNameAr: activeAppointment?.customerNameAr || '',
-                                    customerPhone: activeAppointment?.customerPhone || '',
-                                    customerEmail: activeAppointment?.customerEmail || '',
-                                    price: Number(customerTransactionDetail.amount || 0),
-                                    status: customerTransactionDetail?.appointment?.status || activeAppointment?.status || 'completed',
-                                    paymentStatus: customerTransactionDetail?.appointment?.paymentStatus || customerTransactionDetail.statusLabel || 'paid',
-                                    totalPaid: Number(customerTransactionDetail.amount || 0),
-                                    branchName: activeAppointment?.branchName || '',
-                                    invoiceStatus: customerTransactionDetail.statusLabel || 'paid',
-                                    notes: customerTransactionDetail?.notes || '',
-                                    services: customerTransactionDetail?.appointment?.service ? [customerTransactionDetail.appointment.service] : [],
-                                    serviceItems: customerTransactionDetail?.appointment?.service ? [{
-                                      service: customerTransactionDetail.appointment.service,
-                                      duration: customerTransactionDetail?.appointment?.service?.duration || customerTransactionDetail?.details?.duration || 0,
-                                      price: Number(customerTransactionDetail.amount || 0)
-                                    }] : [],
-                                    lineItems: [],
-                                    invoiceItems: [],
-                                    products: [],
-                                    productItems: [],
-                                    retailItems: [],
-                                    tags: []
-                                  } as any;
-                                  setCustomerTransactionDetail(null);
-                                  setCustomerTransactionDetailTab('overview');
-                                  await openHistoricalAppointmentDetails(linkedAppointment);
-                                }}
-                                className="inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                              >
-                                {isRtl ? 'فتح الموعد' : 'Open Appointment'}
-                              </button>
-                            </section>
-                          ) : (
-                            <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                              {isRtl ? 'لا يوجد موعد مرتبط مباشر لهذا السجل.' : 'No directly linked appointment exists for this record.'}
-                            </div>
-                          )}
-
-                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{isRtl ? 'مسار السجل' : 'Detail Path'}</p>
-                            <p className="mt-1 text-sm font-medium text-slate-800 break-all">
-                              {customerTransactionDetail.detailPath || '—'}
-                            </p>
-                          </section>
-                        </div>
-                      ),
-                      metadata: (
-                        <div className="space-y-3">
-                          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                              {isRtl ? 'الحقول الغنية' : 'Rich Fields'}
-                            </h4>
-                            <div className="mt-3 grid grid-cols-1 gap-2">
-                              {Object.entries({
-                                normalizedPaymentStatus: customerTransactionDetail.normalizedPaymentStatus,
-                                appointmentOutstandingAmount: customerTransactionDetail.appointmentOutstandingAmount,
-                                appointmentPaidAmount: customerTransactionDetail.appointmentPaidAmount,
-                                paymentEvidenceSource: customerTransactionDetail.paymentEvidenceSource,
-                                transactionRef: customerTransactionDetail.transactionRef,
-                                processorName: customerTransactionDetail.processorName,
-                                source: customerTransactionDetail.source,
-                                entityType: customerTransactionDetail.entityType,
-                                entityId: customerTransactionDetail.entityId,
-                                referenceType: customerTransactionDetail.referenceType,
-                                referenceId: customerTransactionDetail.referenceId
-                              }).map(([key, value]) => (
-                                <div key={key} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
-                                  <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{key}</p>
-                                  <p className="mt-1 text-sm font-semibold text-slate-800 break-all">{value === null || value === undefined || value === '' ? '—' : String(value)}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </section>
-                        </div>
-                      )
+                    onOpenAppointment={async () => {
+                      if (!customerTransactionDetail?.appointmentIdLinked) {
+                        return;
+                      }
+                      const linkedAppointment = {
+                        id: customerTransactionDetail.appointmentIdLinked,
+                        date: customerTransactionDetail.date || selectedDate.toISOString().split('T')[0],
+                        details: {
+                          service: customerTransactionDetail?.appointment?.service || customerTransactionDetail?.details?.service || null,
+                          staff: customerTransactionDetail?.appointment?.staff || customerTransactionDetail?.details?.staff || null,
+                          duration: customerTransactionDetail?.details?.duration || customerTransactionDetail?.appointment?.duration || 0,
+                          startTime: customerTransactionDetail?.appointment?.startTime || customerTransactionDetail?.date || customerTransactionDetail?.createdAt || '',
+                          notes: customerTransactionDetail?.notes || ''
+                        },
+                        serviceId: customerTransactionDetail?.appointment?.service?.id || customerTransactionDetail?.appointment?.serviceId || null,
+                        serviceNameEn: customerTransactionDetail?.appointment?.service?.name_en || customerTransactionDetail?.appointment?.serviceName || customerTransactionDetail?.serviceLabel || customerTransactionDetail?.title || '',
+                        serviceNameAr: customerTransactionDetail?.appointment?.service?.name_ar || customerTransactionDetail?.appointment?.serviceName || customerTransactionDetail?.serviceLabel || customerTransactionDetail?.title || '',
+                        staffId: customerTransactionDetail?.appointment?.staff?.id || customerTransactionDetail?.appointment?.staffId || null,
+                        staffName: customerTransactionDetail?.appointment?.staff?.name || customerTransactionDetail?.employeeLabel || customerTransactionDetail?.processorName || '',
+                        customerId: activeAppointment?.customerId || undefined,
+                        customerNameEn: activeAppointment?.customerNameEn || '',
+                        customerNameAr: activeAppointment?.customerNameAr || '',
+                        customerPhone: activeAppointment?.customerPhone || '',
+                        customerEmail: activeAppointment?.customerEmail || '',
+                        price: Number(customerTransactionDetail.amount || 0),
+                        status: customerTransactionDetail?.appointment?.status || customerTransactionDetail?.appointmentStatus || activeAppointment?.status || 'completed',
+                        paymentStatus: customerTransactionDetail?.appointment?.paymentStatus || customerTransactionDetail.statusLabel || 'paid',
+                        totalPaid: Number(customerTransactionDetail.amount || 0),
+                        branchName: customerTransactionDetail.branchLabel || activeAppointment?.branchName || '',
+                        invoiceStatus: customerTransactionDetail.statusLabel || 'paid',
+                        notes: customerTransactionDetail?.notes || '',
+                        services: customerTransactionDetail?.appointment?.service ? [customerTransactionDetail.appointment.service] : [],
+                        serviceItems: customerTransactionDetail?.appointment?.service ? [{
+                          service: customerTransactionDetail.appointment.service,
+                          duration: customerTransactionDetail?.appointment?.service?.duration || customerTransactionDetail?.details?.duration || 0,
+                          price: Number(customerTransactionDetail.amount || 0)
+                        }] : [],
+                        lineItems: [],
+                        invoiceItems: [],
+                        products: [],
+                        productItems: [],
+                        retailItems: [],
+                        tags: []
+                      } as any;
+                      setCustomerTransactionDetail(null);
+                      await openHistoricalAppointmentDetails(linkedAppointment);
                     }}
-                    actions={(
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCustomerTransactionDetail(null);
-                          setCustomerTransactionDetailTab('overview');
-                        }}
-                        className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                      >
-                        {isRtl ? 'إغلاق' : 'Close'}
-                      </button>
-                    )}
-                    footer={null}
-                    sideNote={(
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-slate-800">
-                          {isRtl ? 'المعاملة المالية مرتبطة ببيانات الإنتاج الفعلية.' : 'The financial transaction is linked to live production data.'}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {isRtl ? 'يمكنك العودة إلى الموعد المرتبط دون مغادرة اللوحة.' : 'You can return to the linked appointment without leaving the board.'}
-                        </p>
-                      </div>
-                    )}
+                    onOpenInvoice={() => {
+                      if (!customerTransactionDetail) {
+                        return;
+                      }
+                      setCheckoutReceiptData({
+                        orderId: customerTransactionDetail.invoiceId || customerTransactionDetail.invoiceNumber || customerTransactionDetail.reference || customerTransactionDetail.id,
+                        date: customerTransactionDetail.date || customerTransactionDetail.processedAt || customerTransactionDetail.createdAt || '',
+                        customerName: activeCustomerName,
+                        serviceName: customerTransactionDetail.serviceLabel || customerTransactionDetail.title || 'Transaction',
+                        servicePrice: Number(customerTransactionDetail.amount || 0),
+                        products: customerTransactionDetail.productLabel ? [{ name: customerTransactionDetail.productLabel, price: 0 }] : [],
+                        subtotal: Number(customerTransactionDetail.amount || 0),
+                        discount: 0,
+                        vat: 0,
+                        total: Number(customerTransactionDetail.amount || 0),
+                        paymentSummary: customerTransactionDetail.paymentMethodLabel || customerTransactionDetail.paymentMethod || '—'
+                      });
+                      setShowReceiptModal(true);
+                    }}
+                    onOpenCustomer={() => {
+                      setCustomerTransactionDetail(null);
+                      setIsCustomerProfileOpen(true);
+                      setCustomerDrawerTab('overview');
+                    }}
                   />
                 )}
               </AnimatePresence>
