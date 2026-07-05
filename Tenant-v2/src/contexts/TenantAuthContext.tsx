@@ -136,9 +136,15 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       setUser(normalized.user);
       setAuthError(null);
     } catch (error) {
-      console.error('Failed to load tenant session:', error);
-      clearSession();
-      setAuthError('Unable to load tenant session.');
+      const status = (error as { status?: number } | undefined)?.status;
+      if (status === 401) {
+        clearSession();
+        setAuthError('Session expired. Please sign in again.');
+      } else {
+        console.error('Failed to load tenant session:', error);
+        clearSession();
+        setAuthError('Unable to load tenant session.');
+      }
     } finally {
       setLoading(false);
     }

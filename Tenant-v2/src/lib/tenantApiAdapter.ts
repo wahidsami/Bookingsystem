@@ -113,7 +113,9 @@ class TenantApiAdapter {
   private async handleResponse(response: Response): Promise<any> {
     const data = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(data?.message || data?.error || 'Request failed');
+      const error = new Error(data?.message || data?.error || 'Request failed') as Error & { status?: number };
+      error.status = response.status;
+      throw error;
     }
     return data;
   }
