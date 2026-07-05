@@ -53,6 +53,13 @@ interface Appointment {
   customerEmail?: string;
   loyaltyTier?: string;
   walletBalance?: number;
+  totalPaid?: number;
+  remainderAmount?: number;
+  branchName?: string;
+  branch?: { name?: string };
+  invoiceStatus?: string;
+  assignedStaffName?: string;
+  paymentAllocations?: any[];
   type?: 'appointment' | 'blocked';
   blockedType?: 'Break' | 'Lunch' | 'Meeting';
   serviceCategory?: 'hair' | 'spa' | 'nails';
@@ -176,6 +183,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       customerEmail: a.user?.email || a.customerEmail,
       loyaltyTier: a.loyaltyTier,
       walletBalance: a.walletBalance,
+      totalPaid: a.totalPaid,
+      remainderAmount: a.remainderAmount ?? a.remainingBalance ?? Math.max(0, (parseFloat(a.price || 0) || 0) - (parseFloat(a.totalPaid || 0) || 0)),
+      branchName: a.branchName || a.branch?.name || a.locationName || a.location?.name,
+      invoiceStatus: a.invoiceStatus || a.paymentStatus,
+      assignedStaffName: a.staff?.name || a.staffName || '',
+      paymentAllocations: Array.isArray(a.paymentAllocations) ? a.paymentAllocations : [],
       type: 'appointment',
       serviceCategory: a.service?.category || a.serviceCategory || 'hair',
       date: a.date || dateKey
@@ -259,11 +272,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   // Selection / Detail Drawer State
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<'crm' | 'customer' | 'financials' | 'timeline' | 'reviews'>('crm');
+  const [drawerTab, setDrawerTab] = useState<'crm' | 'financials' | 'timeline' | 'reviews'>('crm');
   const [activeStylistMenuId, setActiveStylistMenuId] = useState<string | null>(null);
+  const [isCustomerProfileOpen, setIsCustomerProfileOpen] = useState(false);
   const [customerProfile, setCustomerProfile] = useState<any | null>(null);
+  const [customerHistoryData, setCustomerHistoryData] = useState<any | null>(null);
   const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
   const [customerProfileError, setCustomerProfileError] = useState<string | null>(null);
+  const [customerTransactionsExpanded, setCustomerTransactionsExpanded] = useState(false);
 
   const activeServiceSummary = (() => {
     const service = liveServices.find(s => s.id === activeAppointment?.serviceId);
@@ -282,6 +298,128 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       categoryAr: service?.categoryAr || ''
     };
   })();
+
+  const activeStylist = liveStylists.find(stylist => stylist.id === activeAppointment?.staffId);
+  const activeCustomerName = isRtl
+    ? (customerProfile?.nameAr || activeAppointment?.customerNameAr || activeAppointment?.customerNameEn || '—')
+    : (customerProfile?.nameEn || activeAppointment?.customerNameEn || activeAppointment?.customerNameAr || '—');
+  const activeCustomerPhone = customerProfile?.phone || activeAppointment?.customerPhone || '';
+  const activeCustomerEmail = customerProfile?.email || activeAppointment?.customerEmail || '';
+  const activeCustomerTier = customerProfile?.loyaltyTier || activeAppointment?.loyaltyTier || '';
+  const activeCustomerWallet = Number(customerProfile?.walletBalance ?? activeAppointment?.walletBalance ?? 0);
+  const activeCustomerBranch = activeAppointment?.branchName || activeAppointment?.branch?.name || '';
+  const activeAppointmentTime = activeAppointment ? buildClockTime(activeAppointment.startTime) : '';
+  const activeInvoiceLineItems = activeAppointment ? [
+    {
+      id: `svc-${activeAppointment.id}`,
+      nameEn: activeServiceSummary.nameEn,
+      nameAr: activeServiceSummary.nameAr,
+      stylistEn: activeAppointment.assignedStaffName || activeStylist?.nameEn || '',
+      stylistAr: activeAppointment.assignedStaffName || activeStylist?.nameAr || '',
+      quantity: 1,
+      unitPrice: Number(activeServiceSummary.price || 0),
+      subtotal: Number(activeServiceSummary.price || 0),
+      type: 'service'
+    },
+    ...checkoutProducts.map((product) => ({
+      id: `prd-${product.id}`,
+      nameEn: product.nameEn,
+      nameAr: product.nameAr,
+      stylistEn: activeAppointment.assignedStaffName || activeStylist?.nameEn || '',
+      stylistAr: activeAppointment.assignedStaffName || activeStylist?.nameAr || '',
+      quantity: product.quantity,
+      unitPrice: Number(product.price || 0),
+      subtotal: Number(product.price || 0) * Number(product.quantity || 0),
+      type: 'product'
+    }))
+  ] : [];
+  const activeInvoiceSubtotal = activeInvoiceLineItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const activeInvoiceDiscount = Number(appliedGiftCardAmount || 0);
+  const activeInvoiceTaxable = Math.max(0, activeInvoiceSubtotal - activeInvoiceDiscount);
+  const activeInvoiceVat = Number((activeInvoiceTaxable * 0.15).toFixed(2));
+  const activeInvoiceTotal = Number((activeInvoiceTaxable + activeInvoiceVat).toFixed(2));
+  const activeInvoiceRemaining = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0) - Number(splitAmounts.wallet || 0));
+
+  const customerAppointmentHistory = Array.isArray(customerHistoryData?.recentAppointments) ? customerHistoryData.recentAppointments : [];
+  const customerOrderHistory = Array.isArray(customerHistoryData?.recentOrders) ? customerHistoryData.recentOrders : [];
+  const customerWalletHistory = Array.isArray(customerHistoryData?.walletTransactions) ? customerHistoryData.walletTransactions : [];
+  const customerGiftHistory = Array.isArray(customerHistoryData?.giftActivity) ? customerHistoryData.giftActivity : [];
+  const customerReviewHistory = Array.isArray(customerHistoryData?.reviews) ? customerHistoryData.reviews : [];
+  const customerNoteHistory = Array.isArray(customerProfile?.notes) ? customerProfile.notes : [];
+  const customerFirstVisit = [...customerAppointmentHistory]
+    .sort((a: any, b: any) => new Date(a.startTime || a.date || a.createdAt || 0).getTime() - new Date(b.startTime || b.date || b.createdAt || 0).getTime())[0];
+  const customerLastVisit = [...customerAppointmentHistory]
+    .sort((a: any, b: any) => new Date(b.startTime || b.date || b.createdAt || 0).getTime() - new Date(a.startTime || a.date || a.createdAt || 0).getTime())[0];
+  const customerCompletedAppointments = customerAppointmentHistory.filter((item: any) => `${item.status || ''}`.toLowerCase() === 'completed').length;
+  const customerCancelledAppointments = customerAppointmentHistory.filter((item: any) => `${item.status || ''}`.toLowerCase() === 'cancelled').length;
+  const customerNoShowAppointments = customerAppointmentHistory.filter((item: any) => `${item.status || ''}`.toLowerCase() === 'no-show' || `${item.status || ''}`.toLowerCase() === 'noshow').length;
+  const customerPreferredStylist = customerProfile?.assignedStylist || activeStylist?.nameEn || '';
+  const customerPreferredService = Array.isArray(customerProfile?.favServices) && customerProfile.favServices.length > 0
+    ? customerProfile.favServices[0]
+    : activeAppointment?.serviceNameEn || '';
+
+  const customerTimelineEntries = (() => {
+    const rows = [
+      ...customerAppointmentHistory.map((item: any) => ({
+        id: `apt-${item.id || item.bookingNumber || Math.random().toString(36).slice(2)}`,
+        titleEn: item.service?.name_en || item.serviceName || 'Appointment',
+        titleAr: item.service?.name_ar || item.serviceNameAr || 'موعد',
+        subtitleEn: item.status || item.paymentStatus || 'appointment activity',
+        subtitleAr: item.status || item.paymentStatus || 'نشاط موعد',
+        date: item.startTime || item.date || item.createdAt || '',
+        kind: 'appointment'
+      })),
+      ...customerOrderHistory.map((item: any) => ({
+        id: `ord-${item.id || item.orderNumber || Math.random().toString(36).slice(2)}`,
+        titleEn: item.orderNumber ? `Order ${item.orderNumber}` : 'Order activity',
+        titleAr: item.orderNumber ? `طلب ${item.orderNumber}` : 'نشاط طلب',
+        subtitleEn: item.status || item.paymentStatus || 'order activity',
+        subtitleAr: item.status || item.paymentStatus || 'نشاط طلب',
+        date: item.date || item.createdAt || '',
+        kind: 'order'
+      })),
+      ...customerWalletHistory.map((item: any) => ({
+        id: `wal-${item.id || Math.random().toString(36).slice(2)}`,
+        titleEn: item.type || 'Wallet transaction',
+        titleAr: item.type || 'عملية محفظة',
+        subtitleEn: item.method || item.status || 'wallet activity',
+        subtitleAr: item.method || item.status || 'نشاط محفظة',
+        date: item.date || item.createdAt || '',
+        kind: 'wallet'
+      })),
+      ...customerGiftHistory.map((item: any) => ({
+        id: `gft-${item.id || Math.random().toString(36).slice(2)}`,
+        titleEn: item.title || item.name || 'Gift activity',
+        titleAr: item.title || item.name || 'نشاط هدايا',
+        subtitleEn: item.status || item.type || 'gift activity',
+        subtitleAr: item.status || item.type || 'نشاط هدايا',
+        date: item.date || item.createdAt || '',
+        kind: 'gift'
+      })),
+      ...customerReviewHistory.map((item: any) => ({
+        id: `rev-${item.id || Math.random().toString(36).slice(2)}`,
+        titleEn: item.serviceName || item.title || 'Review',
+        titleAr: item.serviceName || item.title || 'تقييم',
+        subtitleEn: item.comment || item.text || 'review',
+        subtitleAr: item.comment || item.text || 'تقييم',
+        date: item.createdAt || item.reviewedAt || '',
+        kind: 'review'
+      }))
+    ];
+
+    return rows
+      .filter((entry) => entry.titleEn || entry.titleAr)
+      .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+      .slice(0, 8);
+  })();
+
+  const customerRecentTransactions = (() => {
+    const rows = [
+      ...(customerHistoryData?.transactions || []),
+      ...(customerHistoryData?.walletTransactions || [])
+    ];
+    return rows.slice(0, customerTransactionsExpanded ? 12 : 4);
+  })();
   
   // Custom Drag State & Interactive Preview
   const [draggedAptId, setDraggedAptId] = useState<string | null>(null);
@@ -294,6 +432,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     const loadCustomerProfile = async () => {
       if (!drawerOpen || !activeAppointment?.customerId) {
         setCustomerProfile(null);
+        setCustomerHistoryData(null);
         setCustomerProfileError(null);
         setCustomerProfileLoading(false);
         return;
@@ -303,15 +442,31 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       setCustomerProfileError(null);
 
       try {
-        const response = await tenantApiAdapter.getCustomer(activeAppointment.customerId);
-        const profile = normalizeCustomerProfile(response);
+        const [profileResponse, historyResponse, transactionsResponse] = await Promise.all([
+          tenantApiAdapter.getCustomer(activeAppointment.customerId),
+          tenantApiAdapter.getCustomerHistory(activeAppointment.customerId, { limit: 20 }),
+          tenantApiAdapter.getCustomerTransactions(activeAppointment.customerId, { limit: 20 })
+        ]);
+        const profile = normalizeCustomerProfile(profileResponse);
+        const historyPayload = historyResponse?.history || historyResponse?.data?.history || historyResponse?.data || historyResponse || {};
+        const transactionsPayload = transactionsResponse?.transactions || transactionsResponse?.data?.transactions || transactionsResponse?.data || transactionsResponse || [];
         if (!cancelled) {
           setCustomerProfile(profile);
+          setCustomerHistoryData({
+            recentAppointments: Array.isArray(historyPayload.recentAppointments) ? historyPayload.recentAppointments : Array.isArray(historyPayload.appointments) ? historyPayload.appointments : [],
+            recentOrders: Array.isArray(historyPayload.recentOrders) ? historyPayload.recentOrders : Array.isArray(historyPayload.orders) ? historyPayload.orders : [],
+            walletTransactions: Array.isArray(historyPayload.walletTransactions) ? historyPayload.walletTransactions : Array.isArray(historyPayload.transactions) ? historyPayload.transactions : [],
+            giftActivity: Array.isArray(historyPayload.giftActivity) ? historyPayload.giftActivity : Array.isArray(historyPayload.giftCards) ? historyPayload.giftCards : [],
+            reviews: Array.isArray(historyPayload.reviews) ? historyPayload.reviews : profile.reviews || [],
+            notes: Array.isArray(profile.notes) ? profile.notes : [],
+            transactions: Array.isArray(transactionsPayload) ? transactionsPayload : Array.isArray(transactionsPayload.transactions) ? transactionsPayload.transactions : []
+          });
         }
       } catch (err: any) {
         if (!cancelled) {
           setCustomerProfileError(err?.message || 'Failed to load customer profile');
           setCustomerProfile(null);
+          setCustomerHistoryData(null);
         }
       } finally {
         if (!cancelled) {
@@ -325,7 +480,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     return () => {
       cancelled = true;
     };
-  }, [drawerOpen, drawerTab, activeAppointment?.customerId]);
+  }, [drawerOpen, activeAppointment?.customerId]);
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{
@@ -410,7 +565,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       birthdate: customer.birthdate || customer.birthDate || '',
       preferredLanguage: customer.preferredLanguage || 'ar',
       memberSince: customer.memberSince || customer.createdAt || '',
-      loyaltyTier: customer.loyaltyTier || activeAppointment?.loyaltyTier || 'Regular Member',
+      loyaltyTier: customer.loyaltyTier || activeAppointment?.loyaltyTier || '',
       walletBalance: customer.walletBalance ?? activeAppointment?.walletBalance ?? 0,
       appointmentsCount: customer.appointmentsCount ?? customer.totalBookings ?? 0,
       totalSpent: customer.totalSpent ?? 0,
@@ -789,7 +944,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setCheckoutProducts([]);
     setAppliedGiftCardCode('');
     setAppliedGiftCardAmount(0);
+    setIsCustomerProfileOpen(false);
+    setCustomerTransactionsExpanded(false);
     setCustomerProfile(null);
+    setCustomerHistoryData(null);
     setCustomerProfileError(null);
     setDrawerOpen(true);
   };
@@ -2477,7 +2635,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     <Share2 size={15} />
                   </button>
                   <button
-                    onClick={() => setDrawerTab('customer')}
+                    onClick={() => setIsCustomerProfileOpen(true)}
                     className="px-3 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
                     title={isRtl ? 'فتح ملف العميل' : 'Open customer profile'}
                   >
@@ -2512,7 +2670,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         {isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn}
                       </h3>
                       <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/50 px-2.5 py-0.5 rounded-full mt-1.5 inline-block">
-                        {activeAppointment.loyaltyTier || 'Regular Member'}
+                        {activeCustomerTier || '—'}
                       </span>
                     </div>
 
@@ -2520,15 +2678,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     <div className="space-y-3.5 text-xs text-slate-600">
                       <div className="flex items-center gap-2">
                         <Phone size={13} className="text-slate-400" />
-                        <span className="font-mono">{activeAppointment.customerPhone || '+966 50 123 4567'}</span>
+                        <span className="font-mono">{activeCustomerPhone || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Mail size={13} className="text-slate-400" />
-                        <span className="truncate">{activeAppointment.customerEmail || 'client@refah.sa'}</span>
+                        <span className="truncate">{activeCustomerEmail || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <MapPin size={13} className="text-slate-400" />
-                        <span>{isRtl ? 'فرع العليا - الرياض' : 'Olaya Branch - Riyadh'}</span>
+                        <span>{activeCustomerBranch || '—'}</span>
                       </div>
                     </div>
 
@@ -2548,7 +2706,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     <div className="pt-3 border-t border-slate-100 space-y-2">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'تفضيلات وملاحظات خبيرة التجميل' : 'Stylist Notes'}</span>
                       <div className="bg-amber-50/50 border border-amber-200/40 p-3 rounded-lg text-xs text-amber-900 font-medium leading-relaxed">
-                        {activeAppointment.notes || (isRtl ? 'لا توجد ملاحظات خاصة حتى الآن.' : 'No notes written yet.')}
+                        {activeAppointment.notes || '—'}
                       </div>
                     </div>
 
@@ -2556,7 +2714,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     <div className="pt-3 border-t border-slate-100">
                       <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/60 flex items-center justify-between text-xs">
                         <span className="text-slate-500 font-semibold">{isRtl ? 'رصيد المحفظة النشط:' : 'Active Wallet:'}</span>
-                        <span className="font-mono font-black text-slate-800">{activeAppointment.walletBalance || 0} {t.riyal}</span>
+                        <span className="font-mono font-black text-slate-800">{activeCustomerWallet} {t.riyal}</span>
                       </div>
                     </div>
 
@@ -2569,7 +2727,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   {/* Sliding Tabs selector header */}
                   <div className="bg-white p-1 rounded-xl border border-slate-200/60 flex gap-1 shadow-2xs">
                     {[
-                      { id: 'customer', label: isRtl ? 'ملف العميل' : 'Customer Profile' },
                       { id: 'crm', label: isRtl ? 'الملخص والتحكم' : 'Interactive Hub' },
                       { id: 'timeline', label: isRtl ? 'الخط الزمني' : 'Timeline History' },
                       { id: 'reviews', label: isRtl ? 'التقييمات والآراء' : 'Reviews Log' }
@@ -2587,126 +2744,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       </button>
                     ))}
                   </div>
-
-                  {/* TAB 0: CUSTOMER PROFILE */}
-                  {drawerTab === 'customer' && (
-                    <div className="space-y-5">
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                        <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                          <div>
-                            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                              {isRtl ? 'ملف العميل الفعلي' : 'Live Customer Profile'}
-                            </h4>
-                            <p className="text-[10px] text-slate-400 mt-1">
-                              {isRtl ? 'الملف المرتبط بالموعد الحالي' : 'Profile linked to the active appointment'}
-                            </p>
-                          </div>
-                          {customerProfileLoading && (
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">
-                              {isRtl ? 'جاري التحميل...' : 'Loading...'}
-                            </span>
-                          )}
-                        </div>
-
-                        {customerProfileError && (
-                          <div className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold">
-                            {customerProfileError}
-                          </div>
-                        )}
-
-                        {(() => {
-                          const fallbackCustomer = activeAppointment?.customerId
-                            ? liveCustomers.find(c => c.id === activeAppointment.customerId)
-                            : null;
-                          const profile = customerProfile || (fallbackCustomer ? normalizeCustomerProfile(fallbackCustomer) : null);
-
-                          if (!profile) {
-                            return (
-                              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
-                                {isRtl ? 'لا يوجد ملف عميل مرتبط بالموعد الحالي.' : 'No customer profile is linked to the active appointment.'}
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-14 h-14 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center font-black text-amber-700 text-lg">
-                                    {profile.nameEn.slice(0, 2).toUpperCase()}
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-bold text-slate-800">{isRtl ? profile.nameAr : profile.nameEn}</p>
-                                    <p className="text-[10px] text-slate-400 font-mono">ID: {profile.id || activeAppointment?.customerId || '-'}</p>
-                                  </div>
-                                </div>
-
-                                <div className="space-y-2 text-slate-600">
-                                  <div className="flex items-center gap-2">
-                                    <Phone size={13} className="text-slate-400" />
-                                    <span className="font-mono">{profile.phone || '-'}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Mail size={13} className="text-slate-400" />
-                                    <span className="truncate">{profile.email || '-'}</span>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="rounded-lg bg-white border border-slate-200 p-2">
-                                    <p className="text-[9px] uppercase font-black text-slate-400">{isRtl ? 'الولاء' : 'Loyalty'}</p>
-                                    <p className="font-bold text-slate-800 mt-1">{profile.loyaltyTier || '-'}</p>
-                                  </div>
-                                  <div className="rounded-lg bg-white border border-slate-200 p-2">
-                                    <p className="text-[9px] uppercase font-black text-slate-400">{isRtl ? 'الرصيد' : 'Wallet'}</p>
-                                    <p className="font-bold text-slate-800 mt-1 font-mono">{profile.walletBalance || 0} {t.riyal}</p>
-                                  </div>
-                                  <div className="rounded-lg bg-white border border-slate-200 p-2">
-                                    <p className="text-[9px] uppercase font-black text-slate-400">{isRtl ? 'المواعيد' : 'Appointments'}</p>
-                                    <p className="font-bold text-slate-800 mt-1 font-mono">{profile.appointmentsCount || 0}</p>
-                                  </div>
-                                  <div className="rounded-lg bg-white border border-slate-200 p-2">
-                                    <p className="text-[9px] uppercase font-black text-slate-400">{isRtl ? 'آخر زيارة' : 'Last Visit'}</p>
-                                    <p className="font-bold text-slate-800 mt-1 truncate">{profile.lastVisit || '-'}</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-                                <div>
-                                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'الوسوم' : 'Tags'}</h5>
-                                  <div className="flex flex-wrap gap-1.5 mt-2">
-                                    {(profile.tags || []).length > 0 ? profile.tags.map((tag: string, idx: number) => (
-                                      <span key={idx} className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
-                                        {tag}
-                                      </span>
-                                    )) : (
-                                      <span className="text-slate-400 text-xs">{isRtl ? 'لا توجد وسوم' : 'No tags available'}</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'ملاحظات' : 'Notes'}</h5>
-                                  <div className="mt-2 space-y-1">
-                                    {(profile.notes || []).length > 0 ? profile.notes.map((note: string, idx: number) => (
-                                      <div key={idx} className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-[11px]">
-                                        {note}
-                                      </div>
-                                    )) : (
-                                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs">
-                                        {isRtl ? 'لا توجد ملاحظات محفوظة.' : 'No notes saved.'}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
 
                   {/* TAB 1: CORE CRM & WALLET INTERFACE */}
                   {drawerTab === 'crm' && (
@@ -3089,24 +3126,41 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         </div>
                       </div>
 
-                      {/* CLIENT OTHER ACTIVE TRANSACTION HISTORY SKELETON */}
+                      {/* CLIENT ACTIVE TRANSACTION HISTORY */}
                       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'سجل العمليات المالية الأخيرة' : 'TRANSACTION HISTORY SKELETON'}</h4>
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'سجل العمليات المالية الأخيرة' : 'RECENT TRANSACTIONS'}</h4>
+                          <button
+                            type="button"
+                            onClick={() => setCustomerTransactionsExpanded(prev => !prev)}
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700"
+                          >
+                            {isRtl ? 'عرض الكل' : 'View All'}
+                          </button>
+                        </div>
                         <div className="space-y-2">
-                          <div className="flex justify-between text-xs p-2 bg-slate-50 rounded-lg">
-                            <div>
-                              <p className="font-bold text-slate-800">INV-2026-9081</p>
-                              <p className="text-[9px] text-slate-400">May 15, 2026</p>
+                          {customerRecentTransactions.length === 0 ? (
+                            <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 text-[10px] text-slate-500">
+                              {isRtl ? 'لا توجد عمليات مالية حديثة مسجلة.' : 'No recent financial activity found.'}
                             </div>
-                            <span className="font-mono text-emerald-600 font-bold">+120.00 {t.riyal}</span>
-                          </div>
-                          <div className="flex justify-between text-xs p-2 bg-slate-50 rounded-lg">
-                            <div>
-                              <p className="font-bold text-slate-800">INV-2026-8012</p>
-                              <p className="text-[9px] text-slate-400">April 20, 2026</p>
-                            </div>
-                            <span className="font-mono text-slate-600 font-bold">-450.00 {t.riyal}</span>
-                          </div>
+                          ) : customerRecentTransactions.slice(0, customerTransactionsExpanded ? customerRecentTransactions.length : 3).map((item: any, idx: number) => {
+                            const amount = Number(item.amount ?? item.totalAmount ?? item.value ?? item.price ?? 0);
+                            const label = item.invoiceNumber || item.orderNumber || item.type || item.method || item.paymentMethod || `TX-${idx + 1}`;
+                            const dateLabel = item.date || item.createdAt || item.time || '';
+                            return (
+                              <div key={`${label}-${idx}`} className="flex justify-between gap-2 text-xs p-2 bg-slate-50 rounded-lg">
+                                <div className="min-w-0">
+                                  <p className="font-bold text-slate-800 truncate">{label}</p>
+                                  <p className="text-[9px] text-slate-400 truncate">
+                                    {dateLabel ? new Date(dateLabel).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+                                  </p>
+                                </div>
+                                <span className={`font-mono font-bold ${amount >= 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                                  {amount >= 0 ? '+' : '-'}{Math.abs(amount).toFixed(2)} {t.riyal}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -3117,21 +3171,41 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   {drawerTab === 'timeline' && (
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{t.timelineText}</h4>
-                      
-                      {/* Timeline entries list */}
-                      <div className="relative border-l border-slate-200 pl-4 space-y-5 py-2 text-xs">
-                        <div className="relative">
-                          <span className="absolute -left-6 top-1.5 w-3.5 h-3.5 rounded-full bg-slate-300 border-2 border-white" />
-                          <div>
-                            <p className="font-bold text-slate-800">{isRtl ? 'السجل الزمني ما زال غير متصل' : 'Timeline log not yet connected'}</p>
-                            <p className="text-slate-500 text-[10px] mt-0.5">{isRtl ? 'البيانات الزمنية' : 'Timeline data'}</p>
-                            <p className="text-slate-500 mt-1 leading-relaxed">
-                              {isRtl ? 'هذه التبويبة ما زالت تعرض محتوى ثابتاً ولم تُربط بعد بمصدر الأحداث الفعلي.' : 'This tab is still static content and has not yet been wired to the live event stream.'}
-                            </p>
-                          </div>
+                      {customerProfileLoading ? (
+                        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                          {isRtl ? 'جاري تحميل الخط الزمني من بيانات العميل الفعلية...' : 'Loading live timeline from customer data...'}
                         </div>
-
-                      </div>
+                      ) : customerTimelineEntries.length === 0 ? (
+                        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                          {isRtl ? 'لا توجد أحداث زمنية متاحة لهذا العميل حالياً.' : 'No live timeline events are available for this customer yet.'}
+                        </div>
+                      ) : (
+                        <div className="relative border-l border-slate-200 pl-4 space-y-5 py-2 text-xs">
+                          {customerTimelineEntries.map((entry: any) => (
+                            <div key={entry.id} className="relative">
+                              <span className={`absolute -left-6 top-1.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                                entry.kind === 'appointment' ? 'bg-blue-400' :
+                                entry.kind === 'order' ? 'bg-emerald-400' :
+                                entry.kind === 'wallet' ? 'bg-amber-400' :
+                                entry.kind === 'gift' ? 'bg-pink-400' :
+                                'bg-slate-300'
+                              }`} />
+                              <div>
+                                <p className="font-bold text-slate-800">{isRtl ? entry.titleAr : entry.titleEn}</p>
+                                <p className="text-slate-500 text-[10px] mt-0.5">{isRtl ? entry.subtitleAr : entry.subtitleEn}</p>
+                                {entry.date && (
+                                  <p className="text-slate-400 mt-1 leading-relaxed text-[10px]">
+                                    {new Date(entry.date).toLocaleString(isRtl ? 'ar-SA' : 'en-US', {
+                                      dateStyle: 'medium',
+                                      timeStyle: 'short'
+                                    })}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -3193,6 +3267,61 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       <CreditCard size={14} className="text-amber-500" />
                       {t.financeSummary}
                     </h3>
+
+                    <div className="space-y-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          {isRtl ? 'بنود الفاتورة المباشرة' : 'LIVE INVOICE LINE ITEMS'}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500">
+                          {isRtl ? 'خدمة + منتجات' : 'Service + Products'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {activeInvoiceLineItems.map((item) => (
+                          <div key={item.id} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-[10px] space-y-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-800 truncate">
+                                  {isRtl ? item.nameAr : item.nameEn}
+                                </p>
+                                <p className="text-slate-400">
+                                  {isRtl ? 'الموظفة:' : 'Stylist:'} {isRtl ? item.stylistAr || '—' : item.stylistEn || '—'}
+                                </p>
+                              </div>
+                              <span className="font-black text-slate-800 font-mono">
+                                {item.subtotal.toFixed(2)} {t.riyal}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-4 gap-2 text-slate-500">
+                              <div>
+                                <p className="uppercase text-[9px] font-bold">{isRtl ? 'الكمية' : 'Qty'}</p>
+                                <p className="font-mono font-bold text-slate-700">{item.quantity}</p>
+                              </div>
+                              <div>
+                                <p className="uppercase text-[9px] font-bold">{isRtl ? 'سعر الوحدة' : 'Unit'}</p>
+                                <p className="font-mono font-bold text-slate-700">{item.unitPrice.toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="uppercase text-[9px] font-bold">{isRtl ? 'الإجمالي' : 'Subtotal'}</p>
+                                <p className="font-mono font-bold text-slate-700">{item.subtotal.toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="uppercase text-[9px] font-bold">{isRtl ? 'نوع' : 'Type'}</p>
+                                <p className="font-mono font-bold text-slate-700">{item.type}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {activeInvoiceLineItems.length === 0 && (
+                          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-[10px]">
+                            {isRtl ? 'لم يتم تحميل بنود الفاتورة بعد.' : 'Invoice line items are not loaded yet.'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
                     {/* Add Products to Ticket Section */}
                     {activeAppointment.paymentStatus !== 'paid' && (
@@ -3337,55 +3466,53 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     )}
 
                     {/* Pricing breakdown */}
-                    {(() => {
-                      const serviceSubtotal = activeAppointment.price;
-                      const productsSubtotal = checkoutProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
-                      const subtotal = serviceSubtotal + productsSubtotal;
-                      const discount = appliedGiftCardAmount;
-                      const taxableAmount = Math.max(0, subtotal - discount);
-                      const vat = taxableAmount * 0.15;
-                      const total = taxableAmount + vat;
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between text-slate-500">
+                        <span>{isRtl ? 'رسوم الخدمة الأساسية' : 'Service Subtotal'}</span>
+                        <span className="font-mono font-bold">{activeServiceSummary.price.toFixed(2)} {t.riyal}</span>
+                      </div>
 
-                      return (
-                        <div className="space-y-2 text-xs">
-                          <div className="flex justify-between text-slate-500">
-                            <span>{isRtl ? 'رسوم الخدمة الأساسية' : 'Service Subtotal'}</span>
-                            <span className="font-mono font-bold">{serviceSubtotal} {t.riyal}</span>
-                          </div>
-                          
-                          {checkoutProducts.length > 0 && (
-                            <div className="flex justify-between text-slate-500">
-                              <span>{isRtl ? 'إجمالي منتجات التجزئة' : 'Retail Products Total'}</span>
-                              <span className="font-mono font-bold">+{productsSubtotal.toFixed(2)} {t.riyal}</span>
-                            </div>
-                          )}
+                      <div className="flex justify-between text-slate-500">
+                        <span>{isRtl ? 'إجمالي منتجات التجزئة' : 'Retail Products Total'}</span>
+                        <span className="font-mono font-bold">{checkoutProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2)} {t.riyal}</span>
+                      </div>
 
-                          {discount > 0 && (
-                            <div className="flex justify-between text-emerald-600 font-semibold">
-                              <span>{isRtl ? 'خصم قسيمة الهدايا المطبقة' : 'Applied Gift Card Discount'}</span>
-                              <span className="font-mono font-black">-{discount.toFixed(2)} {t.riyal}</span>
-                            </div>
-                          )}
-
-                          <div className="flex justify-between text-slate-500 border-t pt-1.5 border-dashed">
-                            <span>{isRtl ? 'الوعاء الخاضع للضريبة' : 'Taxable Subtotal'}</span>
-                            <span className="font-mono font-bold">{taxableAmount.toFixed(2)} {t.riyal}</span>
-                          </div>
-
-                          <div className="flex justify-between text-slate-500">
-                            <span>{isRtl ? 'ضريبة القيمة المضافة ١٥٪' : 'ZATCA VAT (15%)'}</span>
-                            <span className="font-mono font-bold">{vat.toFixed(2)} {t.riyal}</span>
-                          </div>
-
-                          <div className="h-px bg-slate-100 border-dashed border-b pt-1" />
-                          
-                          <div className="flex justify-between text-sm font-black text-slate-900 pt-1">
-                            <span>{isRtl ? 'المبلغ الكلي المستحق' : 'Total Amount Due'}</span>
-                            <span className="font-mono text-amber-600 font-black">{total.toFixed(2)} {t.riyal}</span>
-                          </div>
+                      {appliedGiftCardAmount > 0 && (
+                        <div className="flex justify-between text-emerald-600 font-semibold">
+                          <span>{isRtl ? 'خصم بطاقة الهدايا' : 'Gift Card Discount'}</span>
+                          <span className="font-mono font-black">-{appliedGiftCardAmount.toFixed(2)} {t.riyal}</span>
                         </div>
-                      );
-                    })()}
+                      )}
+
+                      <div className="flex justify-between text-slate-500 border-t pt-1.5 border-dashed">
+                        <span>{isRtl ? 'الوعاء الخاضع للضريبة' : 'Taxable Subtotal'}</span>
+                        <span className="font-mono font-bold">{activeInvoiceTaxable.toFixed(2)} {t.riyal}</span>
+                      </div>
+
+                      <div className="flex justify-between text-slate-500">
+                        <span>{isRtl ? 'ضريبة القيمة المضافة ١٥٪' : 'ZATCA VAT (15%)'}</span>
+                        <span className="font-mono font-bold">{activeInvoiceVat.toFixed(2)} {t.riyal}</span>
+                      </div>
+
+                      <div className="h-px bg-slate-100 border-dashed border-b pt-1" />
+
+                      <div className="flex justify-between text-sm font-black text-slate-900 pt-1">
+                        <span>{isRtl ? 'المبلغ الكلي المستحق' : 'Total Amount Due'}</span>
+                        <span className="font-mono text-amber-600 font-black">{activeInvoiceTotal.toFixed(2)} {t.riyal}</span>
+                      </div>
+
+                      <div className="flex justify-between text-slate-500">
+                        <span>{isRtl ? 'الرصيد المتبقي' : 'Remaining Balance'}</span>
+                        <span className="font-mono font-bold">{activeInvoiceRemaining.toFixed(2)} {t.riyal}</span>
+                      </div>
+
+                      {splitAmounts.wallet > 0 && (
+                        <div className="flex justify-between text-amber-700 font-semibold">
+                          <span>{isRtl ? 'خصم/سداد المحفظة' : 'Wallet Deduction'}</span>
+                          <span className="font-mono font-black">-{Number(splitAmounts.wallet).toFixed(2)} {t.riyal}</span>
+                        </div>
+                      )}
+                    </div>
 
                     {/* SPLIT PAYMENTS COMPONENT CONTAINER */}
                     <div className="pt-3 border-t border-slate-100 space-y-3">
@@ -3461,6 +3588,319 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                 </div>
 
               </div>
+
+              <AnimatePresence>
+                {isCustomerProfileOpen && activeAppointment && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-20"
+                  >
+                    <div
+                      className="absolute inset-0 bg-zinc-950/10"
+                      onClick={() => {
+                        setIsCustomerProfileOpen(false);
+                        setCustomerTransactionsExpanded(false);
+                      }}
+                    />
+
+                    <motion.div
+                      initial={{ x: isRtl ? -32 : 32, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: isRtl ? -32 : 32, opacity: 0 }}
+                      transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+                      className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-full md:w-[min(44vw,560px)] bg-white shadow-2xl overflow-y-auto`}
+                      style={isRtl ? { borderRight: '1px solid rgb(226 232 240)' } : { borderLeft: '1px solid rgb(226 232 240)' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 px-5 py-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCustomerProfileOpen(false);
+                              setCustomerTransactionsExpanded(false);
+                            }}
+                            className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all shrink-0 cursor-pointer"
+                            title={isRtl ? 'العودة لتفاصيل الحجز' : 'Back to appointment details'}
+                          >
+                            <ChevronLeft size={16} className={isRtl ? 'rotate-180' : ''} />
+                          </button>
+                          <div className="min-w-0">
+                            <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">
+                              {isRtl ? 'ملف العميل السياقي' : 'CONTEXTUAL CUSTOMER PROFILE'}
+                            </p>
+                            <h3 className="text-sm font-bold text-slate-800 truncate">
+                              {activeCustomerName}
+                            </h3>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                          {isRtl ? 'يرتبط بالموعد الحالي' : 'Scoped to current appointment'}
+                        </span>
+                      </header>
+
+                      <div className="p-5 space-y-4">
+                        {customerProfileError && (
+                          <div className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs">
+                            {customerProfileError}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 gap-4">
+                          <section className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-14 h-14 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center font-black text-amber-700 text-lg shrink-0">
+                                {(activeCustomerName || 'GU').slice(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-base font-bold text-slate-800 truncate">{activeCustomerName}</p>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
+                                    {activeCustomerTier || '—'}
+                                  </span>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
+                                    {customerProfile?.customerType || '—'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
+                              <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
+                                <span>{isRtl ? 'الهاتف' : 'Phone'}</span>
+                                <span className="font-mono font-bold">{activeCustomerPhone || '—'}</span>
+                              </div>
+                              <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
+                                <span>{isRtl ? 'البريد' : 'Email'}</span>
+                                <span className="font-mono font-bold truncate max-w-[12rem]">{activeCustomerEmail || '—'}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (activeCustomerPhone) {
+                                    window.location.href = `tel:${activeCustomerPhone}`;
+                                  }
+                                }}
+                                disabled={!activeCustomerPhone}
+                                className="px-3 py-2 rounded-lg text-xs font-bold bg-zinc-900 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {isRtl ? 'اتصال' : 'Call'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (activeCustomerEmail) {
+                                    window.location.href = `mailto:${activeCustomerEmail}`;
+                                  }
+                                }}
+                                disabled={!activeCustomerEmail}
+                                className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {isRtl ? 'بريد' : 'Email'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (activeAppointment.customerId && navigator.clipboard?.writeText) {
+                                    void navigator.clipboard.writeText(activeAppointment.customerId);
+                                  }
+                                }}
+                                className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700"
+                              >
+                                {isRtl ? 'نسخ المعرف' : 'Copy ID'}
+                              </button>
+                            </div>
+                          </section>
+
+                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                {isRtl ? 'زيارة اليوم' : 'Today\'s Visit'}
+                              </h4>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                activeAppointment.invoiceStatus === 'paid' || activeAppointment.paymentStatus === 'paid'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : activeAppointment.paymentStatus === 'partial'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}>
+                                {activeAppointment.invoiceStatus || activeAppointment.paymentStatus || '—'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                              {[
+                                { label: isRtl ? 'الخدمة' : 'Service', value: isRtl ? activeServiceSummary.nameAr : activeServiceSummary.nameEn },
+                                { label: isRtl ? 'الموظفة' : 'Staff', value: isRtl ? activeStylist?.nameAr || activeAppointment.assignedStaffName || '—' : activeStylist?.nameEn || activeAppointment.assignedStaffName || '—' },
+                                { label: isRtl ? 'المدة' : 'Duration', value: `${activeServiceSummary.duration} ${t.durationMin}` },
+                                { label: isRtl ? 'السعر' : 'Price', value: `${activeServiceSummary.price.toFixed(2)} ${t.riyal}` },
+                                { label: isRtl ? 'وقت الموعد' : 'Appointment Time', value: activeAppointmentTime || '—' },
+                                { label: isRtl ? 'الفرع' : 'Branch', value: activeCustomerBranch || '—' },
+                                { label: isRtl ? 'الرصيد المتبقي' : 'Remaining Balance', value: `${activeInvoiceRemaining.toFixed(2)} ${t.riyal}` },
+                                { label: isRtl ? 'حالة الفاتورة' : 'Invoice Status', value: activeAppointment.invoiceStatus || activeAppointment.paymentStatus || '—' }
+                              ].map((item) => (
+                                <div key={item.label} className="flex items-center justify-between gap-3 bg-slate-50 rounded-lg border border-slate-200 px-3 py-2">
+                                  <span className="text-slate-500">{item.label}</span>
+                                  <span className="font-bold text-slate-800 text-right truncate">{item.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+
+                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                              {isRtl ? 'ملخص العميل' : 'Customer Snapshot'}
+                            </h4>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {[
+                                { label: isRtl ? 'المحفظة' : 'Wallet', value: `${activeCustomerWallet.toFixed(2)} ${t.riyal}` },
+                                { label: isRtl ? 'إجمالي الإنفاق' : 'Total Spent', value: `${Number(customerProfile?.totalSpent || 0).toFixed(2)} ${t.riyal}` },
+                                { label: isRtl ? 'الحجوزات' : 'Appointments', value: `${customerAppointmentHistory.length}` },
+                                { label: isRtl ? 'المكتملة' : 'Completed', value: `${customerCompletedAppointments}` },
+                                { label: isRtl ? 'الملغاة' : 'Cancelled', value: `${customerCancelledAppointments}` },
+                                { label: isRtl ? 'عدم الحضور' : 'No Shows', value: `${customerNoShowAppointments}` },
+                                { label: isRtl ? 'أول زيارة' : 'First Visit', value: customerFirstVisit ? new Date(customerFirstVisit.startTime || customerFirstVisit.date || customerFirstVisit.createdAt || 0).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium' }) : '—' },
+                                { label: isRtl ? 'آخر زيارة' : 'Last Visit', value: customerLastVisit ? new Date(customerLastVisit.startTime || customerLastVisit.date || customerLastVisit.createdAt || 0).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium' }) : '—' },
+                                { label: isRtl ? 'المصفف المفضل' : 'Preferred Stylist', value: customerPreferredStylist || '—' },
+                                { label: isRtl ? 'الخدمة المفضلة' : 'Preferred Service', value: customerPreferredService || '—' }
+                              ].map((item) => (
+                                <div key={item.label} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{item.label}</p>
+                                  <p className="text-slate-800 font-bold mt-1 truncate">{item.value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+
+                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                              {isRtl ? 'الخط الزمني' : 'Timeline'}
+                            </h4>
+                            {customerTimelineEntries.length === 0 ? (
+                              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                {isRtl ? 'لا توجد أحداث زمنية حالياً.' : 'No timeline events available yet.'}
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {customerTimelineEntries.map((entry: any) => (
+                                  <div key={entry.id} className="flex gap-3">
+                                    <span className={`mt-1.5 h-2.5 w-2.5 rounded-full shrink-0 ${
+                                      entry.kind === 'appointment' ? 'bg-blue-400' :
+                                      entry.kind === 'order' ? 'bg-emerald-400' :
+                                      entry.kind === 'wallet' ? 'bg-amber-400' :
+                                      entry.kind === 'gift' ? 'bg-pink-400' :
+                                      'bg-slate-300'
+                                    }`} />
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold text-slate-800">{isRtl ? entry.titleAr : entry.titleEn}</p>
+                                      <p className="text-[10px] text-slate-500">{isRtl ? entry.subtitleAr : entry.subtitleEn}</p>
+                                      {entry.date && (
+                                        <p className="text-[10px] text-slate-400 mt-0.5">
+                                          {new Date(entry.date).toLocaleString(isRtl ? 'ar-SA' : 'en-US', {
+                                            dateStyle: 'medium',
+                                            timeStyle: 'short'
+                                          })}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </section>
+
+                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                {isRtl ? 'العمليات الأخيرة' : 'Recent Transactions'}
+                              </h4>
+                              <button
+                                type="button"
+                                onClick={() => setCustomerTransactionsExpanded(prev => !prev)}
+                                className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-700"
+                              >
+                                {isRtl ? 'عرض الكل' : 'View All'}
+                              </button>
+                            </div>
+                            <div className="space-y-2">
+                              {customerRecentTransactions.length === 0 ? (
+                                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                  {isRtl ? 'لا توجد عمليات مالية مسجلة.' : 'No recent financial activity found.'}
+                                </div>
+                              ) : (
+                                customerRecentTransactions.map((item: any, idx: number) => {
+                                  const amount = Number(item.amount ?? item.totalAmount ?? item.value ?? item.price ?? 0);
+                                  const label = item.invoiceNumber || item.orderNumber || item.type || item.method || item.paymentMethod || `TX-${idx + 1}`;
+                                  const dateLabel = item.date || item.createdAt || item.time || '';
+                                  return (
+                                    <div key={`${label}-${idx}`} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[10px]">
+                                      <div className="min-w-0">
+                                        <p className="font-bold text-slate-800 truncate">{label}</p>
+                                        <p className="text-slate-400 truncate">{dateLabel ? new Date(dateLabel).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</p>
+                                      </div>
+                                      <span className="font-mono font-black text-slate-700 whitespace-nowrap">
+                                        {amount ? `${amount.toFixed(2)} ${t.riyal}` : '—'}
+                                      </span>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </section>
+
+                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                              {isRtl ? 'التقييمات' : 'Reviews'}
+                            </h4>
+                            {customerReviewHistory.length === 0 ? (
+                              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                {isRtl ? 'لا توجد تقييمات مرتبطة بهذا العميل.' : 'No customer reviews are linked yet.'}
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {customerReviewHistory.map((review: any, idx: number) => (
+                                  <div key={review.id || idx} className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs space-y-1">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <p className="font-bold text-slate-800 truncate">{review.serviceName || review.title || (isRtl ? 'خدمة مرتبطة' : 'Linked service')}</p>
+                                      <div className="flex gap-0.5 text-amber-500">
+                                        {Array.from({ length: Math.max(1, Math.min(5, review.rating || 0)) }).map((_, starIdx) => (
+                                          <Star key={starIdx} size={11} fill="currentColor" />
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <p className="text-slate-600 italic">{review.comment || review.text || '—'}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </section>
+
+                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                              {isRtl ? 'الملاحظات الداخلية' : 'Internal Notes'}
+                            </h4>
+                            {customerNoteHistory.length === 0 ? (
+                              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                                {isRtl ? 'لا توجد ملاحظات داخلية حالياً.' : 'No internal notes recorded yet.'}
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {customerNoteHistory.map((note: any, idx: number) => (
+                                  <div key={`${note.id || idx}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">
+                                    {note.text || note.note || note}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </section>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
             </motion.div>
           </div>
