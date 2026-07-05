@@ -309,7 +309,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   // Selection / Detail Drawer State
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<'crm' | 'financials' | 'timeline' | 'reviews'>('crm');
+  const [drawerTab, setDrawerTab] = useState<'overview' | 'financials' | 'timeline' | 'reviews'>('overview');
   const [activeStylistMenuId, setActiveStylistMenuId] = useState<string | null>(null);
   const [isCustomerProfileOpen, setIsCustomerProfileOpen] = useState(false);
   const [customerProfile, setCustomerProfile] = useState<any | null>(null);
@@ -2746,7 +2746,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         )}
       </AnimatePresence>
 
-      {/* 4. PREMIUM APPOINTMENT DETAILS DRAWER (88vw massive CRM Workspace) */}
+      {/* 4. PREMIUM APPOINTMENT DETAILS DRAWER (88vw operations workspace) */}
       <AnimatePresence>
         {drawerOpen && activeAppointment && (
           <div className="fixed inset-0 z-50 flex overflow-hidden">
@@ -2777,7 +2777,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   </span>
                   <div>
                     <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 leading-none">
-                      {isRtl ? 'تفاصيل الحجز وإدارة العميل' : 'APPOINTMENT PLATFORM & CRM CONTROL'}
+                      {isRtl ? 'تفاصيل الحجز وإدارة العميل' : 'APPOINTMENT OPERATIONS CONTROL'}
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
                         activeAppointment.status === 'confirmed' ? 'bg-amber-100 text-amber-700' :
                         activeAppointment.status === 'arrived' ? 'bg-emerald-100 text-emerald-700' :
@@ -2821,10 +2821,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                 </div>
               </header>
 
-              {/* CRM THREE-COLUMN WORKSPACE BODY */}
+              {/* OPERATIONS THREE-COLUMN WORKSPACE BODY */}
               <div className="flex-1 overflow-y-auto p-6 md:p-8 grid grid-cols-1 xl:grid-cols-12 gap-6">
                 
-                {/* COLUMN 1: STICKY CUSTOMER PROFILE & CRM SUMMARY (col-span-3) */}
+                {/* COLUMN 1: STICKY CUSTOMER PROFILE & OPERATIONS SUMMARY (col-span-3) */}
                 <div className="xl:col-span-3">
                   <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 sticky top-4">
                     
@@ -2859,7 +2859,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
                     {/* Tag chips with manual add option */}
                     <div className="pt-3 border-t border-slate-100 space-y-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'الوسوم المميزة' : 'CRM Tags'}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'الوسوم المميزة' : 'Customer Tags'}</span>
                       <div className="flex flex-wrap gap-1">
                         {activeAppointment.tags.map((tag, idx) => (
                           <span key={idx} className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">
@@ -2894,7 +2894,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   {/* Sliding Tabs selector header */}
                   <div className="bg-white p-1 rounded-xl border border-slate-200/60 flex gap-1 shadow-2xs">
                     {[
-                      { id: 'crm', label: isRtl ? 'الملخص والتحكم' : 'Interactive Hub' },
+                      { id: 'overview', label: isRtl ? 'الملخص والتحكم' : 'Interactive Hub' },
                       { id: 'timeline', label: isRtl ? 'الخط الزمني' : 'Timeline History' },
                       { id: 'reviews', label: isRtl ? 'التقييمات والآراء' : 'Reviews Log' }
                     ].map(tab => (
@@ -2912,8 +2912,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                     ))}
                   </div>
 
-                  {/* TAB 1: CORE CRM & WALLET INTERFACE */}
-                  {drawerTab === 'crm' && (
+                  {/* TAB 1: CORE OPERATIONS & WALLET INTERFACE */}
+                  {drawerTab === 'overview' && (
                     <div className="space-y-5">
                       
                       {/* Active service item banner */}
@@ -3247,7 +3247,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           onClick={() => {
                             addLocalToast(
                               'تم حفظ الموعد بالتعديل الجديد، وجاري إرسال إشعار فوري للزبونة! 💬',
-                              'Session schedule updated. Dynamic CRM push alert successfully dispatched! 💬',
+                              'Session schedule updated. Dynamic operations push alert successfully dispatched! 💬',
                               'success'
                             );
                           }}
@@ -4204,7 +4204,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
               className="bg-white rounded-2xl p-5 w-80 font-mono text-xs border text-slate-800 space-y-3 shadow-2xl relative"
             >
               <div className="border-t-2 border-b-2 border-dashed border-slate-800 py-3 text-center space-y-1">
-                <span className="font-black text-sm tracking-widest block text-zinc-950">REFAH CRM</span>
+                <span className="font-black text-sm tracking-widest block text-zinc-950">REFAH OPERATIONS</span>
                 <p className="text-[9px] text-zinc-400">Simplified VAT Tax Invoice</p>
                 <p className="text-[8px] text-zinc-400">VAT Registration: 31092813100003</p>
                 <div className="h-px border-b border-dashed my-1" />
