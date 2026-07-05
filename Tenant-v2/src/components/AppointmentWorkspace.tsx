@@ -3632,7 +3632,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
                           <select
                             value={activeAppointment.staffId}
+                            disabled={appointmentDetailsReadOnly}
                             onChange={async (e) => {
+                              if (appointmentDetailsReadOnly) {
+                                addLocalToast(
+                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                  'info'
+                                );
+                                return;
+                              }
                               const newStaffId = e.target.value;
                               try {
                                 const response = await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, newStaffId);
@@ -3658,7 +3667,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 );
                               }
                             }}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 cursor-pointer focus:ring-1 focus:ring-amber-500 outline-none"
+                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                           >
                             {liveStylists.map(s => (
                               <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
@@ -3672,7 +3681,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                             <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
                           <select
                             value={activeAppointment.startTime}
+                            disabled={appointmentDetailsReadOnly}
                             onChange={async (e) => {
+                              if (appointmentDetailsReadOnly) {
+                                addLocalToast(
+                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                  'info'
+                                );
+                                return;
+                              }
                               const newTime = parseInt(e.target.value);
                               try {
                                 const response = await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
@@ -3702,7 +3720,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 );
                               }
                             }}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 cursor-pointer focus:ring-1 focus:ring-amber-500 outline-none"
+                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                           >
                               {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => {
                                 const totalMins = idx * 15;
@@ -3720,7 +3738,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           <input
                               type="date"
                               value={activeAppointment.date || '2026-06-28'}
+                              disabled={appointmentDetailsReadOnly}
                               onChange={async (e) => {
+                                if (appointmentDetailsReadOnly) {
+                                  addLocalToast(
+                                    isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                    isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                    'info'
+                                  );
+                                  return;
+                                }
                                 const newDateStr = e.target.value;
                                 try {
                                   const response = await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
@@ -3750,7 +3777,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                   );
                                 }
                               }}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none"
+                              className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                             />
                           </div>
                         </div>
@@ -3758,6 +3785,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         {/* Combined Action Reassign + Reschedule */}
                         <button
                           onClick={() => {
+                            if (appointmentDetailsReadOnly) {
+                              addLocalToast(
+                                isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                'info'
+                              );
+                              return;
+                            }
                             addLocalToast(
                               'تم حفظ الموعد بالتعديل الجديد، وجاري إرسال إشعار فوري للزبونة! 💬',
                               'Session schedule updated. Dynamic operations push alert successfully dispatched! 💬',
@@ -3792,13 +3827,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                             <input
                               type="number"
                               value={simulatedWalletTopUp}
+                              disabled={appointmentDetailsReadOnly}
                               onChange={(e) => setSimulatedWalletTopUp(e.target.value)}
                               placeholder={isRtl ? 'المبلغ ر.س...' : 'Amount SAR...'}
-                              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-amber-500"
+                              className={`flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-amber-500 ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : ''}`}
                             />
                             <button
                               onClick={handleAddWalletBalance}
-                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
+                              disabled={appointmentDetailsReadOnly}
+                              className={`px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                             >
                               {isRtl ? 'شحن فوري' : 'Top Up'}
                             </button>
