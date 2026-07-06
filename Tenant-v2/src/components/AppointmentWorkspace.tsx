@@ -1308,7 +1308,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   
   // Step 1: Customer Details State
   const [custMode, setCustMode] = useState<'existing' | 'new' | 'walkin'>('existing');
-  const [selectedCustId, setSelectedCustId] = useState<string>('CUST-001');
+  const [selectedCustId, setSelectedCustId] = useState<string>('');
   const [newCustName, setNewCustName] = useState('');
   const [newCustPhone, setNewCustPhone] = useState('');
   const [newCustEmail, setNewCustEmail] = useState('');
@@ -1320,8 +1320,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [guestNames, setGuestNames] = useState('');
 
   // Step 2: Service Configuration & Queue
-  const [currentServiceId, setCurrentServiceId] = useState<string>('SRV-001');
-  const [currentStaffId, setCurrentStaffId] = useState<string>('st-1');
+  const [currentServiceId, setCurrentServiceId] = useState<string>('');
+  const [currentStaffId, setCurrentStaffId] = useState<string>('');
   const [currentStartTime, setCurrentStartTime] = useState<number>(120); // minutes from 9:00 AM. 120 = 11:00 AM
   const [currentDuration, setCurrentDuration] = useState<number>(60);
   const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
@@ -1351,14 +1351,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   // Blocked shift breaks
   const [blockTitleAr, setBlockTitleAr] = useState('استراحة قهوة الموظفين');
   const [blockTitleEn, setBlockTitleEn] = useState('Staff Espresso Recess');
-  const [blockStaffId, setBlockStaffId] = useState('st-1');
+  const [blockStaffId, setBlockStaffId] = useState('');
   const [blockStartTime, setBlockStartTime] = useState<number>(180); // 12:00 PM
   const [blockDuration, setBlockDuration] = useState<number>(45);
   const [blockType, setBlockType] = useState<'Break' | 'Lunch' | 'Meeting'>('Break');
 
   // Shift Editor Modal states
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
-  const [selectedShiftStaffId, setSelectedShiftStaffId] = useState('st-1');
+  const [selectedShiftStaffId, setSelectedShiftStaffId] = useState('');
   const [initialCreateMode, setInitialCreateMode] = useState<'appointment' | 'blocked'>('appointment');
   const [initialCartTab, setInitialCartTab] = useState<'products' | 'giftcards'>('products');
 
@@ -1388,7 +1388,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   
   // POS Checkout customer association
   const [posCustMode, setPosCustMode] = useState<'walkin' | 'existing'>('walkin');
-  const [posSelectedCustId, setPosSelectedCustId] = useState('CUST-001');
+  const [posSelectedCustId, setPosSelectedCustId] = useState('');
   
   // POS Split checkout state
   const [posSplitActive, setPosSplitActive] = useState(false);
@@ -2371,7 +2371,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       `${apt.customerPhone || ''}`.includes(searchQuery) ||
       `${apt.id || ''}`.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const dateStr = apt.date || '2026-06-28';
+    const dateStr = apt.date || getSelectedDateKey();
     let matchesDate = false;
     
     if (viewMode === 'day') {
@@ -3252,7 +3252,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                   const d = parseLocalDateKey(dayStr);
                                   setSelectedDate(d);
                                   setCurrentStartTime(hoveredSlot.timeInMinutes);
-                                  setCurrentStaffId(liveStylists[0]?.id || hoveredSlot.staffId || currentStaffId);
+                                setCurrentStaffId(liveStylists[0]?.id || hoveredSlot.staffId || currentStaffId);
                                   setCreateMode('appointment');
                                   setCreateStep(1);
                                   setStagedServices([]);
@@ -3321,7 +3321,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                           leftPercent = staffIdx * 25;
                         } else {
                           const activeBlock = getDaysOfActiveBlock(selectedDate);
-                          const dayIdx = activeBlock.indexOf(apt.date || '2026-06-28');
+                          const dayIdx = activeBlock.indexOf(apt.date || getSelectedDateKey());
                           if (dayIdx === -1) return null;
                           leftPercent = dayIdx * 25;
                         }
@@ -4067,7 +4067,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                             <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
                           <input
                               type="date"
-                              value={activeAppointment.date || '2026-06-28'}
+                              value={activeAppointment.date || getSelectedDateKey()}
                               disabled={appointmentDetailsReadOnly}
                               onChange={async (e) => {
                                 if (appointmentDetailsReadOnly) {
