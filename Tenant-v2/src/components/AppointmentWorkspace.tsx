@@ -3184,30 +3184,19 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 e.preventDefault();
                                 const aptId = e.dataTransfer.getData('text/plain');
                                 if (aptId && dragOverStaffId && dragOverTime !== null) {
-                                  setAppointments(prev => prev.map(a => {
-                                    if (a.id === aptId) {
-                                      if (!a.id.startsWith('block-')) {
-                                        const patchDate = buildIsoFromMinutes(getSelectedDateKey(), dragOverTime);
-                                      tenantApiAdapter.reassignRescheduleAppointment(a.id, {
-                                        staffId: dragOverStaffId,
-                                        startTime: patchDate,
-                                        notifyCustomer: true
-                                        }).then(() => {
-                                          void loadBoardData();
-                                        }).catch((err) => {
-                                          console.error("Optimistic sync failed", err);
-                                          const toast = getSchedulingErrorToast(err, 'تعذر نقل الموعد إلى الخانة الجديدة', 'Unable to move appointment to the new slot.');
-                                          addLocalToast(toast.ar, toast.en, 'warning');
-                                        });
-                                      }
-                                      return {
-                                        ...a,
-                                        staffId: dragOverStaffId,
-                                        startTime: dragOverTime
-                                      };
-                                    }
-                                    return a;
-                                  }));
+                                  const patchDate = buildIsoFromMinutes(getSelectedDateKey(), dragOverTime);
+                                  tenantApiAdapter.reassignRescheduleAppointment(aptId, {
+                                    staffId: dragOverStaffId,
+                                    startTime: patchDate,
+                                    notifyCustomer: true
+                                  }).then(() => {
+                                    void loadBoardData();
+                                  }).catch((err) => {
+                                    console.error('Failed to persist drag/drop change', err);
+                                    const toast = getSchedulingErrorToast(err, 'تعذر نقل الموعد إلى الخانة الجديدة', 'Unable to move appointment to the new slot.');
+                                    addLocalToast(toast.ar, toast.en, 'warning');
+                                    void loadBoardData();
+                                  });
                                 }
                                 setDraggedAptId(null);
                                 setDragOverStaffId(null);
