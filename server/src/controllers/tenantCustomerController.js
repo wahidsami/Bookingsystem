@@ -334,6 +334,287 @@ function normalizeAppointmentPaymentState(appointment, evidenceSource = 'appoint
     };
 }
 
+function normalizeBookingSessionStatusValue(status) {
+    return `${status || ''}`.trim().toLowerCase();
+}
+
+function getBookingSessionAggregationKey(record = {}) {
+    return `${record?.bookingSessionId
+        || record?.bookingSession?.id
+        || record?.bookingReference
+        || record?.bookingSession?.bookingReference
+        || record?.bookingNumber
+        || record?.id
+        || ''}`.trim();
+}
+
+function getAppointmentComparableTimestamp(appointment = {}) {
+    const candidates = [
+        appointment?.startTime,
+        appointment?.date,
+        appointment?.createdAt,
+        appointment?.updatedAt,
+        appointment?.endTime,
+        appointment?.processedAt
+    ];
+
+    for (const candidate of candidates) {
+        if (!candidate) {
+            continue;
+        }
+
+        const parsed = new Date(candidate).getTime();
+        if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+        }
+    }
+
+    return 0;
+}
+
+function getAppointmentLineDuration(appointment = {}) {
+    return Number(
+        appointment?.service?.duration
+        || appointment?.serviceVariantDuration
+        || appointment?.duration
+        || 0
+    );
+}
+
+function buildAppointmentServiceLine(appointment, index, bookingSessionId, bookingReference) {
+    const normalizedPayment = normalizeAppointmentPaymentState(appointment, 'appointment');
+    const serviceNameEn = appointment?.service?.name_en || appointment?.serviceNameEn || appointment?.serviceName || appointment?.title || '';
+    const serviceNameAr = appointment?.service?.name_ar || appointment?.serviceNameAr || appointment?.serviceName || appointment?.title || '';
+    const staffName = appointment?.staff?.name || appointment?.employee?.name || appointment?.staffName || '';
+
+    return {
+        id: appointment?.id || `${bookingSessionId || bookingReference || 'appointment'}-${index}`,
+        appointmentId: appointment?.id || null,
+        bookingSessionId: bookingSessionId || appointment?.bookingSessionId || null,
+        bookingReference: bookingReference || appointment?.bookingReference || null,
+        bookingItemIndex: appointment?.bookingItemIndex ?? index,
+        service: appointment?.service || null,
+        staff: appointment?.staff || null,
+        serviceNameEn,
+        serviceNameAr,
+        staffName,
+        date: appointment?.startTime || appointment?.date || null,
+        startTime: appointment?.startTime || null,
+        endTime: appointment?.endTime || null,
+        duration: getAppointmentLineDuration(appointment),
+        price: parseFloat(appointment?.price || 0),
+        status: normalizeBookingSessionStatusValue(appointment?.status),
+        paymentStatus: normalizeBookingSessionStatusValue(appointment?.paymentStatus),
+        normalizedPaymentStatus: normalizedPayment.normalizedPaymentStatus,
+        paymentMethod: appointment?.paymentMethod || null,
+        totalPaid: normalizedPayment.paidAmount,
+        outstandingAmount: normalizedPayment.outstandingAmount,
+        branch: appointment?.branch || appointment?.tenantBranch || null,
+        notes: appointment?.notes || null
+    };
+}
+
+function deriveBookingSessionStatus(appointments = [], bookingSession = null) {
+    const bookingSessionStatus = normalizeBookingSessionStatusValue(bookingSession?.status);
+    if (bookingSessionStatus) {
+        return bookingSessionStatus;
+    }
+
+    const statuses = appointments
+        .map((appointment) => normalizeBookingSessionStatusValue(appointment?.status))
+        .filter(Boolean);
+
+    if (statuses.length === 0) {
+        return 'pending';
+    }
+
+    if (statuses.some((status) => ['cancelled', 'canceled'].includes(status))) {
+        return 'cancelled';
+    }
+
+    if (statuses.some((status) => ['no_show', 'no-show', 'noshow'].includes(status))) {
+        return 'no_show';
+    }
+
+    if (statuses.every((status) => ['completed', 'done', 'served'].includes(status))) {
+        return 'completed';
+    }
+
+    if (statuses.some((status) => ['in_service', 'in service', 'serving'].includes(status))) {
+        return 'in_service';
+    }
+
+    if (statuses.some((status) => ['checked_in', 'arrived'].includes(status))) {
+        return 'checked_in';
+    }
+
+    if (statuses.some((status) => ['confirmed', 'booked', 'scheduled'].includes(status))) {
+        return 'confirmed';
+    }
+
+    return statuses[0] || 'pending';
+}
+
+function deriveBookingSessionPaymentStatus(appointments = [], bookingSession = null) {
+    const bookingSessionPaymentStatus = normalizeBookingSessionStatusValue(bookingSession?.paymentStatus);
+    if (bookingSessionPaymentStatus) {
+        return bookingSessionPaymentStatus;
+    }
+
+    const normalizedPayments = appointments.map((appointment) => normalizeAppointmentPaymentState(appointment, 'appointment'));
+    const totalAmount = normalizedPayments.reduce((sum, item) => sum + Number(item.outstandingAmount || 0) + Number(item.paidAmount || 0), 0);
+    const paidAmount = normalizedPayments.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0);
+    const outstandingAmount = normalizedPayments.reduce((sum, item) => sum + Number(item.outstandingAmount || 0), 0);
+    const statuses = appointments.map((appointment) => normalizeBookingSessionStatusValue(appointment?.paymentStatus));
+
+    if (statuses.some((status) => ['partially_refunded', 'refunded'].includes(status))) {
+        return statuses.includes('partially_refunded') ? 'partially_refunded' : 'refunded';
+    }
+
+    if (totalAmount > 0 && outstandingAmount <= 0.009) {
+        return 'fully_paid';
+    }
+
+    if (paidAmount > 0.009) {
+        return 'deposit_paid';
+    }
+
+    return statuses.find(Boolean) || 'pending';
+}
+
+function aggregateAppointmentsByBookingSession(appointments = []) {
+    const groups = new Map();
+
+    [...appointments]
+        .sort((a, b) => getAppointmentComparableTimestamp(b) - getAppointmentComparableTimestamp(a))
+        .forEach((appointment) => {
+            const groupingKey = getBookingSessionAggregationKey(appointment);
+            if (!groupingKey) {
+                return;
+            }
+
+            const bucket = groups.get(groupingKey) || [];
+            bucket.push(appointment);
+            groups.set(groupingKey, bucket);
+        });
+
+    return Array.from(groups.entries())
+        .map(([groupingKey, group]) => {
+            const orderedGroup = [...group].sort((a, b) => {
+                const indexA = Number.isFinite(Number(a?.bookingItemIndex)) ? Number(a.bookingItemIndex) : Number.MAX_SAFE_INTEGER;
+                const indexB = Number.isFinite(Number(b?.bookingItemIndex)) ? Number(b.bookingItemIndex) : Number.MAX_SAFE_INTEGER;
+                if (indexA !== indexB) {
+                    return indexA - indexB;
+                }
+
+                const timeDiff = getAppointmentComparableTimestamp(a) - getAppointmentComparableTimestamp(b);
+                if (timeDiff !== 0) {
+                    return timeDiff;
+                }
+
+                return `${a?.id || ''}`.localeCompare(`${b?.id || ''}`);
+            });
+
+            const primary = orderedGroup[0] || group[0] || {};
+            const bookingSession = primary?.bookingSession || group.find((appointment) => appointment?.bookingSession)?.bookingSession || null;
+            const bookingSessionId = bookingSession?.id || primary?.bookingSessionId || null;
+            const bookingReference = bookingSession?.bookingReference || primary?.bookingReference || primary?.bookingNumber || null;
+            const serviceLines = orderedGroup.map((appointment, index) => buildAppointmentServiceLine(appointment, index, bookingSessionId, bookingReference));
+            const serviceNameEn = serviceLines
+                .map((line) => line.serviceNameEn)
+                .filter(Boolean)
+                .join(' + ');
+            const serviceNameAr = serviceLines
+                .map((line) => line.serviceNameAr)
+                .filter(Boolean)
+                .join(' + ');
+            const staffNames = [...new Set(serviceLines.map((line) => line.staffName).filter(Boolean))];
+            const totalAmount = orderedGroup.reduce((sum, appointment) => sum + Number(appointment?.price || 0), 0);
+            const paymentSummaries = orderedGroup.map((appointment) => normalizeAppointmentPaymentState(appointment, 'appointment'));
+            const totalPaid = paymentSummaries.reduce((sum, summary) => sum + Number(summary.paidAmount || 0), 0);
+            const outstandingAmount = paymentSummaries.reduce((sum, summary) => sum + Number(summary.outstandingAmount || 0), 0);
+            const normalizedPaymentStatus = deriveBookingSessionPaymentStatus(orderedGroup, bookingSession);
+            const sessionStatus = deriveBookingSessionStatus(orderedGroup, bookingSession);
+            const primaryService = primary?.service || serviceLines[0]?.service || null;
+            const primaryStaff = primary?.staff || serviceLines[0]?.staff || null;
+            const duration = orderedGroup.reduce((sum, appointment) => sum + getAppointmentLineDuration(appointment), 0);
+            const startTime = orderedGroup[0]?.startTime || primary?.startTime || null;
+            const endTime = orderedGroup[orderedGroup.length - 1]?.endTime || primary?.endTime || null;
+            const firstAppointment = orderedGroup[0] || null;
+            const detailPath = firstAppointment?.id ? `/dashboard/appointments/${firstAppointment.id}` : null;
+
+            return {
+                ...primary,
+                id: bookingSessionId || primary?.id || groupingKey,
+                bookingSessionId: bookingSessionId || null,
+                bookingReference: bookingReference || null,
+                bookingNumber: bookingReference || primary?.bookingNumber || null,
+                bookingItemIndex: primary?.bookingItemIndex ?? 0,
+                service: primaryService,
+                staff: primaryStaff,
+                date: startTime,
+                startTime,
+                endTime,
+                status: sessionStatus,
+                paymentStatus: normalizedPaymentStatus,
+                normalizedPaymentStatus,
+                paymentMethod: bookingSession?.paymentMethod || primary?.paymentMethod || null,
+                price: parseFloat(totalAmount.toFixed(2)),
+                totalAmount: parseFloat(totalAmount.toFixed(2)),
+                totalPaid: parseFloat(totalPaid.toFixed(2)),
+                paidAmount: parseFloat(totalPaid.toFixed(2)),
+                outstandingAmount: parseFloat(outstandingAmount.toFixed(2)),
+                duration,
+                serviceNameEn: serviceNameEn || primary?.serviceNameEn || primaryService?.name_en || primaryService?.name || '',
+                serviceNameAr: serviceNameAr || primary?.serviceNameAr || primaryService?.name_ar || primaryService?.name || '',
+                assignedStaffName: staffNames.join(' + ') || primaryStaff?.name || '',
+                serviceLines,
+                appointments: orderedGroup.map((appointment, index) => ({
+                    ...appointment,
+                    bookingSessionId: bookingSessionId || appointment?.bookingSessionId || null,
+                    bookingReference: bookingReference || appointment?.bookingReference || null,
+                    bookingItemIndex: appointment?.bookingItemIndex ?? index
+                })),
+                bookingSession: bookingSession
+                    ? {
+                        ...bookingSession,
+                        id: bookingSessionId || bookingSession.id,
+                        bookingReference: bookingReference || bookingSession.bookingReference || null,
+                        appointments: orderedGroup
+                    }
+                    : {
+                        id: bookingSessionId || null,
+                        bookingReference: bookingReference || null,
+                        appointments: orderedGroup,
+                        status: sessionStatus,
+                        paymentMethod: primary?.paymentMethod || null,
+                        totalAmount: parseFloat(totalAmount.toFixed(2))
+                    },
+                details: {
+                    service: primaryService,
+                    services: serviceLines.map((line) => line.service).filter(Boolean),
+                    staff: primaryStaff,
+                    staffName: staffNames.join(' + ') || primaryStaff?.name || '',
+                    startTime,
+                    endTime,
+                    duration,
+                    branch: primary?.branch || primary?.tenantBranch || null,
+                    bookingSessionId: bookingSessionId || null,
+                    bookingReference: bookingReference || null,
+                    bookingItemCount: orderedGroup.length,
+                    notes: orderedGroup.map((appointment) => appointment?.notes).filter(Boolean).join(' | ') || primary?.notes || ''
+                },
+                detailPath,
+                type: 'booking_session',
+                kind: 'booking_session',
+                sourceBookingSessionId: bookingSessionId || null,
+                sourceBookingReference: bookingReference || null,
+                sessionAppointmentCount: orderedGroup.length
+            };
+        })
+        .sort((a, b) => getAppointmentComparableTimestamp(b) - getAppointmentComparableTimestamp(a));
+}
+
 /**
  * Get all customers who have booked with this tenant
  */
@@ -385,7 +666,7 @@ exports.getCustomers = async (req, res) => {
                             attributes: ['id', 'name_en', 'name_ar']
                         }
                     ],
-                    attributes: ['id', 'startTime', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid']
+                    attributes: ['id', 'startTime', 'endTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid']
                 }
             ],
             attributes: [
@@ -482,11 +763,12 @@ exports.getCustomers = async (req, res) => {
         // Calculate stats for each customer
         const enrichedCustomers = allCustomers.map(customer => {
             const appointments = customer.appointments || [];
+            const bookingSessions = aggregateAppointmentsByBookingSession(appointments);
             const orders = customer.orders || [];
             const insight = insightsMap[customer.id];
 
-            const appointmentDates = appointments
-                .map(a => a.startTime)
+            const appointmentDates = bookingSessions
+                .map(a => a.date || a.startTime)
                 .filter(Boolean)
                 .sort((a, b) => new Date(a) - new Date(b));
             const orderDates = orders
@@ -495,8 +777,8 @@ exports.getCustomers = async (req, res) => {
                 .sort((a, b) => new Date(a) - new Date(b));
 
             // Calculate from appointments
-            const completedAppointments = appointments.filter(a => a.status === 'completed');
-            const appointmentSpending = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
+            const completedAppointments = bookingSessions.filter(a => a.status === 'completed');
+            const appointmentSpending = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || a.totalAmount || 0), 0);
             
             // Calculate from orders
             const completedOrders = orders.filter(o => o.status === 'completed' || o.status === 'delivered');
@@ -524,9 +806,9 @@ exports.getCustomers = async (req, res) => {
 
             // Determine customer type
             let customerType = 'both';
-            if (appointments.length > 0 && orders.length === 0) {
+            if (bookingSessions.length > 0 && orders.length === 0) {
                 customerType = 'service_only';
-            } else if (appointments.length === 0 && orders.length > 0) {
+            } else if (bookingSessions.length === 0 && orders.length > 0) {
                 customerType = 'product_only';
             }
 
@@ -543,7 +825,7 @@ exports.getCustomers = async (req, res) => {
                 gender: customer.gender,
                 joinedAt: customer.createdAt,
                 // Tenant-specific stats
-                totalBookings: insight?.totalBookings || appointments.length,
+                totalBookings: insight?.totalBookings || bookingSessions.length,
                 totalOrders: orders.length,
                 totalProductsPurchased: totalProductsPurchased,
                 totalSpent: insight?.totalSpent || totalSpent,
@@ -553,8 +835,8 @@ exports.getCustomers = async (req, res) => {
                     : (firstAppointment || firstOrder || null)),
                 loyaltyTier: insight?.loyaltyTier || 'bronze',
                 loyaltyPoints: insight?.tenantLoyaltyPoints || 0,
-                noShowCount: insight?.noShowCount || appointments.filter(a => a.status === 'no_show').length,
-                cancellationCount: insight?.cancellationCount || appointments.filter(a => a.status === 'cancelled').length,
+                noShowCount: insight?.noShowCount || bookingSessions.filter(a => a.status === 'no_show').length,
+                cancellationCount: insight?.cancellationCount || bookingSessions.filter(a => a.status === 'cancelled').length,
                 tags: insight?.tags || [],
                 notes: insight?.notes || '',
                 customerType: customerType
@@ -662,8 +944,10 @@ exports.getCustomer = async (req, res) => {
                     attributes: ['id', 'name', 'photo']
                 }
             ],
+            attributes: ['id', 'startTime', 'endTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid', 'notes', 'serviceVariantName', 'serviceVariantDuration'],
             order: [['startTime', 'DESC']]
         });
+        const bookingSessions = aggregateAppointmentsByBookingSession(appointments);
 
         // Get all orders for this customer at this tenant
         const orders = await db.Order.findAll({
@@ -752,9 +1036,9 @@ exports.getCustomer = async (req, res) => {
             where: { platformUserId: id, tenantId }
         });
 
-        // Calculate stats from appointments
-        const completedAppointments = appointments.filter(a => a.status === 'completed');
-        const appointmentSpending = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
+        // Calculate stats from booking sessions
+        const completedAppointments = bookingSessions.filter(a => a.status === 'completed');
+        const appointmentSpending = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || a.totalAmount || 0), 0);
         const avgBookingValue = completedAppointments.length > 0 ? appointmentSpending / completedAppointments.length : 0;
 
         // Calculate stats from orders
@@ -770,23 +1054,34 @@ exports.getCustomer = async (req, res) => {
 
         // Service frequency
         const serviceFrequency = {};
-        appointments.forEach(a => {
-            const serviceName = a.service?.name_en || 'Unknown';
-            serviceFrequency[serviceName] = (serviceFrequency[serviceName] || 0) + 1;
+        bookingSessions.forEach(a => {
+            const serviceEntries = Array.isArray(a.serviceLines) && a.serviceLines.length > 0
+                ? a.serviceLines
+                : [{ service: a.service }];
+            serviceEntries.forEach((entry) => {
+                const serviceName = entry?.service?.name_en || entry?.serviceNameEn || entry?.name_en || 'Unknown';
+                serviceFrequency[serviceName] = (serviceFrequency[serviceName] || 0) + 1;
+            });
         });
 
         // Staff preference
         const staffFrequency = {};
-        appointments.forEach(a => {
-            if (a.staff) {
-                staffFrequency[a.staff.name] = (staffFrequency[a.staff.name] || 0) + 1;
-            }
+        bookingSessions.forEach(a => {
+            const staffEntries = Array.isArray(a.serviceLines) && a.serviceLines.length > 0
+                ? a.serviceLines
+                : [{ staff: a.staff }];
+            staffEntries.forEach((entry) => {
+                if (entry?.staff?.name || entry?.staffName) {
+                    const staffName = entry?.staff?.name || entry?.staffName;
+                    staffFrequency[staffName] = (staffFrequency[staffName] || 0) + 1;
+                }
+            });
         });
 
         // Time preference analysis
         const timeSlots = { morning: 0, afternoon: 0, evening: 0 };
-        appointments.forEach(a => {
-            const hour = new Date(a.startTime).getHours();
+        bookingSessions.forEach(a => {
+            const hour = new Date(a.startTime || a.date || 0).getHours();
             if (hour < 12) timeSlots.morning++;
             else if (hour < 17) timeSlots.afternoon++;
             else timeSlots.evening++;
@@ -810,15 +1105,15 @@ exports.getCustomer = async (req, res) => {
         });
 
         // Determine last visit (most recent of appointment or order)
-        const lastAppointment = appointments.length > 0 ? appointments[0].startTime : null;
+        const lastAppointment = bookingSessions.length > 0 ? bookingSessions[0].startTime || bookingSessions[0].date : null;
         const lastOrder = orders.length > 0 ? orders[0].createdAt : null;
         const lastVisit = lastAppointment && lastOrder
             ? (new Date(lastAppointment) > new Date(lastOrder) ? lastAppointment : lastOrder)
             : (lastAppointment || lastOrder);
 
         // Determine first visit
-        const firstAppointment = appointments.length > 0 
-            ? appointments[appointments.length - 1].startTime 
+        const firstAppointment = bookingSessions.length > 0 
+            ? bookingSessions[bookingSessions.length - 1].startTime || bookingSessions[bookingSessions.length - 1].date
             : null;
         const firstOrder = orders.length > 0
             ? orders[orders.length - 1].createdAt
@@ -829,9 +1124,9 @@ exports.getCustomer = async (req, res) => {
 
         // Determine customer type
         let customerType = 'both';
-        if (appointments.length > 0 && orders.length === 0) {
+        if (bookingSessions.length > 0 && orders.length === 0) {
             customerType = 'service_only';
-        } else if (appointments.length === 0 && orders.length > 0) {
+        } else if (bookingSessions.length === 0 && orders.length > 0) {
             customerType = 'product_only';
         }
 
@@ -877,7 +1172,7 @@ exports.getCustomer = async (req, res) => {
             ...customerJson,
             walletBalance: currentWalletBalance,
             // Stats
-            totalBookings: appointments.length,
+            totalBookings: bookingSessions.length,
             totalOrders: orders.length,
             completedBookings: completedAppointments.length,
             totalProductsPurchased: totalProductsPurchased,
@@ -887,8 +1182,8 @@ exports.getCustomer = async (req, res) => {
             firstVisit: firstVisit,
             lastVisit: lastVisit,
             // Behavior
-            noShowCount: appointments.filter(a => a.status === 'no_show').length,
-            cancellationCount: appointments.filter(a => a.status === 'cancelled').length,
+            noShowCount: bookingSessions.filter(a => a.status === 'no_show').length,
+            cancellationCount: bookingSessions.filter(a => a.status === 'cancelled').length,
             // Preferences
             favoriteServices: Object.entries(serviceFrequency)
                 .sort((a, b) => b[1] - a[1])
@@ -944,24 +1239,27 @@ exports.getCustomer = async (req, res) => {
                 reviewedAt: review.createdAt
             })),
             // All appointments (complete history)
-            allAppointments: appointments.map(a => ({
-                ...normalizeAppointmentPaymentState(a, 'appointment'),
-                id: a.id,
-                service: a.service,
-                staff: a.staff,
-                date: a.startTime,
-                endTime: a.endTime,
+            allAppointments: bookingSessions.map((a) => ({
+                ...a,
+                service: a.service || null,
+                staff: a.staff || null,
+                date: a.date || a.startTime || null,
+                endTime: a.endTime || null,
                 status: a.status,
                 price: a.price,
                 paymentStatus: a.paymentStatus,
                 paymentMethod: a.paymentMethod,
-                notes: a.notes,
+                notes: a.details?.notes || a.notes || null,
                 bookingReference: a.bookingReference || null,
+                bookingSessionId: a.bookingSessionId || null,
                 serviceVariantName: a.serviceVariantName || null,
                 serviceVariantDuration: a.serviceVariantDuration || null,
                 depositAmount: a.depositAmount ?? null,
                 remainderAmount: a.remainderAmount ?? null,
-                totalPaid: a.totalPaid ?? null
+                totalPaid: a.totalPaid ?? null,
+                serviceLines: a.serviceLines || [],
+                appointments: a.appointments || [],
+                details: a.details || {}
             })),
             // All orders (complete history)
             allOrders: orders.map(o => ({
@@ -978,23 +1276,26 @@ exports.getCustomer = async (req, res) => {
                 estimatedDeliveryDate: o.estimatedDeliveryDate
             })),
             // Recent activity (for backward compatibility)
-            recentAppointments: appointments.slice(0, 10).map(a => ({
-                ...normalizeAppointmentPaymentState(a, 'appointment'),
-                id: a.id,
-                service: a.service,
-                staff: a.staff,
-                date: a.startTime,
-                endTime: a.endTime,
+            recentAppointments: bookingSessions.slice(0, 10).map((a) => ({
+                ...a,
+                service: a.service || null,
+                staff: a.staff || null,
+                date: a.date || a.startTime || null,
+                endTime: a.endTime || null,
                 status: a.status,
                 price: a.price,
                 paymentStatus: a.paymentStatus,
                 paymentMethod: a.paymentMethod,
                 bookingReference: a.bookingReference || null,
+                bookingSessionId: a.bookingSessionId || null,
                 serviceVariantName: a.serviceVariantName || null,
                 serviceVariantDuration: a.serviceVariantDuration || null,
                 depositAmount: a.depositAmount ?? null,
                 remainderAmount: a.remainderAmount ?? null,
-                totalPaid: a.totalPaid ?? null
+                totalPaid: a.totalPaid ?? null,
+                serviceLines: a.serviceLines || [],
+                appointments: a.appointments || [],
+                details: a.details || {}
             })),
             recentOrders: orders.slice(0, 10).map(o => ({
                 id: o.id,
@@ -1201,11 +1502,22 @@ exports.getCustomerStats = async (req, res) => {
                     attributes: ['id']
                 }
             ],
-            attributes: ['platformUserId', 'status', 'price', 'startTime']
+            attributes: ['platformUserId', 'bookingSessionId', 'bookingReference', 'status', 'price', 'startTime']
+        });
+
+        const uniqueBookingAppointments = [];
+        const seenBookingKeys = new Set();
+        appointments.forEach((appointment) => {
+            const bookingKey = `${appointment.platformUserId || 'unknown'}:${appointment.bookingSessionId || appointment.bookingReference || appointment.id}`;
+            if (seenBookingKeys.has(bookingKey)) {
+                return;
+            }
+            seenBookingKeys.add(bookingKey);
+            uniqueBookingAppointments.push(appointment);
         });
 
         // Unique customers
-        const uniqueCustomerIds = [...new Set(appointments.map(a => a.platformUserId).filter(Boolean))];
+        const uniqueCustomerIds = [...new Set(uniqueBookingAppointments.map(a => a.platformUserId).filter(Boolean))];
         const totalCustomers = uniqueCustomerIds.length;
 
         // New customers this month
@@ -1213,14 +1525,14 @@ exports.getCustomerStats = async (req, res) => {
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
-        const newCustomersThisMonth = appointments.filter(a => {
+        const newCustomersThisMonth = uniqueBookingAppointments.filter(a => {
             return a.startTime >= startOfMonth && a.platformUserId;
         });
         const newCustomerIds = [...new Set(newCustomersThisMonth.map(a => a.platformUserId))];
 
         // Calculate returning customers
         const customerBookingCounts = {};
-        appointments.forEach(a => {
+        uniqueBookingAppointments.forEach(a => {
             if (a.platformUserId) {
                 customerBookingCounts[a.platformUserId] = (customerBookingCounts[a.platformUserId] || 0) + 1;
             }
@@ -1229,7 +1541,7 @@ exports.getCustomerStats = async (req, res) => {
 
         // Top spenders
         const customerSpending = {};
-        appointments.filter(a => a.status === 'completed').forEach(a => {
+        uniqueBookingAppointments.filter(a => a.status === 'completed').forEach(a => {
             if (a.platformUserId) {
                 customerSpending[a.platformUserId] = (customerSpending[a.platformUserId] || 0) + parseFloat(a.price || 0);
             }
@@ -1253,7 +1565,7 @@ exports.getCustomerStats = async (req, res) => {
                 newCustomersThisMonth: newCustomerIds.length,
                 returningCustomers,
                 returningRate: totalCustomers > 0 ? ((returningCustomers / totalCustomers) * 100).toFixed(1) : 0,
-                averageBookingsPerCustomer: totalCustomers > 0 ? (appointments.length / totalCustomers).toFixed(1) : 0,
+                averageBookingsPerCustomer: totalCustomers > 0 ? (uniqueBookingAppointments.length / totalCustomers).toFixed(1) : 0,
                 loyaltyTierDistribution: tierDistribution
             }
         });
@@ -1300,9 +1612,11 @@ exports.getCustomerHistory = async (req, res) => {
                     attributes: ['id', 'name', 'photo']
                 }
             ],
+            attributes: ['id', 'startTime', 'endTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid', 'notes', 'serviceVariantName', 'serviceVariantDuration'],
             order: [['startTime', 'DESC']],
             limit: type === 'order' ? 0 : parseInt(limit)
         });
+        const bookingSessions = aggregateAppointmentsByBookingSession(appointments);
 
         // Get orders
         const orderWhere = { 
@@ -1345,26 +1659,41 @@ exports.getCustomerHistory = async (req, res) => {
         // Combine and sort by date
         const history = [];
 
-        appointments.forEach(apt => {
-            const normalizedPayment = normalizeAppointmentPaymentState(apt, 'appointment');
+        bookingSessions.forEach((session) => {
             history.push({
-                type: 'appointment',
-                id: apt.id,
-                date: apt.startTime,
-                status: apt.status,
-                paymentStatus: apt.paymentStatus,
-                normalizedPaymentStatus: normalizedPayment.normalizedPaymentStatus,
-                paidAmount: normalizedPayment.paidAmount,
-                outstandingAmount: normalizedPayment.outstandingAmount,
-                paymentEvidenceSource: normalizedPayment.paymentEvidenceSource,
-                amount: parseFloat(apt.price || 0),
+                type: 'booking_session',
+                kind: 'booking_session',
+                id: session.id,
+                bookingSessionId: session.bookingSessionId || null,
+                bookingReference: session.bookingReference || null,
+                date: session.date || session.startTime,
+                status: session.status,
+                paymentStatus: session.paymentStatus,
+                normalizedPaymentStatus: session.normalizedPaymentStatus,
+                paidAmount: session.paidAmount,
+                outstandingAmount: session.outstandingAmount,
+                paymentEvidenceSource: 'appointment',
+                amount: parseFloat(session.price || session.totalAmount || 0),
+                title: session.serviceNameEn || session.serviceNameAr || session.service?.name_en || session.service?.name_ar || 'Booking session',
+                subtitle: session.assignedStaffName || session.staff?.name || '',
+                serviceNameEn: session.serviceNameEn || session.service?.name_en || '',
+                serviceNameAr: session.serviceNameAr || session.service?.name_ar || '',
+                assignedStaffName: session.assignedStaffName || session.staff?.name || '',
+                serviceLines: session.serviceLines || [],
+                appointments: session.appointments || [],
                 details: {
-                    service: apt.service,
-                    staff: apt.staff,
-                    duration: apt.service.duration,
-                    startTime: apt.startTime,
-                    endTime: apt.endTime,
-                    notes: apt.notes
+                    service: session.service || null,
+                    services: session.details?.services || session.serviceLines?.map((line) => line.service).filter(Boolean) || [],
+                    staff: session.staff || null,
+                    staffName: session.assignedStaffName || session.staff?.name || '',
+                    duration: session.duration,
+                    startTime: session.startTime,
+                    endTime: session.endTime,
+                    branch: session.details?.branch || null,
+                    bookingSessionId: session.bookingSessionId || null,
+                    bookingReference: session.bookingReference || null,
+                    bookingItemCount: session.sessionAppointmentCount || session.appointments?.length || 0,
+                    notes: session.details?.notes || session.notes || ''
                 }
             });
         });
@@ -1414,9 +1743,9 @@ exports.getCustomerHistory = async (req, res) => {
         history.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         // Calculate summary
-        const completedAppointments = appointments.filter(a => a.status === 'completed');
+        const completedAppointments = bookingSessions.filter(a => a.status === 'completed');
         const completedOrders = orders.filter(o => o.status === 'completed' || o.status === 'delivered');
-        const appointmentSpending = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
+        const appointmentSpending = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || a.totalAmount || 0), 0);
         const orderSpending = completedOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || 0), 0);
 
         res.json({
@@ -1439,7 +1768,7 @@ exports.getCustomerHistory = async (req, res) => {
                 })),
                 summary: {
                     totalInteractions: history.length,
-                    totalAppointments: appointments.length,
+                    totalAppointments: bookingSessions.length,
                     totalOrders: orders.length,
                     totalWalletTransactions: walletTransactions.length,
                     totalSpent: appointmentSpending + orderSpending,
@@ -1619,7 +1948,7 @@ exports.getCustomerTransactions = async (req, res) => {
                         attributes: ['id', 'name', 'photo']
                     }
                 ],
-                attributes: ['id', 'bookingNumber', 'paymentMethod', 'startTime', 'endTime', 'price', 'status', 'paymentStatus', 'depositAmount', 'remainderAmount', 'totalPaid', 'notes'],
+                attributes: ['id', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'paymentMethod', 'startTime', 'endTime', 'price', 'status', 'paymentStatus', 'depositAmount', 'remainderAmount', 'totalPaid', 'notes'],
                 order: [['startTime', 'DESC']]
             }),
             db.Order.findAll({
@@ -1653,7 +1982,25 @@ exports.getCustomerTransactions = async (req, res) => {
         });
 
         const appointmentIds = appointments.map((row) => row.id);
+        const bookingSessionIds = [...new Set(appointments.map((row) => row.bookingSessionId).filter(Boolean))];
         const orderIds = orders.map((row) => row.id);
+        const bookingReferenceValues = [...new Set(bookingSessions.map((session) => session.bookingReference).filter(Boolean))];
+        const bookingSessionReferenceMatches = bookingReferenceValues.length > 0
+            ? await db.BookingSession.findAll({
+                where: {
+                    tenantId,
+                    platformUserId: id,
+                    bookingReference: { [Op.in]: bookingReferenceValues }
+                },
+                attributes: ['id', 'bookingReference']
+            })
+            : [];
+        const resolvedBookingSessionIds = [
+            ...new Set([
+                ...bookingSessionIds,
+                ...bookingSessionReferenceMatches.map((session) => session.id)
+            ])
+        ];
 
         const [gatewayTransactions, ledgerTransactions] = await Promise.all([
             db.Transaction.findAll({
@@ -1744,6 +2091,7 @@ exports.getCustomerTransactions = async (req, res) => {
                 where: {
                     [Op.or]: [
                         { appointmentId: { [Op.in]: appointmentIds.length ? appointmentIds : ['00000000-0000-0000-0000-000000000000'] } },
+                        { bookingSessionId: { [Op.in]: resolvedBookingSessionIds.length ? resolvedBookingSessionIds : ['00000000-0000-0000-0000-000000000000'] } },
                         { orderId: { [Op.in]: orderIds.length ? orderIds : ['00000000-0000-0000-0000-000000000000'] } }
                     ],
                     paymentMethod: { [Op.in]: ['cash', 'card_pos', 'wallet', 'bank_transfer'] },
@@ -1828,8 +2176,125 @@ exports.getCustomerTransactions = async (req, res) => {
         });
 
         const transactions = [];
+        const transactionGroups = new Map();
         const seenRecords = new Set();
-        const appointmentTransactionIds = new Set();
+        const appointmentSessionKeyMap = new Map();
+        const appointmentByIdMap = new Map(appointments.map((appointment) => [appointment.id, appointment]));
+        const bookingSessionAggregateMap = new Map(bookingSessions.map((session) => [getBookingSessionAggregationKey(session), session]));
+        const bookingSessionTransactionKeys = new Set();
+
+        bookingSessions.forEach((session) => {
+            const sessionKey = getBookingSessionAggregationKey(session);
+            (session.appointments || []).forEach((appointment) => {
+                if (appointment?.id && sessionKey) {
+                    appointmentSessionKeyMap.set(appointment.id, sessionKey);
+                }
+            });
+        });
+
+        const resolveTransactionAggregationKey = (record) => {
+            const bookingSessionId = record.bookingSession?.id
+                || record.bookingSessionId
+                || record.appointment?.bookingSessionId
+                || null;
+            const bookingReference = record.bookingSession?.bookingReference
+                || record.bookingReference
+                || record.appointment?.bookingReference
+                || null;
+
+            if (bookingSessionId) {
+                return `booking_session:${bookingSessionId}`;
+            }
+
+            if (bookingReference) {
+                return `booking_reference:${bookingReference}`;
+            }
+
+            if (record.appointment?.id) {
+                const mappedSessionKey = appointmentSessionKeyMap.get(record.appointment.id);
+                if (mappedSessionKey) {
+                    return `booking_session:${mappedSessionKey}`;
+                }
+                return `appointment:${record.appointment.id}`;
+            }
+
+            if (record.order?.id) {
+                return `order:${record.order.id}`;
+            }
+
+            const referenceType = `${record.referenceType || ''}`.toLowerCase();
+            if (referenceType === 'appointment' && record.referenceId) {
+                const mappedSessionKey = appointmentSessionKeyMap.get(record.referenceId);
+                if (mappedSessionKey) {
+                    return `booking_session:${mappedSessionKey}`;
+                }
+                return `appointment:${record.referenceId}`;
+            }
+
+            if (referenceType === 'order' && record.referenceId) {
+                return `order:${record.referenceId}`;
+            }
+
+            if (referenceType === 'booking_session' && record.referenceId) {
+                return `booking_session:${record.referenceId}`;
+            }
+
+            if (record.referenceType && record.referenceId) {
+                return `${record.referenceType}:${record.referenceId}`;
+            }
+
+            return `${record.source || 'transaction'}:${record.id}`;
+        };
+
+        const registerTransactionRecord = (record, sourcePriority = 0) => {
+            if (!record) {
+                return;
+            }
+
+            const groupingKey = resolveTransactionAggregationKey(record);
+            const fingerprint = `${groupingKey}:${record.type || ''}:${record.amount || 0}:${record.status || ''}:${record.paymentMethod || ''}:${record.transactionRef || ''}:${record.processedAt || ''}`;
+            if (seenRecords.has(fingerprint)) {
+                return;
+            }
+
+            seenRecords.add(fingerprint);
+            const existingGroup = transactionGroups.get(groupingKey);
+            const wrappedRecord = {
+                ...record,
+                groupingKey,
+                sourcePriority
+            };
+
+            if (!existingGroup) {
+                transactionGroups.set(groupingKey, {
+                    primary: wrappedRecord,
+                    relatedRecords: [wrappedRecord],
+                    sourcePriority
+                });
+            } else {
+                existingGroup.relatedRecords.push(wrappedRecord);
+                if (
+                    sourcePriority > existingGroup.sourcePriority
+                    || (
+                        sourcePriority === existingGroup.sourcePriority
+                        && getAppointmentComparableTimestamp(wrappedRecord) > getAppointmentComparableTimestamp(existingGroup.primary)
+                    )
+                ) {
+                    existingGroup.primary = wrappedRecord;
+                    existingGroup.sourcePriority = sourcePriority;
+                }
+            }
+
+            if (groupingKey.startsWith('booking_session:') || groupingKey.startsWith('booking_reference:')) {
+                bookingSessionTransactionKeys.add(groupingKey);
+                if (wrappedRecord.bookingSession?.id) {
+                    bookingSessionTransactionKeys.add(`booking_session:${wrappedRecord.bookingSession.id}`);
+                }
+                if (wrappedRecord.bookingSession?.bookingReference) {
+                    bookingSessionTransactionKeys.add(`booking_reference:${wrappedRecord.bookingSession.bookingReference}`);
+                }
+            }
+        };
 
         gatewayTransactions.forEach((transaction) => {
             const entityType = transaction.bookingSession ? 'booking_session' : (transaction.appointment ? 'appointment' : 'order');
@@ -1841,17 +2306,7 @@ exports.getCustomerTransactions = async (req, res) => {
             }
 
             seenRecords.add(key);
-            if (transaction.appointment?.id) {
-                appointmentTransactionIds.add(transaction.appointment.id);
-            }
-            if (Array.isArray(transaction.bookingSession?.appointments)) {
-                transaction.bookingSession.appointments.forEach((bookingAppointment) => {
-                    if (bookingAppointment?.id) {
-                        appointmentTransactionIds.add(bookingAppointment.id);
-                    }
-                });
-            }
-            transactions.push(mapCustomerTransactionRecord({
+            registerTransactionRecord(mapCustomerTransactionRecord({
                 id: transaction.id,
                 source: 'transaction',
                 kind: entityType,
@@ -1876,7 +2331,7 @@ exports.getCustomerTransactions = async (req, res) => {
                     : transaction.order?.id
                         ? `/dashboard/orders/${transaction.order.id}`
                         : null
-            }, locale));
+            }, locale), 3);
         });
 
         ledgerTransactions.forEach((transaction) => {
@@ -1889,17 +2344,7 @@ exports.getCustomerTransactions = async (req, res) => {
             }
 
             seenRecords.add(key);
-            if (transaction.appointment?.id) {
-                appointmentTransactionIds.add(transaction.appointment.id);
-            }
-            if (Array.isArray(transaction.bookingSession?.appointments)) {
-                transaction.bookingSession.appointments.forEach((bookingAppointment) => {
-                    if (bookingAppointment?.id) {
-                        appointmentTransactionIds.add(bookingAppointment.id);
-                    }
-                });
-            }
-            transactions.push(mapCustomerTransactionRecord({
+            registerTransactionRecord(mapCustomerTransactionRecord({
                 id: transaction.id,
                 source: 'ledger',
                 kind: entityType,
@@ -1924,7 +2369,7 @@ exports.getCustomerTransactions = async (req, res) => {
                     : transaction.order?.id
                         ? `/dashboard/orders/${transaction.order.id}`
                         : null
-            }, locale));
+            }, locale), 2);
         });
 
         walletLedgerTransactions.forEach((transaction) => {
@@ -1935,21 +2380,40 @@ exports.getCustomerTransactions = async (req, res) => {
             }
 
             seenRecords.add(key);
-            transactions.push(mapWalletLedgerRecord(transaction, locale));
+            const mappedWalletRecord = mapWalletLedgerRecord(transaction, locale);
+            const relatedAppointment = `${transaction.referenceType || ''}`.toLowerCase() === 'appointment' && transaction.referenceId
+                ? appointmentByIdMap.get(transaction.referenceId) || null
+                : null;
+            const relatedSessionKey = relatedAppointment ? appointmentSessionKeyMap.get(relatedAppointment.id) : null;
+            const relatedSession = relatedSessionKey ? bookingSessionAggregateMap.get(relatedSessionKey) || null : null;
+
+            registerTransactionRecord({
+                ...mappedWalletRecord,
+                appointment: relatedAppointment || mappedWalletRecord.appointment || null,
+                bookingSession: relatedSession ? {
+                    ...relatedSession.bookingSession,
+                    appointments: relatedSession.appointments || []
+                } : mappedWalletRecord.bookingSession || null
+            }, 1);
         });
 
-        appointments.forEach((appointment) => {
-            const normalizedPaymentStatus = (appointment.paymentStatus || '').toLowerCase();
-            const isPaidAppointment = ['deposit_paid', 'fully_paid', 'paid', 'refunded', 'partially_refunded'].includes(normalizedPaymentStatus);
+        bookingSessions.forEach((session) => {
+            const sessionKey = getBookingSessionAggregationKey(session);
+            const hasDirectTransaction = bookingSessionTransactionKeys.has(`booking_session:${session.bookingSessionId || session.id}`)
+                || bookingSessionTransactionKeys.has(`booking_reference:${session.bookingReference || ''}`);
+            const normalizedPaymentStatus = `${session.paymentStatus || ''}`.toLowerCase();
+            const isPaidSession = ['deposit_paid', 'fully_paid', 'paid', 'refunded', 'partially_refunded'].includes(normalizedPaymentStatus);
 
-            if (!isPaidAppointment || appointmentTransactionIds.has(appointment.id)) {
+            if (hasDirectTransaction || !isPaidSession) {
                 return;
             }
 
             const paidAmount = Number(
-                appointment.totalPaid ??
-                (normalizedPaymentStatus === 'deposit_paid' ? appointment.depositAmount : null) ??
-                appointment.price ??
+                session.totalPaid ??
+                session.paidAmount ??
+                (normalizedPaymentStatus === 'deposit_paid' ? session.details?.paidAmount : null) ??
+                session.price ??
+                session.totalAmount ??
                 0
             );
 
@@ -1964,35 +2428,87 @@ exports.getCustomerTransactions = async (req, res) => {
                 ? 'refund'
                 : 'payment';
 
-            const syntheticRecordKey = `appointment-derived:${appointment.id}:${syntheticType}:${paidAmount}:${syntheticStatus}`;
-            if (seenRecords.has(syntheticRecordKey)) {
-                return;
-            }
-
-            seenRecords.add(syntheticRecordKey);
-            transactions.push(mapCustomerTransactionRecord({
-                id: `appointment-derived-${appointment.id}`,
+            registerTransactionRecord(mapCustomerTransactionRecord({
+                id: `appointment-derived-${session.id || sessionKey}`,
                 source: 'appointment',
-                kind: 'appointment',
-                entityId: appointment.id,
-                appointment,
-                reference: appointment.bookingNumber || appointment.id,
+                kind: 'booking_session',
+                entityId: session.id || sessionKey,
+                appointment: session.appointments?.[0] || null,
+                bookingSession: session.bookingSession || {
+                    id: session.bookingSessionId || session.id || null,
+                    bookingReference: session.bookingReference || null,
+                    appointments: session.appointments || []
+                },
+                reference: session.bookingReference || session.bookingNumber || session.id || sessionKey,
                 amount: paidAmount,
                 currency: 'SAR',
                 type: syntheticType,
                 status: syntheticStatus,
-                paymentMethod: appointment.paymentMethod || null,
-                transactionRef: appointment.bookingNumber || null,
+                paymentMethod: session.paymentMethod || session.appointments?.[0]?.paymentMethod || null,
+                transactionRef: session.bookingReference || session.bookingNumber || null,
                 notes: locale === 'ar'
-                    ? 'مستخرج من حالة الدفع الخاصة بالموعد'
-                    : 'Derived from appointment payment status',
-                processedAt: appointment.endTime || appointment.startTime,
+                    ? 'مستخرج من حالة الدفع الخاصة بالحجز'
+                    : 'Derived from booking session payment status',
+                processedAt: session.endTime || session.startTime || session.date,
                 processor: null,
-                detailPath: `/dashboard/appointments/${appointment.id}`
-            }, locale));
+                detailPath: session.detailPath || (session.appointments?.[0]?.id ? `/dashboard/appointments/${session.appointments[0].id}` : null)
+            }, locale), 0);
         });
 
-        transactions.sort((a, b) => new Date(b.processedAt).getTime() - new Date(a.processedAt).getTime());
+        transactionGroups.forEach((group, groupingKey) => {
+            const primary = group.primary || {};
+            const relatedRecords = group.relatedRecords || [];
+            const bookingSession = primary.bookingSession || relatedRecords.find((record) => record.bookingSession)?.bookingSession || null;
+            const bookingSessionAppointments = Array.isArray(bookingSession?.appointments)
+                ? bookingSession.appointments
+                : [];
+            const serviceLines = bookingSessionAppointments.length > 0
+                ? bookingSessionAppointments.map((appointment, index) => buildAppointmentServiceLine(appointment, index, bookingSession?.id || primary.bookingSessionId || null, bookingSession?.bookingReference || primary.bookingReference || null))
+                : [];
+            const invoiceLines = serviceLines.map((line) => ({
+                ...line,
+                lineType: 'service',
+                subtotal: Number(line.price || 0)
+            }));
+            const paymentLines = relatedRecords.map((record) => ({
+                id: record.id,
+                source: record.source,
+                type: record.type,
+                status: record.status,
+                amount: record.amount,
+                currency: record.currency,
+                paymentMethod: record.paymentMethod,
+                paymentMethodLabel: record.paymentMethodLabel,
+                processedAt: record.processedAt,
+                transactionRef: record.transactionRef,
+                notes: record.notes
+            }));
+
+            transactions.push({
+                ...primary,
+                groupingKey,
+                bookingSessionId: bookingSession?.id || primary.bookingSessionId || null,
+                bookingReference: bookingSession?.bookingReference || primary.bookingReference || null,
+                bookingSession: bookingSession
+                    ? {
+                        ...bookingSession,
+                        appointments: bookingSessionAppointments
+                    }
+                    : primary.bookingSession || null,
+                appointments: bookingSessionAppointments,
+                serviceLines,
+                invoiceLines,
+                paymentLines,
+                relatedRecords,
+                relatedRecordCount: relatedRecords.length,
+                paymentMethodLabel: relatedRecords.find((record) => record.paymentMethodLabel)?.paymentMethodLabel || primary.paymentMethodLabel,
+                detailPath: primary.detailPath
+                    || (bookingSessionAppointments[0]?.id ? `/dashboard/appointments/${bookingSessionAppointments[0].id}` : null)
+                    || primary.detailPath
+            });
+        });
+
+        transactions.sort((a, b) => new Date(b.processedAt || b.date || 0).getTime() - new Date(a.processedAt || a.date || 0).getTime());
 
         const pagedTransactions = transactions.slice(0, safeLimit);
         const completedTotal = pagedTransactions
@@ -2001,7 +2517,7 @@ exports.getCustomerTransactions = async (req, res) => {
         const refundedTotal = pagedTransactions
             .filter((item) => item.status === 'refunded' || item.type === 'refund')
             .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-        const appointmentStatusCounts = appointments.reduce((acc, appointment) => {
+        const appointmentStatusCounts = bookingSessions.reduce((acc, appointment) => {
             const key = `${appointment.paymentStatus || 'unknown'}`.toLowerCase();
             acc[key] = (acc[key] || 0) + 1;
             return acc;
@@ -2026,7 +2542,7 @@ exports.getCustomerTransactions = async (req, res) => {
                     completedTotal: parseFloat(completedTotal.toFixed(2)),
                     refundedTotal: parseFloat(refundedTotal.toFixed(2)),
                     netTotal: parseFloat((completedTotal - refundedTotal).toFixed(2)),
-                    appointmentCount: pagedTransactions.filter((item) => item.entityType === 'appointment').length,
+                    appointmentCount: pagedTransactions.filter((item) => ['appointment', 'booking_session'].includes(item.entityType)).length,
                     orderCount: pagedTransactions.filter((item) => item.entityType === 'order').length,
                     walletCount: pagedTransactions.filter((item) => item.entityType === 'wallet').length
                 }
