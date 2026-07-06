@@ -275,6 +275,26 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
                 model: db.PaymentTransaction,
                 as: 'paymentTransactions',
                 required: false
+            },
+            {
+                model: db.BookingSession,
+                as: 'bookingSession',
+                required: false,
+                include: [
+                    {
+                        model: db.Appointment,
+                        as: 'appointments',
+                        required: false,
+                        include: [
+                            { model: db.Service, as: 'service', required: false },
+                            {
+                                model: db.PaymentTransaction,
+                                as: 'paymentTransactions',
+                                required: false
+                            }
+                        ]
+                    }
+                ]
             }
         ],
         transaction

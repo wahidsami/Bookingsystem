@@ -117,6 +117,37 @@ const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations
 
 const roundMoney = (value) => parseFloat(Number(value || 0).toFixed(2));
 
+const attachCanonicalFinancialState = (appointment) => {
+    if (!appointment) {
+        return appointment;
+    }
+
+    const price = roundMoney(appointment.price || 0);
+    const totalPaid = roundMoney(appointment.totalPaid || 0);
+    const remainderAmount = roundMoney(appointment.remainderAmount || 0);
+    const paymentStatus = `${appointment.paymentStatus || ''}`.trim().toLowerCase();
+
+    let outstandingAmount = Math.max(price - totalPaid, 0);
+    if (paymentStatus === 'deposit_paid') {
+        outstandingAmount = remainderAmount > 0 ? remainderAmount : outstandingAmount;
+    }
+
+    if (paymentStatus === 'fully_paid' || paymentStatus === 'paid' || (price > 0 && totalPaid >= price - 0.009)) {
+        outstandingAmount = 0;
+    }
+
+    const normalizedOutstanding = roundMoney(outstandingAmount);
+    if (typeof appointment.setDataValue === 'function') {
+        appointment.setDataValue('outstandingAmount', normalizedOutstanding);
+        appointment.setDataValue('remainingBalance', normalizedOutstanding);
+    } else {
+        appointment.outstandingAmount = normalizedOutstanding;
+        appointment.remainingBalance = normalizedOutstanding;
+    }
+
+    return appointment;
+};
+
 const resolvePaymentAmount = (requestedAmount, fallbackAmount) => {
     const computedAmount = roundMoney(fallbackAmount);
     const numericRequestedAmount = Number(requestedAmount);
@@ -479,6 +510,8 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
                     paymentStatus: newTotalPaid + 0.01 >= roundMoney(targetAppointment.price) ? 'fully_paid' : 'deposit_paid',
                     paidAt: targetAppointment.paidAt || new Date()
                 }, { transaction });
+
+                attachCanonicalFinancialState(targetAppointment);
             }
 
             await bookingSession.update({
@@ -559,6 +592,8 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
             paidAt: appointment.paidAt || new Date()
         }, { transaction });
 
+        attachCanonicalFinancialState(appointment);
+
         const invoice = await ensureAppointmentInvoice(appointment.id, {
             transaction,
             triggerSource: 'tenant_remainder_collection'
@@ -576,6 +611,7 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
             });
         }
 
+        attachCanonicalFinancialState(updatedAppointment);
         return updatedAppointment;
     });
 };

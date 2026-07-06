@@ -42,6 +42,43 @@ const INVITE_EXPIRY_HOURS = 72;
 const TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED = process.env.TENANT_APPOINTMENT_AUDIT_LOGS === '1';
 const TENANT_APPOINTMENT_ADVANCED_DRAG_ENABLED = process.env.TENANT_APPOINTMENT_ADVANCED_DRAG !== '0';
 
+const roundMoney = (value) => Number.parseFloat(Number(value || 0).toFixed(2));
+
+function attachCanonicalFinancialState(appointment) {
+    if (!appointment) {
+        return appointment;
+    }
+
+    const price = roundMoney(appointment.price || 0);
+    const totalPaid = roundMoney(appointment.totalPaid || 0);
+    const remainderAmount = roundMoney(appointment.remainderAmount || 0);
+    const paymentStatus = `${appointment.paymentStatus || ''}`.trim().toLowerCase();
+
+    let outstandingAmount = Math.max(price - totalPaid, 0);
+    if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
+        outstandingAmount = remainderAmount > 0 ? remainderAmount : outstandingAmount;
+    }
+
+    if (
+        paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID ||
+        paymentStatus === 'paid' ||
+        (price > 0 && totalPaid >= price - 0.009)
+    ) {
+        outstandingAmount = 0;
+    }
+
+    const normalizedOutstanding = roundMoney(outstandingAmount);
+    if (typeof appointment.setDataValue === 'function') {
+        appointment.setDataValue('outstandingAmount', normalizedOutstanding);
+        appointment.setDataValue('remainingBalance', normalizedOutstanding);
+    } else {
+        appointment.outstandingAmount = normalizedOutstanding;
+        appointment.remainingBalance = normalizedOutstanding;
+    }
+
+    return appointment;
+}
+
 function logTenantAppointmentAudit(event, payload = {}) {
     if (!TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED) {
         return;
@@ -1823,6 +1860,12 @@ exports.getAppointment = async (req, res) => {
         }
 
         const responseAppointment = appointment.toJSON();
+        if (responseAppointment.bookingSession && Array.isArray(responseAppointment.bookingSession.appointments)) {
+            responseAppointment.bookingSession.appointments = responseAppointment.bookingSession.appointments.map((sessionAppointment) => (
+                attachCanonicalFinancialState(sessionAppointment)
+            ));
+        }
+        attachCanonicalFinancialState(responseAppointment);
         responseAppointment.events = Array.isArray(responseAppointment.events)
             ? responseAppointment.events
                 .slice()
@@ -2414,6 +2457,15 @@ exports.updatePaymentStatus = async (req, res) => {
                 }
             }
 
+            appointment.paymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
+            appointment.paidAt = appointment.paidAt || new Date();
+            appointment.depositPaid = true;
+            appointment.remainderPaid = true;
+            appointment.remainderAmount = 0;
+            appointment.totalPaid = roundMoney(appointment.price || appointment.totalPaid || 0);
+            appointment.paymentMethod = appointment.paymentMethod || resolvedPaymentMethod || paymentMethod || 'cash';
+            attachCanonicalFinancialState(appointment);
+
             await transaction.commit();
 
             try {
@@ -2503,6 +2555,7 @@ exports.updatePaymentStatus = async (req, res) => {
             appointment.paymentMethod = resolvedPaymentMethod;
         }
 
+        attachCanonicalFinancialState(appointment);
         await appointment.save({ transaction });
 
         await createAppointmentEventSafe({
@@ -2577,6 +2630,8 @@ exports.updatePaymentStatus = async (req, res) => {
             }
         }
 
+        attachCanonicalFinancialState(appointment);
+
         if (appointment.platformUserId && paymentDelta > 0) {
             await db.PlatformUser.increment('totalSpent', {
                 by: paymentDelta,
@@ -2590,6 +2645,8 @@ exports.updatePaymentStatus = async (req, res) => {
                 transaction
             });
         }
+
+        attachCanonicalFinancialState(appointment);
 
         await transaction.commit();
         logTenantAppointmentAudit('payment_update_committed', {
