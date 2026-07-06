@@ -1196,6 +1196,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [appliedGiftCardAmount, setAppliedGiftCardAmount] = useState<number>(0);
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [checkoutReceiptData, setCheckoutReceiptData] = useState<any | null>(null);
+  const [showPaymentConfirmModal, setShowPaymentConfirmModal] = useState<boolean>(false);
   const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<string | null>(null);
 
   const activeInvoiceLineItems = activeAppointment ? [
@@ -1748,6 +1749,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     const vat = taxableAmount * 0.15;
     const total = paymentDueAmount > 0 ? paymentDueAmount : taxableAmount + vat;
 
+    const paymentAllocationsPayload = isSplitActive
+      ? Object.entries(splitAmounts)
+          .filter(([, amount]) => Number(amount) > 0)
+          .map(([paymentMethod, amount]) => ({
+            paymentMethod:
+              paymentMethod === 'card'
+                ? 'card_pos'
+                : paymentMethod === 'bank'
+                  ? 'bank_transfer'
+                  : paymentMethod,
+            amount: Number(amount)
+          }))
+      : undefined;
+    const paymentMethodApi = paymentAllocationsPayload?.length
+      ? paymentAllocationsPayload[0].paymentMethod
+      : 'card_pos';
     let paymentMethodSummary = isRtl ? 'بوابة مدى الرقمية المتكاملة' : 'Integrated Mada Card Terminal';
     if (isSplitActive) {
       const parts = [];
@@ -1763,16 +1780,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       const paymentResponse = isRemainderPayment && paymentDueAmount > 0
         ? await tenantApiAdapter.recordRemainderPayment(activeAppointment.id, {
             amount: total,
-            paymentMethod: paymentMethodSummary,
+            paymentMethod: paymentMethodApi,
             notes: isRtl ? 'تحصيل المتبقي من داخل لوحة الموعد' : 'Collected remainder from appointment drawer',
-            paymentAllocations: isSplitActive ? Object.entries(splitAmounts)
-              .filter(([, amount]) => Number(amount) > 0)
-              .map(([paymentMethod, amount]) => ({ paymentMethod, amount: Number(amount) })) : undefined
+            paymentAllocations: paymentAllocationsPayload
           })
         : await tenantApiAdapter.updateAppointmentPaymentStatus(activeAppointment.id, {
             paymentStatus: 'fully_paid',
-            paymentMethod: paymentMethodSummary,
-            splitAmounts: isSplitActive ? splitAmounts : undefined,
+            paymentMethod: paymentMethodApi,
+            paymentAllocations: paymentAllocationsPayload,
             totalPaid: total
           });
 
@@ -1785,23 +1800,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           paymentMethod: paymentMethodSummary
         });
       }
-
-      const receipt = {
-        orderId: `REF-APT-${activeAppointment.id.substring(0, 8).toUpperCase()}`,
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        customerName: isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn,
-        serviceName: isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn,
-        servicePrice: serviceSubtotal,
-        products: [...checkoutProducts],
-        subtotal,
-        discount,
-        vat,
-        total,
-        paymentSummary: paymentMethodSummary
-      };
-
-      setCheckoutReceiptData(receipt);
-      setShowReceiptModal(true);
 
       await loadBoardData();
       setCustomerProfileRefreshToken(token => token + 1);
@@ -1826,6 +1824,23 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         await loadBoardData();
       }
       setPendingStatusAfterPayment(null);
+
+      const receipt = {
+        orderId: `REF-APT-${activeAppointment.id.substring(0, 8).toUpperCase()}`,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        customerName: isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn,
+        serviceName: isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn,
+        servicePrice: serviceSubtotal,
+        products: [...checkoutProducts],
+        subtotal,
+        discount,
+        vat,
+        total,
+        paymentSummary: paymentMethodSummary
+      };
+
+      setCheckoutReceiptData(receipt);
+      setShowReceiptModal(true);
       
       addLocalToast(
         'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',
@@ -4632,7 +4647,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         </div>
                       ) : (
                         <button
-                          onClick={handleCheckoutPayment}
+                          onClick={() => setShowPaymentConfirmModal(true)}
                           className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <CheckCircle2 size={15} className="text-amber-400" />
@@ -5518,6 +5533,58 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                   className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600 cursor-pointer"
                 >
                   Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showPaymentConfirmModal && (
+          <div className="fixed inset-0 z-[155] flex items-center justify-center px-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-zinc-950/45 backdrop-blur-sm"
+              onClick={() => setShowPaymentConfirmModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 220 }}
+              className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl p-5"
+            >
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-600">
+                {isRtl ? 'تأكيد التحصيل' : 'Confirm Payment'}
+              </p>
+              <h3 className="mt-2 text-sm font-black text-slate-900">
+                {isRtl ? 'هل تريد إتمام الدفع الآن؟' : 'Do you want to collect payment now?'}
+              </h3>
+              <p className="mt-2 text-xs leading-6 text-slate-600">
+                {isRtl
+                  ? 'سيتم إرسال عملية الدفع إلى الخادم أولاً، ثم تظهر الفاتورة بعد نجاح الحفظ.'
+                  : 'The payment will be sent to the backend first. The receipt appears only after persistence succeeds.'}
+              </p>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentConfirmModal(false)}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPaymentConfirmModal(false);
+                    void handleCheckoutPayment();
+                  }}
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800"
+                >
+                  {isRtl ? 'تأكيد الدفع' : 'Confirm Payment'}
                 </button>
               </div>
             </motion.div>
