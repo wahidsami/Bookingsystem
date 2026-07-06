@@ -345,7 +345,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       internalNotes: a.internalNotes || '',
       type: 'appointment',
       serviceCategory: a.service?.category || a.serviceCategory || 'hair',
-      date: a.date || dateKey
+      date: getLocalDateKey(a.startTime || a.date || dateKey)
     };
   };
 
@@ -772,7 +772,92 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const customerNoteHistory = Array.isArray(customerProfile?.notes) ? customerProfile.notes : [];
   const customerAppointmentHistoryRows = [...customerAppointmentHistory]
     .sort((a: any, b: any) => getHistoryTimestamp(b) - getHistoryTimestamp(a));
-  const customerAppointmentHistoryCards = customerAppointmentHistoryRows.filter((item: any) => {
+  const customerAppointmentHistoryCards = (() => {
+    const groups = new Map<string, any[]>();
+    const standalone: any[] = [];
+
+    customerAppointmentHistoryRows.forEach((item: any) => {
+      const groupingKey = `${item?.bookingSessionId || item?.bookingReference || item?.details?.bookingSessionId || item?.details?.bookingReference || item?.id || ''}`.trim();
+      if (!groupingKey) {
+        standalone.push(item);
+        return;
+      }
+
+      const bucket = groups.get(groupingKey) || [];
+      bucket.push(item);
+      groups.set(groupingKey, bucket);
+    });
+
+    const aggregateGroup = (group: any[]) => {
+      if (group.length === 1) {
+        return group[0];
+      }
+
+      const primary = group[0];
+      const serviceEntries = group.flatMap((entry) => {
+        if (Array.isArray(entry?.details?.services) && entry.details.services.length > 0) {
+          return entry.details.services;
+        }
+        if (entry?.details?.service) {
+          return [entry.details.service];
+        }
+        if (entry?.service) {
+          return [entry.service];
+        }
+        return [];
+      });
+      const uniqueServices = serviceEntries.filter((entry, index, arr) => {
+        const entryKey = `${entry?.id || entry?.serviceId || entry?.name_en || entry?.name_ar || entry?.name || index}`;
+        return arr.findIndex((candidate) => `${candidate?.id || candidate?.serviceId || candidate?.name_en || candidate?.name_ar || candidate?.name || ''}` === entryKey) === index;
+      });
+      const serviceNameEn = uniqueServices.map((entry: any) => entry?.name_en || entry?.nameEn || entry?.name || '').filter(Boolean);
+      const serviceNameAr = uniqueServices.map((entry: any) => entry?.name_ar || entry?.nameAr || entry?.name || '').filter(Boolean);
+      const staffNames = Array.from(new Set(group.map((entry) => entry?.details?.staff?.name || entry?.staff?.name || entry?.staffName || entry?.employee?.name).filter(Boolean)));
+      const totalDuration = group.reduce((sum, entry) => sum + Number(entry?.details?.duration || entry?.duration || 0), 0);
+      const totalPaid = group.reduce((sum, entry) => sum + Number(entry?.paidAmount ?? entry?.amount ?? entry?.totalPaid ?? entry?.totalAmount ?? 0), 0);
+      const service = uniqueServices[0] || primary?.details?.service || primary?.service || null;
+
+      return {
+        ...primary,
+        id: primary.id,
+        bookingSessionId: primary.bookingSessionId || primary?.details?.bookingSessionId || undefined,
+        bookingReference: primary.bookingReference || primary?.details?.bookingReference || undefined,
+        details: {
+          ...(primary.details || {}),
+          service,
+          services: uniqueServices,
+          staff: primary?.details?.staff || primary?.staff || null,
+          startTime: primary?.details?.startTime || primary?.date || null,
+          duration: totalDuration || primary?.details?.duration || primary?.duration || 0,
+          branch: primary?.details?.branch || primary?.branch || null,
+          notes: group.map((entry) => entry?.details?.notes || entry?.notes).filter(Boolean).join(' | ') || primary?.details?.notes || primary?.notes || ''
+        },
+        serviceNameEn: serviceNameEn.length > 0 ? serviceNameEn.join(' + ') : primary?.serviceNameEn || primary?.title || '',
+        serviceNameAr: serviceNameAr.length > 0 ? serviceNameAr.join(' + ') : primary?.serviceNameAr || primary?.title || '',
+        assignedStaffName: staffNames.length > 0 ? staffNames.join(' + ') : primary?.assignedStaffName || primary?.staffName || '',
+        duration: totalDuration || primary?.duration || 0,
+        price: group.reduce((sum, entry) => sum + Number(entry?.amount ?? entry?.paidAmount ?? entry?.totalPaid ?? entry?.totalAmount ?? 0), 0) || primary?.price || 0,
+        paidAmount: totalPaid || primary?.paidAmount || primary?.amount || 0,
+        amount: totalPaid || primary?.amount || primary?.paidAmount || 0,
+        paymentStatus: group.some((entry) => ['cancelled', 'canceled'].includes(getHistoryStatus(entry)))
+          ? 'cancelled'
+          : group.some((entry) => ['no-show', 'noshow', 'no_show'].includes(getHistoryStatus(entry)))
+            ? 'no_show'
+            : group.every((entry) => ['completed', 'done', 'served'].includes(getHistoryStatus(entry)))
+              ? 'completed'
+              : primary?.status || 'completed',
+        normalizedPaymentStatus: group.some((entry) => ['paid', 'fully_paid', 'deposit_paid'].includes(`${entry?.normalizedPaymentStatus || entry?.paymentStatus || ''}`.toLowerCase()))
+          ? (group.some((entry) => ['deposit_paid', 'partial', 'partially_paid'].includes(`${entry?.normalizedPaymentStatus || entry?.paymentStatus || ''}`.toLowerCase())) ? 'partial' : 'paid')
+          : primary?.normalizedPaymentStatus || primary?.paymentStatus || 'paid'
+      };
+    };
+
+    return [
+      ...standalone,
+      ...Array.from(groups.values()).map((group) => aggregateGroup(group))
+    ].sort((a: any, b: any) => getHistoryTimestamp(b) - getHistoryTimestamp(a));
+  })();
+  const customerAppointmentHistoryCardsFiltered = customerAppointmentHistoryCards.filter((item: any) => {
     const rawStatus = getHistoryStatus(item);
     const appointmentStart = getHistoryTimestamp(item);
     const isFuture = Number.isFinite(appointmentStart) && appointmentStart > Date.now();
@@ -1243,18 +1328,56 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [showPaymentConfirmModal, setShowPaymentConfirmModal] = useState<boolean>(false);
   const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<string | null>(null);
 
+  const activeInvoiceServiceItems = activeAppointment ? (
+    activeAppointmentServiceSources.length > 0
+      ? activeAppointmentServiceSources.map((item: any, index: number) => {
+          const serviceNameEn = item?.service?.name_en
+            || item?.service?.nameEn
+            || item?.service?.name
+            || item?.serviceNameEn
+            || item?.serviceName
+            || item?.nameEn
+            || item?.name
+            || item?.title
+            || activeServiceSummary.nameEn
+            || 'Service';
+          const serviceNameAr = item?.service?.name_ar
+            || item?.service?.nameAr
+            || item?.service?.name
+            || item?.serviceNameAr
+            || item?.serviceName
+            || item?.nameAr
+            || item?.name
+            || item?.title
+            || activeServiceSummary.nameAr
+            || 'الخدمة';
+          const servicePrice = Number(item?.price || item?.service?.price || item?.subtotal || 0);
+          return {
+            id: item?.id || item?.serviceId || `svc-${activeAppointment.id}-${index}`,
+            nameEn: serviceNameEn,
+            nameAr: serviceNameAr,
+            stylistEn: item?.staff?.name || item?.staffName || activeAppointment.assignedStaffName || activeStylist?.nameEn || '',
+            stylistAr: item?.staff?.name || item?.staffName || activeAppointment.assignedStaffName || activeStylist?.nameAr || '',
+            quantity: 1,
+            unitPrice: servicePrice,
+            subtotal: servicePrice,
+            type: 'service'
+          };
+        })
+      : [{
+          id: `svc-${activeAppointment.id}`,
+          nameEn: activeServiceSummary.nameEn,
+          nameAr: activeServiceSummary.nameAr,
+          stylistEn: activeAppointment.assignedStaffName || activeStylist?.nameEn || '',
+          stylistAr: activeAppointment.assignedStaffName || activeStylist?.nameAr || '',
+          quantity: 1,
+          unitPrice: Number(activeServiceSummary.price || 0),
+          subtotal: Number(activeServiceSummary.price || 0),
+          type: 'service'
+        }]
+  ) : [];
   const activeInvoiceLineItems = activeAppointment ? [
-    {
-      id: `svc-${activeAppointment.id}`,
-      nameEn: activeServiceSummary.nameEn,
-      nameAr: activeServiceSummary.nameAr,
-      stylistEn: activeAppointment.assignedStaffName || activeStylist?.nameEn || '',
-      stylistAr: activeAppointment.assignedStaffName || activeStylist?.nameAr || '',
-      quantity: 1,
-      unitPrice: Number(activeServiceSummary.price || 0),
-      subtotal: Number(activeServiceSummary.price || 0),
-      type: 'service'
-    },
+    ...activeInvoiceServiceItems,
     ...checkoutProducts.map((product) => ({
       id: `prd-${product.id}`,
       nameEn: product.nameEn,
@@ -5087,12 +5210,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                         </div>
                                       </div>
                                       <div className="space-y-2">
-                                        {customerAppointmentHistoryCards.length === 0 ? (
+                                        {customerAppointmentHistoryCardsFiltered.length === 0 ? (
                                           <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
                                             {isRtl ? 'لا توجد حجوزات تطابق هذا الفلتر.' : 'No appointments match the selected filter.'}
                                           </div>
                                         ) : (
-                                          customerAppointmentHistoryCards.map((item: any) => {
+                                          customerAppointmentHistoryCardsFiltered.map((item: any) => {
                                             const serviceName = item?.details?.service?.name_en
                                               || item?.details?.service?.nameEn
                                               || item?.details?.service?.name
