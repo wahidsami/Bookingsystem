@@ -121,6 +121,21 @@ const toMoney = (value: any) => {
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
+const getLocalDateKey = (value: Date) => {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseLocalDateKey = (dateKey: string) => {
+  const [year, month, day] = `${dateKey || ''}`.split('-').map((value) => Number.parseInt(value || '0', 10));
+  if (!year || !month || !day) {
+    return new Date();
+  }
+  return new Date(year, month - 1, day);
+};
+
 export default function AppointmentWorkspace({ lang, onQuickAction }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
   
@@ -445,7 +460,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const loadBoardData = async () => {
     setIsLoading(true);
     try {
-      const dateStr = selectedDate.toLocaleDateString('en-CA');
+      const dateStr = getSelectedDateKey();
       const res = await tenantApiAdapter.getAppointmentsBoard(dateStr, {
         staffId: selectedStylistFilter === 'all' ? undefined : selectedStylistFilter,
         status: statusFilter === 'all' ? undefined : statusFilter,
@@ -469,7 +484,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     }
   };
 
-  const getSelectedDateKey = () => selectedDate.toISOString().split('T')[0];
+  const getSelectedDateKey = () => getLocalDateKey(selectedDate);
   const buildIsoFromMinutes = (dateKey: string, minutesFromNine: number) => {
     const safeMinutes = Math.max(0, Math.round(minutesFromNine));
     const base = new Date(`${dateKey}T00:00:00`);
@@ -1568,7 +1583,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     try {
       const response = await tenantApiAdapter.getAppointment(apt.id);
       const detail = response?.appointment || response?.data?.appointment || response?.data || response;
-      setActiveAppointment(detail?.id ? mapBoardAppointment(detail, apt.date || selectedDate.toISOString().split('T')[0]) : apt);
+      setActiveAppointment(detail?.id ? mapBoardAppointment(detail, apt.date || getSelectedDateKey()) : apt);
     } catch (err) {
       console.warn('Failed to load appointment detail, falling back to board row', err);
       setActiveAppointment(apt);
@@ -1593,7 +1608,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       return;
     }
 
-    const historyDate = historyItem?.date || historyItem?.details?.startTime || selectedDate.toISOString().split('T')[0];
+    const historyDate = historyItem?.date || historyItem?.details?.startTime || getSelectedDateKey();
     const fallbackAppointment = mapBoardAppointment({
       id: historyItem.id,
       customerId: activeAppointment?.customerId,
@@ -1741,7 +1756,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         const refreshedAppointment = await tenantApiAdapter.getAppointment(confirmedAppointmentId);
         const confirmedData = refreshedAppointment?.appointment || refreshedAppointment?.data?.appointment || refreshedAppointment?.data || refreshedAppointment;
         if (confirmedData) {
-          setActiveAppointment(mapBoardAppointment(confirmedData, selectedDate.toISOString().split('T')[0]));
+          setActiveAppointment(mapBoardAppointment(confirmedData, getSelectedDateKey()));
         }
       }
       if (pendingStatusAfterPayment) {
@@ -1752,7 +1767,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         const refreshedStatus = await tenantApiAdapter.getAppointment(activeAppointment.id);
         const statusData = refreshedStatus?.appointment || refreshedStatus?.data?.appointment || refreshedStatus?.data || refreshedStatus;
         if (statusData) {
-          setActiveAppointment(mapBoardAppointment(statusData, selectedDate.toISOString().split('T')[0]));
+          setActiveAppointment(mapBoardAppointment(statusData, getSelectedDateKey()));
         }
         await loadBoardData();
       }
@@ -1837,7 +1852,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       const refreshed = await tenantApiAdapter.getAppointment(activeAppointment.id);
       const refreshedData = refreshed?.appointment || refreshed?.data?.appointment || refreshed?.data || refreshed;
       if (refreshedData) {
-        setActiveAppointment(mapBoardAppointment(refreshedData, selectedDate.toISOString().split('T')[0]));
+        setActiveAppointment(mapBoardAppointment(refreshedData, getSelectedDateKey()));
       }
       setCustomerProfileRefreshToken(token => token + 1);
       addLocalToast(
@@ -2294,7 +2309,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     for (let i = 0; i < 4; i++) {
       const d = new Date(baseDate);
       d.setDate(baseDate.getDate() + i);
-      list.push(d.toISOString().split('T')[0]);
+      list.push(getLocalDateKey(d));
     }
     return list;
   };
@@ -2316,13 +2331,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     let matchesDate = false;
     
     if (viewMode === 'day') {
-      matchesDate = dateStr === selectedDate.toISOString().split('T')[0];
+      matchesDate = dateStr === getSelectedDateKey();
     } else if (viewMode === 'week') {
       const activeBlock = getDaysOfActiveBlock(selectedDate);
       matchesDate = activeBlock.includes(dateStr);
     } else {
       // Agenda view shows all appointments starting from selected date
-      const targetDateStr = selectedDate.toISOString().split('T')[0];
+      const targetDateStr = getSelectedDateKey();
       matchesDate = dateStr >= targetDateStr;
     }
 
@@ -2371,7 +2386,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
               <CalendarIcon size={13} className="mr-1.5 ml-1.5 text-slate-500" />
               <input 
                 type="date" 
-                value={selectedDate.toISOString().split('T')[0]} 
+                value={getSelectedDateKey()} 
                 onChange={(e) => {
                   const parts = e.target.value.split('-');
                   if (parts.length === 3) {
@@ -2962,10 +2977,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       /* Date columns headers (Week View) */
                       <div className="col-span-10 grid grid-cols-4 h-full relative">
                         {getDaysOfActiveBlock(selectedDate).map((dayStr, idx) => {
-                          const d = new Date(dayStr);
+                          const d = parseLocalDateKey(dayStr);
                           const dayName = d.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
                           const dateFormatted = d.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
-                          const isTodayStr = new Date().toISOString().split('T')[0] === dayStr;
+                          const isTodayStr = getLocalDateKey(new Date()) === dayStr;
                           
                           return (
                             <div 
@@ -3189,7 +3204,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                               onMouseLeave={() => setHoveredSlot(null)}
                               onClick={() => {
                                 if (hoveredSlot) {
-                                  const d = new Date(dayStr);
+                                  const d = parseLocalDateKey(dayStr);
                                   setSelectedDate(d);
                                   setCurrentStartTime(hoveredSlot.timeInMinutes);
                                   setCurrentStaffId('st-1'); // default to first stylist
@@ -5239,7 +5254,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       }
                       const linkedAppointment = {
                         id: customerTransactionDetail.appointmentIdLinked,
-                        date: customerTransactionDetail.date || selectedDate.toISOString().split('T')[0],
+                        date: customerTransactionDetail.date || getSelectedDateKey(),
                         details: {
                           service: customerTransactionDetail?.appointment?.service || customerTransactionDetail?.details?.service || null,
                           staff: customerTransactionDetail?.appointment?.staff || customerTransactionDetail?.details?.staff || null,
