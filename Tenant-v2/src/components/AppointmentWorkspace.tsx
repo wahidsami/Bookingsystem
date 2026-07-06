@@ -136,6 +136,20 @@ const parseLocalDateKey = (dateKey: string) => {
   return new Date(year, month - 1, day);
 };
 
+const getRiyadhDateKey = (value: Date) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Riyadh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(value);
+
+  const year = parts.find((part) => part.type === 'year')?.value || '0000';
+  const month = parts.find((part) => part.type === 'month')?.value || '00';
+  const day = parts.find((part) => part.type === 'day')?.value || '00';
+  return `${year}-${month}-${day}`;
+};
+
 export default function AppointmentWorkspace({ lang, onQuickAction }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
   
@@ -484,7 +498,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     }
   };
 
-  const getSelectedDateKey = () => getLocalDateKey(selectedDate);
+  const getSelectedDateKey = () => selectedDateKey;
   const buildIsoFromMinutes = (dateKey: string, minutesFromNine: number) => {
     const safeMinutes = Math.max(0, Math.round(minutesFromNine));
     const base = new Date(`${dateKey}T00:00:00`);
@@ -523,6 +537,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [customerTransactionsExpanded, setCustomerTransactionsExpanded] = useState(false);
   const [customerTransactionDetail, setCustomerTransactionDetail] = useState<any | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const selectedDateKey = getLocalDateKey(selectedDate);
+  const riyadhTodayKey = getRiyadhDateKey(new Date());
+  const isBoardEditable = selectedDateKey >= riyadhTodayKey;
 
   const activeAppointmentServiceSources = Array.isArray(activeAppointment?.bookingSession?.appointments) && activeAppointment.bookingSession.appointments.length > 0
     ? activeAppointment.bookingSession.appointments
@@ -1501,6 +1518,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
   // Context Menu Helpers
   const handleContextMenu = (e: React.MouseEvent, staffId: string, timeInMinutes: number, appointmentId?: string) => {
+    if (!isBoardEditable) {
+      return;
+    }
     e.preventDefault();
     setContextMenu({
       visible: true,
@@ -1520,6 +1540,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
   // Quick action from Context Menu
   const triggerContextAction = (actionType: 'new' | 'block' | 'shift' | 'break' | 'paste' | 'refresh' | 'giftcards' | 'products') => {
+    const isMutationAction = ['new', 'block', 'shift', 'break', 'paste', 'giftcards', 'products'].includes(actionType);
+    if (!isBoardEditable && isMutationAction) {
+      addLocalToast(
+        isRtl ? 'هذا اليوم للعرض فقط' : 'This date is read-only',
+        isRtl ? 'لا يمكن إضافة أو تعديل الحجوزات في الأيام السابقة.' : 'You cannot create or modify bookings on past dates.',
+        'warning'
+      );
+      setContextMenu(null);
+      return;
+    }
+
     if (actionType === 'new') {
       if (contextMenu) {
         setCurrentStaffId(contextMenu.staffId);
@@ -1593,7 +1624,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     setCheckoutProducts([]);
     setAppliedGiftCardCode('');
     setAppliedGiftCardAmount(0);
-    setAppointmentDetailsReadOnly(Boolean(options.readOnly));
+    setAppointmentDetailsReadOnly(Boolean(options.readOnly) || !isBoardEditable);
     setIsCustomerProfileOpen(false);
     setCustomerTransactionsExpanded(false);
     setCustomerTransactionDetail(null);
@@ -2445,6 +2476,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             {/* Add Appointment Global Trigger */}
             <button 
               onClick={() => {
+                if (!isBoardEditable) {
+                  return;
+                }
                 setCreateMode('appointment');
                 setCreateStep(1);
                 setStagedServices([]);
@@ -2459,6 +2493,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             {/* POS Cart Counter Trigger */}
             <button 
               onClick={() => {
+                if (!isBoardEditable) {
+                  return;
+                }
                 setIsCartDrawerOpen(true);
                 setCompletedOrder(null);
               }}
@@ -3114,12 +3151,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                               }}
                               onMouseLeave={() => setHoveredSlot(null)}
                               onContextMenu={(e) => {
-                                if (hoveredSlot) {
+                                if (hoveredSlot && isBoardEditable) {
                                   handleContextMenu(e, stylist.id, hoveredSlot.timeInMinutes);
                                 }
                               }}
                               onClick={() => {
-                                if (hoveredSlot) {
+                                if (hoveredSlot && isBoardEditable) {
                                   setCurrentStaffId(hoveredSlot.staffId);
                                   setCurrentStartTime(hoveredSlot.timeInMinutes);
                                   setCreateMode('appointment');
@@ -3129,6 +3166,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 }
                               }}
                               onDragOver={(e) => {
+                                if (!isBoardEditable) {
+                                  return;
+                                }
                                 e.preventDefault();
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 const relativeY = e.clientY - rect.top;
@@ -3138,6 +3178,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 setDragOverTime(stepMins);
                               }}
                               onDrop={(e) => {
+                                if (!isBoardEditable) {
+                                  return;
+                                }
                                 e.preventDefault();
                                 const aptId = e.dataTransfer.getData('text/plain');
                                 if (aptId && dragOverStaffId && dragOverTime !== null) {
@@ -3203,7 +3246,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                               }}
                               onMouseLeave={() => setHoveredSlot(null)}
                               onClick={() => {
-                                if (hoveredSlot) {
+                                if (hoveredSlot && isBoardEditable) {
                                   const d = parseLocalDateKey(dayStr);
                                   setSelectedDate(d);
                                   setCurrentStartTime(hoveredSlot.timeInMinutes);
@@ -3310,9 +3353,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         return (
                           <div
                             key={apt.id}
-                            draggable={viewMode === 'day'}
+                            draggable={viewMode === 'day' && isBoardEditable}
                             onDragStart={(e) => {
-                              if (viewMode !== 'day') return;
+                              if (viewMode !== 'day' || !isBoardEditable) return;
                               e.dataTransfer.setData('text/plain', apt.id);
                               setDraggedAptId(apt.id);
                             }}
@@ -3333,15 +3376,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              openAppointmentDetails(apt);
+                              openAppointmentDetails(apt, { readOnly: !isBoardEditable });
                             }}
                             onMouseDown={(e) => {
-                              if (viewMode === 'day') {
+                              if (viewMode === 'day' && isBoardEditable) {
                                 handleMouseDown(e, apt.id, false);
                               }
                             }}
                             onContextMenu={(e) => {
-                              if (viewMode === 'day') {
+                              if (viewMode === 'day' && isBoardEditable) {
                                 handleContextMenu(e, apt.staffId, apt.startTime, apt.id);
                               }
                             }}
