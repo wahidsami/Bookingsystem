@@ -1444,12 +1444,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     return (duration / 60) * SLOT_HEIGHT;
   };
 
-  const getVisualStaffIndex = (staffId: string) => {
+  const TOTAL_STAFF_LANES = 4;
+
+  const getStaffLaneIndex = (staffId: string) => {
     const logicalIndex = liveStylists.findIndex((stylist) => stylist.id === staffId);
     if (logicalIndex === -1) {
       return -1;
     }
-    return isRtl ? (liveStylists.length - 1 - logicalIndex) : logicalIndex;
+    return isRtl ? (TOTAL_STAFF_LANES - 1 - logicalIndex) : logicalIndex;
   };
 
   const formatMinutesToTime = (totalMins: number) => {
@@ -3291,9 +3293,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       {/* GHOST PREVIEW OF DRAGGED APPOINTMENT (Only in Day View) */}
                       {viewMode === 'day' && draggedApt && dragOverStaffId && dragOverTime !== null && (
                         (() => {
-                          const sIdx = getVisualStaffIndex(dragOverStaffId);
+                          const sIdx = getStaffLaneIndex(dragOverStaffId);
                           if (sIdx === -1) return null;
-                          const leftPct = (sIdx / liveStylists.length) * 100;
+                          const leftPct = (sIdx / TOTAL_STAFF_LANES) * 100;
                           const topPos = minutesToTop(dragOverTime);
                           const hPos = minutesToHeight(draggedApt.duration);
                           return (
@@ -3324,9 +3326,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         let leftPercent = 0;
                         
                         if (viewMode === 'day') {
-                          const staffIdx = getVisualStaffIndex(apt.staffId);
+                          const staffIdx = getStaffLaneIndex(apt.staffId);
                           if (staffIdx === -1) return null;
-                          leftPercent = (staffIdx / liveStylists.length) * 100;
+                          leftPercent = (staffIdx / TOTAL_STAFF_LANES) * 100;
                         } else {
                           const activeBlock = getDaysOfActiveBlock(selectedDate);
                           const dayIdx = activeBlock.indexOf(apt.date || getSelectedDateKey());
