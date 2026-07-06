@@ -6,17 +6,32 @@ import {
 } from 'lucide-react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
-const FALLBACK_STYLISTS = [
-  { id: 'st-1', nameAr: 'نادين الحربي', nameEn: 'Nadeen Al-Harbi', roleAr: 'خبير صبغات وتصفيف', roleEn: 'Colorist & Master Stylist' },
-  { id: 'st-2', nameAr: 'ليلى سيف', nameEn: 'Layla Saif', roleAr: 'أخصائية العناية بالبشرة', roleEn: 'Skincare Specialist' },
-  { id: 'st-3', nameAr: 'إيلينا كوزلوفا', nameEn: 'Elena Kozlova', roleAr: 'خبير المساج والاستجمام', roleEn: 'Massage & Spa therapist' },
-  { id: 'st-4', nameAr: 'منى الراجحي', nameEn: 'Mona Al-Rajhi', roleAr: 'أخصائي العناية بالأظافر', roleEn: 'Nail Artist' },
-];
-
 const toMoney = (value: any) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
 };
+
+const getLocalDateKey = (value: Date) => {
+  const year = value.getFullYear();
+  const month = `${value.getMonth() + 1}`.padStart(2, '0');
+  const day = `${value.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const createEmptyGuestService = () => ({
+  id: `gs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  serviceId: '',
+  serviceName: '',
+  category: '',
+  duration: 0,
+  staffId: '',
+  startTime: 540,
+  basePrice: 0,
+  discountType: 'none',
+  discountValue: 0,
+  finalPrice: 0,
+  isFree: false,
+});
 
 interface InteractiveDrawersProps {
   isRtl: boolean;
@@ -133,11 +148,11 @@ export default function InteractiveDrawers({
     }
   }, [isCartDrawerOpen, initialCartTab]);
 
-  const availableStylists = stylists.length > 0 ? stylists : FALLBACK_STYLISTS;
+  const availableStylists = stylists;
 
   // Step 1: Customer Info
   const [custMode, setCustMode] = useState<'existing' | 'new' | 'walkin'>('existing');
-  const [selectedCustId, setSelectedCustId] = useState<string>('CUST-001');
+  const [selectedCustId, setSelectedCustId] = useState<string>('');
   const [newCustName, setNewCustName] = useState('');
   const [newCustPhone, setNewCustPhone] = useState('');
   const [newCustEmail, setNewCustEmail] = useState('');
@@ -164,22 +179,7 @@ export default function InteractiveDrawers({
       birthDate: '',
       notes: '', 
       isFree: false, 
-      services: [
-        {
-          id: 'gs-1-1',
-          serviceId: 'SRV-001',
-          serviceName: 'Royal Swedish Massage with Aromatherapy',
-          category: 'Massage & Therapy',
-          duration: 90,
-          staffId: availableStylists[0]?.id || 'st-1',
-          startTime: 540,
-          basePrice: 450,
-          discountType: 'none',
-          discountValue: 0,
-          finalPrice: 450,
-          isFree: false
-        }
-      ] 
+      services: [createEmptyGuestService()] 
     }
   ]);
 
@@ -198,22 +198,7 @@ export default function InteractiveDrawers({
               birthDate: '',
               notes: '',
               isFree: false,
-              services: [
-                {
-                  id: `gs-${Date.now()}-${i}-0`,
-                  serviceId: 'SRV-001',
-                  serviceName: 'Royal Swedish Massage with Aromatherapy',
-                  category: 'Massage & Therapy',
-                  duration: 90,
-                  staffId: availableStylists[0]?.id || 'st-1',
-                  startTime: 540,
-                  basePrice: 450,
-                  discountType: 'none',
-                  discountValue: 0,
-                  finalPrice: 450,
-                  isFree: false
-                }
-              ]
+              services: [createEmptyGuestService()]
             });
           }
         } else if (next.length > guestCount) {
@@ -222,27 +207,55 @@ export default function InteractiveDrawers({
         return next;
       });
     }
-  }, [guestCount, availableStylists]);
+  }, [guestCount]);
+
+  useEffect(() => {
+    if (services.length === 0) return;
+    const primaryService = services[0];
+    const primaryStaff = availableStylists[0];
+    setGuestsList(prev => prev.map((guest) => ({
+      ...guest,
+      services: (guest.services || []).map((service) => {
+        const resolvedService = service.serviceId ? services.find((srv) => srv.id === service.serviceId) : null;
+        const resolvedStaff = service.staffId ? availableStylists.find((staff) => staff.id === service.staffId) : null;
+        const nextService = resolvedService || primaryService;
+        const nextStaffId = resolvedStaff?.id || primaryStaff?.id || '';
+        const nextBasePrice = toMoney(nextService?.price);
+        return {
+          ...service,
+          serviceId: nextService?.id || '',
+          serviceName: isRtl ? (nextService?.nameAr || '') : (nextService?.nameEn || ''),
+          category: nextService?.categoryEn || nextService?.categoryAr || '',
+          duration: nextService?.duration || service.duration,
+          staffId: nextStaffId,
+          basePrice: nextBasePrice,
+          finalPrice: service.isFree || guest.isFree ? 0 : nextBasePrice,
+        };
+      }),
+    })));
+  }, [services, availableStylists, isRtl]);
 
   const addGuestService = (guestId: string) => {
     setGuestsList(prev => prev.map(g => {
       if (g.id === guestId) {
-        const services = g.services || [];
+        const guestServices = g.services || [];
+        const catalogService = services[0];
+        const catalogStylist = availableStylists[0];
         const newService: GuestService = {
-          id: `gs-${Date.now()}-${services.length}`,
-          serviceId: 'SRV-001',
-          serviceName: 'Royal Swedish Massage with Aromatherapy',
-          category: 'Massage & Therapy',
-          duration: 90,
-          staffId: availableStylists[0]?.id || 'st-1',
+          id: `gs-${Date.now()}-${guestServices.length}`,
+          serviceId: catalogService?.id || '',
+          serviceName: isRtl ? (catalogService?.nameAr || '') : (catalogService?.nameEn || ''),
+          category: catalogService?.categoryEn || catalogService?.categoryAr || '',
+          duration: catalogService?.duration || 0,
+          staffId: catalogStylist?.id || '',
           startTime: 540,
-          basePrice: 450,
+          basePrice: toMoney(catalogService?.price),
           discountType: 'none',
           discountValue: 0,
-          finalPrice: 450,
+          finalPrice: toMoney(catalogService?.price),
           isFree: false
         };
-        return { ...g, services: [...services, newService] };
+        return { ...g, services: [...guestServices, newService] };
       }
       return g;
     }));
@@ -294,7 +307,7 @@ export default function InteractiveDrawers({
   };
 
   // Step 2: Service Queue Staging
-  const [currentServiceId, setCurrentServiceId] = useState<string>('SRV-001');
+  const [currentServiceId, setCurrentServiceId] = useState<string>('');
   const [currentDuration, setCurrentDuration] = useState<number>(60);
   const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
   const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
@@ -336,7 +349,7 @@ export default function InteractiveDrawers({
   // Blocked shift breaks
   const [blockTitleAr, setBlockTitleAr] = useState('استراحة قهوة الموظفين');
   const [blockTitleEn, setBlockTitleEn] = useState('Staff Espresso Recess');
-  const [blockStaffId, setBlockStaffId] = useState('st-1');
+  const [blockStaffId, setBlockStaffId] = useState('');
   const [blockStartTime, setBlockStartTime] = useState<number>(180); // 12:00 PM
   const [blockDuration, setBlockDuration] = useState<number>(45);
   const [blockType, setBlockType] = useState<'Break' | 'Lunch' | 'Meeting'>('Break');
@@ -347,9 +360,9 @@ export default function InteractiveDrawers({
   const [gcSender, setGcSender] = useState('');
   const [gcRecipient, setGcRecipient] = useState('');
   const [gcValue, setGcValue] = useState<number>(500);
-  const [generatedGcCode, setGeneratedGcCode] = useState('REF-GFT-2026-9844');
+  const [generatedGcCode, setGeneratedGcCode] = useState(() => `REF-GFT-2026-${Math.floor(1000 + Math.random() * 9000)}`);
   const [posCustMode, setPosCustMode] = useState<'walkin' | 'existing'>('walkin');
-  const [posSelectedCustId, setPosSelectedCustId] = useState('CUST-001');
+  const [posSelectedCustId, setPosSelectedCustId] = useState('');
   const [posSplitActive, setPosSplitActive] = useState(false);
   const [posSplitAmounts, setPosSplitAmounts] = useState({ card: 0, cash: 0, wallet: 0 });
 
@@ -357,7 +370,7 @@ export default function InteractiveDrawers({
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
 
   const buildIsoFromMinutes = (date: Date, minutesFromNine: number) => {
-    const dateKey = date.toISOString().split('T')[0];
+    const dateKey = getLocalDateKey(date);
     const safeMinutes = Math.max(0, Math.round(minutesFromNine));
     const next = new Date(`${dateKey}T00:00:00`);
     next.setHours(9 + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
@@ -439,7 +452,7 @@ export default function InteractiveDrawers({
         custPhone = existing.phone;
         custEmail = existing.email || '';
         loyalty = existing.appointmentsCount > 10 ? 'VIP Gold' : 'Loyal Club';
-        balance = 300;
+        balance = Number(existing.walletBalance || existing.balance || 0);
       }
     } else if (custMode === 'new') {
       if (!newCustName || !newCustPhone) {
@@ -455,7 +468,7 @@ export default function InteractiveDrawers({
     } else {
       custNameEn = includeGroupGuests ? `Group Guest (${guestCount} pax)` : 'Walk-in Guest';
       custNameAr = includeGroupGuests ? `حجز مجموعة زوار (${guestCount} أشخاص)` : 'زائرة زائرة';
-      custPhone = '+966 50 000 0000';
+      custPhone = '';
       loyalty = 'Guest Account';
     }
 
@@ -589,7 +602,7 @@ export default function InteractiveDrawers({
       setSessionNotes('');
       setGiftCardCodeInput('');
       setCreateSplitActive(false);
-      setGuestsList([{ id: 'g-1', name: '', phone: '', services: [{ id: 'gs-1-1', serviceId: 'SRV-001', serviceName: 'Premium Manicure & Pedicure', serviceNameAr: 'باديكير ومانيكير فاخر', price: 150, discountType: 'none', discountValue: 0, finalPrice: 150, isFree: false, staffId: 'STF-001' }], notes: '', isFree: false }]);
+      setGuestsList([{ id: 'g-1', name: '', phone: '', services: [createEmptyGuestService()], notes: '', isFree: false }]);
       setIncludeGroupGuests(false);
       setGuestCount(1);
       if (onBoardChanged) {
@@ -613,13 +626,13 @@ export default function InteractiveDrawers({
   const handleConfirmBlockCreation = async () => {
     try {
       const response = await tenantApiAdapter.createEmployeeBreak(blockStaffId, {
-        specificDate: selectedDate.toISOString().split('T')[0],
+        specificDate: getLocalDateKey(selectedDate),
         startTime: buildClockTime(blockStartTime),
         endTime: buildClockTime(blockStartTime + blockDuration),
         type: (blockType === 'Meeting' ? 'other' : blockType.toLowerCase() as any),
         label: blockTitleEn,
         isRecurring: false,
-        referenceDate: selectedDate.toISOString().split('T')[0]
+        referenceDate: getLocalDateKey(selectedDate)
       });
 
       if (!response?.success) {

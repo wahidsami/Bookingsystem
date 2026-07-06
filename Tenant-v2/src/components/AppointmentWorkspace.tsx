@@ -1384,7 +1384,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [gcSender, setGcSender] = useState('');
   const [gcRecipient, setGcRecipient] = useState('');
   const [gcValue, setGcValue] = useState<number>(500);
-  const [generatedGcCode, setGeneratedGcCode] = useState('REF-GFT-2026-9844');
+  const [generatedGcCode, setGeneratedGcCode] = useState(() => `REF-GFT-2026-${Math.floor(1000 + Math.random() * 9000)}`);
   
   // POS Checkout customer association
   const [posCustMode, setPosCustMode] = useState<'walkin' | 'existing'>('walkin');
