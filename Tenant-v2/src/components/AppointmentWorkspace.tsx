@@ -121,10 +121,19 @@ const toMoney = (value: any) => {
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
-const getLocalDateKey = (value: Date) => {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
+const getLocalDateKey = (value: Date | string | number | null | undefined) => {
+  const date = value instanceof Date ? value : new Date(value || new Date());
+  if (Number.isNaN(date.getTime())) {
+    const fallback = new Date();
+    const year = fallback.getFullYear();
+    const month = String(fallback.getMonth() + 1).padStart(2, '0');
+    const day = String(fallback.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 
