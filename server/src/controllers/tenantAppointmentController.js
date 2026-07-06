@@ -44,6 +44,34 @@ const TENANT_APPOINTMENT_ADVANCED_DRAG_ENABLED = process.env.TENANT_APPOINTMENT_
 
 const roundMoney = (value) => Number.parseFloat(Number(value || 0).toFixed(2));
 
+function createRuntimeTraceLogger(req, res, label, details = {}) {
+    const startedAt = Date.now();
+    console.info(`[runtime-trace] ${label} request start`, {
+        method: req.method,
+        url: req.originalUrl,
+        params: req.params,
+        query: req.query,
+        ...details
+    });
+
+    res.once('finish', () => {
+        console.info(`[runtime-trace] ${label} request end`, {
+            method: req.method,
+            url: req.originalUrl,
+            statusCode: res.statusCode,
+            durationMs: Date.now() - startedAt
+        });
+    });
+}
+
+function logRuntimeTraceException(label, error, details = {}) {
+    console.error(`[runtime-trace] ${label} exception`, {
+        message: error?.message || String(error),
+        stack: error?.stack || null,
+        ...details
+    });
+}
+
 function attachCanonicalFinancialState(appointment) {
     if (!appointment) {
         return appointment;
@@ -1762,6 +1790,7 @@ exports.searchDashboard = async (req, res) => {
  */
 exports.getAppointment = async (req, res) => {
     try {
+        createRuntimeTraceLogger(req, res, 'GET /api/v1/tenant/appointments/:id');
         const tenantId = req.tenantId;
         const { id } = req.params;
 
@@ -1872,11 +1901,26 @@ exports.getAppointment = async (req, res) => {
                 .sort((a, b) => new Date(a.occurredAt || a.createdAt || 0) - new Date(b.occurredAt || b.createdAt || 0))
             : [];
 
+        console.info('[runtime-trace] GET /api/v1/tenant/appointments/:id payload', {
+            appointmentId: responseAppointment.id,
+            paymentStatus: responseAppointment.paymentStatus || null,
+            totalPaid: responseAppointment.totalPaid ?? null,
+            remainingBalance: responseAppointment.remainingBalance ?? null,
+            outstandingAmount: responseAppointment.outstandingAmount ?? null,
+            bookingSessionId: responseAppointment.bookingSessionId || responseAppointment.bookingSession?.id || null,
+            bookingSessionAppointmentCount: Array.isArray(responseAppointment.bookingSession?.appointments)
+                ? responseAppointment.bookingSession.appointments.length
+                : 0
+        });
+
         res.json({
             success: true,
             appointment: responseAppointment
         });
     } catch (error) {
+        logRuntimeTraceException('GET /api/v1/tenant/appointments/:id', error, {
+            statusCode: 500
+        });
         console.error('Get appointment error:', error);
         res.status(500).json({
             success: false,
@@ -2219,10 +2263,28 @@ exports.updateAppointmentStatus = async (req, res) => {
 exports.updatePaymentStatus = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
+        createRuntimeTraceLogger(req, res, 'PATCH /api/v1/tenant/appointments/:id/payment');
         const tenantId = req.tenantId;
         const { id } = req.params;
         const { paymentStatus, paymentMethod, amount, paymentAllocations, transactionRef, notes } = req.body;
         const requestId = `pay_${Date.now()}_${id}`;
+        const tracePaymentSnapshot = (label, appointment, invoice = null, bookingSession = null) => {
+            console.info(`[runtime-trace] PATCH /api/v1/tenant/appointments/:id/payment ${label}`, {
+                appointmentId: appointment?.id || null,
+                bookingSessionId: bookingSession?.id || appointment?.bookingSessionId || appointment?.bookingSession?.id || null,
+                paymentStatus: appointment?.paymentStatus || null,
+                totalPaid: appointment?.totalPaid ?? null,
+                remainingAmount: appointment?.remainderAmount ?? null,
+                outstandingAmount: appointment?.outstandingAmount ?? null,
+                invoiceId: invoice?.id || null,
+                invoiceItemsCount: Array.isArray(invoice?.customerInvoiceItems) ? invoice.customerInvoiceItems.length : 0,
+                bookingSessionAppointmentCount: Array.isArray(bookingSession?.appointments)
+                    ? bookingSession.appointments.length
+                    : Array.isArray(appointment?.bookingSession?.appointments)
+                        ? appointment.bookingSession.appointments.length
+                        : 0
+            });
+        };
 
         const validPaymentStatuses = [
             APPOINTMENT_PAYMENT_STATUS.PENDING,
@@ -2285,6 +2347,14 @@ exports.updatePaymentStatus = async (req, res) => {
         const previousTotalPaid = parseFloat(appointment.totalPaid || 0);
         const previousPaymentStatus = appointment.paymentStatus;
         const previousPaymentMethod = appointment.paymentMethod || null;
+        console.info('[runtime-trace] PATCH /api/v1/tenant/appointments/:id/payment request snapshot', {
+            appointmentId: appointment.id,
+            bookingSessionId: appointment.bookingSessionId || appointment.bookingSession?.id || null,
+            paymentStatusBefore: previousPaymentStatus,
+            totalPaidBefore: previousTotalPaid,
+            remainingAmountBefore: appointment.remainderAmount ?? null,
+            outstandingAmountBefore: appointment.outstandingAmount ?? null
+        });
 
         const roundMoney = (value) => Number.parseFloat(Number(value || 0).toFixed(2));
         const getAppointmentDueAmount = (targetAppointment) => {
@@ -2475,6 +2545,7 @@ exports.updatePaymentStatus = async (req, res) => {
                 if (primaryInvoice?.id) {
                     await sendCustomerInvoiceLifecycleEmail(primaryInvoice.id);
                 }
+                tracePaymentSnapshot('committed', appointment, primaryInvoice, bookingSession);
             } catch (invoiceError) {
                 console.warn('Tenant booking payment invoice email warning:', invoiceError.message);
             }
@@ -2679,6 +2750,7 @@ exports.updatePaymentStatus = async (req, res) => {
             if (invoice?.id) {
                 await sendCustomerInvoiceLifecycleEmail(invoice.id);
             }
+            tracePaymentSnapshot('committed', appointment, invoice, appointment.bookingSession || null);
         } catch (invoiceError) {
             console.warn('Tenant booking payment invoice email warning:', invoiceError.message);
         }
@@ -2690,6 +2762,9 @@ exports.updatePaymentStatus = async (req, res) => {
         });
     } catch (error) {
         await transaction.rollback();
+        logRuntimeTraceException('PATCH /api/v1/tenant/appointments/:id/payment', error, {
+            statusCode: 500
+        });
         console.error('Update payment status error:', error);
         res.status(500).json({
             success: false,

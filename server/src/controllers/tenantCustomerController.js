@@ -9,6 +9,34 @@ const { buildPublicAssetUrl } = require('../utils/url');
 const walletService = require('../services/walletService');
 const TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED = process.env.TENANT_APPOINTMENT_AUDIT_LOGS === '1';
 
+function createRuntimeTraceLogger(req, res, label, details = {}) {
+    const startedAt = Date.now();
+    console.info(`[runtime-trace] ${label} request start`, {
+        method: req.method,
+        url: req.originalUrl,
+        params: req.params,
+        query: req.query,
+        ...details
+    });
+
+    res.once('finish', () => {
+        console.info(`[runtime-trace] ${label} request end`, {
+            method: req.method,
+            url: req.originalUrl,
+            statusCode: res.statusCode,
+            durationMs: Date.now() - startedAt
+        });
+    });
+}
+
+function logRuntimeTraceException(label, error, details = {}) {
+    console.error(`[runtime-trace] ${label} exception`, {
+        message: error?.message || String(error),
+        stack: error?.stack || null,
+        ...details
+    });
+}
+
 function logTenantAppointmentAudit(event, payload = {}) {
     if (!TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED) {
         return;
@@ -907,6 +935,7 @@ exports.getCustomers = async (req, res) => {
  */
 exports.getCustomer = async (req, res) => {
     try {
+        createRuntimeTraceLogger(req, res, 'GET /api/v1/tenant/customers/:id');
         const tenantId = req.tenant.id;
         const { id } = req.params;
         const walletHistoryMode = `${req.query.walletHistory || ''}`.toLowerCase() === 'full' || req.query.includeWalletHistory === '1';
@@ -1315,6 +1344,9 @@ exports.getCustomer = async (req, res) => {
         });
 
     } catch (error) {
+        logRuntimeTraceException('GET /api/v1/tenant/customers/:id', error, {
+            statusCode: 500
+        });
         console.error('Get customer error:', error);
         res.status(500).json({
             success: false,
@@ -1585,6 +1617,7 @@ exports.getCustomerStats = async (req, res) => {
  */
 exports.getCustomerHistory = async (req, res) => {
     try {
+        createRuntimeTraceLogger(req, res, 'GET /api/v1/tenant/customers/:id/history');
         const tenantId = req.tenant.id;
         const { id } = req.params;
         const { type, startDate, endDate, limit = 50 } = req.query;
@@ -1781,6 +1814,9 @@ exports.getCustomerHistory = async (req, res) => {
         });
 
     } catch (error) {
+        logRuntimeTraceException('GET /api/v1/tenant/customers/:id/history', error, {
+            statusCode: 500
+        });
         console.error('Get customer history error:', error);
         res.status(500).json({
             success: false,
@@ -1906,6 +1942,7 @@ exports.topUpCustomerWallet = async (req, res) => {
  */
 exports.getCustomerTransactions = async (req, res) => {
     try {
+        createRuntimeTraceLogger(req, res, 'GET /api/v1/tenant/customers/:id/transactions');
         const tenantId = req.tenant.id;
         const { id } = req.params;
         const { startDate, endDate, limit = 50 } = req.query;
@@ -2550,6 +2587,9 @@ exports.getCustomerTransactions = async (req, res) => {
             }
         });
     } catch (error) {
+        logRuntimeTraceException('GET /api/v1/tenant/customers/:id/transactions', error, {
+            statusCode: 500
+        });
         console.error('Get customer transactions error:', error);
         res.status(500).json({
             success: false,
