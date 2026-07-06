@@ -2005,8 +2005,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         custNameAr = existing.name;
         custPhone = existing.phone;
         custEmail = existing.email || '';
-        loyalty = existing.appointmentsCount > 10 ? 'VIP Gold' : 'Loyal Club';
-        balance = 300;
+        loyalty = existing.loyaltyTier || '';
+        balance = Number(existing.walletBalance || 0);
       }
     } else if (custMode === 'new') {
       if (!newCustName || !newCustPhone) {
@@ -2022,7 +2022,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     } else {
       custNameEn = includeGroupGuests ? `Group Guest (${guestCount} pax)` : 'Walk-in Guest';
       custNameAr = includeGroupGuests ? `حجز مجموعة زوار (${guestCount} أشخاص)` : 'زائرة زائرة';
-      custPhone = '+966 50 000 0000';
+      custPhone = '';
       loyalty = 'Guest Account';
     }
 
