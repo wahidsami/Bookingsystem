@@ -1984,6 +1984,7 @@ exports.getCustomerTransactions = async (req, res) => {
         const appointmentIds = appointments.map((row) => row.id);
         const bookingSessionIds = [...new Set(appointments.map((row) => row.bookingSessionId).filter(Boolean))];
         const orderIds = orders.map((row) => row.id);
+        const bookingSessions = aggregateAppointmentsByBookingSession(appointments);
         const bookingReferenceValues = [...new Set(bookingSessions.map((session) => session.bookingReference).filter(Boolean))];
         const bookingSessionReferenceMatches = bookingReferenceValues.length > 0
             ? await db.BookingSession.findAll({
