@@ -409,6 +409,39 @@ function getAppointmentLineDuration(appointment = {}) {
     );
 }
 
+function toPlainAppointmentAggregationRecord(appointment, overrides = {}) {
+    if (!appointment) {
+        return null;
+    }
+
+    const plain = typeof appointment.toJSON === 'function'
+        ? appointment.toJSON()
+        : { ...appointment };
+
+    const sanitized = {
+        ...plain,
+        ...overrides
+    };
+
+    delete sanitized.bookingSession;
+    delete sanitized.bookingSessions;
+    delete sanitized.appointments;
+
+    if (sanitized.service && typeof sanitized.service === 'object') {
+        sanitized.service = { ...sanitized.service };
+    }
+
+    if (sanitized.staff && typeof sanitized.staff === 'object') {
+        sanitized.staff = { ...sanitized.staff };
+    }
+
+    if (sanitized.user && typeof sanitized.user === 'object') {
+        sanitized.user = { ...sanitized.user };
+    }
+
+    return sanitized;
+}
+
 function buildAppointmentServiceLine(appointment, index, bookingSessionId, bookingReference) {
     const normalizedPayment = normalizeAppointmentPaymentState(appointment, 'appointment');
     const serviceNameEn = appointment?.service?.name_en || appointment?.serviceNameEn || appointment?.serviceName || appointment?.title || '';
@@ -543,11 +576,18 @@ function aggregateAppointmentsByBookingSession(appointments = []) {
                 return `${a?.id || ''}`.localeCompare(`${b?.id || ''}`);
             });
 
-            const primary = orderedGroup[0] || group[0] || {};
-            const bookingSession = primary?.bookingSession || group.find((appointment) => appointment?.bookingSession)?.bookingSession || null;
-            const bookingSessionId = bookingSession?.id || primary?.bookingSessionId || null;
-            const bookingReference = bookingSession?.bookingReference || primary?.bookingReference || primary?.bookingNumber || null;
-            const serviceLines = orderedGroup.map((appointment, index) => buildAppointmentServiceLine(appointment, index, bookingSessionId, bookingReference));
+            const plainGroup = orderedGroup
+                .map((appointment, index) => toPlainAppointmentAggregationRecord(appointment, {
+                    bookingItemIndex: appointment?.bookingItemIndex ?? index,
+                    bookingSessionId: appointment?.bookingSessionId || null,
+                    bookingReference: appointment?.bookingReference || appointment?.bookingNumber || null
+                }))
+                .filter(Boolean);
+            const primary = plainGroup[0] || {};
+            const sourceBookingSession = orderedGroup.find((appointment) => appointment?.bookingSession)?.bookingSession || null;
+            const bookingSessionId = sourceBookingSession?.id || primary?.bookingSessionId || null;
+            const bookingReference = sourceBookingSession?.bookingReference || primary?.bookingReference || primary?.bookingNumber || null;
+            const serviceLines = plainGroup.map((appointment, index) => buildAppointmentServiceLine(appointment, index, bookingSessionId, bookingReference));
             const serviceNameEn = serviceLines
                 .map((line) => line.serviceNameEn)
                 .filter(Boolean)
@@ -558,18 +598,24 @@ function aggregateAppointmentsByBookingSession(appointments = []) {
                 .join(' + ');
             const staffNames = [...new Set(serviceLines.map((line) => line.staffName).filter(Boolean))];
             const totalAmount = orderedGroup.reduce((sum, appointment) => sum + Number(appointment?.price || 0), 0);
-            const paymentSummaries = orderedGroup.map((appointment) => normalizeAppointmentPaymentState(appointment, 'appointment'));
+            const paymentSummaries = plainGroup.map((appointment) => normalizeAppointmentPaymentState(appointment, 'appointment'));
             const totalPaid = paymentSummaries.reduce((sum, summary) => sum + Number(summary.paidAmount || 0), 0);
             const outstandingAmount = paymentSummaries.reduce((sum, summary) => sum + Number(summary.outstandingAmount || 0), 0);
-            const normalizedPaymentStatus = deriveBookingSessionPaymentStatus(orderedGroup, bookingSession);
-            const sessionStatus = deriveBookingSessionStatus(orderedGroup, bookingSession);
+            const normalizedPaymentStatus = deriveBookingSessionPaymentStatus(plainGroup, sourceBookingSession);
+            const sessionStatus = deriveBookingSessionStatus(plainGroup, sourceBookingSession);
             const primaryService = primary?.service || serviceLines[0]?.service || null;
             const primaryStaff = primary?.staff || serviceLines[0]?.staff || null;
-            const duration = orderedGroup.reduce((sum, appointment) => sum + getAppointmentLineDuration(appointment), 0);
+            const duration = plainGroup.reduce((sum, appointment) => sum + getAppointmentLineDuration(appointment), 0);
             const startTime = orderedGroup[0]?.startTime || primary?.startTime || null;
             const endTime = orderedGroup[orderedGroup.length - 1]?.endTime || primary?.endTime || null;
-            const firstAppointment = orderedGroup[0] || null;
+            const firstAppointment = plainGroup[0] || null;
             const detailPath = firstAppointment?.id ? `/dashboard/appointments/${firstAppointment.id}` : null;
+            const bookingSessionAppointments = plainGroup.map((appointment, index) => ({
+                ...appointment,
+                bookingSessionId: bookingSessionId || appointment?.bookingSessionId || null,
+                bookingReference: bookingReference || appointment?.bookingReference || null,
+                bookingItemIndex: appointment?.bookingItemIndex ?? index
+            }));
 
             return {
                 ...primary,
@@ -597,27 +643,18 @@ function aggregateAppointmentsByBookingSession(appointments = []) {
                 serviceNameAr: serviceNameAr || primary?.serviceNameAr || primaryService?.name_ar || primaryService?.name || '',
                 assignedStaffName: staffNames.join(' + ') || primaryStaff?.name || '',
                 serviceLines,
-                appointments: orderedGroup.map((appointment, index) => ({
-                    ...appointment,
-                    bookingSessionId: bookingSessionId || appointment?.bookingSessionId || null,
-                    bookingReference: bookingReference || appointment?.bookingReference || null,
-                    bookingItemIndex: appointment?.bookingItemIndex ?? index
-                })),
-                bookingSession: bookingSession
-                    ? {
-                        ...bookingSession,
-                        id: bookingSessionId || bookingSession.id,
-                        bookingReference: bookingReference || bookingSession.bookingReference || null,
-                        appointments: orderedGroup
-                    }
-                    : {
-                        id: bookingSessionId || null,
-                        bookingReference: bookingReference || null,
-                        appointments: orderedGroup,
-                        status: sessionStatus,
-                        paymentMethod: primary?.paymentMethod || null,
-                        totalAmount: parseFloat(totalAmount.toFixed(2))
-                    },
+                appointments: bookingSessionAppointments,
+                bookingSession: {
+                    id: bookingSessionId || null,
+                    bookingReference: bookingReference || null,
+                    status: sessionStatus,
+                    paymentStatus: normalizedPaymentStatus,
+                    paymentMethod: sourceBookingSession?.paymentMethod || primary?.paymentMethod || null,
+                    totalAmount: parseFloat(totalAmount.toFixed(2)),
+                    totalPaid: parseFloat(totalPaid.toFixed(2)),
+                    outstandingAmount: parseFloat(outstandingAmount.toFixed(2)),
+                    appointments: bookingSessionAppointments
+                },
                 details: {
                     service: primaryService,
                     services: serviceLines.map((line) => line.service).filter(Boolean),
@@ -2019,7 +2056,6 @@ exports.getCustomerTransactions = async (req, res) => {
         });
 
         const appointmentIds = appointments.map((row) => row.id);
-        const bookingSessionIds = [...new Set(appointments.map((row) => row.bookingSessionId).filter(Boolean))];
         const orderIds = orders.map((row) => row.id);
         const bookingSessions = aggregateAppointmentsByBookingSession(appointments);
         const bookingReferenceValues = [...new Set(bookingSessions.map((session) => session.bookingReference).filter(Boolean))];
@@ -2033,12 +2069,6 @@ exports.getCustomerTransactions = async (req, res) => {
                 attributes: ['id', 'bookingReference']
             })
             : [];
-        const resolvedBookingSessionIds = [
-            ...new Set([
-                ...bookingSessionIds,
-                ...bookingSessionReferenceMatches.map((session) => session.id)
-            ])
-        ];
 
         const [gatewayTransactions, ledgerTransactions] = await Promise.all([
             db.Transaction.findAll({
@@ -2129,7 +2159,6 @@ exports.getCustomerTransactions = async (req, res) => {
                 where: {
                     [Op.or]: [
                         { appointmentId: { [Op.in]: appointmentIds.length ? appointmentIds : ['00000000-0000-0000-0000-000000000000'] } },
-                        { bookingSessionId: { [Op.in]: resolvedBookingSessionIds.length ? resolvedBookingSessionIds : ['00000000-0000-0000-0000-000000000000'] } },
                         { orderId: { [Op.in]: orderIds.length ? orderIds : ['00000000-0000-0000-0000-000000000000'] } }
                     ],
                     paymentMethod: { [Op.in]: ['cash', 'card_pos', 'wallet', 'bank_transfer'] },
