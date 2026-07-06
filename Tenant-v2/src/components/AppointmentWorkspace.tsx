@@ -663,6 +663,49 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     return [];
   };
 
+  const getTransactionIdentityKey = (entry: any) => {
+    if (!entry || typeof entry !== 'object') {
+      return '';
+    }
+
+    const reference = `${entry.reference || entry.transactionRef || entry.invoiceNumber || entry.orderNumber || ''}`.trim();
+    if (reference) {
+      return reference;
+    }
+
+    const title = `${entry.title || entry.type || entry.kind || entry.source || ''}`.trim().toLowerCase();
+    const date = `${entry.processedAt || entry.date || entry.createdAt || entry.time || ''}`.trim();
+    const amount = Number(entry.amount ?? entry.totalAmount ?? entry.value ?? entry.price ?? 0).toFixed(2);
+    const method = `${entry.paymentMethod || entry.paymentMethodLabel || entry.method || ''}`.trim().toLowerCase();
+
+    return [title, date, amount, method].filter(Boolean).join('|');
+  };
+
+  const dedupeTransactionRows = (rows: any[]) => {
+    const seen = new Map<string, any>();
+    const sourceRank = (value: any) => {
+      const source = `${value?.source || ''}`.toLowerCase();
+      if (source === 'ledger' || source === 'transaction') return 3;
+      if (source === 'appointment') return 2;
+      if (source === 'history') return 1;
+      return 0;
+    };
+
+    rows.forEach((entry: any) => {
+      const key = getTransactionIdentityKey(entry);
+      if (!key) {
+        return;
+      }
+
+      const existing = seen.get(key);
+      if (!existing || sourceRank(entry) >= sourceRank(existing)) {
+        seen.set(key, entry);
+      }
+    });
+
+    return Array.from(seen.values());
+  };
+
   const getHistoryTimestamp = (item: any) => {
     const timestamp = item?.details?.startTime
       || item?.startTime
@@ -1129,6 +1172,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           ...getArrayFromPayload(transactionsPayload, 'records'),
           ...(Array.isArray(transactionsPayload) ? transactionsPayload : [])
         ];
+        const dedupedTransactionRows = dedupeTransactionRows(transactionRows);
         if (!cancelled) {
           setCustomerProfile(profile);
           setCustomerHistoryData({
@@ -1139,7 +1183,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             summary: summaryPayload,
             walletTransactions: walletTransactionsPayload,
             notes: Array.isArray(profile.notes) ? profile.notes : [],
-            transactions: transactionRows
+            transactions: dedupedTransactionRows
           });
         }
       } catch (err: any) {
