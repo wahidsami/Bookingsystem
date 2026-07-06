@@ -227,6 +227,19 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           categoryAr: p.category || '',
           categoryEn: p.category || ''
         })));
+
+        if (employees.length > 0) {
+          setCurrentStaffId((current) => employees.some((emp: any) => emp.id === current) ? current : employees[0].id);
+          setBlockStaffId((current) => employees.some((emp: any) => emp.id === current) ? current : employees[0].id);
+          setSelectedShiftStaffId((current) => employees.some((emp: any) => emp.id === current) ? current : employees[0].id);
+        }
+        if (services.length > 0) {
+          setCurrentServiceId((current) => services.some((srv: any) => srv.id === current) ? current : services[0].id);
+        }
+        if (customers.length > 0) {
+          setSelectedCustId((current) => customers.some((cust: any) => cust.id === current) ? current : customers[0].id);
+          setPosSelectedCustId((current) => customers.some((cust: any) => cust.id === current) ? current : customers[0].id);
+        }
       } catch (err) {
         console.error('Failed to load master data', err);
       }
@@ -3239,7 +3252,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                   const d = parseLocalDateKey(dayStr);
                                   setSelectedDate(d);
                                   setCurrentStartTime(hoveredSlot.timeInMinutes);
-                                  setCurrentStaffId('st-1'); // default to first stylist
+                                  setCurrentStaffId(liveStylists[0]?.id || hoveredSlot.staffId || currentStaffId);
                                   setCreateMode('appointment');
                                   setCreateStep(1);
                                   setStagedServices([]);
