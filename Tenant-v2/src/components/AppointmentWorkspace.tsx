@@ -1444,6 +1444,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     return (duration / 60) * SLOT_HEIGHT;
   };
 
+  const getVisualStaffIndex = (staffId: string) => {
+    const logicalIndex = liveStylists.findIndex((stylist) => stylist.id === staffId);
+    if (logicalIndex === -1) {
+      return -1;
+    }
+    return isRtl ? (liveStylists.length - 1 - logicalIndex) : logicalIndex;
+  };
+
   const formatMinutesToTime = (totalMins: number) => {
     const minsFromMidnight = (START_HOUR * 60) + totalMins;
     let hours = Math.floor(minsFromMidnight / 60);
@@ -3283,9 +3291,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       {/* GHOST PREVIEW OF DRAGGED APPOINTMENT (Only in Day View) */}
                       {viewMode === 'day' && draggedApt && dragOverStaffId && dragOverTime !== null && (
                         (() => {
-                          const sIdx = liveStylists.findIndex(s => s.id === dragOverStaffId);
+                          const sIdx = getVisualStaffIndex(dragOverStaffId);
                           if (sIdx === -1) return null;
-                          const leftPct = sIdx * 25;
+                          const leftPct = (sIdx / liveStylists.length) * 100;
                           const topPos = minutesToTop(dragOverTime);
                           const hPos = minutesToHeight(draggedApt.duration);
                           return (
@@ -3316,9 +3324,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         let leftPercent = 0;
                         
                         if (viewMode === 'day') {
-                          const staffIdx = liveStylists.findIndex(s => s.id === apt.staffId);
+                          const staffIdx = getVisualStaffIndex(apt.staffId);
                           if (staffIdx === -1) return null;
-                          leftPercent = staffIdx * 25;
+                          leftPercent = (staffIdx / liveStylists.length) * 100;
                         } else {
                           const activeBlock = getDaysOfActiveBlock(selectedDate);
                           const dayIdx = activeBlock.indexOf(apt.date || getSelectedDateKey());
