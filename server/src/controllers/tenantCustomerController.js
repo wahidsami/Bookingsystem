@@ -685,7 +685,7 @@ function aggregateAppointmentsByBookingSession(appointments = []) {
                 status: sessionStatus,
                 paymentStatus: normalizedPaymentStatus,
                 normalizedPaymentStatus,
-                paymentMethod: bookingSession?.paymentMethod || primary?.paymentMethod || null,
+                paymentMethod: sourceBookingSession?.paymentMethod || primary?.paymentMethod || null,
                 price: parseFloat(totalAmount.toFixed(2)),
                 totalAmount: parseFloat(totalAmount.toFixed(2)),
                 totalPaid: parseFloat(totalPaid.toFixed(2)),
