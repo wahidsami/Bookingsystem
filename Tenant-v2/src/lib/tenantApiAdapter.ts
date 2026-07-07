@@ -597,13 +597,33 @@ class TenantApiAdapter {
   }
 
   // --- Reports ---
-  async getDashboardSummary(): Promise<any> {
-    return this.get('/tenant/reports/summary');
+  async getReportsSummary(params: Record<string, string | number | undefined> = {}): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/reports/summary${query ? `?${query}` : ''}`);
+  }
+
+  async getDashboardSummary(params: Record<string, string | number | undefined> = {}): Promise<any> {
+    return this.getReportsSummary(params);
+  }
+
+  async getFinancialOverview(params: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/financial/overview${query ? `?${query}` : ''}`);
+  }
+
+  async getBookingTrends(params: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/reports/booking-trends${query ? `?${query}` : ''}`);
   }
 
   async getFullReport(startDate: string, endDate: string, sections: string[] = []): Promise<any> {
     const query = this.buildQueryString({ startDate, endDate, sections });
     return this.get(`/tenant/reports/full${query ? `?${query}` : ''}`);
+  }
+
+  async getPeakHoursAnalysis(params: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/reports/peak-hours${query ? `?${query}` : ''}`);
   }
 
   async getServicePerformance(startDate: string, endDate: string): Promise<any> {
@@ -622,12 +642,27 @@ class TenantApiAdapter {
     return this.get(`/tenant/reports/rebookings?startDate=${startDate}&endDate=${endDate}`);
   }
 
+  async getProductRevenue(params: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/financial/products${query ? `?${query}` : ''}`);
+  }
+
   async getRefundsReport(startDate: string, endDate: string): Promise<any> {
     return this.get(`/tenant/reports/refunds?startDate=${startDate}&endDate=${endDate}`);
   }
 
   async getPaymentMethodsReport(startDate: string, endDate: string): Promise<any> {
     return this.get(`/tenant/reports/payment-methods?startDate=${startDate}&endDate=${endDate}`);
+  }
+
+  async getPosClosingSummary(params: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/pos/closing${query ? `?${query}` : ''}`);
+  }
+
+  async getAdvancedAnalytics(params: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/reports/advanced-analytics${query ? `?${query}` : ''}`);
   }
 
   // --- POS & Cart Checkout ---

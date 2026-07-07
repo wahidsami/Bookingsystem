@@ -17,17 +17,18 @@ interface ReportsWorkspaceProps {
 
 type ReportTab =
   | 'overview'
-  | 'sales_reports'
-  | 'financial_reports'
-  | 'appointment_reports'
-  | 'employee_reports'
-  | 'service_reports'
-  | 'product_reports'
-  | 'discounts_reports'
-  | 'refund_reports'
-  | 'payment_methods'
-  | 'customer_sales'
-  | 'rebooking_analytics';
+  | 'sales'
+  | 'financial'
+  | 'appointments'
+  | 'rebookings'
+  | 'employees'
+  | 'services'
+  | 'products'
+  | 'discounts'
+  | 'refunds'
+  | 'paymentMethods'
+  | 'customerSales'
+  | 'advancedAnalytics';
 
 export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
   const isRtl = lang === 'ar';
@@ -65,23 +66,166 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
   const [reportData, setReportData] = useState<any>({});
   const [overviewStats, setOverviewStats] = useState<any>(null);
 
-  // Trigger loading effect when switching reports or filters
+  const resolveDateRange = (range: string) => {
+    const now = new Date();
+    const endDate = new Date(now);
+    const startDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
+
+    switch (range) {
+      case 'today':
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'yesterday':
+        startDate.setDate(startDate.getDate() - 1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setDate(endDate.getDate() - 1);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'last_7_days':
+        startDate.setDate(startDate.getDate() - 6);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'this_month':
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'last_month': {
+        startDate.setMonth(startDate.getMonth() - 1, 1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setDate(0);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      }
+      case 'custom':
+      case 'last_30_days':
+      default:
+        startDate.setDate(startDate.getDate() - 29);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+    }
+
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    };
+  };
+
+  const mapBookingTrendRows = (rows: any[]) =>
+    rows.map((row) => ({
+      id: row.id || row.date,
+      date: row.date,
+      grossSales: Number(row.revenue || 0),
+      discounts: 0,
+      refunds: 0,
+      netSales: Number(row.revenue || 0),
+      total: Number(row.revenue || 0),
+      vat: Number((Number(row.revenue || 0) * 0.15).toFixed(2)),
+      bookings: Number(row.bookings || 0),
+      completed: Number(row.completed || 0)
+    }));
+
+  const mapAppointmentTrendRows = (rows: any[]) =>
+    rows.map((row) => ({
+      id: row.id || row.date,
+      date: row.date,
+      customer: row.customer || row.customerName || '-',
+      customerAr: row.customer || row.customerName || '-',
+      stylist: row.stylist || row.employee || '-',
+      stylistAr: row.stylist || row.employee || '-',
+      service: row.service || row.serviceName || '-',
+      serviceAr: row.service || row.serviceName || '-',
+      duration: row.duration || '-',
+      price: Number(row.revenue || 0),
+      status: row.completed ? 'Completed' : 'Booked',
+      statusAr: row.completed ? 'مكتمل' : 'محجوز',
+      paymentStatus: row.completed ? 'Paid' : 'Pending',
+      totalPaid: Number(row.revenue || 0),
+      branch: row.branch || '-'
+    }));
+
+  const mapFinancialRows = (transactions: any[] = []) =>
+    transactions.map((transaction) => ({
+      id: transaction.id,
+      date: transaction.processedAt || transaction.createdAt,
+      customer: transaction.appointment?.customer?.fullName || transaction.order?.customer?.fullName || transaction.customerName || '-',
+      customerAr: transaction.appointment?.customer?.fullName || transaction.order?.customer?.fullName || transaction.customerName || '-',
+      type: transaction.type || transaction.source || (transaction.appointment ? 'Appointment' : transaction.order ? 'Order' : 'Transaction'),
+      subtotal: Number(transaction.subtotal || transaction.amount || 0),
+      vat: Number(transaction.taxAmount || 0),
+      total: Number(transaction.amount || transaction.totalAmount || 0),
+      method: transaction.paymentMethod || '-',
+      methodAr: transaction.paymentMethod || '-',
+      invoiceId: transaction.reference || transaction.invoiceNumber || transaction.transactionRef || transaction.id
+    }));
+
+  const mapAdvancedAnalyticsRows = (analytics: any) => {
+    if (!analytics) return [];
+    const current = analytics.comparativeAnalytics?.current || {};
+    const comparisons = analytics.comparativeAnalytics?.comparisons || {};
+
+    return [
+      { id: 'current_revenue', date: 'current', nameEn: 'Current revenue', total: Number(current.revenue || 0), pct: current.completionRate || 0 },
+      { id: 'current_bookings', date: 'current', nameEn: 'Current bookings', total: Number(current.bookings || 0), pct: current.completionRate || 0 },
+      { id: 'current_refunds', date: 'current', nameEn: 'Current refunds', total: Number(current.refunds || 0), pct: current.refunds || 0 },
+      { id: 'current_customers', date: 'current', nameEn: 'Current customers', total: Number(current.customers || 0), pct: current.completionRate || 0 },
+      { id: 'completion_rate', date: 'current', nameEn: 'Completion rate', total: Number(current.completionRate || 0), pct: current.completionRate || 0 },
+      ...Object.entries(comparisons).map(([key, value]: [string, any]) => ({
+        id: `comparison_${key}`,
+        date: 'comparison',
+        nameEn: key,
+        total: Number(value || 0),
+        pct: Number(value || 0)
+      }))
+    ];
+  };
+
+  // Trigger loading effect when the date range changes
   useEffect(() => {
     async function fetchReportData() {
       setIsLoading(true);
       try {
-        const [empRes, srvRes, summaryRes, fullReport] = await Promise.all([
+        const { startDate, endDate } = resolveDateRange(dateRange);
+        const groupBy = 'day';
+
+        const [
+          empRes,
+          srvRes,
+          summaryRes,
+          financialRes,
+          trendsRes,
+          servicePerfRes,
+          employeePerfRes,
+          productRevenueRes,
+          peakHoursRes,
+          customerAnalyticsRes,
+          rebookingRes,
+          refundsRes,
+          paymentMethodsRes,
+          posRes,
+          customerSalesRes,
+          advancedRes
+        ] = await Promise.allSettled([
           tenantApiAdapter.getEmployees(),
           tenantApiAdapter.getServices(),
-          tenantApiAdapter.getDashboardSummary(),
-          tenantApiAdapter.getFullReport(
-            dateRange === 'today' ? new Date().toISOString() : '2026-01-01', 
-            new Date().toISOString(), 
-            [activeTab]
-          )
+          tenantApiAdapter.getReportsSummary({ startDate, endDate }),
+          tenantApiAdapter.getFinancialOverview({ startDate, endDate }),
+          tenantApiAdapter.getBookingTrends({ startDate, endDate, groupBy }),
+          tenantApiAdapter.getServicePerformance(startDate, endDate),
+          tenantApiAdapter.getEmployeePerformance(startDate, endDate),
+          tenantApiAdapter.getProductRevenue({ startDate, endDate }),
+          tenantApiAdapter.getPeakHoursAnalysis({ startDate, endDate }),
+          tenantApiAdapter.getCustomerAnalytics(startDate, endDate),
+          tenantApiAdapter.getRebookingAnalytics(startDate, endDate),
+          tenantApiAdapter.getRefundsReport(startDate, endDate),
+          tenantApiAdapter.getPaymentMethodsReport(startDate, endDate),
+          tenantApiAdapter.getPosClosingSummary({ date: endDate.split('T')[0] }),
+          tenantApiAdapter.getFullReport(startDate, endDate, ['customerSales', 'advancedAnalytics'])
         ]);
-        
-        const employees = empRes?.employees || [];
+
+        const employees = empRes.status === 'fulfilled' && empRes.value?.employees
+          ? empRes.value.employees
+          : [];
         setEmployeesList([
           { id: 'all', nameEn: 'All Staff', nameAr: 'جميع الموظفات' },
           ...employees.map((e: any) => ({
@@ -92,15 +236,201 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           }))
         ]);
 
-        const services = srvRes?.services || [];
+        const services = srvRes.status === 'fulfilled' && srvRes.value?.services
+          ? srvRes.value.services
+          : [];
         const uniqueCats = Array.from(new Set(services.map((s: any) => s.categoryEn || 'Uncategorized')));
         setServiceCategories([
           { id: 'all', nameEn: 'All Categories', nameAr: 'جميع التصنيفات' },
           ...uniqueCats.map((c: any) => ({ id: (c as string).toLowerCase(), nameEn: c, nameAr: c }))
         ]);
 
-        setOverviewStats(summaryRes.data || summaryRes.overview || summaryRes);
-        setReportData(fullReport.data || {});
+        const summaryData = summaryRes.status === 'fulfilled' && summaryRes.value?.success
+          ? (summaryRes.value.data || summaryRes.value.overview || summaryRes.value)
+          : null;
+        const financialOverviewData = financialRes.status === 'fulfilled' && financialRes.value?.success
+          ? (financialRes.value.overview || financialRes.value.data || null)
+          : null;
+        const bookingTrendRows = trendsRes.status === 'fulfilled' && trendsRes.value?.success
+          ? (trendsRes.value.data || [])
+          : [];
+        const servicePerformanceRows = servicePerfRes.status === 'fulfilled' && servicePerfRes.value?.success
+          ? (servicePerfRes.value.data || [])
+          : [];
+        const employeePerformanceRows = employeePerfRes.status === 'fulfilled' && employeePerfRes.value?.success
+          ? (employeePerfRes.value.data || [])
+          : [];
+        const productRevenueData = productRevenueRes.status === 'fulfilled' && productRevenueRes.value?.success
+          ? {
+              rows: productRevenueRes.value.products || [],
+              totals: productRevenueRes.value.totals || null
+            }
+          : { rows: [], totals: null };
+        const peakHoursData = peakHoursRes.status === 'fulfilled' && peakHoursRes.value?.success
+          ? (peakHoursRes.value.data || null)
+          : null;
+        const customerAnalyticsData = customerAnalyticsRes.status === 'fulfilled' && customerAnalyticsRes.value?.success
+          ? (customerAnalyticsRes.value.data || null)
+          : null;
+        const rebookingAnalyticsData = rebookingRes.status === 'fulfilled' && rebookingRes.value?.success
+          ? {
+              rows: rebookingRes.value.data || [],
+              totals: rebookingRes.value.totals || null,
+              trend: rebookingRes.value.trend || [],
+              topRebookingEmployees: rebookingRes.value.topRebookingEmployees || []
+            }
+          : { rows: [], totals: null, trend: [], topRebookingEmployees: [] };
+        const refundsData = refundsRes.status === 'fulfilled' && refundsRes.value?.success
+          ? {
+              rows: refundsRes.value.data || [],
+              totals: refundsRes.value.totals || null
+            }
+          : { rows: [], totals: null };
+        const paymentMethodsData = paymentMethodsRes.status === 'fulfilled' && paymentMethodsRes.value?.success
+          ? {
+              rows: paymentMethodsRes.value.data || [],
+              totals: paymentMethodsRes.value.totals || null,
+              trend: paymentMethodsRes.value.trend || []
+            }
+          : { rows: [], totals: null, trend: [] };
+        const posSummary = posRes.status === 'fulfilled' && posRes.value?.success
+          ? posRes.value.summary || null
+          : null;
+        const posTransactions = posRes.status === 'fulfilled' && posRes.value?.success
+          ? posRes.value.transactions || []
+          : [];
+        const financialSourceRows = posTransactions.length
+          ? posTransactions
+          : (financialOverviewData?.discountTotals?.topDiscountedOrders || []).map((entry: any) => ({
+              id: entry.id,
+              processedAt: endDate,
+              customerName: entry.orderNumber || entry.id,
+              amount: entry.totalAmount,
+              subtotal: entry.baseAmount,
+              taxAmount: Number((Number(entry.totalAmount || 0) - Number(entry.baseAmount || 0)).toFixed(2)),
+              paymentMethod: 'order',
+              type: 'order'
+            }));
+        const customerSalesData = customerSalesRes.status === 'fulfilled' && customerSalesRes.value?.success
+          ? (customerSalesRes.value.data || {})
+          : {};
+        const advancedAnalyticsData = advancedRes.status === 'fulfilled' && advancedRes.value?.success
+          ? (advancedRes.value.data || null)
+          : null;
+        const mappedCustomerSales = Array.isArray(customerSalesData.customerSales)
+          ? customerSalesData.customerSales.map((row: any) => ({
+              ...row,
+              nameAr: row.name || row.customer || row.customerDisplayName || row.id,
+              name: row.customer || row.name || row.customerDisplayName || row.id,
+              phone: row.phone || '-',
+              tier: row.customerBadge || row.customerType || '-',
+              visits: Number(row.bookings || row.visits || 0),
+              spentServices: Number(row.revenue || row.spentServices || 0),
+              spentProducts: Number(row.spentProducts || 0),
+              totalSpent: Number(row.totalSpent || row.revenue || 0)
+            }))
+          : [];
+        const serviceRevenueTotal = servicePerformanceRows.reduce((sum: number, row: any) => sum + Number(row.revenue || 0), 0) || 1;
+        const mappedServices = servicePerformanceRows.map((row: any) => ({
+          id: row.id,
+          name: row.name_en || row.name_ar || row.name || row.id,
+          nameAr: row.name_ar || row.name_en || row.name || row.id,
+          category: row.category || '-',
+          categoryAr: row.category || '-',
+          bookings: Number(row.totalBookings || row.bookings || 0),
+          duration: row.duration || '-',
+          avgPrice: Number(row.avgRevenue || row.avgPrice || row.price || 0),
+          totalRevenue: Number(row.revenue || 0),
+          share: `${((Number(row.revenue || 0) / serviceRevenueTotal) * 100).toFixed(1)}%`
+        }));
+        const mappedEmployees = employeePerformanceRows.map((row: any) => ({
+          id: row.id,
+          name: row.name || row.firstName || row.id,
+          nameAr: row.name || row.firstName || row.id,
+          role: row.commissionRate != null ? `${row.commissionRate}%` : '-',
+          roleAr: row.commissionRate != null ? `${row.commissionRate}%` : '-',
+          bookings: Number(row.totalBookings || row.bookings || 0),
+          utilization: `${Number(row.completionRate || 0).toFixed(1)}%`,
+          servicesSales: Number(row.revenue || 0),
+          productSales: 0,
+          tips: Number(row.commission || 0),
+          totalSales: Number(row.revenue || 0),
+          photo: row.photo || null
+        }));
+        const mappedProducts = (productRevenueData.rows || []).map((row: any) => ({
+          id: row.id,
+          sku: row.id,
+          name: row.name_en || row.name_ar || row.name || row.id,
+          nameAr: row.name_ar || row.name_en || row.name || row.id,
+          category: row.category || '-',
+          categoryAr: row.category || '-',
+          sold: Number(row.totalQuantity || row.sold || 0),
+          unitPrice: Number(row.productPrice || row.unitPrice || 0),
+          revenue: Number(row.totalRevenue || row.revenue || 0),
+          stock: row.stock ?? row.stockQuantity ?? 0
+        }));
+        const mappedPaymentMethods = paymentMethodsData.rows.map((row: any) => ({
+          id: row.paymentMethod,
+          method: row.paymentMethodLabel || row.paymentMethod,
+          methodAr: row.paymentMethodLabel || row.paymentMethod,
+          transactions: Number(row.transactionCount || 0),
+          collected: Number(row.revenue || 0),
+          fees: 0,
+          settlement: Number(row.revenue || 0),
+          pct: `${paymentMethodsData.totals?.revenue ? ((Number(row.revenue || 0) / Number(paymentMethodsData.totals.revenue || 1)) * 100).toFixed(1) : '0.0'}%`,
+          rating: 'Live'
+        }));
+        const mappedDiscounts = Array.isArray(financialOverviewData?.discountTotals?.topDiscountedServices)
+          ? financialOverviewData.discountTotals.topDiscountedServices.map((row: any) => ({
+              id: row.id,
+              code: row.id,
+              description: row.name_en || row.name_ar || row.name || row.id,
+              descriptionAr: row.name_ar || row.name_en || row.name || row.id,
+              appliedCount: Number(row.bookingCount || row.appliedCount || 0),
+              avgDiscount: Number(row.bookingCount ? row.discountAmount / Math.max(Number(row.bookingCount || 0), 1) : row.discountAmount || 0).toFixed(2),
+              totalDiscount: Number(row.discountAmount || 0).toFixed(2),
+              category: row.category || '-'
+            }))
+          : [];
+        const mappedRebookings = rebookingAnalyticsData.rows.map((row: any) => ({
+          id: row.id,
+          customer: row.customer || row.customerName || row.id,
+          customerAr: row.customer || row.customerName || row.id,
+          service: row.service || '-',
+          serviceAr: row.service || '-',
+          lastVisit: row.date || row.lastVisit || '-',
+          rebookedDate: row.date || row.rebookedDate || '-',
+          interval: row.interval || 0,
+          rate: 'Rebooked',
+          rebookAr: isRtl ? 'معاد الحجز' : 'Rebooked',
+          stylist: row.employee || row.stylist || '-'
+        }));
+
+        setOverviewStats(summaryData);
+        setReportData({
+          overview: summaryData,
+          sales: mapBookingTrendRows(bookingTrendRows),
+          financial: mapFinancialRows(financialSourceRows),
+          appointments: mapAppointmentTrendRows(bookingTrendRows),
+          rebookings: mappedRebookings,
+          employees: mappedEmployees,
+          services: mappedServices,
+          products: mappedProducts,
+          discounts: mappedDiscounts,
+          refunds: refundsData.rows,
+          paymentMethods: mappedPaymentMethods,
+          customerSales: mappedCustomerSales,
+          advancedAnalytics: mapAdvancedAnalyticsRows(advancedAnalyticsData),
+          financialOverview: financialOverviewData,
+          bookingTrends: bookingTrendRows,
+          peakHours: peakHoursData,
+          customerAnalytics: customerAnalyticsData,
+          rebookingAnalytics: rebookingAnalyticsData,
+          refundsReport: refundsData,
+          paymentMethodsReport: paymentMethodsData,
+          posClosingSummary: posSummary,
+          customerSalesReport: customerSalesData
+        });
       } catch (err) {
         console.error('Error fetching report data:', err);
       } finally {
@@ -108,22 +438,23 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
       }
     }
     fetchReportData();
-  }, [activeTab, dateRange, selectedEmployee, selectedService, selectedPaymentMethod]);
+  }, [dateRange]);
 
   // Translations
   const t = {
     overview: isRtl ? 'نظرة عامة والتحليلات' : 'Overview & Analytics',
-    sales_reports: isRtl ? 'تقارير المبيعات' : 'Sales Reports',
-    financial_reports: isRtl ? 'التقارير المالية والضريبية' : 'Financial Reports',
-    appointment_reports: isRtl ? 'تقارير المواعيد والحجوزات' : 'Appointment Reports',
-    employee_reports: isRtl ? 'أداء وتكليف الموظفات' : 'Employee Reports',
-    service_reports: isRtl ? 'تحليل أداء الخدمات' : 'Service Reports',
-    product_reports: isRtl ? 'مبيعات المنتجات والمخزون' : 'Product Reports',
-    discounts_reports: isRtl ? 'تقارير الخصومات والعروض' : 'Discounts Reports',
-    refund_reports: isRtl ? 'تقارير المرتجعات والاسترداد' : 'Refund Reports',
-    payment_methods: isRtl ? 'قنوات طرق الدفع' : 'Payment Methods',
-    customer_sales: isRtl ? 'تحليل مبيعات العملاء' : 'Customer Sales',
-    rebooking_analytics: isRtl ? 'تحليلات إعادة الحجز' : 'Rebooking Analytics',
+    sales: isRtl ? 'تقارير المبيعات' : 'Sales Reports',
+    financial: isRtl ? 'التقارير المالية والضريبية' : 'Financial Reports',
+    appointments: isRtl ? 'تقارير المواعيد والحجوزات' : 'Appointment Reports',
+    rebookings: isRtl ? 'تحليلات إعادة الحجز' : 'Rebooking Analytics',
+    employees: isRtl ? 'أداء وتكليف الموظفات' : 'Employee Reports',
+    services: isRtl ? 'تحليل أداء الخدمات' : 'Service Reports',
+    products: isRtl ? 'مبيعات المنتجات والمخزون' : 'Product Reports',
+    discounts: isRtl ? 'تقارير الخصومات والعروض' : 'Discounts Reports',
+    refunds: isRtl ? 'تقارير المرتجعات والاسترداد' : 'Refund Reports',
+    paymentMethods: isRtl ? 'قنوات طرق الدفع' : 'Payment Methods',
+    customerSales: isRtl ? 'تحليل مبيعات العملاء' : 'Customer Sales',
+    advancedAnalytics: isRtl ? 'التحليلات المتقدمة' : 'Advanced Analytics',
 
     // Overview Stats Labels
     revenue: isRtl ? 'إجمالي الإيرادات' : 'Gross Revenue',
@@ -184,27 +515,28 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
   ];
 
   const mockSavedReports = [
-    { id: 'vat_q2', labelEn: 'Q2 VAT Tax Compliance', labelAr: 'إقرار ضريبة القيمة المضافة Q2', tab: 'financial_reports', dateRange: 'this_month' },
-    { id: 'emp_comm', labelEn: 'Employee Commission Audit', labelAr: 'تدقيق عمولات الموظفات', tab: 'employee_reports', emp: 'st-1' },
-    { id: 'retention_low', labelEn: 'VIP Rebooking Peak Days', labelAr: 'أيام ذروة إعادة حجز VIP', tab: 'rebooking_analytics', service: 'hair' },
-    { id: 'discount_limit', labelEn: 'Discount Threshold Review', labelAr: 'مراجعة حدود الخصومات الممنوحة', tab: 'discounts_reports' }
+    { id: 'vat_q2', labelEn: 'Q2 VAT Tax Compliance', labelAr: 'إقرار ضريبة القيمة المضافة Q2', tab: 'financial', dateRange: 'this_month' },
+    { id: 'emp_comm', labelEn: 'Employee Commission Audit', labelAr: 'تدقيق عمولات الموظفات', tab: 'employees', emp: 'st-1' },
+    { id: 'retention_low', labelEn: 'VIP Rebooking Peak Days', labelAr: 'أيام ذروة إعادة حجز VIP', tab: 'rebookings', service: 'hair' },
+    { id: 'discount_limit', labelEn: 'Discount Threshold Review', labelAr: 'مراجعة حدود الخصومات الممنوحة', tab: 'discounts' }
   ];
 
   // Helper to filter and sort the raw records
   const getFilteredData = () => {
     let list: any[] = [];
     switch (activeTab) {
-      case 'sales_reports': list = reportData.sales_reports || []; break;
-      case 'financial_reports': list = reportData.financial_reports || []; break;
-      case 'appointment_reports': list = reportData.appointment_reports || []; break;
-      case 'employee_reports': list = reportData.employee_reports || []; break;
-      case 'service_reports': list = reportData.service_reports || []; break;
-      case 'product_reports': list = reportData.product_reports || []; break;
-      case 'discounts_reports': list = reportData.discounts_reports || []; break;
-      case 'refund_reports': list = reportData.refund_reports || []; break;
-      case 'payment_methods': list = reportData.payment_methods || []; break;
-      case 'customer_sales': list = reportData.customer_sales || []; break;
-      case 'rebooking_analytics': list = reportData.rebooking_analytics || []; break;
+      case 'sales': list = reportData.sales || []; break;
+      case 'financial': list = reportData.financial || []; break;
+      case 'appointments': list = reportData.appointments || []; break;
+      case 'employees': list = reportData.employees || []; break;
+      case 'services': list = reportData.services || []; break;
+      case 'products': list = reportData.products || []; break;
+      case 'discounts': list = reportData.discounts || []; break;
+      case 'refunds': list = reportData.refunds || []; break;
+      case 'paymentMethods': list = reportData.paymentMethods || []; break;
+      case 'customerSales': list = reportData.customerSales || []; break;
+      case 'rebookings': list = reportData.rebookings || []; break;
+      case 'advancedAnalytics': list = reportData.advancedAnalytics || []; break;
       default: list = [];
     }
 
@@ -220,9 +552,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
     // Dropdown filters (Employee filter)
     if (selectedEmployee !== 'all') {
-      if (activeTab === 'employee_reports') {
+      if (activeTab === 'employees') {
         list = list.filter(i => i.id === selectedEmployee || i.nameEn?.toLowerCase().includes(selectedEmployee.replace('st-', '')) || i.name?.toLowerCase().includes(selectedEmployee.replace('st-', '')));
-      } else if (activeTab === 'appointment_reports') {
+      } else if (activeTab === 'appointments') {
         if (selectedEmployee !== 'all') {
           list = list.filter(i => i.stylistId === selectedEmployee || i.stylist === employeesList.find(e => e.id === selectedEmployee)?.nameEn);
         }
@@ -231,9 +563,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
     // Category Filter
     if (selectedService !== 'all') {
-      if (activeTab === 'service_reports') {
+      if (activeTab === 'services') {
         list = list.filter(i => i.category.toLowerCase() === selectedService);
-      } else if (activeTab === 'product_reports') {
+      } else if (activeTab === 'products') {
         list = list.filter(i => i.category.toLowerCase().includes(selectedService));
       }
     }
@@ -259,6 +591,16 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
   const filteredRecords = getFilteredData();
   const paginatedRecords = filteredRecords.slice((currentPage - 1) * 5, currentPage * 5);
   const totalPages = Math.ceil(filteredRecords.length / 5) || 1;
+  const totalBookingsValue = Number(overviewStats?.totalBookings || 0);
+  const totalRevenueValue = Number(overviewStats?.totalRevenue || 0);
+  const completionRateValue = Number(overviewStats?.completionRate || 0);
+  const avgBookingValue = Number(overviewStats?.avgBookingValue || 0);
+  const noShowRateValue = totalBookingsValue > 0
+    ? Number(((Number(overviewStats?.noShowBookings || 0) / totalBookingsValue) * 100).toFixed(1))
+    : 0;
+  const rebookingRateValue = Number(reportData?.rebookingAnalytics?.totals?.rebookingRate || 0);
+  const refundTotalValue = Number(reportData?.refundsReport?.totals?.totalRefunds || 0);
+  const uniqueCustomersValue = Number(overviewStats?.uniqueCustomers || 0);
 
   // Handles export simulations
   const handleExport = (format: 'pdf' | 'csv' | 'excel' | 'print') => {
@@ -354,17 +696,18 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         <div className="flex flex-col gap-1">
           {[
             { id: 'overview', label: t.overview, icon: TrendingUp },
-            { id: 'sales_reports', label: t.sales_reports, icon: Receipt },
-            { id: 'financial_reports', label: t.financial_reports, icon: FileText },
-            { id: 'appointment_reports', label: t.appointment_reports, icon: Calendar },
-            { id: 'employee_reports', label: t.employee_reports, icon: Users },
-            { id: 'service_reports', label: t.service_reports, icon: Sparkles },
-            { id: 'product_reports', label: t.product_reports, icon: Package },
-            { id: 'discounts_reports', label: t.discounts_reports, icon: Gift },
-            { id: 'refund_reports', label: t.refund_reports, icon: RefreshCw },
-            { id: 'payment_methods', label: t.payment_methods, icon: CreditCard },
-            { id: 'customer_sales', label: t.customer_sales, icon: Award },
-            { id: 'rebooking_analytics', label: t.rebooking_analytics, icon: Clock }
+            { id: 'sales', label: t.sales, icon: Receipt },
+            { id: 'financial', label: t.financial, icon: FileText },
+            { id: 'appointments', label: t.appointments, icon: Calendar },
+            { id: 'rebookings', label: t.rebookings, icon: Clock },
+            { id: 'employees', label: t.employees, icon: Users },
+            { id: 'services', label: t.services, icon: Sparkles },
+            { id: 'products', label: t.products, icon: Package },
+            { id: 'discounts', label: t.discounts, icon: Gift },
+            { id: 'refunds', label: t.refunds, icon: RefreshCw },
+            { id: 'paymentMethods', label: t.paymentMethods, icon: CreditCard },
+            { id: 'customerSales', label: t.customerSales, icon: Award },
+            { id: 'advancedAnalytics', label: t.advancedAnalytics, icon: MessageSquare }
           ].map(item => {
             const isActive = activeTab === item.id;
             return (
@@ -588,11 +931,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                       </div>
                       <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.revenue}</span>
                       <p className="text-xl md:text-2xl font-black text-neutral-800 font-mono tracking-tight mt-1">
-                        148,250 <span className="text-xs font-bold text-neutral-500">{isRtl ? 'ر.س' : 'SAR'}</span>
+                        {totalRevenueValue.toLocaleString()} <span className="text-xs font-bold text-neutral-500">{isRtl ? 'ر.س' : 'SAR'}</span>
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-2 bg-emerald-50 px-2 py-0.5 rounded-full">
                         <ArrowUpRight size={11} />
-                        +12.4% vs last period
+                        {isRtl ? 'مؤشر مباشر من البيانات الإنتاجية' : 'Live production metric'}
                       </span>
                     </div>
 
@@ -603,11 +946,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                       </div>
                       <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.bookings}</span>
                       <p className="text-xl md:text-2xl font-black text-neutral-800 font-mono tracking-tight mt-1">
-                        384 <span className="text-xs font-bold text-neutral-500">{isRtl ? 'حجزاً' : 'bookings'}</span>
+                        {totalBookingsValue.toLocaleString()} <span className="text-xs font-bold text-neutral-500">{isRtl ? 'حجزاً' : 'bookings'}</span>
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-2 bg-emerald-50 px-2 py-0.5 rounded-full">
                         <ArrowUpRight size={11} />
-                        +8.2% vs last period
+                        {isRtl ? 'مؤشر مباشر من البيانات الإنتاجية' : 'Live production metric'}
                       </span>
                     </div>
 
@@ -618,11 +961,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                       </div>
                       <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.retention}</span>
                       <p className="text-xl md:text-2xl font-black text-neutral-800 font-mono tracking-tight mt-1">
-                        78.4%
+                        {uniqueCustomersValue.toLocaleString()}
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-2 bg-emerald-50 px-2 py-0.5 rounded-full">
                         <ArrowUpRight size={11} />
-                        +4.5% vs last period
+                        {isRtl ? 'عملاء فريدون من التقارير الإنتاجية' : 'Live unique customers'}
                       </span>
                     </div>
 
@@ -633,11 +976,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                       </div>
                       <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.avgValue}</span>
                       <p className="text-xl md:text-2xl font-black text-neutral-800 font-mono tracking-tight mt-1">
-                        386 <span className="text-xs font-bold text-neutral-500">{isRtl ? 'ر.س' : 'SAR'}</span>
+                        {avgBookingValue.toLocaleString()} <span className="text-xs font-bold text-neutral-500">{isRtl ? 'ر.س' : 'SAR'}</span>
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-2 bg-emerald-50 px-2 py-0.5 rounded-full">
                         <ArrowUpRight size={11} />
-                        +2.1% vs last period
+                        {isRtl ? 'مؤشر مباشر من البيانات الإنتاجية' : 'Live production metric'}
                       </span>
                     </div>
 
@@ -645,11 +988,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                     <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs relative overflow-hidden group">
                       <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.noShowRate}</span>
                       <p className="text-xl md:text-2xl font-black text-neutral-800 font-mono tracking-tight mt-1">
-                        2.1%
+                        {noShowRateValue.toFixed(1)}%
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 mt-2 bg-rose-50 px-2 py-0.5 rounded-full">
                         <ArrowDownRight size={11} />
-                        -1.5% decrease (good)
+                        {isRtl ? 'مؤشر مباشر من البيانات الإنتاجية' : 'Live production metric'}
                       </span>
                     </div>
 
@@ -657,11 +1000,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                     <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs relative overflow-hidden group">
                       <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.rebookingRate}</span>
                       <p className="text-xl md:text-2xl font-black text-neutral-800 font-mono tracking-tight mt-1">
-                        64.2%
+                        {rebookingRateValue.toFixed(1)}%
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-2 bg-emerald-50 px-2 py-0.5 rounded-full">
                         <ArrowUpRight size={11} />
-                        +5.2% rebooking growth
+                        {isRtl ? 'تحليلات إعادة الحجز من الإنتاج' : 'Live rebooking analytics'}
                       </span>
                     </div>
 
@@ -669,11 +1012,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                     <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs relative overflow-hidden group">
                       <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.refunds}</span>
                       <p className="text-xl md:text-2xl font-black text-neutral-800 font-mono tracking-tight mt-1">
-                        1,200 <span className="text-xs font-bold text-neutral-500">{isRtl ? 'ر.س' : 'SAR'}</span>
+                        {refundTotalValue.toLocaleString()} <span className="text-xs font-bold text-neutral-500">{isRtl ? 'ر.س' : 'SAR'}</span>
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 mt-2 bg-amber-50 px-2 py-0.5 rounded-full">
                         <AlertTriangle size={11} />
-                        Safe boundary (0.8% of gross)
+                        {isRtl ? 'تقرير مرتجعات مباشر من الإنتاج' : 'Live refund totals'}
                       </span>
                     </div>
 
@@ -681,11 +1024,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                     <div className="bg-zinc-900 text-white p-5 rounded-2xl border border-zinc-800 shadow-xs relative overflow-hidden group col-span-2 lg:col-span-1">
                       <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block">{isRtl ? 'معدل إشغال الصالون' : 'Salon Room Occupancy'}</span>
                       <p className="text-xl md:text-2xl font-black text-amber-400 font-mono tracking-tight mt-1">
-                        84.5%
+                        {completionRateValue.toFixed(1)}%
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 mt-2 bg-zinc-800 px-2 py-0.5 rounded-full">
                         <ArrowUpRight size={11} />
-                        +4.5% vs weekend average
+                        {isRtl ? 'مؤشر مباشر من البيانات الإنتاجية' : 'Live production metric'}
                       </span>
                     </div>
 
@@ -978,7 +1321,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                             <tr className="border-b border-neutral-100 text-neutral-400 font-bold bg-neutral-50/50">
                               
                               {/* Headers for Sales Reports */}
-                              {activeTab === 'sales_reports' && (
+                              {activeTab === 'sales' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'رقم التقرير' : 'ID'}</th>
                                   <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ' : 'Date'} <ArrowUpDown size={10} className="inline" /></th>
@@ -992,7 +1335,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               )}
 
                               {/* Headers for Financial Reports */}
-                              {activeTab === 'financial_reports' && (
+                              {activeTab === 'financial' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'مرجع الفاتورة' : 'Invoice ID'}</th>
                                   <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ والساعة' : 'Timestamp'} <ArrowUpDown size={10} className="inline" /></th>
@@ -1006,7 +1349,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               )}
 
                               {/* Headers for Appointment Reports */}
-                              {activeTab === 'appointment_reports' && (
+                              {activeTab === 'appointments' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'رقم الموعد' : 'Booking ID'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'العميل' : 'Customer'}</th>
@@ -1020,7 +1363,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               )}
 
                               {/* Headers for Employee Reports */}
-                              {activeTab === 'employee_reports' && (
+                              {activeTab === 'employees' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'الموظفة' : 'Employee'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'التخصص الفرعي' : 'Role'}</th>
@@ -1034,7 +1377,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               )}
 
                               {/* Headers for Service Reports */}
-                              {activeTab === 'service_reports' && (
+                              {activeTab === 'services' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'الخدمة' : 'Service'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'التصنيف الرئيسي' : 'Category'}</th>
@@ -1047,7 +1390,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               )}
 
                               {/* Headers for Product Reports */}
-                              {activeTab === 'product_reports' && (
+                              {activeTab === 'products' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'رمز التخزين SKU' : 'SKU'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'المنتج' : 'Product'}</th>
@@ -1060,7 +1403,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               )}
 
                               {/* Headers for Discounts Reports */}
-                              {activeTab === 'discounts_reports' && (
+                              {activeTab === 'discounts' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'كود العرض / القسيمة' : 'Promo Code'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'البيان وتفاصيل العرض' : 'Description'}</th>
@@ -1072,7 +1415,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               )}
 
                               {/* Headers for Refund Reports */}
-                              {activeTab === 'refund_reports' && (
+                              {activeTab === 'refunds' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'رقم عملية الاسترداد' : 'Refund ID'}</th>
                                   <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ والوقت' : 'Date & Time'} <ArrowUpDown size={10} className="inline" /></th>
@@ -1085,7 +1428,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               )}
 
                               {/* Headers for Payment Methods */}
-                              {activeTab === 'payment_methods' && (
+                              {activeTab === 'paymentMethods' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'بوابة الدفع وقناة السداد' : 'Payment Method / Provider'}</th>
                                   <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('transactions')}>{isRtl ? 'عدد العمليات' : 'Transactions count'} <ArrowUpDown size={10} className="inline" /></th>
@@ -1098,7 +1441,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               )}
 
                               {/* Headers for Customer Sales */}
-                              {activeTab === 'customer_sales' && (
+                              {activeTab === 'customerSales' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'كود العميل ID' : 'Client Code'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'الاسم' : 'Customer'}</th>
@@ -1111,8 +1454,18 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 </>
                               )}
 
+                              {/* Headers for Advanced Analytics */}
+                              {activeTab === 'advancedAnalytics' && (
+                                <>
+                                  <th className="p-3 text-start">{isRtl ? 'المؤشر' : 'Metric'}</th>
+                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('total')}>{isRtl ? 'القيمة' : 'Value'} <ArrowUpDown size={10} className="inline" /></th>
+                                  <th className="p-3 text-start">{isRtl ? 'السياق' : 'Context'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'الحالة' : 'Status'}</th>
+                                </>
+                              )}
+
                               {/* Headers for Rebooking Analytics */}
-                              {activeTab === 'rebooking_analytics' && (
+                              {activeTab === 'rebookings' && (
                                 <>
                                   <th className="p-3 text-start">{isRtl ? 'رقم التحليل' : 'ID'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'العميل' : 'Customer'}</th>
@@ -1139,7 +1492,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               >
                                 
                                 {/* 1. Sales Report Column Renders */}
-                                {activeTab === 'sales_reports' && (
+                                {activeTab === 'sales' && (
                                   <>
                                     <td className="p-3 font-mono font-bold text-neutral-800">{item.id}</td>
                                     <td className="p-3 font-mono">{item.date}</td>
@@ -1153,7 +1506,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 )}
 
                                 {/* 2. Financial Reports Column Renders */}
-                                {activeTab === 'financial_reports' && (
+                                {activeTab === 'financial' && (
                                   <>
                                     <td className="p-3 font-mono font-bold text-neutral-800">{item.id}</td>
                                     <td className="p-3 font-mono text-neutral-500">{item.date}</td>
@@ -1171,7 +1524,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 )}
 
                                 {/* 3. Appointment Reports Column Renders */}
-                                {activeTab === 'appointment_reports' && (
+                                {activeTab === 'appointments' && (
                                   <>
                                     <td className="p-3 font-mono font-bold text-neutral-800">{item.id}</td>
                                     <td className="p-3 font-bold">{isRtl ? item.customerAr : item.customer}</td>
@@ -1194,7 +1547,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 )}
 
                                 {/* 4. Employee Reports Column Renders */}
-                                {activeTab === 'employee_reports' && (
+                                {activeTab === 'employees' && (
                                   <>
                                     <td className="p-3 font-bold text-neutral-800">{isRtl ? item.nameAr : item.name}</td>
                                     <td className="p-3 text-neutral-500">{isRtl ? item.roleAr : item.role}</td>
@@ -1208,7 +1561,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 )}
 
                                 {/* 5. Service Reports Column Renders */}
-                                {activeTab === 'service_reports' && (
+                                {activeTab === 'services' && (
                                   <>
                                     <td className="p-3 font-bold text-neutral-800">{isRtl ? item.nameAr : item.name}</td>
                                     <td className="p-3 text-neutral-500">{isRtl ? item.categoryAr : item.category}</td>
@@ -1221,7 +1574,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 )}
 
                                 {/* 6. Product Reports Column Renders */}
-                                {activeTab === 'product_reports' && (
+                                {activeTab === 'products' && (
                                   <>
                                     <td className="p-3 font-mono text-neutral-400 font-bold">{item.sku}</td>
                                     <td className="p-3 font-bold text-neutral-800">{isRtl ? item.nameAr : item.name}</td>
@@ -1240,7 +1593,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 )}
 
                                 {/* 7. Discounts Reports Column Renders */}
-                                {activeTab === 'discounts_reports' && (
+                                {activeTab === 'discounts' && (
                                   <>
                                     <td className="p-3 font-mono font-black text-brand-600">{item.code}</td>
                                     <td className="p-3 text-neutral-600">{isRtl ? item.descriptionAr : item.description}</td>
@@ -1256,7 +1609,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 )}
 
                                 {/* 8. Refund Reports Column Renders */}
-                                {activeTab === 'refund_reports' && (
+                                {activeTab === 'refunds' && (
                                   <>
                                     <td className="p-3 font-mono font-bold text-neutral-800">{item.id}</td>
                                     <td className="p-3 font-mono text-neutral-500">{item.date}</td>
@@ -1269,7 +1622,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 )}
 
                                 {/* 9. Payment Methods Column Renders */}
-                                {activeTab === 'payment_methods' && (
+                                {activeTab === 'paymentMethods' && (
                                   <>
                                     <td className="p-3 font-bold text-neutral-800">{isRtl ? item.methodAr : item.method}</td>
                                     <td className="p-3 font-mono font-bold">{item.transactions}</td>
@@ -1286,7 +1639,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 )}
 
                                 {/* 10. Customer Sales Column Renders */}
-                                {activeTab === 'customer_sales' && (
+                                {activeTab === 'customerSales' && (
                                   <>
                                     <td className="p-3 font-mono text-neutral-400 font-bold">{item.id}</td>
                                     <td className="p-3 font-bold text-neutral-800">{isRtl ? item.nameAr : item.name}</td>
@@ -1303,8 +1656,22 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                   </>
                                 )}
 
-                                {/* 11. Rebooking Analytics Column Renders */}
-                                {activeTab === 'rebooking_analytics' && (
+                                {/* 11. Advanced Analytics Column Renders */}
+                                {activeTab === 'advancedAnalytics' && (
+                                  <>
+                                    <td className="p-3 font-bold text-neutral-800">{isRtl ? item.nameAr || item.nameEn : item.nameEn || item.nameAr || item.id}</td>
+                                    <td className="p-3 font-mono font-extrabold text-emerald-600">{item.total ?? 0}</td>
+                                    <td className="p-3 text-neutral-500">{item.pct ?? '-'}</td>
+                                    <td className="p-3 font-bold">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700">
+                                        {isRtl ? 'مباشر' : 'Live'}
+                                      </span>
+                                    </td>
+                                  </>
+                                )}
+
+                                {/* 12. Rebooking Analytics Column Renders */}
+                                {activeTab === 'rebookings' && (
                                   <>
                                     <td className="p-3 font-mono font-bold text-neutral-800">{item.id}</td>
                                     <td className="p-3 font-bold">{isRtl ? item.customerAr : item.customer}</td>
