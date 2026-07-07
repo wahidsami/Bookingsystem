@@ -315,6 +315,12 @@ export default function InteractiveDrawers({
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
 
   useEffect(() => {
+    if (createStep === 4 && stagedServices.length === 0) {
+      setCreateStep(3);
+    }
+  }, [createStep, stagedServices.length]);
+
+  useEffect(() => {
     if (services.length > 0) {
       const selectedServiceExists = services.some((service) => service.id === currentServiceId);
       if (!selectedServiceExists) {
@@ -472,24 +478,7 @@ export default function InteractiveDrawers({
       loyalty = 'Guest Account';
     }
 
-    let finalStaged = [...stagedServices];
-    if (finalStaged.length === 0) {
-      const resolvedServiceId = `${currentServiceId || ''}`.trim();
-      const srv = services.find(s => s.id === resolvedServiceId);
-      if (srv) {
-        finalStaged.push({
-          id: `stg-${Date.now()}`,
-          serviceId: resolvedServiceId,
-          staffId: currentStaffId,
-          startTime: currentStartTime,
-          duration: currentDuration,
-          discountType: currentDiscountType,
-          discountValue: currentDiscountValue,
-          notes: currentServiceNotes,
-        });
-      }
-    }
-
+    const finalStaged = [...stagedServices];
     if (finalStaged.length === 0) {
       addLocalToast('يرجى إدراج خدمة واحدة على الأقل لتأكيد الحجز', 'Please add at least one service to confirm booking', 'warning');
       return;
@@ -554,7 +543,7 @@ export default function InteractiveDrawers({
       };
     });
 
-    const resolvedPrimaryServiceId = `${items[0]?.serviceId || currentServiceId || ''}`.trim();
+    const resolvedPrimaryServiceId = `${items[0]?.serviceId || ''}`.trim();
     const resolvedPrimaryStaffId = `${firstStaffId || currentStaffId || ''}`.trim();
     if (!resolvedPrimaryServiceId) {
       addLocalToast('يرجى اختيار خدمة صحيحة قبل تأكيد الحجز', 'Please choose a valid service before confirming the booking', 'warning');
@@ -749,10 +738,10 @@ export default function InteractiveDrawers({
     const vat = subtotal * 0.15;
     const total = subtotal + vat;
 
-    let paymentMethodSummary = isRtl ? 'أطراف مدى المشتركة' : 'Mada Unified Terminals';
+    let paymentMethodSummary = isRtl ? 'طرق الدفع' : 'Payment methods';
     if (posSplitActive) {
       const parts = [];
-      if (posSplitAmounts.card > 0) parts.push(`مدى: ${posSplitAmounts.card} ر.س`);
+      if (posSplitAmounts.card > 0) parts.push(`Card: ${posSplitAmounts.card} ر.س`);
       if (posSplitAmounts.cash > 0) parts.push(`نقداً: ${posSplitAmounts.cash} ر.س`);
       if (posSplitAmounts.wallet > 0) parts.push(`المحفظة: ${posSplitAmounts.wallet} ر.س`);
       paymentMethodSummary = parts.join(' | ');
@@ -877,7 +866,23 @@ export default function InteractiveDrawers({
                         <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 3 ? 'bg-amber-500 text-zinc-950 font-black' : 'bg-slate-200 text-slate-500'}`}>3</span>
                         <span>{isRtl ? 'الخدمات والجدولة' : 'Services'}</span>
                       </button>
-                      <button onClick={() => setCreateStep(4)} className={`flex items-center gap-1 font-bold ${createStep === 4 ? 'text-amber-600' : 'text-slate-400'}`}>
+                      <button
+                        onClick={() => {
+                          if (stagedServices.length === 0) {
+                            addLocalToast(
+                              'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
+                              'Please add at least one service before opening the invoice step',
+                              'warning'
+                            );
+                            return;
+                          }
+                          setCreateStep(4);
+                        }}
+                        disabled={stagedServices.length === 0}
+                        className={`flex items-center gap-1 font-bold ${
+                          createStep === 4 ? 'text-amber-600' : 'text-slate-400'
+                        } ${stagedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
                         <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 4 ? 'bg-amber-500 text-zinc-950 font-black' : 'bg-slate-200 text-slate-500'}`}>4</span>
                         <span>{isRtl ? 'الفاتورة والسداد' : 'Invoice'}</span>
                       </button>
@@ -1368,36 +1373,24 @@ export default function InteractiveDrawers({
                     {createStep === 4 && (
                       <div className="space-y-4 animate-fadeIn text-xs">
                         {(() => {
-                          let subtotal = 0;
-                          let primarySubtotal = 0;
-                          let finalStaged = [...stagedServices];
-                          if (finalStaged.length === 0) {
-                            const srv = services.find(s => s.id === currentServiceId);
-                            if (srv) {
-                              finalStaged.push({
-                                id: 'dummy',
-                                serviceId: currentServiceId,
-                                staffId: currentStaffId,
-                                startTime: currentStartTime,
-                                duration: currentDuration,
-                                discountType: 'none',
-                                discountValue: 0,
-                                notes: ''
-                              });
-                            }
-                          }
-                          finalStaged.forEach(item => {
-                            const srv = services.find(s => s.id === item.serviceId);
-                            if (srv) primarySubtotal += toMoney(srv.price);
+                          const queuedLineItems = stagedServices.map((item, index) => {
+                            const srv = services.find((service) => service.id === item.serviceId);
+                            const staff = availableStylists.find((stylist) => stylist.id === item.staffId);
+                            return {
+                              id: item.id,
+                              index,
+                              serviceName: srv ? (isRtl ? srv.nameAr : srv.nameEn) : item.serviceId,
+                              staffName: isRtl ? staff?.nameAr : staff?.nameEn,
+                              duration: item.duration,
+                              startTime: item.startTime,
+                              price: srv ? toMoney(srv.price) : 0
+                            };
                           });
-
-                          // Guest group cost calculation
-                          let guestsSubtotal = 0;
-                          if (includeGroupGuests) {
-                            guestsSubtotal = guestsList.reduce((acc, g) => acc + (g.isFree ? 0 : (g.services || []).reduce((sum, gs) => sum + (gs.isFree ? 0 : toMoney(gs.finalPrice)), 0)), 0);
-                          }
-
-                          subtotal = primarySubtotal + guestsSubtotal;
+                          const primarySubtotal = queuedLineItems.reduce((sum, item) => sum + item.price, 0);
+                          const guestsSubtotal = includeGroupGuests
+                            ? guestsList.reduce((acc, g) => acc + (g.isFree ? 0 : (g.services || []).reduce((sum, gs) => sum + (gs.isFree ? 0 : toMoney(gs.finalPrice)), 0)), 0)
+                            : 0;
+                          const subtotal = primarySubtotal + guestsSubtotal;
                           const vat = subtotal * 0.15;
                           const total = subtotal + vat;
 
@@ -1407,13 +1400,36 @@ export default function InteractiveDrawers({
                                 <span>{isRtl ? 'ملخص الحساب الضريبي للفاتورة' : 'Invoice Statement'}</span>
                                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded uppercase">ZATCA QR</span>
                               </h4>
-                              
-                              {/* LINE ITEMS BREAKDOWN */}
-                              <div className="space-y-1.5 text-xs text-slate-600 border-b pb-2">
-                                <div className="flex justify-between">
-                                  <span className="font-bold text-slate-700">{isRtl ? 'العميل الرئيسي' : 'Primary Session Customer'}</span>
-                                  <span className="font-mono">{toMoney(primarySubtotal).toFixed(2)} ر.س</span>
+                              <div className="space-y-2 border-b pb-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-slate-700">{isRtl ? 'خدمات الجلسة المحجوزة' : 'Queued Service Lines'}</span>
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{queuedLineItems.length}</span>
                                 </div>
+                                {queuedLineItems.length === 0 ? (
+                                  <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50 px-3 py-3 text-[11px] font-semibold text-amber-800">
+                                    {isRtl
+                                      ? 'لا توجد خدمات في قائمة الجلسة بعد. أضف خدمة واحدة على الأقل قبل متابعة الفاتورة.'
+                                      : 'No services have been added to the session queue yet. Add at least one service before continuing.'}
+                                  </div>
+                                ) : (
+                                  queuedLineItems.map((item) => (
+                                    <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <p className="font-bold text-slate-800 truncate">{item.serviceName}</p>
+                                          <p className="text-[10px] text-slate-400 truncate">
+                                            {item.staffName || (isRtl ? 'غير محدد' : 'Unassigned')}
+                                            {' · '}
+                                            {formatMinutesToTime(item.startTime)} · {item.duration} {isRtl ? 'دقيقة' : 'min'}
+                                          </p>
+                                        </div>
+                                        <span className="font-mono font-bold text-slate-700 whitespace-nowrap">
+                                          {item.price.toFixed(2)} ر.س
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
                                 {includeGroupGuests && (
                                   <div className="space-y-1 pl-2.5 border-l-2 border-amber-500/30 pr-2.5">
                                     <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">{isRtl ? 'تفصيل خدمات الضيوف:' : 'GROUP GUESTS BREAKDOWN'}</p>
@@ -1494,7 +1510,7 @@ export default function InteractiveDrawers({
 
                         <div className="p-4 bg-white border rounded-xl space-y-3">
                           <div className="flex items-center justify-between">
-                            <span className="font-bold">{isRtl ? 'سداد فوري عند الحجز (POS)' : 'Instant Terminal Settlement'}</span>
+                            <span className="font-bold">{isRtl ? 'طريقة الدفع' : 'Payment allocation'}</span>
                             <button type="button" onClick={() => setCreateSplitActive(!createSplitActive)} className={`px-2 py-0.5 rounded text-[10px] font-bold ${createSplitActive ? 'bg-amber-500 text-zinc-950' : 'bg-slate-100 text-slate-500'}`}>
                               {createSplitActive ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'تفعيل' : 'Activate')}
                             </button>
@@ -1502,7 +1518,7 @@ export default function InteractiveDrawers({
                           {createSplitActive && (
                             <div className="grid grid-cols-3 gap-2 animate-fadeIn">
                               <div>
-                                <label className="text-[9px] text-zinc-500 block mb-0.5 font-bold">{isRtl ? 'مدى / بطاقة' : 'Card / Mada'}</label>
+                                <label className="text-[9px] text-zinc-500 block mb-0.5 font-bold">{isRtl ? 'بطاقة' : 'Card'}</label>
                                 <input type="number" placeholder="0" value={createSplitAmounts.card || ''} onChange={(e) => setCreateSplitAmounts(prev => ({ ...prev, card: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold text-xs" />
                               </div>
                               <div>
@@ -1558,6 +1574,14 @@ export default function InteractiveDrawers({
                               );
                               return;
                             }
+                          }
+                          if (createStep === 3 && stagedServices.length === 0) {
+                            addLocalToast(
+                              'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
+                              'Please add at least one service before continuing to the invoice step',
+                              'warning'
+                            );
+                            return;
                           }
                           setCreateStep(prev => prev + 1);
                         }} 

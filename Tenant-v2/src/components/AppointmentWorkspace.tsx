@@ -1422,6 +1422,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [checkoutReceiptData, setCheckoutReceiptData] = useState<any | null>(null);
   const [showPaymentConfirmModal, setShowPaymentConfirmModal] = useState<boolean>(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<string | null>(null);
 
   const activeInvoiceServiceItems = activeAppointment ? (
@@ -1500,6 +1501,48 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   );
   const paymentCollectionMode: 'full' | 'remainder' = hasTrueRemainderBalance ? 'remainder' : 'full';
   const paymentDueAmount = activeInvoiceRemaining;
+  const paymentMethodOptions = [
+    { value: 'cash', labelEn: 'Cash', labelAr: 'كاش' },
+    { value: 'card_pos', labelEn: 'Card', labelAr: 'بطاقة' },
+    { value: 'wallet', labelEn: 'Wallet', labelAr: 'المحفظة' },
+    { value: 'bank_transfer', labelEn: 'Bank transfer', labelAr: 'تحويل بنكي' },
+    { value: 'gift_card_code', labelEn: 'Gift card code', labelAr: 'رمز بطاقة الهدية' }
+  ];
+
+  useEffect(() => {
+    if (!activeAppointment?.id) {
+      setSelectedPaymentMethod('');
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadDefaultPaymentMethod = async () => {
+      try {
+        const response = await tenantApiAdapter.getPaymentMethods();
+        if (!isMounted) return;
+
+        const paymentMethods = Array.isArray(response?.paymentMethods)
+          ? response.paymentMethods
+          : Array.isArray(response?.data?.paymentMethods)
+            ? response.data.paymentMethods
+            : [];
+
+        const hasDefaultSavedMethod = paymentMethods.some((method: any) => method?.isDefault);
+        setSelectedPaymentMethod(hasDefaultSavedMethod ? 'card_pos' : '');
+      } catch {
+        if (isMounted) {
+          setSelectedPaymentMethod('');
+        }
+      }
+    };
+
+    void loadDefaultPaymentMethod();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeAppointment?.id]);
 
   // Skeletons / Refresh Simulation
   const [isLoading, setIsLoading] = useState(false);
@@ -2017,6 +2060,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     const taxableAmount = Math.max(0, subtotal - discount);
     const vat = taxableAmount * 0.15;
     const total = paymentDueAmount > 0 ? paymentDueAmount : taxableAmount + vat;
+    const paymentMethodApi = `${selectedPaymentMethod || ''}`.trim();
+    if (!paymentMethodApi) {
+      addLocalToast(
+        'الرجاء اختيار طريقة الدفع أولاً.',
+        'Please choose a payment method first.',
+        'warning'
+      );
+      return;
+    }
 
     const paymentAllocationsPayload = isSplitActive
       ? Object.entries(splitAmounts)
@@ -2027,19 +2079,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                 ? 'card_pos'
                 : paymentMethod === 'bank'
                   ? 'bank_transfer'
-                  : paymentMethod,
+              : paymentMethod,
             amount: Number(amount)
           }))
       : undefined;
-    const paymentMethodApi = paymentAllocationsPayload?.length
-      ? paymentAllocationsPayload[0].paymentMethod
-      : 'card_pos';
-    let paymentMethodSummary = isRtl ? 'بوابة مدى الرقمية المتكاملة' : 'Integrated Mada Card Terminal';
+    const selectedMethodOption = paymentMethodOptions.find((option) => option.value === paymentMethodApi);
+    let paymentMethodSummary = selectedMethodOption
+      ? (isRtl ? selectedMethodOption.labelAr : selectedMethodOption.labelEn)
+      : paymentMethodApi;
     if (isSplitActive) {
       const parts = [];
-      if (splitAmounts.card > 0) parts.push(`${isRtl ? 'مدى' : 'Mada'}: ${splitAmounts.card} ${t.riyal}`);
+      if (splitAmounts.card > 0) parts.push(`${isRtl ? 'بطاقة' : 'Card'}: ${splitAmounts.card} ${t.riyal}`);
       if (splitAmounts.cash > 0) parts.push(`${isRtl ? 'كاش' : 'Cash'}: ${splitAmounts.cash} ${t.riyal}`);
       if (splitAmounts.wallet > 0) parts.push(`${isRtl ? 'المحفظة' : 'Wallet'}: ${splitAmounts.wallet} ${t.riyal}`);
+      if (parts.length === 0 && paymentMethodSummary) {
+        parts.push(paymentMethodSummary);
+      }
       if (parts.length > 0) paymentMethodSummary = parts.join(' | ');
     }
 
@@ -4856,6 +4911,29 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
                     {/* SPLIT PAYMENTS COMPONENT CONTAINER */}
                     <div className="pt-3 border-t border-slate-100 space-y-3">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          {isRtl ? 'طريقة الدفع' : 'Payment method'}
+                        </label>
+                        <select
+                          value={selectedPaymentMethod}
+                          onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700"
+                        >
+                          <option value="">{isRtl ? 'اختر طريقة الدفع' : 'Choose payment method'}</option>
+                          {paymentMethodOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {isRtl ? option.labelAr : option.labelEn}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                          {isRtl
+                            ? 'إذا كانت هناك طريقة افتراضية محفوظة فستظهر هنا، وإلا اخترها يدوياً قبل المتابعة.'
+                            : 'If a default payment method is saved it will appear here; otherwise choose one manually before continuing.'}
+                        </p>
+                      </div>
+
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{t.splitPayments}</span>
                         <button 
@@ -4872,7 +4950,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       {isSplitActive ? (
                         <div className="space-y-2 text-xs">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-slate-500 w-16">{isRtl ? 'مدى / فيزا' : 'Card'}</span>
+                            <span className="text-slate-500 w-16">{isRtl ? 'بطاقة' : 'Card'}</span>
                             <input 
                               type="number" 
                               value={splitAmounts.card}
@@ -4901,7 +4979,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         </div>
                       ) : (
                         <p className="text-[10px] text-slate-400 leading-relaxed">
-                          {isRtl ? 'تسمح هذه الأداة بتقسيم الفاتورة الكلية على أكثر من طريقة دفع (مثل مدى + كاش).' : 'Allows split distribution among multi-payment gateways (Mada, Cash, Credit, Wallet).'}
+                          {isRtl ? 'تسمح هذه الأداة بتقسيم الفاتورة الكلية على أكثر من طريقة دفع (مثل البطاقة + كاش).' : 'Allows split distribution among multiple payment methods (Card, Cash, Wallet, Bank transfer).'}
                         </p>
                       )}
                     </div>
@@ -4911,12 +4989,25 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       {activeAppointment.paymentStatus === 'paid' ? (
                         <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-3 rounded-lg flex items-center gap-2 text-xs font-bold">
                           <Check size={16} />
-                          <span>{isRtl ? 'تم سداد الفاتورة بنجاح عبر بوابة مدى الرقمية' : 'Paid successfully via Integrated Mada terminal'}</span>
+                          <span>{isRtl ? 'تم سداد الفاتورة بنجاح' : 'Payment completed successfully'}</span>
                         </div>
                       ) : (
                         <button
-                          onClick={() => setShowPaymentConfirmModal(true)}
-                          className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                          disabled={!selectedPaymentMethod.trim()}
+                          onClick={() => {
+                            if (!selectedPaymentMethod.trim()) {
+                              addLocalToast(
+                                'الرجاء اختيار طريقة الدفع أولاً.',
+                                'Please choose a payment method first.',
+                                'warning'
+                              );
+                              return;
+                            }
+                            setShowPaymentConfirmModal(true);
+                          }}
+                          className={`w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold tracking-wider transition-all shadow-md flex items-center justify-center gap-2 ${
+                            selectedPaymentMethod.trim() ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'
+                          }`}
                         >
                           <CheckCircle2 size={15} className="text-amber-400" />
                           <span>{t.checkout}</span>
