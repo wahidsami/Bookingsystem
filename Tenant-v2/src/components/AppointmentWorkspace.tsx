@@ -127,7 +127,7 @@ const toMoney = (value: any) => {
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
-function resolveEffectivePaymentStatus(item: {
+function resolveEffectivePaymentStatus(item?: {
   paymentStatus?: string | null;
   normalizedPaymentStatus?: string | null;
   price?: number | null;
@@ -135,6 +135,10 @@ function resolveEffectivePaymentStatus(item: {
   outstandingAmount?: number | null;
   remainderAmount?: number | null;
 }) {
+  if (!item) {
+    return 'pending';
+  }
+
   const normalizedStatus = `${item.normalizedPaymentStatus || ''}`.trim().toLowerCase();
   if (normalizedStatus) {
     return normalizedStatus;
