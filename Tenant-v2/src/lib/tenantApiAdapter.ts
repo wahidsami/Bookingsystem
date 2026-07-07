@@ -317,10 +317,6 @@ class TenantApiAdapter {
     return this.get('/tenant/profile');
   }
 
-  async getPaymentMethods(): Promise<any> {
-    return this.get('/api/v1/users/payment-methods');
-  }
-
   private buildQueryString(params?: Record<string, any>): string {
     const q = new URLSearchParams();
     Object.entries(params || {}).forEach(([key, value]) => {

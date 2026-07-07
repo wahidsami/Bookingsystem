@@ -129,7 +129,6 @@ const toMoney = (value: any) => {
 
 function resolveEffectivePaymentStatus(item?: {
   paymentStatus?: string | null;
-  normalizedPaymentStatus?: string | null;
   price?: number | null;
   totalPaid?: number | null;
   outstandingAmount?: number | null;
@@ -139,25 +138,20 @@ function resolveEffectivePaymentStatus(item?: {
     return 'pending';
   }
 
-  const normalizedStatus = `${item.normalizedPaymentStatus || ''}`.trim().toLowerCase();
-  if (normalizedStatus) {
-    return normalizedStatus;
-  }
-
   const rawStatus = `${item.paymentStatus || ''}`.trim().toLowerCase();
   const price = Number(item.price || 0);
   const totalPaid = Number(item.totalPaid || 0);
   const explicitOutstanding = Number(item.outstandingAmount);
-  const computedOutstanding = Number.isFinite(explicitOutstanding)
+  const outstanding = Number.isFinite(explicitOutstanding)
     ? explicitOutstanding
     : Math.max(0, price - totalPaid);
   const remainderAmount = Number(item.remainderAmount || 0);
 
-  if ((rawStatus === 'fully_paid' || rawStatus === 'paid') && computedOutstanding > 0.009) {
+  if ((rawStatus === 'fully_paid' || rawStatus === 'paid') && outstanding > 0.009) {
     return 'deposit_paid';
   }
 
-  if (rawStatus === 'deposit_paid' && computedOutstanding <= 0.009 && remainderAmount <= 0.009) {
+  if (rawStatus === 'deposit_paid' && outstanding <= 0.009 && remainderAmount <= 0.009) {
     return 'fully_paid';
   }
 
@@ -331,7 +325,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     const outstandingAmount = Number(a.outstandingAmount ?? a.remainingBalance ?? remainderAmount);
     const normalizedPaymentStatus = resolveEffectivePaymentStatus({
       paymentStatus: a.paymentStatus,
-      normalizedPaymentStatus: a.normalizedPaymentStatus,
       price,
       totalPaid,
       outstandingAmount,
@@ -1422,7 +1415,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [checkoutReceiptData, setCheckoutReceiptData] = useState<any | null>(null);
   const [showPaymentConfirmModal, setShowPaymentConfirmModal] = useState<boolean>(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('cash');
   const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<string | null>(null);
 
   const activeInvoiceServiceItems = activeAppointment ? (
@@ -1500,48 +1493,27 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     (currentPaymentStatus === 'deposit_paid' || Number(activeAppointment?.depositAmount ?? 0) > 0)
   );
   const paymentCollectionMode: 'full' | 'remainder' = hasTrueRemainderBalance ? 'remainder' : 'full';
-  const paymentDueAmount = activeInvoiceRemaining;
+  const paymentDueAmount = Math.max(
+    0,
+    currentPaymentStatus === 'deposit_paid'
+      ? Math.max(0, Number(activeAppointment?.remainderAmount ?? activeAppointment?.outstandingAmount ?? activeInvoiceRemaining))
+      : Math.max(0, Number(activeAppointment?.outstandingAmount ?? activeInvoiceRemaining))
+  );
   const paymentMethodOptions = [
-    { value: 'cash', labelEn: 'Cash', labelAr: 'كاش' },
-    { value: 'card_pos', labelEn: 'Card', labelAr: 'بطاقة' },
+    { value: 'cash', labelEn: 'Cash', labelAr: 'نقداً' },
+    { value: 'card_pos', labelEn: 'Card POS', labelAr: 'بطاقة عند المركز' },
     { value: 'wallet', labelEn: 'Wallet', labelAr: 'المحفظة' },
     { value: 'bank_transfer', labelEn: 'Bank transfer', labelAr: 'تحويل بنكي' },
-    { value: 'gift_card_code', labelEn: 'Gift card code', labelAr: 'رمز بطاقة الهدية' }
+    { value: 'gift_card_code', labelEn: 'Gift card code', labelAr: 'رمز بطاقة هدية' }
   ];
 
   useEffect(() => {
     if (!activeAppointment?.id) {
-      setSelectedPaymentMethod('');
+      setSelectedPaymentMethod('cash');
       return;
     }
 
-    let isMounted = true;
-
-    const loadDefaultPaymentMethod = async () => {
-      try {
-        const response = await tenantApiAdapter.getPaymentMethods();
-        if (!isMounted) return;
-
-        const paymentMethods = Array.isArray(response?.paymentMethods)
-          ? response.paymentMethods
-          : Array.isArray(response?.data?.paymentMethods)
-            ? response.data.paymentMethods
-            : [];
-
-        const hasDefaultSavedMethod = paymentMethods.some((method: any) => method?.isDefault);
-        setSelectedPaymentMethod(hasDefaultSavedMethod ? 'card_pos' : '');
-      } catch {
-        if (isMounted) {
-          setSelectedPaymentMethod('');
-        }
-      }
-    };
-
-    void loadDefaultPaymentMethod();
-
-    return () => {
-      isMounted = false;
-    };
+    setSelectedPaymentMethod('cash');
   }, [activeAppointment?.id]);
 
   // Skeletons / Refresh Simulation
@@ -2089,7 +2061,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       : paymentMethodApi;
     if (isSplitActive) {
       const parts = [];
-      if (splitAmounts.card > 0) parts.push(`${isRtl ? 'بطاقة' : 'Card'}: ${splitAmounts.card} ${t.riyal}`);
+      if (splitAmounts.card > 0) parts.push(`${isRtl ? 'بطاقة عند المركز' : 'Card POS'}: ${splitAmounts.card} ${t.riyal}`);
       if (splitAmounts.cash > 0) parts.push(`${isRtl ? 'كاش' : 'Cash'}: ${splitAmounts.cash} ${t.riyal}`);
       if (splitAmounts.wallet > 0) parts.push(`${isRtl ? 'المحفظة' : 'Wallet'}: ${splitAmounts.wallet} ${t.riyal}`);
       if (parts.length === 0 && paymentMethodSummary) {
@@ -4929,8 +4901,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                         </select>
                         <p className="text-[10px] text-slate-400 leading-relaxed">
                           {isRtl
-                            ? 'إذا كانت هناك طريقة افتراضية محفوظة فستظهر هنا، وإلا اخترها يدوياً قبل المتابعة.'
-                            : 'If a default payment method is saved it will appear here; otherwise choose one manually before continuing.'}
+                            ? 'اختر طريقة الدفع قبل المتابعة.'
+                            : 'Choose a payment method before continuing.'}
                         </p>
                       </div>
 
@@ -4950,7 +4922,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                       {isSplitActive ? (
                         <div className="space-y-2 text-xs">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-slate-500 w-16">{isRtl ? 'بطاقة' : 'Card'}</span>
+                            <span className="text-slate-500 w-16">{isRtl ? 'بطاقة عند المركز' : 'Card POS'}</span>
                             <input 
                               type="number" 
                               value={splitAmounts.card}
