@@ -48,6 +48,7 @@ interface Appointment {
   duration: number; // minutes
   status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
   paymentStatus: 'paid' | 'unpaid' | 'partial';
+  normalizedPaymentStatus?: string | null;
   isGroupBooking: boolean;
   guestCount?: number;
   hasNotes: boolean;
@@ -59,7 +60,12 @@ interface Appointment {
   loyaltyTier?: string;
   walletBalance?: number;
   totalPaid?: number;
+  depositAmount?: number | null;
+  depositPaid?: number | null;
   remainderAmount?: number;
+  remainderPaid?: number | null;
+  remainingBalance?: number | null;
+  outstandingAmount?: number | null;
   branchName?: string;
   branch?: { name?: string };
   invoiceStatus?: string;
@@ -120,6 +126,46 @@ const toMoney = (value: any) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
 };
+
+function resolveEffectivePaymentStatus(item: {
+  paymentStatus?: string | null;
+  normalizedPaymentStatus?: string | null;
+  price?: number | null;
+  totalPaid?: number | null;
+  outstandingAmount?: number | null;
+  remainderAmount?: number | null;
+}) {
+  const normalizedStatus = `${item.normalizedPaymentStatus || ''}`.trim().toLowerCase();
+  if (normalizedStatus) {
+    return normalizedStatus;
+  }
+
+  const rawStatus = `${item.paymentStatus || ''}`.trim().toLowerCase();
+  const price = Number(item.price || 0);
+  const totalPaid = Number(item.totalPaid || 0);
+  const explicitOutstanding = Number(item.outstandingAmount);
+  const computedOutstanding = Number.isFinite(explicitOutstanding)
+    ? explicitOutstanding
+    : Math.max(0, price - totalPaid);
+  const remainderAmount = Number(item.remainderAmount || 0);
+
+  if ((rawStatus === 'fully_paid' || rawStatus === 'paid') && computedOutstanding > 0.009) {
+    return 'deposit_paid';
+  }
+
+  if (rawStatus === 'deposit_paid' && computedOutstanding <= 0.009 && remainderAmount <= 0.009) {
+    return 'fully_paid';
+  }
+
+  return rawStatus || 'pending';
+}
+
+function normalizeWorkspacePaymentStatus(status: string): Appointment['paymentStatus'] {
+  const normalized = `${status || ''}`.toLowerCase();
+  if (['paid', 'fully_paid'].includes(normalized)) return 'paid';
+  if (['partial', 'deposit_paid', 'partially_paid'].includes(normalized)) return 'partial';
+  return 'unpaid';
+}
 
 const getLocalDateKey = (value: Date | string | number | null | undefined) => {
   const date = value instanceof Date ? value : new Date(value || new Date());
@@ -269,6 +315,24 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
           : (a.service ? [a.service] : []);
     const lineItems = Array.isArray(a.lineItems) ? a.lineItems : Array.isArray(a.invoiceItems) ? a.invoiceItems : [];
     const products = Array.isArray(a.products) ? a.products : Array.isArray(a.productItems) ? a.productItems : Array.isArray(a.retailItems) ? a.retailItems : [];
+    const price = sessionAppointments.length > 0
+      ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.price || item?.service?.price || 0), 0)
+      : parseFloat(a.price || 0);
+    const totalPaid = Number(a.totalPaid ?? 0);
+    const depositAmount = Number(a.depositAmount ?? 0);
+    const depositPaid = Number(a.depositPaid ?? 0);
+    const remainderAmount = Number(a.remainderAmount ?? a.remainingBalance ?? Math.max(0, price - totalPaid));
+    const remainderPaid = Number(a.remainderPaid ?? 0);
+    const remainingBalance = Number(a.remainingBalance ?? a.outstandingAmount ?? remainderAmount);
+    const outstandingAmount = Number(a.outstandingAmount ?? a.remainingBalance ?? remainderAmount);
+    const normalizedPaymentStatus = resolveEffectivePaymentStatus({
+      paymentStatus: a.paymentStatus,
+      normalizedPaymentStatus: a.normalizedPaymentStatus,
+      price,
+      totalPaid,
+      outstandingAmount,
+      remainderAmount
+    });
     const normalizeServiceName = (item: any, key: 'en' | 'ar') => {
       if (key === 'en') {
         return item?.service?.name_en
@@ -300,9 +364,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     const duration = sessionAppointments.length > 0
       ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.duration || item?.service?.duration || 0), 0)
       : (a.service?.duration || a.duration || 60);
-    const price = sessionAppointments.length > 0
-      ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.price || item?.service?.price || 0), 0)
-      : parseFloat(a.price || 0);
     return {
       id: a.id,
       customerId: a.user?.id || a.customerId,
@@ -318,7 +379,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       startTime: startMins,
       duration,
       status: normalizeWorkspaceAppointmentStatus(a.status),
-      paymentStatus: a.paymentStatus,
+      paymentStatus: normalizeWorkspacePaymentStatus(normalizedPaymentStatus),
+      normalizedPaymentStatus,
       isGroupBooking: Boolean(a.isGroupBooking),
       guestCount: a.guestCount,
       hasNotes: !!a.notes,
@@ -329,10 +391,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       customerEmail: a.user?.email || a.customerEmail,
       loyaltyTier: a.loyaltyTier,
       walletBalance: a.walletBalance,
-      totalPaid: a.totalPaid,
-      remainderAmount: a.remainderAmount ?? a.remainingBalance ?? Math.max(0, (parseFloat(a.price || 0) || 0) - (parseFloat(a.totalPaid || 0) || 0)),
+      totalPaid,
+      depositAmount,
+      depositPaid,
+      remainderAmount,
+      remainderPaid,
+      remainingBalance,
+      outstandingAmount,
       branchName: a.branchName || a.branch?.name || a.locationName || a.location?.name,
-      invoiceStatus: a.invoiceStatus || a.paymentStatus,
+      invoiceStatus: a.invoiceStatus || normalizedPaymentStatus,
       assignedStaffName: a.staff?.name || a.staffName || '',
       paymentAllocations: Array.isArray(a.paymentAllocations) ? a.paymentAllocations : [],
       services,
@@ -420,10 +487,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
       const sumDuration = group.reduce((sum, entry) => sum + Number(entry.duration || 0), 0);
       const sumPrice = group.reduce((sum, entry) => sum + Number(entry.price || 0), 0);
       const sumPaid = group.reduce((sum, entry) => sum + Number(entry.totalPaid || 0), 0);
+      const sumDepositAmount = group.reduce((sum, entry) => sum + Number(entry.depositAmount || 0), 0);
+      const sumDepositPaid = group.reduce((sum, entry) => sum + Number(entry.depositPaid || 0), 0);
       const sumRemainder = group.reduce((sum, entry) => sum + Number(entry.remainderAmount || 0), 0);
+      const sumRemainderPaid = group.reduce((sum, entry) => sum + Number(entry.remainderPaid || 0), 0);
+      const sumRemainingBalance = group.reduce((sum, entry) => sum + Number((entry.remainingBalance ?? entry.outstandingAmount ?? entry.remainderAmount) || 0), 0);
+      const sumOutstandingAmount = group.reduce((sum, entry) => sum + Number((entry.outstandingAmount ?? entry.remainingBalance ?? entry.remainderAmount) || 0), 0);
       const combinedLineItems = group.flatMap((entry) => Array.isArray(entry.lineItems) ? entry.lineItems : Array.isArray(entry.invoiceItems) ? entry.invoiceItems : []);
       const combinedProducts = group.flatMap((entry) => Array.isArray(entry.products) ? entry.products : Array.isArray(entry.productItems) ? entry.productItems : Array.isArray(entry.retailItems) ? entry.retailItems : []);
       const combinedTags = Array.from(new Set(group.flatMap((entry) => Array.isArray(entry.tags) ? entry.tags : [])));
+      const normalizedPaymentStatus = group.some((entry) => `${entry.normalizedPaymentStatus || ''}`.toLowerCase() === 'deposit_paid')
+        ? 'deposit_paid'
+        : group.every((entry) => ['paid', 'fully_paid'].includes(`${entry.normalizedPaymentStatus || entry.paymentStatus || ''}`.toLowerCase()))
+          ? 'fully_paid'
+          : primary.normalizedPaymentStatus || primary.paymentStatus || undefined;
 
       return {
         ...primary,
@@ -431,6 +508,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         serviceId: primary.serviceId || group.find((entry) => entry.serviceId)?.serviceId,
         bookingSessionId: primary.bookingSessionId || undefined,
         bookingReference: primary.bookingReference || undefined,
+        normalizedPaymentStatus,
         serviceNameEn: namesEn.length > 0 ? namesEn.join(' + ') : primary.serviceNameEn,
         serviceNameAr: namesAr.length > 0 ? namesAr.join(' + ') : primary.serviceNameAr,
         staffId: primary.staffId,
@@ -438,7 +516,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         duration: sumDuration || primary.duration,
         price: sumPrice || primary.price,
         totalPaid: sumPaid || primary.totalPaid,
+        depositAmount: sumDepositAmount || primary.depositAmount,
+        depositPaid: sumDepositPaid || primary.depositPaid,
         remainderAmount: sumRemainder || primary.remainderAmount,
+        remainderPaid: sumRemainderPaid || primary.remainderPaid,
+        remainingBalance: sumRemainingBalance || primary.remainingBalance,
+        outstandingAmount: sumOutstandingAmount || primary.outstandingAmount,
         hasNotes: group.some((entry) => entry.hasNotes),
         notes: group.map((entry) => entry.notes).filter(Boolean).join(' | ') || primary.notes,
         tags: combinedTags,
@@ -1405,7 +1488,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const activeInvoiceVat = Number((activeInvoiceTaxable * 0.15).toFixed(2));
   const activeInvoiceTotal = Number((activeInvoiceTaxable + activeInvoiceVat).toFixed(2));
   const activeInvoiceRemaining = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0) - Number(splitAmounts.wallet || 0));
-  const currentPaymentStatus = `${activeAppointment?.paymentStatus || ''}`.toLowerCase();
+  const currentPaymentStatus = resolveEffectivePaymentStatus(activeAppointment || undefined);
+  const hasTrueRemainderBalance = Boolean(
+    Number(activeAppointment?.totalPaid ?? 0) > 0 &&
+    Number(activeAppointment?.remainderAmount ?? 0) > 0 &&
+    (currentPaymentStatus === 'deposit_paid' || Number(activeAppointment?.depositAmount ?? 0) > 0)
+  );
+  const paymentCollectionMode: 'full' | 'remainder' = hasTrueRemainderBalance ? 'remainder' : 'full';
   const paymentDueAmount = activeInvoiceRemaining;
 
   // Skeletons / Refresh Simulation
@@ -1952,8 +2041,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
     try {
       // 1. Mark appointment as paid
-      const isRemainderPayment = ['partial', 'deposit_paid'].includes(currentPaymentStatus) || Number(activeAppointment?.totalPaid ?? 0) > 0;
-      const paymentResponse = isRemainderPayment && paymentDueAmount > 0
+      const paymentResponse = paymentCollectionMode === 'remainder' || hasTrueRemainderBalance
         ? await tenantApiAdapter.recordRemainderPayment(activeAppointment.id, {
             amount: total,
             paymentMethod: paymentMethodApi,
