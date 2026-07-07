@@ -1524,6 +1524,11 @@ export function AppointmentDetailsDrawer({
     if (!appointment) return null;
 
   const currentPaymentStatus = resolveEffectivePaymentStatus(appointment);
+  const hasTrueRemainderBalance = Boolean(
+    Number(appointment.totalPaid ?? 0) > 0 &&
+    Number(appointment.remainderAmount ?? 0) > 0 &&
+    (appointment.paymentStatus === "deposit_paid" || Number(appointment.depositAmount ?? 0) > 0)
+  );
     const appointmentDateTime = new Date(appointment.startTime);
     const appointmentEndDateTime = new Date(appointment.endTime);
     const durationMinutes = Math.max(
@@ -1674,7 +1679,7 @@ export function AppointmentDetailsDrawer({
   const handleCheckout = async () => {
     if (remainingAmount > 0) {
       setPendingStatusAfterPayment("completed");
-      openPaymentCollection(currentPaymentStatus === "deposit_paid" ? "remainder" : "full", "completed");
+      openPaymentCollection(hasTrueRemainderBalance ? "remainder" : "full", "completed");
       setActionNotice({
         kind: "success",
         message: locale === "ar"
@@ -1882,7 +1887,7 @@ export function AppointmentDetailsDrawer({
           }))
         };
 
-        const response = paymentCollectionMode === "remainder" || currentPaymentStatus === "deposit_paid"
+        const response = paymentCollectionMode === "remainder" || hasTrueRemainderBalance
           ? await tenantApi.recordRemainderPayment(appointment.id, {
               ...payload,
               transactionRef: undefined
@@ -1911,9 +1916,13 @@ export function AppointmentDetailsDrawer({
         updateCustomerProfileAfterPayment(paymentDueAmount, walletAllocationTotal);
 
         if (pendingStatusAfterPayment && appointment?.status !== pendingStatusAfterPayment) {
-          const statusResponse = await tenantApi.updateAppointmentStatus(appointment.id, pendingStatusAfterPayment);
-          if (statusResponse?.success && statusResponse?.appointment) {
-            setAppointment((prev) => prev ? { ...prev, status: statusResponse.appointment.status } : prev);
+          try {
+            const statusResponse = await tenantApi.updateAppointmentStatus(appointment.id, pendingStatusAfterPayment);
+            if (statusResponse?.success && statusResponse?.appointment) {
+              setAppointment((prev) => prev ? { ...prev, status: statusResponse.appointment.status } : prev);
+            }
+          } catch (statusErr) {
+            console.warn("Failed to apply pending appointment status after payment:", statusErr);
           }
         }
 
