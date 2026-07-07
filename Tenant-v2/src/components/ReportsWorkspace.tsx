@@ -318,19 +318,20 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         const advancedAnalyticsData = advancedRes.status === 'fulfilled' && advancedRes.value?.success
           ? (advancedRes.value.data || null)
           : null;
-        const mappedCustomerSales = Array.isArray(customerSalesData.customerSales)
-          ? customerSalesData.customerSales.map((row: any) => ({
-              ...row,
-              nameAr: row.name || row.customer || row.customerDisplayName || row.id,
-              name: row.customer || row.name || row.customerDisplayName || row.id,
-              phone: row.phone || '-',
-              tier: row.customerBadge || row.customerType || '-',
-              visits: Number(row.bookings || row.visits || 0),
-              spentServices: Number(row.revenue || row.spentServices || 0),
-              spentProducts: Number(row.spentProducts || 0),
-              totalSpent: Number(row.totalSpent || row.revenue || 0)
-            }))
-          : [];
+        const customerSalesSourceRows = Array.isArray(customerSalesData.customerSales) && customerSalesData.customerSales.length
+          ? customerSalesData.customerSales
+          : (customerAnalyticsData?.topCustomers || []);
+        const mappedCustomerSales = customerSalesSourceRows.map((row: any) => ({
+          ...row,
+          nameAr: row.customerDisplayName || row.name || row.customer || row.id,
+          name: row.customerDisplayName || row.name || row.customer || row.id,
+          phone: row.phone || '-',
+          tier: row.customerBadge || row.customerType || '-',
+          visits: Number(row.bookings || row.visits || 0),
+          spentServices: Number(row.revenue || row.spentServices || 0),
+          spentProducts: Number(row.spentProducts || 0),
+          totalSpent: Number(row.totalSpent || row.revenue || 0)
+        }));
         const serviceRevenueTotal = servicePerformanceRows.reduce((sum: number, row: any) => sum + Number(row.revenue || 0), 0) || 1;
         const mappedServices = servicePerformanceRows.map((row: any) => ({
           id: row.id,
@@ -371,15 +372,33 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           stock: row.stock ?? row.stockQuantity ?? 0
         }));
         const mappedPaymentMethods = paymentMethodsData.rows.map((row: any) => ({
-          id: row.paymentMethod,
-          method: row.paymentMethodLabel || row.paymentMethod,
-          methodAr: row.paymentMethodLabel || row.paymentMethod,
+          id: row.paymentMethod || row.id,
+          paymentMethod: row.paymentMethod || row.id,
+          paymentMethodLabel: row.paymentMethodLabel || row.paymentMethod || row.id || '-',
+          method: row.paymentMethodLabel || row.paymentMethod || row.id || '-',
+          methodAr: row.paymentMethodLabel || row.paymentMethod || row.id || '-',
           transactions: Number(row.transactionCount || 0),
           collected: Number(row.revenue || 0),
-          fees: 0,
+          fees: Number(row.fees || 0),
           settlement: Number(row.revenue || 0),
           pct: `${paymentMethodsData.totals?.revenue ? ((Number(row.revenue || 0) / Number(paymentMethodsData.totals.revenue || 1)) * 100).toFixed(1) : '0.0'}%`,
           rating: 'Live'
+        }));
+        const mappedRefunds = refundsData.rows.map((row: any) => ({
+          ...row,
+          id: row.id,
+          date: row.date,
+          reference: row.reference || row.invoice || row.transactionReference || row.id,
+          invoice: row.reference || row.invoice || row.transactionReference || row.id,
+          customer: row.customer || row.customerDisplayName || row.name || '-',
+          item: row.entityLabel || row.item || '-',
+          reason: row.refundReason || row.reason || '-',
+          amount: Number(row.amount || 0),
+          total: Number(row.amount || 0),
+          revenue: Number(row.amount || 0),
+          paymentMethodLabel: row.paymentMethodLabel || row.paymentMethod || '-',
+          employee: row.employee || '-',
+          refundMode: row.refundMode || row.type || '-'
         }));
         const mappedDiscounts = Array.isArray(financialOverviewData?.discountTotals?.topDiscountedServices)
           ? financialOverviewData.discountTotals.topDiscountedServices.map((row: any) => ({
@@ -418,7 +437,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           services: mappedServices,
           products: mappedProducts,
           discounts: mappedDiscounts,
-          refunds: refundsData.rows,
+          refunds: mappedRefunds,
           paymentMethods: mappedPaymentMethods,
           customerSales: mappedCustomerSales,
           advancedAnalytics: mapAdvancedAnalyticsRows(advancedAnalyticsData),
@@ -1418,40 +1437,37 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               {/* Headers for Refund Reports */}
                               {activeTab === 'refunds' && (
                                 <>
-                                  <th className="p-3 text-start">{isRtl ? 'رقم عملية الاسترداد' : 'Refund ID'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ والوقت' : 'Date & Time'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start">{isRtl ? 'رقم الفاتورة الأصلية' : 'Original Invoice'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'العميل المستفيد' : 'Customer'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'البند المسترد' : 'Refunded Item'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'سبب الاسترجاع المعتمد' : 'Reason For Refund'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('amount')}>{isRtl ? 'المبلغ المسترد' : 'Refunded Amount'} <ArrowUpDown size={10} className="inline" /></th>
+                                  <th className="p-3 text-start">{isRtl ? 'التاريخ' : 'Date'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'العميل' : 'Customer'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'المرجع' : 'Reference'}</th>
+                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('amount')}>{isRtl ? 'المبلغ' : 'Amount'} <ArrowUpDown size={10} className="inline" /></th>
+                                  <th className="p-3 text-start">{isRtl ? 'طريقة الدفع' : 'Payment method'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'السبب' : 'Reason'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'الموظف' : 'Employee'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'النوع' : 'Type'}</th>
                                 </>
                               )}
 
                               {/* Headers for Payment Methods */}
                               {activeTab === 'paymentMethods' && (
                                 <>
-                                  <th className="p-3 text-start">{isRtl ? 'بوابة الدفع وقناة السداد' : 'Payment Method / Provider'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('transactions')}>{isRtl ? 'عدد العمليات' : 'Transactions count'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('collected')}>{isRtl ? 'إجمالي المبالغ المحصلة' : 'Gross Collected'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start">{isRtl ? 'رسوم معالجة الشبكة' : 'Processing Fees'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'صافي التسوية والتحويل' : 'Net Settlement'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'النسبة من الإجمالي' : 'Distribution %'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'تقييم كفاءة الشبكة' : 'Provider Health Status'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'الطريقة' : 'Method'}</th>
+                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('collected')}>{isRtl ? 'الإيراد' : 'Revenue'} <ArrowUpDown size={10} className="inline" /></th>
+                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('transactions')}>{isRtl ? 'العمليات' : 'Transactions'} <ArrowUpDown size={10} className="inline" /></th>
+                                  <th className="p-3 text-start">{isRtl ? 'النسبة' : 'Share'}</th>
                                 </>
                               )}
 
                               {/* Headers for Customer Sales */}
                               {activeTab === 'customerSales' && (
                                 <>
-                                  <th className="p-3 text-start">{isRtl ? 'كود العميل ID' : 'Client Code'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'الاسم' : 'Customer'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'رقم الجوال' : 'Phone'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'فئة الولاء' : 'Loyalty Tier'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('visits')}>{isRtl ? 'إجمالي الزيارات' : 'Total Visits'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start">{isRtl ? 'مشتريات الخدمات' : 'Services Value'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'مشتريات المنتجات' : 'Products Value'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('totalSpent')}>{isRtl ? 'مجموع المنفق' : 'Aggregate Spent'} <ArrowUpDown size={10} className="inline" /></th>
+                                  <th className="p-3 text-start">{isRtl ? 'العميل' : 'Customer'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'النوع' : 'Type'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'الهوية' : 'Identity'}</th>
+                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('visits')}>{isRtl ? 'الحجوزات' : 'Bookings'} <ArrowUpDown size={10} className="inline" /></th>
+                                  <th className="p-3 text-start">{isRtl ? 'المكتملة' : 'Completed'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'الإيراد' : 'Revenue'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'آخر زيارة' : 'Last visit'}</th>
                                 </>
                               )}
 
@@ -1612,48 +1628,50 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 {/* 8. Refund Reports Column Renders */}
                                 {activeTab === 'refunds' && (
                                   <>
-                                    <td className="p-3 font-mono font-bold text-neutral-800">{item.id}</td>
-                                    <td className="p-3 font-mono text-neutral-500">{item.date}</td>
-                                    <td className="p-3 font-mono font-bold text-neutral-700">{item.invoice}</td>
-                                    <td className="p-3 font-bold">{isRtl ? item.customerAr : item.customer}</td>
-                                    <td className="p-3 font-semibold text-neutral-600">{isRtl ? item.itemAr : item.item}</td>
-                                    <td className="p-3 text-rose-800 font-bold">{isRtl ? item.reasonAr : item.reason}</td>
+                                    <td className="p-3 font-mono text-neutral-500">{item.date ? new Date(item.date).toLocaleString() : '-'}</td>
+                                    <td className="p-3 font-bold">{item.customer || '-'}</td>
+                                    <td className="p-3 font-mono font-bold text-neutral-700">{item.reference || item.invoice || '-'}</td>
                                     <td className="p-3 font-mono font-extrabold text-rose-600">-{item.amount} {isRtl ? 'ر.س' : 'SAR'}</td>
+                                    <td className="p-3">
+                                      <span className="bg-zinc-100 text-zinc-800 border border-zinc-200 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                                        {item.paymentMethodLabel || '-'}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-rose-800 font-bold">{item.reason || '-'}</td>
+                                    <td className="p-3 font-mono text-neutral-500">{item.employee || '-'}</td>
+                                    <td className="p-3 text-neutral-600">{item.refundMode || '-'}</td>
                                   </>
                                 )}
 
                                 {/* 9. Payment Methods Column Renders */}
                                 {activeTab === 'paymentMethods' && (
                                   <>
-                                    <td className="p-3 font-bold text-neutral-800">{isRtl ? item.methodAr : item.method}</td>
-                                    <td className="p-3 font-mono font-bold">{item.transactions}</td>
+                                    <td className="p-3 font-bold text-neutral-800">{item.paymentMethodLabel || item.method || '-'}</td>
                                     <td className="p-3 font-mono font-extrabold text-neutral-900">{item.collected} {isRtl ? 'ر.س' : 'SAR'}</td>
-                                    <td className="p-3 font-mono text-rose-600">-{item.fees} {isRtl ? 'ر.س' : 'SAR'}</td>
-                                    <td className="p-3 font-mono font-extrabold text-emerald-600">{item.settlement} {isRtl ? 'ر.س' : 'SAR'}</td>
+                                    <td className="p-3 font-mono font-bold">{item.transactions}</td>
                                     <td className="p-3 font-mono font-bold text-brand-600">{item.pct}</td>
-                                    <td className="p-3">
-                                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold text-[10px]">
-                                        {item.rating}
-                                      </span>
-                                    </td>
                                   </>
                                 )}
 
                                 {/* 10. Customer Sales Column Renders */}
                                 {activeTab === 'customerSales' && (
                                   <>
-                                    <td className="p-3 font-mono text-neutral-400 font-bold">{item.id}</td>
-                                    <td className="p-3 font-bold text-neutral-800">{isRtl ? item.nameAr : item.name}</td>
-                                    <td className="p-3 font-mono text-neutral-500">{item.phone}</td>
-                                    <td className="p-3">
-                                      <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-bold text-[10px]">
-                                        {item.tier}
+                                    <td className="p-3 font-bold text-neutral-800">
+                                      <span className="inline-flex min-w-0 flex-col">
+                                        <span>{item.customerDisplayName || item.customerName || item.name || item.id || '-'}</span>
+                                        <span className="text-[10px] text-neutral-500">{item.customerIdentityLine || item.email || item.phone || item.id || ''}</span>
                                       </span>
                                     </td>
-                                    <td className="p-3 font-mono font-bold">{item.visits}</td>
-                                    <td className="p-3 font-mono">{item.spentServices} {isRtl ? 'ر.س' : 'SAR'}</td>
-                                    <td className="p-3 font-mono">{item.spentProducts} {isRtl ? 'ر.س' : 'SAR'}</td>
-                                    <td className="p-3 font-mono font-extrabold text-emerald-600">{item.totalSpent} {isRtl ? 'ر.س' : 'SAR'}</td>
+                                    <td className="p-3">
+                                      <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                                        {item.customerType || item.type || '-'}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 font-mono text-neutral-500">{item.customerIdentityLine || item.email || item.phone || item.id || '-'}</td>
+                                    <td className="p-3 font-mono font-bold">{item.visits ?? item.bookings ?? 0}</td>
+                                    <td className="p-3 font-mono font-bold">{item.completed ?? item.visits ?? item.bookings ?? 0}</td>
+                                    <td className="p-3 font-mono">{item.revenue ?? item.totalSpent ?? 0} {isRtl ? 'ر.س' : 'SAR'}</td>
+                                    <td className="p-3 font-mono text-neutral-500">{item.lastVisit ? new Date(item.lastVisit).toLocaleDateString() : '-'}</td>
                                   </>
                                 )}
 
