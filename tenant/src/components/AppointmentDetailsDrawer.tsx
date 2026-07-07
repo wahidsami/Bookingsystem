@@ -1088,8 +1088,54 @@ export function AppointmentDetailsDrawer({
     if (!appointment) return;
     const refreshed = await tenantApi.getAppointment(appointment.id);
     if (refreshed?.success && refreshed?.appointment) {
-      setAppointment(refreshed.appointment);
+      setAppointment((current) => preferMoreSettledAppointmentState(current, refreshed.appointment));
     }
+  };
+
+  const preferMoreSettledAppointmentState = (
+    current: AppointmentItem | null,
+    next: AppointmentItem
+  ): AppointmentItem => {
+    if (!current) return next;
+
+    const currentPaymentScore = getPaymentStateScore(current);
+    const nextPaymentScore = getPaymentStateScore(next);
+
+    if (nextPaymentScore > currentPaymentScore) {
+      return next;
+    }
+
+    if (nextPaymentScore < currentPaymentScore) {
+      return current;
+    }
+
+    const currentPaid = Number(current.totalPaid ?? 0);
+    const nextPaid = Number(next.totalPaid ?? 0);
+    if (nextPaid > currentPaid + 0.01) {
+      return next;
+    }
+    if (nextPaid < currentPaid - 0.01) {
+      return current;
+    }
+
+    const currentOutstanding = Number(current.outstandingAmount ?? current.remainderAmount ?? 0);
+    const nextOutstanding = Number(next.outstandingAmount ?? next.remainderAmount ?? 0);
+    if (nextOutstanding < currentOutstanding - 0.01) {
+      return next;
+    }
+    if (nextOutstanding > currentOutstanding + 0.01) {
+      return current;
+    }
+
+    return next;
+  };
+
+  const getPaymentStateScore = (item: AppointmentItem): number => {
+    const status = resolveEffectivePaymentStatus(item);
+    if (status === "fully_paid" || status === "paid") return 3;
+    if (status === "deposit_paid") return 2;
+    if (Number(item.totalPaid ?? 0) > 0) return 1;
+    return 0;
   };
 
   const updateCustomerProfileAfterPayment = (paymentAmount: number, walletAmount: number = 0) => {
@@ -1211,6 +1257,9 @@ export function AppointmentDetailsDrawer({
           message: response?.message || (locale === "ar" ? "تعذر تحديث الدفع." : "Failed to update payment.")
         });
         return;
+      }
+      if (response?.appointment) {
+        setAppointment((current) => preferMoreSettledAppointmentState(current, response.appointment));
       }
       updateCustomerProfileAfterPayment(paymentAmount, walletAmount);
       await refreshAppointment();
@@ -1850,6 +1899,10 @@ export function AppointmentDetailsDrawer({
             message: response?.message || (locale === "ar" ? "تعذر تسجيل الدفعة." : "Failed to record payment.")
           });
           return;
+        }
+
+        if (response?.appointment) {
+          setAppointment((current) => preferMoreSettledAppointmentState(current, response.appointment));
         }
 
         const walletAllocationTotal = normalizedRows
