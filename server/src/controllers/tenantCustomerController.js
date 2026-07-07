@@ -53,7 +53,7 @@ function logTenantAppointmentAudit(event, payload = {}) {
     }
 }
 
-function toSerializableValue(value, seen = new WeakSet()) {
+function toSerializableValue(value, stack = new WeakSet()) {
     if (value === null || value === undefined) {
         return value;
     }
@@ -70,22 +70,22 @@ function toSerializableValue(value, seen = new WeakSet()) {
         try {
             const jsonValue = value.toJSON();
             if (jsonValue !== value) {
-                return toSerializableValue(jsonValue, seen);
+                return toSerializableValue(jsonValue, stack);
             }
         } catch (error) {
             // Fall through to manual cloning below.
         }
     }
 
-    if (seen.has(value)) {
+    if (stack.has(value)) {
         return null;
     }
 
-    seen.add(value);
+    stack.add(value);
 
     if (Array.isArray(value)) {
-        const clonedArray = value.map((item) => toSerializableValue(item, seen));
-        seen.delete(value);
+        const clonedArray = value.map((item) => toSerializableValue(item, stack));
+        stack.delete(value);
         return clonedArray;
     }
 
@@ -99,10 +99,10 @@ function toSerializableValue(value, seen = new WeakSet()) {
             continue;
         }
 
-        output[key] = toSerializableValue(nestedValue, seen);
+        output[key] = toSerializableValue(nestedValue, stack);
     }
 
-    seen.delete(value);
+    stack.delete(value);
     return output;
 }
 
@@ -467,9 +467,11 @@ function toPlainAppointmentAggregationRecord(appointment, overrides = {}) {
         return null;
     }
 
-    const plain = typeof appointment.toJSON === 'function'
-        ? appointment.toJSON()
-        : { ...appointment };
+    const plain = typeof appointment.get === 'function'
+        ? appointment.get({ plain: true })
+        : (typeof appointment.toJSON === 'function'
+            ? appointment.toJSON()
+            : { ...appointment });
 
     const sanitized = {
         ...plain,
@@ -2100,8 +2102,6 @@ exports.getCustomerTransactions = async (req, res) => {
             endDate: endDate || null
         });
 
-        const appointmentIds = appointments.map((row) => row.id);
-        const orderIds = orders.map((row) => row.id);
         const bookingSessions = aggregateAppointmentsByBookingSession(appointments);
         const bookingReferenceValues = [...new Set(bookingSessions.map((session) => session.bookingReference).filter(Boolean))];
         const bookingSessionReferenceMatches = bookingReferenceValues.length > 0
@@ -2200,71 +2200,7 @@ exports.getCustomerTransactions = async (req, res) => {
                 ],
                 order: [['createdAt', 'DESC']]
             }),
-            db.PaymentTransaction.findAll({
-                where: {
-                    [Op.or]: [
-                        { appointmentId: { [Op.in]: appointmentIds.length ? appointmentIds : ['00000000-0000-0000-0000-000000000000'] } },
-                        { orderId: { [Op.in]: orderIds.length ? orderIds : ['00000000-0000-0000-0000-000000000000'] } }
-                    ],
-                    paymentMethod: { [Op.in]: ['cash', 'card_pos', 'wallet', 'bank_transfer'] },
-                    ...(appointmentStart || appointmentEnd ? {
-                        processedAt: {
-                            ...(appointmentStart ? { [Op.gte]: appointmentStart } : {}),
-                            ...(appointmentEnd ? { [Op.lte]: appointmentEnd } : {})
-                        }
-                    } : {})
-                },
-                include: [
-                    {
-                        model: db.Appointment,
-                        as: 'appointment',
-                        attributes: ['id', 'bookingNumber', 'startTime', 'endTime', 'paymentStatus', 'status', 'paymentMethod', 'price', 'depositAmount', 'remainderAmount', 'totalPaid'],
-                        required: false,
-                        include: [
-                            {
-                                model: db.Service,
-                                as: 'service',
-                                attributes: ['id', 'name_en', 'name_ar', 'duration'],
-                                required: false
-                            },
-                            {
-                                model: db.Staff,
-                                as: 'staff',
-                                attributes: ['id', 'name', 'photo'],
-                                required: false
-                            }
-                        ]
-                    },
-                    {
-                        model: db.Order,
-                        as: 'order',
-                        attributes: ['id', 'orderNumber', 'paymentStatus', 'status', 'paymentMethod', 'totalAmount', 'createdAt', 'deliveryType', 'shippingAddress', 'trackingNumber', 'estimatedDeliveryDate'],
-                        required: false,
-                        include: [
-                            {
-                                model: db.OrderItem,
-                                as: 'items',
-                                include: [
-                                    {
-                                        model: db.Product,
-                                        as: 'product',
-                                        attributes: ['id', 'name_en', 'name_ar', 'image', 'category'],
-                                        required: false
-                                    }
-                                ],
-                                required: false
-                            }
-                        ]
-                    },
-                    {
-                        model: db.Staff,
-                        as: 'processor',
-                        attributes: ['id', 'name'],
-                        required: false
-                    }
-                ],
-                order: [['processedAt', 'DESC']]
-            })
+            []
         ]);
         const walletLedgerTransactions = await db.WalletLedgerEntry.findAll({
             where: {
