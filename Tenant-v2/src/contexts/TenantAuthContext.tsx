@@ -7,6 +7,17 @@ import {
 
 type SessionType = 'tenant_owner' | 'tenant_account' | null;
 
+export function isElevatedDashboardRoleKey(roleKey?: string | null): boolean {
+  if (!roleKey) return false;
+
+  const normalized = String(roleKey).trim().toLowerCase();
+  return (
+    normalized.includes('admin') ||
+    normalized.includes('owner') ||
+    normalized.includes('super')
+  );
+}
+
 export interface TenantAuthUser {
   id?: string;
   email?: string;
@@ -218,6 +229,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = useCallback(
     (permissionKey: string) => {
       if (sessionType === 'tenant_owner') return true;
+      if (isElevatedDashboardRoleKey(permissions?.roleKey)) return true;
       return Boolean(permissions?.[permissionKey]);
     },
     [permissions, sessionType]

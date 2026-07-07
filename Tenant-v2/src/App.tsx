@@ -10,7 +10,7 @@ import QuickCreateModal from './components/QuickCreateModal';
 import ActivityCenter from './components/ActivityCenter';
 import TenantLoginScreen from './components/TenantLoginScreen';
 import { translations, navigationItems } from './data/translations';
-import { useTenantAuth } from './contexts/TenantAuthContext';
+import { isElevatedDashboardRoleKey, useTenantAuth } from './contexts/TenantAuthContext';
 import {
   hasHotDealsEntitlement,
   hasProductsAndOrdersEntitlement,
@@ -21,6 +21,8 @@ import {
 export default function App() {
   const {
     user,
+    account,
+    sessionType,
     permissions,
     packageEntitlements,
     error: authError,
@@ -94,6 +96,9 @@ export default function App() {
     'marketing-reviews': true,
     'marketing-page-setup': true,
   });
+  const hasFullDashboardAccess =
+    sessionType === 'tenant_owner' ||
+    isElevatedDashboardRoleKey(account?.roleKey || user?.roleKey || permissions?.roleKey);
 
   // Custom premium Toast Notifications
   const [toasts, setToasts] = useState<{ id: string; messageAr: string; messageEn: string; type: 'success' | 'info' }[]>([]);
@@ -139,6 +144,17 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
+    if (hasFullDashboardAccess) {
+      setAccessibleMarketingModules({
+        'marketing-hot-deals': true,
+        'marketing-gift-cards': true,
+        'marketing-notifications': true,
+        'marketing-reviews': true,
+        'marketing-page-setup': true,
+      });
+      return;
+    }
+
     setAccessibleMarketingModules({
       'marketing-hot-deals': hasHotDealsEntitlement(packageEntitlements),
       'marketing-gift-cards': hasProductsAndOrdersEntitlement(packageEntitlements),
@@ -146,7 +162,7 @@ export default function App() {
       'marketing-reviews': Boolean(permissions?.view_reviews),
       'marketing-page-setup': hasPublicPageCustomizationEntitlement(packageEntitlements)
     });
-  }, [packageEntitlements, permissions]);
+  }, [packageEntitlements, permissions, hasFullDashboardAccess]);
 
   const addToast = (msgAr: string, msgEn: string, type: 'success' | 'info' = 'success') => {
     const id = Math.random().toString(36).substr(2, 9);
