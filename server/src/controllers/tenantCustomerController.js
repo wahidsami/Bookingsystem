@@ -53,6 +53,59 @@ function logTenantAppointmentAudit(event, payload = {}) {
     }
 }
 
+function toSerializableValue(value, seen = new WeakSet()) {
+    if (value === null || value === undefined) {
+        return value;
+    }
+
+    if (typeof value !== 'object') {
+        return value;
+    }
+
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    if (typeof value.toJSON === 'function') {
+        try {
+            const jsonValue = value.toJSON();
+            if (jsonValue !== value) {
+                return toSerializableValue(jsonValue, seen);
+            }
+        } catch (error) {
+            // Fall through to manual cloning below.
+        }
+    }
+
+    if (seen.has(value)) {
+        return null;
+    }
+
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+        const clonedArray = value.map((item) => toSerializableValue(item, seen));
+        seen.delete(value);
+        return clonedArray;
+    }
+
+    const output = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+        if (typeof nestedValue === 'function') {
+            continue;
+        }
+
+        if (key === 'parent' || key === 'sequelize') {
+            continue;
+        }
+
+        output[key] = toSerializableValue(nestedValue, seen);
+    }
+
+    seen.delete(value);
+    return output;
+}
+
 function parseDateValue(value, endOfDay = false) {
     if (!value) {
         return null;
@@ -714,14 +767,22 @@ exports.getCustomers = async (req, res) => {
             ];
         }
 
-        // Get customers with appointments
-        const customersWithAppointments = await db.PlatformUser.findAll({
+        const baseCustomers = await db.PlatformUser.findAll({
             where: whereClause,
-            include: [
-                {
-                    model: db.Appointment,
-                    as: 'appointments',
-                    required: true,
+            attributes: [
+                'id', 'firstName', 'lastName', 'email', 'phone',
+                'profileImage', 'gender', 'createdAt'
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        const customerIds = baseCustomers.map((customer) => customer.id);
+        const [appointmentRows, orderRows] = customerIds.length > 0
+            ? await Promise.all([
+                db.Appointment.findAll({
+                    where: {
+                        platformUserId: { [Op.in]: customerIds }
+                    },
                     include: [
                         {
                             model: db.Service,
@@ -731,25 +792,14 @@ exports.getCustomers = async (req, res) => {
                             attributes: ['id', 'name_en', 'name_ar']
                         }
                     ],
-                    attributes: ['id', 'startTime', 'endTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid']
-                }
-            ],
-            attributes: [
-                'id', 'firstName', 'lastName', 'email', 'phone', 
-                'profileImage', 'gender', 'createdAt'
-            ],
-            distinct: true
-        });
-
-        // Get customers with orders
-        const customersWithOrders = await db.PlatformUser.findAll({
-            where: whereClause,
-            include: [
-                {
-                    model: db.Order,
-                    as: 'orders',
-                    required: true,
-                    where: { tenantId },
+                    attributes: ['id', 'platformUserId', 'startTime', 'endTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid'],
+                    order: [['startTime', 'DESC']]
+                }),
+                db.Order.findAll({
+                    where: {
+                        platformUserId: { [Op.in]: customerIds },
+                        tenantId
+                    },
                     include: [
                         {
                             model: db.OrderItem,
@@ -757,46 +807,41 @@ exports.getCustomers = async (req, res) => {
                             attributes: ['id', 'quantity', 'unitPrice', 'totalPrice']
                         }
                     ],
-                    attributes: ['id', 'orderNumber', 'status', 'paymentStatus', 'totalAmount', 'createdAt']
-                }
-            ],
-            attributes: [
-                'id', 'firstName', 'lastName', 'email', 'phone', 
-                'profileImage', 'gender', 'createdAt'
-            ],
-            distinct: true
-        });
+                    attributes: ['id', 'platformUserId', 'orderNumber', 'status', 'paymentStatus', 'totalAmount', 'createdAt'],
+                    order: [['createdAt', 'DESC']]
+                })
+            ])
+            : [[], []];
 
-        // Merge and deduplicate customers
-        const customerMap = new Map();
-        
-        customersWithAppointments.forEach(customer => {
-            const customerData = customer.toJSON();
-            if (!customerMap.has(customerData.id)) {
-                customerMap.set(customerData.id, {
-                    ...customerData,
-                    appointments: customerData.appointments || [],
-                    orders: []
-                });
-            } else {
-                customerMap.get(customerData.id).appointments = customerData.appointments || [];
+        const appointmentMap = new Map();
+        appointmentRows.forEach((appointment) => {
+            const appointmentData = typeof appointment.toJSON === 'function' ? appointment.toJSON() : { ...appointment };
+            const customerId = appointmentData.platformUserId || null;
+            if (!customerId) {
+                return;
             }
+            const bucket = appointmentMap.get(customerId) || [];
+            bucket.push(appointmentData);
+            appointmentMap.set(customerId, bucket);
         });
 
-        customersWithOrders.forEach(customer => {
-            const customerData = customer.toJSON();
-            if (!customerMap.has(customerData.id)) {
-                customerMap.set(customerData.id, {
-                    ...customerData,
-                    appointments: [],
-                    orders: customerData.orders || []
-                });
-            } else {
-                customerMap.get(customerData.id).orders = customerData.orders || [];
+        const orderMap = new Map();
+        orderRows.forEach((order) => {
+            const orderData = typeof order.toJSON === 'function' ? order.toJSON() : { ...order };
+            const customerId = orderData.platformUserId || null;
+            if (!customerId) {
+                return;
             }
+            const bucket = orderMap.get(customerId) || [];
+            bucket.push(orderData);
+            orderMap.set(customerId, bucket);
         });
 
-        let allCustomers = Array.from(customerMap.values());
+        let allCustomers = baseCustomers.map((customer) => ({
+            ...(typeof customer.toJSON === 'function' ? customer.toJSON() : { ...customer }),
+            appointments: appointmentMap.get(customer.id) || [],
+            orders: orderMap.get(customer.id) || []
+        }));
 
         // Filter by customer type
         if (customerType === 'service_only') {
@@ -810,11 +855,11 @@ exports.getCustomers = async (req, res) => {
         }
 
         // Enrich with customer insights
-        const customerIds = allCustomers.map(c => c.id);
-        const insights = customerIds.length > 0
+        const insightCustomerIds = allCustomers.map((c) => c.id);
+        const insights = insightCustomerIds.length > 0
             ? await db.CustomerInsight.findAll({
                 where: {
-                    platformUserId: { [Op.in]: customerIds },
+                    platformUserId: { [Op.in]: insightCustomerIds },
                     tenantId
                 }
             })
@@ -947,7 +992,7 @@ exports.getCustomers = async (req, res) => {
         res.json({
             success: true,
             data: {
-                customers: paginatedFiltered,
+                customers: toSerializableValue(paginatedFiltered),
                 pagination: {
                     total: filteredTotal,
                     page: safePage,
@@ -1377,7 +1422,7 @@ exports.getCustomer = async (req, res) => {
 
         res.json({
             success: true,
-            data: customerData
+            data: toSerializableValue(customerData)
         });
 
     } catch (error) {
@@ -1821,8 +1866,8 @@ exports.getCustomerHistory = async (req, res) => {
         res.json({
             success: true,
             data: {
-                history: history.slice(0, parseInt(limit)),
-                walletTransactions: walletTransactions.map((entry) => ({
+                history: toSerializableValue(history.slice(0, parseInt(limit))),
+                walletTransactions: toSerializableValue(walletTransactions.map((entry) => ({
                     id: entry.id,
                     source: 'wallet_ledger',
                     type: entry.type,
@@ -1835,7 +1880,7 @@ exports.getCustomerHistory = async (req, res) => {
                     referenceId: entry.referenceId || null,
                     metadata: entry.metadata || {},
                     createdAt: entry.createdAt
-                })),
+                }))),
                 summary: {
                     totalInteractions: history.length,
                     totalAppointments: bookingSessions.length,
@@ -2603,7 +2648,7 @@ exports.getCustomerTransactions = async (req, res) => {
         res.json({
             success: true,
             data: {
-                transactions: pagedTransactions,
+                transactions: toSerializableValue(pagedTransactions),
                 summary: {
                     totalTransactions: transactions.length,
                     completedTotal: parseFloat(completedTotal.toFixed(2)),
