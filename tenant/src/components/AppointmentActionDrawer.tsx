@@ -1374,7 +1374,8 @@ export function AppointmentActionDrawer({
       return;
     }
 
-    const resolvedCustomerMode = selectedCustomer
+    const hasExistingCustomer = Boolean(selectedCustomer?.id);
+    const resolvedCustomerMode = hasExistingCustomer
       ? "existing"
       : (customerMode === "new" ? "new" : "guest");
 
@@ -1465,13 +1466,13 @@ export function AppointmentActionDrawer({
               .join(" • ") || undefined;
           })()
         } : undefined,
-        platformUserId: resolvedCustomerMode === "existing" ? selectedCustomer?.id : undefined,
+        platformUserId: hasExistingCustomer ? selectedCustomer?.id : undefined,
         notifyCustomer: true,
         customer: resolvedCustomerMode === "new" || resolvedCustomerMode === "guest"
           ? {
               ...newCustomer,
               ...(resolvedCustomerMode === "guest"
-                ? splitFullName(newCustomer.firstName.trim())
+                ? splitFullName((newCustomer.firstName || "").trim() || (locale === "ar" ? "عميل" : "Customer"))
                 : {
                     firstName: newCustomer.firstName.trim(),
                     lastName: newCustomer.lastName.trim()
