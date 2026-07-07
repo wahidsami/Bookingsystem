@@ -220,7 +220,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           tenantApiAdapter.getRefundsReport(startDate, endDate),
           tenantApiAdapter.getPaymentMethodsReport(startDate, endDate),
           tenantApiAdapter.getPosClosingSummary({ date: endDate.split('T')[0] }),
-          tenantApiAdapter.getFullReport(startDate, endDate, ['customerSales', 'advancedAnalytics'])
+          tenantApiAdapter.getFullReport(startDate, endDate, ['customerSales']),
+          tenantApiAdapter.getAdvancedAnalytics({ startDate, endDate, groupBy })
         ]);
 
         const employees = empRes.status === 'fulfilled' && empRes.value?.employees
@@ -462,7 +463,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     retention: isRtl ? 'نسبة الاحتفاظ بالعملاء' : 'Client Retention',
     noShowRate: isRtl ? 'نسبة عدم الحضور' : 'No-Show Rate',
     rebookingRate: isRtl ? 'معدل إعادة الحجز' : 'Rebooking Rate',
-    refunds: isRtl ? 'إجمالي المرتجعات' : 'Total Refunds',
+    totalRefunds: isRtl ? 'إجمالي المرتجعات' : 'Total Refunds',
     avgValue: isRtl ? 'متوسط قيمة الحجز' : 'Avg Booking Value',
     vatLabel: isRtl ? 'شامل ضريبة القيمة المضافة (15%)' : 'Inc. VAT (15%)',
 
@@ -1010,7 +1011,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
                     {/* Refunds */}
                     <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs relative overflow-hidden group">
-                      <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.refunds}</span>
+                      <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.totalRefunds}</span>
                       <p className="text-xl md:text-2xl font-black text-neutral-800 font-mono tracking-tight mt-1">
                         {refundTotalValue.toLocaleString()} <span className="text-xs font-bold text-neutral-500">{isRtl ? 'ر.س' : 'SAR'}</span>
                       </p>
