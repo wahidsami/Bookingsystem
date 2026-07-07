@@ -167,7 +167,15 @@ const resolvePaymentAmount = (requestedAmount, fallbackAmount) => {
 const loadAppointmentPaymentContext = async (appointmentId, { transaction = null, lock = false } = {}) => {
     const appointment = await db.Appointment.findByPk(appointmentId, {
         transaction,
-        lock: lock && transaction ? transaction.LOCK.UPDATE : undefined,
+        lock: lock && transaction ? transaction.LOCK.UPDATE : undefined
+    });
+
+    if (!appointment) {
+        return null;
+    }
+
+    await appointment.reload({
+        transaction,
         include: [
             {
                 model: db.Service,
@@ -215,10 +223,6 @@ const loadAppointmentPaymentContext = async (appointmentId, { transaction = null
             }
         ]
     });
-
-    if (!appointment) {
-        return null;
-    }
 
     const sessionAppointments = Array.isArray(appointment.bookingSession?.appointments)
         ? appointment.bookingSession.appointments
