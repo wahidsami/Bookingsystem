@@ -1118,7 +1118,7 @@ async function getPaymentTransactions(req, { startDate, endDate, limit = 200 } =
             { '$order.tenantId$': tenantId }
         ],
         status: { [Op.in]: ['completed', 'refunded'] },
-        type: { [Op.in]: ['booking', 'product_purchase', 'refund'] }
+        type: { [Op.in]: ['deposit', 'remainder', 'full', 'refund'] }
     };
 
     if (startDate || endDate) {
