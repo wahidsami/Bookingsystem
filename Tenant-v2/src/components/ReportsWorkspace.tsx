@@ -193,7 +193,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     }
   };
 
-  const buildSalesReportRows = (appointments: any[] = [], refunds: any[] = []) => {
+  const buildSalesReportRows = (ledgerRows: any[] = [], refunds: any[] = []) => {
     const rowsByDate = new Map<string, any>();
 
     const ensureRow = (dateKey: string, fallbackDate?: any) => {
@@ -214,26 +214,25 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
       return rowsByDate.get(dateKey);
     };
 
-    appointments.forEach((appointment) => {
-      const dateKey = getDateKey(appointment?.startTime);
+    ledgerRows.forEach((row) => {
+      const dateKey = getDateKey(row?.date || row?.processedAt || row?.createdAt);
       if (!dateKey) return;
 
-      const row = ensureRow(dateKey, appointment.startTime);
-      const grossSales = Number(appointment?.rawPrice ?? appointment?.price ?? 0);
-      const finalPrice = Number(appointment?.price ?? appointment?.rawPrice ?? 0);
-      const discountAmount = Math.max(grossSales - finalPrice, 0);
-      const taxAmount = Number(appointment?.taxAmount ?? 0);
-      const isCompleted = `${appointment?.status || ''}`.trim().toLowerCase() === 'completed';
+      const bucket = ensureRow(dateKey, row.date || row.processedAt || row.createdAt);
+      const revenue = Number(row?.revenue ?? 0);
+      const discountAmount = Math.abs(Number(row?.discount ?? 0));
+      const taxAmount = Math.abs(Number(row?.tax ?? 0));
+      const isRefund = revenue < 0;
+      const grossSales = Math.abs(revenue);
 
-      row.bookings += 1;
-      if (isCompleted) {
-        row.grossSales += grossSales;
-        row.discounts += discountAmount;
-        row.netSales += finalPrice;
-        row.vat += taxAmount;
-        row.total += finalPrice + taxAmount;
-        row.completed += 1;
-      }
+      bucket.bookings += 1;
+      bucket.grossSales += grossSales;
+      bucket.discounts += discountAmount;
+      bucket.refunds += isRefund ? grossSales : 0;
+      bucket.vat += taxAmount;
+      bucket.netSales += isRefund ? -grossSales : grossSales;
+      bucket.total += isRefund ? -grossSales + taxAmount : grossSales + taxAmount;
+      bucket.completed += 1;
     });
 
     refunds.forEach((refund) => {
@@ -386,6 +385,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           trendsRes,
           servicePerfRes,
           employeePerfRes,
+          financialLedgerRes,
+          productCatalogRes,
           productRevenueRes,
           peakHoursRes,
           customerAnalyticsRes,
@@ -400,9 +401,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           tenantApiAdapter.getReportsSummary({ startDate, endDate }),
           tenantApiAdapter.getFinancialOverview({ startDate, endDate }),
           tenantApiAdapter.getAppointments({ startDate, endDate, limit: 5000 }),
+          tenantApiAdapter.getFinancialLedger({ startDate, endDate }),
           tenantApiAdapter.getBookingTrends({ startDate, endDate, groupBy }),
           tenantApiAdapter.getServicePerformance(startDate, endDate),
           tenantApiAdapter.getEmployeePerformance(startDate, endDate),
+          tenantApiAdapter.getProducts(),
           tenantApiAdapter.getProductRevenue({ startDate, endDate }),
           tenantApiAdapter.getPeakHoursAnalysis({ startDate, endDate }),
           tenantApiAdapter.getCustomerAnalytics(startDate, endDate),
@@ -443,6 +446,12 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           : null;
         const appointmentRows = appointmentsRes.status === 'fulfilled' && appointmentsRes.value?.success
           ? (appointmentsRes.value.appointments || [])
+          : [];
+        const financialLedgerData = financialLedgerRes.status === 'fulfilled' && financialLedgerRes.value?.success
+          ? financialLedgerRes.value
+          : null;
+        const productCatalogData = productCatalogRes.status === 'fulfilled' && productCatalogRes.value?.success
+          ? (productCatalogRes.value.products || [])
           : [];
         const bookingTrendRows = trendsRes.status === 'fulfilled' && trendsRes.value?.success
           ? (trendsRes.value.data || [])
@@ -535,18 +544,22 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           totalSales: Number(row.revenue || 0),
           photo: row.photo || null
         }));
-        const mappedProducts = (productRevenueData.rows || []).map((row: any) => ({
-          id: row.id,
-          sku: row.id,
-          name: row.name_en || row.name_ar || row.name || row.id,
-          nameAr: row.name_ar || row.name_en || row.name || row.id,
-          category: row.category || '-',
-          categoryAr: row.category || '-',
-          sold: Number(row.totalQuantity || row.sold || 0),
-          unitPrice: Number(row.productPrice || row.unitPrice || 0),
-          revenue: Number(row.totalRevenue || row.revenue || 0),
-          stock: row.stock ?? row.stockQuantity ?? 0
-        }));
+        const productRevenueById = new Map<string, any>((productRevenueData.rows || []).map((row: any) => [row.id, row]));
+        const mappedProducts = productCatalogData.map((product: any) => {
+          const revenueRow = (productRevenueById.get(product.id) || {}) as any;
+          return {
+            id: product.id,
+            sku: product.sku || product.id,
+            name: product.name_en || product.name_ar || product.name || product.id,
+            nameAr: product.name_ar || product.name_en || product.name || product.id,
+            category: product.category || revenueRow.category || '-',
+            categoryAr: product.category || revenueRow.category || '-',
+            sold: Number(revenueRow.totalQuantity || revenueRow.sold || product.soldCount || 0),
+            unitPrice: Number(product.price || revenueRow.productPrice || revenueRow.unitPrice || 0),
+            revenue: Number(revenueRow.totalRevenue || revenueRow.revenue || 0),
+            stock: Number(product.stock ?? product.stockQuantity ?? 0)
+          };
+        });
         const mappedPaymentMethods = paymentMethodsData.rows.map((row: any) => ({
           id: row.paymentMethod || row.id,
           paymentMethod: row.paymentMethod || row.id,
@@ -588,7 +601,10 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               category: row.category || '-'
             }))
           : [];
-        const mappedSales = buildSalesReportRows(appointmentRows, refundsData.rows);
+        const ledgerSalesRows = Array.isArray(financialLedgerData?.revenueLedger?.rows)
+          ? financialLedgerData.revenueLedger.rows
+          : [];
+        const mappedSales = buildSalesReportRows(ledgerSalesRows);
         const mappedAppointments = buildAppointmentReportRows(appointmentRows);
         const mappedRebookings = rebookingAnalyticsData.rows.map((row: any) => ({
           id: row.id,
