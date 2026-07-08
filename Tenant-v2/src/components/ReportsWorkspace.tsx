@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  TrendingUp, Users, Calendar, Sparkles, Plus, Search, MapPin, 
-  Clock, Check, X, ShieldAlert, Award, Star, Gift, Package, 
-  Receipt, ShoppingBag, CreditCard, ChevronRight, MessageSquare, 
-  AlertCircle, ChevronDown, Download, Share2, Printer, Filter, 
+import {
+  TrendingUp, Users, Calendar, Sparkles, Plus, Search, MapPin,
+  Clock, Check, X, ShieldAlert, Award, Star, Gift, Package,
+  Receipt, ShoppingBag, CreditCard, ChevronRight, MessageSquare,
+  AlertCircle, ChevronDown, Download, Share2, Printer, Filter,
   AlertTriangle, Eye, ArrowUpDown, ChevronLeft, HelpCircle, FileSpreadsheet,
   FileText, ArrowUpRight, ArrowDownRight, RefreshCw, CalendarDays, CheckCircle2
 } from 'lucide-react';
@@ -32,6 +32,7 @@ type ReportTab =
 
 export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
   const isRtl = lang === 'ar';
+  const formatMoney = (value: unknown) => `${(Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${isRtl ? 'ر.س' : 'SAR'}`;
 
   // State Management
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
@@ -45,7 +46,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [drillDownId, setDrillDownId] = useState<string | null>(null);
-  
+
   // Custom Toast State
   const [toast, setToast] = useState<{ show: boolean; msgEn: string; msgAr: string; type: 'success' | 'info' }>({
     show: false,
@@ -564,7 +565,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     if (searchTerm.trim() !== '') {
       const q = searchTerm.toLowerCase();
       list = list.filter(item => {
-        return Object.values(item).some(val => 
+        return Object.values(item).some(val =>
           typeof val === 'string' && val.toLowerCase().includes(q)
         );
       });
@@ -687,7 +688,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start select-none font-sans" id="reports-workspace-master">
-      
+
       {/* Dynamic Toast System */}
       <AnimatePresence>
         {toast.show && (
@@ -696,8 +697,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 p-4 rounded-xl border flex items-center gap-3 shadow-2xl ${
-              toast.type === 'success' 
-                ? 'bg-zinc-900 border-emerald-500/30 text-emerald-400' 
+              toast.type === 'success'
+                ? 'bg-zinc-900 border-emerald-500/30 text-emerald-400'
                 : 'bg-zinc-900 border-blue-500/30 text-blue-400'
             }`}
           >
@@ -758,11 +759,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
       {/* RIGHT REPORT AREA (col-span-9) */}
       <div className="xl:col-span-9 space-y-6">
-        
+
         {/* TOP STICKY FILTER BAR */}
         <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs sticky top-0 z-20 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            
+
             {/* Header / Subtitle mapping inside filter bar */}
             <div>
               <span className="text-[10px] font-black tracking-widest text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-md uppercase block w-fit">
@@ -809,7 +810,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
           {/* Core Interactive Selectors */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t border-neutral-100">
-            
+
             {/* 1. Date range drop */}
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide flex items-center gap-1">
@@ -934,16 +935,16 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
-              
+
               {/* ======================================= */}
               {/* OVERVIEW PAGE RENDER */}
               {/* ======================================= */}
               {activeTab === 'overview' && (
                 <div className="space-y-6">
-                  
+
                   {/* Seven Critical Stats Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    
+
                     {/* Revenue */}
                     <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-4 opacity-5 text-neutral-900 group-hover:scale-110 transition-transform">
@@ -1056,7 +1057,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
                   {/* TREND CHARTS COMPONENT */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    
+
                     {/* Area line chart: Revenue Growth Trend */}
                     <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs lg:col-span-2 space-y-4">
                       <div className="flex justify-between items-center">
@@ -1076,7 +1077,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                               <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.00" />
                             </linearGradient>
                           </defs>
-                          
+
                           {/* Grid lines */}
                           <line x1="0" y1="20" x2="500" y2="20" stroke="#f4f4f5" strokeWidth="1" strokeDasharray="3" />
                           <line x1="0" y1="60" x2="500" y2="60" stroke="#f4f4f5" strokeWidth="1" strokeDasharray="3" />
@@ -1131,26 +1132,26 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                     {/* Interactive Donut: Booking Channel Distribution */}
                     <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
                       <h4 className="font-extrabold text-neutral-800 text-sm md:text-base">{isRtl ? 'مصادر قنوات المبيعات والطلب' : 'Channel Distribution'}</h4>
-                      
+
                       <div className="flex justify-center items-center py-2 relative">
                         {/* Custom Radial SVG */}
                         <svg className="w-32 h-32" viewBox="0 0 36 36">
                           {/* Background channel */}
                           <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f4f4f5" strokeWidth="3.5" />
-                          
+
                           {/* Widget channel (65%) */}
-                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="3.5" 
+                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="3.5"
                             strokeDasharray="65 35" strokeDashoffset="25" />
 
                           {/* POS channel (25%) */}
-                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="#3b82f6" strokeWidth="3.5" 
+                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="#3b82f6" strokeWidth="3.5"
                             strokeDasharray="25 75" strokeDashoffset="-40" />
 
                           {/* Instagram/Social (10%) */}
-                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="3.5" 
+                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="3.5"
                             strokeDasharray="10 90" strokeDashoffset="-65" />
                         </svg>
-                        
+
                         {/* Center rate label */}
                         <div className="absolute flex flex-col items-center">
                           <span className="text-xl font-black text-neutral-800 font-mono">65%</span>
@@ -1193,17 +1194,17 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                       <ShieldAlert size={14} className="text-amber-500 animate-bounce" />
                       {t.opsAlerts}
                     </h3>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      
+
                       {/* Alert 1 */}
                       <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-100 text-xs flex gap-3">
                         <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
                         <div>
                           <p className="font-bold text-amber-800">{isRtl ? 'ملاحظة سلوكية لتفادي التغيب' : 'High Sunday No-shows detected'}</p>
                           <p className="text-neutral-500 mt-1 leading-relaxed">
-                            {isRtl 
-                              ? 'لوحظت زيادة في نسبة عدم حضور العملاء (+4.2%) مع الأخصائية إيلينا فاسيلي خلال فترات يوم الأحد.' 
+                            {isRtl
+                              ? 'لوحظت زيادة في نسبة عدم حضور العملاء (+4.2%) مع الأخصائية إيلينا فاسيلي خلال فترات يوم الأحد.'
                               : 'Elena Vasily experienced an abnormal spike in no-shows during Sunday evening blocks. System auto-reminders recommended.'}
                           </p>
                         </div>
@@ -1215,8 +1216,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                         <div>
                           <p className="font-bold text-rose-800">{isRtl ? 'مؤشر أمان حدود الخصومات الممنوحة' : 'Discount Limit Warning Trigger'}</p>
                           <p className="text-neutral-500 mt-1 leading-relaxed">
-                            {isRtl 
-                              ? 'معدل الخصم الإجمالي تخطى حاجز الأمان (15%) في يوم السبت وبلغ 18.4%. يرجى مراجعة الصلاحيات لرموز الترويج.' 
+                            {isRtl
+                              ? 'معدل الخصم الإجمالي تخطى حاجز الأمان (15%) في يوم السبت وبلغ 18.4%. يرجى مراجعة الصلاحيات لرموز الترويج.'
                               : 'Discounts exceeded your 15% safety margin on Saturday, reaching 18.4%. Review and restrict promotional overrides.'}
                           </p>
                         </div>
@@ -1228,8 +1229,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                         <div>
                           <p className="font-bold text-emerald-800">{isRtl ? 'التزام الإقرار الضريبي المعتمد (ZATCA)' : 'ZATCA VAT Return Ready'}</p>
                           <p className="text-neutral-500 mt-1 leading-relaxed">
-                            {isRtl 
-                              ? 'سجل VAT للربع الحالي جاهز ومطابق للفوترة الفورية والضوابط. يرجى المراجعة والرفع قبل نهاية المدة.' 
+                            {isRtl
+                              ? 'سجل VAT للربع الحالي جاهز ومطابق للفوترة الفورية والضوابط. يرجى المراجعة والرفع قبل نهاية المدة.'
                               : 'Tax summaries for Q2 2026 comply with ZATCA phase-2 parameters. Sandbox validated with zero ledger discrepancy.'}
                           </p>
                         </div>
@@ -1246,14 +1247,14 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               {/* ======================================= */}
               {activeTab !== 'overview' && (
                 <div className="space-y-6">
-                  
+
                   {/* Dynamic report description */}
                   <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                       <h4 className="font-black text-neutral-800 text-xs uppercase tracking-wider">{t[activeTab]}</h4>
                       <p className="text-xs text-neutral-500 mt-0.5 leading-relaxed">
-                        {isRtl 
-                          ? 'تفاصيل حركة السجلات المالية والتشغيلية المفصلة للصالون. انقر فوق أي سجل بالجدول لإجراء تدقيق وتدفق المعاملة.' 
+                        {isRtl
+                          ? 'تفاصيل حركة السجلات المالية والتشغيلية المفصلة للصالون. انقر فوق أي سجل بالجدول لإجراء تدقيق وتدفق المعاملة.'
                           : 'Deep inspection and transaction tracing logs. Click any record below to trigger the interactive drill-down workflow.'}
                       </p>
                     </div>
@@ -1282,105 +1283,163 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                     </div>
                   </div>
 
-                  {/* CUSTOM SVG CHART DESIGNED TO MATCH INDIVIDUAL REPORT VIEWS */}
-                  <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
-                    <h4 className="font-extrabold text-neutral-800 text-sm">{isRtl ? 'التمثيل البياني للحركة والنشاط' : 'Visual Analytics representation'}</h4>
-                    
-                    <div className="h-36 relative flex items-end">
-                      
-                      {/* Rendering a dynamic Bar / Chart pattern based on the report data length */}
-                      {filteredRecords.length > 0 ? (
-                        <div className="w-full h-full flex items-end gap-2.5 pt-4">
-                          {filteredRecords.map((item, index) => {
-                            // Calculate height percentage based on standard column
-                            const totalVal = item.total || item.grossSales || item.revenue || item.collected || item.totalSales || item.totalSpent || item.bookings * 100 || 100;
-                            const maxVal = Math.max(...filteredRecords.map(r => r.total || r.grossSales || r.revenue || r.collected || r.totalSales || r.totalSpent || r.bookings * 100 || 100));
-                            const heightPct = Math.max(15, (totalVal / maxVal) * 80);
-                            
-                            return (
-                              <div key={item.id} className="flex-1 flex flex-col items-center group h-full justify-end cursor-pointer">
-                                
-                                {/* Bar Value Tooltip */}
-                                <div className="opacity-0 group-hover:opacity-100 absolute -top-1 bg-zinc-950 text-white font-mono text-[9px] py-1 px-1.5 rounded shadow-lg pointer-events-none transition-opacity z-10">
-                                  {totalVal} {isRtl ? 'ر.س' : 'SAR'}
-                                </div>
-
-                                {/* Custom Bar segment with rounded top */}
-                                <div 
-                                  className="w-full bg-gradient-to-t from-amber-500/10 to-amber-500/80 group-hover:from-zinc-900 group-hover:to-zinc-800 rounded-t-lg transition-all"
-                                  style={{ height: `${heightPct}%` }}
-                                />
-                                
-                                {/* Label representing the X-Axis */}
-                                <span className="text-[9px] font-mono text-neutral-400 font-bold truncate w-full text-center mt-1.5">
-                                  {item.date || item.id || item.code || item.name || item.customer}
-                                </span>
-
-                              </div>
-                            );
-                          })}
+                  {activeTab === 'financial' && (
+                    <div className="grid gap-5 xl:grid-cols-2">
+                      <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                        <h4 className="font-extrabold text-neutral-800 text-sm">{isRtl ? 'ملخص مالي' : 'Financial summary'}</h4>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-4 space-y-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'الإيراد الخام' : 'Gross revenue'}</p>
+                            <p className="text-xl font-black text-neutral-900 font-mono">{formatMoney(reportData.financialOverview?.totalRevenue ?? overviewStats?.totalRevenue)}</p>
+                          </div>
+                          <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-4 space-y-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'إيراد المركز' : 'Tenant revenue'}</p>
+                            <p className="text-xl font-black text-neutral-900 font-mono">{formatMoney(reportData.financialOverview?.totalTenantRevenue)}</p>
+                          </div>
+                          <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-4 space-y-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'الرسوم والعمولات' : 'Fees and commissions'}</p>
+                            <p className="text-xl font-black text-neutral-900 font-mono">
+                              {formatMoney((reportData.financialOverview?.totalPlatformFees || 0) + (reportData.financialOverview?.totalEmployeeCommissions || 0))}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-4 space-y-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'صافي الإيراد' : 'Net revenue'}</p>
+                            <p className="text-xl font-black text-neutral-900 font-mono">{formatMoney(reportData.financialOverview?.netRevenue)}</p>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400">
-                          {isRtl ? 'لا تتوفر إحصائيات بيانية للفلاتر المحددة' : 'Analytical charts not available for the selected parameters'}
-                        </div>
-                      )}
+                      </div>
 
+                      <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                        <h4 className="font-extrabold text-neutral-800 text-sm">{isRtl ? 'طرق الدفع' : 'Payment methods'}</h4>
+                        {reportData.posClosingSummary?.totalsByMethod?.length ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-start text-xs border-collapse">
+                              <thead>
+                                <tr className="border-b border-neutral-100 text-neutral-400 font-bold bg-neutral-50/50">
+                                  <th className="p-3 text-start">{isRtl ? 'الطريقة' : 'Method'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'المحصّل' : 'Collected'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'الاسترداد' : 'Refunded'}</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-neutral-100">
+                                {reportData.posClosingSummary.totalsByMethod.map((method: any) => (
+                                  <tr key={method.paymentMethod || method.paymentMethodLabel} className="hover:bg-neutral-50/50">
+                                    <td className="p-3 font-bold text-neutral-800">{method.paymentMethodLabel || method.paymentMethod || '-'}</td>
+                                    <td className="p-3 font-mono font-bold text-neutral-900">{formatMoney(method.collected)}</td>
+                                    <td className="p-3 font-mono text-neutral-500">{formatMoney(method.refunded)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 p-6 text-center text-xs text-neutral-400">
+                            {isRtl ? 'اختر نطاق تاريخ يحتوي على نشاط POS.' : 'Pick a date range with POS closing activity.'}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  <div className="space-y-6">
+                      {/* CUSTOM SVG CHART DESIGNED TO MATCH INDIVIDUAL REPORT VIEWS */}
+                      <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs space-y-4">
+                        <h4 className="font-extrabold text-neutral-800 text-sm">{isRtl ? 'التمثيل البياني للحركة والنشاط' : 'Visual Analytics representation'}</h4>
 
-                  {/* REPORT RENDER TABLES */}
-                  <div className="bg-white rounded-2xl border border-neutral-100 shadow-xs overflow-hidden">
-                    
-                    {filteredRecords.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-start text-xs border-collapse">
-                          
-                          {/* TABLE HEADERS MAP */}
-                          <thead>
-                            <tr className="border-b border-neutral-100 text-neutral-400 font-bold bg-neutral-50/50">
-                              
-                              {/* Headers for Sales Reports */}
-                              {activeTab === 'sales' && (
-                                <>
-                                  <th className="p-3 text-start">{isRtl ? 'رقم التقرير' : 'ID'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ' : 'Date'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('grossSales')}>{isRtl ? 'المبيعات الإجمالية' : 'Gross Sales'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start">{isRtl ? 'الخصومات' : 'Discounts'}</th>
+                        <div className="h-36 relative flex items-end">
+
+                          {/* Rendering a dynamic Bar / Chart pattern based on the report data length */}
+                          {filteredRecords.length > 0 ? (
+                            <div className="w-full h-full flex items-end gap-2.5 pt-4">
+                              {filteredRecords.map((item, index) => {
+                                // Calculate height percentage based on standard column
+                                const totalVal = item.total || item.grossSales || item.revenue || item.collected || item.totalSales || item.totalSpent || item.bookings * 100 || 100;
+                                const maxVal = Math.max(...filteredRecords.map(r => r.total || r.grossSales || r.revenue || r.collected || r.totalSales || r.totalSpent || r.bookings * 100 || 100));
+                                const heightPct = Math.max(15, (totalVal / maxVal) * 80);
+
+                                return (
+                                  <div key={item.id} className="flex-1 flex flex-col items-center group h-full justify-end cursor-pointer">
+
+                                    {/* Bar Value Tooltip */}
+                                    <div className="opacity-0 group-hover:opacity-100 absolute -top-1 bg-zinc-950 text-white font-mono text-[9px] py-1 px-1.5 rounded shadow-lg pointer-events-none transition-opacity z-10">
+                                      {totalVal} {isRtl ? 'ر.س' : 'SAR'}
+                                    </div>
+
+                                    {/* Custom Bar segment with rounded top */}
+                                    <div
+                                      className="w-full bg-gradient-to-t from-amber-500/10 to-amber-500/80 group-hover:from-zinc-900 group-hover:to-zinc-800 rounded-t-lg transition-all"
+                                      style={{ height: `${heightPct}%` }}
+                                    />
+
+                                    {/* Label representing the X-Axis */}
+                                    <span className="text-[9px] font-mono text-neutral-400 font-bold truncate w-full text-center mt-1.5">
+                                      {item.date || item.id || item.code || item.name || item.customer}
+                                    </span>
+
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400">
+                              {isRtl ? 'لا تتوفر إحصائيات بيانية للفلاتر المحددة' : 'Analytical charts not available for the selected parameters'}
+                            </div>
+                          )}
+
+                        </div>
+                      </div>
+
+                      {/* REPORT RENDER TABLES */}
+                      <div className="bg-white rounded-2xl border border-neutral-100 shadow-xs overflow-hidden">
+
+                        {filteredRecords.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-start text-xs border-collapse">
+
+                              {/* TABLE HEADERS MAP */}
+                              <thead>
+                                <tr className="border-b border-neutral-100 text-neutral-400 font-bold bg-neutral-50/50">
+
+                                  {/* Headers for Sales Reports */}
+                                  {activeTab === 'sales' && (
+                                    <>
+                                      <th className="p-3 text-start">{isRtl ? 'رقم التقرير' : 'ID'}</th>
+                                      <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ' : 'Date'} <ArrowUpDown size={10} className="inline" /></th>
+                                      <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('grossSales')}>{isRtl ? 'المبيعات الإجمالية' : 'Gross Sales'} <ArrowUpDown size={10} className="inline" /></th>
+                                      <th className="p-3 text-start">{isRtl ? 'الخصومات' : 'Discounts'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'المرتجعات' : 'Refunds'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'صافي المبيعات' : 'Net Sales'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'ضريبة القيمة المضافة (15%)' : 'VAT (15%)'}</th>
                                   <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('total')}>{isRtl ? 'الإجمالي العام' : 'Total Revenue'} <ArrowUpDown size={10} className="inline" /></th>
                                 </>
-                              )}
+                                  )}
 
-                              {/* Headers for Financial Reports */}
-                              {activeTab === 'financial' && (
-                                <>
-                                  <th className="p-3 text-start">{isRtl ? 'مرجع الفاتورة' : 'Invoice ID'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ والساعة' : 'Timestamp'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start">{isRtl ? 'العميل' : 'Customer'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'النوع' : 'Category'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'صافي الفاتورة' : 'Ex-VAT Subtotal'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'الضريبة' : 'Tax'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('total')}>{isRtl ? 'المبلغ الكلي' : 'Collected Total'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start">{isRtl ? 'طريقة الدفع' : 'Payment Type'}</th>
-                                </>
-                              )}
+                                  {/* Headers for Financial Reports */}
+                                  {activeTab === 'financial' && (
+                                    <>
+                                      <th className="p-3 text-start">{isRtl ? 'مرجع الفاتورة' : 'Invoice ID'}</th>
+                                      <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ والساعة' : 'Timestamp'} <ArrowUpDown size={10} className="inline" /></th>
+                                      <th className="p-3 text-start">{isRtl ? 'العميل' : 'Customer'}</th>
+                                      <th className="p-3 text-start">{isRtl ? 'النوع' : 'Category'}</th>
+                                      <th className="p-3 text-start">{isRtl ? 'صافي الفاتورة' : 'Ex-VAT Subtotal'}</th>
+                                      <th className="p-3 text-start">{isRtl ? 'الضريبة' : 'Tax'}</th>
+                                      <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('total')}>{isRtl ? 'المبلغ الكلي' : 'Collected Total'} <ArrowUpDown size={10} className="inline" /></th>
+                                      <th className="p-3 text-start">{isRtl ? 'طريقة الدفع' : 'Payment Type'}</th>
+                                    </>
+                                  )}
 
-                              {/* Headers for Appointment Reports */}
-                              {activeTab === 'appointments' && (
-                                <>
-                                  <th className="p-3 text-start">{isRtl ? 'رقم الموعد' : 'Booking ID'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'العميل' : 'Customer'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'الخبيرة الأخصائية' : 'Stylist'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'الخدمة المقدمة' : 'Service Provided'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ' : 'Scheduled Date'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start">{isRtl ? 'المدة' : 'Duration'}</th>
-                                  <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('price')}>{isRtl ? 'القيمة' : 'Value'} <ArrowUpDown size={10} className="inline" /></th>
-                                  <th className="p-3 text-start">{isRtl ? 'حالة الحجز' : 'Status'}</th>
-                                </>
-                              )}
+                                  {/* Headers for Appointment Reports */}
+                                  {activeTab === 'appointments' && (
+                                    <>
+                                      <th className="p-3 text-start">{isRtl ? 'رقم الموعد' : 'Booking ID'}</th>
+                                      <th className="p-3 text-start">{isRtl ? 'العميل' : 'Customer'}</th>
+                                      <th className="p-3 text-start">{isRtl ? 'الخبيرة الأخصائية' : 'Stylist'}</th>
+                                      <th className="p-3 text-start">{isRtl ? 'الخدمة المقدمة' : 'Service Provided'}</th>
+                                      <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('date')}>{isRtl ? 'التاريخ' : 'Scheduled Date'} <ArrowUpDown size={10} className="inline" /></th>
+                                      <th className="p-3 text-start">{isRtl ? 'المدة' : 'Duration'}</th>
+                                      <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('price')}>{isRtl ? 'القيمة' : 'Value'} <ArrowUpDown size={10} className="inline" /></th>
+                                      <th className="p-3 text-start">{isRtl ? 'حالة الحجز' : 'Status'}</th>
+                                    </>
+                                  )}
 
                               {/* Headers for Employee Reports */}
                               {activeTab === 'employees' && (
@@ -1502,12 +1561,12 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                           {/* TABLE BODY RECORD RENDERS */}
                           <tbody className="divide-y divide-neutral-100 font-sans">
                             {paginatedRecords.map((item) => (
-                              <tr 
-                                key={item.id} 
+                              <tr
+                                key={item.id}
                                 className={`hover:bg-neutral-50/50 transition-colors cursor-pointer ${drillDownId === item.id ? 'bg-amber-50/20' : ''}`}
                                 onClick={() => setDrillDownId(drillDownId === item.id ? null : item.id)}
                               >
-                                
+
                                 {/* 1. Sales Report Column Renders */}
                                 {activeTab === 'sales' && (
                                   <>
@@ -1755,7 +1814,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                         <span>
                           {t.displaying} {(currentPage - 1) * 5 + 1} - {Math.min(currentPage * 5, filteredRecords.length)} {t.of} {filteredRecords.length} {t.records}
                         </span>
-                        
+
                         <div className="flex items-center gap-2">
                           <button
                             disabled={currentPage === 1}
@@ -1809,7 +1868,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
                             {/* Drill down specifications mapping */}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-4 text-xs">
-                              
+
                               <div className="space-y-1 bg-zinc-900/50 p-3 rounded-xl border border-zinc-850">
                                 <p className="text-[10px] text-zinc-500 font-bold uppercase">{isRtl ? 'الهوية التشغيلية' : 'OPERATIONAL ENTITY'}</p>
                                 <p className="font-bold text-neutral-200 font-sans mt-0.5">{rec.id}</p>
@@ -1843,8 +1902,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
                             {/* Custom audit description / drill down message */}
                             <div className="mt-4 p-3 bg-zinc-900 rounded-xl border border-zinc-850 text-[11px] text-zinc-400 leading-relaxed">
-                              {isRtl 
-                                ? 'هذه المعاملة تم فحصها من قبل النظام ومطابقتها لضوابط الفوترة والضوابط الضريبية لمشغلي ومراكز التجميل الملكية التابعة لشركة رفاه.' 
+                              {isRtl
+                                ? 'هذه المعاملة تم فحصها من قبل النظام ومطابقتها لضوابط الفوترة والضوابط الضريبية لمشغلي ومراكز التجميل الملكية التابعة لشركة رفاه.'
                                 : 'This transactional and performance record represents a valid system ledger audit entry matching Refah core operating frameworks. Synchronized with live database states.'}
                             </div>
 
@@ -1855,6 +1914,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                   </AnimatePresence>
 
                 </div>
+              </div>
               )}
 
             </motion.div>
