@@ -112,39 +112,6 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     };
   };
 
-  const mapBookingTrendRows = (rows: any[]) =>
-    rows.map((row) => ({
-      id: row.id || row.date,
-      date: row.date,
-      grossSales: Number(row.revenue || 0),
-      discounts: 0,
-      refunds: 0,
-      netSales: Number(row.revenue || 0),
-      total: Number(row.revenue || 0),
-      vat: Number((Number(row.revenue || 0) * 0.15).toFixed(2)),
-      bookings: Number(row.bookings || 0),
-      completed: Number(row.completed || 0)
-    }));
-
-  const mapAppointmentTrendRows = (rows: any[]) =>
-    rows.map((row) => ({
-      id: row.id || row.date,
-      date: row.date,
-      customer: row.customer || row.customerName || '-',
-      customerAr: row.customer || row.customerName || '-',
-      stylist: row.stylist || row.employee || '-',
-      stylistAr: row.stylist || row.employee || '-',
-      service: row.service || row.serviceName || '-',
-      serviceAr: row.service || row.serviceName || '-',
-      duration: row.duration || '-',
-      price: Number(row.revenue || 0),
-      status: row.completed ? 'Completed' : 'Booked',
-      statusAr: row.completed ? 'مكتمل' : 'محجوز',
-      paymentStatus: row.completed ? 'Paid' : 'Pending',
-      totalPaid: Number(row.revenue || 0),
-      branch: row.branch || '-'
-    }));
-
   const mapFinancialRows = (transactions: any[] = []) =>
     transactions.map((transaction) => ({
       id: transaction.id,
@@ -181,6 +148,227 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     ];
   };
 
+  const getDateKey = (value: any) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString().split('T')[0];
+  };
+
+  const formatAppointmentStatus = (status: any) => {
+    const normalized = `${status || ''}`.trim().toLowerCase();
+    switch (normalized) {
+      case 'completed':
+        return { en: 'Completed', ar: 'مكتمل' };
+      case 'confirmed':
+        return { en: 'Confirmed', ar: 'مؤكد' };
+      case 'cancelled':
+        return { en: 'Cancelled', ar: 'ملغى' };
+      case 'no_show':
+      case 'no-show':
+        return { en: 'No-Show', ar: 'عدم حضور' };
+      case 'pending':
+        return { en: 'Pending', ar: 'قيد الانتظار' };
+      default:
+        return {
+          en: normalized ? normalized.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) : 'Booked',
+          ar: normalized ? normalized.replace(/_/g, ' ') : 'محجوز'
+        };
+    }
+  };
+
+  const formatAppointmentPaymentStatus = (status: any) => {
+    const normalized = `${status || ''}`.trim().toLowerCase();
+    switch (normalized) {
+      case 'fully_paid':
+      case 'paid':
+        return { en: 'Paid', ar: 'مدفوع' };
+      case 'deposit_paid':
+        return { en: 'Deposit Paid', ar: 'مدفوع جزئياً' };
+      case 'partially_refunded':
+        return { en: 'Partially Refunded', ar: 'مسترد جزئياً' };
+      case 'refunded':
+        return { en: 'Refunded', ar: 'مسترد' };
+      default:
+        return { en: 'Pending', ar: 'قيد الانتظار' };
+    }
+  };
+
+  const buildSalesReportRows = (appointments: any[] = [], refunds: any[] = []) => {
+    const rowsByDate = new Map<string, any>();
+
+    const ensureRow = (dateKey: string, fallbackDate?: any) => {
+      if (!rowsByDate.has(dateKey)) {
+        rowsByDate.set(dateKey, {
+          id: dateKey,
+          date: fallbackDate || dateKey,
+          grossSales: 0,
+          discounts: 0,
+          refunds: 0,
+          netSales: 0,
+          vat: 0,
+          total: 0,
+          bookings: 0,
+          completed: 0
+        });
+      }
+      return rowsByDate.get(dateKey);
+    };
+
+    appointments.forEach((appointment) => {
+      const dateKey = getDateKey(appointment?.startTime);
+      if (!dateKey) return;
+
+      const row = ensureRow(dateKey, appointment.startTime);
+      const grossSales = Number(appointment?.rawPrice ?? appointment?.price ?? 0);
+      const finalPrice = Number(appointment?.price ?? appointment?.rawPrice ?? 0);
+      const discountAmount = Math.max(grossSales - finalPrice, 0);
+      const taxAmount = Number(appointment?.taxAmount ?? 0);
+      const isCompleted = `${appointment?.status || ''}`.trim().toLowerCase() === 'completed';
+
+      row.bookings += 1;
+      if (isCompleted) {
+        row.grossSales += grossSales;
+        row.discounts += discountAmount;
+        row.netSales += finalPrice;
+        row.vat += taxAmount;
+        row.total += finalPrice + taxAmount;
+        row.completed += 1;
+      }
+    });
+
+    refunds.forEach((refund) => {
+      const dateKey = getDateKey(refund?.date || refund?.processedAt || refund?.createdAt);
+      if (!dateKey) return;
+
+      const row = ensureRow(dateKey, refund.date || refund.processedAt || refund.createdAt);
+      const refundAmount = Math.abs(Number(refund?.amount ?? 0));
+      row.refunds += refundAmount;
+      row.netSales -= refundAmount;
+      row.total -= refundAmount;
+    });
+
+    return Array.from(rowsByDate.values())
+      .map((row) => ({
+        ...row,
+        grossSales: Number(row.grossSales.toFixed(2)),
+        discounts: Number(row.discounts.toFixed(2)),
+        refunds: Number(row.refunds.toFixed(2)),
+        netSales: Number(row.netSales.toFixed(2)),
+        vat: Number(row.vat.toFixed(2)),
+        total: Number(row.total.toFixed(2)),
+        bookings: Number(row.bookings || 0),
+        completed: Number(row.completed || 0)
+      }))
+      .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+  };
+
+  const buildAppointmentReportRows = (appointments: any[] = []) =>
+    appointments.map((appointment) => {
+      const customerName = `${appointment?.user?.firstName || ''} ${appointment?.user?.lastName || ''}`.trim()
+        || appointment?.user?.displayName
+        || appointment?.user?.name
+        || appointment?.customerName
+        || appointment?.platformUserId
+        || '-';
+      const stylistName = appointment?.staff?.name || appointment?.staffName || '-';
+      const serviceName = appointment?.service?.name_en || appointment?.service?.name_ar || appointment?.serviceName || '-';
+      const paymentStatus = formatAppointmentPaymentStatus(appointment?.paymentStatus);
+      const lifecycleStatus = formatAppointmentStatus(appointment?.status);
+
+      return {
+        id: appointment?.id,
+        date: appointment?.startTime,
+        customer: customerName,
+        customerAr: customerName,
+        customerId: appointment?.user?.id || appointment?.platformUserId || appointment?.bookingReference || appointment?.bookingNumber || appointment?.id,
+        stylist: stylistName,
+        stylistAr: stylistName,
+        stylistId: appointment?.staff?.id || appointment?.staffId || null,
+        service: serviceName,
+        serviceAr: serviceName,
+        duration: appointment?.service?.duration ? `${appointment.service.duration} min` : appointment?.duration || '-',
+        price: Number(appointment?.price || 0),
+        status: lifecycleStatus.en,
+        statusAr: lifecycleStatus.ar,
+        paymentStatus: paymentStatus.en,
+        paymentStatusAr: paymentStatus.ar,
+        totalPaid: Number(appointment?.totalPaid || 0),
+        branch: appointment?.branch?.name || appointment?.branchName || '-'
+      };
+    });
+
+  const buildCustomerSalesRows = (appointments: any[] = []) => {
+    const customers = new Map<string, any>();
+
+    appointments.forEach((appointment) => {
+      const customer = appointment?.user;
+      const customerId = customer?.id
+        || appointment?.platformUserId
+        || appointment?.customerId
+        || appointment?.bookingReference
+        || appointment?.bookingNumber
+        || appointment?.id;
+      const identity = `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim()
+        || customer?.displayName
+        || customer?.name
+        || customer?.fullName
+        || customer?.email
+        || customer?.phone
+        || customerId;
+      const current = customers.get(customerId) || {
+        id: customerId,
+        name: identity,
+        customerDisplayName: identity,
+        customerBadge: customer?.id ? (customer?.customerBadge || customer?.tier || 'Customer') : 'Guest Customer',
+        customerBadgeKey: customer?.id ? (customer?.customerBadgeKey || 'registered_customer') : 'guest_customer',
+        customerIdentityLine: customer?.email || customer?.phone || customerId,
+        customerType: customer?.id ? (customer?.customerType || 'registered_customer') : 'guest_customer',
+        totalSpent: 0,
+        visits: 0,
+        averageSpend: 0,
+        lastVisit: null,
+        firstVisit: null
+      };
+
+      const isCompleted = `${appointment?.status || ''}`.trim().toLowerCase() === 'completed';
+      if (!isCompleted) {
+        customers.set(customerId, current);
+        return;
+      }
+
+      const amount = Number(appointment?.price || 0);
+      const visitedAt = appointment?.startTime || appointment?.createdAt;
+
+      current.totalSpent += amount;
+      current.visits += 1;
+      current.lastVisit = !current.lastVisit || new Date(visitedAt) > new Date(current.lastVisit) ? visitedAt : current.lastVisit;
+      current.firstVisit = !current.firstVisit || new Date(visitedAt) < new Date(current.firstVisit) ? visitedAt : current.firstVisit;
+      current.averageSpend = current.visits > 0 ? current.totalSpent / current.visits : 0;
+
+      customers.set(customerId, current);
+    });
+
+    return Array.from(customers.values())
+      .sort((left, right) => right.totalSpent - left.totalSpent)
+      .map((item) => ({
+        ...item,
+        customerName: item.name,
+        customer: item.customerDisplayName || item.name,
+        customerDisplayName: item.customerDisplayName || item.name,
+        customerBadge: item.customerBadge || 'Customer',
+        customerBadgeKey: item.customerBadgeKey || 'registered_customer',
+        customerIdentityLine: item.customerIdentityLine || item.id || '-',
+        customerType: item.customerType || 'registered_customer',
+        bookings: item.visits,
+        completed: item.visits,
+        revenue: Number(item.totalSpent.toFixed(2)),
+        totalSpent: Number(item.totalSpent.toFixed(2)),
+        averageSpend: Number(item.averageSpend.toFixed(2)),
+        spentServices: Number(item.totalSpent.toFixed(2)),
+        spentProducts: 0
+      }));
+  };
+
   // Trigger loading effect when the date range changes
   useEffect(() => {
     async function fetchReportData() {
@@ -194,6 +382,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           srvRes,
           summaryRes,
           financialRes,
+          appointmentsRes,
           trendsRes,
           servicePerfRes,
           employeePerfRes,
@@ -204,13 +393,13 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           refundsRes,
           paymentMethodsRes,
           posRes,
-          customerSalesRes,
           advancedRes
         ] = await Promise.allSettled([
           tenantApiAdapter.getEmployees(),
           tenantApiAdapter.getServices(),
           tenantApiAdapter.getReportsSummary({ startDate, endDate }),
           tenantApiAdapter.getFinancialOverview({ startDate, endDate }),
+          tenantApiAdapter.getAppointments({ startDate, endDate, limit: 5000 }),
           tenantApiAdapter.getBookingTrends({ startDate, endDate, groupBy }),
           tenantApiAdapter.getServicePerformance(startDate, endDate),
           tenantApiAdapter.getEmployeePerformance(startDate, endDate),
@@ -221,7 +410,6 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           tenantApiAdapter.getRefundsReport(startDate, endDate),
           tenantApiAdapter.getPaymentMethodsReport(startDate, endDate),
           tenantApiAdapter.getPosClosingSummary({ date: endDate.split('T')[0] }),
-          tenantApiAdapter.getFullReport(startDate, endDate, ['customerSales']),
           tenantApiAdapter.getAdvancedAnalytics({ startDate, endDate, groupBy })
         ]);
 
@@ -253,6 +441,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         const financialOverviewData = financialRes.status === 'fulfilled' && financialRes.value?.success
           ? (financialRes.value.overview || financialRes.value.data || null)
           : null;
+        const appointmentRows = appointmentsRes.status === 'fulfilled' && appointmentsRes.value?.success
+          ? (appointmentsRes.value.appointments || [])
+          : [];
         const bookingTrendRows = trendsRes.status === 'fulfilled' && trendsRes.value?.success
           ? (trendsRes.value.data || [])
           : [];
@@ -313,26 +504,10 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               paymentMethod: 'order',
               type: 'order'
             }));
-        const customerSalesData = customerSalesRes.status === 'fulfilled' && customerSalesRes.value?.success
-          ? (customerSalesRes.value.data || {})
-          : {};
         const advancedAnalyticsData = advancedRes.status === 'fulfilled' && advancedRes.value?.success
           ? (advancedRes.value.data || null)
           : null;
-        const customerSalesSourceRows = Array.isArray(customerSalesData.customerSales) && customerSalesData.customerSales.length
-          ? customerSalesData.customerSales
-          : (customerAnalyticsData?.topCustomers || []);
-        const mappedCustomerSales = customerSalesSourceRows.map((row: any) => ({
-          ...row,
-          nameAr: row.customerDisplayName || row.name || row.customer || row.id,
-          name: row.customerDisplayName || row.name || row.customer || row.id,
-          phone: row.phone || '-',
-          tier: row.customerBadge || row.customerType || '-',
-          visits: Number(row.bookings || row.visits || 0),
-          spentServices: Number(row.revenue || row.spentServices || 0),
-          spentProducts: Number(row.spentProducts || 0),
-          totalSpent: Number(row.totalSpent || row.revenue || 0)
-        }));
+        const mappedCustomerSales = buildCustomerSalesRows(appointmentRows);
         const serviceRevenueTotal = servicePerformanceRows.reduce((sum: number, row: any) => sum + Number(row.revenue || 0), 0) || 1;
         const mappedServices = servicePerformanceRows.map((row: any) => ({
           id: row.id,
@@ -413,6 +588,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               category: row.category || '-'
             }))
           : [];
+        const mappedSales = buildSalesReportRows(appointmentRows, refundsData.rows);
+        const mappedAppointments = buildAppointmentReportRows(appointmentRows);
         const mappedRebookings = rebookingAnalyticsData.rows.map((row: any) => ({
           id: row.id,
           customer: row.customer || row.customerName || row.id,
@@ -430,9 +607,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         setOverviewStats(summaryData);
         setReportData({
           overview: summaryData,
-          sales: mapBookingTrendRows(bookingTrendRows),
+          sales: mappedSales,
           financial: mapFinancialRows(financialSourceRows),
-          appointments: mapAppointmentTrendRows(bookingTrendRows),
+          appointments: mappedAppointments,
           rebookings: mappedRebookings,
           employees: mappedEmployees,
           services: mappedServices,
@@ -450,7 +627,16 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           refundsReport: refundsData,
           paymentMethodsReport: paymentMethodsData,
           posClosingSummary: posSummary,
-          customerSalesReport: customerSalesData
+          customerSalesReport: {
+            rows: mappedCustomerSales,
+            totals: {
+              totalCustomers: Number(customerAnalyticsData?.totalCustomers || mappedCustomerSales.length),
+              newCustomers: Number(customerAnalyticsData?.newCustomers || 0),
+              returningCustomers: Number(customerAnalyticsData?.returningCustomers || 0),
+              retentionRate: Number(customerAnalyticsData?.retentionRate || 0),
+              topCustomers: customerAnalyticsData?.topCustomers || mappedCustomerSales
+            }
+          }
         });
       } catch (err) {
         console.error('Error fetching report data:', err);
@@ -485,7 +671,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     rebookingRate: isRtl ? 'معدل إعادة الحجز' : 'Rebooking Rate',
     totalRefunds: isRtl ? 'إجمالي المرتجعات' : 'Total Refunds',
     avgValue: isRtl ? 'متوسط قيمة الحجز' : 'Avg Booking Value',
-    vatLabel: isRtl ? 'شامل ضريبة القيمة المضافة (15%)' : 'Inc. VAT (15%)',
+    vatLabel: isRtl ? 'ضريبة القيمة المضافة' : 'VAT',
 
     // Quick filter titles
     dateRangeLabel: isRtl ? 'نطاق التاريخ' : 'Date Range',
@@ -621,7 +807,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     : 0;
   const rebookingRateValue = Number(reportData?.rebookingAnalytics?.totals?.rebookingRate || 0);
   const refundTotalValue = Number(reportData?.refundsReport?.totals?.totalRefunds || 0);
-  const uniqueCustomersValue = Number(overviewStats?.uniqueCustomers || 0);
+  const retentionRateValue = Number(reportData?.customerAnalytics?.retentionRate || overviewStats?.completionRate || 0);
 
   // Handles export simulations
   const handleExport = (format: 'pdf' | 'csv' | 'excel' | 'print') => {
@@ -982,7 +1168,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                       </div>
                       <span className="text-[10px] font-black text-neutral-400 uppercase tracking-wider block">{t.retention}</span>
                       <p className="text-xl md:text-2xl font-black text-neutral-800 font-mono tracking-tight mt-1">
-                        {uniqueCustomersValue.toLocaleString()}
+                        {retentionRateValue.toFixed(1)}%
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-2 bg-emerald-50 px-2 py-0.5 rounded-full">
                         <ArrowUpRight size={11} />
@@ -1408,7 +1594,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                       <th className="p-3 text-start">{isRtl ? 'الخصومات' : 'Discounts'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'المرتجعات' : 'Refunds'}</th>
                                   <th className="p-3 text-start">{isRtl ? 'صافي المبيعات' : 'Net Sales'}</th>
-                                  <th className="p-3 text-start">{isRtl ? 'ضريبة القيمة المضافة (15%)' : 'VAT (15%)'}</th>
+                                  <th className="p-3 text-start">{isRtl ? 'ضريبة القيمة المضافة' : 'VAT'}</th>
                                   <th className="p-3 text-start cursor-pointer hover:text-neutral-800" onClick={() => triggerSort('total')}>{isRtl ? 'الإجمالي العام' : 'Total Revenue'} <ArrowUpDown size={10} className="inline" /></th>
                                 </>
                                   )}
