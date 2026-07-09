@@ -60,6 +60,17 @@ interface UsageStats {
   lastAttempt: NotificationHistoryItem | null;
 }
 
+const normalizeService = (service: any) => ({
+  ...service,
+  id: String(service?.id || ''),
+  nameAr: service?.nameAr || service?.name_ar || service?.name || '',
+  nameEn: service?.nameEn || service?.name_en || service?.name || '',
+  categoryAr: service?.categoryAr || service?.category || '',
+  categoryEn: service?.categoryEn || service?.category || '',
+  duration: Number(service?.duration ?? 0),
+  price: Number(service?.price ?? service?.finalPrice ?? service?.rawPrice ?? service?.basePrice ?? 0)
+});
+
 const normalizeHistoryItem = (item: any): NotificationHistoryItem => {
   const createdAt = item?.sentAt || item?.createdAt || item?.created_at || new Date().toISOString();
   const data = item?.data || {};
@@ -236,7 +247,14 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
       }));
       setCustomers(customersMapped);
       const servicesData = await tenantApiAdapter.getServices();
-      setServices(Array.isArray(servicesData?.services) ? servicesData.services : Array.isArray(servicesData?.data?.services) ? servicesData.data.services : Array.isArray(servicesData) ? servicesData : []);
+      const rawServices = Array.isArray(servicesData?.services)
+        ? servicesData.services
+        : Array.isArray(servicesData?.data?.services)
+          ? servicesData.data.services
+          : Array.isArray(servicesData)
+            ? servicesData
+            : [];
+      setServices(rawServices.map(normalizeService));
 
     } catch (err: any) {
       setError(err.message || "Failed to synchronise data with push service.");
