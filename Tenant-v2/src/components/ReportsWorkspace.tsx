@@ -154,6 +154,57 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     return date.toISOString().split('T')[0];
   };
 
+  const normalizeFilterValue = (value: any) => `${value || ''}`.trim().toLowerCase();
+
+  const resolveSalesServiceCategory = (saleRow: any) => {
+    const serviceName = normalizeFilterValue(saleRow?.service);
+    if (!serviceName) return '';
+
+    const serviceCatalog = Array.isArray(reportData.services) ? reportData.services : [];
+    const matchedService = serviceCatalog.find((service: any) => {
+      const names = [service?.nameEn, service?.nameAr, service?.name, service?.serviceName].map(normalizeFilterValue);
+      return names.includes(serviceName);
+    });
+
+    return normalizeFilterValue(matchedService?.category || matchedService?.categoryEn || matchedService?.categoryAr || '');
+  };
+
+  const getFilteredSalesSourceRows = () => {
+    const salesRows = Array.isArray(reportData.salesSourceRows) ? reportData.salesSourceRows : [];
+    const selectedEmployeeName = selectedEmployee !== 'all'
+      ? normalizeFilterValue(employeesList.find((emp: any) => emp.id === selectedEmployee)?.nameEn || employeesList.find((emp: any) => emp.id === selectedEmployee)?.nameAr)
+      : '';
+    const selectedServiceCategory = selectedService !== 'all' ? normalizeFilterValue(selectedService) : '';
+    const selectedPaymentMethodValue = selectedPaymentMethod !== 'all' ? normalizeFilterValue(selectedPaymentMethod) : '';
+    const q = searchTerm.trim().toLowerCase();
+
+    return salesRows.filter((row: any) => {
+      const rowEmployee = normalizeFilterValue(row?.employee || row?.employeeName || row?.stylist || '');
+      const rowPaymentMethod = normalizeFilterValue(row?.paymentMethod || row?.method || '');
+      const rowServiceName = normalizeFilterValue(row?.service || '');
+      const rowServiceCategory = resolveSalesServiceCategory(row);
+
+      if (selectedEmployeeName && !(rowEmployee.includes(selectedEmployeeName) || selectedEmployeeName.includes(rowEmployee))) {
+        return false;
+      }
+
+      if (selectedServiceCategory && !(rowServiceCategory === selectedServiceCategory || rowServiceName.includes(selectedServiceCategory))) {
+        return false;
+      }
+
+      if (selectedPaymentMethodValue && !(rowPaymentMethod === selectedPaymentMethodValue || rowPaymentMethod.includes(selectedPaymentMethodValue))) {
+        return false;
+      }
+
+      if (q) {
+        const rawMatch = Object.values(row).some(val => typeof val === 'string' && val.toLowerCase().includes(q));
+        if (!rawMatch) return false;
+      }
+
+      return true;
+    });
+  };
+
   const formatAppointmentStatus = (status: any) => {
     const normalized = `${status || ''}`.trim().toLowerCase();
     switch (normalized) {
@@ -647,6 +698,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         setReportData({
           overview: summaryData,
           sales: mappedSales,
+          salesSourceRows,
           financial: mapFinancialRows(financialSourceRows),
           appointments: mappedAppointments,
           rebookings: mappedRebookings,
@@ -771,7 +823,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
   const getFilteredData = () => {
     let list: any[] = [];
     switch (activeTab) {
-      case 'sales': list = reportData.sales || []; break;
+      case 'sales':
+        list = buildSalesReportRows(getFilteredSalesSourceRows());
+        break;
       case 'financial': list = reportData.financial || []; break;
       case 'appointments': list = reportData.appointments || []; break;
       case 'employees': list = reportData.employees || []; break;
