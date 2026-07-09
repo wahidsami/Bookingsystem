@@ -42,6 +42,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
   const [selectedService, setSelectedService] = useState('all');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
   const [dateRange, setDateRange] = useState('last_30_days');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,10 +66,24 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
   const [employeesList, setEmployeesList] = useState<any[]>([]);
   const [serviceCategories, setServiceCategories] = useState<any[]>([]);
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState<any[]>([]);
   const [reportData, setReportData] = useState<any>({});
   const [overviewStats, setOverviewStats] = useState<any>(null);
 
   const resolveDateRange = (range: string) => {
+    if (range === 'custom' && customDateFrom && customDateTo) {
+      const from = new Date(customDateFrom);
+      const to = new Date(customDateTo);
+      if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime()) && to >= from) {
+        from.setHours(0, 0, 0, 0);
+        to.setHours(23, 59, 59, 999);
+        return {
+          startDate: from.toISOString(),
+          endDate: to.toISOString()
+        };
+      }
+    }
+
     const now = new Date();
     const endDate = new Date(now);
     const startDate = new Date(now);
@@ -175,7 +191,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
       ? normalizeFilterValue(employeesList.find((emp: any) => emp.id === selectedEmployee)?.nameEn || employeesList.find((emp: any) => emp.id === selectedEmployee)?.nameAr)
       : '';
     const selectedServiceCategory = selectedService !== 'all' ? normalizeFilterValue(selectedService) : '';
-    const selectedPaymentMethodValue = selectedPaymentMethod !== 'all' ? normalizeFilterValue(selectedPaymentMethod) : '';
+    const selectedPaymentMethodValue = selectedPaymentMethod !== 'all'
+      ? normalizeFilterValue(paymentMethodOptions.find((method: any) => method.id === selectedPaymentMethod)?.nameEn || paymentMethodOptions.find((method: any) => method.id === selectedPaymentMethod)?.nameAr || selectedPaymentMethod)
+      : '';
     const q = searchTerm.trim().toLowerCase();
 
     return salesRows.filter((row: any) => {
@@ -477,8 +495,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           { id: 'all', nameEn: 'All Staff', nameAr: 'جميع الموظفات' },
           ...employees.map((e: any) => ({
             id: e.id,
-            nameEn: `${e.firstName} ${e.lastName}`,
-            nameAr: `${e.firstName} ${e.lastName}`,
+            nameEn: e.name || `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || e.phone || e.id,
+            nameAr: e.name || `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || e.phone || e.id,
             ...e
           }))
         ]);
@@ -486,7 +504,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         const services = srvRes.status === 'fulfilled' && srvRes.value?.services
           ? srvRes.value.services
           : [];
-        const uniqueCats = Array.from(new Set(services.map((s: any) => s.categoryEn || 'Uncategorized')));
+        const uniqueCats = Array.from(new Set(services.map((s: any) => s.categoryEn || s.categoryAr || s.category || 'Uncategorized')));
         setServiceCategories([
           { id: 'all', nameEn: 'All Categories', nameAr: 'جميع التصنيفات' },
           ...uniqueCats.map((c: any) => ({ id: (c as string).toLowerCase(), nameEn: c, nameAr: c }))
@@ -549,6 +567,15 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               trend: paymentMethodsRes.value.trend || []
             }
           : { rows: [], totals: null, trend: [] };
+        const paymentMethodRows = Array.isArray(paymentMethodsData.rows) ? paymentMethodsData.rows : [];
+        setPaymentMethodOptions([
+          { id: 'all', nameEn: 'All Methods', nameAr: 'جميع طرق الدفع' },
+          ...paymentMethodRows.map((row: any) => ({
+            id: row.paymentMethod || row.id,
+            nameEn: row.paymentMethodLabel || row.paymentMethod || row.id || '-',
+            nameAr: row.paymentMethodLabel || row.paymentMethod || row.id || '-'
+          }))
+        ]);
         const posSummary = posRes.status === 'fulfilled' && posRes.value?.success
           ? posRes.value.summary || null
           : null;
@@ -736,7 +763,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
       }
     }
     fetchReportData();
-  }, [dateRange]);
+  }, [dateRange, customDateFrom, customDateTo]);
 
   // Translations
   const t = {
@@ -766,6 +793,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
     // Quick filter titles
     dateRangeLabel: isRtl ? 'نطاق التاريخ' : 'Date Range',
+    customDateFromLabel: isRtl ? 'من' : 'From',
+    customDateToLabel: isRtl ? 'إلى' : 'To',
     employeeLabel: isRtl ? 'عضو الفريق' : 'Team Member',
     serviceLabel: isRtl ? 'تصنيف الخدمة' : 'Service Category',
     paymentLabel: isRtl ? 'طريقة السداد' : 'Payment Method',
@@ -802,14 +831,6 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     { id: 'this_month', labelEn: 'This Month', labelAr: 'الشهر الحالي' },
     { id: 'last_month', labelEn: 'Last Month', labelAr: 'الشهر الماضي' },
     { id: 'custom', labelEn: 'Custom Date', labelAr: 'تاريخ مخصص' }
-  ];
-
-  const mockPaymentMethodsList = [
-    { id: 'all', nameEn: 'All Methods', nameAr: 'جميع القنوات' },
-    { id: 'mada', nameEn: 'Mada Debit', nameAr: 'مدى Mada' },
-    { id: 'card', nameEn: 'Credit Card', nameAr: 'بطاقة ائتمانية' },
-    { id: 'cash', nameEn: 'Cash', nameAr: 'نقدي Cash' },
-    { id: 'wallet', nameEn: 'Wallet', nameAr: 'المحفظة الرقمية' }
   ];
 
   const mockSavedReports = [
@@ -1109,6 +1130,30 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                   <option key={dr.id} value={dr.id}>{isRtl ? dr.labelAr : dr.labelEn}</option>
                 ))}
               </select>
+              {dateRange === 'custom' && (
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <input
+                    type="date"
+                    value={customDateFrom}
+                    onChange={(e) => {
+                      setCustomDateFrom(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl p-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer transition-all"
+                    aria-label={t.customDateFromLabel}
+                  />
+                  <input
+                    type="date"
+                    value={customDateTo}
+                    onChange={(e) => {
+                      setCustomDateTo(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl p-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer transition-all"
+                    aria-label={t.customDateToLabel}
+                  />
+                </div>
+              )}
             </div>
 
             {/* 2. Employee Drop */}
@@ -1167,7 +1212,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                 }}
                 className="w-full bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl p-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer transition-all"
               >
-                {mockPaymentMethodsList.map(m => (
+                {paymentMethodOptions.map(m => (
                   <option key={m.id} value={m.id}>{isRtl ? m.nameAr : m.nameEn}</option>
                 ))}
               </select>
