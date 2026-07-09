@@ -215,14 +215,17 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     };
 
     ledgerRows.forEach((row) => {
-      const dateKey = getDateKey(row?.date || row?.processedAt || row?.createdAt);
+      const dateValue = row?.date || row?.processedAt || row?.createdAt || row?.saleDate || row?.timestamp;
+      const dateKey = getDateKey(dateValue);
       if (!dateKey) return;
 
-      const bucket = ensureRow(dateKey, row.date || row.processedAt || row.createdAt);
-      const revenue = Number(row?.revenue ?? 0);
-      const discountAmount = Math.abs(Number(row?.discount ?? 0));
-      const taxAmount = Math.abs(Number(row?.tax ?? 0));
-      const isRefund = revenue < 0;
+      const bucket = ensureRow(dateKey, dateValue);
+      const revenue = Number(row?.revenue ?? row?.amount ?? row?.paymentAmount ?? row?.totalAmount ?? 0);
+      const discountAmount = Math.abs(Number(row?.discount ?? row?.discountAmount ?? 0));
+      const taxAmount = Math.abs(Number(row?.tax ?? row?.taxAmount ?? row?.vat ?? 0));
+      const normalizedStatus = `${row?.status || ''}`.trim().toLowerCase();
+      const normalizedType = `${row?.type || row?.transactionType || ''}`.trim().toLowerCase();
+      const isRefund = revenue < 0 || normalizedStatus === 'refunded' || normalizedType === 'refund';
       const grossSales = Math.abs(revenue);
 
       bucket.bookings += 1;
@@ -230,8 +233,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
       bucket.discounts += discountAmount;
       bucket.refunds += isRefund ? grossSales : 0;
       bucket.vat += taxAmount;
-      bucket.netSales += isRefund ? -grossSales : grossSales;
-      bucket.total += isRefund ? -grossSales + taxAmount : grossSales + taxAmount;
+      bucket.netSales += isRefund ? -grossSales : grossSales - discountAmount;
+      bucket.total += isRefund ? -grossSales : grossSales - discountAmount;
       bucket.completed += 1;
     });
 
@@ -254,7 +257,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         refunds: Number(row.refunds.toFixed(2)),
         netSales: Number(row.netSales.toFixed(2)),
         vat: Number(row.vat.toFixed(2)),
-        total: Number(row.total.toFixed(2)),
+        total: Number((row.netSales + row.vat).toFixed(2)),
         bookings: Number(row.bookings || 0),
         completed: Number(row.completed || 0)
       }))
@@ -603,8 +606,28 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           : [];
         const ledgerSalesRows = Array.isArray(financialLedgerData?.revenueLedger?.rows)
           ? financialLedgerData.revenueLedger.rows
+          : Array.isArray(financialLedgerData?.paymentLedger?.rows)
+            ? financialLedgerData.paymentLedger.rows.map((row: any) => ({
+                ...row,
+                revenue: Number(row?.revenue ?? row?.amount ?? row?.paymentAmount ?? row?.totalAmount ?? 0),
+                discount: Number(row?.discount ?? row?.discountAmount ?? 0),
+                tax: Number(row?.tax ?? row?.taxAmount ?? row?.vat ?? 0),
+                date: row?.date || row?.processedAt || row?.createdAt || row?.saleDate || row?.timestamp
+              }))
           : [];
-        const mappedSales = buildSalesReportRows(ledgerSalesRows);
+        const salesSourceRows = ledgerSalesRows.length > 0
+          ? ledgerSalesRows
+          : financialOverviewData
+            ? [{
+                date: endDate,
+                revenue: Number(financialOverviewData.totalRevenue || financialOverviewData.appointmentRevenue || financialOverviewData.orderRevenue || 0),
+                discount: Number(financialOverviewData.totalDiscountAmount || 0),
+                tax: Number(financialOverviewData.totalTax || 0),
+                status: 'completed',
+                type: 'summary'
+              }]
+            : [];
+        const mappedSales = buildSalesReportRows(salesSourceRows);
         const mappedAppointments = buildAppointmentReportRows(appointmentRows);
         const mappedRebookings = rebookingAnalyticsData.rows.map((row: any) => ({
           id: row.id,
