@@ -38,6 +38,40 @@ interface PackageLimits {
   totalCreated: number;
 }
 
+const normalizeHotDealLimits = (input: any): PackageLimits => {
+  const limits = input?.limits || input || {};
+  const maxHotDeals = Number(limits.maxHotDeals ?? 0);
+  const currentHotDeals = Number(limits.currentHotDeals ?? limits.currentCount ?? limits.totalCreated ?? 0);
+  const totalCreated = Number(limits.totalCreated ?? limits.currentCount ?? currentHotDeals);
+  const remaining = maxHotDeals === -1 ? -1 : Math.max(maxHotDeals - currentHotDeals, 0);
+
+  return {
+    maxHotDeals,
+    currentHotDeals,
+    remaining,
+    totalCreated
+  };
+};
+
+const normalizeHotDeal = (deal: any): HotDeal => ({
+  id: String(deal?.id || ''),
+  serviceId: String(deal?.serviceId || ''),
+  title_en: deal?.title_en || deal?.titleEn || '',
+  title_ar: deal?.title_ar || deal?.titleAr || '',
+  description_en: deal?.description_en || deal?.descriptionEn || '',
+  description_ar: deal?.description_ar || deal?.descriptionAr || '',
+  discountType: deal?.discountType || 'percentage',
+  discountValue: Number(deal?.discountValue ?? 0),
+  validFrom: deal?.validFrom || deal?.valid_from || '',
+  validUntil: deal?.validUntil || deal?.valid_until || '',
+  maxRedemptions: Number(deal?.maxRedemptions ?? 0),
+  redemptionCount: Number(deal?.redemptionCount ?? deal?.currentRedemptions ?? 0),
+  status: deal?.status || 'pending',
+  rejectionReason: deal?.rejectionReason ?? null,
+  image: deal?.image || '',
+  createdAt: deal?.createdAt || new Date().toISOString()
+});
+
 // Gorgeous preset high-res spa images
 const IMAGE_PRESETS = [
   {
@@ -151,10 +185,17 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
         tenantApiAdapter.getServices()
       ]);
 
-      setServices(servicesData?.services || []);
+      setServices(Array.isArray(servicesData?.services) ? servicesData.services : Array.isArray(servicesData?.data?.services) ? servicesData.data.services : Array.isArray(servicesData) ? servicesData : []);
 
-      setDeals(Array.isArray(dealsRes?.deals) ? dealsRes.deals : Array.isArray(dealsRes) ? dealsRes : []);
-      setLimits(limitsRes?.limits || limitsRes || null);
+      const rawDeals = Array.isArray(dealsRes?.deals)
+        ? dealsRes.deals
+        : Array.isArray(dealsRes?.data?.deals)
+          ? dealsRes.data.deals
+          : Array.isArray(dealsRes)
+            ? dealsRes
+            : [];
+      setDeals(rawDeals.map(normalizeHotDeal));
+      setLimits(normalizeHotDealLimits(limitsRes));
     } catch (err: any) {
       console.error(err);
       setError(isRtl 
@@ -176,7 +217,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
       try {
         setLoading(true);
           const res = await tenantApiAdapter.get(`/tenant/hot-deals/${selectedDealId}`);
-          const deal: HotDeal = res?.deal || res?.data || res;
+          const deal: HotDeal = normalizeHotDeal(res?.deal || res?.data || res);
           
           setImage(deal.image);
           setServiceId(deal.serviceId);
@@ -252,21 +293,16 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
   const handlePauseDeal = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`/api/v1/tenant/hot-deals/${id}/pause`, {
-        method: 'POST'
-      });
-      if (!res.ok) throw new Error("Pause failed");
-      
-      const updatedDeal = await res.json();
-      setDeals(prev => prev.map(d => d.id === id ? updatedDeal : d));
+      const updatedDeal = await tenantApiAdapter.post(`/tenant/hot-deals/${id}/pause`);
+      setDeals(prev => prev.map(d => d.id === id ? normalizeHotDeal(updatedDeal?.deal || updatedDeal?.data || updatedDeal) : d));
       triggerNotification(
         "تم إيقاف العرض الساخن مؤقتاً بنجاح ⏸️",
         "Hot deal paused successfully ⏸️",
         "success"
       );
       // Refresh limits
-      const limRes = await fetch('/api/v1/tenant/hot-deals/limits');
-      if (limRes.ok) setLimits(await limRes.json());
+      const limRes = await tenantApiAdapter.get('/tenant/hot-deals/limits');
+      setLimits(normalizeHotDealLimits(limRes));
     } catch (err) {
       triggerNotification(
         "فشل إيقاف العرض مؤقتاً.",
@@ -279,21 +315,16 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
   const handleResumeDeal = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`/api/v1/tenant/hot-deals/${id}/resume`, {
-        method: 'POST'
-      });
-      if (!res.ok) throw new Error("Resume failed");
-      
-      const updatedDeal = await res.json();
-      setDeals(prev => prev.map(d => d.id === id ? updatedDeal : d));
+      const updatedDeal = await tenantApiAdapter.post(`/tenant/hot-deals/${id}/resume`);
+      setDeals(prev => prev.map(d => d.id === id ? normalizeHotDeal(updatedDeal?.deal || updatedDeal?.data || updatedDeal) : d));
       triggerNotification(
         "تم استئناف وتفعيل العرض الساخن بنجاح! ⚡",
         "Hot deal resumed and activated successfully! ⚡",
         "success"
       );
       // Refresh limits
-      const limRes = await fetch('/api/v1/tenant/hot-deals/limits');
-      if (limRes.ok) setLimits(await limRes.json());
+      const limRes = await tenantApiAdapter.get('/tenant/hot-deals/limits');
+      setLimits(normalizeHotDealLimits(limRes));
     } catch (err) {
       triggerNotification(
         "فشل تفعيل العرض.",
@@ -309,11 +340,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
       return;
     }
     try {
-      const res = await fetch(`/api/v1/tenant/hot-deals/${id}`, {
-        method: 'DELETE'
-      });
-      if (!res.ok) throw new Error("Delete failed");
-      
+      await tenantApiAdapter.delete(`/tenant/hot-deals/${id}`);
       setDeals(prev => prev.filter(d => d.id !== id));
       triggerNotification(
         "تم حذف العرض الساخن نهائياً.",
@@ -321,8 +348,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
         "success"
       );
       // Refresh limits
-      const limRes = await fetch('/api/v1/tenant/hot-deals/limits');
-      if (limRes.ok) setLimits(await limRes.json());
+      const limRes = await tenantApiAdapter.get('/tenant/hot-deals/limits');
+      setLimits(normalizeHotDealLimits(limRes));
     } catch (err) {
       triggerNotification(
         "فشل حذف العرض الترويجي.",
@@ -420,21 +447,11 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
         image
       };
 
-      const url = subView === 'new' ? '/api/v1/tenant/hot-deals' : `/api/v1/tenant/hot-deals/${selectedDealId}`;
       const method = subView === 'new' ? 'POST' : 'PUT';
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "API transaction failed");
-      }
-
-      const savedDeal = await res.json();
+      await (method === 'POST'
+        ? tenantApiAdapter.post('/tenant/hot-deals', payload)
+        : tenantApiAdapter.put(`/tenant/hot-deals/${selectedDealId}`, payload));
 
       triggerNotification(
         subView === 'new' ? "تم إطلاق العرض الساخن الجديد بنجاح! 🎉" : "تم تحديث وحفظ بيانات العرض الترويجي بنجاح! 💾",
@@ -633,12 +650,12 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                 <div className="w-full md:w-60 space-y-1.5 shrink-0">
                   <div className="flex justify-between text-xs font-bold font-mono">
                     <span className="text-zinc-400">{isRtl ? 'المستهلك:' : 'Quota Usage:'}</span>
-                    <span>{limits.currentHotDeals} / {limits.maxHotDeals}</span>
+                            <span>{limits.currentHotDeals} / {limits.maxHotDeals}</span>
                   </div>
                   <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-brand-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, (limits.currentHotDeals / limits.maxHotDeals) * 100)}%` }}
+                      style={{ width: `${limits.maxHotDeals > 0 ? Math.min(100, (limits.currentHotDeals / limits.maxHotDeals) * 100) : 0}%` }}
                     />
                   </div>
                   <p className="text-[10px] text-zinc-500 text-end font-mono">

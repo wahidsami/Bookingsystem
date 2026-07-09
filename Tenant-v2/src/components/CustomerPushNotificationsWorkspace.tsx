@@ -16,7 +16,7 @@ interface NotificationHistoryItem {
   id: string;
   title: string;
   message: string;
-  linkType: 'general' | 'service' | 'deal';
+  linkType: 'none' | 'tenant' | 'service';
   serviceId: string | null;
   image: string | null;
   sendToAll: boolean;
@@ -60,11 +60,85 @@ interface UsageStats {
   lastAttempt: NotificationHistoryItem | null;
 }
 
-interface HotDeal {
-  id: string;
-  title_en: string;
-  title_ar: string;
-}
+const normalizeHistoryItem = (item: any): NotificationHistoryItem => {
+  const createdAt = item?.sentAt || item?.createdAt || item?.created_at || new Date().toISOString();
+  const data = item?.data || {};
+  const recipientCount = Number(item?.recipientCount ?? data?.recipientCount ?? data?.sent ?? 0);
+  const isAllBooked = String(item?.audienceType || data?.audienceType || '').toLowerCase() === 'all_booked';
+  const linkType = String(data?.linkType || item?.linkType || 'none').toLowerCase();
+  const countsSent = Number(data?.counts?.sent ?? recipientCount);
+  const countsDelivered = Number(data?.counts?.delivered ?? recipientCount);
+  const countsSkipped = Number(data?.counts?.skipped ?? 0);
+  const countsFailed = Number(data?.counts?.failed ?? 0);
+
+  return {
+    id: String(item?.id || ''),
+    title: item?.title || data?.title || '',
+    message: item?.body || item?.message || data?.body || '',
+    linkType: linkType === 'service' || linkType === 'tenant' ? linkType : 'none',
+    serviceId: data?.serviceId || item?.serviceId || null,
+    image: data?.imageUrl || data?.image || item?.image || null,
+    sendToAll: isAllBooked,
+    audienceType: isAllBooked ? 'All Customers' : 'Segmented',
+    recipientCount,
+    status: Number(countsFailed) > 0 ? 'warning' : 'completed',
+    createdAt,
+    requestPayload: data?.requestPayload || data || {
+      title: item?.title || '',
+      body: item?.body || ''
+    },
+    responsePayload: data?.responsePayload || {
+      sent: recipientCount
+    },
+    timestamps: {
+      created: createdAt,
+      processed: item?.sentAt || createdAt,
+      completed: item?.sentAt || createdAt
+    },
+    counts: {
+      sent: countsSent,
+      delivered: countsDelivered,
+      skipped: countsSkipped,
+      failed: countsFailed
+    },
+    skippedReasons: Array.isArray(data?.skippedReasons)
+      ? data.skippedReasons
+      : data?.skippedReasons && typeof data.skippedReasons === 'object'
+        ? Object.entries(data.skippedReasons).map(([reason, count]) => ({
+            customerId: '',
+            name: String(reason),
+            reason: `${count}`
+          }))
+        : [],
+    recipientResults: Array.isArray(data?.recipientResults)
+      ? data.recipientResults
+      : []
+  };
+};
+
+const normalizeUsageStats = (input: any, lastAttempt: NotificationHistoryItem | null): UsageStats => {
+  const payload = input?.data || input || {};
+  const limit = Number(payload?.limit ?? 0);
+  const sent = Number(payload?.count ?? payload?.sent ?? 0);
+  const remaining = payload?.remaining !== undefined
+    ? Number(payload.remaining)
+    : limit === -1
+      ? 0
+      : Math.max(limit - sent, 0);
+  const deliverySuccessRate = payload?.deliverySuccessRate !== undefined
+    ? Number(payload.deliverySuccessRate)
+    : lastAttempt && lastAttempt.counts.sent > 0
+      ? Number(((lastAttempt.counts.delivered / Math.max(lastAttempt.counts.sent, 1)) * 100).toFixed(1))
+      : 100;
+
+  return {
+    limit,
+    sent,
+    remaining,
+    deliverySuccessRate,
+    lastAttempt
+  };
+};
 
 export default function CustomerPushNotificationsWorkspace({ lang, darkMode = false }: PushNotificationsWorkspaceProps) {
   const isRtl = lang === 'ar';
@@ -80,18 +154,16 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
     lastAttempt: null
   });
   const [history, setHistory] = useState<NotificationHistoryItem[]>([]);
-  const [hotDeals, setHotDeals] = useState<HotDeal[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
 
   // Composer Form States
   const [title, setTitle] = useState<string>('');
   const [message, setMessage] = useState<string>('');
-  const [linkType, setLinkType] = useState<'general' | 'service' | 'deal'>('general');
+  const [linkType, setLinkType] = useState<'none' | 'tenant' | 'service'>('tenant');
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
-  const [selectedDealId, setSelectedDealId] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
-  const [sendToAll, setSendToAll] = useState<boolean>(true);
+  const [sendToAll, setSendToAll] = useState<boolean>(false);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
 
   // Customer Selection Search and Toggle State
@@ -119,7 +191,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
       message: isRtl 
         ? "استمتعي بخصم ٢٠٪ على جلسات العناية الملكية بالشعر هذا الأسبوع." 
         : "Enjoy 20% off on all royal hair care treatments this week.",
-      linkType: 'general' as const,
+      linkType: 'tenant' as const,
       sendToAll: true
     },
     {
@@ -141,38 +213,30 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
 
       // Fetch Usage Stats
       const usageData = await tenantApiAdapter.get('/tenant/notifications/usage');
-      setUsage(usageData?.data || usageData || {
-        limit: 5000,
-        sent: 0,
-        remaining: 5000,
-        deliverySuccessRate: 99.4,
-        lastAttempt: null
-      });
-
-      // Fetch History
       const historyData = await tenantApiAdapter.get('/tenant/notifications/history');
-      setHistory(Array.isArray(historyData?.campaigns) ? historyData.campaigns : Array.isArray(historyData?.data) ? historyData.data : Array.isArray(historyData) ? historyData : []);
-
-      // Fetch Hot Deals (if any)
-      try {
-        const dealsData = await tenantApiAdapter.get('/tenant/hot-deals');
-        setHotDeals(Array.isArray(dealsData?.deals) ? dealsData.deals : Array.isArray(dealsData) ? dealsData : []);
-      } catch (e) {
-        console.warn("Hot deals endpoint not fully accessible", e);
-      }
+      const rawHistory = Array.isArray(historyData?.campaigns)
+        ? historyData.campaigns
+        : Array.isArray(historyData?.data)
+          ? historyData.data
+          : Array.isArray(historyData)
+            ? historyData
+            : [];
+      const normalizedHistory = rawHistory.map(normalizeHistoryItem);
+      setHistory(normalizedHistory);
+      setUsage(normalizeUsageStats(usageData, normalizedHistory[0] || null));
 
       // Fetch Dependencies (Customers & Services)
       const customersRes = await tenantApiAdapter.getCustomers({ limit: 1000 });
       const customersMapped = (customersRes?.customers || (customersRes as any)?.data?.customers || []).map((c: any) => ({
         ...c,
-        name: c.nameEn || c.nameAr || 'Unknown',
-        phone: c.phone || 'No Phone',
+        name: c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.nameEn || c.nameAr || 'Unknown',
+        phone: c.phone || c.mobile || 'No Phone',
         email: c.email || 'No Email',
-        appointmentsCount: c.stats?.totalAppointments || 0
+        appointmentsCount: c.stats?.totalAppointments || c.appointmentsCount || 0
       }));
       setCustomers(customersMapped);
       const servicesData = await tenantApiAdapter.getServices();
-      setServices(servicesData?.services || []);
+      setServices(Array.isArray(servicesData?.services) ? servicesData.services : Array.isArray(servicesData?.data?.services) ? servicesData.data.services : Array.isArray(servicesData) ? servicesData : []);
 
     } catch (err: any) {
       setError(err.message || "Failed to synchronise data with push service.");
@@ -197,17 +261,17 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
   };
 
   // Image upload handling
-  const handleImageUpload = async (base64String: string) => {
+  const handleImageUpload = async (file: File) => {
     try {
       setUploadingImage(true);
-      const res = await fetch('/api/v1/tenant/notifications/image', {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await tenantApiAdapter.request('/tenant/notifications/image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64String })
+        body: formData
       });
-      if (!res.ok) throw new Error("Failed to process image upload on server.");
       const data = await res.json();
-      setImageUrl(data.imageUrl);
+      setImageUrl(data?.data?.imageUrl || data?.imageUrl || '');
     } catch (err: any) {
       alert(isRtl ? "فشل رفع الصورة: " + err.message : "Image upload failed: " + err.message);
     } finally {
@@ -223,7 +287,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result) {
-        handleImageUpload(e.target.result as string);
+        handleImageUpload(file);
       }
     };
     reader.readAsDataURL(file);
@@ -287,42 +351,51 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
 
     try {
       setLoading(true);
-      const payload = {
-        title,
-        message,
-        linkType,
-        serviceId: linkType === 'service' ? selectedServiceId : null,
-        dealId: linkType === 'deal' ? selectedDealId : null,
-        image: imageUrl || null,
-        sendToAll,
-        customerIds: sendToAll ? [] : selectedCustomerIds
-      };
+      const payload = sendToAll
+        ? {
+            audience: 'all_booked',
+            title: title.trim(),
+            body: message.trim(),
+            linkType,
+            serviceId: linkType === 'service' ? selectedServiceId || undefined : undefined,
+            imageUrl: imageUrl || undefined
+          }
+        : {
+            platformUserIds: Array.from(selectedCustomerIds),
+            title: title.trim(),
+            body: message.trim(),
+            linkType,
+            serviceId: linkType === 'service' ? selectedServiceId || undefined : undefined,
+            imageUrl: imageUrl || undefined
+          };
 
-      const response = await fetch('/api/v1/tenant/notifications/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Failed to dispatch notification.");
+      const response = await tenantApiAdapter.post('/tenant/notifications/send', payload);
+      if (!response?.success) {
+        throw new Error(response?.message || "Failed to dispatch notification.");
       }
-
-      const newLog = await response.json();
 
       // Reset Form fields
       setTitle('');
       setMessage('');
       setImageUrl('');
-      setLinkType('general');
+      setLinkType('tenant');
       setSelectedServiceId('');
-      setSelectedDealId('');
       setSelectedCustomerIds([]);
       setCustomerPanelExpanded(false);
 
       // Refresh data
-      await fetchData();
+      const refreshedUsage = await tenantApiAdapter.get('/tenant/notifications/usage');
+      const refreshedHistory = await tenantApiAdapter.get('/tenant/notifications/history');
+      const refreshedRawHistory = Array.isArray(refreshedHistory?.campaigns)
+        ? refreshedHistory.campaigns
+        : Array.isArray(refreshedHistory?.data)
+          ? refreshedHistory.data
+          : Array.isArray(refreshedHistory)
+            ? refreshedHistory
+            : [];
+      const refreshedNormalizedHistory = refreshedRawHistory.map(normalizeHistoryItem);
+      setHistory(refreshedNormalizedHistory);
+      setUsage(normalizeUsageStats(refreshedUsage, refreshedNormalizedHistory[0] || null));
 
       // Show success toast/alert
       alert(isRtl ? "🎉 تم بث إشعار الدفع بنجاح للعملاء!" : "🎉 Push notification dispatched successfully!");
@@ -530,9 +603,9 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
                     darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-250 text-neutral-800'
                   }`}
                 >
-                  <option value="general">{isRtl ? 'عام (فتح التطبيق)' : 'General (Open Application)'}</option>
+                  <option value="none">{isRtl ? 'بدون رابط' : 'No Link'}</option>
+                  <option value="tenant">{isRtl ? 'صفحة المركز' : 'Tenant Page'}</option>
                   <option value="service">{isRtl ? 'ربط بخدمة صالون محددة' : 'Link to Salon Service'}</option>
-                  <option value="deal">{isRtl ? 'ربط بعرض ساخن نشط' : 'Link to Hot Deal Page'}</option>
                 </select>
               </div>
 
@@ -558,31 +631,6 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
                 </div>
               )}
 
-              {/* Deal Selector conditional */}
-              {linkType === 'deal' && (
-                <div className="space-y-1.5">
-                  <label className="font-bold text-brand-500 block">{isRtl ? 'اختر العرض المستهدف' : 'Select Target Hot Deal'}</label>
-                  <select
-                    value={selectedDealId}
-                    required
-                    onChange={(e) => setSelectedDealId(e.target.value)}
-                    className={`w-full p-3 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden font-bold cursor-pointer transition-all ${
-                      darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-250 text-neutral-800'
-                    }`}
-                  >
-                    <option value="">{isRtl ? '-- اختر العرض الساخن --' : '-- Select Hot Deal --'}</option>
-                    {hotDeals.length > 0 ? (
-                      hotDeals.map(deal => (
-                        <option key={deal.id} value={deal.id}>
-                          {isRtl ? deal.title_ar : deal.title_en}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="deal-royal-massage">{isRtl ? 'هروب الاسترخاء الملكي (مؤقت)' : 'Royal Relaxation Escape'}</option>
-                    )}
-                  </select>
-                </div>
-              )}
             </div>
 
             {/* Image Upload Area */}
@@ -964,10 +1012,8 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
                       </td>
                       <td className="p-3 whitespace-nowrap">
                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
-                          item.linkType === 'deal' 
-                            ? 'bg-amber-500/10 text-amber-500' 
-                            : item.linkType === 'service' 
-                              ? 'bg-brand-500/10 text-brand-400' 
+                          item.linkType === 'service'
+                              ? 'bg-brand-500/10 text-brand-400'
                               : 'bg-neutral-500/10 text-zinc-400'
                         }`}>
                           {item.linkType}

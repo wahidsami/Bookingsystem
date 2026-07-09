@@ -23,6 +23,18 @@ interface Review {
   isVisible: boolean;
 }
 
+const normalizeReviewRecord = (review: any): Review => ({
+  id: String(review?.id || ''),
+  customer: review?.customer || review?.customerName || review?.platformUser?.fullName || review?.platformUser?.name || 'Unknown',
+  rating: Number(review?.rating || 0),
+  employee: review?.employee || review?.staff?.name || review?.staffName || '—',
+  commentAr: review?.commentAr || review?.comment || review?.commentArText || review?.staffReply || '',
+  commentEn: review?.commentEn || review?.comment || review?.commentEnText || review?.staffReply || '',
+  reply: review?.reply ?? review?.staffReply ?? null,
+  date: review?.date || review?.createdAt || review?.created_at || '',
+  isVisible: typeof review?.isVisible === 'boolean' ? review.isVisible : Boolean(review?.isVisible ?? true)
+});
+
 export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWorkspaceProps) {
   const isRtl = lang === 'ar';
 
@@ -67,7 +79,16 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
       setLoading(true);
       setError(null);
       const data = await tenantApiAdapter.get('/tenant/reviews');
-      setReviews(Array.isArray(data?.data?.reviews) ? data.data.reviews : Array.isArray(data?.reviews) ? data.reviews : Array.isArray(data) ? data : []);
+      const rawReviews = Array.isArray(data?.data?.reviews)
+        ? data.data.reviews
+        : Array.isArray(data?.reviews)
+          ? data.reviews
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data)
+              ? data
+              : [];
+      setReviews(rawReviews.map(normalizeReviewRecord));
     } catch (err: any) {
       setError(err.message || "Failed to load reviews.");
     } finally {
@@ -83,18 +104,12 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
   const updateReview = async (id: string, payload: { isVisible?: boolean; reply?: string | null }) => {
     try {
       setActionLoadingId(id);
-      const response = await fetch(`/api/v1/tenant/reviews/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      const updatedReview = await tenantApiAdapter.patch(`/tenant/reviews/${id}`, {
+        ...(typeof payload.isVisible === 'boolean' ? { isVisible: payload.isVisible } : {}),
+        ...(payload.reply !== undefined ? { staffReply: payload.reply } : {})
       });
-      if (!response.ok) {
-        throw new Error(isRtl ? "فشل حفظ التعديلات على الخادم." : "Failed to commit changes on the server.");
-      }
-      const updatedReview = await response.json();
-      
-      // Update local state
-      const normalizedReview = updatedReview?.data || updatedReview?.review || updatedReview;
+
+      const normalizedReview = normalizeReviewRecord(updatedReview?.data || updatedReview?.review || updatedReview);
       setReviews(prevReviews => prevReviews.map(r => r.id === id ? normalizedReview : r));
       if (editingReplyId === id) {
         setEditingReplyId(null);

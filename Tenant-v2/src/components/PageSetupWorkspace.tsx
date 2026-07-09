@@ -5,6 +5,7 @@ import {
   Instagram, Twitter, Youtube, Linkedin, Sparkles, Upload, Map, ExternalLink,
   ChevronLeft, ChevronRight, FileText, CheckCircle, Smartphone, HelpCircle
 } from 'lucide-react';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface PageSetupWorkspaceProps {
   lang: 'ar' | 'en';
@@ -16,16 +17,6 @@ interface SectionsVisibility {
   products: boolean;
   reviews: boolean;
   about: boolean;
-}
-
-interface PublicPageData {
-  coverImage: string;
-  sectionsVisibility: SectionsVisibility;
-  aboutTitleAr: string;
-  aboutTitleEn: string;
-  aboutTextAr: string;
-  aboutTextEn: string;
-  gallery: string[];
 }
 
 interface BusinessSettings {
@@ -42,12 +33,44 @@ interface BusinessSettings {
   snapchat: string;
 }
 
+const normalizeSectionsVisibility = (value: any): SectionsVisibility => {
+  const sections = value?.sections || value || {};
+  return {
+    services: sections.services !== false,
+    products: sections.products !== false,
+    reviews: sections.reviews === true,
+    about: sections.about !== false && sections.callToAction !== false
+  };
+};
+
+const normalizeAboutText = (pageData: any) => {
+  const aboutUs = pageData?.aboutUs || {};
+  return {
+    title: aboutUs.storyTitle || '',
+    textEn: aboutUs.storyEn || '',
+    textAr: aboutUs.storyAr || '',
+    gallery: Array.isArray(aboutUs.facilitiesImages) ? aboutUs.facilitiesImages : []
+  };
+};
+
+const composeAddressText = (business: any) => {
+  const fallback = [
+    business?.buildingNumber,
+    business?.street,
+    business?.district,
+    business?.city,
+    business?.country
+  ].filter(Boolean).join(', ');
+  return business?.addressText || fallback || '';
+};
+
 export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetupWorkspaceProps) {
   const isRtl = lang === 'ar';
 
   // State management
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
+  const [coverUploading, setCoverUploading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -113,32 +136,41 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
       setError(null);
 
       // Fetch public page setup
-      const pageRes = await fetch('/api/v1/tenant/public-page');
-      if (!pageRes.ok) throw new Error(isRtl ? 'فشل جلب إعدادات الصفحة العامة من الخادم.' : 'Failed to retrieve public page setup.');
-      const pageData: PublicPageData = await pageRes.json();
+      const pageRes = await tenantApiAdapter.get('/tenant/public-page');
+      const pageData = pageRes?.data || pageRes || {};
 
       // Fetch settings
-      const settingsRes = await fetch('/api/v1/tenant/settings');
-      if (!settingsRes.ok) throw new Error(isRtl ? 'فشل جلب إعدادات الاتصال والأعمال من الخادم.' : 'Failed to retrieve settings details.');
-      const settingsData = await settingsRes.json();
+      const settingsRes = await tenantApiAdapter.get('/tenant/settings');
+      const settingsData = settingsRes?.data || settingsRes || {};
 
       // Apply to states
-      setCoverImage(pageData.coverImage || '');
-      setSectionsVisibility(pageData.sectionsVisibility || {
-        services: true,
-        products: true,
-        reviews: true,
-        about: true
-      });
-      setAboutTitleAr(pageData.aboutTitleAr || '');
-      setAboutTitleEn(pageData.aboutTitleEn || '');
-      setAboutTextAr(pageData.aboutTextAr || '');
-      setAboutTextEn(pageData.aboutTextEn || '');
-      setGallery(pageData.gallery || []);
+      const normalizedSections = normalizeSectionsVisibility(pageData?.generalSettings || pageData?.sectionsVisibility || {});
+      const about = normalizeAboutText(pageData);
+      const business = settingsData?.business || {};
 
-      if (settingsData.business) {
-        setContact(settingsData.business);
-      }
+      setCoverImage(pageData?.aboutUs?.heroImage || pageData?.coverImage || business?.coverImage || '');
+      setSectionsVisibility(normalizedSections);
+      setAboutTitleAr(about.title || '');
+      setAboutTitleEn(about.title || '');
+      setAboutTextAr(about.textAr || about.textEn || '');
+      setAboutTextEn(about.textEn || about.textAr || '');
+      setGallery(about.gallery);
+      setContact({
+        address: composeAddressText({
+          ...business,
+          addressText: pageData?.generalSettings?.pageSetup?.addressText || settingsData?.settings?.pageSetup?.addressText
+        }),
+        googleMapLink: pageData?.generalSettings?.pageSetup?.googleMapLink || business?.googleMapLink || '',
+        phone: pageData?.generalSettings?.pageSetup?.phone || business?.phone || business?.mobile || '',
+        email: pageData?.generalSettings?.pageSetup?.email || business?.email || '',
+        website: pageData?.generalSettings?.pageSetup?.website || business?.website || '',
+        instagram: pageData?.generalSettings?.pageSetup?.instagramUrl || business?.instagramUrl || '',
+        twitter: pageData?.generalSettings?.pageSetup?.twitterUrl || business?.twitterUrl || '',
+        tiktok: pageData?.generalSettings?.pageSetup?.tiktokUrl || business?.tiktokUrl || '',
+        youtube: pageData?.generalSettings?.pageSetup?.youtubeUrl || business?.youtubeUrl || '',
+        linkedin: pageData?.generalSettings?.pageSetup?.linkedinUrl || business?.linkedinUrl || '',
+        snapchat: pageData?.generalSettings?.pageSetup?.snapchatUrl || business?.snapchatUrl || ''
+      });
     } catch (err: any) {
       setError(err.message || 'An error occurred while loading settings data.');
     } finally {
@@ -188,28 +220,41 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      readAndSetCover(file);
+      void uploadCoverImage(file);
     }
   };
 
   const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      readAndSetCover(e.target.files[0]);
+      void uploadCoverImage(e.target.files[0]);
     }
   };
 
-  const readAndSetCover = (file: File) => {
+  const uploadCoverImage = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert(isRtl ? 'عذراً، يرجى رفع ملف صورة صحيح فقط.' : 'Please upload a valid image file only.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setCoverImage(event.target.result as string);
+
+    try {
+      setCoverUploading(true);
+      const formData = new FormData();
+      formData.append('coverImage', file);
+
+      const response = await tenantApiAdapter.request('/tenant/settings/cover', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+      const nextCover = data?.data?.coverImage || '';
+      if (nextCover) {
+        setCoverImage(nextCover);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      alert(err?.message || (isRtl ? 'فشل تحديث صورة الغلاف' : 'Failed to update cover image'));
+    } finally {
+      setCoverUploading(false);
+    }
   };
 
   // Drag and drop for Gallery
@@ -309,38 +354,54 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
       }
 
       // 1. Save public page content
-      const publicPagePayload: PublicPageData = {
-        coverImage,
-        sectionsVisibility,
-        aboutTitleAr,
-        aboutTitleEn,
-        aboutTextAr,
-        aboutTextEn,
-        gallery
-      };
+      const publicPageForm = new FormData();
+      publicPageForm.append('storyTitle', aboutTitleEn || aboutTitleAr || 'ourStory');
+      publicPageForm.append('storyEn', aboutTextEn || aboutTextAr || '');
+      publicPageForm.append('storyAr', aboutTextAr || aboutTextEn || '');
+      publicPageForm.append('existingHeroImage', coverImage || '');
+      publicPageForm.append('existingFacilitiesImages', JSON.stringify(gallery));
+      publicPageForm.append('generalSettings', JSON.stringify({
+        sections: {
+          services: sectionsVisibility.services,
+          products: sectionsVisibility.products,
+          reviews: sectionsVisibility.reviews,
+          about: sectionsVisibility.about,
+          callToAction: sectionsVisibility.about
+        },
+        pageSetup: {
+          addressText: contact.address,
+          googleMapLink: contact.googleMapLink,
+          phone: contact.phone,
+          email: contact.email,
+          website: contact.website,
+          instagramUrl: contact.instagram,
+          twitterUrl: contact.twitter,
+          tiktokUrl: contact.tiktok,
+          youtubeUrl: contact.youtube,
+          linkedinUrl: contact.linkedin,
+          snapchatUrl: contact.snapchat
+        }
+      }));
 
-      const pageRes = await fetch('/api/v1/tenant/public-page', {
+      await tenantApiAdapter.request('/tenant/public-page', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(publicPagePayload)
+        body: publicPageForm
       });
-
-      if (!pageRes.ok) {
-        const errJson = await pageRes.json();
-        throw new Error(errJson.error || (isRtl ? 'فشل في حفظ إعدادات الصفحة العامة.' : 'Failed to save public page content.'));
-      }
 
       // 2. Save business info
-      const settingsRes = await fetch('/api/v1/tenant/settings/business', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contact)
+      await tenantApiAdapter.put('/tenant/settings/business', {
+        googleMapLink: contact.googleMapLink,
+        phone: contact.phone,
+        mobile: contact.phone,
+        email: contact.email,
+        website: contact.website,
+        instagramUrl: contact.instagram,
+        twitterUrl: contact.twitter,
+        tiktokUrl: contact.tiktok,
+        youtubeUrl: contact.youtube,
+        linkedinUrl: contact.linkedin,
+        snapchatUrl: contact.snapchat
       });
-
-      if (!settingsRes.ok) {
-        const errJson = await settingsRes.json();
-        throw new Error(errJson.error || (isRtl ? 'فشل في حفظ تفاصيل الاتصال والأعمال.' : 'Failed to save business settings.'));
-      }
 
       // 3. Refresh gallery state (by refetching latest server state to confirm sync)
       await loadPageSetupAndSettings();
@@ -448,6 +509,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     <button
                       type="button"
                       onClick={() => setCoverImage('')}
+                      disabled={coverUploading}
                       className="p-2 bg-rose-500 text-white rounded-full hover:bg-rose-600 transition-colors cursor-pointer"
                       title={isRtl ? 'حذف الصورة الحالية' : 'Delete current cover'}
                     >
@@ -455,7 +517,8 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     </button>
                     <button
                       type="button"
-                      onClick={() => coverInputRef.current?.click()}
+                      onClick={() => !coverUploading && coverInputRef.current?.click()}
+                      disabled={coverUploading}
                       className="p-2 bg-brand-500 text-white rounded-full hover:bg-brand-600 transition-colors cursor-pointer"
                       title={isRtl ? 'استبدال الصورة' : 'Replace cover'}
                     >
@@ -470,7 +533,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                   onDragOver={handleCoverDrag}
                   onDragLeave={handleCoverDrag}
                   onDrop={handleCoverDrop}
-                  onClick={() => coverInputRef.current?.click()}
+                  onClick={() => !coverUploading && coverInputRef.current?.click()}
                   className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
                     dragActiveCover 
                       ? 'border-brand-500 bg-brand-500/5' 
@@ -489,6 +552,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                 type="file"
                 accept="image/*"
                 onChange={handleCoverFileChange}
+                disabled={coverUploading}
                 className="hidden"
               />
 
@@ -501,6 +565,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     value={coverImage}
                     onChange={(e) => setCoverImage(e.target.value)}
                     placeholder="https://example.com/salon-hero.jpg"
+                    disabled={coverUploading}
                     className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden font-medium ${
                       darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200 text-neutral-850'
                     }`}
@@ -517,6 +582,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                       key={idx}
                       type="button"
                       onClick={() => setCoverImage(preset.url)}
+                      disabled={coverUploading}
                       className={`relative h-14 rounded-lg overflow-hidden border transition-all text-start cursor-pointer group ${
                         coverImage === preset.url 
                           ? 'border-brand-500 ring-1 ring-brand-500' 
