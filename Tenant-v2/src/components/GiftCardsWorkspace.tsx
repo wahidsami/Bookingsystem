@@ -59,6 +59,32 @@ interface ReportsSummary {
 }
 
 const formatNumber = (value: unknown) => Number(value ?? 0).toLocaleString();
+const safeText = (value: unknown) => `${value ?? ''}`;
+
+const normalizeTransactionLog = (tx: any): TransactionLog => ({
+  id: String(tx?.id || ''),
+  packageName: tx?.packageName || tx?.package?.title_en || tx?.package?.title_ar || tx?.package?.title || '',
+  code: tx?.code || tx?.giftCardCode?.code || '',
+  buyerName: tx?.buyerName || `${tx?.sender?.firstName || ''} ${tx?.sender?.lastName || ''}`.trim() || tx?.sender?.email || '',
+  recipientName: tx?.recipientName || `${tx?.recipient?.firstName || ''} ${tx?.recipient?.lastName || ''}`.trim() || tx?.recipient?.email || '',
+  amountPaid: Number(tx?.amountPaid ?? tx?.purchaseAmount ?? 0),
+  walletCreditAmount: Number(tx?.walletCreditAmount ?? tx?.creditAmount ?? tx?.totalCreditAmount ?? 0),
+  bonusAmount: Number(tx?.bonusAmount ?? 0),
+  purchasedAt: tx?.purchasedAt || tx?.createdAt || '',
+  status: tx?.status === 'refunded' ? 'refunded' : 'completed'
+});
+
+const normalizeRedemptionLog = (red: any): RedemptionLog => ({
+  id: String(red?.id || ''),
+  code: red?.code || red?.giftCardCode?.code || '',
+  customerName: red?.customerName || `${red?.customer?.firstName || ''} ${red?.customer?.lastName || ''}`.trim() || red?.customer?.email || '',
+  customerPhone: red?.customerPhone || red?.customer?.phone || red?.customer?.mobile || '',
+  amount: Number(red?.amount ?? red?.redeemedAmount ?? 0),
+  appointmentId: red?.appointmentId || null,
+  redeemedAt: red?.redeemedAt || red?.createdAt || '',
+  redeemedBy: red?.redeemedBy === 'tenant' ? 'tenant' : 'admin',
+  status: red?.status === 'reversed' ? 'reversed' : 'success'
+});
 
 const normalizeGiftCardSummary = (input: any): ReportsSummary => {
   const summary = input?.summary || input || {};
@@ -129,11 +155,21 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
 
       // Load redemptions
       const redData = await tenantApiAdapter.get('/tenant/gift-cards/reports/redemptions');
-      setRedemptions(Array.isArray(redData?.redemptions) ? redData.redemptions : Array.isArray(redData) ? redData : []);
+      const rawRedemptions = Array.isArray(redData?.redemptions)
+        ? redData.redemptions
+        : Array.isArray(redData)
+          ? redData
+          : [];
+      setRedemptions(rawRedemptions.map(normalizeRedemptionLog));
 
       // Load transactions
       const txData = await tenantApiAdapter.get('/tenant/gift-cards/reports/transactions');
-      setTransactions(Array.isArray(txData?.transactions) ? txData.transactions : Array.isArray(txData) ? txData : []);
+      const rawTransactions = Array.isArray(txData?.transactions)
+        ? txData.transactions
+        : Array.isArray(txData)
+          ? txData
+          : [];
+      setTransactions(rawTransactions.map(normalizeTransactionLog));
 
     } catch (err: any) {
       setError(err.message || "Failed to establish synchronization with gift card servers.");
@@ -342,16 +378,16 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
 
   // Filtering for reports tables
   const filteredTransactions = (Array.isArray(transactions) ? transactions : []).filter(tx =>
-    tx.buyerName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    tx.recipientName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    tx.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.packageName.toLowerCase().includes(searchQuery.toLowerCase())
+    safeText(tx.buyerName).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    safeText(tx.recipientName).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    safeText(tx.code).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    safeText(tx.packageName).toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredRedemptions = (Array.isArray(redemptions) ? redemptions : []).filter(red =>
-    red.customerName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    red.code.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    red.customerPhone.includes(searchQuery)
+    safeText(red.customerName).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    safeText(red.code).toLowerCase().includes(searchQuery.toLowerCase()) ||
+    safeText(red.customerPhone).includes(searchQuery)
   );
 
   // Pagination bounds
