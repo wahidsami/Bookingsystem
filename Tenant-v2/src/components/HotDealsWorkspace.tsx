@@ -38,6 +38,30 @@ interface PackageLimits {
   totalCreated: number;
 }
 
+const normalizeHotDealService = (service: any) => {
+  const canonicalPrice = Number(
+    service?.finalPrice ??
+    service?.price ??
+    service?.rawPrice ??
+    service?.basePrice ??
+    0
+  );
+
+  return {
+    ...service,
+    id: String(service?.id || ''),
+    nameAr: service?.nameAr || service?.name_ar || service?.name || '',
+    nameEn: service?.nameEn || service?.name_en || service?.name || '',
+    categoryAr: service?.categoryAr || service?.category || '',
+    categoryEn: service?.categoryEn || service?.category || '',
+    duration: Number(service?.duration ?? 0),
+    price: canonicalPrice,
+    rawPrice: Number(service?.rawPrice ?? service?.basePrice ?? canonicalPrice),
+    finalPrice: Number(service?.finalPrice ?? canonicalPrice),
+    basePrice: Number(service?.basePrice ?? service?.rawPrice ?? canonicalPrice)
+  };
+};
+
 const normalizeHotDealLimits = (input: any): PackageLimits => {
   const limits = input?.limits || input || {};
   const maxHotDeals = Number(limits.maxHotDeals ?? 0);
@@ -185,7 +209,14 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
         tenantApiAdapter.getServices()
       ]);
 
-      setServices(Array.isArray(servicesData?.services) ? servicesData.services : Array.isArray(servicesData?.data?.services) ? servicesData.data.services : Array.isArray(servicesData) ? servicesData : []);
+      const rawServices = Array.isArray(servicesData?.services)
+        ? servicesData.services
+        : Array.isArray(servicesData?.data?.services)
+          ? servicesData.data.services
+          : Array.isArray(servicesData)
+            ? servicesData
+            : [];
+      setServices(rawServices.map(normalizeHotDealService));
 
       const rawDeals = Array.isArray(dealsRes?.deals)
         ? dealsRes.deals
