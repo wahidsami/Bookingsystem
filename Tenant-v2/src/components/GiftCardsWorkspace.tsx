@@ -58,6 +58,18 @@ interface ReportsSummary {
   tenantRedeemedAmount: number;
 }
 
+const formatNumber = (value: unknown) => Number(value ?? 0).toLocaleString();
+
+const normalizeGiftCardSummary = (input: any): ReportsSummary => {
+  const summary = input?.summary || input || {};
+  return {
+    totalRedemptions: Number(summary.totalRedemptions ?? summary.transactionsCount ?? 0),
+    redeemedAmount: Number(summary.redeemedAmount ?? summary.totalRedeemedAmount ?? summary.totalCredit ?? 0),
+    adminRedeemedAmount: Number(summary.adminRedeemedAmount ?? summary.adminGlobalRedemptionsAmount ?? 0),
+    tenantRedeemedAmount: Number(summary.tenantRedeemedAmount ?? summary.tenantScopedRedemptionsAmount ?? 0)
+  };
+};
+
 export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCardsWorkspaceProps) {
   const isRtl = lang === 'ar';
 
@@ -113,12 +125,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
 
       // Load summary
       const sumData = await tenantApiAdapter.get('/tenant/gift-cards/reports/summary');
-      setSummary(sumData?.summary || sumData || {
-        totalRedemptions: 0,
-        redeemedAmount: 0,
-        adminRedeemedAmount: 0,
-        tenantRedeemedAmount: 0
-      });
+      setSummary(normalizeGiftCardSummary(sumData));
 
       // Load redemptions
       const redData = await tenantApiAdapter.get('/tenant/gift-cards/reports/redemptions');
@@ -429,7 +436,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
             <div className={`p-4 rounded-xl border text-start flex-1 lg:flex-none min-w-[130px] ${darkMode ? 'bg-zinc-950 border-zinc-855' : 'bg-neutral-50 border-neutral-200'}`}>
               <span className="text-[9px] text-zinc-500 uppercase tracking-wider block">{isRtl ? 'إجمالي المبالغ المستردة' : 'Total Redeemed'}</span>
               <span className="text-lg font-black font-mono text-emerald-500 mt-1 block">
-                {summary.redeemedAmount.toLocaleString()} {isRtl ? 'ر.س' : 'SAR'}
+                {formatNumber(summary.redeemedAmount)} {isRtl ? 'ر.س' : 'SAR'}
               </span>
             </div>
           </div>
@@ -791,12 +798,12 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                         <div className="grid grid-cols-2 gap-3 border-b border-zinc-800/60 pb-3">
                           <div>
                             <span className="text-[9px] text-zinc-400 block">{isRtl ? 'قيمة الرصيد (الرئيسية)' : 'Wallet Credit Value'}</span>
-                            <span className="font-extrabold text-brand-500 text-sm font-mono mt-0.5 block">{pkg.walletCreditAmount.toLocaleString()} {isRtl ? 'ر.س' : 'SAR'}</span>
+                            <span className="font-extrabold text-brand-500 text-sm font-mono mt-0.5 block">{formatNumber(pkg.walletCreditAmount)} {isRtl ? 'ر.س' : 'SAR'}</span>
                           </div>
                           <div>
                             <span className="text-[9px] text-zinc-400 block">{isRtl ? 'سعر البيع النهائي' : 'Purchasing Price'}</span>
                             <span className="font-extrabold text-emerald-500 text-sm font-mono mt-0.5 block">
-                              {price.toLocaleString()} {isRtl ? 'ر.س' : 'SAR'}
+                              {formatNumber(price)} {isRtl ? 'ر.س' : 'SAR'}
                               {discountPercent > 0 && (
                                 <span className="text-[9px] text-zinc-500 line-through font-normal ml-1.5">
                                   {pkg.walletCreditAmount}
@@ -816,7 +823,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                           <div className="space-y-0.5">
                             <span className="block font-bold">{isRtl ? 'مبلغ البونص المضاف:' : 'Added Bonus:'}</span>
                             <span className="font-extrabold text-amber-500 block font-mono">
-                              +{pkg.bonusAmount.toLocaleString()} {isRtl ? 'ر.س' : 'SAR'}
+                              +{formatNumber(pkg.bonusAmount)} {isRtl ? 'ر.س' : 'SAR'}
                             </span>
                           </div>
                         </div>
@@ -867,7 +874,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                 <span className="text-[10px] uppercase tracking-wider font-bold">{isRtl ? 'إجمالي المبالغ المستردة' : 'Redeemed amount'}</span>
                 <TrendingUp size={16} className="text-brand-500" />
               </div>
-              <p className="text-2xl font-black font-mono text-brand-500">{summary.redeemedAmount.toLocaleString()} {isRtl ? 'ر.س' : 'SAR'}</p>
+              <p className="text-2xl font-black font-mono text-brand-500">{formatNumber(summary.redeemedAmount)} {isRtl ? 'ر.س' : 'SAR'}</p>
               <p className="text-[9px] text-zinc-500 mt-1">{isRtl ? 'القيمة المالية التي تم شطبها كلياً.' : 'Total face value redeemed as salon credits.'}</p>
             </div>
 
@@ -876,7 +883,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                 <span className="text-[10px] uppercase tracking-wider font-bold">{isRtl ? 'استرداد بواسطة الإدارة' : 'Admin manual redemptions'}</span>
                 <UserCheck size={16} className="text-amber-500" />
               </div>
-              <p className="text-2xl font-black font-mono">{summary.adminRedeemedAmount.toLocaleString()} {isRtl ? 'ر.س' : 'SAR'}</p>
+              <p className="text-2xl font-black font-mono">{formatNumber(summary.adminRedeemedAmount)} {isRtl ? 'ر.س' : 'SAR'}</p>
               <p className="text-[9px] text-zinc-500 mt-1">{isRtl ? 'تم استهلاكها يدوياً بواسطة مدراء الفروع.' : 'Redeemed by salon staff / branch receptionists.'}</p>
             </div>
 
@@ -885,7 +892,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                 <span className="text-[10px] uppercase tracking-wider font-bold">{isRtl ? 'استرداد عبر التطبيق' : 'Tenant App Redemptions'}</span>
                 <Layers size={16} className="text-zinc-400" />
               </div>
-              <p className="text-2xl font-black font-mono">{summary.tenantRedeemedAmount.toLocaleString()} {isRtl ? 'ر.س' : 'SAR'}</p>
+              <p className="text-2xl font-black font-mono">{formatNumber(summary.tenantRedeemedAmount)} {isRtl ? 'ر.س' : 'SAR'}</p>
               <p className="text-[9px] text-zinc-500 mt-1">{isRtl ? 'تم تطبيقها ذاتياً بواسطة العملاء للتطبيق.' : 'Applied directly by clients during checkout.'}</p>
             </div>
 
@@ -964,9 +971,9 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                             <span className="text-zinc-400 mx-1">→</span>
                             <span className="text-zinc-400">{tx.recipientName}</span>
                           </td>
-                          <td className="p-3 font-mono font-bold">{tx.amountPaid.toLocaleString()} {isRtl ? 'ر.س' : 'SAR'}</td>
+                          <td className="p-3 font-mono font-bold">{formatNumber(tx.amountPaid)} {isRtl ? 'ر.س' : 'SAR'}</td>
                           <td className="p-3 font-mono font-bold text-brand-500">
-                            {tx.walletCreditAmount.toLocaleString()} 
+                            {formatNumber(tx.walletCreditAmount)}
                             {tx.bonusAmount > 0 && <span className="text-[10px] text-amber-500 ml-1">+{tx.bonusAmount}</span>}
                           </td>
                           <td className="p-3 text-center">
@@ -1051,7 +1058,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                             <span className="font-extrabold block">{red.customerName}</span>
                             <span className="text-[10px] text-zinc-500 block font-mono">{red.customerPhone}</span>
                           </td>
-                          <td className="p-3 font-mono font-bold text-emerald-500">-{red.amount.toLocaleString()} {isRtl ? 'ر.س' : 'SAR'}</td>
+                          <td className="p-3 font-mono font-bold text-emerald-500">-{formatNumber(red.amount)} {isRtl ? 'ر.س' : 'SAR'}</td>
                           <td className="p-3">
                             {red.appointmentId ? (
                               <span className="font-mono text-[10px] bg-brand-500/10 text-brand-400 border border-brand-500/20 px-1.5 py-0.5 rounded">
