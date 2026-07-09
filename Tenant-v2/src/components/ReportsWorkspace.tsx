@@ -958,6 +958,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     if (preset.dateRange) setDateRange(preset.dateRange);
     if (preset.emp) setSelectedEmployee(preset.emp);
     if (preset.service) setSelectedService(preset.service);
+    setCurrentPage(1);
     showToast(
       `Saved Filter applied: ${preset.labelEn}`,
       `تم تطبيق التقرير المحفوظ: ${preset.labelAr}`,
@@ -1098,7 +1099,10 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               </label>
               <select
                 value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
+                onChange={(e) => {
+                  setDateRange(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl p-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer transition-all"
               >
                 {mockDateRanges.map(dr => (
@@ -1115,7 +1119,10 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               </label>
               <select
                 value={selectedEmployee}
-                onChange={(e) => setSelectedEmployee(e.target.value)}
+                onChange={(e) => {
+                  setSelectedEmployee(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl p-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer transition-all"
               >
                 <option value="all">👑 {t.allEmployees}</option>
@@ -1133,7 +1140,10 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               </label>
               <select
                 value={selectedService}
-                onChange={(e) => setSelectedService(e.target.value)}
+                onChange={(e) => {
+                  setSelectedService(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl p-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer transition-all"
               >
                 <option value="all">✨ {t.allServices}</option>
@@ -1151,7 +1161,10 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
               </label>
               <select
                 value={selectedPaymentMethod}
-                onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                onChange={(e) => {
+                  setSelectedPaymentMethod(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl p-2 text-xs font-bold text-neutral-700 outline-none cursor-pointer transition-all"
               >
                 {mockPaymentMethodsList.map(m => (
