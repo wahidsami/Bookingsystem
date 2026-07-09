@@ -146,22 +146,15 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
       setError(null);
       
       const [dealsRes, limitsRes, servicesData] = await Promise.all([
-        fetch('/api/v1/tenant/hot-deals'),
-        fetch('/api/v1/tenant/hot-deals/limits'),
+        tenantApiAdapter.get('/tenant/hot-deals'),
+        tenantApiAdapter.get('/tenant/hot-deals/limits'),
         tenantApiAdapter.getServices()
       ]);
 
       setServices(servicesData?.services || []);
 
-      if (!dealsRes.ok || !limitsRes.ok) {
-        throw new Error("Failed to communicate with full-stack endpoints");
-      }
-
-      const dealsData = await dealsRes.json();
-      const limitsData = await limitsRes.json();
-
-      setDeals(dealsData);
-      setLimits(limitsData);
+      setDeals(Array.isArray(dealsRes?.deals) ? dealsRes.deals : Array.isArray(dealsRes) ? dealsRes : []);
+      setLimits(limitsRes?.limits || limitsRes || null);
     } catch (err: any) {
       console.error(err);
       setError(isRtl 
@@ -180,13 +173,10 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
   useEffect(() => {
     if (subView === 'edit' && selectedDealId) {
       const loadDealToForm = async () => {
-        try {
-          setLoading(true);
-          const res = await fetch(`/api/v1/tenant/hot-deals/${selectedDealId}`);
-          if (!res.ok) {
-            throw new Error("Deal not found");
-          }
-          const deal: HotDeal = await res.json();
+      try {
+        setLoading(true);
+          const res = await tenantApiAdapter.get(`/tenant/hot-deals/${selectedDealId}`);
+          const deal: HotDeal = res?.deal || res?.data || res;
           
           setImage(deal.image);
           setServiceId(deal.serviceId);

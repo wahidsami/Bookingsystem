@@ -4,6 +4,7 @@ import {
   Trash2, Eye, EyeOff, Search, User, Calendar, ShieldAlert, CheckCircle, 
   MessageCircle, StarHalf, X, Sparkles, FilterX, HelpCircle, ArrowUpRight
 } from 'lucide-react';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface ReviewsWorkspaceProps {
   lang: 'ar' | 'en';
@@ -65,12 +66,8 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/v1/tenant/reviews');
-      if (!response.ok) {
-        throw new Error(isRtl ? "فشل جلب قائمة المراجعات والتقييمات من الخادم." : "Could not retrieve the reviews stream from the server.");
-      }
-      const data = await response.json();
-      setReviews(data);
+      const data = await tenantApiAdapter.get('/tenant/reviews');
+      setReviews(Array.isArray(data?.data?.reviews) ? data.data.reviews : Array.isArray(data?.reviews) ? data.reviews : Array.isArray(data) ? data : []);
     } catch (err: any) {
       setError(err.message || "Failed to load reviews.");
     } finally {
@@ -97,7 +94,8 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
       const updatedReview = await response.json();
       
       // Update local state
-      setReviews(prevReviews => prevReviews.map(r => r.id === id ? updatedReview : r));
+      const normalizedReview = updatedReview?.data || updatedReview?.review || updatedReview;
+      setReviews(prevReviews => prevReviews.map(r => r.id === id ? normalizedReview : r));
       if (editingReplyId === id) {
         setEditingReplyId(null);
         setTempReplyText('');

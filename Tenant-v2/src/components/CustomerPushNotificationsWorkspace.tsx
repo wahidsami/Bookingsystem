@@ -140,24 +140,23 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
       setError(null);
 
       // Fetch Usage Stats
-      const usageRes = await fetch('/api/v1/tenant/notifications/usage');
-      if (!usageRes.ok) throw new Error("Could not load push usage statistics.");
-      const usageData = await usageRes.json();
-      setUsage(usageData);
+      const usageData = await tenantApiAdapter.get('/tenant/notifications/usage');
+      setUsage(usageData?.data || usageData || {
+        limit: 5000,
+        sent: 0,
+        remaining: 5000,
+        deliverySuccessRate: 99.4,
+        lastAttempt: null
+      });
 
       // Fetch History
-      const historyRes = await fetch('/api/v1/tenant/notifications/history');
-      if (!historyRes.ok) throw new Error("Could not load dispatch log history.");
-      const historyData = await historyRes.json();
-      setHistory(historyData);
+      const historyData = await tenantApiAdapter.get('/tenant/notifications/history');
+      setHistory(Array.isArray(historyData?.campaigns) ? historyData.campaigns : Array.isArray(historyData?.data) ? historyData.data : Array.isArray(historyData) ? historyData : []);
 
       // Fetch Hot Deals (if any)
       try {
-        const dealsRes = await fetch('/api/v1/tenant/hot-deals');
-        if (dealsRes.ok) {
-          const dealsData = await dealsRes.json();
-          setHotDeals(dealsData);
-        }
+        const dealsData = await tenantApiAdapter.get('/tenant/hot-deals');
+        setHotDeals(Array.isArray(dealsData?.deals) ? dealsData.deals : Array.isArray(dealsData) ? dealsData : []);
       } catch (e) {
         console.warn("Hot deals endpoint not fully accessible", e);
       }

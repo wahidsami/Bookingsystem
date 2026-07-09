@@ -5,6 +5,7 @@ import {
   FileSpreadsheet, ClipboardList, TrendingUp, UserCheck, Settings, 
   Eye, ToggleLeft, ToggleRight, Layers, FileDown, CheckCircle, Info, Edit3
 } from 'lucide-react';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface GiftCardsWorkspaceProps {
   lang: 'ar' | 'en';
@@ -107,28 +108,25 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
       setError(null);
 
       // Load packages
-      const pkgRes = await fetch('/api/v1/tenant/gift-cards/packages');
-      if (!pkgRes.ok) throw new Error("Could not retrieve gift card packages.");
-      const pkgData = await pkgRes.json();
-      setPackages(pkgData);
+      const pkgData = await tenantApiAdapter.get('/tenant/gift-cards/packages');
+      setPackages(Array.isArray(pkgData?.packages) ? pkgData.packages : Array.isArray(pkgData) ? pkgData : []);
 
       // Load summary
-      const sumRes = await fetch('/api/v1/tenant/gift-cards/reports/summary');
-      if (!sumRes.ok) throw new Error("Could not retrieve report summary.");
-      const sumData = await sumRes.json();
-      setSummary(sumData);
+      const sumData = await tenantApiAdapter.get('/tenant/gift-cards/reports/summary');
+      setSummary(sumData?.summary || sumData || {
+        totalRedemptions: 0,
+        redeemedAmount: 0,
+        adminRedeemedAmount: 0,
+        tenantRedeemedAmount: 0
+      });
 
       // Load redemptions
-      const redRes = await fetch('/api/v1/tenant/gift-cards/reports/redemptions');
-      if (!redRes.ok) throw new Error("Could not retrieve redemption logs.");
-      const redData = await redRes.json();
-      setRedemptions(redData);
+      const redData = await tenantApiAdapter.get('/tenant/gift-cards/reports/redemptions');
+      setRedemptions(Array.isArray(redData?.redemptions) ? redData.redemptions : Array.isArray(redData) ? redData : []);
 
       // Load transactions
-      const txRes = await fetch('/api/v1/tenant/gift-cards/reports/transactions');
-      if (!txRes.ok) throw new Error("Could not retrieve transaction logs.");
-      const txData = await txRes.json();
-      setTransactions(txData);
+      const txData = await tenantApiAdapter.get('/tenant/gift-cards/reports/transactions');
+      setTransactions(Array.isArray(txData?.transactions) ? txData.transactions : Array.isArray(txData) ? txData : []);
 
     } catch (err: any) {
       setError(err.message || "Failed to establish synchronization with gift card servers.");
@@ -336,14 +334,14 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
   };
 
   // Filtering for reports tables
-  const filteredTransactions = transactions.filter(tx => 
+  const filteredTransactions = (Array.isArray(transactions) ? transactions : []).filter(tx =>
     tx.buyerName.toLowerCase().includes(searchQuery.toLowerCase()) || 
     tx.recipientName.toLowerCase().includes(searchQuery.toLowerCase()) || 
     tx.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
     tx.packageName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredRedemptions = redemptions.filter(red => 
+  const filteredRedemptions = (Array.isArray(redemptions) ? redemptions : []).filter(red =>
     red.customerName.toLowerCase().includes(searchQuery.toLowerCase()) || 
     red.code.toLowerCase().includes(searchQuery.toLowerCase()) || 
     red.customerPhone.includes(searchQuery)
