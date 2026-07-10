@@ -616,6 +616,11 @@ class TenantApiAdapter {
     return this.get(`/tenant/financial/ledger${query ? `?${query}` : ''}`);
   }
 
+  async getDailyRevenue(params: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/financial/daily${query ? `?${query}` : ''}`);
+  }
+
   async getBookingTrends(params: Record<string, string | number | undefined>): Promise<any> {
     const query = this.buildQueryString(params);
     return this.get(`/tenant/reports/booking-trends${query ? `?${query}` : ''}`);

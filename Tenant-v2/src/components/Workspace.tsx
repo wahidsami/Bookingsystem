@@ -15,6 +15,7 @@ import {
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import LucideIcon from './LucideIcon';
 import AppointmentWorkspace from './AppointmentWorkspace';
+import FinanceOverviewReport from './reports/FinanceOverviewReport';
 import SalesOverviewReport from './reports/SalesOverviewReport';
 import CustomersWorkspace from './CustomersWorkspace';
 import TeamsWorkspace from './TeamsWorkspace';
@@ -736,36 +737,7 @@ export default function Workspace({
 
       {/* 8. FINANCIAL */}
       {view === 'financial' && (
-        <div className={`p-6 rounded-2xl border transition-colors ${
-          darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
-        }`}>
-          <h3 className="font-bold text-base mb-4">{isRtl ? 'سجل العمليات المالية والتحصيل' : 'Financial Revenue & Invoicing Register'}</h3>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-start text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-neutral-100 dark:border-zinc-800 text-neutral-400 font-bold bg-neutral-50/50 dark:bg-zinc-950/20">
-                  <th className="p-3 text-start">{isRtl ? 'رقم الحركة' : 'Transaction ID'}</th>
-                  <th className="p-3 text-start">{isRtl ? 'تاريخ التحصيل' : 'Collected At'}</th>
-                  <th className="p-3 text-start">{isRtl ? 'نوع العملية' : 'Transaction Category'}</th>
-                  <th className="p-3 text-start">{isRtl ? 'طريقة الدفع' : 'Payment Type'}</th>
-                  <th className="p-3 text-start">{isRtl ? 'مبلغ القيمة' : 'Value'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
-                {mockTransactions.map(txn => (
-                  <tr key={txn.id} className="hover:bg-neutral-50/50 dark:hover:bg-zinc-800/20">
-                    <td className="p-3 font-mono font-bold">{txn.id}</td>
-                    <td className="p-3 text-neutral-400 font-mono">{txn.date}</td>
-                    <td className="p-3 font-semibold">{isRtl ? txn.typeAr : txn.typeEn}</td>
-                    <td className="p-3 font-medium text-neutral-400">{isRtl ? txn.methodAr : txn.methodEn}</td>
-                    <td className={`p-3 font-mono font-bold ${txn.amount.startsWith('-') ? 'text-rose-600' : 'text-emerald-600'}`}>{txn.amount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <FinanceOverviewReport lang={lang} />
       )}
 
       {/* 9. REPORTS */}
