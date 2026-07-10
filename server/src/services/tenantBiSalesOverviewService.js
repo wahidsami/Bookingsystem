@@ -26,7 +26,7 @@ function buildGroupedRevenue(rows = [], keyField, revenueField = 'revenue', coun
         .sort((left, right) => right.revenue - left.revenue);
 }
 
-function buildSalesOverviewPayload(result, startDate, endDate, sections = []) {
+function buildSalesOverviewPayload(result, startDate, endDate) {
     const overview = result.overview || {};
     const financialLedger = result.financialLedger || {};
     const revenueLedger = financialLedger.revenueLedger || {};
@@ -34,6 +34,7 @@ function buildSalesOverviewPayload(result, startDate, endDate, sections = []) {
     const refundLedger = financialLedger.refundLedger || {};
     const commissionLedger = financialLedger.commissionLedger || {};
     const settlementLedger = financialLedger.settlementLedger || {};
+
     const customerAnalytics = result.customerAnalytics || {};
     const customerSales = Array.isArray(result.customerSales) ? result.customerSales : [];
     const dailyRevenue = Array.isArray(result.dailyRevenue) ? result.dailyRevenue : [];
@@ -50,6 +51,7 @@ function buildSalesOverviewPayload(result, startDate, endDate, sections = []) {
     const paymentMethodTrends = advancedAnalytics.paymentMethodTrends || paymentMethods.trend || [];
     const refundTrends = advancedAnalytics.refundTrends || result.refunds || null;
     const rebookingAnalytics = advancedAnalytics.rebookingAnalytics || result.rebookings || null;
+    const operationalAlerts = advancedAnalytics.operationalAlerts || [];
 
     const revenueLedgerRows = Array.isArray(revenueLedger.rows) ? revenueLedger.rows : [];
     const paymentLedgerRows = Array.isArray(paymentLedger.rows) ? paymentLedger.rows : [];
@@ -68,18 +70,15 @@ function buildSalesOverviewPayload(result, startDate, endDate, sections = []) {
         return Number(row?.revenue || 0) > Number(best?.revenue || 0) ? row : best;
     }, null);
 
-    const averageSale = Number.isFinite(Number(revenueLedger?.totals?.revenue))
-        && Number(revenueLedger?.totals?.totalRows || revenueLedgerRows.length) > 0
-        ? Number((Number(revenueLedger.totals.revenue) / Number(revenueLedger.totals.totalRows || revenueLedgerRows.length)).toFixed(2))
+    const totalRows = Number(revenueLedger?.totals?.totalRows || revenueLedgerRows.length);
+    const averageSale = totalRows > 0 && Number.isFinite(Number(revenueLedger?.totals?.revenue))
+        ? Number((Number(revenueLedger.totals.revenue) / totalRows).toFixed(2))
         : null;
-    const averageVat = Number.isFinite(Number(revenueLedger?.totals?.tax))
-        && Number(revenueLedger?.totals?.totalRows || revenueLedgerRows.length) > 0
-        ? Number((Number(revenueLedger.totals.tax) / Number(revenueLedger.totals.totalRows || revenueLedgerRows.length)).toFixed(2))
+    const averageVat = totalRows > 0 && Number.isFinite(Number(revenueLedger?.totals?.tax))
+        ? Number((Number(revenueLedger.totals.tax) / totalRows).toFixed(2))
         : null;
-    const averageBasketSize = Number.isFinite(Number(productTotals.totalQuantity))
-        && Number.isFinite(Number(productTotals.totalOrders))
-        && Number(productTotals.totalOrders) > 0
-        ? Number((Number(productTotals.totalQuantity) / Number(productTotals.totalOrders)).toFixed(2))
+    const averageBasketSize = Number.isFinite(Number(productTotals.totalOrders)) && Number(productTotals.totalOrders) > 0
+        ? Number((Number(productTotals.totalQuantity || 0) / Number(productTotals.totalOrders)).toFixed(2))
         : null;
 
     const revenueByCategory = buildGroupedRevenue(
@@ -89,158 +88,172 @@ function buildSalesOverviewPayload(result, startDate, endDate, sections = []) {
     );
     const revenueByCustomerType = buildGroupedRevenue(customerSales, 'customerType', 'revenue');
     const customerGrowth = customerCohorts?.rows || [];
-
     const walkInCustomers = customerSales.filter((row) => row.customerType === 'walk_in_customer').length;
-    const completedSales = revenueLedgerRows.filter((row) => `${row.status || ''}`.toLowerCase() === 'completed').length;
-    const cancelledSales = Number(overview.cancelledBookings || 0);
-    const salesCount = Number(revenueLedger?.totals?.totalRows || revenueLedgerRows.length);
     const collectedAmount = Number.isFinite(Number(financialLedger?.overview?.netCollected))
         ? Number(financialLedger.overview.netCollected)
         : Number(overview.totalRevenue || 0);
     const outstandingAmount = Number(overview.pendingPayments || 0);
-    const averageAppointmentValue = Number(overview.avgBookingValue || 0);
-    const averageDiscount = Number(overview.discountTotals?.averageDiscountAmount || 0);
+
+    const financeOverview = {
+        revenue: Number(overview.totalRevenue || 0),
+        netRevenue: Number(overview.netRevenue || 0),
+        tax: Number(overview.totalTax || 0),
+        discount: Number(overview.totalDiscountAmount || 0),
+        platformFees: Number(overview.totalPlatformFees || 0),
+        tenantRevenue: Number(overview.totalTenantRevenue || 0),
+        collectedAmount,
+        outstandingAmount
+    };
+
+    const salesTotals = {
+        salesCount: totalRows,
+        completedSales: revenueLedgerRows.filter((row) => `${row.status || ''}`.toLowerCase() === 'completed').length,
+        cancelledSales: Number(overview.cancelledBookings || 0),
+        noShowBookings: Number(overview.noShowBookings || 0),
+        completionRate: Number(overview.completionRate || 0),
+        averageTicket: Number(overview.avgBookingValue || 0),
+        averageSale,
+        averageVat,
+        averageDiscount: Number(overview.discountTotals?.averageDiscountAmount || 0),
+        averageBasketSize
+    };
+
+    const summaryDateRange = financialLedger.dateRange || {
+        startDate: startDate || null,
+        endDate: endDate || null
+    };
 
     return {
         summary: {
-            overview,
-            ledger: financialLedger.overview || null,
-            dateRange: financialLedger.dateRange || {
-                startDate: startDate || null,
-                endDate: endDate || null
+            dateRange: summaryDateRange,
+            totals: financeOverview,
+            metrics: {
+                salesCount: salesTotals.salesCount,
+                completionRate: salesTotals.completionRate,
+                averageTicket: salesTotals.averageTicket,
+                uniqueCustomers: Number(overview.uniqueCustomers || 0),
+                repeatRate: Number(customerAnalytics.retentionRate || 0)
             }
         },
-        kpis: {
-            revenue: {
-                totalRevenue: Number(overview.totalRevenue || 0),
-                netRevenue: Number(overview.netRevenue || 0),
-                totalTax: Number(overview.totalTax || 0),
-                totalDiscountAmount: Number(overview.totalDiscountAmount || 0),
-                totalPlatformFees: Number(overview.totalPlatformFees || 0),
-                totalTenantRevenue: Number(overview.totalTenantRevenue || 0)
+        sales: {
+            totals: salesTotals,
+            trends: {
+                dailyRevenue,
+                bookingTrends,
+                revenueByDay: dailyRevenue,
+                revenueByCategory,
+                revenueByCustomerType
             },
-            sales: {
-                salesCount,
-                completedSales,
-                cancelledSales,
-                noShowBookings: Number(overview.noShowBookings || 0),
-                completionRate: Number(overview.completionRate || 0),
-                averageTicket: averageAppointmentValue,
-                averageSale,
-                averageVat,
-                averageDiscount,
-                averageBasketSize
-            },
-            customers: {
-                uniqueCustomers: Number(overview.uniqueCustomers || 0),
-                newCustomers: Number(customerAnalytics.newCustomers || customerCohorts?.totals?.newCustomers || 0),
-                returningCustomers: Number(customerAnalytics.returningCustomers || customerCohorts?.totals?.returningCustomers || 0),
-                walkInCustomers,
-                repeatRate: Number(customerAnalytics.retentionRate || 0)
-            },
-            collections: {
-                collectedAmount,
-                outstandingAmount,
-                totalTransactions: Number(financialLedger?.overview?.totalTransactions || revenueLedgerRows.length),
-                paymentMethods: paymentMethods.totals || null
-            },
-            top: {
-                topCustomer,
-                topEmployee,
-                topService,
-                topProduct,
-                highestSale
-            },
-            missing: [
-                !Array.isArray(dailyRevenue) || dailyRevenue.length === 0 ? 'dailyRevenue' : null,
-                !Array.isArray(bookingTrends) || bookingTrends.length === 0 ? 'bookingTrends' : null,
-                !paymentMethodTrends || (Array.isArray(paymentMethodTrends) && paymentMethodTrends.length === 0) ? 'paymentMethodTrends' : null,
-                !Array.isArray(revenueLedgerRows) || revenueLedgerRows.length === 0 ? 'financialLedger' : null
-            ].filter(Boolean)
-        },
-        charts: {
-            revenueByDay: dailyRevenue,
-            bookingTrends,
-            paymentMethodTrends,
-            revenueByEmployee: employeePerformance.length ? employeePerformance : employees,
-            revenueByService: servicePerformance.length ? servicePerformance : services,
-            revenueByCategory,
-            revenueByCustomerType,
-            customerGrowth,
-            refunds: refundTrends,
-            rebookings: rebookingAnalytics
-        },
-        paymentMethods: {
-            rows: paymentMethods.rows || [],
-            trend: paymentMethods.trend || [],
-            totals: paymentMethods.totals || null
+            ledger: {
+                revenueLedger: {
+                    rows: revenueLedgerRows,
+                    totals: revenueLedger.totals || null
+                }
+            }
         },
         customers: {
             analytics: customerAnalytics,
             sales: customerSales,
-            growth: customerGrowth
+            growth: customerGrowth,
+            topCustomer,
+            cohorts: customerCohorts,
+            walkInCustomers
         },
         employees: {
             revenue: employees,
             performance: employeePerformance,
-            totals: result.employeeTotals || null
+            totals: result.employeeTotals || null,
+            topEmployee
         },
         services: {
             revenue: services,
             performance: servicePerformance,
-            totals: result.serviceTotals || null
+            totals: result.serviceTotals || null,
+            topService
         },
-        sales: {
-            dailyRevenue,
-            bookingTrends,
-            refunds: result.refunds || null,
-            rebookings: result.rebookings || null,
-            advancedAnalytics,
-            productRevenue: products,
-            productTotals,
-            finance: financialLedger.overview || null
+        products: {
+            revenue: products,
+            totals: productTotals,
+            topProduct
         },
-        table: {
-            revenueLedger: {
-                rows: revenueLedgerRows,
-                totals: revenueLedger.totals || null
+        payments: {
+            methods: {
+                rows: paymentMethods.rows || [],
+                trend: paymentMethods.trend || [],
+                totals: paymentMethods.totals || null
             },
-            paymentLedger: {
-                rows: paymentLedgerRows,
-                totals: paymentLedger.totals || null
+            ledger: {
+                paymentLedger: {
+                    rows: paymentLedgerRows,
+                    totals: paymentLedger.totals || null
+                },
+                refundLedger: {
+                    rows: refundLedgerRows,
+                    totals: refundLedger.totals || null
+                }
             },
-            refundLedger: {
-                rows: refundLedgerRows,
-                totals: refundLedger.totals || null
+            collections: {
+                collectedAmount,
+                outstandingAmount,
+                totalTransactions: Number(financialLedger?.overview?.totalTransactions || revenueLedgerRows.length)
+            }
+        },
+        finance: {
+            overview: financeOverview,
+            ledger: {
+                revenueLedger: {
+                    rows: revenueLedgerRows,
+                    totals: revenueLedger.totals || null
+                },
+                paymentLedger: {
+                    rows: paymentLedgerRows,
+                    totals: paymentLedger.totals || null
+                },
+                refundLedger: {
+                    rows: refundLedgerRows,
+                    totals: refundLedger.totals || null
+                },
+                commissionLedger: {
+                    rows: commissionLedgerRows,
+                    totals: commissionLedger.totals || null
+                },
+                settlementLedger: {
+                    rows: settlementLedgerRows,
+                    totals: settlementLedger.totals || null
+                }
             },
-            commissionLedger: {
-                rows: commissionLedgerRows,
+            refunds: refundTrends,
+            commissions: {
+                ledger: commissionLedgerRows,
                 totals: commissionLedger.totals || null
             },
-            settlementLedger: {
-                rows: settlementLedgerRows,
+            settlements: {
+                ledger: settlementLedgerRows,
                 totals: settlementLedger.totals || null
             }
         },
+        performance: {
+            dailyRevenue,
+            bookingTrends,
+            paymentMethodTrends,
+            revenueByCategory,
+            revenueByCustomerType,
+            customerGrowth,
+            refunds: refundTrends,
+            rebookings: rebookingAnalytics,
+            operationalAlerts
+        },
+        executive: {
+            topCustomer,
+            topEmployee,
+            topService,
+            topProduct,
+            highestSale,
+            alerts: operationalAlerts
+        },
         metadata: {
             generatedAt: new Date().toISOString(),
-            dateRange: {
-                startDate: startDate || financialLedger.dateRange?.startDate || null,
-                endDate: endDate || financialLedger.dateRange?.endDate || null
-            },
-            sourceSections: sections,
-            sourceEndpoints: [
-                '/tenant/financial/overview',
-                '/tenant/financial/daily',
-                '/tenant/financial/ledger',
-                '/tenant/financial/products',
-                '/tenant/reports/booking-trends',
-                '/tenant/reports/service-performance',
-                '/tenant/reports/employee-performance',
-                '/tenant/reports/customer-analytics',
-                '/tenant/reports/payment-methods',
-                '/tenant/reports/advanced-analytics'
-            ]
+            dateRange: summaryDateRange
         }
     };
 }
