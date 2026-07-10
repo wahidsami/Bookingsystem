@@ -9,6 +9,7 @@ interface BIReportShellProps {
   table?: ReactNode;
   pagination?: ReactNode;
   footer?: ReactNode;
+  children?: ReactNode;
   className?: string;
 }
 
@@ -21,6 +22,7 @@ export function BIReportShell({
   table,
   pagination,
   footer,
+  children,
   className = '',
 }: BIReportShellProps) {
   return (
@@ -38,7 +40,7 @@ export function BIReportShell({
       {table ? <section>{table}</section> : null}
       {pagination ? <section>{pagination}</section> : null}
       {footer ? <footer className="text-sm text-slate-500">{footer}</footer> : null}
+      {children ? <div>{children}</div> : null}
     </div>
   );
 }
-

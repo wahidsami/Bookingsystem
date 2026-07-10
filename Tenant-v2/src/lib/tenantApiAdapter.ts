@@ -670,6 +670,11 @@ class TenantApiAdapter {
     return this.get(`/tenant/reports/advanced-analytics${query ? `?${query}` : ''}`);
   }
 
+  async getSalesOverview(params: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/bi/sales-overview${query ? `?${query}` : ''}`);
+  }
+
   // --- POS & Cart Checkout ---
   async checkoutProducts(payload: any): Promise<any> {
     return this.post('/tenant/cart/products/purchase', payload);

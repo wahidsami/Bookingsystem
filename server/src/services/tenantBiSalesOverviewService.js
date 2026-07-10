@@ -122,6 +122,7 @@ function buildSalesOverviewPayload(result, startDate, endDate) {
         startDate: startDate || null,
         endDate: endDate || null
     };
+    const appointments = Number(overview.totalBookings || 0);
 
     return {
         summary: {
@@ -129,6 +130,7 @@ function buildSalesOverviewPayload(result, startDate, endDate) {
             totals: financeOverview,
             metrics: {
                 salesCount: salesTotals.salesCount,
+                appointments,
                 completionRate: salesTotals.completionRate,
                 averageTicket: salesTotals.averageTicket,
                 uniqueCustomers: Number(overview.uniqueCustomers || 0),
