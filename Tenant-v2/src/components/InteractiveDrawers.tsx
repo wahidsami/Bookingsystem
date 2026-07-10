@@ -53,6 +53,7 @@ interface InteractiveDrawersProps {
   customers: any[];
   services: any[];
   products: any[];
+  giftCardPackages?: GiftCardPackage[];
   stylists: any[];
   onBoardChanged?: () => Promise<void> | void;
 }
@@ -105,6 +106,17 @@ interface CartItem {
   skuOrCode: string;
   recipient?: string;
   sender?: string;
+  packageId?: string;
+}
+
+interface GiftCardPackage {
+  id: string;
+  title: string;
+  title_en?: string;
+  title_ar?: string;
+  priceAmount?: number;
+  walletCreditAmount?: number;
+  isActive?: boolean;
 }
 
 export default function InteractiveDrawers({
@@ -127,6 +139,7 @@ export default function InteractiveDrawers({
   customers,
   services,
   products,
+  giftCardPackages = [],
   stylists,
   onBoardChanged
 }: InteractiveDrawersProps) {
@@ -147,6 +160,15 @@ export default function InteractiveDrawers({
       setCartTab(initialCartTab);
     }
   }, [isCartDrawerOpen, initialCartTab]);
+
+  useEffect(() => {
+    if (isCartDrawerOpen) {
+      setPosCheckoutComplete(false);
+    } else {
+      setCompletedOrder(null);
+      setPosCheckoutComplete(false);
+    }
+  }, [isCartDrawerOpen]);
 
   const availableStylists = stylists;
 
@@ -374,6 +396,7 @@ export default function InteractiveDrawers({
 
   // Receipt printed preview modal
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
+  const [posCheckoutComplete, setPosCheckoutComplete] = useState(false);
 
   const buildIsoFromMinutes = (date: Date, minutesFromNine: number) => {
     const dateKey = getLocalDateKey(date);
@@ -676,6 +699,40 @@ export default function InteractiveDrawers({
     );
   };
 
+  const handleAddGiftCardPackageToCart = (giftCardPackage: GiftCardPackage) => {
+    const displayTitle = giftCardPackage.title_ar || giftCardPackage.title_en || giftCardPackage.title || 'Gift Card';
+    setCartItems((prev) => {
+      const exists = prev.find((item) => item.type === 'giftcard' && item.packageId === giftCardPackage.id);
+      if (exists) {
+        return prev.map((item) => (
+          item.type === 'giftcard' && item.packageId === giftCardPackage.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        ));
+      }
+
+      return [
+        ...prev,
+        {
+          id: giftCardPackage.id,
+          packageId: giftCardPackage.id,
+          type: 'giftcard',
+          nameAr: displayTitle,
+          nameEn: displayTitle,
+          price: Number(giftCardPackage.priceAmount || 0),
+          quantity: 1,
+          skuOrCode: giftCardPackage.id
+        }
+      ];
+    });
+
+    addLocalToast(
+      `تمت إضافة "${displayTitle}" إلى سلة بطاقات الهدايا.`,
+      `Added "${displayTitle}" to the gift card cart.`,
+      'success'
+    );
+  };
+
   const handleAddProductToCart = (prod: any) => {
     if (prod.stock === 0) {
       addLocalToast(
@@ -760,9 +817,10 @@ export default function InteractiveDrawers({
       paymentSummary: paymentMethodSummary
     });
 
-    setCartItems([]);
-    setPosSplitActive(false);
-    setPosSplitAmounts({ card: 0, cash: 0, wallet: 0 });
+      setCartItems([]);
+      setPosSplitActive(false);
+      setPosSplitAmounts({ card: 0, cash: 0, wallet: 0 });
+      setPosCheckoutComplete(true);
 
     if (onBoardChanged) {
       await onBoardChanged();
@@ -1746,32 +1804,76 @@ export default function InteractiveDrawers({
                         ))}
                       </div>
                     ) : (
-                      <div className="p-3 bg-slate-50 border rounded-lg space-y-3 animate-fadeIn text-xs">
-                        <div className="flex justify-between items-center border-b pb-1">
-                          <span className="font-black text-slate-800">{isRtl ? 'إصدار بطاقة هدايا جديدة' : 'Voucher Design'}</span>
-                          <span className="text-[10px] font-mono font-bold text-amber-600">{generatedGcCode}</span>
+                      <div className="space-y-3 animate-fadeIn text-xs">
+                        <div className="p-3 bg-slate-50 border rounded-lg space-y-3">
+                          <div className="flex justify-between items-center border-b pb-1">
+                            <span className="font-black text-slate-800">{isRtl ? 'بطاقات الهدايا النشطة' : 'Available Gift Cards'}</span>
+                            <span className="text-[10px] font-mono font-bold text-amber-600">{giftCardPackages.length}</span>
+                          </div>
+
+                          {giftCardPackages.length > 0 ? (
+                            <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                              {giftCardPackages.map((giftCardPackage) => {
+                                const displayTitle = giftCardPackage.title_ar || giftCardPackage.title_en || giftCardPackage.title || 'Gift Card';
+                                return (
+                                  <button
+                                    key={giftCardPackage.id}
+                                    type="button"
+                                    onClick={() => handleAddGiftCardPackageToCart(giftCardPackage)}
+                                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-amber-400 hover:bg-amber-50/60"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="truncate font-bold text-slate-800">{displayTitle}</p>
+                                        <p className="mt-0.5 text-[10px] text-slate-500">
+                                          {isRtl ? 'رصيد' : 'Credit'} {Number(giftCardPackage.walletCreditAmount || 0).toFixed(2)} SAR
+                                        </p>
+                                      </div>
+                                      <div className="shrink-0 text-right">
+                                        <p className="text-[10px] font-bold text-amber-600">
+                                          {Number(giftCardPackage.priceAmount || 0).toFixed(2)} SAR
+                                        </p>
+                                        <p className="text-[9px] text-slate-400">{isRtl ? 'اضغط للإضافة' : 'Tap to add'}</p>
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-4 text-center text-[10px] text-slate-500">
+                              {isRtl ? 'لا توجد بطاقات هدايا نشطة بعد.' : 'No active gift card packages yet.'}
+                            </div>
+                          )}
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] text-slate-400 mb-0.5 block">{isRtl ? 'المرسل' : 'From'}</label>
-                            <input type="text" value={gcSender} onChange={(e) => setGcSender(e.target.value)} placeholder="Nora Al-Sudairi" className="w-full border bg-white p-1 text-xs rounded" />
+
+                        <div className="p-3 bg-slate-50 border rounded-lg space-y-3">
+                          <div className="flex justify-between items-center border-b pb-1">
+                            <span className="font-black text-slate-800">{isRtl ? 'إصدار بطاقة هدايا جديدة' : 'Voucher Design'}</span>
+                            <span className="text-[10px] font-mono font-bold text-amber-600">{generatedGcCode}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] text-slate-400 mb-0.5 block">{isRtl ? 'المرسل' : 'From'}</label>
+                              <input type="text" value={gcSender} onChange={(e) => setGcSender(e.target.value)} placeholder="Nora Al-Sudairi" className="w-full border bg-white p-1 text-xs rounded" />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-400 mb-0.5 block">{isRtl ? 'المستلم' : 'To'}</label>
+                              <input type="text" value={gcRecipient} onChange={(e) => setGcRecipient(e.target.value)} placeholder="Abeer Bin Laden" className="w-full border bg-white p-1 text-xs rounded" />
+                            </div>
                           </div>
                           <div>
-                            <label className="text-[10px] text-slate-400 mb-0.5 block">{isRtl ? 'المستلم' : 'To'}</label>
-                            <input type="text" value={gcRecipient} onChange={(e) => setGcRecipient(e.target.value)} placeholder="Abeer Bin Laden" className="w-full border bg-white p-1 text-xs rounded" />
+                            <label className="text-[10px] text-slate-400 block mb-1">Value Card Amount</label>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {[150, 300, 500, 1000].map(v => (
+                                <button key={v} onClick={() => setGcValue(v)} className={`py-1 rounded font-mono font-bold border text-[11px] ${gcValue === v ? 'bg-zinc-950 text-white border-zinc-950' : 'bg-white text-slate-600'}`}>{v} ر.س</button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-slate-400 block mb-1">Value Card Amount</label>
-                          <div className="grid grid-cols-4 gap-1.5">
-                            {[150, 300, 500, 1000].map(v => (
-                              <button key={v} onClick={() => setGcValue(v)} className={`py-1 rounded font-mono font-bold border text-[11px] ${gcValue === v ? 'bg-zinc-950 text-white border-zinc-950' : 'bg-white text-slate-600'}`}>{v} ر.س</button>
-                            ))}
+                          <div className="flex justify-between pt-1">
+                            <button type="button" onClick={handleRegenerateGiftCardCode} className="text-[9px] underline text-slate-500">Regenerate Serial</button>
+                            <button type="button" onClick={handleAddGiftCardToCart} className="bg-zinc-950 text-white text-[10px] font-bold py-1.5 px-3 rounded-lg">+ Issue card</button>
                           </div>
-                        </div>
-                        <div className="flex justify-between pt-1">
-                          <button type="button" onClick={handleRegenerateGiftCardCode} className="text-[9px] underline text-slate-500">Regenerate Serial</button>
-                          <button type="button" onClick={handleAddGiftCardToCart} className="bg-zinc-950 text-white text-[10px] font-bold py-1.5 px-3 rounded-lg">+ Issue card</button>
                         </div>
                       </div>
                     )}
@@ -1871,9 +1973,23 @@ export default function InteractiveDrawers({
                       </div>
                     )}
 
-                    <button onClick={handleProcessPosCheckout} className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5">
+                    {posCheckoutComplete && !completedOrder ? (
+                      <div className="w-full py-2 bg-emerald-500/10 border border-emerald-500 text-emerald-800 font-black rounded-xl text-[10px] text-center">
+                        {isRtl ? 'تم إتمام التحصيل بنجاح' : 'Checkout completed successfully'}
+                      </div>
+                    ) : null}
+
+                    <button
+                      onClick={handleProcessPosCheckout}
+                      disabled={posCheckoutComplete || cartItems.length === 0}
+                      className="w-full py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-zinc-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
+                    >
                       <Receipt size={13} className="text-zinc-950" />
-                      <span>{isRtl ? 'فوترة المشتريات وتأكيد استلام السداد' : 'Process Checkout & Generate Receipt'}</span>
+                      <span>
+                        {posCheckoutComplete
+                          ? (isRtl ? 'تم التحصيل' : 'Checkout completed')
+                          : (isRtl ? 'فوترة المشتريات وتأكيد استلام السداد' : 'Process Checkout & Generate Receipt')}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -1918,7 +2034,7 @@ export default function InteractiveDrawers({
                         <Printer size={12} />
                         <span>Print</span>
                       </button>
-                      <button onClick={() => setCompletedOrder(null)} className="py-1.5 px-3 bg-slate-100 rounded-lg text-xs font-bold">
+                      <button onClick={() => { setCompletedOrder(null); setPosCheckoutComplete(true); }} className="py-1.5 px-3 bg-slate-100 rounded-lg text-xs font-bold">
                         Close
                       </button>
                     </div>

@@ -14,6 +14,7 @@ import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface CustomersWorkspaceProps {
   lang: Language;
+  initialSubTab?: CustomerTab;
 }
 
 type CustomerTab =
@@ -124,7 +125,7 @@ interface CustomerStats {
   avgBookings: number;
 }
 
-export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
+export default function CustomersWorkspace({ lang, initialSubTab = 'history' }: CustomersWorkspaceProps) {
   const isRtl = lang === 'ar';
   const { hasPermission } = useTenantAuth();
   const hasViewCustomersPermission = hasPermission('view_customers');
@@ -360,7 +361,7 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
   const [editPreferredLanguage, setEditPreferredLanguage] = useState('ar');
   
   // Inspected Subtab State
-  const [activeSubTab, setActiveSubTab] = useState<CustomerTab>('history');
+  const [activeSubTab, setActiveSubTab] = useState<CustomerTab>(initialSubTab);
   const [newNote, setNewNote] = useState('');
   const [newTag, setNewTag] = useState('');
   const [walletAmount, setWalletAmount] = useState('');
@@ -423,13 +424,7 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
     try {
       setIsLoadingWalletHistory(true);
       setIsErrorWalletHistory(false);
-      const res = await fetch(`/api/v1/tenant/customers/${selectedCustomerId}?walletHistory=full`);
-      if (res.status === 403) {
-        setIsPermissionDenied(true);
-        return;
-      }
-      if (!res.ok) throw new Error("Failed to load customer wallet history");
-      const data = await res.json();
+      const data = await tenantApiAdapter.getCustomer(selectedCustomerId, { walletHistory: 'full' });
       setWalletHistoryData(data);
       setIsPermissionDenied(false);
     } catch (err) {
@@ -474,13 +469,7 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
       try {
         setIsLoadingDetail(true);
         setIsErrorDetail(false);
-        const res = await fetch(`/api/v1/tenant/customers/${selectedCustomerId}`);
-        if (res.status === 403) {
-          setIsPermissionDenied(true);
-          return;
-        }
-        if (!res.ok) throw new Error("Failed to load VVIP client file");
-        const data = await res.json();
+        const data = await tenantApiAdapter.getCustomer(selectedCustomerId);
         
         const profile: CustomerProfileData = {
           ...data,
@@ -561,24 +550,11 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
   const saveNotesAndTags = async (newNotes: string[], newTags: string[]) => {
     if (!inspectedCustomer) return;
     try {
-      const response = await fetch(`/api/v1/tenant/customers/${inspectedCustomer.id}/notes`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          notes: newNotes,
-          tags: newTags
-        })
+      const response = await tenantApiAdapter.patch(`/tenant/customers/${inspectedCustomer.id}/notes`, {
+        notes: newNotes,
+        tags: newTags
       });
-      if (response.status === 403) {
-        setIsPermissionDenied(true);
-        return;
-      }
-      if (!response.ok) {
-        throw new Error("Failed to save notes and tags on server");
-      }
-      const updated = await response.json();
+      const updated = response;
       setInspectedCustomer(prev => {
         if (!prev) return null;
         return {
@@ -605,33 +581,16 @@ export default function CustomersWorkspace({ lang }: CustomersWorkspaceProps) {
 
     try {
       setIsLoadingDetail(true);
-      const response = await fetch(`/api/v1/tenant/customers/${inspectedCustomer.id}/profile`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          firstName: editFirstName.trim(),
-          lastName: editLastName.trim(),
-          email: editEmail.trim(),
-          phone: editPhone.trim(),
-          gender: editGender,
-          birthdate: editBirthdate,
-          preferredLanguage: editPreferredLanguage
-        })
+      const response = await tenantApiAdapter.patch(`/tenant/customers/${inspectedCustomer.id}/profile`, {
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim(),
+        email: editEmail.trim(),
+        phone: editPhone.trim(),
+        gender: editGender,
+        birthdate: editBirthdate,
+        preferredLanguage: editPreferredLanguage
       });
-
-      if (response.status === 403) {
-        setIsPermissionDenied(true);
-        return;
-      }
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Failed to update profile");
-      }
-
-      const updated = await response.json();
+      const updated = response;
       setInspectedCustomer(prev => {
         if (!prev) return null;
         return {

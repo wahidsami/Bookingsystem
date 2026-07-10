@@ -98,6 +98,20 @@ interface Appointment {
   date?: string;
 }
 
+interface GiftCardPackage {
+  id: string;
+  title: string;
+  title_en?: string;
+  title_ar?: string;
+  priceAmount?: number;
+  walletCreditAmount?: number;
+  discountPreset?: string;
+  discountPercent?: number;
+  expirationPreset?: string;
+  isActive?: boolean;
+  imageUrl?: string | null;
+}
+
 const API_COLORS = [
   'border-amber-500 bg-amber-500/10 text-amber-900',
   'border-emerald-500 bg-emerald-500/10 text-emerald-900',
@@ -116,6 +130,23 @@ const normalizeWorkspaceAppointmentStatus = (status: any): Appointment['status']
     return raw as Appointment['status'];
   }
   return 'confirmed';
+};
+
+const normalizeGiftCardPackage = (item: any): GiftCardPackage => {
+  const title = item?.title || item?.title_en || item?.title_ar || '';
+  return {
+    id: String(item?.id || ''),
+    title,
+    title_en: item?.title_en || title,
+    title_ar: item?.title_ar || title,
+    priceAmount: Number(item?.priceAmount ?? item?.price ?? 0),
+    walletCreditAmount: Number(item?.walletCreditAmount ?? item?.creditAmount ?? 0),
+    discountPreset: item?.discountPreset || '',
+    discountPercent: item?.discountPercent != null ? Number(item.discountPercent) : undefined,
+    expirationPreset: item?.expirationPreset || '',
+    isActive: item?.isActive !== false,
+    imageUrl: item?.imageUrl || item?.image || null
+  };
 };
 
 const displayAppointmentStatus = (status: any): string => {
@@ -211,6 +242,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [liveServices, setLiveServices] = useState<any[]>([]);
   const [liveCustomers, setLiveCustomers] = useState<any[]>([]);
   const [liveProducts, setLiveProducts] = useState<any[]>([]);
+  const [giftCardPackages, setGiftCardPackages] = useState<GiftCardPackage[]>([]);
   
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
@@ -1847,7 +1879,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   }, []);
 
   // Quick action from Context Menu
-  const triggerContextAction = (actionType: 'new' | 'block' | 'shift' | 'break' | 'paste' | 'refresh' | 'giftcards' | 'products') => {
+  const triggerContextAction = async (actionType: 'new' | 'block' | 'shift' | 'break' | 'paste' | 'refresh' | 'giftcards' | 'products') => {
     const isMutationAction = ['new', 'block', 'shift', 'break', 'paste', 'giftcards', 'products'].includes(actionType);
     if (!isBoardEditable && isMutationAction) {
       addLocalToast(
@@ -1882,6 +1914,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
     } else if (actionType === 'giftcards') {
       if (contextMenu) {
         setCurrentStaffId(contextMenu.staffId);
+      }
+      try {
+        const response = await tenantApiAdapter.get('/tenant/gift-cards/packages');
+        const rawPackages = Array.isArray(response?.packages)
+          ? response.packages
+          : Array.isArray(response?.data?.packages)
+            ? response.data.packages
+            : Array.isArray(response?.data)
+              ? response.data
+              : [];
+        const normalized = rawPackages
+          .map(normalizeGiftCardPackage)
+          .filter((item: GiftCardPackage) => item.id && item.isActive !== false);
+        setGiftCardPackages(normalized);
+      } catch (error) {
+        console.error('Failed to load gift card packages for the appointment drawer:', error);
       }
       setInitialCartTab('giftcards');
       setIsCartDrawerOpen(true);
@@ -3800,7 +3848,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             </p>
             
             <button 
-              onClick={() => triggerContextAction('new')} 
+              onClick={() => void triggerContextAction('new')} 
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <Plus size={13} className="text-amber-400" />
@@ -3808,7 +3856,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             </button>
             
             <button 
-              onClick={() => triggerContextAction('giftcards')} 
+              onClick={() => void triggerContextAction('giftcards')} 
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <Gift size={13} className="text-pink-400" />
@@ -3816,7 +3864,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             </button>
 
             <button 
-              onClick={() => triggerContextAction('products')} 
+              onClick={() => void triggerContextAction('products')} 
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <ShoppingBag size={13} className="text-teal-400" />
@@ -3824,7 +3872,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             </button>
 
             <button 
-              onClick={() => triggerContextAction('block')} 
+              onClick={() => void triggerContextAction('block')} 
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <Lock size={13} className="text-neutral-400" />
@@ -3832,7 +3880,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
             </button>
 
             <button 
-              onClick={() => triggerContextAction('shift')} 
+              onClick={() => void triggerContextAction('shift')} 
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <Scissors size={13} className="text-indigo-400" />
@@ -3841,7 +3889,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
 
             <div className="border-t border-zinc-800/60 my-1" />
             <button 
-              onClick={() => triggerContextAction('refresh')} 
+              onClick={() => void triggerContextAction('refresh')} 
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2 text-zinc-400"
             >
               <RefreshCw size={13} />
@@ -5751,6 +5799,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
         customers={liveCustomers}
         services={liveServices}
         products={liveProducts}
+        giftCardPackages={giftCardPackages}
         onBoardChanged={loadBoardData}
       />
 
