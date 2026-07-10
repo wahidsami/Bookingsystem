@@ -16,7 +16,7 @@ import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import LucideIcon from './LucideIcon';
 import AppointmentWorkspace from './AppointmentWorkspace';
 import FinanceOverviewReport from './reports/FinanceOverviewReport';
-import SalesOverviewReport from './reports/SalesOverviewReport';
+import OperationsIntelligenceReport from './reports/OperationsIntelligenceReport';
 import CustomersWorkspace from './CustomersWorkspace';
 import TeamsWorkspace from './TeamsWorkspace';
 import ServicesWorkspace from './ServicesWorkspace';
@@ -742,7 +742,7 @@ export default function Workspace({
 
       {/* 9. REPORTS */}
       {view === 'reports' && (
-        <SalesOverviewReport lang={lang} />
+        <OperationsIntelligenceReport lang={lang} />
       )}
 
       {/* 10. MARKETING OVERVIEW & COMPLIANCE CONTROLS */}
