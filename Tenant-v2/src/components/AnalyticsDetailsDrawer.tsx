@@ -75,7 +75,7 @@ export function AnalyticsDetailsDrawer({
             <aside className="border-b border-gray-200 bg-gray-50 p-5 lg:border-b-0 lg:border-r">
               <div className="space-y-3">
                 {summaryItems.map((item, index) => (
-                  <div key={index} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div key={`${String(item.label)}-${index}`} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">{item.label}</div>
                     <div className="mt-2 text-lg font-bold text-gray-900">{item.value}</div>
                     {item.note ? <div className="mt-1 text-xs text-gray-500">{item.note}</div> : null}

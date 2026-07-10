@@ -144,7 +144,7 @@ function MiniLineChart({
       </svg>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {rows.slice(-8).map((row, index) => (
-          <div key={`${row?.[labelKey] || index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <div key={`${row?.id || row?.[labelKey] || 'row'}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
             <div className="text-[11px] font-semibold text-slate-500">{`${row?.[labelKey] || '-'}`}</div>
             <div className="mt-1 text-sm font-black text-slate-900">{Number(row?.[valueKey] || 0).toLocaleString()}</div>
           </div>
@@ -178,7 +178,7 @@ function MiniBarChart({
         const width = `${Math.max((value / max) * 100, 4)}%`;
         const label = formatLabel ? formatLabel(row) : `${row?.[labelKey] || '-'}`;
         return (
-          <div key={`${row?.[labelKey] || index}`} className="space-y-1">
+          <div key={`${row?.id || row?.[labelKey] || 'row'}-${index}`} className="space-y-1">
             <div className="flex items-center justify-between gap-3 text-xs">
               <span className="truncate font-semibold text-slate-700">{label}</span>
               <span className="font-bold text-slate-500">{value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>

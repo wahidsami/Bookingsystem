@@ -5186,9 +5186,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                     disabled: false,
                                     tone: 'bg-slate-100 text-slate-700'
                                   }
-                                ].map((item) => (
+                                ].map((item, idx) => (
                                   <button
-                                    key={item.label}
+                                    key={`${item.label}-${idx}`}
                                     type="button"
                                     onClick={item.action}
                                     disabled={item.disabled}
@@ -5238,8 +5238,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                 </button>
                               </div>
                               <div className="grid grid-cols-1 gap-2">
-                                {customerInternalNotes.map((note) => (
-                                  <div key={note.label} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
+                                {customerInternalNotes.map((note, idx) => (
+                                  <div key={`${note.label}-${idx}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
                                     <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{note.label}</p>
                                     <p className="leading-relaxed">{note.value || '—'}</p>
                                   </div>
@@ -5313,8 +5313,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                           { label: isRtl ? 'المصفف المفضل' : 'Preferred Stylist', value: customerPreferredStylist || '—' },
                                           { label: isRtl ? 'الخدمة المفضلة' : 'Preferred Service', value: customerPreferredService || '—' },
                                           { label: isRtl ? 'متوسط الإنفاق' : 'Average Spend', value: `${customerAverageSpend.toFixed(2)} ${t.riyal}` }
-                                        ].map((item) => (
-                                          <div key={item.label} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                                        ].map((item, idx) => (
+                                          <div key={`${item.label}-${idx}`} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                                             <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{item.label}</p>
                                             <p className="text-slate-800 font-bold mt-1 truncate">{item.value}</p>
                                           </div>
@@ -5658,8 +5658,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
                                         {isRtl ? 'ملاحظات الصالون' : 'Internal Notes'}
                                       </h4>
                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        {customerInternalNotes.map((note) => (
-                                          <div key={note.label} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
+                                        {customerInternalNotes.map((note, idx) => (
+                                          <div key={`${note.label}-${idx}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
                                             <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{note.label}</p>
                                             <p className="leading-relaxed">{note.value || '—'}</p>
                                           </div>

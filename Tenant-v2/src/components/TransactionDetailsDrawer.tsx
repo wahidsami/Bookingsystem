@@ -182,9 +182,9 @@ export function TransactionDetailsDrawer({
                   </h3>
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {fields.map((field) => (
+                  {fields.map((field, index) => (
                     <div
-                      key={field.label}
+                      key={`${String(field.label)}-${index}`}
                       className={`rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 ${field.wide ? "md:col-span-2" : ""}`}
                     >
                       <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{field.label}</p>
@@ -204,11 +204,11 @@ export function TransactionDetailsDrawer({
                   </h3>
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {relatedActions.map((action) => {
+                  {relatedActions.map((action, index) => {
                     const Icon = action.icon;
                     return (
                       <button
-                        key={action.label}
+                        key={`${String(action.label)}-${index}`}
                         type="button"
                         onClick={action.onClick}
                         disabled={action.disabled}
