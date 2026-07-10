@@ -504,6 +504,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         const services = srvRes.status === 'fulfilled' && srvRes.value?.services
           ? srvRes.value.services
           : [];
+        const serviceCatalogById = new Map<string, any>(
+          services.map((service: any) => [service.id, service])
+        );
         const uniqueCats = Array.from(new Set(services.map((s: any) => s.categoryEn || s.categoryAr || s.category || 'Uncategorized')));
         setServiceCategories([
           { id: 'all', nameEn: 'All Categories', nameAr: 'جميع التصنيفات' },
@@ -598,18 +601,31 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           ? (advancedRes.value.data || null)
           : null;
         const mappedCustomerSales = buildCustomerSalesRows(appointmentRows);
-        const serviceRevenueTotal = servicePerformanceRows.reduce((sum: number, row: any) => sum + Number(row.revenue || 0), 0) || 1;
-        const mappedServices = servicePerformanceRows.map((row: any) => ({
-          id: row.id,
-          name: row.name_en || row.name_ar || row.name || row.id,
-          nameAr: row.name_ar || row.name_en || row.name || row.id,
-          category: row.category || '-',
-          categoryAr: row.category || '-',
-          bookings: Number(row.totalBookings || row.bookings || 0),
-          duration: row.duration || '-',
-          avgPrice: Number(row.avgRevenue || row.avgPrice || row.price || 0),
-          totalRevenue: Number(row.revenue || 0),
-          share: `${((Number(row.revenue || 0) / serviceRevenueTotal) * 100).toFixed(1)}%`
+        const serviceRevenueRows = servicePerformanceRows.map((row: any) => {
+          const catalogRow: any = serviceCatalogById.get(row.id) || {};
+          const nameEn = catalogRow.name_en || catalogRow.nameEn || row.name_en || row.nameEn || row.name || '';
+          const nameAr = catalogRow.name_ar || catalogRow.nameAr || row.name_ar || row.nameAr || row.name || '';
+          const category = catalogRow.category || row.category || catalogRow.categoryEn || catalogRow.categoryAr || '-';
+          return {
+            id: row.id,
+            nameEn,
+            nameAr,
+            name: nameEn || nameAr || row.name || row.id,
+            serviceName: nameEn || nameAr || row.name || row.id,
+            category,
+            categoryEn: category,
+            categoryAr: category,
+            isActive: typeof catalogRow.isActive === 'boolean' ? catalogRow.isActive : row.isActive,
+            bookings: Number(row.totalBookings || row.bookings || 0),
+            duration: row.duration || catalogRow.duration || '-',
+            avgPrice: Number(row.avgRevenue || row.avgPrice || row.price || catalogRow.finalPrice || 0),
+            totalRevenue: Number(row.revenue || 0)
+          };
+        }).filter((row: any) => `${row.nameEn || row.nameAr || row.name || ''}`.trim().length > 0);
+        const serviceRevenueTotal = serviceRevenueRows.reduce((sum: number, row: any) => sum + Number(row.totalRevenue || 0), 0) || 1;
+        const mappedServices = serviceRevenueRows.map((row: any) => ({
+          ...row,
+          share: `${((Number(row.totalRevenue || 0) / serviceRevenueTotal) * 100).toFixed(1)}%`
         }));
         const mappedEmployees = employeePerformanceRows.map((row: any) => ({
           id: row.id,
@@ -885,9 +901,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
     // Category Filter
     if (selectedService !== 'all') {
       if (activeTab === 'services') {
-        list = list.filter(i => i.category.toLowerCase() === selectedService);
+        list = list.filter(i => normalizeFilterValue(i.category || i.categoryEn || i.categoryAr) === selectedService);
       } else if (activeTab === 'products') {
-        list = list.filter(i => i.category.toLowerCase().includes(selectedService));
+        list = list.filter(i => normalizeFilterValue(i.category || i.categoryEn || i.categoryAr).includes(selectedService));
       }
     }
 
@@ -938,7 +954,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         let csvContent = "data:text/csv;charset=utf-8,";
         csvContent += "ID,Date/Detail,Primary Column,Value/Total\r\n";
         filteredRecords.forEach(r => {
-          csvContent += `${r.id},${r.date || r.sku || ''},${r.nameEn || r.customer || r.code || ''},${r.total || r.totalSpent || r.revenue || r.collected || ''}\r\n`;
+          csvContent += `${r.id},${r.date || r.sku || ''},${r.nameEn || r.nameAr || r.name || r.customer || r.code || ''},${r.total || r.totalSpent || r.revenue || r.collected || ''}\r\n`;
         });
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -1709,7 +1725,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
 
                                     {/* Label representing the X-Axis */}
                                     <span className="text-[9px] font-mono text-neutral-400 font-bold truncate w-full text-center mt-1.5">
-                                      {item.date || item.id || item.code || item.name || item.customer}
+                                      {item.date || item.id || item.code || item.nameEn || item.nameAr || item.name || item.customer}
                                     </span>
 
                                   </div>
@@ -1976,8 +1992,8 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                 {/* 5. Service Reports Column Renders */}
                                 {activeTab === 'services' && (
                                   <>
-                                    <td className="p-3 font-bold text-neutral-800">{isRtl ? item.nameAr : item.name}</td>
-                                    <td className="p-3 text-neutral-500">{isRtl ? item.categoryAr : item.category}</td>
+                                    <td className="p-3 font-bold text-neutral-800">{isRtl ? (item.nameAr || item.nameEn || item.name || item.id) : (item.nameEn || item.nameAr || item.name || item.id)}</td>
+                                    <td className="p-3 text-neutral-500">{isRtl ? (item.categoryAr || item.categoryEn || item.category || '-') : (item.categoryEn || item.categoryAr || item.category || '-')}</td>
                                     <td className="p-3 font-mono font-bold">{item.bookings}</td>
                                     <td className="p-3 font-mono text-neutral-500">{item.duration}</td>
                                     <td className="p-3 font-mono">{item.avgPrice} {isRtl ? 'ر.س' : 'SAR'}</td>
@@ -2015,11 +2031,11 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
                                     <td className="p-3 font-mono font-extrabold text-rose-600">-{item.totalDiscount} {isRtl ? 'ر.س' : 'SAR'}</td>
                                     <td className="p-3">
                                       <span className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded font-bold text-[10px]">
-                                        {item.category}
-                                      </span>
-                                    </td>
-                                  </>
-                                )}
+                                      {item.category || '-'}
+                                    </span>
+                                  </td>
+                                </>
+                              )}
 
                                 {/* 8. Refund Reports Column Renders */}
                                 {activeTab === 'refunds' && (
