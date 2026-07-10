@@ -5,7 +5,7 @@ import {
   FileSpreadsheet, ClipboardList, TrendingUp, UserCheck, Settings, 
   Eye, ToggleLeft, ToggleRight, Layers, FileDown, CheckCircle, Info, Edit3
 } from 'lucide-react';
-import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { API_ORIGIN, tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface GiftCardsWorkspaceProps {
   lang: 'ar' | 'en';
@@ -18,12 +18,19 @@ interface GiftCardPackage {
   description: string;
   displayOrder: number;
   walletCreditAmount: number;
-  discountPreset: 'none' | 'percentage' | 'custom';
-  customDiscountPercent: number;
+  priceAmount?: number;
+  discountPreset: string;
+  discountPercent?: number;
   bonusAmount: number;
-  expirationPreset: 'none' | '1month' | '3months' | '6months' | '1year';
+  expirationPreset: string;
   isActive: boolean;
-  image: string;
+  imageUrl?: string | null;
+  title_en?: string;
+  title_ar?: string;
+  description_en?: string | null;
+  description_ar?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 interface RedemptionLog {
@@ -60,6 +67,47 @@ interface ReportsSummary {
 
 const formatNumber = (value: unknown) => Number(value ?? 0).toLocaleString();
 const safeText = (value: unknown) => `${value ?? ''}`;
+const resolveImageUrl = (value: unknown) => {
+  const url = safeText(value).trim();
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+  return `${API_ORIGIN}${url.startsWith('/') ? url : `/${url}`}`;
+};
+
+const normalizeGiftCardPackage = (item: any): GiftCardPackage => {
+  const title = item?.title || item?.title_en || item?.title_ar || '';
+  const description = item?.description || item?.description_en || item?.description_ar || '';
+  const discountPercent = item?.discountPercent != null
+    ? Number(item.discountPercent)
+    : item?.discountPreset && item.discountPreset !== 'custom'
+      ? Number(item.discountPreset)
+      : (Number(item?.walletCreditAmount || 0) > 0 && Number(item?.priceAmount || 0) >= 0
+        ? Number((100 - ((Number(item.priceAmount || 0) / Number(item.walletCreditAmount || 1)) * 100)).toFixed(2))
+        : 0);
+
+  return {
+    id: String(item?.id || ''),
+    title,
+    description,
+    displayOrder: Number(item?.displayOrder || 0),
+    walletCreditAmount: Number(item?.walletCreditAmount || 0),
+    priceAmount: Number(item?.priceAmount || 0),
+    discountPreset: safeText(item?.discountPreset || (Number.isFinite(discountPercent) && discountPercent > 0 ? String(discountPercent) : 'custom')),
+    discountPercent: Number.isFinite(discountPercent) ? Number(discountPercent) : 0,
+    bonusAmount: Number(item?.bonusAmount || 0),
+    expirationPreset: safeText(item?.expirationPreset || 'never') || 'never',
+    isActive: item?.isActive !== false,
+    imageUrl: item?.imageUrl || item?.image || null,
+    title_en: item?.title_en || title,
+    title_ar: item?.title_ar || title,
+    description_en: item?.description_en ?? description ?? null,
+    description_ar: item?.description_ar ?? description ?? null,
+    createdAt: item?.createdAt || null,
+    updatedAt: item?.updatedAt || null
+  };
+};
 
 const normalizeTransactionLog = (tx: any): TransactionLog => ({
   id: String(tx?.id || ''),
@@ -121,12 +169,13 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
   const [formDescription, setFormDescription] = useState<string>('');
   const [formDisplayOrder, setFormDisplayOrder] = useState<number>(1);
   const [formWalletCredit, setFormWalletCredit] = useState<number>(500);
-  const [formDiscountPreset, setFormDiscountPreset] = useState<'none' | 'percentage' | 'custom'>('percentage');
-  const [formCustomDiscount, setFormCustomDiscount] = useState<number>(10);
-  const [formBonusAmount, setFormBonusAmount] = useState<number>(50);
-  const [formExpiration, setFormExpiration] = useState<'none' | '1month' | '3months' | '6months' | '1year'>('1year');
+  const [formDiscountPreset, setFormDiscountPreset] = useState<string>('10');
+  const [formCustomDiscount, setFormCustomDiscount] = useState<string>('');
+  const [formBonusAmount, setFormBonusAmount] = useState<number>(0);
+  const [formExpiration, setFormExpiration] = useState<string>('1_month');
   const [formIsActive, setFormIsActive] = useState<boolean>(true);
   const [formImage, setFormImage] = useState<string>('');
+  const [formImageFile, setFormImageFile] = useState<File | null>(null);
 
   // Image upload states
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
@@ -147,7 +196,8 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
 
       // Load packages
       const pkgData = await tenantApiAdapter.get('/tenant/gift-cards/packages');
-      setPackages(Array.isArray(pkgData?.packages) ? pkgData.packages : Array.isArray(pkgData) ? pkgData : []);
+      const rawPackages = Array.isArray(pkgData?.packages) ? pkgData.packages : Array.isArray(pkgData) ? pkgData : [];
+      setPackages(rawPackages.map(normalizeGiftCardPackage));
 
       // Load summary
       const sumData = await tenantApiAdapter.get('/tenant/gift-cards/reports/summary');
@@ -189,12 +239,13 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
     setFormDescription('');
     setFormDisplayOrder(1);
     setFormWalletCredit(500);
-    setFormDiscountPreset('percentage');
-    setFormCustomDiscount(10);
-    setFormBonusAmount(50);
-    setFormExpiration('1year');
+    setFormDiscountPreset('10');
+    setFormCustomDiscount('');
+    setFormBonusAmount(0);
+    setFormExpiration('1_month');
     setFormIsActive(true);
     setFormImage('');
+    setFormImageFile(null);
   };
 
   // Preset fill helper
@@ -205,11 +256,12 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
     setFormDisplayOrder(pkg.displayOrder);
     setFormWalletCredit(pkg.walletCreditAmount);
     setFormDiscountPreset(pkg.discountPreset);
-    setFormCustomDiscount(pkg.customDiscountPercent);
+    setFormCustomDiscount(pkg.discountPreset === 'custom' ? String(pkg.discountPercent ?? '') : '');
     setFormBonusAmount(pkg.bonusAmount);
     setFormExpiration(pkg.expirationPreset);
     setFormIsActive(pkg.isActive);
-    setFormImage(pkg.image);
+    setFormImage(resolveImageUrl(pkg.imageUrl));
+    setFormImageFile(null);
   };
 
   // Image base64 handler
@@ -218,34 +270,10 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
       alert(isRtl ? "يرجى اختيار ملف صورة صالح." : "Please choose a valid image file.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      if (e.target?.result) {
-        try {
-          setUploadingImage(true);
-          const base64Str = e.target.result as string;
-          if (editingId) {
-            // Post directly to specific package image endpoint
-            const res = await fetch(`/api/v1/tenant/gift-cards/packages/${editingId}/image`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ image: base64Str })
-            });
-            if (!res.ok) throw new Error("Server image processing error.");
-            const data = await res.json();
-            setFormImage(data.imageUrl);
-          } else {
-            // Just save in state for creation
-            setFormImage(base64Str);
-          }
-        } catch (err: any) {
-          alert(isRtl ? "فشل رفع الصورة: " : "Image upload failed: " + err.message);
-        } finally {
-          setUploadingImage(false);
-        }
-      }
-    };
-    reader.readAsDataURL(file);
+    setUploadingImage(true);
+    setFormImageFile(file);
+    setFormImage(URL.createObjectURL(file));
+    setUploadingImage(false);
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -277,12 +305,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
   const togglePackageActive = async (id: string, currentStatus: boolean) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/v1/tenant/gift-cards/packages/${id}/active`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !currentStatus })
-      });
-      if (!res.ok) throw new Error("Could not toggle package state.");
+      await tenantApiAdapter.patch(`/tenant/gift-cards/packages/${id}/active`, { isActive: !currentStatus });
       await loadData();
     } catch (err: any) {
       alert(err.message || "Failed to toggle status.");
@@ -304,11 +327,15 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
       alert(isRtl ? "يجب أن تكون قيمة شحن المحفظة أكبر من 0." : "Wallet credit amount must be greater than 0.");
       return;
     }
-    if (formDiscountPreset === 'custom' && (formCustomDiscount < 0 || formCustomDiscount > 100)) {
+    if (formDiscountPreset === 'custom' && !String(formCustomDiscount || '').trim()) {
+      alert(isRtl ? "نسبة الخصم المخصصة مطلوبة." : "Custom discount percentage is required.");
+      return;
+    }
+    if (formDiscountPreset === 'custom' && (Number(formCustomDiscount) < 0 || Number(formCustomDiscount) > 100)) {
       alert(isRtl ? "نسبة الخصم المخصصة يجب أن تكون بين 0 و 100." : "Custom discount percentage must be between 0 and 100.");
       return;
     }
-    if (!editingId && !formImage) {
+    if (!editingId && !formImageFile) {
       alert(isRtl ? "يرجى تحميل غلاف لبطاقة الإهداء قبل الإنشاء." : "An image background is required to create a gift card package.");
       return;
     }
@@ -317,30 +344,56 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
       setLoading(true);
       const payload = {
         title: formTitle,
+        title_en: formTitle,
+        title_ar: formTitle,
         description: formDescription,
+        description_en: formDescription || null,
+        description_ar: formDescription || null,
         displayOrder: Number(formDisplayOrder),
         walletCreditAmount: Number(formWalletCredit),
+        priceAmount: Number((Number(formWalletCredit) - (Number(formWalletCredit) * ((formDiscountPreset === 'custom' ? Number(formCustomDiscount) : Number(formDiscountPreset || 0)) / 100))).toFixed(2)),
         discountPreset: formDiscountPreset,
-        customDiscountPercent: formDiscountPreset === 'custom' ? Number(formCustomDiscount) : (formDiscountPreset === 'percentage' ? 10 : 0),
+        discountPercent: formDiscountPreset === 'custom' ? Number(formCustomDiscount) : Number(formDiscountPreset || 0),
+        discountValue: formDiscountPreset === 'custom' ? Number(formCustomDiscount) : Number(formDiscountPreset || 0),
         bonusAmount: Number(formBonusAmount),
         expirationPreset: formExpiration,
         isActive: formIsActive,
-        image: formImage
       };
 
-      const url = editingId 
-        ? `/api/v1/tenant/gift-cards/packages/${editingId}` 
-        : `/api/v1/tenant/gift-cards/packages`;
+      if (editingId) {
+        await tenantApiAdapter.put(`/tenant/gift-cards/packages/${editingId}`, payload);
 
-      const response = await fetch(url, {
-        method: editingId ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+        if (formImageFile) {
+          const imageFormData = new FormData();
+          imageFormData.append('image', formImageFile);
+          const imageResponse = await tenantApiAdapter.request(`/tenant/gift-cards/packages/${editingId}/image`, {
+            method: 'POST',
+            body: imageFormData
+          });
+          if (!imageResponse.ok) {
+            const errData = await imageResponse.json();
+            throw new Error(errData.error || errData.message || "Failed to upload gift card image.");
+          }
+        }
+      } else {
+        const formData = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+          if (value === undefined || value === null) return;
+          formData.append(key, String(value));
+        });
+        if (formImageFile) {
+          formData.append('image', formImageFile);
+        }
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Failed to process gift card packaging.");
+        const response = await tenantApiAdapter.request('/tenant/gift-cards/packages', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || errData.message || "Failed to process gift card packaging.");
+        }
       }
 
       resetForm();
@@ -355,23 +408,46 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
 
   // CSV download function
   const downloadCsv = () => {
-    window.open('/api/v1/tenant/gift-cards/reports/transactions.csv', '_blank');
+    tenantApiAdapter.request('/tenant/gift-cards/reports/transactions.csv', { method: 'GET' })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error('Failed to export gift card CSV.');
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('content-disposition') || '';
+        const filenameMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+        const filename = filenameMatch?.[1] || 'tenant-gift-transactions.csv';
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.URL.revokeObjectURL(url);
+      })
+      .catch((err) => {
+        alert(err?.message || 'Failed to export gift card CSV.');
+      });
   };
 
   // Helper calculations for displaying values
-  const getDiscountPercent = (preset: 'none' | 'percentage' | 'custom', customVal: number) => {
-    if (preset === 'none') return 0;
-    if (preset === 'percentage') return 10;
-    return customVal;
+  const getDiscountPercent = (preset: string, customVal: number) => {
+    if (preset === 'custom') return Number(customVal || 0);
+    const numeric = Number(preset || 0);
+    return Number.isFinite(numeric) ? numeric : 0;
   };
 
-  const getExpirationLabel = (preset: 'none' | '1month' | '3months' | '6months' | '1year') => {
+  const getExpirationLabel = (preset: string) => {
     switch (preset) {
-      case 'none': return isRtl ? 'صلاحية مدى الحياة' : 'Lifetime validity';
-      case '1month': return isRtl ? 'شهر واحد' : '1 Month';
-      case '3months': return isRtl ? '٣ أشهر' : '3 Months';
-      case '6months': return isRtl ? '٦ أشهر' : '6 Months';
-      case '1year': return isRtl ? 'سنة واحدة' : '1 Year';
+      case 'never': return isRtl ? 'صلاحية مدى الحياة' : 'Lifetime validity';
+      case '1_week': return isRtl ? 'أسبوع واحد' : '1 Week';
+      case '2_weeks': return isRtl ? 'أسبوعان' : '2 Weeks';
+      case '3_weeks': return isRtl ? '٣ أسابيع' : '3 Weeks';
+      case '1_month': return isRtl ? 'شهر واحد' : '1 Month';
+      case '2_months': return isRtl ? 'شهران' : '2 Months';
+      case '3_months': return isRtl ? '٣ أشهر' : '3 Months';
+      case '1_year': return isRtl ? 'سنة واحدة' : '1 Year';
       default: return preset;
     }
   };
@@ -603,8 +679,10 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                       darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-250 text-neutral-800'
                     }`}
                   >
-                    <option value="none">{isRtl ? 'بدون خصم (السعر كامل)' : 'Full Face Value Price'}</option>
-                    <option value="percentage">{isRtl ? 'خصم مسبق تلقائي (10%)' : 'Standard 10% Discount'}</option>
+                    <option value="2">2%</option>
+                    <option value="5">5%</option>
+                    <option value="7">7%</option>
+                    <option value="10">10%</option>
                     <option value="custom">{isRtl ? 'خصم مخصص (%)' : 'Enter Custom Discount %'}</option>
                   </select>
                 </div>
@@ -618,7 +696,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                       max={100}
                       required
                       value={formCustomDiscount}
-                      onChange={(e) => setFormCustomDiscount(Number(e.target.value))}
+                      onChange={(e) => setFormCustomDiscount(e.target.value)}
                       placeholder="20"
                       className={`w-full p-3 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden font-mono font-bold transition-all ${
                         darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-250 text-neutral-800'
@@ -651,11 +729,14 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                     darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-250 text-neutral-800'
                   }`}
                 >
-                  <option value="none">{isRtl ? 'صلاحية مفتوحة (مدى الحياة)' : 'Indefinite (Lifetime Validity)'}</option>
-                  <option value="1month">{isRtl ? 'صلاحية شهر واحد' : '1 Month Expiration Period'}</option>
-                  <option value="3months">{isRtl ? 'صلاحية ٣ أشهر' : '3 Months Expiration Period'}</option>
-                  <option value="6months">{isRtl ? 'صلاحية ٦ أشهر' : '6 Months Expiration Period'}</option>
-                  <option value="1year">{isRtl ? 'صلاحية سنة واحدة كاملة' : '1 Year Expiration Period'}</option>
+                  <option value="1_week">{isRtl ? 'صلاحية أسبوع واحد' : '1 Week Expiration Period'}</option>
+                  <option value="2_weeks">{isRtl ? 'صلاحية أسبوعين' : '2 Weeks Expiration Period'}</option>
+                  <option value="3_weeks">{isRtl ? 'صلاحية ٣ أسابيع' : '3 Weeks Expiration Period'}</option>
+                  <option value="1_month">{isRtl ? 'صلاحية شهر واحد' : '1 Month Expiration Period'}</option>
+                  <option value="2_months">{isRtl ? 'صلاحية شهرين' : '2 Months Expiration Period'}</option>
+                  <option value="3_months">{isRtl ? 'صلاحية ٣ أشهر' : '3 Months Expiration Period'}</option>
+                  <option value="1_year">{isRtl ? 'صلاحية سنة واحدة كاملة' : '1 Year Expiration Period'}</option>
+                  <option value="never">{isRtl ? 'صلاحية مفتوحة (مدى الحياة)' : 'Indefinite (Lifetime Validity)'}</option>
                 </select>
               </div>
 
@@ -778,8 +859,8 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {packages.map((pkg) => {
-                  const discountPercent = getDiscountPercent(pkg.discountPreset, pkg.customDiscountPercent);
-                  const price = pkg.walletCreditAmount * (1 - discountPercent / 100);
+                  const discountPercent = getDiscountPercent(pkg.discountPreset, pkg.discountPercent ?? 0);
+                  const price = Number(pkg.priceAmount || (pkg.walletCreditAmount * (1 - discountPercent / 100)));
 
                   return (
                     <div 
@@ -790,10 +871,10 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                     >
                       {/* Image background area with text overlay */}
                       <div className="h-36 relative overflow-hidden bg-zinc-950">
-                        <img 
-                          src={pkg.image} 
-                          alt={pkg.title} 
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 filter brightness-90" 
+                        <img
+                          src={resolveImageUrl(pkg.imageUrl)}
+                          alt={pkg.title}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 filter brightness-90"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent p-4 flex flex-col justify-between text-white text-start">
                           <div className="flex justify-between items-start">
