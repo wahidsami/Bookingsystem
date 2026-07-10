@@ -22,31 +22,21 @@ import {
 } from '../../lib/bi';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import { createSalesOverviewReportDefinition, type SalesOverviewTableRow } from '../../lib/bi/reports/salesOverview';
+import {
+  buildSalesOverviewBackendGaps,
+  buildSalesOverviewDrawerPairs,
+  buildSalesOverviewFilterOptions,
+  buildSalesOverviewPrintHtml,
+  buildSalesOverviewRows,
+  type SalesOverviewPayload,
+  type SalesOverviewRow,
+} from '../../lib/bi/reports/salesOverviewViewModel';
 import type { BIDatePresetValue, BIDateRange, BIOption, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
 import type { Language } from '../../types';
-
-type SalesOverviewRow = SalesOverviewTableRow & {
-  category?: string;
-  refundMode?: string;
-  sourceRow?: any;
-};
 
 interface SalesOverviewReportProps {
   lang: Language;
 }
-
-type SalesOverviewPayload = {
-  summary?: any;
-  sales?: any;
-  customers?: any;
-  employees?: any;
-  services?: any;
-  products?: any;
-  payments?: any;
-  finance?: any;
-  performance?: any;
-  executive?: any;
-};
 
 function normalizeText(value: unknown): string {
   return `${value ?? ''}`.trim().toLowerCase();
@@ -218,80 +208,6 @@ function SectionBlock({
   );
 }
 
-function buildDrawerPairs(row: SalesOverviewRow | null) {
-  if (!row) return [];
-  return [
-    { label: 'Sale Number', value: row.saleNumber },
-    { label: 'Invoice Number', value: row.invoiceNumber },
-    { label: 'Sale Date', value: formatDate(row.saleDate, 'en') },
-    { label: 'Customer', value: row.customer },
-    { label: 'Employee', value: row.employee },
-    { label: 'Channel', value: row.channel },
-    { label: 'Items', value: row.items },
-    { label: 'Gross Sales', value: row.grossSales == null ? '-' : formatMoney(row.grossSales, 'en') },
-    { label: 'Discounts', value: row.discount == null ? '-' : formatMoney(row.discount, 'en') },
-    { label: 'Taxes', value: row.vat == null ? '-' : formatMoney(row.vat, 'en') },
-    { label: 'Refund', value: row.refund == null ? '-' : formatMoney(row.refund, 'en') },
-    { label: 'Net Sales', value: row.netSales == null ? '-' : formatMoney(row.netSales, 'en') },
-    { label: 'Payment Method', value: row.paymentMethod },
-    { label: 'Payment Status', value: row.paymentStatus },
-    { label: 'Sale Status', value: row.saleStatus },
-    { label: 'Notes', value: row.notes || '-' },
-  ];
-}
-
-function buildPrintHtml({
-  title,
-  description,
-  rows,
-  columns,
-  lang,
-}: {
-  title: string;
-  description: string;
-  rows: SalesOverviewRow[];
-  columns: any[];
-  lang: Language;
-}) {
-  const thead = columns.map((column) => `<th>${column.header}</th>`).join('');
-  const tbody = rows.map((row) => {
-    const cells = columns.map((column) => {
-      const rawValue = typeof column.accessor === 'function'
-        ? column.accessor(row)
-        : row[column.accessor as keyof SalesOverviewRow];
-      const text = typeof rawValue === 'number'
-        ? formatMoney(rawValue, lang)
-        : `${rawValue ?? '-'}`;
-      return `<td>${text}</td>`;
-    }).join('');
-    return `<tr>${cells}</tr>`;
-  }).join('');
-
-  return `
-    <html>
-      <head>
-        <title>${title}</title>
-        <style>
-          body { font-family: Arial, sans-serif; color: #0f172a; padding: 24px; }
-          h1 { margin: 0 0 8px; }
-          p { margin: 0 0 16px; color: #475569; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; vertical-align: top; }
-          th { background: #f8fafc; }
-        </style>
-      </head>
-      <body>
-        <h1>${title}</h1>
-        <p>${description}</p>
-        <table>
-          <thead><tr>${thead}</tr></thead>
-          <tbody>${tbody}</tbody>
-        </table>
-      </body>
-    </html>
-  `;
-}
-
 export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) {
   const isRtl = lang === 'ar';
   const reportId = 'sales-overview';
@@ -349,7 +265,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
       { label: isRtl ? 'جميع الحالات' : 'All Statuses', value: '' },
       ...Array.from(
         new Set(
-          (buildSalesRows(report).map((row) => row.saleStatus).filter(Boolean) as string[])
+          (buildSalesOverviewRows(report).map((row) => row.saleStatus).filter(Boolean) as string[])
             .map((item) => item.trim())
         )
       ).map((value) => ({ label: value, value }))
@@ -381,68 +297,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
   const { columnState, visibleColumns, toggleColumn, moveColumn, resetColumns } = useBIColumnPreferences(reportId, reportDefinition.columns || []);
   const { savedViews, saveView, deleteView } = useBISavedViews(reportId);
 
-  function buildSalesRows(data: SalesOverviewPayload): SalesOverviewRow[] {
-    const revenueRows = Array.isArray(data.finance?.ledger?.revenueLedger?.rows)
-      ? data.finance.ledger.revenueLedger.rows
-      : [];
-    const refundRows = Array.isArray(data.finance?.ledger?.refundLedger?.rows)
-      ? data.finance.ledger.refundLedger.rows
-      : [];
-    const refundByReference = new Map<string, any>();
-    refundRows.forEach((refund: any) => {
-      const key = `${refund?.reference || refund?.id || ''}`.trim();
-      if (key) refundByReference.set(key, refund);
-    });
-
-    const serviceCategoryLookup = new Map<string, string>();
-    (data.services?.performance || data.services?.revenue || []).forEach((service: any) => {
-      const serviceName = `${service?.name_en || service?.nameEn || service?.name || ''}`.trim().toLowerCase();
-      const category = `${service?.category || service?.categoryEn || service?.categoryAr || '-'}`.trim() || '-';
-      if (serviceName) serviceCategoryLookup.set(serviceName, category);
-    });
-
-    return revenueRows.map((row: any) => {
-      const reference = `${row?.reference || row?.saleNumber || row?.id || '-'}`.trim();
-      const refund = refundByReference.get(reference) || refundByReference.get(`${row?.id || ''}`.trim()) || null;
-      const saleDate = row?.date || row?.processedAt || row?.createdAt || '';
-      const items = `${row?.service || row?.entityLabel || row?.items || '-'}`.trim() || '-';
-      const category = serviceCategoryLookup.get(items.toLowerCase()) || '-';
-      const grossSales = row?.grossSales ?? row?.revenue ?? null;
-      const discount = row?.discount ?? null;
-      const vat = row?.tax ?? null;
-      const refundAmount = refund?.amount ?? row?.refund ?? null;
-      const netSales = row?.netSales ?? null;
-      const paymentMethod = `${row?.paymentMethodLabel || row?.paymentMethod || '-'}`.trim() || '-';
-      const saleStatus = `${row?.saleStatus || row?.status || '-'}`.trim() || '-';
-      const paymentStatus = `${row?.paymentStatus || row?.status || saleStatus}`.trim() || '-';
-
-      return {
-        id: String(row?.id || reference),
-        saleNumber: reference,
-        invoiceNumber: `${row?.invoiceNumber || row?.reference || '-'}`.trim() || '-',
-        saleDate,
-        customer: `${row?.customer || '-'}`.trim() || '-',
-        employee: `${row?.employee || '-'}`.trim() || '-',
-        channel: `${row?.channel || row?.entityType || '-'}`.trim() || '-',
-        items,
-        grossSales: grossSales === null || grossSales === undefined ? null : Number(grossSales),
-        discount: discount === null || discount === undefined ? null : Number(discount),
-        vat: vat === null || vat === undefined ? null : Number(vat),
-        refund: refundAmount === null || refundAmount === undefined ? null : Number(refundAmount),
-        netSales: netSales === null || netSales === undefined ? null : Number(netSales),
-        paymentMethod,
-        paymentStatus,
-        saleStatus,
-        category,
-        refundMode: refund?.refundMode || null,
-        detailPath: row?.detailPath || refund?.detailPath || null,
-        notes: row?.notes || refund?.reason || null,
-        sourceRow: row,
-      };
-    });
-  }
-
-  const rows = useMemo(() => buildSalesRows(report), [report]);
+  const rows = useMemo(() => buildSalesOverviewRows(report), [report]);
 
   const filteredRows = useMemo(() => {
     const q = normalizeText(search);
@@ -568,17 +423,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
     { label: 'Highest Revenue Day', value: highestRevenueDay ? `${formatDate(highestRevenueDay.date, lang)} · ${formatMoney(highestRevenueDay.revenue || 0, lang)}` : '-' },
   ];
 
-  const backendGaps = useMemo(() => {
-    const gaps = new Set<string>();
-    if (rows.some((row) => row.invoiceNumber === '-' || row.invoiceNumber === row.saleNumber)) gaps.add('Invoice Number');
-    if (rows.some((row) => row.channel === '-')) gaps.add('Channel');
-    if (rows.some((row) => row.items === '-')) gaps.add('Items');
-    if (rows.some((row) => row.grossSales == null)) gaps.add('Gross Sales');
-    if (rows.some((row) => row.netSales == null)) gaps.add('Net Sales');
-    if (rows.some((row) => row.refund == null)) gaps.add('Refund');
-    if (rows.some((row) => row.vat == null)) gaps.add('VAT');
-    return Array.from(gaps);
-  }, [rows]);
+  const backendGaps = useMemo(() => buildSalesOverviewBackendGaps(rows), [rows]);
 
   const applyQuery = (next: {
     search: string;
@@ -630,7 +475,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
     if (!printWindow) return;
     printWindow.document.open();
     printWindow.document.write(
-      buildPrintHtml({
+      buildSalesOverviewPrintHtml({
         title: reportTitle,
         description: reportDescription,
         rows: exportRows,
@@ -811,7 +656,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
         row={drawerRow}
         onClose={() => setDrawerRow(null)}
         renderContent={(row) => {
-          const pairs = buildDrawerPairs(row);
+          const pairs = buildSalesOverviewDrawerPairs(row, lang);
           return (
             <div className="space-y-5">
               <div className="grid gap-4 xl:grid-cols-2">
