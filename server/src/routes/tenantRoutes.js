@@ -251,6 +251,7 @@ router.post('/settings/cover', settingsUpload.single('coverImage'), tenantSettin
 router.get('/reports/summary', checkTenantFeature('reports'), tenantReportsController.getDashboardSummary);
 router.get('/reports/builder/options', checkTenantFeature('reports'), tenantReportsController.getReportBuilderOptions);
 router.get('/reports/full', checkTenantFeature('reports'), tenantReportsController.getFullReport);
+router.get('/bi/sales-overview', checkTenantFeature('reports'), tenantReportsController.getSalesOverview);
 router.get('/reports/pdf', checkTenantFeature('reports'), tenantReportsController.downloadReportPdf);
 router.get('/reports/saved', checkTenantFeature('reports'), tenantReportsController.getSavedReports);
 router.get('/reports/saved/:id', checkTenantFeature('reports'), tenantReportsController.getSavedReport);

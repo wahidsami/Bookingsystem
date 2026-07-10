@@ -22,6 +22,9 @@ const {
     buildAdvancedAnalytics,
     buildRebookingAnalyticsEnhanced
 } = require('../services/tenantAdvancedAnalyticsService');
+const {
+    buildSalesOverviewPayload
+} = require('../services/tenantBiSalesOverviewService');
 
 function getCustomerName(user) {
     const firstName = user?.firstName || '';
@@ -1380,6 +1383,15 @@ async function buildFullReportData(req, sections, startDate, endDate) {
         });
     }
 
+    if (sections.includes('financialLedger')) {
+        await collectSection('financialLedger', async () => {
+            const response = await runHandler(tenantFinancialController.getFinancialLedger, req);
+            if (response?.success) {
+                result.financialLedger = response;
+            }
+        });
+    }
+
     if (sections.includes('customerSales')) {
         await collectSection('customerSales', async () => {
             result.customerSales = buildCustomerSalesRows(transactions);
@@ -1611,6 +1623,44 @@ exports.getFullReport = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to generate full report',
+            error: error.message
+        });
+    }
+};
+
+exports.getSalesOverview = async (req, res) => {
+    try {
+        const { startDate, endDate, groupBy } = req.query;
+        const sections = [
+            'overview',
+            'daily',
+            'bookingTrends',
+            'servicePerformance',
+            'employeePerformance',
+            'customerAnalytics',
+            'paymentMethods',
+            'rebookings',
+            'refunds',
+            'advancedAnalytics',
+            'customerSales',
+            'products',
+            'financialLedger'
+        ];
+
+        const result = await buildFullReportData(req, sections, startDate, endDate);
+        const payload = buildSalesOverviewPayload(result, startDate, endDate, sections);
+
+        payload.metadata.groupBy = typeof groupBy === 'string' && groupBy.trim() ? groupBy.trim() : 'day';
+
+        res.json({
+            success: true,
+            data: payload
+        });
+    } catch (error) {
+        console.error('Get sales overview error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate sales overview',
             error: error.message
         });
     }
