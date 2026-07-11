@@ -246,6 +246,7 @@ export default function FinanceOverviewReport({ lang }: FinanceOverviewReportPro
   const [customDateRange, setCustomDateRange] = useState<BIDateRange>({ from: '', to: '' });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
   const [sort, setSort] = useState<BIReportSortState>({ columnId: 'date', direction: 'desc' });
   const [filterValues, setFilterValues] = useState<BIReportFilterValues>({
     employee: '',
@@ -296,6 +297,9 @@ export default function FinanceOverviewReport({ lang }: FinanceOverviewReportPro
   );
   const reportTitle = String(reportDefinition.title || 'Finance Overview');
   const reportDescription = String(reportDefinition.description || '');
+  useEffect(() => {
+    setPageSize(reportDefinition.defaultPageSize || 8);
+  }, [reportDefinition.defaultPageSize]);
 
   const { columnState, visibleColumns, toggleColumn, moveColumn, resetColumns } = useBIColumnPreferences(reportId, reportDefinition.columns || []);
   const { savedViews, saveView, deleteView } = useBISavedViews(reportId);
@@ -393,7 +397,6 @@ export default function FinanceOverviewReport({ lang }: FinanceOverviewReportPro
     });
   }, [filterValues, rows, search]);
 
-  const pageSize = reportDefinition.defaultPageSize || 8;
   const totalPages = Math.max(Math.ceil(filteredRows.length / pageSize), 1);
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
@@ -650,6 +653,10 @@ export default function FinanceOverviewReport({ lang }: FinanceOverviewReportPro
           totalPages={totalPages}
           onPageChange={setPage}
           pageSize={pageSize}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
           totalItems={filteredRows.length}
         />
       }

@@ -271,6 +271,7 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
   const [customDateRange, setCustomDateRange] = useState<BIDateRange>({ from: '', to: '' });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [sort, setSort] = useState<BIReportSortState>({ columnId: 'dateTime', direction: 'desc' });
   const [filterValues, setFilterValues] = useState<BIReportFilterValues>({
     customer: '',
@@ -359,6 +360,10 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
     return createSalesLogDetailsReportDefinition(options);
   }, [isRtl, rows]);
 
+  useEffect(() => {
+    setPageSize(reportDefinition.defaultPageSize || 10);
+  }, [reportDefinition.defaultPageSize]);
+
   const columns = reportDefinition.columns || [];
   const { columnState, visibleColumns, toggleColumn, moveColumn, resetColumns } = useBIColumnPreferences(reportId, columns);
   const { savedViews, saveView, deleteView } = useBISavedViews(reportId);
@@ -405,7 +410,6 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
     });
   }, [filterValues, rows, search]);
 
-  const pageSize = reportDefinition.defaultPageSize || 10;
   const totalPages = Math.max(Math.ceil(filteredRows.length / pageSize), 1);
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
@@ -623,6 +627,10 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
           totalPages={totalPages}
           onPageChange={setPage}
           pageSize={pageSize}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
           totalItems={filteredRows.length}
         />
       }

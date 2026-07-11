@@ -462,6 +462,7 @@ export default function CashFlowSummaryReport({ lang }: { lang: Language }) {
   const [customDateRange, setCustomDateRange] = useState<BIDateRange>({ from: '', to: '' });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [sort, setSort] = useState<BIReportSortState>({ columnId: 'period', direction: 'desc' });
   const [filterValues, setFilterValues] = useState<BIReportFilterValues>({
     grouping: 'day',
@@ -547,7 +548,9 @@ export default function CashFlowSummaryReport({ lang }: { lang: Language }) {
   }, [filterValues.grouping, filterValues.location, filterValues.paymentMethod, rawRows, search]);
 
   const sortedRows = useMemo(() => sortRows(filteredRows, sort), [filteredRows, sort]);
-  const pageSize = reportDefinition.defaultPageSize || 10;
+  useEffect(() => {
+    setPageSize(reportDefinition.defaultPageSize || 10);
+  }, [reportDefinition.defaultPageSize]);
   const totalPages = Math.max(Math.ceil(sortedRows.length / pageSize), 1);
   const paginatedRows = sortedRows.slice((page - 1) * pageSize, page * pageSize);
 
@@ -736,6 +739,10 @@ export default function CashFlowSummaryReport({ lang }: { lang: Language }) {
           totalPages={totalPages}
           onPageChange={setPage}
           pageSize={pageSize}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
           totalItems={sortedRows.length}
         />
       }

@@ -348,6 +348,7 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
   const [sort, setSort] = useState<BIReportSortState>({ columnId: 'revenue', direction: 'desc' });
   const [filterValues, setFilterValues] = useState<BIReportFilterValues>({
     customerType: '',
@@ -433,7 +434,9 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
     });
   }, [filterValues, rows, search]);
 
-  const pageSize = reportDefinition.defaultPageSize || 8;
+  useEffect(() => {
+    setPageSize(reportDefinition.defaultPageSize || 8);
+  }, [reportDefinition.defaultPageSize]);
   const totalPages = Math.max(Math.ceil(filteredRows.length / pageSize), 1);
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
@@ -646,6 +649,10 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
           totalPages={totalPages}
           onPageChange={setPage}
           pageSize={pageSize}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
           totalItems={filteredRows.length}
         />
       }
@@ -773,7 +780,10 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
     });
   }, [filterValues, rows, search]);
 
-  const pageSize = reportDefinition.defaultPageSize || 8;
+  const [pageSize, setPageSize] = useState(reportDefinition.defaultPageSize || 8);
+  useEffect(() => {
+    setPageSize(reportDefinition.defaultPageSize || 8);
+  }, [reportDefinition.defaultPageSize]);
   const totalPages = Math.max(Math.ceil(filteredRows.length / pageSize), 1);
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
@@ -979,6 +989,10 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
           totalPages={totalPages}
           onPageChange={setPage}
           pageSize={pageSize}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
           totalItems={filteredRows.length}
         />
       }
@@ -1111,7 +1125,10 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
     });
   }, [filterValues, rows, search]);
 
-  const pageSize = reportDefinition.defaultPageSize || 8;
+  const [pageSize, setPageSize] = useState(reportDefinition.defaultPageSize || 8);
+  useEffect(() => {
+    setPageSize(reportDefinition.defaultPageSize || 8);
+  }, [reportDefinition.defaultPageSize]);
   const totalPages = Math.max(Math.ceil(filteredRows.length / pageSize), 1);
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
@@ -1316,6 +1333,10 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
           totalPages={totalPages}
           onPageChange={setPage}
           pageSize={pageSize}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
           totalItems={filteredRows.length}
         />
       }
@@ -1445,7 +1466,10 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
     });
   }, [filterValues, rows, search]);
 
-  const pageSize = reportDefinition.defaultPageSize || 8;
+  const [pageSize, setPageSize] = useState(reportDefinition.defaultPageSize || 8);
+  useEffect(() => {
+    setPageSize(reportDefinition.defaultPageSize || 8);
+  }, [reportDefinition.defaultPageSize]);
   const totalPages = Math.max(Math.ceil(filteredRows.length / pageSize), 1);
   const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
@@ -1652,6 +1676,10 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
           totalPages={totalPages}
           onPageChange={setPage}
           pageSize={pageSize}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
           totalItems={filteredRows.length}
         />
       }
