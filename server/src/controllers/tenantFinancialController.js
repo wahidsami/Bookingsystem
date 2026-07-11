@@ -407,6 +407,7 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
         invoiceDueAmount: invoice?.dueAmount == null ? null : Number(invoice.dueAmount),
         invoiceItems: detailedInvoiceItems,
         transactionRef: transaction?.transactionRef || null,
+        type: transaction?.type || null,
         notes: transaction?.notes
             || transaction?.metadata?.notes
             || transaction?.metadata?.note
@@ -1489,6 +1490,7 @@ exports.getFinancialLedger = async (req, res) => {
                 || transaction?.gatewayResponse?.notes
                 || transaction?.gatewayResponse?.note
                 || null,
+            transactionType: transaction?.type || null,
             source: transaction.appointment ? 'appointment' : 'order',
             detailPath: transaction.appointment?.id
                 ? `/dashboard/appointments/${transaction.appointment.id}`
@@ -1557,7 +1559,9 @@ exports.getFinancialLedger = async (req, res) => {
                 refunds: 0,
                 cash: 0,
                 card: 0,
-                wallet: 0
+                wallet: 0,
+                online: 0,
+                bankTransfer: 0
             };
 
             if (isRefund) {
@@ -1567,6 +1571,8 @@ exports.getFinancialLedger = async (req, res) => {
                 if (method === 'cash') existing.cash += Math.abs(amount);
                 if (method === 'card') existing.card += Math.abs(amount);
                 if (method === 'wallet') existing.wallet += Math.abs(amount);
+                if (method === 'online') existing.online += Math.abs(amount);
+                if (method === 'bank_transfer') existing.bankTransfer += Math.abs(amount);
             }
 
             settlementBuckets.set(date, existing);
@@ -1581,7 +1587,9 @@ exports.getFinancialLedger = async (req, res) => {
                 netCollected: Number((row.grossRevenue - row.refunds).toFixed(2)),
                 cash: Number(row.cash.toFixed(2)),
                 card: Number(row.card.toFixed(2)),
-                wallet: Number(row.wallet.toFixed(2))
+                wallet: Number(row.wallet.toFixed(2)),
+                online: Number((row.online || 0).toFixed(2)),
+                bankTransfer: Number((row.bankTransfer || 0).toFixed(2))
             }));
 
         const revenueTotals = revenueLedger.reduce((acc, row) => {
@@ -1610,8 +1618,10 @@ exports.getFinancialLedger = async (req, res) => {
             acc.cash += Number(row.cash || 0);
             acc.card += Number(row.card || 0);
             acc.wallet += Number(row.wallet || 0);
+            acc.online += Number(row.online || 0);
+            acc.bankTransfer += Number(row.bankTransfer || 0);
             return acc;
-        }, { grossRevenue: 0, refunds: 0, netCollected: 0, cash: 0, card: 0, wallet: 0 });
+        }, { grossRevenue: 0, refunds: 0, netCollected: 0, cash: 0, card: 0, wallet: 0, online: 0, bankTransfer: 0 });
 
         res.json({
             success: true,

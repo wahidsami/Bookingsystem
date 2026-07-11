@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { CreditCard, TrendingUp } from 'lucide-react';
+import { Banknote, CreditCard, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Language } from '../types';
 import FinanceOverviewReport from './reports/FinanceOverviewReport';
+import CashFlowSummaryReport from './reports/CashFlowSummaryReport';
 import PaymentTransactionsReport from './reports/PaymentTransactionsReport';
 
-type FinanceTab = 'overview' | 'payment-transactions';
+type FinanceTab = 'overview' | 'payment-transactions' | 'cash-flow-summary';
 
 interface FinanceReportsWorkspaceProps {
   lang: Language;
@@ -18,6 +19,7 @@ export default function FinanceReportsWorkspace({ lang }: FinanceReportsWorkspac
   const tabs: Array<{ id: FinanceTab; labelEn: string; labelAr: string; icon: ReactNode }> = [
     { id: 'overview', labelEn: 'Finance Overview', labelAr: 'نظرة عامة مالية', icon: <TrendingUp size={16} /> },
     { id: 'payment-transactions', labelEn: 'Payment Transactions', labelAr: 'المعاملات المالية', icon: <CreditCard size={16} /> },
+    { id: 'cash-flow-summary', labelEn: 'Cash Flow Summary', labelAr: 'ملخص التدفق النقدي', icon: <Banknote size={16} /> },
   ];
 
   return (
@@ -44,6 +46,7 @@ export default function FinanceReportsWorkspace({ lang }: FinanceReportsWorkspac
 
       {activeTab === 'overview' ? <FinanceOverviewReport lang={lang} /> : null}
       {activeTab === 'payment-transactions' ? <PaymentTransactionsReport lang={lang} /> : null}
+      {activeTab === 'cash-flow-summary' ? <CashFlowSummaryReport lang={lang} /> : null}
     </div>
   );
 }
