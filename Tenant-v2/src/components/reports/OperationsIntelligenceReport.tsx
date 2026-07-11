@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BarChart3,
   CreditCard,
+  ClipboardList,
   FileText,
   Filter,
   Package,
@@ -28,6 +29,7 @@ import {
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import SalesOverviewReport from './SalesOverviewReport';
 import SalesListReport from './SalesListReport';
+import SalesLogDetailsReport from './SalesLogDetailsReport';
 import {
   createCustomerOverviewReportDefinition,
   createEmployeePerformanceReportDefinition,
@@ -41,7 +43,7 @@ import {
 import type { BIDatePresetValue, BIDateRange, BIOption, BIReportColumnDefinition, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
 import type { Language } from '../../types';
 
-type OperationsTab = 'sales-overview' | 'sales-list' | 'customer-overview' | 'employee-performance' | 'service-performance' | 'product-performance';
+type OperationsTab = 'sales-overview' | 'sales-list' | 'sales-log-details' | 'customer-overview' | 'employee-performance' | 'service-performance' | 'product-performance';
 
 type OperationsFullReportPayload = {
   overview?: any;
@@ -1590,6 +1592,7 @@ export default function OperationsIntelligenceReport({ lang }: { lang: Language 
   const tabs: Array<{ id: OperationsTab; labelEn: string; labelAr: string; icon: ReactNode }> = [
     { id: 'sales-overview', labelEn: 'Sales Overview', labelAr: 'نظرة عامة على المبيعات', icon: <TrendingUp size={16} /> },
     { id: 'sales-list', labelEn: 'Sales List', labelAr: 'قائمة المبيعات', icon: <FileText size={16} /> },
+    { id: 'sales-log-details', labelEn: 'Sales Log Details', labelAr: 'تفاصيل سجل المبيعات', icon: <ClipboardList size={16} /> },
     { id: 'customer-overview', labelEn: 'Customer Overview', labelAr: 'نظرة عامة على العملاء', icon: <Users size={16} /> },
     { id: 'employee-performance', labelEn: 'Employee Performance', labelAr: 'أداء الموظفين', icon: <UserCheck size={16} /> },
     { id: 'service-performance', labelEn: 'Service Performance', labelAr: 'أداء الخدمات', icon: <Sparkles size={16} /> },
@@ -1620,6 +1623,7 @@ export default function OperationsIntelligenceReport({ lang }: { lang: Language 
 
       {activeTab === 'sales-overview' ? <SalesOverviewReport lang={lang} /> : null}
       {activeTab === 'sales-list' ? <SalesListReport lang={lang} /> : null}
+      {activeTab === 'sales-log-details' ? <SalesLogDetailsReport lang={lang} /> : null}
       {activeTab === 'customer-overview' ? <CustomerOverviewReport lang={lang} /> : null}
       {activeTab === 'employee-performance' ? <EmployeePerformanceReport lang={lang} /> : null}
       {activeTab === 'service-performance' ? <ServicePerformanceReport lang={lang} /> : null}

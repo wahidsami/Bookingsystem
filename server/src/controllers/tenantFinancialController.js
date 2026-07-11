@@ -151,6 +151,28 @@ function getLedgerTransactionIncludes() {
                     as: 'tenant',
                     attributes: ['id', 'name', 'name_en', 'name_ar', 'city', 'address'],
                     required: false
+                },
+                {
+                    model: db.BookingSession,
+                    as: 'bookingSession',
+                    attributes: ['id', 'bookingReference', 'paymentMethod', 'paymentStatus'],
+                    required: false,
+                    include: [
+                        {
+                            model: db.Appointment,
+                            as: 'appointments',
+                            attributes: ['id', 'bookingItemIndex', 'status', 'startTime', 'serviceId'],
+                            required: false,
+                            include: [
+                                {
+                                    model: db.Service,
+                                    as: 'service',
+                                    attributes: ['id', 'name_en', 'name_ar', 'category'],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
                 }
             ]
         },
@@ -187,11 +209,12 @@ function getLedgerTransactionIncludes() {
                 {
                     model: db.OrderItem,
                     as: 'items',
+                    attributes: ['id', 'quantity', 'unitPrice', 'totalPrice', 'productId'],
                     include: [
                         {
                             model: db.Product,
                             as: 'product',
-                            attributes: ['id', 'name_en', 'name_ar'],
+                            attributes: ['id', 'name_en', 'name_ar', 'category'],
                             required: false
                         }
                     ],
@@ -298,12 +321,59 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
             ? `order:${order.id}`
             : null;
     const invoice = invoiceKey ? invoiceLookup.get(invoiceKey) || null : null;
+    const invoiceItems = Array.isArray(invoice?.items) ? invoice.items : [];
     const amountPaid = appointment
         ? Number(appointment.totalPaid || 0)
         : Number(invoice?.paidAmount || amount || 0);
     const remainingBalance = appointment
         ? Number(appointment.remainderAmount || 0)
         : Number(invoice?.dueAmount || 0);
+    const orderedSessionAppointments = Array.isArray(appointment?.bookingSession?.appointments)
+        ? appointment.bookingSession.appointments
+            .filter((sessionAppointment) => sessionAppointment && `${sessionAppointment.status || ''}`.trim().toLowerCase() !== 'cancelled')
+            .slice()
+            .sort((left, right) => {
+                const leftIndex = Number.isFinite(Number(left.bookingItemIndex)) ? Number(left.bookingItemIndex) : 0;
+                const rightIndex = Number.isFinite(Number(right.bookingItemIndex)) ? Number(right.bookingItemIndex) : 0;
+                if (leftIndex !== rightIndex) {
+                    return leftIndex - rightIndex;
+                }
+                return new Date(left.startTime || 0) - new Date(right.startTime || 0);
+            })
+        : [];
+    const orderItems = Array.isArray(order?.items) ? order.items : [];
+
+    const detailedInvoiceItems = invoiceItems.map((item, index) => {
+        const sourceAppointment = appointment
+            ? (orderedSessionAppointments[index]
+                || orderedSessionAppointments.find((candidate) => `${candidate.bookingItemIndex ?? ''}` === `${item?.metadata?.bookingItemIndex ?? ''}`)
+                || appointment)
+            : null;
+        const sourceOrderItem = !appointment ? (orderItems[index] || orderItems.find((candidate) => `${candidate?.productId || ''}` === `${item?.itemRefId || ''}`)) : null;
+        const category = sourceAppointment?.service?.category
+            || sourceOrderItem?.product?.category
+            || item?.metadata?.category
+            || null;
+        const itemType = `${item?.itemType || ''}`.trim() || (sourceAppointment ? 'service' : sourceOrderItem ? 'product' : null);
+        const gross = Number(item?.lineTotal || 0);
+        const vat = Number(item?.taxAmount || 0);
+        const net = Number((gross - vat).toFixed(2));
+        return {
+            id: item?.id || `${transaction.id}:${index}`,
+            itemType,
+            itemRefId: item?.itemRefId || null,
+            itemNameEn: item?.nameEn || sourceAppointment?.service?.name_en || sourceOrderItem?.product?.name_en || 'Unavailable',
+            itemNameAr: item?.nameAr || sourceAppointment?.service?.name_ar || sourceOrderItem?.product?.name_ar || item?.nameEn || 'Unavailable',
+            category,
+            quantity: Number(item?.quantity || sourceOrderItem?.quantity || 1),
+            unitPrice: Number(item?.unitPrice || sourceOrderItem?.unitPrice || 0),
+            gross: Number(gross.toFixed(2)),
+            discount: null,
+            vat: Number(vat.toFixed(2)),
+            net,
+            metadata: item?.metadata || {}
+        };
+    });
 
     return {
         id: transaction.id,
@@ -327,6 +397,15 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
         amountPaid: Number(amountPaid.toFixed(2)),
         remainingBalance: Number(remainingBalance.toFixed(2)),
         paidAt: appointment?.paidAt || order?.paidAt || transaction.processedAt || transaction.createdAt,
+        invoiceStatus: invoice?.status || null,
+        invoiceIssuedAt: invoice?.issuedAt || null,
+        invoicePaidAt: invoice?.paidAt || null,
+        invoiceSubtotalAmount: invoice?.subtotalAmount == null ? null : Number(invoice.subtotalAmount),
+        invoiceVatAmount: invoice?.vatAmount == null ? null : Number(invoice.vatAmount),
+        invoiceTotalAmount: invoice?.totalAmount == null ? null : Number(invoice.totalAmount),
+        invoicePaidAmount: invoice?.paidAmount == null ? null : Number(invoice.paidAmount),
+        invoiceDueAmount: invoice?.dueAmount == null ? null : Number(invoice.dueAmount),
+        invoiceItems: detailedInvoiceItems,
         status: transaction.status,
         entityType: appointment ? 'appointment' : 'order',
         entityId: appointment?.id || order?.id || null,
@@ -1357,12 +1436,32 @@ exports.getFinancialLedger = async (req, res) => {
                     tenantId,
                     [Op.or]: invoiceConditions
                 },
-                attributes: ['entityType', 'entityId', 'invoiceNumber', 'paidAmount', 'dueAmount']
+                attributes: [
+                    'entityType',
+                    'entityId',
+                    'invoiceNumber',
+                    'status',
+                    'subtotalAmount',
+                    'vatAmount',
+                    'totalAmount',
+                    'paidAmount',
+                    'dueAmount',
+                    'issuedAt',
+                    'paidAt'
+                ],
+                include: [
+                    {
+                        model: db.CustomerInvoiceItem,
+                        as: 'items',
+                        required: false,
+                        attributes: ['id', 'itemType', 'itemRefId', 'nameEn', 'nameAr', 'quantity', 'unitPrice', 'lineTotal', 'taxAmount', 'metadata']
+                    }
+                ]
             })
             : [];
 
         const invoiceLookup = new Map(
-            invoices.map((invoice) => [`${invoice.entityType}:${invoice.entityId}`, invoice])
+            invoices.map((invoice) => [`${invoice.entityType}:${invoice.entityId}`, invoice.toJSON ? invoice.toJSON() : invoice])
         );
 
         const revenueLedger = transactions.map((transaction) => mapLedgerTransaction(transaction, invoiceLookup));
