@@ -47,6 +47,10 @@ function isTenantApiPath(pathname: string): boolean {
   return pathname.startsWith('/api/v1/') || pathname.startsWith('/auth/tenant/');
 }
 
+function shouldRetryUnauthorizedRequest(pathname: string): boolean {
+  return !pathname.endsWith('/tenant/profile');
+}
+
 function createJsonResponse(body: any, init: ResponseInit & { headers?: HeadersInit } = {}): Response {
   const headers = new Headers(init.headers || {});
   if (!headers.has('content-type')) {
@@ -230,7 +234,7 @@ class TenantApiAdapter {
         : JSON.stringify(translatedBody)
     });
 
-    if (response.status === 401 && isTenantApiPath(url.pathname) && !url.pathname.startsWith('/auth/tenant/')) {
+    if (response.status === 401 && isTenantApiPath(url.pathname) && !url.pathname.startsWith('/auth/tenant/') && shouldRetryUnauthorizedRequest(url.pathname)) {
       const refreshed = await this.refreshAccessToken();
       if (refreshed) {
         const retryToken = this.getAccessToken();

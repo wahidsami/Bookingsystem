@@ -61,6 +61,17 @@ function formatDate(value: unknown, lang: Language): string {
   });
 }
 
+function dedupeBIOptions(options: BIOption[]) {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    const nextValue = `${option.value ?? ''}`.trim();
+    if (!nextValue) return false;
+    if (seen.has(nextValue)) return false;
+    seen.add(nextValue);
+    return true;
+  });
+}
+
 function toOption(label: unknown, value: unknown): BIOption | null {
   const nextLabel = `${label ?? ''}`.trim();
   const nextValue = `${value ?? ''}`.trim();
@@ -233,35 +244,35 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
   const [drawerRow, setDrawerRow] = useState<SalesOverviewRow | null>(null);
 
   const definitionOptions = useMemo(() => {
-    const employeeOptions = [
+    const employeeOptions = dedupeBIOptions([
       { label: isRtl ? 'جميع الموظفين' : 'All Employees', value: '' },
       ...(report.employees?.performance || report.employees?.revenue || [])
         .map((item: any) => toOption(item.name || item.nameEn || item.nameAr || item.id, item.name || item.nameEn || item.nameAr || item.id))
         .filter(Boolean) as BIOption[]
-    ];
+    ]);
 
-    const serviceOptions = [
+    const serviceOptions = dedupeBIOptions([
       { label: isRtl ? 'جميع الخدمات' : 'All Services', value: '' },
       ...(report.services?.performance || report.services?.revenue || [])
         .map((item: any) => toOption(item.name_en || item.nameEn || item.name || item.id, item.name_en || item.nameEn || item.name || item.id))
         .filter(Boolean) as BIOption[]
-    ];
+    ]);
 
-    const paymentMethodOptions = [
+    const paymentMethodOptions = dedupeBIOptions([
       { label: isRtl ? 'جميع طرق الدفع' : 'All Payment Methods', value: '' },
       ...(report.payments?.methods?.rows || [])
         .map((item: any) => toOption(item.paymentMethodLabel || item.paymentMethod || item.id, item.paymentMethod || item.id))
         .filter(Boolean) as BIOption[]
-    ];
+    ]);
 
-    const categoryOptions = [
+    const categoryOptions = dedupeBIOptions([
       { label: isRtl ? 'جميع التصنيفات' : 'All Categories', value: '' },
       ...(report.services?.performance || report.services?.revenue || [])
         .map((item: any) => toOption(item.category || item.categoryEn || item.categoryAr || '-', item.category || item.categoryEn || item.categoryAr || '-'))
         .filter(Boolean) as BIOption[]
-    ];
+    ]);
 
-    const statusOptions = [
+    const statusOptions = dedupeBIOptions([
       { label: isRtl ? 'جميع الحالات' : 'All Statuses', value: '' },
       ...Array.from(
         new Set(
@@ -269,7 +280,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
             .map((item) => item.trim())
         )
       ).map((value) => ({ label: value, value }))
-    ];
+    ]);
 
     return {
       employees: employeeOptions,

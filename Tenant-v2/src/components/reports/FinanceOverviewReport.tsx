@@ -65,6 +65,17 @@ function formatDate(value: unknown, lang: Language): string {
   });
 }
 
+function dedupeBIOptions(options: BIOption[]) {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    const nextValue = `${option.value ?? ''}`.trim();
+    if (!nextValue) return false;
+    if (seen.has(nextValue)) return false;
+    seen.add(nextValue);
+    return true;
+  });
+}
+
 function buildSeriesPoints(rows: any[], valueKey: string, labelKey = 'date') {
   const values = rows.map((row) => Number(row?.[valueKey] || 0));
   const max = Math.max(...values, 1);
@@ -248,27 +259,27 @@ export default function FinanceOverviewReport({ lang }: FinanceOverviewReportPro
   const rows = useMemo(() => buildFinanceRows(report), [report]);
 
   const definitionOptions = useMemo(() => {
-    const paymentMethods = [
+    const paymentMethods = dedupeBIOptions([
       { label: isRtl ? 'جميع طرق الدفع' : 'All Payment Methods', value: '' },
       ...(report.paymentMethods?.rows || [])
         .map((item: any) => toOption(item.paymentMethodLabel || item.paymentMethod || '-', item.paymentMethod || '-'))
         .filter(Boolean) as BIOption[]
-    ];
+    ]);
 
-    const statuses = [
+    const statuses = dedupeBIOptions([
       { label: isRtl ? 'جميع الحالات' : 'All Statuses', value: '' },
-      ...Array.from(new Set(rows.map((row) => row.status).filter(Boolean))).map((value) => ({ label: value, value }))
-    ];
+      ...Array.from(new Set(rows.map((row) => row.status).filter(Boolean))).map((value) => ({ label: String(value), value: String(value) }))
+    ]);
 
-    const sources = [
+    const sources = dedupeBIOptions([
       { label: isRtl ? 'جميع المصادر' : 'All Sources', value: '' },
-      ...Array.from(new Set(rows.map((row) => row.source).filter(Boolean))).map((value) => ({ label: value, value }))
-    ];
+      ...Array.from(new Set(rows.map((row) => row.source).filter(Boolean))).map((value) => ({ label: String(value), value: String(value) }))
+    ]);
 
-    const employees = [
+    const employees = dedupeBIOptions([
       { label: isRtl ? 'جميع الموظفين' : 'All Employees', value: '' },
-      ...Array.from(new Set(rows.map((row) => row.employee).filter(Boolean))).map((value) => ({ label: value, value }))
-    ];
+      ...Array.from(new Set(rows.map((row) => row.employee).filter(Boolean))).map((value) => ({ label: String(value), value: String(value) }))
+    ]);
 
     return { paymentMethods, statuses, sources, employees };
   }, [isRtl, report.paymentMethods?.rows, rows]);

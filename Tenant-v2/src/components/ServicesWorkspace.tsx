@@ -1221,20 +1221,20 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
                             {isRtl ? 'فئة الخدمة الرئيسية *' : 'Service Main Category *'}
                           </label>
                           <select
-                            value={formData.categoryEn}
+                            value={categories.find(c => c.labelEn === formData.categoryEn || c.id === formData.categoryEn)?.id || 'all'}
                             onChange={e => {
                               const val = e.target.value;
-                              const matched = categories.find(c => c.id === val || c.labelEn === val);
+                              const matched = categories.find(c => c.id === val) || categories.find(c => c.labelEn === val);
                               setFormData(p => ({
                                 ...p,
-                                categoryEn: val,
+                                categoryEn: matched ? matched.labelEn : val,
                                 categoryAr: matched ? matched.labelAr : val
                               }));
                             }}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-indigo-500 text-neutral-800 cursor-pointer"
                           >
                             {categories.slice(1).map(c => (
-                              <option key={c.id} value={c.labelEn}>{isRtl ? c.labelAr : c.labelEn}</option>
+                              <option key={c.id} value={c.id}>{isRtl ? c.labelAr : c.labelEn}</option>
                             ))}
                           </select>
                         </div>

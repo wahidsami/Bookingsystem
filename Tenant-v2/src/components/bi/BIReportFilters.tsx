@@ -12,6 +12,17 @@ export function BIReportFilters({ filters, values, onChange }: BIReportFiltersPr
   const visibleFilters = useMemo(() => filters.filter((filter) => !filter.disabled), [filters]);
   if (!visibleFilters.length) return null;
 
+  const dedupeOptions = (options: Array<{ label: string; value: string; disabled?: boolean }>) => {
+    const seen = new Set<string>();
+    return options.filter((option) => {
+      const normalizedValue = `${option.value ?? ''}`.trim();
+      if (!normalizedValue) return false;
+      if (seen.has(normalizedValue)) return false;
+      seen.add(normalizedValue);
+      return true;
+    });
+  };
+
   const updateFilter = (id: string, nextValue: unknown) => {
     onChange({ ...values, [id]: nextValue });
   };
@@ -24,7 +35,7 @@ export function BIReportFilters({ filters, values, onChange }: BIReportFiltersPr
 
           if (filter.type === 'date-preset') {
             const presets = filter.presets && filter.presets.length
-              ? filter.presets
+              ? Array.from(new Set(filter.presets))
               : BI_DATE_PRESET_OPTIONS.map((option) => option.value);
             return (
               <label key={filter.id} className="space-y-1">
@@ -76,7 +87,7 @@ export function BIReportFilters({ filters, values, onChange }: BIReportFiltersPr
 
           if (filter.type === 'multi-select') {
             const selected = Array.isArray(currentValue) ? currentValue.map(String) : [];
-            const options = filter.options as { label: string; value: string; disabled?: boolean }[];
+            const options = dedupeOptions((filter.options as { label: string; value: string; disabled?: boolean }[]) || []);
             return (
               <label key={filter.id} className="space-y-1">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{filter.label}</div>
@@ -92,7 +103,7 @@ export function BIReportFilters({ filters, values, onChange }: BIReportFiltersPr
                   className="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-brand-500"
                 >
                   {options.map((option) => (
-                    <option key={option.value} value={option.value} disabled={option.disabled}>
+                    <option key={`${filter.id}-${option.value}`} value={option.value} disabled={option.disabled}>
                       {option.label}
                     </option>
                   ))}
@@ -146,7 +157,7 @@ export function BIReportFilters({ filters, values, onChange }: BIReportFiltersPr
 
           const isSelectLike = filter.type === 'dropdown' || filter.type === 'status' || filter.type === 'employee' || filter.type === 'customer' || filter.type === 'category' || filter.type === 'payment-method' || filter.type === 'location';
           if (isSelectLike) {
-            const options = ('options' in filter && Array.isArray(filter.options)) ? filter.options : [];
+            const options = dedupeOptions((('options' in filter && Array.isArray(filter.options)) ? filter.options : []) as { label: string; value: string; disabled?: boolean }[]);
             return (
               <label key={filter.id} className="space-y-1">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{filter.label}</div>
@@ -157,7 +168,7 @@ export function BIReportFilters({ filters, values, onChange }: BIReportFiltersPr
                 >
                   <option value="">All</option>
                   {options.map((option) => (
-                    <option key={option.value} value={option.value} disabled={option.disabled}>
+                    <option key={`${filter.id}-${option.value}`} value={option.value} disabled={option.disabled}>
                       {option.label}
                     </option>
                   ))}
