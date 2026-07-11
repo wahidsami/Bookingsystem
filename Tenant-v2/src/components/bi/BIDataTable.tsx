@@ -51,7 +51,7 @@ export function BIDataTable<TRow>({
                   <th
                     key={column.id}
                     scope="col"
-                    className={`whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'}`}
+                    className={`whitespace-nowrap px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'}`}
                     style={column.width ? { width: column.width } : undefined}
                   >
                     {column.sortable && onSortChange ? (
@@ -93,7 +93,7 @@ export function BIDataTable<TRow>({
                     return (
                       <td
                         key={column.id}
-                        className={`px-4 py-3 text-sm text-slate-700 ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'}`}
+                        className={`px-3 py-2.5 text-sm text-slate-700 ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'}`}
                       >
                         {content as ReactNode}
                       </td>
