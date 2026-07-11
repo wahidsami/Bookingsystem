@@ -170,6 +170,161 @@ const getActiveGiftPackageWhere = (tenantId, extraWhere = {}) => {
   };
 };
 
+const formatPersonName = (person, fallback = 'Unavailable') => {
+  if (!person) return fallback;
+  const name = `${person.firstName || ''} ${person.lastName || ''}`.trim();
+  return name || person.displayName || person.name || person.email || fallback;
+};
+
+const buildGiftCardPurchasedByLabel = (transaction, staffLookup, accountLookup) => {
+  const metadata = transaction?.metadata || {};
+  const sender = transaction?.sender || null;
+  const staffId = metadata.createdByStaffId || metadata.paymentCollectedByStaffId || null;
+  const accountId = metadata.createdByTenantAccountId || metadata.paymentCollectedByTenantAccountId || null;
+
+  if (sender) return formatPersonName(sender);
+  if (staffId && staffLookup.has(staffId)) return staffLookup.get(staffId);
+  if (accountId && accountLookup.has(accountId)) return accountLookup.get(accountId);
+  return metadata.createdByLabel || metadata.paymentCollectedByLabel || 'Tenant';
+};
+
+const buildGiftCardRedeemedByLabel = (redemptions, staffLookup) => {
+  const latestRedemption = Array.isArray(redemptions) && redemptions.length
+    ? redemptions.slice().sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0]
+    : null;
+  const staffId = latestRedemption?.redeemedByStaffId || null;
+  if (staffId && staffLookup.has(staffId)) return staffLookup.get(staffId);
+  if (latestRedemption?.redeemedByStaff) return formatPersonName(latestRedemption.redeemedByStaff);
+  return 'Unavailable';
+};
+
+const buildGiftCardCustomerLabel = (transaction) => {
+  const recipient = transaction?.recipient || null;
+  if (recipient) return formatPersonName(recipient);
+  return transaction?.recipientEmail || transaction?.recipientPhone || 'Unavailable';
+};
+
+const buildGiftCardRows = async ({ tenantId, where = {}, limit = 300 }) => {
+  const transactionRows = await db.TenantGiftCardTransaction.findAll({
+    where: { tenantId, ...where },
+    include: [
+      { model: db.TenantGiftCardPackage, as: 'package', attributes: ['id', 'title_en', 'title_ar', 'imageUrl'], required: false },
+      { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
+      { model: db.PlatformUser, as: 'recipient', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
+      { model: db.TenantGiftCardSettlement, as: 'settlement', attributes: ['id', 'grossAmount', 'platformFeeAmount', 'netTenantPayableAmount', 'status', 'settledAt'], required: false },
+      {
+        model: db.GiftCardCode,
+        as: 'giftCode',
+        required: false,
+        include: [
+          {
+            model: db.GiftCardCodeRedemption,
+            as: 'redemptions',
+            required: false,
+            include: [
+              { model: db.Staff, as: 'redeemedByStaff', attributes: ['id', 'name', 'email'], required: false }
+            ]
+          }
+        ]
+      }
+    ],
+    order: [['createdAt', 'DESC']],
+    limit
+  });
+
+  const staffIds = new Set();
+  const accountIds = new Set();
+  transactionRows.forEach((row) => {
+    const metadata = row?.metadata || {};
+    if (metadata.createdByStaffId) staffIds.add(String(metadata.createdByStaffId));
+    if (metadata.paymentCollectedByStaffId) staffIds.add(String(metadata.paymentCollectedByStaffId));
+    if (metadata.createdByTenantAccountId) accountIds.add(String(metadata.createdByTenantAccountId));
+    if (metadata.paymentCollectedByTenantAccountId) accountIds.add(String(metadata.paymentCollectedByTenantAccountId));
+    const redemptions = Array.isArray(row?.giftCode?.redemptions) ? row.giftCode.redemptions : [];
+    redemptions.forEach((redemption) => {
+      if (redemption?.redeemedByStaffId) staffIds.add(String(redemption.redeemedByStaffId));
+    });
+  });
+
+  const [staffRows, accountRows] = await Promise.all([
+    staffIds.size
+      ? db.Staff.findAll({
+          where: { id: { [Op.in]: Array.from(staffIds) } },
+          attributes: ['id', 'name', 'email']
+        })
+      : [],
+    accountIds.size
+      ? db.TenantDashboardAccount.findAll({
+          where: { id: { [Op.in]: Array.from(accountIds) } },
+          attributes: ['id', 'displayName', 'email']
+        })
+      : []
+  ]);
+
+  const staffLookup = new Map(staffRows.map((row) => [row.id, row.name || row.email || 'Unavailable']));
+  const accountLookup = new Map(accountRows.map((row) => [row.id, row.displayName || row.email || 'Unavailable']));
+
+  return transactionRows.map((transaction) => {
+    const giftCode = transaction.giftCode || null;
+    const redemptions = Array.isArray(giftCode?.redemptions) ? giftCode.redemptions : [];
+    const redeemedAmount = redemptions.reduce((sum, redemption) => sum + Number(redemption?.redeemedAmount || 0), 0);
+    const latestRedemption = redemptions.length
+      ? redemptions.slice().sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0]
+      : null;
+    const purchasedBy = buildGiftCardPurchasedByLabel(transaction, staffLookup, accountLookup);
+    const redeemedBy = buildGiftCardRedeemedByLabel(redemptions, staffLookup);
+
+    return {
+      id: giftCode?.id || transaction.id,
+      giftCardCode: giftCode?.code || 'Unavailable',
+      saleNumber: transaction.id,
+      purchasedBy,
+      redeemedBy,
+      customer: buildGiftCardCustomerLabel(transaction),
+      status: giftCode?.status || transaction.status || 'Unavailable',
+      issueDate: giftCode?.createdAt || transaction.createdAt || null,
+      expiryDate: giftCode?.expiresAt || transaction.expiresAt || null,
+      originalAmount: Number((giftCode?.initialAmount ?? transaction.totalCreditAmount ?? 0).toFixed(2)),
+      redeemedAmount: Number(redeemedAmount.toFixed(2)),
+      remainingBalance: giftCode?.remainingAmount == null ? null : Number(giftCode.remainingAmount),
+      invoiceNumber: transaction?.settlement?.metadata?.invoiceNumber
+        || transaction?.metadata?.invoiceNumber
+        || transaction?.invoiceNumber
+        || 'Unavailable',
+      paymentMethod: transaction?.metadata?.paymentMethod || 'Unavailable',
+      location: transaction?.metadata?.location || 'Unavailable',
+      employee: redeemedBy !== 'Unavailable' ? redeemedBy : purchasedBy,
+      sourceTransaction: transaction.toJSON ? transaction.toJSON() : transaction,
+      redemptions: redemptions.map((redemption) => ({
+        id: redemption.id,
+        redeemedAmount: Number(redemption.redeemedAmount || 0),
+        remainingAfter: Number(redemption.remainingAfter || 0),
+        redeemedBy: redemption?.redeemedByStaff
+          ? formatPersonName(redemption.redeemedByStaff)
+          : (redemption?.redeemedByStaffId && staffLookup.has(redemption.redeemedByStaffId)
+            ? staffLookup.get(redemption.redeemedByStaffId)
+            : 'Unavailable'),
+        redeemedAt: redemption.createdAt || null,
+        appointmentId: redemption.appointmentId || null,
+        orderId: redemption.orderId || null,
+        posInvoiceId: redemption.posInvoiceId || null,
+        metadata: redemption.metadata || {}
+      })),
+      latestRedemption: latestRedemption ? {
+        id: latestRedemption.id,
+        redeemedAmount: Number(latestRedemption.redeemedAmount || 0),
+        remainingAfter: Number(latestRedemption.remainingAfter || 0),
+        redeemedBy: latestRedemption?.redeemedByStaff
+          ? formatPersonName(latestRedemption.redeemedByStaff)
+          : (latestRedemption?.redeemedByStaffId && staffLookup.has(latestRedemption.redeemedByStaffId)
+            ? staffLookup.get(latestRedemption.redeemedByStaffId)
+            : 'Unavailable'),
+        redeemedAt: latestRedemption.createdAt || null
+      } : null
+    };
+  });
+};
+
 const uploadStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const tenantId = ensureTenantId(req);
@@ -453,13 +608,70 @@ exports.getTransactionsReport = async (req, res) => {
         { model: db.TenantGiftCardPackage, as: 'package', attributes: ['id', 'title_en', 'title_ar', 'imageUrl'], required: false },
         { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
         { model: db.PlatformUser, as: 'recipient', attributes: ['id', 'firstName', 'lastName', 'email'], required: false },
-        { model: db.TenantGiftCardSettlement, as: 'settlement', attributes: ['id', 'grossAmount', 'platformFeeAmount', 'netTenantPayableAmount', 'status', 'settledAt'], required: false }
+        { model: db.TenantGiftCardSettlement, as: 'settlement', attributes: ['id', 'grossAmount', 'platformFeeAmount', 'netTenantPayableAmount', 'status', 'settledAt'], required: false },
+        {
+          model: db.GiftCardCode,
+          as: 'giftCode',
+          required: false,
+          include: [
+            {
+              model: db.GiftCardCodeRedemption,
+              as: 'redemptions',
+              required: false,
+              include: [
+                { model: db.Staff, as: 'redeemedByStaff', attributes: ['id', 'name', 'email'], required: false }
+              ]
+            }
+          ]
+        }
       ],
       order: [['createdAt', 'DESC']],
       limit: Number(req.query.limit || 200)
     });
 
-    return res.json({ success: true, transactions: rows });
+    const giftCards = await buildGiftCardRows({ tenantId, where, limit: Number(req.query.limit || 300) });
+    const summary = giftCards.reduce((acc, row) => {
+      const originalAmount = Number(row.originalAmount || 0);
+      const redeemedAmount = Number(row.redeemedAmount || 0);
+      const remainingBalance = row.remainingBalance == null ? 0 : Number(row.remainingBalance || 0);
+      acc.totalGiftCards += 1;
+      acc.totalOriginalAmount += originalAmount;
+      acc.totalRedeemedAmount += redeemedAmount;
+      acc.totalRemainingBalance += remainingBalance;
+      if (`${row.status || ''}`.trim().toLowerCase() === 'redeemed') acc.redeemedCount += 1;
+      else if (`${row.status || ''}`.trim().toLowerCase() === 'partially_redeemed') acc.partiallyRedeemedCount += 1;
+      else if (`${row.status || ''}`.trim().toLowerCase() === 'expired') acc.expiredCount += 1;
+      else if (`${row.status || ''}`.trim().toLowerCase() === 'cancelled') acc.cancelledCount += 1;
+      else acc.issuedCount += 1;
+      return acc;
+    }, {
+      totalGiftCards: 0,
+      totalOriginalAmount: 0,
+      totalRedeemedAmount: 0,
+      totalRemainingBalance: 0,
+      issuedCount: 0,
+      redeemedCount: 0,
+      partiallyRedeemedCount: 0,
+      expiredCount: 0,
+      cancelledCount: 0
+    });
+
+    return res.json({
+      success: true,
+      transactions: rows,
+      giftCards,
+      giftCardSummary: {
+        totalGiftCards: summary.totalGiftCards,
+        totalOriginalAmount: Number(summary.totalOriginalAmount.toFixed(2)),
+        totalRedeemedAmount: Number(summary.totalRedeemedAmount.toFixed(2)),
+        totalRemainingBalance: Number(summary.totalRemainingBalance.toFixed(2)),
+        issuedCount: summary.issuedCount,
+        redeemedCount: summary.redeemedCount,
+        partiallyRedeemedCount: summary.partiallyRedeemedCount,
+        expiredCount: summary.expiredCount,
+        cancelledCount: summary.cancelledCount
+      }
+    });
   } catch (error) {
     console.error('tenant gift transactions report error:', error);
     return res.status(500).json({ success: false, message: 'Failed to load gift card transactions report' });
