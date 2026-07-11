@@ -31,6 +31,7 @@ import SalesOverviewReport from './SalesOverviewReport';
 import SalesListReport from './SalesListReport';
 import SalesLogDetailsReport from './SalesLogDetailsReport';
 import DiscountSummaryReport from './DiscountSummaryReport';
+import TaxSummaryReport from './TaxSummaryReport';
 import {
   createCustomerOverviewReportDefinition,
   createEmployeePerformanceReportDefinition,
@@ -44,7 +45,7 @@ import {
 import type { BIDatePresetValue, BIDateRange, BIOption, BIReportColumnDefinition, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
 import type { Language } from '../../types';
 
-type OperationsTab = 'sales-overview' | 'sales-list' | 'sales-log-details' | 'discount-summary' | 'customer-overview' | 'employee-performance' | 'service-performance' | 'product-performance';
+type OperationsTab = 'sales-overview' | 'sales-list' | 'sales-log-details' | 'discount-summary' | 'tax-summary' | 'customer-overview' | 'employee-performance' | 'service-performance' | 'product-performance';
 
 type OperationsFullReportPayload = {
   overview?: any;
@@ -1595,6 +1596,7 @@ export default function OperationsIntelligenceReport({ lang }: { lang: Language 
     { id: 'sales-list', labelEn: 'Sales List', labelAr: 'قائمة المبيعات', icon: <FileText size={16} /> },
     { id: 'sales-log-details', labelEn: 'Sales Log Details', labelAr: 'تفاصيل سجل المبيعات', icon: <ClipboardList size={16} /> },
     { id: 'discount-summary', labelEn: 'Discount Summary', labelAr: 'ملخص الخصومات', icon: <Filter size={16} /> },
+    { id: 'tax-summary', labelEn: 'Tax Summary', labelAr: 'ملخص الضرائب', icon: <Wallet size={16} /> },
     { id: 'customer-overview', labelEn: 'Customer Overview', labelAr: 'نظرة عامة على العملاء', icon: <Users size={16} /> },
     { id: 'employee-performance', labelEn: 'Employee Performance', labelAr: 'أداء الموظفين', icon: <UserCheck size={16} /> },
     { id: 'service-performance', labelEn: 'Service Performance', labelAr: 'أداء الخدمات', icon: <Sparkles size={16} /> },
@@ -1627,6 +1629,7 @@ export default function OperationsIntelligenceReport({ lang }: { lang: Language 
       {activeTab === 'sales-list' ? <SalesListReport lang={lang} /> : null}
       {activeTab === 'sales-log-details' ? <SalesLogDetailsReport lang={lang} /> : null}
       {activeTab === 'discount-summary' ? <DiscountSummaryReport lang={lang} /> : null}
+      {activeTab === 'tax-summary' ? <TaxSummaryReport lang={lang} /> : null}
       {activeTab === 'customer-overview' ? <CustomerOverviewReport lang={lang} /> : null}
       {activeTab === 'employee-performance' ? <EmployeePerformanceReport lang={lang} /> : null}
       {activeTab === 'service-performance' ? <ServicePerformanceReport lang={lang} /> : null}
