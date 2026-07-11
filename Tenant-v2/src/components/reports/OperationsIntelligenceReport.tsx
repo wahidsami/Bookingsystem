@@ -16,7 +16,7 @@ import {
   BadgeInfo,
   Clock,
 } from 'lucide-react';
-import { BIChartContainer, BIDataTable, BIDetailsDrawer, BIKpiCards, BIReportFilters, BIReportShell, BIReportToolbar, BIPagination } from '../bi';
+import { BIActiveFilterSummary, BIChartContainer, BIDataTable, BIDetailsDrawer, BIKpiCards, BIReportFilters, BIReportShell, BIReportToolbar, BIPagination } from '../bi';
 import {
   buildExportFileName,
   downloadCsv,
@@ -346,7 +346,7 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
   const reportId = 'customer-overview';
   const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData();
   const [search, setSearch] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<BIReportSortState>({ columnId: 'revenue', direction: 'desc' });
   const [filterValues, setFilterValues] = useState<BIReportFilterValues>({
@@ -534,18 +534,50 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
             onToggleColumn={toggleColumn}
             onMoveColumn={moveColumn}
             onResetColumns={resetColumns}
+            summary={
+              <BIActiveFilterSummary
+                filters={reportDefinition.filters || []}
+                values={filterValues}
+                searchValue={search}
+                onSearchChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
+                datePreset={datePreset}
+                onDatePresetChange={(preset) => {
+                  setDatePreset(preset);
+                  setPage(1);
+                }}
+                customDateRange={customDateRange}
+                onCustomDateRangeChange={(next) => {
+                  setCustomDateRange(next);
+                  setPage(1);
+                }}
+                onFilterValuesChange={(next) => {
+                  setFilterValues(next);
+                  setPage(1);
+                }}
+              />
+            }
           />
 
-          {filtersOpen ? (
-            <BIReportFilters
-              filters={reportDefinition.filters || []}
-              values={filterValues}
-              onChange={(next) => {
-                setFilterValues(next);
-                setPage(1);
-              }}
-            />
-          ) : null}
+          <BIReportFilters
+            open={filtersOpen}
+            filters={reportDefinition.filters || []}
+            values={filterValues}
+            onApply={(next) => {
+              setFilterValues(next);
+              setPage(1);
+            }}
+            onReset={() => {
+              setFilterValues({
+                customerType: '',
+                visitsRange: { min: '', max: '' },
+              });
+              setPage(1);
+            }}
+            onClose={() => setFiltersOpen(false)}
+          />
         </div>
       }
       kpis={<BIKpiCards items={kpiItems} />}
@@ -673,7 +705,7 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
   const reportId = 'employee-performance';
   const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData();
   const [search, setSearch] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<BIReportSortState>({ columnId: 'revenue', direction: 'desc' });
   const [filterValues, setFilterValues] = useState<BIReportFilterValues>({
@@ -840,18 +872,49 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
             onToggleColumn={toggleColumn}
             onMoveColumn={moveColumn}
             onResetColumns={resetColumns}
+            summary={
+              <BIActiveFilterSummary
+                filters={reportDefinition.filters || []}
+                values={filterValues}
+                searchValue={search}
+                onSearchChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
+                datePreset={datePreset}
+                onDatePresetChange={(preset) => {
+                  setDatePreset(preset);
+                  setPage(1);
+                }}
+                customDateRange={customDateRange}
+                onCustomDateRangeChange={(next) => {
+                  setCustomDateRange(next);
+                  setPage(1);
+                }}
+                onFilterValuesChange={(next) => {
+                  setFilterValues(next);
+                  setPage(1);
+                }}
+              />
+            }
           />
 
-          {filtersOpen ? (
-            <BIReportFilters
-              filters={reportDefinition.filters || []}
-              values={filterValues}
-              onChange={(next) => {
-                setFilterValues(next);
-                setPage(1);
-              }}
-            />
-          ) : null}
+          <BIReportFilters
+            open={filtersOpen}
+            filters={reportDefinition.filters || []}
+            values={filterValues}
+            onApply={(next) => {
+              setFilterValues(next);
+              setPage(1);
+            }}
+            onReset={() => {
+              setFilterValues({
+                revenueRange: { min: '', max: '' },
+              });
+              setPage(1);
+            }}
+            onClose={() => setFiltersOpen(false)}
+          />
         </div>
       }
       kpis={<BIKpiCards items={kpiItems} />}
@@ -976,7 +1039,7 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
   const reportId = 'service-performance';
   const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData();
   const [search, setSearch] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<BIReportSortState>({ columnId: 'revenue', direction: 'desc' });
   const [filterValues, setFilterValues] = useState<BIReportFilterValues>({
@@ -1145,18 +1208,50 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
             onToggleColumn={toggleColumn}
             onMoveColumn={moveColumn}
             onResetColumns={resetColumns}
+            summary={
+              <BIActiveFilterSummary
+                filters={reportDefinition.filters || []}
+                values={filterValues}
+                searchValue={search}
+                onSearchChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
+                datePreset={datePreset}
+                onDatePresetChange={(preset) => {
+                  setDatePreset(preset);
+                  setPage(1);
+                }}
+                customDateRange={customDateRange}
+                onCustomDateRangeChange={(next) => {
+                  setCustomDateRange(next);
+                  setPage(1);
+                }}
+                onFilterValuesChange={(next) => {
+                  setFilterValues(next);
+                  setPage(1);
+                }}
+              />
+            }
           />
 
-          {filtersOpen ? (
-            <BIReportFilters
-              filters={reportDefinition.filters || []}
-              values={filterValues}
-              onChange={(next) => {
-                setFilterValues(next);
-                setPage(1);
-              }}
-            />
-          ) : null}
+          <BIReportFilters
+            open={filtersOpen}
+            filters={reportDefinition.filters || []}
+            values={filterValues}
+            onApply={(next) => {
+              setFilterValues(next);
+              setPage(1);
+            }}
+            onReset={() => {
+              setFilterValues({
+                category: '',
+                quantityRange: { min: '', max: '' },
+              });
+              setPage(1);
+            }}
+            onClose={() => setFiltersOpen(false)}
+          />
         </div>
       }
       kpis={<BIKpiCards items={kpiItems} />}
@@ -1280,7 +1375,7 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
   const reportId = 'product-performance';
   const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData();
   const [search, setSearch] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<BIReportSortState>({ columnId: 'revenue', direction: 'desc' });
   const [filterValues, setFilterValues] = useState<BIReportFilterValues>({
@@ -1449,18 +1544,50 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
             onToggleColumn={toggleColumn}
             onMoveColumn={moveColumn}
             onResetColumns={resetColumns}
+            summary={
+              <BIActiveFilterSummary
+                filters={reportDefinition.filters || []}
+                values={filterValues}
+                searchValue={search}
+                onSearchChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
+                datePreset={datePreset}
+                onDatePresetChange={(preset) => {
+                  setDatePreset(preset);
+                  setPage(1);
+                }}
+                customDateRange={customDateRange}
+                onCustomDateRangeChange={(next) => {
+                  setCustomDateRange(next);
+                  setPage(1);
+                }}
+                onFilterValuesChange={(next) => {
+                  setFilterValues(next);
+                  setPage(1);
+                }}
+              />
+            }
           />
 
-          {filtersOpen ? (
-            <BIReportFilters
-              filters={reportDefinition.filters || []}
-              values={filterValues}
-              onChange={(next) => {
-                setFilterValues(next);
-                setPage(1);
-              }}
-            />
-          ) : null}
+          <BIReportFilters
+            open={filtersOpen}
+            filters={reportDefinition.filters || []}
+            values={filterValues}
+            onApply={(next) => {
+              setFilterValues(next);
+              setPage(1);
+            }}
+            onReset={() => {
+              setFilterValues({
+                category: '',
+                revenueRange: { min: '', max: '' },
+              });
+              setPage(1);
+            }}
+            onClose={() => setFiltersOpen(false)}
+          />
         </div>
       }
       kpis={<BIKpiCards items={kpiItems} />}

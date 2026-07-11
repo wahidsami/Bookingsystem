@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { BI_DATE_PRESET_OPTIONS, buildExportFileName, downloadCsv, serializeRowsToCsv } from '../../lib/bi';
 import type {
@@ -48,6 +49,7 @@ interface BIReportToolbarProps<TRow> {
   onToggleColumn?: (columnId: string) => void;
   onMoveColumn?: (columnId: string, direction: 'up' | 'down') => void;
   onResetColumns?: () => void;
+  summary?: ReactNode;
 }
 
 export function BIReportToolbar<TRow>({
@@ -74,6 +76,7 @@ export function BIReportToolbar<TRow>({
   onToggleColumn,
   onMoveColumn,
   onResetColumns,
+  summary,
 }: BIReportToolbarProps<TRow>) {
   const [savedViewName, setSavedViewName] = useState('');
   const [openPanel, setOpenPanel] = useState<'saved' | 'columns' | null>(null);
@@ -239,6 +242,8 @@ export function BIReportToolbar<TRow>({
           </button>
         </div>
       </div>
+
+      {summary ? <div>{summary}</div> : null}
 
       {openPanel === 'saved' ? (
         <div className="rounded-[1.25rem] border border-slate-200 bg-white p-4 shadow-sm">

@@ -1,3 +1,4 @@
+export * from './BIActiveFilterSummary';
 export * from './BIChartContainer';
 export * from './BIDataTable';
 export * from './BIDetailsDrawer';

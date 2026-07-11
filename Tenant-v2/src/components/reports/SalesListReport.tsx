@@ -11,6 +11,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import {
+  BIActiveFilterSummary,
   BIDataTable,
   BIDetailsDrawer,
   BIKpiCards,
@@ -227,7 +228,7 @@ export default function SalesListReport({ lang }: { lang: Language }) {
   const [search, setSearch] = useState('');
   const [datePreset, setDatePreset] = useState<BIDatePresetValue>('last_30_days');
   const [customDateRange, setCustomDateRange] = useState<BIDateRange>({ from: '', to: '' });
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<BIReportSortState>({ columnId: 'saleDate', direction: 'desc' });
   const [filterValues, setFilterValues] = useState<BIReportFilterValues>({
@@ -483,18 +484,56 @@ export default function SalesListReport({ lang }: { lang: Language }) {
             onToggleColumn={toggleColumn}
             onMoveColumn={moveColumn}
             onResetColumns={resetColumns}
+            summary={
+              <BIActiveFilterSummary
+                filters={reportDefinition.filters || []}
+                values={filterValues}
+                searchValue={search}
+                onSearchChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
+                datePreset={datePreset}
+                onDatePresetChange={(preset) => {
+                  setDatePreset(preset);
+                  setPage(1);
+                }}
+                customDateRange={customDateRange}
+                onCustomDateRangeChange={(next) => {
+                  setCustomDateRange(next);
+                  setPage(1);
+                }}
+                onFilterValuesChange={(next) => {
+                  setFilterValues(next);
+                  setPage(1);
+                }}
+              />
+            }
           />
 
-          {filtersOpen ? (
-            <BIReportFilters
-              filters={reportDefinition.filters || []}
-              values={filterValues}
-              onChange={(next) => {
-                setFilterValues(next);
-                setPage(1);
-              }}
-            />
-          ) : null}
+          <BIReportFilters
+            open={filtersOpen}
+            filters={reportDefinition.filters || []}
+            values={filterValues}
+            onApply={(next) => {
+              setFilterValues(next);
+              setPage(1);
+            }}
+            onReset={() => {
+              setFilterValues({
+                customer: '',
+                employee: '',
+                paymentMethod: '',
+                saleStatus: '',
+                paymentStatus: '',
+                location: '',
+                channel: '',
+                grossSalesRange: { min: '', max: '' },
+              });
+              setPage(1);
+            }}
+            onClose={() => setFiltersOpen(false)}
+          />
         </div>
       }
       kpis={<BIKpiCards items={kpiItems} />}
