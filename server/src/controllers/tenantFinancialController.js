@@ -406,6 +406,13 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
         invoicePaidAmount: invoice?.paidAmount == null ? null : Number(invoice.paidAmount),
         invoiceDueAmount: invoice?.dueAmount == null ? null : Number(invoice.dueAmount),
         invoiceItems: detailedInvoiceItems,
+        transactionRef: transaction?.transactionRef || null,
+        notes: transaction?.notes
+            || transaction?.metadata?.notes
+            || transaction?.metadata?.note
+            || transaction?.gatewayResponse?.notes
+            || transaction?.gatewayResponse?.note
+            || null,
         status: transaction.status,
         entityType: appointment ? 'appointment' : 'order',
         entityId: appointment?.id || order?.id || null,
@@ -1470,11 +1477,18 @@ exports.getFinancialLedger = async (req, res) => {
             id: transaction.id,
             date: transaction.processedAt || transaction.createdAt,
             reference: getTransactionReference(transaction),
+            transactionRef: transaction?.transactionRef || null,
             customer: getLedgerCustomerName(transaction.appointment?.user || transaction.order?.user),
             method: formatLedgerPaymentMethodLabel(transaction.paymentMethod),
             amount: Number((Number(transaction.amount || 0)).toFixed(2)),
             type: transaction.type,
             status: transaction.status,
+            notes: transaction?.notes
+                || transaction?.metadata?.notes
+                || transaction?.metadata?.note
+                || transaction?.gatewayResponse?.notes
+                || transaction?.gatewayResponse?.note
+                || null,
             source: transaction.appointment ? 'appointment' : 'order',
             detailPath: transaction.appointment?.id
                 ? `/dashboard/appointments/${transaction.appointment.id}`
