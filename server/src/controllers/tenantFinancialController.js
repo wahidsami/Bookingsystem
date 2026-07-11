@@ -106,6 +106,8 @@ function getLedgerTransactionIncludes() {
             attributes: [
                 'id',
                 'bookingNumber',
+                'bookingReference',
+                'bookingItemIndex',
                 'tenantId',
                 'startTime',
                 'paymentStatus',
@@ -116,7 +118,13 @@ function getLedgerTransactionIncludes() {
                 'platformFee',
                 'tenantRevenue',
                 'employeeCommission',
-                'employeeCommissionRate'
+                'employeeCommissionRate',
+                'depositAmount',
+                'depositPaid',
+                'remainderAmount',
+                'remainderPaid',
+                'totalPaid',
+                'paidAt'
             ],
             required: false,
             include: [
@@ -136,6 +144,12 @@ function getLedgerTransactionIncludes() {
                     model: db.PlatformUser,
                     as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                },
+                {
+                    model: db.Tenant,
+                    as: 'tenant',
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'city', 'address'],
                     required: false
                 }
             ]
@@ -162,6 +176,12 @@ function getLedgerTransactionIncludes() {
                     model: db.PlatformUser,
                     as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                },
+                {
+                    model: db.Tenant,
+                    as: 'tenant',
+                    attributes: ['id', 'name', 'name_en', 'name_ar', 'city', 'address'],
                     required: false
                 },
                 {
@@ -196,6 +216,25 @@ function getTransactionReference(transaction) {
         || order?.orderNumber
         || transaction?.transactionRef
         || transaction?.id;
+}
+
+function getTransactionAppointmentReference(transaction) {
+    const appointment = transaction?.appointment;
+    return appointment?.bookingReference
+        || appointment?.bookingNumber
+        || appointment?.id
+        || null;
+}
+
+function getTransactionLocationLabel(transaction) {
+    const appointment = transaction?.appointment;
+    const order = transaction?.order;
+    const tenant = appointment?.tenant || order?.tenant;
+    return tenant?.city
+        || tenant?.name_en
+        || tenant?.name_ar
+        || tenant?.name
+        || 'Unavailable';
 }
 
 function getTransactionReferenceAmount(transaction) {
@@ -246,26 +285,48 @@ function getTransactionEmployeeLabel(transaction) {
     return appointment?.staff?.name || transaction?.processor?.name || 'Tenant Dashboard';
 }
 
-function mapLedgerTransaction(transaction) {
+function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
     const appointment = transaction.appointment;
     const order = transaction.order;
     const user = appointment?.user || order?.user;
     const amount = Number(transaction.amount || 0);
     const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
     const signedAmount = isRefund ? -Math.abs(amount) : Math.abs(amount);
+    const invoiceKey = appointment?.id
+        ? `appointment:${appointment.id}`
+        : order?.id
+            ? `order:${order.id}`
+            : null;
+    const invoice = invoiceKey ? invoiceLookup.get(invoiceKey) || null : null;
+    const amountPaid = appointment
+        ? Number(appointment.totalPaid || 0)
+        : Number(invoice?.paidAmount || amount || 0);
+    const remainingBalance = appointment
+        ? Number(appointment.remainderAmount || 0)
+        : Number(invoice?.dueAmount || 0);
 
     return {
         id: transaction.id,
         date: transaction.processedAt || transaction.createdAt,
         reference: getTransactionReference(transaction),
+        appointmentReference: getTransactionAppointmentReference(transaction),
+        invoiceNumber: invoice?.invoiceNumber || null,
         customer: getLedgerCustomerName(user),
         employee: getTransactionEmployeeLabel(transaction),
         service: getTransactionServiceLabel(transaction),
+        itemsSold: getTransactionServiceLabel(transaction),
+        channel: appointment ? 'Appointment' : order ? 'Order' : 'Transaction',
+        location: getTransactionLocationLabel(transaction),
         revenue: Number(signedAmount.toFixed(2)),
         tax: Number((Number(appointment?.taxAmount || order?.taxAmount || 0)).toFixed(2)),
         discount: Number(getTransactionDiscountAmount(transaction).toFixed(2)),
         paymentMethod: transaction.paymentMethod,
         paymentMethodLabel: formatLedgerPaymentMethodLabel(transaction.paymentMethod),
+        paymentStatus: appointment?.paymentStatus || order?.paymentStatus || transaction.status,
+        saleStatus: appointment?.status || order?.status || transaction.status,
+        amountPaid: Number(amountPaid.toFixed(2)),
+        remainingBalance: Number(remainingBalance.toFixed(2)),
+        paidAt: appointment?.paidAt || order?.paidAt || transaction.processedAt || transaction.createdAt,
         status: transaction.status,
         entityType: appointment ? 'appointment' : 'order',
         entityId: appointment?.id || order?.id || null,
@@ -1269,7 +1330,42 @@ exports.getFinancialLedger = async (req, res) => {
             })
         ]);
 
-        const revenueLedger = transactions.map(mapLedgerTransaction);
+        const appointmentIds = transactions
+            .map((transaction) => transaction?.appointment?.id || null)
+            .filter(Boolean);
+        const orderIds = transactions
+            .map((transaction) => transaction?.order?.id || null)
+            .filter(Boolean);
+
+        const invoiceConditions = [];
+        if (appointmentIds.length) {
+            invoiceConditions.push({
+                entityType: 'appointment',
+                entityId: { [Op.in]: appointmentIds }
+            });
+        }
+        if (orderIds.length) {
+            invoiceConditions.push({
+                entityType: 'order',
+                entityId: { [Op.in]: orderIds }
+            });
+        }
+
+        const invoices = invoiceConditions.length
+            ? await db.CustomerInvoice.findAll({
+                where: {
+                    tenantId,
+                    [Op.or]: invoiceConditions
+                },
+                attributes: ['entityType', 'entityId', 'invoiceNumber', 'paidAmount', 'dueAmount']
+            })
+            : [];
+
+        const invoiceLookup = new Map(
+            invoices.map((invoice) => [`${invoice.entityType}:${invoice.entityId}`, invoice])
+        );
+
+        const revenueLedger = transactions.map((transaction) => mapLedgerTransaction(transaction, invoiceLookup));
 
         const paymentLedger = transactions.map((transaction) => ({
             id: transaction.id,

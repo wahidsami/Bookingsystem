@@ -4,6 +4,13 @@ import type { Language } from '../../../types';
 import type { SalesOverviewTableRow } from './salesOverview';
 
 export type SalesOverviewRow = SalesOverviewTableRow & {
+  appointmentReference?: string;
+  location?: string;
+  amountPaid?: number | null;
+  remainingBalance?: number | null;
+  itemsSold?: string;
+  service?: string;
+  entityType?: string;
   category?: string;
   refundMode?: string;
   sourceRow?: any;
@@ -77,6 +84,11 @@ export function buildSalesOverviewRows(data: SalesOverviewPayload): SalesOvervie
     const refund = refundByReference.get(reference) || refundByReference.get(`${row?.id || ''}`.trim()) || null;
     const saleDate = row?.date || row?.processedAt || row?.createdAt || '';
     const items = `${row?.service || row?.entityLabel || row?.items || '-'}`.trim() || '-';
+    const appointmentReference = `${row?.appointmentReference || row?.bookingReference || row?.bookingNumber || ''}`.trim() || 'Unavailable';
+    const invoiceNumber = `${row?.invoiceNumber || ''}`.trim() || 'Unavailable';
+    const location = `${row?.location || row?.tenantLocation || row?.branch || ''}`.trim() || 'Unavailable';
+    const amountPaid = row?.amountPaid === null || row?.amountPaid === undefined ? null : Number(row.amountPaid);
+    const remainingBalance = row?.remainingBalance === null || row?.remainingBalance === undefined ? null : Number(row.remainingBalance);
     const category = serviceCategoryLookup.get(items.toLowerCase()) || '-';
     const grossSales = row?.grossSales ?? row?.revenue ?? null;
     const discount = row?.discount ?? null;
@@ -90,12 +102,13 @@ export function buildSalesOverviewRows(data: SalesOverviewPayload): SalesOvervie
     return {
       id: String(row?.id || reference),
       saleNumber: reference,
-      invoiceNumber: `${row?.invoiceNumber || row?.reference || '-'}`.trim() || '-',
+      invoiceNumber,
       saleDate,
       customer: `${row?.customer || '-'}`.trim() || '-',
       employee: `${row?.employee || '-'}`.trim() || '-',
       channel: `${row?.channel || row?.entityType || '-'}`.trim() || '-',
       items,
+      itemsSold: `${row?.itemsSold || items || '-'}`.trim() || 'Unavailable',
       grossSales: grossSales === null || grossSales === undefined ? null : Number(grossSales),
       discount: discount === null || discount === undefined ? null : Number(discount),
       vat: vat === null || vat === undefined ? null : Number(vat),
@@ -104,6 +117,10 @@ export function buildSalesOverviewRows(data: SalesOverviewPayload): SalesOvervie
       paymentMethod,
       paymentStatus,
       saleStatus,
+      appointmentReference,
+      location,
+      amountPaid,
+      remainingBalance,
       category,
       refundMode: refund?.refundMode || null,
       detailPath: row?.detailPath || refund?.detailPath || null,
