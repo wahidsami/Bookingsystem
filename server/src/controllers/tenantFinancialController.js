@@ -1547,7 +1547,11 @@ exports.getFinancialLedger = async (req, res) => {
 
         const settlementBuckets = new Map();
         transactions.forEach((transaction) => {
-            const date = (transaction.processedAt || transaction.createdAt || start).toISOString().split('T')[0];
+            const dateSource = transaction?.processedAt || transaction?.createdAt || start;
+            const dateValue = dateSource instanceof Date ? dateSource : new Date(dateSource);
+            const date = Number.isNaN(dateValue.getTime())
+                ? start.toISOString().split('T')[0]
+                : dateValue.toISOString().split('T')[0];
             const amount = Number(transaction.amount || 0);
             const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
             const method = normalizeLedgerPaymentMethodGroup(transaction.paymentMethod);

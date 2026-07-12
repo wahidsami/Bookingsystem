@@ -284,7 +284,7 @@ const buildGiftCardRows = async ({ tenantId, where = {}, limit = 300 }) => {
       status: giftCode?.status || transaction.status || 'Unavailable',
       issueDate: giftCode?.createdAt || transaction.createdAt || null,
       expiryDate: giftCode?.expiresAt || transaction.expiresAt || null,
-      originalAmount: Number((giftCode?.initialAmount ?? transaction.totalCreditAmount ?? 0).toFixed(2)),
+      originalAmount: Number(Number(giftCode?.initialAmount ?? transaction.totalCreditAmount ?? 0).toFixed(2)),
       redeemedAmount: Number(redeemedAmount.toFixed(2)),
       remainingBalance: giftCode?.remainingAmount == null ? null : Number(giftCode.remainingAmount),
       invoiceNumber: transaction?.settlement?.metadata?.invoiceNumber
