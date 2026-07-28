@@ -141,73 +141,6 @@ function buildSourceRows(report: CashFlowPayload): CashFlowSourceRow[] {
   });
 }
 
-function normalizePaymentMethodGroup(method: unknown): 'cash' | 'card' | 'online' | 'wallet' | 'bank_transfer' | 'other' {
-  const value = `${method ?? ''}`.trim().toLowerCase();
-  if (['cash', 'pay_on_visit', 'cash_on_delivery'].includes(value)) return 'cash';
-  if (['card_pos', 'card'].includes(value)) return 'card';
-  if (value === 'online') return 'online';
-  if (value === 'wallet') return 'wallet';
-  if (value === 'bank_transfer') return 'bank_transfer';
-  return 'other';
-}
-
-function groupLabel(date: Date, grouping: 'day' | 'week' | 'month') {
-  if (grouping === 'month') {
-    return date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-  }
-
-  if (grouping === 'week') {
-    const day = date.getDay();
-    const diff = (day + 6) % 7;
-    const start = new Date(date);
-    start.setDate(date.getDate() - diff);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return `${start.toISOString().split('T')[0]} → ${end.toISOString().split('T')[0]}`;
-  }
-
-  return date.toISOString().split('T')[0];
-}
-
-function groupStart(date: Date, grouping: 'day' | 'week' | 'month') {
-  const start = new Date(date);
-  if (grouping === 'month') {
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-    return start;
-  }
-
-  if (grouping === 'week') {
-    const day = start.getDay();
-    const diff = (day + 6) % 7;
-    start.setDate(start.getDate() - diff);
-    start.setHours(0, 0, 0, 0);
-    return start;
-  }
-
-  start.setHours(0, 0, 0, 0);
-  return start;
-}
-
-function groupEnd(start: Date, grouping: 'day' | 'week' | 'month') {
-  const end = new Date(start);
-  if (grouping === 'month') {
-    end.setMonth(end.getMonth() + 1, 0);
-    end.setHours(23, 59, 59, 999);
-    return end;
-  }
-
-  if (grouping === 'week') {
-    end.setDate(end.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-    return end;
-  }
-
-  end.setHours(23, 59, 59, 999);
-  return end;
-}
-
 function buildPrintHtml({
   title,
   description,
@@ -303,104 +236,29 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function buildCashFlowRows(report: CashFlowPayload, grouping: 'day' | 'week' | 'month'): CashFlowSummaryTableRow[] {
-  const settlementRows = Array.isArray(report.ledger?.settlementLedger?.rows)
-    ? report.ledger.settlementLedger.rows
-    : [];
-  const paymentRows = Array.isArray(report.ledger?.paymentLedger?.rows)
-    ? report.ledger.paymentLedger.rows
+function buildCashFlowRows(report: CashFlowPayload): CashFlowSummaryTableRow[] {
+  const rows = Array.isArray(report.ledger?.cashFlowSummary?.rows)
+    ? report.ledger.cashFlowSummary.rows
     : [];
 
-  const buckets = new Map<string, CashFlowSummaryTableRow>();
-
-  settlementRows.forEach((row: any) => {
-    const rawDate = new Date(String(row?.date || ''));
-    if (Number.isNaN(rawDate.getTime())) {
-      return;
-    }
-
-    const start = groupStart(rawDate, grouping);
-    const end = groupEnd(start, grouping);
-    const key = `${start.toISOString().split('T')[0]}:${grouping}`;
-    const existing = buckets.get(key) || {
-      id: key,
-      period: groupLabel(rawDate, grouping),
-      periodStart: start.toISOString(),
-      periodEnd: end.toISOString(),
-      openingBalance: null,
-      cashIn: 0,
-      cashOut: 0,
-      netMovement: 0,
-      closingBalance: null,
-      cashPayments: 0,
-      cardPayments: 0,
-      onlinePayments: 0,
-      walletPayments: 0,
-      bankTransferPayments: 0,
-      transactionCount: 0,
-      sourceRows: [],
-    };
-
-    existing.cashIn += Number(row?.grossRevenue || 0);
-    existing.cashOut += Number(row?.refunds || 0);
-    existing.netMovement += Number(row?.netCollected || 0);
-    existing.cashPayments += Number(row?.cash || 0);
-    existing.cardPayments += Number(row?.card || 0);
-    existing.walletPayments += Number(row?.wallet || 0);
-    existing.sourceRows = [...(existing.sourceRows || []), row];
-    buckets.set(key, existing);
-  });
-
-  paymentRows.forEach((row: any) => {
-    const rawDate = new Date(String(row?.date || row?.processedAt || row?.createdAt || ''));
-    if (Number.isNaN(rawDate.getTime())) {
-      return;
-    }
-
-    const start = groupStart(rawDate, grouping);
-    const end = groupEnd(start, grouping);
-    const key = `${start.toISOString().split('T')[0]}:${grouping}`;
-    const existing = buckets.get(key) || {
-      id: key,
-      period: groupLabel(rawDate, grouping),
-      periodStart: start.toISOString(),
-      periodEnd: end.toISOString(),
-      openingBalance: null,
-      cashIn: 0,
-      cashOut: 0,
-      netMovement: 0,
-      closingBalance: null,
-      cashPayments: 0,
-      cardPayments: 0,
-      onlinePayments: 0,
-      walletPayments: 0,
-      bankTransferPayments: 0,
-      transactionCount: 0,
-      sourceRows: [],
-    };
-
-    const amount = Math.abs(Number(row?.amount || 0));
-    const method = normalizePaymentMethodGroup(row?.paymentMethod || row?.method);
-    if (method === 'online') existing.onlinePayments += amount;
-    if (method === 'bank_transfer') existing.bankTransferPayments += amount;
-    existing.sourceRows = [...(existing.sourceRows || []), row];
-    existing.transactionCount += 1;
-    buckets.set(key, existing);
-  });
-
-  return Array.from(buckets.values())
-    .sort((left, right) => right.periodStart.localeCompare(left.periodStart))
-    .map((row) => ({
-      ...row,
-      cashIn: Number(row.cashIn.toFixed(2)),
-      cashOut: Number(row.cashOut.toFixed(2)),
-      netMovement: Number(row.netMovement.toFixed(2)),
-      cashPayments: Number(row.cashPayments.toFixed(2)),
-      cardPayments: Number(row.cardPayments.toFixed(2)),
-      onlinePayments: Number(row.onlinePayments.toFixed(2)),
-      walletPayments: Number(row.walletPayments.toFixed(2)),
-      bankTransferPayments: Number(row.bankTransferPayments.toFixed(2)),
-    }));
+  return rows.map((row: any) => ({
+    id: `${row?.id || row?.period || ''}`.trim() || '-',
+    period: `${row?.period || 'Unavailable'}`.trim() || 'Unavailable',
+    periodStart: `${row?.periodStart || ''}`.trim() || '',
+    periodEnd: `${row?.periodEnd || ''}`.trim() || '',
+    openingBalance: row?.openingBalance ?? null,
+    cashIn: row?.cashIn ?? null,
+    cashOut: row?.cashOut ?? null,
+    netMovement: row?.netMovement ?? null,
+    closingBalance: row?.closingBalance ?? null,
+    cashPayments: row?.cashPayments ?? null,
+    cardPayments: row?.cardPayments ?? null,
+    onlinePayments: row?.onlinePayments ?? null,
+    walletPayments: row?.walletPayments ?? null,
+    bankTransferPayments: row?.bankTransferPayments ?? null,
+    transactionCount: Number(row?.transactionCount || 0),
+    sourceRows: Array.isArray(row?.sourceRows) ? row.sourceRows : [],
+  }));
 }
 
 function buildOptions(sourceRows: CashFlowSourceRow[], isRtl: boolean): CashFlowSummaryReportOptions {
@@ -479,7 +337,11 @@ export default function CashFlowSummaryReport({ lang }: { lang: Language }) {
       setError(null);
       try {
         const range = resolveBIDateRange(datePreset, customDateRange);
-        const response = await tenantApiAdapter.getFinancialLedger({ startDate: range.from, endDate: range.to });
+        const response = await tenantApiAdapter.getFinancialLedger({
+          startDate: range.from,
+          endDate: range.to,
+          groupBy: filterValues.grouping || 'day',
+        });
         const payload = (response?.data || response || {}) as CashFlowPayload;
         if (!cancelled) {
           setReport(payload);
@@ -498,12 +360,11 @@ export default function CashFlowSummaryReport({ lang }: { lang: Language }) {
     return () => {
       cancelled = true;
     };
-  }, [customDateRange, datePreset, refreshTick]);
+  }, [customDateRange, datePreset, filterValues.grouping, refreshTick]);
 
   const rawRows = useMemo(() => {
-    const grouping = `${filterValues.grouping || 'day'}` as 'day' | 'week' | 'month';
-    return buildCashFlowRows(report, grouping);
-  }, [filterValues.grouping, report]);
+    return buildCashFlowRows(report);
+  }, [report]);
 
   const sourceRows = useMemo(() => buildSourceRows(report), [report]);
   const reportDefinition = useMemo(() => createCashFlowSummaryReportDefinition(buildOptions(sourceRows, isRtl)), [isRtl, sourceRows]);
@@ -557,10 +418,10 @@ export default function CashFlowSummaryReport({ lang }: { lang: Language }) {
   const backendGaps = useMemo(() => buildBackendGaps(rawRows), [rawRows]);
 
   const kpiItems = [
-    { id: 'periods', label: 'Periods', value: Number(rawRows.length || 0).toLocaleString(), note: isRtl ? 'إجمالي الفترات' : 'Grouped periods', icon: <CalendarDays size={18} /> },
-    { id: 'cash-in', label: 'Cash In', value: formatMoney(rawRows.reduce((sum, row) => sum + Number(row.cashIn || 0), 0), lang), note: isRtl ? 'المتحصلات' : 'Total inflows', icon: <Banknote size={18} /> },
-    { id: 'cash-out', label: 'Cash Out', value: formatMoney(rawRows.reduce((sum, row) => sum + Number(row.cashOut || 0), 0), lang), note: isRtl ? 'المدفوعات الخارجة' : 'Total outflows', icon: <Wallet size={18} /> },
-    { id: 'net-movement', label: 'Net Movement', value: formatMoney(rawRows.reduce((sum, row) => sum + Number(row.netMovement || 0), 0), lang), note: isRtl ? 'الصافي' : 'Net movement', icon: <DollarSign size={18} /> },
+    { id: 'periods', label: 'Periods', value: Number(report.ledger?.cashFlowSummary?.totals?.periods || 0).toLocaleString(), note: isRtl ? 'إجمالي الفترات' : 'Grouped periods', icon: <CalendarDays size={18} /> },
+    { id: 'cash-in', label: 'Cash In', value: formatMoney(report.ledger?.cashFlowSummary?.totals?.cashIn, lang), note: isRtl ? 'المتحصلات' : 'Total inflows', icon: <Banknote size={18} /> },
+    { id: 'cash-out', label: 'Cash Out', value: formatMoney(report.ledger?.cashFlowSummary?.totals?.cashOut, lang), note: isRtl ? 'المدفوعات الخارجة' : 'Total outflows', icon: <Wallet size={18} /> },
+    { id: 'net-movement', label: 'Net Movement', value: formatMoney(report.ledger?.cashFlowSummary?.totals?.netMovement, lang), note: isRtl ? 'الصافي' : 'Net movement', icon: <DollarSign size={18} /> },
   ];
 
   const handleExport = (format: 'csv' | 'excel' | 'pdf' | 'print') => {

@@ -232,6 +232,205 @@ function getLedgerTransactionIncludes() {
     ];
 }
 
+function getCashFlowPeriodStart(date, grouping = 'day') {
+    const start = new Date(date);
+    if (Number.isNaN(start.getTime())) {
+        return null;
+    }
+
+    if (grouping === 'month') {
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        return start;
+    }
+
+    if (grouping === 'week') {
+        const day = start.getDay();
+        const diff = (day + 6) % 7;
+        start.setDate(start.getDate() - diff);
+        start.setHours(0, 0, 0, 0);
+        return start;
+    }
+
+    start.setHours(0, 0, 0, 0);
+    return start;
+}
+
+function getCashFlowPeriodEnd(start, grouping = 'day') {
+    const end = new Date(start);
+    if (Number.isNaN(end.getTime())) {
+        return null;
+    }
+
+    if (grouping === 'month') {
+        end.setMonth(end.getMonth() + 1, 0);
+        end.setHours(23, 59, 59, 999);
+        return end;
+    }
+
+    if (grouping === 'week') {
+        end.setDate(end.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+        return end;
+    }
+
+    end.setHours(23, 59, 59, 999);
+    return end;
+}
+
+function getCashFlowPeriodLabel(date, grouping = 'day') {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+        return 'Unavailable';
+    }
+
+    if (grouping === 'month') {
+        return date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    }
+
+    if (grouping === 'week') {
+        const start = getCashFlowPeriodStart(date, grouping);
+        const end = getCashFlowPeriodEnd(start, grouping);
+        return `${start.toISOString().split('T')[0]} → ${end.toISOString().split('T')[0]}`;
+    }
+
+    return date.toISOString().split('T')[0];
+}
+
+function buildCashFlowSummaryRows(settlementRows = [], paymentRows = [], grouping = 'day') {
+    const buckets = new Map();
+
+    settlementRows.forEach((row) => {
+        const rawDate = new Date(String(row?.date || ''));
+        if (Number.isNaN(rawDate.getTime())) {
+            return;
+        }
+
+        const start = getCashFlowPeriodStart(rawDate, grouping);
+        const end = getCashFlowPeriodEnd(start, grouping);
+        const key = `${start.toISOString().split('T')[0]}:${grouping}`;
+        const existing = buckets.get(key) || {
+            id: key,
+            period: getCashFlowPeriodLabel(rawDate, grouping),
+            periodStart: start.toISOString(),
+            periodEnd: end.toISOString(),
+            openingBalance: null,
+            cashIn: 0,
+            cashOut: 0,
+            netMovement: 0,
+            closingBalance: null,
+            cashPayments: 0,
+            cardPayments: 0,
+            onlinePayments: 0,
+            walletPayments: 0,
+            bankTransferPayments: 0,
+            transactionCount: 0,
+            sourceRows: []
+        };
+
+        existing.cashIn += Number(row?.grossRevenue || 0);
+        existing.cashOut += Number(row?.refunds || 0);
+        existing.netMovement += Number(row?.netCollected || 0);
+        existing.cashPayments += Number(row?.cash || 0);
+        existing.cardPayments += Number(row?.card || 0);
+        existing.walletPayments += Number(row?.wallet || 0);
+        existing.sourceRows = [...(existing.sourceRows || []), row];
+        buckets.set(key, existing);
+    });
+
+    paymentRows.forEach((row) => {
+        const rawDate = new Date(String(row?.date || row?.processedAt || row?.createdAt || ''));
+        if (Number.isNaN(rawDate.getTime())) {
+            return;
+        }
+
+        const start = getCashFlowPeriodStart(rawDate, grouping);
+        const end = getCashFlowPeriodEnd(start, grouping);
+        const key = `${start.toISOString().split('T')[0]}:${grouping}`;
+        const existing = buckets.get(key) || {
+            id: key,
+            period: getCashFlowPeriodLabel(rawDate, grouping),
+            periodStart: start.toISOString(),
+            periodEnd: end.toISOString(),
+            openingBalance: null,
+            cashIn: 0,
+            cashOut: 0,
+            netMovement: 0,
+            closingBalance: null,
+            cashPayments: 0,
+            cardPayments: 0,
+            onlinePayments: 0,
+            walletPayments: 0,
+            bankTransferPayments: 0,
+            transactionCount: 0,
+            sourceRows: []
+        };
+
+        const amount = Math.abs(Number(row?.amount || 0));
+        const method = normalizeLedgerPaymentMethodGroup(row?.paymentMethod || row?.method);
+        if (method === 'online') existing.onlinePayments += amount;
+        if (method === 'bank_transfer') existing.bankTransferPayments += amount;
+        existing.sourceRows = [...(existing.sourceRows || []), row];
+        existing.transactionCount += 1;
+        buckets.set(key, existing);
+    });
+
+    const rows = Array.from(buckets.values())
+        .sort((left, right) => right.periodStart.localeCompare(left.periodStart))
+        .map((row) => ({
+            ...row,
+            cashIn: Number(row.cashIn.toFixed(2)),
+            cashOut: Number(row.cashOut.toFixed(2)),
+            netMovement: Number(row.netMovement.toFixed(2)),
+            cashPayments: Number(row.cashPayments.toFixed(2)),
+            cardPayments: Number(row.cardPayments.toFixed(2)),
+            onlinePayments: Number(row.onlinePayments.toFixed(2)),
+            walletPayments: Number(row.walletPayments.toFixed(2)),
+            bankTransferPayments: Number(row.bankTransferPayments.toFixed(2))
+        }));
+
+    const totals = rows.reduce((acc, row) => {
+        acc.periods += 1;
+        acc.cashIn += Number(row.cashIn || 0);
+        acc.cashOut += Number(row.cashOut || 0);
+        acc.netMovement += Number(row.netMovement || 0);
+        acc.cashPayments += Number(row.cashPayments || 0);
+        acc.cardPayments += Number(row.cardPayments || 0);
+        acc.onlinePayments += Number(row.onlinePayments || 0);
+        acc.walletPayments += Number(row.walletPayments || 0);
+        acc.bankTransferPayments += Number(row.bankTransferPayments || 0);
+        acc.transactionCount += Number(row.transactionCount || 0);
+        return acc;
+    }, {
+        periods: 0,
+        cashIn: 0,
+        cashOut: 0,
+        netMovement: 0,
+        cashPayments: 0,
+        cardPayments: 0,
+        onlinePayments: 0,
+        walletPayments: 0,
+        bankTransferPayments: 0,
+        transactionCount: 0
+    });
+
+    return {
+        grouping,
+        rows,
+        totals: {
+            periods: totals.periods,
+            cashIn: Number(totals.cashIn.toFixed(2)),
+            cashOut: Number(totals.cashOut.toFixed(2)),
+            netMovement: Number(totals.netMovement.toFixed(2)),
+            cashPayments: Number(totals.cashPayments.toFixed(2)),
+            cardPayments: Number(totals.cardPayments.toFixed(2)),
+            onlinePayments: Number(totals.onlinePayments.toFixed(2)),
+            walletPayments: Number(totals.walletPayments.toFixed(2)),
+            bankTransferPayments: Number(totals.bankTransferPayments.toFixed(2)),
+            transactionCount: totals.transactionCount
+        }
+    };
+}
+
 function getTransactionReference(transaction) {
     const appointment = transaction?.appointment;
     const order = transaction?.order;
@@ -1370,7 +1569,7 @@ exports.getDailyRevenue = async (req, res) => {
 exports.getFinancialLedger = async (req, res) => {
     try {
         const tenantId = req.tenantId;
-        const { startDate, endDate } = req.query;
+        const { startDate, endDate, groupBy } = req.query;
 
         const fallbackEnd = new Date();
         fallbackEnd.setHours(23, 59, 59, 999);
@@ -1596,6 +1795,11 @@ exports.getFinancialLedger = async (req, res) => {
                 online: Number((row.online || 0).toFixed(2)),
                 bankTransfer: Number((row.bankTransfer || 0).toFixed(2))
             }));
+        const cashFlowSummary = buildCashFlowSummaryRows(
+            settlementLedger,
+            paymentLedger,
+            typeof groupBy === 'string' && groupBy.trim() ? groupBy.trim() : 'day'
+        );
 
         const revenueTotals = revenueLedger.reduce((acc, row) => {
             acc.revenue += Number(row.revenue || 0);
@@ -1684,6 +1888,11 @@ exports.getFinancialLedger = async (req, res) => {
                     card: Number(settlementTotals.card.toFixed(2)),
                     wallet: Number(settlementTotals.wallet.toFixed(2))
                 }
+            },
+            cashFlowSummary: {
+                grouping: cashFlowSummary.grouping,
+                rows: cashFlowSummary.rows,
+                totals: cashFlowSummary.totals
             },
             dateRange: {
                 startDate: start.toISOString().split('T')[0],
