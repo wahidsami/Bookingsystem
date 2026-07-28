@@ -630,8 +630,13 @@ class TenantApiAdapter {
     return this.get(`/tenant/reports/booking-trends${query ? `?${query}` : ''}`);
   }
 
-  async getFullReport(startDate: string, endDate: string, sections: string[] = []): Promise<any> {
-    const query = this.buildQueryString({ startDate, endDate, sections });
+  async getFullReport(
+    startDate: string,
+    endDate: string,
+    sections: string[] = [],
+    params: Record<string, string | number | boolean | undefined | null | object> = {}
+  ): Promise<any> {
+    const query = this.buildQueryString({ startDate, endDate, sections, ...params });
     return this.get(`/tenant/reports/full${query ? `?${query}` : ''}`);
   }
 
@@ -665,9 +670,14 @@ class TenantApiAdapter {
     return this.get(`/tenant/reports/refunds?startDate=${startDate}&endDate=${endDate}`);
   }
 
-  async getPaymentMethodsReport(startDate: string, endDate: string): Promise<any> {
-    return this.get(`/tenant/reports/payment-methods?startDate=${startDate}&endDate=${endDate}`);
-  }
+    async getPaymentMethodsReport(
+      startDate: string,
+      endDate: string,
+      params: Record<string, string | number | undefined> = {}
+    ): Promise<any> {
+      const query = this.buildQueryString({ startDate, endDate, ...params });
+      return this.get(`/tenant/reports/payment-methods${query ? `?${query}` : ''}`);
+    }
 
   async getPosClosingSummary(params: Record<string, string | number | undefined>): Promise<any> {
     const query = this.buildQueryString(params);

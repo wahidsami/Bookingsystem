@@ -330,6 +330,8 @@ export default function DiscountSummaryReport({ lang }: { lang: Language }) {
           startDate: range.from,
           endDate: range.to,
           groupBy: 'day',
+          search,
+          ...filterValues,
         });
         const payload = (response?.data || response || {}) as DiscountSummaryPayload;
         if (!cancelled) {
@@ -349,7 +351,7 @@ export default function DiscountSummaryReport({ lang }: { lang: Language }) {
     return () => {
       cancelled = true;
     };
-  }, [customDateRange, datePreset, refreshTick]);
+  }, [customDateRange, datePreset, filterValues, refreshTick, search]);
 
   const rows = useMemo(() => buildDiscountSummaryRows(report), [report]);
 

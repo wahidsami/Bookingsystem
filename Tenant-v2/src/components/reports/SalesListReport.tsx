@@ -256,6 +256,8 @@ export default function SalesListReport({ lang }: { lang: Language }) {
           startDate: range.from,
           endDate: range.to,
           groupBy: 'day',
+          search,
+          ...filterValues,
         });
         const payload = (response?.data || response || {}) as SalesOverviewPayload;
         if (!cancelled) {
@@ -275,7 +277,7 @@ export default function SalesListReport({ lang }: { lang: Language }) {
     return () => {
       cancelled = true;
     };
-  }, [customDateRange, datePreset, refreshTick]);
+  }, [customDateRange, datePreset, filterValues, refreshTick, search]);
 
   const rows = useMemo(() => buildSalesListRows(report), [report]);
   const reportDefinition = useMemo(() => {

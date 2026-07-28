@@ -335,13 +335,15 @@ export default function CashFlowSummaryReport({ lang }: { lang: Language }) {
     async function load() {
       setLoading(true);
       setError(null);
-      try {
-        const range = resolveBIDateRange(datePreset, customDateRange);
-        const response = await tenantApiAdapter.getFinancialLedger({
-          startDate: range.from,
-          endDate: range.to,
-          groupBy: filterValues.grouping || 'day',
-        });
+        try {
+          const range = resolveBIDateRange(datePreset, customDateRange);
+          const response = await tenantApiAdapter.getFinancialLedger({
+            startDate: range.from,
+            endDate: range.to,
+            groupBy: filterValues.grouping || 'day',
+            search,
+            ...filterValues,
+          });
         const payload = (response?.data || response || {}) as CashFlowPayload;
         if (!cancelled) {
           setReport(payload);
@@ -360,7 +362,7 @@ export default function CashFlowSummaryReport({ lang }: { lang: Language }) {
     return () => {
       cancelled = true;
     };
-  }, [customDateRange, datePreset, filterValues.grouping, refreshTick]);
+    }, [customDateRange, datePreset, filterValues, refreshTick, search]);
 
   const rawRows = useMemo(() => {
     return buildCashFlowRows(report);

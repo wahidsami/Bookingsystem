@@ -9,6 +9,13 @@ const { isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
 const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const { buildSubscriptionConsumption } = require('../services/subscriptionConsumptionService');
 const { PAYABLE_BILL_STATUSES } = require('../utils/billStatus');
+const {
+    buildReportFilterContext,
+    matchesAppointmentFilters,
+    matchesOrderFilters,
+    matchesTransactionFilters,
+    matchesSelection
+} = require('../services/tenantReportFilterService');
 const tenantPosController = require('./tenantPosController');
 
 function parseDateValue(value, endOfDay = false) {
@@ -741,6 +748,7 @@ exports.getFinancialOverview = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
+        const filters = buildReportFilterContext(req.query);
 
         // Build date filter for appointments
         const dateFilter = buildDateRangeWhere('startTime', startDate, endDate);
@@ -749,7 +757,7 @@ exports.getFinancialOverview = async (req, res) => {
         const orderDateFilter = buildDateRangeWhere('createdAt', startDate, endDate);
 
         // Get all appointments for KPI counters (status distribution, unique customers, completion rate)
-        const allAppointments = await db.Appointment.findAll({
+        let allAppointments = await db.Appointment.findAll({
             where: {
                 ...buildTenantAppointmentScope(tenantId),
                 ...dateFilter
@@ -760,7 +768,7 @@ exports.getFinancialOverview = async (req, res) => {
         });
 
         // Get monetized appointments with financials
-        const appointments = await db.Appointment.findAll({
+        let appointments = await db.Appointment.findAll({
             where: {
                 ...buildTenantAppointmentScope(tenantId),
                 ...dateFilter,
@@ -785,7 +793,7 @@ exports.getFinancialOverview = async (req, res) => {
             orderWhere.createdAt = orderDateFilter.createdAt;
         }
         
-        const orders = await db.Order.findAll({
+        let orders = await db.Order.findAll({
             where: orderWhere,
             attributes: [
                 'id', 'orderNumber', 'subtotal', 'taxAmount', 'shippingFee', 'totalAmount', 'platformFee',
@@ -799,7 +807,7 @@ exports.getFinancialOverview = async (req, res) => {
             giftCardWhere.createdAt = giftCardDateFilter.createdAt;
         }
 
-        const giftCards = await db.TenantGiftCardTransaction.findAll({
+        let giftCards = await db.TenantGiftCardTransaction.findAll({
             where: giftCardWhere,
             attributes: ['id', 'purchaseAmount', 'createdAt', 'status']
         }).catch(() => []);
@@ -817,7 +825,7 @@ exports.getFinancialOverview = async (req, res) => {
             }
         });
 
-        const paymentTransactions = await db.PaymentTransaction.findAll({
+        let paymentTransactions = await db.PaymentTransaction.findAll({
             where: {
                 [Op.or]: [
                     { '$appointment.tenantId$': tenantId },
@@ -831,6 +839,11 @@ exports.getFinancialOverview = async (req, res) => {
             order: [['processedAt', 'DESC']],
             subQuery: false
         });
+
+        allAppointments = allAppointments.filter((appointment) => matchesAppointmentFilters(appointment, filters));
+        appointments = appointments.filter((appointment) => matchesAppointmentFilters(appointment, filters));
+        orders = orders.filter((order) => matchesOrderFilters(order, filters));
+        paymentTransactions = paymentTransactions.filter((transaction) => matchesTransactionFilters(transaction, filters));
 
         const paymentTransactionTotals = paymentTransactions.reduce((totals, transaction) => {
             const appointment = transaction.appointment;
@@ -1200,6 +1213,7 @@ exports.getEmployeeRevenue = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { startDate, endDate, staffId } = req.query;
+        const filters = buildReportFilterContext(req.query);
 
         // Build date filter
         const dateFilter = buildDateRangeWhere('startTime', startDate, endDate);
@@ -1240,6 +1254,10 @@ exports.getEmployeeRevenue = async (req, res) => {
                     'employeeCommissionRate', 'employeeCommission', 'paymentStatus'
                 ]
             });
+            const filteredAppointments = appointments.filter((appointment) => matchesAppointmentFilters({
+                ...appointment,
+                staff: { name: employee.name },
+            }, filters));
 
             const stats = {
                 id: employee.id,
@@ -1247,14 +1265,14 @@ exports.getEmployeeRevenue = async (req, res) => {
                 photo: employee.photo,
                 baseSalary: parseFloat(employee.salary || 0),
                 commissionRate: parseFloat(employee.commissionRate || 0),
-                totalBookings: appointments.length,
+                totalBookings: filteredAppointments.length,
                 paidBookings: 0,
                 totalRevenueGenerated: 0,
                 totalCommission: 0,
                 totalEarnings: 0
             };
 
-            appointments.forEach(appt => {
+            filteredAppointments.forEach(appt => {
                 stats.totalRevenueGenerated += parseFloat(appt.rawPrice || appt.price || 0);
                 stats.totalCommission += parseFloat(appt.employeeCommission || 0);
                 if (isAppointmentFullyPaid(appt.paymentStatus)) {
@@ -1315,6 +1333,7 @@ exports.getServiceRevenue = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
+        const filters = buildReportFilterContext(req.query);
 
         // Build date filter
         const dateFilter = buildDateRangeWhere('startTime', startDate, endDate);
@@ -1328,7 +1347,10 @@ exports.getServiceRevenue = async (req, res) => {
 
         const serviceRevenue = [];
 
-        for (const service of services) {
+        for (const service of services.filter((item) => {
+            const serviceLabel = item.name_en || item.name_ar || item.id;
+            return matchesSelection(serviceLabel, filters.service) && matchesSelection(item.category, filters.category);
+        })) {
             const appointments = await db.Appointment.findAll({
                 where: {
                     serviceId: service.id,
@@ -1337,6 +1359,10 @@ exports.getServiceRevenue = async (req, res) => {
                 },
                 attributes: ['id', 'price', 'rawPrice', 'taxAmount', 'platformFee', 'tenantRevenue']
             });
+            const filteredAppointments = appointments.filter((appointment) => matchesAppointmentFilters({
+                ...appointment,
+                service,
+            }, filters));
 
             const stats = {
                 id: service.id,
@@ -1344,14 +1370,14 @@ exports.getServiceRevenue = async (req, res) => {
                 name_ar: service.name_ar,
                 category: service.category,
                 servicePrice: parseFloat(service.finalPrice || 0),
-                totalBookings: appointments.length,
+                totalBookings: filteredAppointments.length,
                 totalRevenue: 0,
                 totalTax: 0,
                 totalPlatformFees: 0,
                 totalTenantRevenue: 0
             };
 
-            appointments.forEach(appt => {
+            filteredAppointments.forEach(appt => {
                 stats.totalRevenue += parseFloat(appt.price || 0);
                 stats.totalTax += parseFloat(appt.taxAmount || 0);
                 stats.totalPlatformFees += parseFloat(appt.platformFee || 0);
@@ -1410,6 +1436,7 @@ exports.getDailyRevenue = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
+        const filters = buildReportFilterContext(req.query);
 
         // Default to last 30 days
         const fallbackEnd = new Date();
@@ -1419,7 +1446,7 @@ exports.getDailyRevenue = async (req, res) => {
         fallbackStart.setHours(0, 0, 0, 0);
         const start = parseDateValue(startDate, false) || fallbackStart;
 
-        const appointments = await db.Appointment.findAll({
+        const appointments = (await db.Appointment.findAll({
             where: {
                 startTime: {
                     [Op.gte]: start,
@@ -1438,10 +1465,10 @@ exports.getDailyRevenue = async (req, res) => {
             ],
             attributes: ['id', 'startTime', 'price', 'tenantRevenue'],
             order: [['startTime', 'ASC']]
-        });
+        })).filter((appointment) => matchesAppointmentFilters(appointment, filters));
 
         // Get orders in the date range
-        const orders = await db.Order.findAll({
+        const orders = (await db.Order.findAll({
             where: {
                 tenantId,
                 createdAt: {
@@ -1452,7 +1479,7 @@ exports.getDailyRevenue = async (req, res) => {
             },
             attributes: ['id', 'createdAt', 'totalAmount', 'platformFee'],
             order: [['createdAt', 'ASC']]
-        });
+        })).filter((order) => matchesOrderFilters(order, filters));
 
         const giftCards = await db.TenantGiftCardTransaction.findAll({
             where: {
@@ -1570,6 +1597,7 @@ exports.getFinancialLedger = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { startDate, endDate, groupBy } = req.query;
+        const filters = buildReportFilterContext(req.query);
 
         const fallbackEnd = new Date();
         fallbackEnd.setHours(23, 59, 59, 999);
@@ -1578,7 +1606,7 @@ exports.getFinancialLedger = async (req, res) => {
         fallbackStart.setHours(0, 0, 0, 0);
         const start = parseDateValue(startDate, false) || fallbackStart;
 
-        const [transactions, employeeRevenueResponse, payrollRecords] = await Promise.all([
+        const [transactionsRaw, employeeRevenueResponse, payrollRecords] = await Promise.all([
             db.PaymentTransaction.findAll({
                 where: {
                     [Op.or]: [
@@ -1616,6 +1644,7 @@ exports.getFinancialLedger = async (req, res) => {
                 order: [['periodStart', 'DESC'], ['createdAt', 'DESC']]
             })
         ]);
+        const transactions = transactionsRaw.filter((transaction) => matchesTransactionFilters(transaction, filters));
 
         const appointmentIds = transactions
             .map((transaction) => transaction?.appointment?.id || null)
@@ -1917,6 +1946,7 @@ exports.getProductRevenue = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
+        const filters = buildReportFilterContext(req.query);
 
         // Build date filter for orders
         const orderDateFilter = buildDateRangeWhere('createdAt', startDate, endDate);
@@ -1930,7 +1960,10 @@ exports.getProductRevenue = async (req, res) => {
 
         const productRevenue = [];
 
-        for (const product of products) {
+        for (const product of products.filter((item) => {
+            const productLabel = item.name_en || item.name_ar || item.id;
+            return matchesSelection(productLabel, filters.product) && matchesSelection(item.category, filters.category);
+        })) {
             // Get orders that include this product
             const orderWhere = {
                 tenantId,

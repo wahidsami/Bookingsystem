@@ -313,10 +313,10 @@ export default function FinanceOverviewReport({ lang }: FinanceOverviewReportPro
       try {
         const range = resolveBIDateRange(datePreset, customDateRange);
         const [overviewRes, ledgerRes, dailyRes, paymentMethodsRes] = await Promise.all([
-          tenantApiAdapter.getFinancialOverview({ startDate: range.from, endDate: range.to }),
-          tenantApiAdapter.getFinancialLedger({ startDate: range.from, endDate: range.to }),
-          tenantApiAdapter.getDailyRevenue({ startDate: range.from, endDate: range.to }),
-          tenantApiAdapter.getPaymentMethodsReport(range.from, range.to),
+          tenantApiAdapter.getFinancialOverview({ startDate: range.from, endDate: range.to, search, ...filterValues }),
+          tenantApiAdapter.getFinancialLedger({ startDate: range.from, endDate: range.to, search, ...filterValues }),
+          tenantApiAdapter.getDailyRevenue({ startDate: range.from, endDate: range.to, search, ...filterValues }),
+          tenantApiAdapter.getPaymentMethodsReport(range.from, range.to, { search, ...filterValues }),
         ]);
 
         if (!cancelled) {
@@ -345,7 +345,7 @@ export default function FinanceOverviewReport({ lang }: FinanceOverviewReportPro
     return () => {
       cancelled = true;
     };
-  }, [customDateRange, datePreset, refreshTick]);
+  }, [customDateRange, datePreset, filterValues, refreshTick, search]);
 
   const overview = report.overview || {};
   const ledger = report.ledger || {};

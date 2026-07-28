@@ -376,6 +376,8 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
           startDate: range.from,
           endDate: range.to,
           groupBy: 'day',
+          search,
+          ...filterValues,
         });
         const payload = (response?.data || response || {}) as SalesOverviewPayload;
         if (!cancelled) {
@@ -395,7 +397,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
     return () => {
       cancelled = true;
     };
-  }, [customDateRange, datePreset, refreshTick]);
+  }, [customDateRange, datePreset, filterValues, refreshTick, search]);
 
   const summaryTotals = report.summary?.totals || {};
   const summaryMetrics = report.summary?.metrics || {};

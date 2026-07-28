@@ -25,6 +25,16 @@ const {
 const {
     buildSalesOverviewPayload
 } = require('../services/tenantBiSalesOverviewService');
+const {
+    buildReportFilterContext,
+    matchesAppointmentFilters,
+    matchesOrderFilters,
+    matchesTransactionFilters,
+    matchesGiftCardRowFilters,
+    matchesSearch,
+    matchesSelection,
+    matchesRange
+} = require('../services/tenantReportFilterService');
 
 function getCustomerName(user) {
     const firstName = user?.firstName || '';
@@ -1117,6 +1127,7 @@ function runHandler(handler, req) {
 
 async function getPaymentTransactions(req, { startDate, endDate, limit = 200 } = {}) {
     const tenantId = req.tenantId;
+    const filters = buildReportFilterContext(req.query);
     const where = {
         [Op.or]: [
             { '$appointment.tenantId$': tenantId },
@@ -1143,7 +1154,7 @@ async function getPaymentTransactions(req, { startDate, endDate, limit = 200 } =
         order: [['processedAt', 'DESC']],
         limit,
         subQuery: false
-    });
+    }).then((rows) => rows.filter((transaction) => matchesTransactionFilters(transaction, filters)));
 }
 
 async function buildRefundsReport(req, startDate, endDate) {
@@ -1225,6 +1236,7 @@ async function buildPaymentMethodsReport(req, startDate, endDate, groupBy = 'day
 
 async function buildFullReportData(req, sections, startDate, endDate) {
     const result = {};
+    const filters = buildReportFilterContext(req.query);
     const queryWithRange = { ...req.query, startDate, endDate };
     const groupBy = typeof req.query?.groupBy === 'string' ? req.query.groupBy : 'day';
     const transactions = (sections.includes('refunds') || sections.includes('paymentMethods') || sections.includes('customerSales'))
@@ -1404,6 +1416,70 @@ async function buildFullReportData(req, sections, startDate, endDate) {
     if (sections.includes('advancedAnalytics')) {
         await collectSection('advancedAnalytics', async () => {
             result.advancedAnalytics = await buildAdvancedAnalytics(req, startDate, endDate, groupBy);
+        });
+    }
+
+    if (result.customerAnalytics?.topCustomers && Array.isArray(result.customerAnalytics.topCustomers)) {
+        result.customerAnalytics.topCustomers = result.customerAnalytics.topCustomers.filter((row) => {
+            const visits = Number(row?.bookings ?? row?.visits ?? 0);
+            const customerType = visits > 1 ? 'Returning Customer' : 'New Customer';
+
+            return matchesSearch([
+                row?.id,
+                row?.name,
+                row?.customerName,
+                row?.customerDisplayName,
+                row?.customerIdentityLine,
+                row?.customerBadge,
+                row?.customerType,
+                row?.notes
+            ], filters.search) && matchesSelection(customerType, filters.customerType) && matchesRange(visits, filters.visitsRange);
+        });
+    }
+
+    if (Array.isArray(result.employeePerformance)) {
+        result.employeePerformance = result.employeePerformance.filter((row) => {
+            return matchesSearch([
+                row?.id,
+                row?.name,
+                row?.employee,
+                row?.notes
+            ], filters.search) && matchesRange(row?.revenue, filters.revenueRange);
+        });
+    }
+
+    if (Array.isArray(result.servicePerformance)) {
+        result.servicePerformance = result.servicePerformance.filter((row) => {
+            const serviceName = row?.name_en || row?.name_ar || row?.name || row?.id;
+            return matchesSearch([
+                row?.id,
+                row?.name_en,
+                row?.name_ar,
+                row?.name,
+                row?.category,
+                row?.notes
+            ], filters.search)
+                && matchesSelection(row?.category, filters.category)
+                && matchesSelection(serviceName, filters.service)
+                && matchesRange(row?.totalBookings ?? row?.quantitySold, filters.quantityRange)
+                && matchesRange(row?.revenue, filters.revenueRange);
+        });
+    }
+
+    if (Array.isArray(result.products)) {
+        result.products = result.products.filter((row) => {
+            const productName = row?.name_en || row?.name_ar || row?.name || row?.id;
+            return matchesSearch([
+                row?.id,
+                row?.name_en,
+                row?.name_ar,
+                row?.name,
+                row?.category,
+                row?.notes
+            ], filters.search)
+                && matchesSelection(row?.category, filters.category)
+                && matchesSelection(productName, filters.product)
+                && matchesRange(row?.totalRevenue, filters.revenueRange);
         });
     }
 

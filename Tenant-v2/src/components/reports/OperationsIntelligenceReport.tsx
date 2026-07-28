@@ -282,13 +282,14 @@ function buildPrintHtml({
   `;
 }
 
-function useOperationsReportData() {
+function useOperationsReportData(queryParams: Record<string, any> = {}) {
   const [loading, setLoading] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<OperationsFullReportPayload>({});
   const [datePreset, setDatePreset] = useState<BIDatePresetValue>('last_30_days');
   const [customDateRange, setCustomDateRange] = useState<BIDateRange>({ from: '', to: '' });
+  const querySignature = useMemo(() => JSON.stringify(queryParams ?? {}), [queryParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -305,7 +306,7 @@ function useOperationsReportData() {
           'employeePerformance',
           'servicePerformance',
           'products',
-        ]);
+        ], queryParams);
         const payload = (response?.data || response || {}) as OperationsFullReportPayload;
         if (!cancelled) {
           setReport(payload);
@@ -323,7 +324,7 @@ function useOperationsReportData() {
     return () => {
       cancelled = true;
     };
-  }, [customDateRange, datePreset, refreshTick]);
+  }, [customDateRange, datePreset, refreshTick, querySignature]);
 
   return {
     loading,
@@ -344,7 +345,6 @@ function formatYesNo(value: boolean): string {
 function CustomerOverviewReport({ lang }: { lang: Language }) {
   const isRtl = lang === 'ar';
   const reportId = 'customer-overview';
-  const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData();
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -355,6 +355,12 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
     visitsRange: { min: '', max: '' },
   });
   const [drawerRow, setDrawerRow] = useState<CustomerOverviewTableRow | null>(null);
+  const reportQueryParams = useMemo(() => ({
+    search,
+    customerType: filterValues.customerType,
+    visitsRange: filterValues.visitsRange,
+  }), [filterValues.customerType, filterValues.visitsRange, search]);
+  const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData(reportQueryParams);
 
   const overview = report.overview || {};
   const analytics = report.customerAnalytics || {};
@@ -710,7 +716,6 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
 function EmployeePerformanceReport({ lang }: { lang: Language }) {
   const isRtl = lang === 'ar';
   const reportId = 'employee-performance';
-  const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData();
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -719,6 +724,11 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
     revenueRange: { min: '', max: '' },
   });
   const [drawerRow, setDrawerRow] = useState<EmployeePerformanceTableRow | null>(null);
+  const reportQueryParams = useMemo(() => ({
+    search,
+    revenueRange: filterValues.revenueRange,
+  }), [filterValues.revenueRange, search]);
+  const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData(reportQueryParams);
 
   const overview = report.overview || {};
   const employees = Array.isArray(report.employeePerformance) ? report.employeePerformance : [];
@@ -1051,7 +1061,6 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
 function ServicePerformanceReport({ lang }: { lang: Language }) {
   const isRtl = lang === 'ar';
   const reportId = 'service-performance';
-  const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData();
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -1061,6 +1070,12 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
     quantityRange: { min: '', max: '' },
   });
   const [drawerRow, setDrawerRow] = useState<ServicePerformanceTableRow | null>(null);
+  const reportQueryParams = useMemo(() => ({
+    search,
+    category: filterValues.category,
+    quantityRange: filterValues.quantityRange,
+  }), [filterValues.category, filterValues.quantityRange, search]);
+  const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData(reportQueryParams);
 
   const services = Array.isArray(report.servicePerformance) ? report.servicePerformance : [];
   const overview = report.overview || {};
@@ -1394,7 +1409,6 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
 function ProductPerformanceReport({ lang }: { lang: Language }) {
   const isRtl = lang === 'ar';
   const reportId = 'product-performance';
-  const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData();
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -1404,6 +1418,12 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
     revenueRange: { min: '', max: '' },
   });
   const [drawerRow, setDrawerRow] = useState<ProductPerformanceTableRow | null>(null);
+  const reportQueryParams = useMemo(() => ({
+    search,
+    category: filterValues.category,
+    revenueRange: filterValues.revenueRange,
+  }), [filterValues.category, filterValues.revenueRange, search]);
+  const { loading, error, report, refresh, datePreset, setDatePreset, customDateRange, setCustomDateRange } = useOperationsReportData(reportQueryParams);
 
   const products = Array.isArray(report.products) ? report.products : [];
 

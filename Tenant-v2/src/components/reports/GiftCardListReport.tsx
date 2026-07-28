@@ -268,14 +268,16 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
     async function load() {
       setLoading(true);
       setError(null);
-      try {
-        const range = resolveBIDateRange(datePreset, customDateRange);
-        const query = new URLSearchParams({
-          startDate: range.from,
-          endDate: range.to,
-          limit: '1000',
-        }).toString();
-        const response = await tenantApiAdapter.get(`/tenant/gift-cards/reports/transactions${query ? `?${query}` : ''}`);
+        try {
+          const range = resolveBIDateRange(datePreset, customDateRange);
+          const query = new URLSearchParams({
+            startDate: range.from,
+            endDate: range.to,
+            limit: '1000',
+            search,
+            ...filterValues,
+          }).toString();
+          const response = await tenantApiAdapter.get(`/tenant/gift-cards/reports/transactions${query ? `?${query}` : ''}`);
         const payload = (response?.data || response || {}) as GiftCardListPayload;
         if (!cancelled) {
           setReport(payload);
@@ -294,7 +296,7 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
     return () => {
       cancelled = true;
     };
-  }, [customDateRange, datePreset, refreshTick]);
+  }, [customDateRange, datePreset, filterValues, refreshTick, search]);
 
   const rows = useMemo(() => buildGiftCardRows(report), [report]);
 

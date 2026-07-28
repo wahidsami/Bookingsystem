@@ -335,6 +335,8 @@ export default function TaxSummaryReport({ lang }: { lang: Language }) {
         const response = await tenantApiAdapter.getFinancialLedger({
           startDate: range.from,
           endDate: range.to,
+          search,
+          ...filterValues,
         });
         const payload = (response?.data || response || {}) as TaxSummaryPayload;
         if (!cancelled) {
@@ -354,7 +356,7 @@ export default function TaxSummaryReport({ lang }: { lang: Language }) {
     return () => {
       cancelled = true;
     };
-  }, [customDateRange, datePreset, refreshTick]);
+  }, [customDateRange, datePreset, filterValues, refreshTick, search]);
 
   const rows = useMemo(() => buildTaxSummaryRows(report), [report]);
 

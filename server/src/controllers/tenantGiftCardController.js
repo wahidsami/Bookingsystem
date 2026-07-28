@@ -3,6 +3,10 @@ const fs = require('fs');
 const multer = require('multer');
 const { Op } = require('sequelize');
 const db = require('../models');
+const {
+  buildReportFilterContext,
+  matchesGiftCardRowFilters
+} = require('../services/tenantReportFilterService');
 
 const ensureTenantId = (req) => req?.tenant?.id || null;
 
@@ -591,14 +595,15 @@ exports.getSummaryReport = async (req, res) => {
   }
 };
 
-exports.getTransactionsReport = async (req, res) => {
-  try {
-    const tenantId = ensureTenantId(req);
-    const where = { tenantId };
-    if (req.query.status) where.status = req.query.status;
-    if (req.query.startDate || req.query.endDate) {
-      where.createdAt = {};
-      if (req.query.startDate) where.createdAt[Op.gte] = new Date(req.query.startDate);
+  exports.getTransactionsReport = async (req, res) => {
+    try {
+      const tenantId = ensureTenantId(req);
+      const filters = buildReportFilterContext(req.query);
+      const where = { tenantId };
+      if (req.query.status) where.status = req.query.status;
+      if (req.query.startDate || req.query.endDate) {
+        where.createdAt = {};
+        if (req.query.startDate) where.createdAt[Op.gte] = new Date(req.query.startDate);
       if (req.query.endDate) where.createdAt[Op.lte] = new Date(req.query.endDate);
     }
 
@@ -629,8 +634,9 @@ exports.getTransactionsReport = async (req, res) => {
       limit: Number(req.query.limit || 200)
     });
 
-    const giftCards = await buildGiftCardRows({ tenantId, where, limit: Number(req.query.limit || 300) });
-    const summary = giftCards.reduce((acc, row) => {
+      const giftCards = (await buildGiftCardRows({ tenantId, where, limit: Number(req.query.limit || 300) }))
+        .filter((row) => matchesGiftCardRowFilters(row, filters));
+      const summary = giftCards.reduce((acc, row) => {
       const originalAmount = Number(row.originalAmount || 0);
       const redeemedAmount = Number(row.redeemedAmount || 0);
       const remainingBalance = row.remainingBalance == null ? 0 : Number(row.remainingBalance || 0);
