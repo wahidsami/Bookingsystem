@@ -120,7 +120,8 @@ function normalizePaymentMethodGroup(paymentMethod) {
     const method = `${paymentMethod || ''}`.trim().toLowerCase();
 
     if (['cash', 'pay_on_visit', 'cash_on_delivery'].includes(method)) return 'cash';
-    if (['card_pos', 'online', 'online-full', 'mock_online', 'bank_transfer'].includes(method)) return 'card';
+    if (['card_pos', 'online', 'online-full', 'mock_online'].includes(method)) return 'card';
+    if (method === 'bank_transfer') return 'bank_transfer';
     if (['wallet'].includes(method)) return 'wallet';
     if (['gift_card_code'].includes(method)) return 'gift_card';
     if (method === 'split') return 'split';
@@ -253,6 +254,7 @@ function buildTimeSeriesBuckets(transactions, groupBy = 'day') {
             paymentMethodLabel: ({
                 cash: 'Cash',
                 card: 'Card',
+                bank_transfer: 'Bank transfer',
                 wallet: 'Wallet',
                 gift_card: 'Gift Card',
                 split: 'Split Payments',
@@ -1185,6 +1187,7 @@ async function buildPaymentMethodsReport(req, startDate, endDate, groupBy = 'day
             paymentMethodLabel: ({
                 cash: 'Cash',
                 card: 'Card',
+                bank_transfer: 'Bank transfer',
                 wallet: 'Wallet',
                 gift_card: 'Gift Card',
                 split: 'Split Payments',

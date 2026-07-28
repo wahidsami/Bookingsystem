@@ -91,7 +91,8 @@ function formatLedgerPaymentMethodLabel(paymentMethod) {
 function normalizeLedgerPaymentMethodGroup(paymentMethod) {
     const method = `${paymentMethod || ''}`.trim().toLowerCase();
     if (['cash', 'pay_on_visit', 'cash_on_delivery'].includes(method)) return 'cash';
-    if (['card_pos', 'online', 'online-full', 'mock_online', 'bank_transfer'].includes(method)) return 'card';
+    if (['card_pos', 'online', 'online-full', 'mock_online'].includes(method)) return 'card';
+    if (method === 'bank_transfer') return 'bank_transfer';
     if (method === 'wallet') return 'wallet';
     if (method === 'gift_card_code') return 'gift_card';
     if (method === 'split') return 'split';
