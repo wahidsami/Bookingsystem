@@ -380,11 +380,11 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
         visits,
         completedVisits: Number(customer?.completed || 0),
         revenue: Number(customer?.revenue || 0),
+        lifetimeRevenue: customer?.lifetimeRevenue == null ? null : Number(customer.lifetimeRevenue),
         firstVisit: customer?.firstVisit || '',
         lastVisit: customer?.lastVisit || '',
         customerType,
         retentionRate,
-        lifetimeRevenue: null,
         notes: customerType,
       };
     });
@@ -406,7 +406,7 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
   );
 
   const tableColumns = useMemo(() => reportDefinition.columns?.map((column) => {
-    if (['revenue'].includes(column.id)) {
+    if (['revenue', 'lifetimeRevenue'].includes(column.id)) {
       return { ...column, format: (value: unknown) => formatMoney(value, lang) };
     }
     if (['visits', 'completedVisits'].includes(column.id)) {
@@ -454,6 +454,7 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
   const customerCount = Number(analytics.totalCustomers || rows.length || 0);
   const retentionRate = analytics.retentionRate == null ? null : Number(analytics.retentionRate);
   const topCustomer = rows[0] || null;
+  const customerLifetimeRevenue = topCustomer?.lifetimeRevenue == null ? null : Number(topCustomer.lifetimeRevenue);
 
   const kpiItems = [
     { id: 'customers', label: 'Customers', value: customerCount.toLocaleString(), note: isRtl ? 'العملاء داخل النطاق' : 'Customers in range', icon: <Users size={18} /> },
@@ -461,13 +462,11 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
     { id: 'returning-customers', label: 'Returning Customers', value: returningCustomers.toLocaleString(), note: isRtl ? 'زيارات متكررة' : 'Repeat customers', icon: <RefreshCw size={18} /> },
     { id: 'visits', label: 'Customer Visits', value: totalVisits.toLocaleString(), note: isRtl ? 'إجمالي الزيارات' : 'Total visits', icon: <Clock size={18} /> },
     { id: 'retention', label: 'Retention Rate', value: formatPercent(retentionRate), note: isRtl ? 'نسبة الاحتفاظ' : 'Retention rate', icon: <BadgeInfo size={18} /> },
-    { id: 'top-customer', label: 'Top Customer', value: topCustomer?.customer || '-', note: topCustomer ? formatMoney(topCustomer.revenue, lang) : '-', icon: <UserCheck size={18} /> },
-    { id: 'lifetime-revenue', label: 'Customer Lifetime Revenue', value: '-', note: isRtl ? 'غير متاح من backend' : 'Not exposed by backend', icon: <Wallet size={18} /> },
+    { id: 'top-customer', label: 'Top Customer', value: topCustomer?.customer || '-', note: topCustomer?.lifetimeRevenue == null ? '-' : formatMoney(topCustomer.lifetimeRevenue, lang), icon: <UserCheck size={18} /> },
+    { id: 'lifetime-revenue', label: 'Customer Lifetime Revenue', value: customerLifetimeRevenue == null ? '-' : formatMoney(customerLifetimeRevenue, lang), note: isRtl ? 'من DTO backend' : 'Canonical backend field', icon: <Wallet size={18} /> },
   ];
 
-  const backendGaps = [
-    'Customer lifetime revenue',
-  ];
+  const backendGaps: string[] = [];
 
   const handleExport = (format: 'csv' | 'excel' | 'pdf' | 'print') => {
     if (format === 'csv') {
@@ -694,7 +693,7 @@ function CustomerOverviewReport({ lang }: { lang: Language }) {
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Revenue</div>
                 <div className="mt-3 space-y-2 text-sm">
                   <Field label="Revenue" value={formatMoney(row.revenue, lang)} />
-                  <Field label="Lifetime Revenue" value="-" />
+                  <Field label="Lifetime Revenue" value={row.lifetimeRevenue == null ? '-' : formatMoney(row.lifetimeRevenue, lang)} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -746,9 +745,9 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
       productivity: employee?.completionRate == null ? null : Number(employee.completionRate),
       commission: employee?.commission == null ? null : Number(employee.commission),
       completionRate: employee?.completionRate == null ? null : Number(employee.completionRate),
-      noShows: null,
-      cancellations: null,
-      notes: 'Cancellation and no-show counts are not exposed per employee.',
+      noShows: employee?.noShows == null ? null : Number(employee.noShows),
+      cancellations: employee?.cancellations == null ? null : Number(employee.cancellations),
+      notes: 'Canonical employee analytics row.',
     };
   }), [employees]);
 
@@ -761,7 +760,7 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
     if (['revenue', 'averageTicket', 'commission'].includes(column.id)) {
       return { ...column, format: (value: unknown) => formatMoney(value, lang) };
     }
-    if (['appointments', 'servicesPerformed'].includes(column.id)) {
+    if (['appointments', 'servicesPerformed', 'noShows', 'cancellations'].includes(column.id)) {
       return { ...column, format: (value: unknown) => formatNumber(value) };
     }
     if (['productivity', 'completionRate'].includes(column.id)) {
@@ -802,6 +801,8 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
   const productivityByEmployee = rows.slice().sort((a, b) => Number(b.productivity || 0) - Number(a.productivity || 0));
   const totalAppointments = Number(overview.totalBookings || rows.reduce((sum, row) => sum + Number(row.appointments || 0), 0) || 0);
   const totalCompleted = Number(overview.completedBookings || rows.reduce((sum, row) => sum + Number(row.servicesPerformed || 0), 0) || 0);
+  const totalNoShows = rows.reduce((sum, row) => sum + Number(row.noShows || 0), 0);
+  const totalCancellations = rows.reduce((sum, row) => sum + Number(row.cancellations || 0), 0);
   const completionRate = overview.completionRate == null ? null : Number(overview.completionRate);
   const topEmployee = rows[0] || null;
 
@@ -811,13 +812,10 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
     { id: 'services', label: 'Services Performed', value: totalCompleted.toLocaleString(), note: isRtl ? 'المنجز فعلياً' : 'Completed bookings', icon: <Sparkles size={18} /> },
     { id: 'average-ticket', label: 'Average Ticket', value: formatMoney(overview.avgBookingValue ?? topEmployee?.averageTicket, lang), note: isRtl ? 'متوسط القيمة' : 'Average booking value', icon: <BadgeInfo size={18} /> },
     { id: 'productivity', label: 'Productivity', value: formatPercent(completionRate), note: isRtl ? 'معدل الإنجاز' : 'Completion rate', icon: <UserCheck size={18} /> },
-    { id: 'cancellations', label: 'Cancellations / No-shows', value: '-', note: isRtl ? 'غير متاح لكل موظف' : 'Per-employee breakdown not exposed', icon: <RefreshCw size={18} /> },
+    { id: 'cancellations', label: 'Cancellations / No-shows', value: `${totalCancellations.toLocaleString()} / ${totalNoShows.toLocaleString()}`, note: isRtl ? 'مخرجات backend canonical' : 'Canonical backend counts', icon: <RefreshCw size={18} /> },
   ];
 
-  const backendGaps = [
-    'Per-employee cancellation counts',
-    'Per-employee no-show counts',
-  ];
+  const backendGaps: string[] = [];
 
   const handleExport = (format: 'csv' | 'excel' | 'pdf' | 'print') => {
     if (format === 'csv') {
@@ -955,11 +953,16 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
               <MiniBarChart rows={productivityByEmployee} labelKey="employee" valueKey="productivity" formatLabel={(row) => row.employee} />
             </BIChartContainer>
           </SectionBlock>
-          <SectionBlock title="Cancellation / No-show Statistics" description="Backend gap for per-employee status breakdowns." icon={<RefreshCw size={18} />}>
+          <SectionBlock title="Cancellation / No-show Statistics" description="Canonical per-employee status breakdown from the backend." icon={<RefreshCw size={18} />}>
             <BIChartContainer>
-              <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-                Per-employee cancellation and no-show counts are not exposed by the backend contract yet.
-              </div>
+              <MiniBarChart
+                rows={[
+                  { label: 'No-shows', value: totalNoShows },
+                  { label: 'Cancellations', value: totalCancellations },
+                ]}
+                labelKey="label"
+                valueKey="value"
+              />
             </BIChartContainer>
           </SectionBlock>
         </div>
@@ -1041,9 +1044,12 @@ function EmployeePerformanceReport({ lang }: { lang: Language }) {
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Backend Gap</div>
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Status Breakdown</div>
                 <div className="mt-3 text-sm text-slate-700">
-                  Cancellation and no-show counts are not exposed per employee yet.
+                  <div className="space-y-2">
+                    <Field label="No-shows" value={formatNumber(row.noShows)} />
+                    <Field label="Cancellations" value={formatNumber(row.cancellations)} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1086,10 +1092,11 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
     category: String(service?.category || '-'),
     quantitySold: Number(service?.totalBookings || 0),
     revenue: Number(service?.revenue || 0),
-    averagePrice: service?.avgRevenue == null ? null : Number(service.avgRevenue),
+    averagePrice: service?.averagePrice == null ? null : Number(service.averagePrice),
     completedBookings: Number(service?.completedBookings || 0),
     completionRate: service?.completionRate == null ? null : Number(service.completionRate),
-    notes: 'Service trends are not exposed as a time series by the backend contract.',
+    trend: Array.isArray(service?.trend) ? service.trend : [],
+    notes: 'Canonical service analytics row.',
   })), [services]);
 
   const definitionOptions = useMemo(() => {
@@ -1152,6 +1159,7 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
   const completionRows = rows.slice().sort((a, b) => Number(b.completionRate || 0) - Number(a.completionRate || 0));
   const totalServices = rows.reduce((sum, row) => sum + Number(row.quantitySold || 0), 0);
   const topService = rows[0] || null;
+  const serviceTrendRows = Array.isArray(topService?.trend) ? topService.trend : [];
   const averagePrice = topService?.averagePrice;
 
   const kpiItems = [
@@ -1160,12 +1168,10 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
     { id: 'avg-price', label: 'Average Price', value: averagePrice == null ? '-' : formatMoney(averagePrice, lang), note: isRtl ? 'متوسط السعر من backend' : 'Backend average price', icon: <BadgeInfo size={18} /> },
     { id: 'top-service', label: 'Top Service', value: topService?.service || '-', note: topService ? formatMoney(topService.revenue, lang) : '-', icon: <Sparkles size={18} /> },
     { id: 'completion-rate', label: 'Completion Rate', value: formatPercent(overview.completionRate), note: isRtl ? 'معدل الإكمال العام' : 'Overall completion rate', icon: <UserCheck size={18} /> },
-    { id: 'service-trend', label: 'Service Trends', value: '-', note: isRtl ? 'غير متاح كسلسلة زمنية' : 'No backend time series', icon: <TrendingUp size={18} /> },
+    { id: 'service-trend', label: 'Service Trends', value: serviceTrendRows.length.toLocaleString(), note: isRtl ? 'سلسلة زمنية من backend' : 'Backend trend series points', icon: <TrendingUp size={18} /> },
   ];
 
-  const backendGaps = [
-    'Service trend time series',
-  ];
+  const backendGaps: string[] = [];
 
   const handleExport = (format: 'csv' | 'excel' | 'pdf' | 'print') => {
     if (format === 'csv') {
@@ -1304,11 +1310,9 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
               <MiniBarChart rows={completionRows} labelKey="service" valueKey="completionRate" formatLabel={(row) => row.service} />
             </BIChartContainer>
           </SectionBlock>
-          <SectionBlock title="Service Trends" description="Time-series service trends are not exposed by the backend." icon={<TrendingUp size={18} />}>
+          <SectionBlock title="Service Trends" description="Time-series service trends are exposed by the backend." icon={<TrendingUp size={18} />}>
             <BIChartContainer>
-              <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-                The backend provides service totals and completion metrics, but not a service-by-day trend series.
-              </div>
+              <MiniLineChart rows={serviceTrendRows} valueKey="revenue" labelKey="date" />
             </BIChartContainer>
           </SectionBlock>
         </div>
@@ -1389,9 +1393,12 @@ function ServicePerformanceReport({ lang }: { lang: Language }) {
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Backend Gap</div>
-                <div className="mt-3 text-sm text-slate-700">
-                  Service-by-day trend data is not exposed by the backend yet.
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Trend</div>
+                <div className="mt-3 space-y-3">
+                  <div className="text-sm text-slate-700">Canonical service trend series from the backend.</div>
+                  <BIChartContainer>
+                    <MiniLineChart rows={row.trend || []} valueKey="revenue" labelKey="date" />
+                  </BIChartContainer>
                 </div>
               </div>
             </div>
@@ -1434,11 +1441,15 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
     orders: Number(product?.totalOrders || 0),
     quantitySold: Number(product?.totalQuantity || 0),
     revenue: Number(product?.totalRevenue || 0),
-    averagePrice: null,
+    averagePrice: product?.averagePrice == null ? null : Number(product.averagePrice),
     platformFees: Number(product?.totalPlatformFees || 0),
     tenantRevenue: Number(product?.totalTenantRevenue || 0),
-    inventoryImpact: null,
-    notes: 'Average sold price and inventory impact are not exposed by the backend contract.',
+    stock: product?.stock == null ? null : Number(product.stock),
+    soldCount: product?.soldCount == null ? null : Number(product.soldCount),
+    usedAsGiftCount: product?.usedAsGiftCount == null ? null : Number(product.usedAsGiftCount),
+    inventoryImpact: product?.inventoryImpact == null ? null : Number(product.inventoryImpact),
+    trend: Array.isArray(product?.trend) ? product.trend : [],
+    notes: 'Canonical product analytics row.',
   })), [products]);
 
   const definitionOptions = useMemo(() => {
@@ -1458,7 +1469,7 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
     if (['revenue', 'averagePrice', 'platformFees', 'tenantRevenue'].includes(column.id)) {
       return { ...column, format: (value: unknown) => formatMoney(value, lang) };
     }
-    if (['orders', 'quantitySold'].includes(column.id)) {
+    if (['orders', 'quantitySold', 'stock', 'soldCount', 'usedAsGiftCount', 'inventoryImpact'].includes(column.id)) {
       return { ...column, format: (value: unknown) => formatNumber(value) };
     }
     return column;
@@ -1499,6 +1510,7 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
   const totalRevenue = rows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
   const totalQuantity = rows.reduce((sum, row) => sum + Number(row.quantitySold || 0), 0);
   const topProduct = rows[0] || null;
+  const productTrendRows = Array.isArray(topProduct?.trend) ? topProduct.trend : [];
 
   const kpiItems = [
     { id: 'revenue', label: 'Product Revenue', value: formatMoney(totalRevenue, lang), note: isRtl ? 'إجمالي الإيراد' : 'Total revenue', icon: <TrendingUp size={18} /> },
@@ -1506,14 +1518,10 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
     { id: 'orders', label: 'Orders', value: rows.reduce((sum, row) => sum + Number(row.orders || 0), 0).toLocaleString(), note: isRtl ? 'عدد الطلبات' : 'Order count', icon: <CreditCard size={18} /> },
     { id: 'tenant-revenue', label: 'Tenant Revenue', value: formatMoney(rows.reduce((sum, row) => sum + Number(row.tenantRevenue || 0), 0), lang), note: isRtl ? 'إيراد المنصة' : 'Tenant share', icon: <Wallet size={18} /> },
     { id: 'top-product', label: 'Top Product', value: topProduct?.product || '-', note: topProduct ? formatMoney(topProduct.revenue, lang) : '-', icon: <Sparkles size={18} /> },
-    { id: 'inventory-impact', label: 'Inventory Impact', value: '-', note: isRtl ? 'غير متاح من backend' : 'Not exposed by backend', icon: <AlertTriangle size={18} /> },
+    { id: 'inventory-impact', label: 'Inventory Impact', value: topProduct?.inventoryImpact == null ? '-' : formatNumber(topProduct.inventoryImpact), note: isRtl ? 'من stock/soldCount/usedAsGiftCount' : 'Derived from backend inventory counters', icon: <AlertTriangle size={18} /> },
   ];
 
-  const backendGaps = [
-    'Average price per sold unit',
-    'Inventory impact',
-    'Product trend time series',
-  ];
+  const backendGaps: string[] = [];
 
   const handleExport = (format: 'csv' | 'excel' | 'pdf' | 'print') => {
     if (format === 'csv') {
@@ -1652,11 +1660,9 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
               <MiniBarChart rows={tenantRevenueRows} labelKey="product" valueKey="tenantRevenue" formatLabel={(row) => row.product} />
             </BIChartContainer>
           </SectionBlock>
-          <SectionBlock title="Inventory Impact" description="Inventory impact is not exposed by the backend." icon={<AlertTriangle size={18} />}>
+          <SectionBlock title="Inventory Impact" description="Inventory impact is derived from backend inventory counters." icon={<AlertTriangle size={18} />}>
             <BIChartContainer>
-              <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-                The backend does not currently expose inventory movements or stock impact for product sales.
-              </div>
+              <MiniLineChart rows={productTrendRows} valueKey="quantitySold" labelKey="date" />
             </BIChartContainer>
           </SectionBlock>
         </div>
@@ -1734,13 +1740,25 @@ function ProductPerformanceReport({ lang }: { lang: Language }) {
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Financial</div>
                 <div className="mt-3 space-y-2 text-sm">
                   <Field label="Platform Fees" value={formatMoney(row.platformFees, lang)} />
-                  <Field label="Average Price" value="-" />
+                  <Field label="Average Price" value={row.averagePrice == null ? '-' : formatMoney(row.averagePrice, lang)} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Backend Gap</div>
-                <div className="mt-3 text-sm text-slate-700">
-                  Inventory impact and average sold price are not exposed by the backend yet.
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Inventory</div>
+                <div className="mt-3 space-y-2 text-sm">
+                  <Field label="Stock" value={formatNumber(row.stock)} />
+                  <Field label="Sold Count" value={formatNumber(row.soldCount)} />
+                  <Field label="Gift Uses" value={formatNumber(row.usedAsGiftCount)} />
+                  <Field label="Inventory Impact" value={formatNumber(row.inventoryImpact)} />
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Trend</div>
+                <div className="mt-3 space-y-3">
+                  <div className="text-sm text-slate-700">Canonical product trend series from the backend.</div>
+                  <BIChartContainer>
+                    <MiniLineChart rows={row.trend || []} valueKey="quantitySold" labelKey="date" />
+                  </BIChartContainer>
                 </div>
               </div>
             </div>

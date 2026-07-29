@@ -1938,7 +1938,7 @@ exports.getProductRevenue = async (req, res) => {
         // Get all products for this tenant
         const products = await db.Product.findAll({
             where: { tenantId },
-            attributes: ['id', 'name_en', 'name_ar', 'category', 'price'],
+            attributes: ['id', 'name_en', 'name_ar', 'category', 'price', 'stock', 'soldCount', 'usedAsGiftCount'],
             order: [['name_en', 'ASC']]
         });
 
@@ -1981,21 +1981,41 @@ exports.getProductRevenue = async (req, res) => {
                 name_ar: product.name_ar,
                 category: product.category,
                 productPrice: parseFloat(product.price || 0),
+                averagePrice: 0,
+                stock: Number(product.stock || 0),
+                soldCount: Number(product.soldCount || 0),
+                usedAsGiftCount: Number(product.usedAsGiftCount || 0),
+                inventoryImpact: 0,
                 totalOrders: 0,
                 totalQuantity: 0,
                 totalRevenue: 0,
                 totalPlatformFees: 0,
-                totalTenantRevenue: 0
+                totalTenantRevenue: 0,
+                trend: []
             };
 
             // Track unique orders
             const orderIds = new Set();
+            const trendBuckets = new Map();
 
             orderItems.forEach(item => {
                 if (item.order) {
                     orderIds.add(item.order.id);
                     stats.totalQuantity += item.quantity || 0;
                     stats.totalRevenue += parseFloat(item.totalPrice || 0);
+
+                    const bucketKey = item.order.createdAt ? new Date(item.order.createdAt).toISOString().split('T')[0] : null;
+                    if (bucketKey) {
+                        const trend = trendBuckets.get(bucketKey) || {
+                            date: bucketKey,
+                            quantitySold: 0,
+                            revenue: 0
+                        };
+                        trend.quantitySold += item.quantity || 0;
+                        trend.revenue += parseFloat(item.totalPrice || 0);
+                        trendBuckets.set(bucketKey, trend);
+                    }
+
                     // Platform fee and tenant revenue are at order level, so we need to calculate proportionally
                     // For simplicity, we'll use the order's total values divided by number of items
                     const orderTotal = parseFloat(item.order.totalAmount || 0);
@@ -2013,6 +2033,15 @@ exports.getProductRevenue = async (req, res) => {
             stats.totalRevenue = parseFloat(stats.totalRevenue.toFixed(2));
             stats.totalPlatformFees = parseFloat(stats.totalPlatformFees.toFixed(2));
             stats.totalTenantRevenue = parseFloat(stats.totalTenantRevenue.toFixed(2));
+            stats.averagePrice = stats.totalQuantity > 0 ? parseFloat((stats.totalRevenue / stats.totalQuantity).toFixed(2)) : parseFloat(product.price || 0);
+            stats.inventoryImpact = Number((stats.soldCount + stats.usedAsGiftCount).toFixed(0));
+            stats.trend = Array.from(trendBuckets.values())
+                .map((item) => ({
+                    ...item,
+                    revenue: parseFloat(item.revenue.toFixed(2)),
+                    averagePrice: item.quantitySold > 0 ? parseFloat((item.revenue / item.quantitySold).toFixed(2)) : 0
+                }))
+                .sort((left, right) => left.date.localeCompare(right.date));
 
             // Only include products that have sales
             if (stats.totalOrders > 0) {
@@ -2030,7 +2059,8 @@ exports.getProductRevenue = async (req, res) => {
             totalQuantity: productRevenue.reduce((sum, p) => sum + p.totalQuantity, 0),
             totalRevenue: productRevenue.reduce((sum, p) => sum + p.totalRevenue, 0),
             totalPlatformFees: productRevenue.reduce((sum, p) => sum + p.totalPlatformFees, 0),
-            totalTenantRevenue: productRevenue.reduce((sum, p) => sum + p.totalTenantRevenue, 0)
+            totalTenantRevenue: productRevenue.reduce((sum, p) => sum + p.totalTenantRevenue, 0),
+            totalInventoryImpact: productRevenue.reduce((sum, p) => sum + Number(p.inventoryImpact || 0), 0)
         };
 
         // Round totals

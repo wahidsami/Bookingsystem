@@ -737,7 +737,7 @@ exports.getServicePerformance = async (req, res) => {
                 as: 'appointments',
                 where: buildDateRangeWhere('startTime', startDate, endDate),
                 required: false,
-                attributes: ['id', 'status', 'price']
+                attributes: ['id', 'status', 'price', 'startTime']
             }],
             attributes: ['id', 'name_en', 'name_ar', 'category', 'finalPrice', 'duration']
         });
@@ -746,6 +746,24 @@ exports.getServicePerformance = async (req, res) => {
             const appointments = service.appointments || [];
             const completed = appointments.filter(a => a.status === 'completed');
             const revenue = completed.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
+            const trendBuckets = new Map();
+
+            completed.forEach((appointment) => {
+                const bucketKey = getDateBucketKey(appointment.startTime, 'day');
+                if (!bucketKey) {
+                    return;
+                }
+
+                const current = trendBuckets.get(bucketKey) || {
+                    date: bucketKey,
+                    bookings: 0,
+                    revenue: 0
+                };
+
+                current.bookings += 1;
+                current.revenue += parseFloat(appointment.price || 0);
+                trendBuckets.set(bucketKey, current);
+            });
             
             return {
                 id: service.id,
@@ -757,10 +775,17 @@ exports.getServicePerformance = async (req, res) => {
                 totalBookings: appointments.length,
                 completedBookings: completed.length,
                 revenue,
-                avgRevenue: completed.length > 0 ? (revenue / completed.length).toFixed(2) : 0,
+                averagePrice: completed.length > 0 ? Number((revenue / completed.length).toFixed(2)) : 0,
                 completionRate: appointments.length > 0 
-                    ? ((completed.length / appointments.length) * 100).toFixed(1) 
-                    : 0
+                    ? Number(((completed.length / appointments.length) * 100).toFixed(1))
+                    : 0,
+                trend: Array.from(trendBuckets.values())
+                    .map((item) => ({
+                        ...item,
+                        revenue: Number(item.revenue.toFixed(2)),
+                        averagePrice: item.bookings > 0 ? Number((item.revenue / item.bookings).toFixed(2)) : 0
+                    }))
+                    .sort((left, right) => left.date.localeCompare(right.date))
             };
         }).sort((a, b) => b.revenue - a.revenue);
 
@@ -803,6 +828,8 @@ exports.getEmployeePerformance = async (req, res) => {
         const employeeStats = employees.map(employee => {
             const appointments = employee.appointments || [];
             const completed = appointments.filter(a => a.status === 'completed');
+            const noShows = appointments.filter(a => a.status === 'no_show').length;
+            const cancellations = appointments.filter(a => a.status === 'cancelled').length;
             const revenue = completed.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
             const commission = completed.reduce((sum, a) => sum + parseFloat(a.employeeCommission || 0), 0);
             
@@ -814,6 +841,8 @@ exports.getEmployeePerformance = async (req, res) => {
                 salary: employee.salary,
                 totalBookings: appointments.length,
                 completedBookings: completed.length,
+                noShows,
+                cancellations,
                 revenue,
                 commission,
                 avgBookingValue: completed.length > 0 ? (revenue / completed.length).toFixed(2) : 0,
@@ -950,16 +979,37 @@ exports.getCustomerAnalytics = async (req, res) => {
                 },
                 platformUserId: { [Op.ne]: null }
             },
-            include: getTenantAppointmentIncludes(),
+            include: [
+                ...getTenantAppointmentIncludes(),
+                {
+                    model: db.PlatformUser,
+                    as: 'user',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+                    required: false
+                }
+            ],
             attributes: ['platformUserId', 'status', 'price', 'startTime', 'tenantId'],
             subQuery: false
         });
+
+        const customerIds = [...new Set(appointments.map((appointment) => appointment.platformUserId).filter(Boolean))];
+        const customerInsights = customerIds.length > 0
+            ? await db.CustomerInsight.findAll({
+                where: {
+                    platformUserId: { [Op.in]: customerIds },
+                    tenantId
+                },
+                attributes: ['platformUserId', 'totalSpent']
+            })
+            : [];
+        const customerInsightsMap = new Map(customerInsights.map((insight) => [insight.platformUserId, insight]));
 
         // Customer frequency analysis
         const customerStats = {};
         appointments.forEach(appointment => {
             const customerId = appointment.platformUserId;
             const customerName = getCustomerName(appointment.user);
+            const customerInsight = customerInsightsMap.get(customerId);
             if (!customerStats[customerId]) {
                 customerStats[customerId] = {
                     id: customerId,
@@ -967,6 +1017,7 @@ exports.getCustomerAnalytics = async (req, res) => {
                     bookings: 0,
                     completed: 0,
                     revenue: 0,
+                    lifetimeRevenue: customerInsight?.totalSpent == null ? 0 : Number(customerInsight.totalSpent),
                     firstVisit: appointment.startTime,
                     lastVisit: appointment.startTime
                 };
@@ -1014,7 +1065,8 @@ exports.getCustomerAnalytics = async (req, res) => {
             .map(([id, stats]) => ({
                 id,
                 name: stats.name || id,
-                ...stats
+                ...stats,
+                lifetimeRevenue: Number((stats.lifetimeRevenue ?? stats.revenue ?? 0).toFixed(2))
             }))
             .sort((a, b) => b.revenue - a.revenue)
             .slice(0, 10);

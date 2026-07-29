@@ -39,6 +39,12 @@ export interface ServicePerformanceTableRow {
   averagePrice: number | null;
   completedBookings: number | null;
   completionRate: number | null;
+  trend?: Array<{
+    date: string;
+    bookings: number;
+    revenue: number;
+    averagePrice: number;
+  }>;
   notes?: string | null;
 }
 
@@ -52,7 +58,16 @@ export interface ProductPerformanceTableRow {
   averagePrice: number | null;
   platformFees: number | null;
   tenantRevenue: number | null;
-  inventoryImpact?: string | null;
+  stock?: number | null;
+  soldCount?: number | null;
+  usedAsGiftCount?: number | null;
+  inventoryImpact?: number | null;
+  trend?: Array<{
+    date: string;
+    quantitySold: number;
+    revenue: number;
+    averagePrice: number;
+  }>;
   notes?: string | null;
 }
 
@@ -94,6 +109,7 @@ export function createCustomerOverviewReportDefinition(
       { id: 'visits', header: 'Visits', accessor: 'visits', sortable: true, align: 'right', width: '8rem' },
       { id: 'completedVisits', header: 'Completed Visits', accessor: 'completedVisits', sortable: true, align: 'right', width: '10rem' },
       { id: 'revenue', header: 'Revenue', accessor: 'revenue', sortable: true, align: 'right', width: '10rem' },
+      { id: 'lifetimeRevenue', header: 'Lifetime Revenue', accessor: 'lifetimeRevenue', sortable: true, align: 'right', width: '11rem' },
       { id: 'customerType', header: 'Customer Type', accessor: 'customerType', sortable: true, width: '11rem' },
       { id: 'firstVisit', header: 'First Visit', accessor: 'firstVisit', sortable: true, width: '12rem' },
       { id: 'lastVisit', header: 'Last Visit', accessor: 'lastVisit', sortable: true, width: '12rem' }
@@ -134,7 +150,9 @@ export function createEmployeePerformanceReportDefinition(
       { id: 'revenue', header: 'Revenue', accessor: 'revenue', sortable: true, align: 'right', width: '10rem' },
       { id: 'averageTicket', header: 'Average Ticket', accessor: 'averageTicket', sortable: true, align: 'right', width: '10rem' },
       { id: 'productivity', header: 'Productivity', accessor: 'productivity', sortable: true, align: 'right', width: '9rem' },
-      { id: 'completionRate', header: 'Completion Rate', accessor: 'completionRate', sortable: true, align: 'right', width: '10rem' }
+      { id: 'completionRate', header: 'Completion Rate', accessor: 'completionRate', sortable: true, align: 'right', width: '10rem' },
+      { id: 'noShows', header: 'No-shows', accessor: 'noShows', sortable: true, align: 'right', width: '8rem' },
+      { id: 'cancellations', header: 'Cancellations', accessor: 'cancellations', sortable: true, align: 'right', width: '9rem' }
     ],
     exports: {
       enabled: { csv: true, excel: true, pdf: true, print: true }
@@ -210,6 +228,10 @@ export function createProductPerformanceReportDefinition(
       { id: 'category', header: 'Category', accessor: 'category', sortable: true, width: '11rem' },
       { id: 'orders', header: 'Orders', accessor: 'orders', sortable: true, align: 'right', width: '8rem' },
       { id: 'quantitySold', header: 'Quantity Sold', accessor: 'quantitySold', sortable: true, align: 'right', width: '10rem' },
+      { id: 'stock', header: 'Stock', accessor: 'stock', sortable: true, align: 'right', width: '8rem' },
+      { id: 'soldCount', header: 'Sold Count', accessor: 'soldCount', sortable: true, align: 'right', width: '9rem' },
+      { id: 'usedAsGiftCount', header: 'Gift Uses', accessor: 'usedAsGiftCount', sortable: true, align: 'right', width: '9rem' },
+      { id: 'inventoryImpact', header: 'Inventory Impact', accessor: 'inventoryImpact', sortable: true, align: 'right', width: '10rem' },
       { id: 'revenue', header: 'Revenue', accessor: 'revenue', sortable: true, align: 'right', width: '10rem' },
       { id: 'averagePrice', header: 'Average Price', accessor: 'averagePrice', sortable: true, align: 'right', width: '10rem' },
       { id: 'tenantRevenue', header: 'Tenant Revenue', accessor: 'tenantRevenue', sortable: true, align: 'right', width: '10rem' }
