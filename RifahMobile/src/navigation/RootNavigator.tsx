@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TabNavigator } from './TabNavigator';
 import { PurchasesScreen } from '../screens/PurchasesScreen';
 import { PaymentScreen } from '../screens/PaymentScreen';
+import { PaymentSuccessScreen } from '../screens/PaymentSuccessScreen';
 import { TenantScreen } from '../screens/TenantScreen';
 import { BookingJourneyScreen } from '../screens/BookingJourneyScreen';
 import { HotDealDetailScreen } from '../screens/HotDealDetailScreen';
@@ -41,6 +42,7 @@ export function RootNavigator() {
             <Stack.Screen name="Booking" component={BookingJourneyScreen} />
             <Stack.Screen name="MyPurchases" component={PurchasesScreen} />
             <Stack.Screen name="Payment" component={PaymentScreen} />
+            <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} />
             <Stack.Screen name="HotDealDetail" component={HotDealDetailScreen} />
             <Stack.Screen name="Cart" component={CartScreen} />
             <Stack.Screen name="ServiceBookingCart" component={ServiceBookingCartScreen} />

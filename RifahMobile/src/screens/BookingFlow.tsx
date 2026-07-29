@@ -327,8 +327,9 @@ export function BookingFlow({ route, navigation }: BookingProps) {
             ]);
             return;
         }
-        const user = await api.getUser();
-        if (!user) return;
+            const user = await api.getUser();
+            if (!user) return;
+            const primaryCustomerName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || (language === 'ar' ? 'العميل الأساسي' : 'Primary customer');
 
         if (includeGuest && (!guestFirstName.trim() || !guestLastName.trim())) {
             Alert.alert('Guest Details', 'Please provide guest first and last name.');
@@ -401,6 +402,25 @@ export function BookingFlow({ route, navigation }: BookingProps) {
                             amount: selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : bookingAmount,
                             tenantId: tenant.id,
                             paymentChoice: selectedPaymentMethod === 'booking-fee' ? 'booking-fee' : 'online-full',
+                            paymentSummary: {
+                                primaryCustomer: primaryCustomerName,
+                                participants: [
+                                    {
+                                        name: primaryCustomerName,
+                                        services: [language === 'ar' ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar)],
+                                    },
+                                ],
+                                services: [language === 'ar' ? (service.name_ar || service.name_en) : (service.name_en || service.name_ar)],
+                                date: format(selectedDate, 'PPP', { locale: isRTL ? ar : enUS }),
+                                time: format(new Date(selectedTime.startTime), 'p', { locale: isRTL ? ar : enUS }),
+                                employee: selectedTime.staffName || selectedStaff?.name || (language === 'ar' ? 'أي متخصص' : 'Any professional'),
+                                salon: tenant.name,
+                                subtotal: bookingAmount,
+                                tax: null,
+                                deposit: selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : null,
+                                remaining: selectedPaymentMethod === 'booking-fee' ? Math.max(0, bookingAmount - bookingFeeAmount) : 0,
+                                total: bookingAmount,
+                            },
                         });
                     }
                     : null,

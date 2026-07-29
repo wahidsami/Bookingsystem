@@ -488,7 +488,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                 email: participant.email,
                 selectedServiceIds: participant.serviceIds.length > 0
                     ? participant.serviceIds
-                    : bookingServiceOptions.map((item) => item.id),
+                    : bookingServiceOptions.map((item: BookingServiceOption) => item.id),
             });
         } else {
             setEditingParticipantId(null);
@@ -496,7 +496,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                 name: '',
                 phone: '',
                 email: '',
-                selectedServiceIds: bookingServiceOptions.map((item) => item.id),
+                selectedServiceIds: bookingServiceOptions.map((item: BookingServiceOption) => item.id),
             });
         }
 
@@ -509,7 +509,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
     };
 
     const toggleGuestService = (serviceId: string) => {
-        setParticipantDraft((prev) => {
+        setParticipantDraft((prev: ParticipantDraft) => {
             const exists = prev.selectedServiceIds.includes(serviceId);
             const nextSelectedServiceIds = exists
                 ? prev.selectedServiceIds.filter((entry) => entry !== serviceId)
@@ -536,7 +536,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
             return;
         }
 
-        const selectedServices = bookingServiceOptions.filter((item) => participantDraft.selectedServiceIds.includes(item.id));
+        const selectedServices = bookingServiceOptions.filter((item: BookingServiceOption) => participantDraft.selectedServiceIds.includes(item.id));
         if (selectedServices.length === 0) {
             Alert.alert(
                 isRTL ? 'اختاري خدمة' : 'Select a service',
@@ -549,8 +549,8 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
 
         const [firstName, ...restNameParts] = name.split(/\s+/).filter(Boolean);
         const lastName = restNameParts.length > 0 ? restNameParts.join(' ') : firstName;
-        const serviceIds = selectedServices.map((item) => item.id);
-        const serviceLabels = selectedServices.map((item) => item.label);
+        const serviceIds = selectedServices.map((item: BookingServiceOption) => item.id);
+        const serviceLabels = selectedServices.map((item: BookingServiceOption) => item.label);
         const payload = buildGroupGuestPayload({
             firstName,
             lastName,
@@ -572,9 +572,9 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
             payload,
         };
 
-        setParticipants((prev) => {
+        setParticipants((prev: GuestParticipant[]) => {
             if (editingParticipantId) {
-                return prev.map((item) => (item.id === editingParticipantId ? nextParticipant : item));
+                return prev.map((item: GuestParticipant) => (item.id === editingParticipantId ? nextParticipant : item));
             }
 
             return [...prev, nextParticipant];
@@ -584,11 +584,11 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
     };
 
     const handleRemoveGuest = (guestId: string) => {
-        setParticipants((prev) => prev.filter((item) => item.id !== guestId));
+        setParticipants((prev: GuestParticipant[]) => prev.filter((item: GuestParticipant) => item.id !== guestId));
     };
 
     const guestModalServiceLabels = bookingServiceOptions
-        .map((item) => item.label)
+        .map((item: BookingServiceOption) => item.label)
         .join(' · ');
 
     const renderPriceRow = (label: string, value: string, emphasized?: boolean) => (
@@ -857,7 +857,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                         </Text>
                     </View>
 
-                    {participants.map((participant) => (
+                    {participants.map((participant: GuestParticipant) => (
                         <View key={participant.id} style={styles.participantCard}>
                             <View style={styles.participantCardTopRow}>
                                 <View style={styles.participantCardTitleWrap}>
@@ -884,7 +884,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                             </View>
 
                             <View style={styles.participantServiceChips}>
-                                {participant.serviceLabels.map((serviceLabel) => (
+                                {participant.serviceLabels.map((serviceLabel: string) => (
                                     <View key={`${participant.id}-${serviceLabel}`} style={styles.participantServiceChip}>
                                         <Text style={styles.participantServiceChipText}>{serviceLabel}</Text>
                                     </View>
@@ -987,7 +987,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                                     <Text style={styles.modalFieldLabel}>{isRTL ? 'الاسم *' : 'Name *'}</Text>
                                     <TextInput
                                         value={participantDraft.name}
-                                        onChangeText={(value) => setParticipantDraft((prev) => ({ ...prev, name: value }))}
+                                        onChangeText={(value: string) => setParticipantDraft((prev: ParticipantDraft) => ({ ...prev, name: value }))}
                                         placeholder={isRTL ? 'اسم الضيف الكامل' : 'Guest full name'}
                                         placeholderTextColor={colors.textSecondary}
                                         style={styles.modalInput}
@@ -998,7 +998,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                                     <Text style={styles.modalFieldLabel}>{isRTL ? 'الجوال' : 'Phone'}</Text>
                                     <TextInput
                                         value={participantDraft.phone}
-                                        onChangeText={(value) => setParticipantDraft((prev) => ({ ...prev, phone: value }))}
+                                        onChangeText={(value: string) => setParticipantDraft((prev: ParticipantDraft) => ({ ...prev, phone: value }))}
                                         placeholder={isRTL ? 'رقم الجوال' : 'Guest phone'}
                                         placeholderTextColor={colors.textSecondary}
                                         style={styles.modalInput}
@@ -1010,7 +1010,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                                     <Text style={styles.modalFieldLabel}>{isRTL ? 'البريد الإلكتروني' : 'Email'}</Text>
                                     <TextInput
                                         value={participantDraft.email}
-                                        onChangeText={(value) => setParticipantDraft((prev) => ({ ...prev, email: value }))}
+                                        onChangeText={(value: string) => setParticipantDraft((prev: ParticipantDraft) => ({ ...prev, email: value }))}
                                         placeholder={isRTL ? 'البريد الإلكتروني' : 'Guest email'}
                                         placeholderTextColor={colors.textSecondary}
                                         style={styles.modalInput}
@@ -1025,7 +1025,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                                         {guestModalServiceLabels || (isRTL ? 'الخدمة الحالية' : 'Current service')}
                                     </Text>
                                     <View style={styles.serviceSelectGrid}>
-                                        {bookingServiceOptions.map((item) => {
+                                        {bookingServiceOptions.map((item: BookingServiceOption) => {
                                             const selected = participantDraft.selectedServiceIds.includes(item.id);
                                             return (
                                                 <TouchableOpacity

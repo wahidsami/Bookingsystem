@@ -132,6 +132,33 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                     paymentChoice: groupedByPayment.some((group) => group.paymentMethod === 'online-full')
                         ? 'online-full'
                         : 'booking-fee',
+                    paymentSummary: {
+                        primaryCustomer: cartTenant?.name || (language === 'ar' ? 'العميل الأساسي' : 'Primary customer'),
+                        participants: groupedByPayment.map((group) => ({
+                            name: group.paymentMethod === 'booking-fee'
+                                ? (language === 'ar' ? 'عربون الحجز' : 'Booking fee')
+                                : (group.paymentMethod === 'online-full'
+                                    ? (language === 'ar' ? 'الدفع الكامل' : 'Full payment')
+                                    : (language === 'ar' ? 'الدفع عند المركز' : 'Pay at center')),
+                            services: items
+                                .filter((item) => item.paymentMethod === group.paymentMethod)
+                                .map((item) => language === 'ar'
+                                    ? (item.service.name_ar || item.service.name_en)
+                                    : (item.service.name_en || item.service.name_ar)),
+                        })),
+                        services: items.map((item) => language === 'ar'
+                            ? (item.service.name_ar || item.service.name_en)
+                            : (item.service.name_en || item.service.name_ar)),
+                        date: items[0] ? format(new Date(items[0].startTime), 'PPP', { locale: isRTL ? ar : enUS }) : undefined,
+                        time: items[0] ? format(new Date(items[0].startTime), 'p', { locale: isRTL ? ar : enUS }) : undefined,
+                        employee: items[0]?.staff?.name || items[0]?.staff?.name_en || items[0]?.staff?.name_ar || (language === 'ar' ? 'أي متخصص' : 'Any specialist'),
+                        salon: cartTenant?.name || (language === 'ar' ? 'الصالون' : 'Salon'),
+                        subtotal: totalPrice,
+                        tax: null,
+                        deposit: payableNowTotal < totalPrice ? payableNowTotal : null,
+                        remaining: payableNowTotal < totalPrice ? Math.max(0, totalPrice - payableNowTotal) : 0,
+                        total: totalPrice,
+                    },
                 });
                 return;
             }

@@ -528,6 +528,29 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                       representative.paymentStatus === 'pending' && representative.paymentMethod === 'booking-fee'
                         ? 'booking-fee'
                         : undefined,
+                    paymentSummary: {
+                      primaryCustomer: guest?.fullName || representative.customerName || representative.customer?.name || representative.customer?.fullName || representative.customer?.firstName || representative.customer?.email || (language === 'ar' ? 'العميل الأساسي' : 'Primary customer'),
+                      participants: [
+                        {
+                          name: guest?.fullName || representative.customerName || representative.customer?.name || representative.customer?.fullName || representative.customer?.firstName || (language === 'ar' ? 'أنتِ' : 'You'),
+                          services: group.items.map((item) => getServiceName(item)),
+                        },
+                      ],
+                      services: group.items.map((item) => getServiceName(item)),
+                      date: format(new Date(representative.startTime), 'PPP', { locale: language === 'ar' ? ar : enUS }),
+                      time: format(new Date(representative.startTime), 'p', { locale: language === 'ar' ? ar : enUS }),
+                      employee: getStaffName(representative),
+                      salon: group.tenant?.name || representative.tenant?.name || representative.tenantName || (language === 'ar' ? 'الصالون' : 'Salon'),
+                      subtotal: subtotalAmount,
+                      tax: null,
+                      deposit: representative.paymentMethod === 'booking-fee'
+                        ? Number(group.payableNowTotal || 0)
+                        : null,
+                      remaining: representative.paymentMethod === 'booking-fee'
+                        ? Math.max(0, subtotalAmount - Number(group.payableNowTotal || 0))
+                        : 0,
+                      total: subtotalAmount,
+                    },
                   })
                 }
               >
