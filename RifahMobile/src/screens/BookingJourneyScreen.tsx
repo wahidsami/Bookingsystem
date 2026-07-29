@@ -44,6 +44,14 @@ type DateCard = {
 
 const BOOKING_WINDOW_DAYS = 14;
 const SLOT_LEAD_MINUTES = 0;
+const DEFAULT_BOOKING_PAYMENT_SETTINGS = {
+    allowServicePayAtCenter: true,
+    allowServiceFullOnline: true,
+    allowServiceDeposit: true,
+    serviceDepositMode: 'fixed' as const,
+    serviceDepositFixedAmount: 50,
+    serviceDepositPercentage: 50,
+};
 
 const toDateKey = (value: Date) => format(value, 'yyyy-MM-dd');
 
@@ -56,7 +64,7 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
     const { service, tenant } = route.params || {};
     const initialVariant = route.params?.selectedVariant || null;
     const selectedStaff = route.params?.selectedStaff || null;
-    const { language, isRTL } = useLanguage();
+    const { isRTL } = useLanguage();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [step, setStep] = useState<BookingStep>('date');
@@ -78,6 +86,46 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
         || '';
     const servicePrice = getServicePrice(service, initialVariant || undefined);
     const serviceDuration = initialVariant?.duration || service?.duration || 0;
+    const bookingPaymentSettings = useMemo(() => ({
+        ...DEFAULT_BOOKING_PAYMENT_SETTINGS,
+        ...(tenant?.paymentSettings || {}),
+    }), [tenant?.paymentSettings]);
+    const bookingDepositAmount = useMemo(() => {
+        if (!bookingPaymentSettings.allowServiceDeposit) {
+            return null;
+        }
+
+        const calculated = bookingPaymentSettings.serviceDepositMode === 'percentage'
+            ? servicePrice * (bookingPaymentSettings.serviceDepositPercentage / 100)
+            : bookingPaymentSettings.serviceDepositFixedAmount;
+
+        return Number(Math.max(0, Math.min(servicePrice, calculated)).toFixed(2));
+    }, [
+        bookingPaymentSettings.allowServiceDeposit,
+        bookingPaymentSettings.serviceDepositFixedAmount,
+        bookingPaymentSettings.serviceDepositMode,
+        bookingPaymentSettings.serviceDepositPercentage,
+        servicePrice,
+    ]);
+    const bookingRemainingAmount = useMemo(() => {
+        if (bookingDepositAmount === null) {
+            return null;
+        }
+
+        return Number(Math.max(0, servicePrice - bookingDepositAmount).toFixed(2));
+    }, [bookingDepositAmount, servicePrice]);
+    const bookingTotalAmount = servicePrice;
+    const locationLabel = useMemo(() => {
+        const parts = [
+            tenant?.location,
+            tenant?.address,
+            [tenant?.district, tenant?.city].filter(Boolean).join(', '),
+        ]
+            .map((value) => `${value || ''}`.trim())
+            .filter(Boolean);
+
+        return parts.length > 0 ? parts[0] : (isRTL ? 'الموقع غير محدد' : 'Location not specified');
+    }, [isRTL, tenant?.address, tenant?.city, tenant?.district, tenant?.location]);
     const serviceImage = useMemo(() => {
         const candidates = [
             service?.image,
@@ -372,6 +420,30 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
         );
     };
 
+    const renderPriceRow = (label: string, value: string, emphasized?: boolean) => (
+        <View style={styles.priceRow}>
+            <Text style={[styles.priceRowLabel, emphasized ? styles.priceRowLabelEmphasized : null]}>{label}</Text>
+            <Text style={[styles.priceRowValue, emphasized ? styles.priceRowValueEmphasized : null]}>{value}</Text>
+        </View>
+    );
+
+    const renderSummaryChip = (
+        iconName: React.ComponentProps<typeof AppIcon>['name'],
+        label: string,
+        value: string
+    ) => (
+        <View style={styles.summaryChip}>
+            <AppIcon name={iconName} size={14} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+                <Text style={styles.summaryChipLabel}>{label}</Text>
+                <Text style={styles.summaryChipValue} numberOfLines={1}>{value}</Text>
+            </View>
+        </View>
+    );
+
+    const serviceVariantLabel = initialVariant?.description?.trim() || (isRTL ? 'الخيار الأساسي' : 'Standard service');
+    const serviceTimeDisplay = selectedTimeLabel || (isRTL ? 'غير محدد' : 'Unavailable');
+
     const renderServiceContext = () => (
         <View style={styles.contextCard}>
             <View style={styles.contextMedia}>
@@ -573,63 +645,92 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                 <Text style={styles.stepTitle}>{isRTL ? 'مراجعة الزيارة' : 'Review your visit'}</Text>
                 <Text style={styles.stepSubtitle}>
                     {isRTL
-                        ? 'هذه الشاشة مخصصة للمراجعة فقط في هذه المرحلة.'
-                        : 'This screen is a placeholder for now while the journey foundation is completed.'}
+                        ? 'راجعي تفاصيل زيارتك بهدوء قبل المتابعة.'
+                        : 'Review the visit details calmly before continuing.'}
                 </Text>
             </View>
 
             <View style={styles.reviewSummaryCard}>
                 <View style={styles.reviewSummaryHeader}>
-                    <Text style={styles.reviewSummaryLabel}>{isRTL ? 'الخدمة المختارة' : 'Selected service'}</Text>
-                    <Text style={styles.reviewSummaryPrice}>{formatRiyal(servicePrice, isRTL ? 'ar' : 'en')}</Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.reviewSummaryLabel}>{isRTL ? 'الخدمة المختارة' : 'Selected service'}</Text>
+                        <Text style={styles.reviewSummaryServiceName}>{serviceName}</Text>
+                        <Text style={styles.reviewSummaryVariant}>{serviceVariantLabel}</Text>
+                    </View>
+                    <View style={styles.reviewSummaryPriceWrap}>
+                        <Text style={styles.reviewSummaryPrice}>{formatRiyal(servicePrice, isRTL ? 'ar' : 'en')}</Text>
+                        <Text style={styles.reviewSummaryPriceCaption}>{isRTL ? 'إجمالي الخدمة' : 'Service total'}</Text>
+                    </View>
                 </View>
-                <Text style={styles.reviewSummaryServiceName}>{serviceName}</Text>
-                {initialVariant?.description ? (
-                    <Text style={styles.reviewSummaryVariant}>{initialVariant.description}</Text>
+                <View style={styles.summaryChipGrid}>
+                    {renderSummaryChip('event', isRTL ? 'التاريخ' : 'Date', selectedDateLabel || (isRTL ? 'غير محدد' : 'Unavailable'))}
+                    {renderSummaryChip('clock', isRTL ? 'الوقت' : 'Time', serviceTimeDisplay)}
+                    {renderSummaryChip('user', isRTL ? 'الموظف' : 'Employee', selectedEmployeeLabel)}
+                    {renderSummaryChip('location', isRTL ? 'الموقع' : 'Location', locationLabel)}
+                    {renderSummaryChip('clock', isRTL ? 'المدة' : 'Duration', `${serviceDuration} ${isRTL ? 'دقيقة' : 'min'}`)}
+                </View>
+            </View>
+
+            <View style={styles.sectionCard}>
+                <View style={styles.sectionCardHeader}>
+                    <Text style={styles.sectionCardLabel}>{isRTL ? 'المشاركون' : 'Participants'}</Text>
+                </View>
+                <View style={styles.participantsRow}>
+                    <View style={styles.participantBadge}>
+                        <AppIcon name="verified_user" size={12} color={colors.primary} />
+                        <Text style={styles.participantBadgeText}>{isRTL ? 'أنتِ' : 'You'}</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.addParticipantButton}
+                        onPress={() => {
+                            Alert.alert(
+                                isRTL ? 'قريباً' : 'Coming soon',
+                                isRTL
+                                    ? 'سيتم تفعيل إضافة الضيوف في مرحلة لاحقة.'
+                                    : 'Guest navigation will be enabled in a later phase.'
+                            );
+                        }}
+                        activeOpacity={0.9}
+                    >
+                        <AppIcon name="plus" size={14} color={colors.primary} />
+                        <Text style={styles.addParticipantText}>{isRTL ? 'إضافة شخص' : 'Bring Someone'}</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <View style={styles.sectionCard}>
+                <View style={styles.sectionCardHeader}>
+                    <Text style={styles.sectionCardLabel}>{isRTL ? 'ملخص الدفع' : 'Payment summary'}</Text>
+                </View>
+                {renderPriceRow(isRTL ? 'المجموع الفرعي' : 'Subtotal', formatRiyal(servicePrice, isRTL ? 'ar' : 'en'))}
+                {renderPriceRow(isRTL ? 'الضريبة' : 'Tax', isRTL ? 'غير متاح' : 'Unavailable')}
+                {renderPriceRow(isRTL ? 'الإجمالي' : 'Total', formatRiyal(bookingTotalAmount, isRTL ? 'ar' : 'en'), true)}
+                {bookingDepositAmount !== null ? renderPriceRow(
+                    isRTL ? 'العربون' : 'Deposit',
+                    formatRiyal(bookingDepositAmount, isRTL ? 'ar' : 'en')
                 ) : null}
-
-                <View style={styles.reviewDetailRow}>
-                    <Text style={styles.reviewDetailLabel}>{isRTL ? 'التاريخ' : 'Date'}</Text>
-                    <Text style={styles.reviewDetailValue}>{selectedDateLabel || '-'}</Text>
-                </View>
-                <View style={styles.reviewDetailRow}>
-                    <Text style={styles.reviewDetailLabel}>{isRTL ? 'الوقت' : 'Time'}</Text>
-                    <Text style={styles.reviewDetailValue}>{selectedTimeLabel || '-'}</Text>
-                </View>
-                <View style={styles.reviewDetailRow}>
-                    <Text style={styles.reviewDetailLabel}>{isRTL ? 'الموظف' : 'Employee'}</Text>
-                    <Text style={styles.reviewDetailValue}>{selectedEmployeeLabel}</Text>
-                </View>
-                <View style={styles.reviewDetailRow}>
-                    <Text style={styles.reviewDetailLabel}>{isRTL ? 'المدة' : 'Duration'}</Text>
-                    <Text style={styles.reviewDetailValue}>{serviceDuration} {isRTL ? 'دقيقة' : 'min'}</Text>
-                </View>
-            </View>
-
-            <View style={styles.placeholderCard}>
-                <Text style={styles.placeholderTitle}>{isRTL ? 'Participants' : 'Participants'}</Text>
-                <Text style={styles.placeholderText}>
-                    {isRTL
-                        ? 'سيتم دعم الضيوف والمشاركين في مرحلة لاحقة.'
-                        : 'Guest and participant support will arrive in a later phase.'}
-                </Text>
-            </View>
-
-            <View style={styles.placeholderCard}>
-                <Text style={styles.placeholderTitle}>{isRTL ? 'Payment Summary' : 'Payment Summary'}</Text>
-                <Text style={styles.placeholderText}>
-                    {isRTL
-                        ? 'سيظهر ملخص الدفع هنا بعد اكتمال رحلة الحجز.'
-                        : 'Payment details will appear here once the booking journey is completed.'}
-                </Text>
+                {bookingRemainingAmount !== null ? renderPriceRow(
+                    isRTL ? 'المتبقي' : 'Remaining',
+                    formatRiyal(bookingRemainingAmount, isRTL ? 'ar' : 'en')
+                ) : null}
+                {bookingDepositAmount === null ? (
+                    <View style={styles.paymentHint}>
+                        <AppIcon name="info" size={14} color={colors.textSecondary} />
+                        <Text style={styles.paymentHintText}>
+                            {isRTL
+                                ? 'لا يوجد عربون مفعّل لهذه الخدمة حالياً.'
+                                : 'No deposit is active for this service right now.'}
+                        </Text>
+                    </View>
+                ) : null}
             </View>
 
             <View style={styles.placeholderNote}>
                 <AppIcon name="warning" size={16} color={colors.primary} />
                 <Text style={styles.placeholderNoteText}>
                     {isRTL
-                        ? 'هذه خطوة معاينة فقط في هذه المرحلة.'
-                        : 'This is only a review placeholder for this phase.'}
+                        ? 'سيتم ربط زر المتابعة بالتدفق النهائي في المرحلة التالية.'
+                        : 'The Continue action will connect to the final booking step in the next phase.'}
                 </Text>
             </View>
         </View>
@@ -1146,48 +1247,155 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         color: colors.text,
     },
+    reviewSummaryPriceWrap: {
+        alignItems: 'flex-end',
+    },
+    reviewSummaryPriceCaption: {
+        marginTop: 2,
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+        fontWeight: '700',
+    },
     reviewSummaryServiceName: {
         fontSize: fontSize.xl,
         fontWeight: '900',
         color: colors.text,
+        marginTop: 2,
     },
     reviewSummaryVariant: {
         fontSize: fontSize.sm,
         color: colors.textSecondary,
         marginTop: -2,
     },
-    reviewDetailRow: {
+    summaryChipGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        marginTop: spacing.xs,
+    },
+    summaryChip: {
+        width: '48%',
+        minWidth: 140,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.sm,
+        borderRadius: 18,
+        backgroundColor: '#F8F5FF',
+        borderWidth: 1,
+        borderColor: '#EAE1FA',
+    },
+    summaryChipLabel: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    summaryChipValue: {
+        marginTop: 2,
+        fontSize: fontSize.sm,
+        fontWeight: '900',
+        color: colors.text,
+    },
+    sectionCard: {
+        borderRadius: 28,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#ECE5F8',
+        padding: spacing.lg,
+        gap: spacing.sm,
+    },
+    sectionCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    sectionCardLabel: {
+        fontSize: fontSize.xs,
+        fontWeight: '900',
+        letterSpacing: 0.6,
+        color: colors.primary,
+        textTransform: 'uppercase',
+    },
+    participantsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+        flexWrap: 'wrap',
+    },
+    participantBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 10,
+        borderRadius: 999,
+        backgroundColor: '#F8F5FF',
+        borderWidth: 1,
+        borderColor: '#EAE1FA',
+    },
+    participantBadgeText: {
+        fontSize: fontSize.sm,
+        fontWeight: '800',
+        color: colors.text,
+    },
+    addParticipantButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 10,
+        borderRadius: 999,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#EAE1FA',
+    },
+    addParticipantText: {
+        fontSize: fontSize.sm,
+        fontWeight: '900',
+        color: colors.primary,
+    },
+    priceRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
         gap: spacing.md,
-        paddingTop: 10,
+        paddingVertical: 4,
     },
-    reviewDetailLabel: {
+    priceRowLabel: {
         flex: 1,
         fontSize: fontSize.sm,
         color: colors.textSecondary,
     },
-    reviewDetailValue: {
+    priceRowLabelEmphasized: {
+        color: colors.text,
+        fontWeight: '900',
+    },
+    priceRowValue: {
         flex: 1,
         fontSize: fontSize.sm,
         fontWeight: '800',
         color: colors.text,
         textAlign: 'right',
     },
-    placeholderCard: {
-        borderRadius: 24,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#ECE5F8',
-        padding: spacing.lg,
-        gap: 6,
-    },
-    placeholderTitle: {
+    priceRowValueEmphasized: {
         fontSize: fontSize.md,
         fontWeight: '900',
         color: colors.text,
     },
-    placeholderText: {
+    paymentHint: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: spacing.xs,
+        paddingTop: spacing.xs,
+        borderTopWidth: 1,
+        borderTopColor: '#F0EBFA',
+    },
+    paymentHintText: {
+        flex: 1,
         fontSize: fontSize.sm,
         color: colors.textSecondary,
         lineHeight: 20,
