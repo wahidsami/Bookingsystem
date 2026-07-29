@@ -56,6 +56,15 @@ interface InteractiveDrawersProps {
   giftCardPackages?: GiftCardPackage[];
   stylists: any[];
   onBoardChanged?: () => Promise<void> | void;
+  existingBreak?: {
+    id: string;
+    staffId?: string;
+    startTime?: number;
+    duration?: number;
+    blockedType?: 'Break' | 'Lunch' | 'Meeting';
+    type?: string;
+    label?: string;
+  } | null;
 }
 
 export interface GuestService {
@@ -119,6 +128,27 @@ interface GiftCardPackage {
   isActive?: boolean;
 }
 
+const getBlockPresetTexts = (type: 'Break' | 'Lunch' | 'Meeting') => {
+  if (type === 'Break') {
+    return {
+      titleAr: 'استراحة فنجان قهوة',
+      titleEn: 'Coffee Recess Break'
+    };
+  }
+
+  if (type === 'Lunch') {
+    return {
+      titleAr: 'فترة استراحة الغداء',
+      titleEn: 'Staff Lunch Break'
+    };
+  }
+
+  return {
+    titleAr: 'اجتماع إداري',
+    titleEn: 'Staff Administrative Sync'
+  };
+};
+
 export default function InteractiveDrawers({
   isRtl,
   isCreateDrawerOpen,
@@ -141,7 +171,8 @@ export default function InteractiveDrawers({
   products,
   giftCardPackages = [],
   stylists,
-  onBoardChanged
+  onBoardChanged,
+  existingBreak
 }: InteractiveDrawersProps) {
   
   // Create Modal Step
@@ -154,6 +185,43 @@ export default function InteractiveDrawers({
       setCreateMode(initialCreateMode);
     }
   }, [isCreateDrawerOpen, initialCreateMode]);
+
+  useEffect(() => {
+    if (!isCreateDrawerOpen || createMode !== 'blocked') {
+      loadedBreakIdRef.current = null;
+      return;
+    }
+
+    if (existingBreak?.id) {
+      if (loadedBreakIdRef.current === existingBreak.id) {
+        return;
+      }
+      const presetType = (existingBreak.blockedType || existingBreak.type || 'Break') as 'Break' | 'Lunch' | 'Meeting';
+      const normalizedType = ['Break', 'Lunch', 'Meeting'].includes(presetType) ? presetType : 'Break';
+      setBlockStaffId(existingBreak.staffId || currentStaffId || availableStylists[0]?.id || '');
+      setBlockStartTime(Number(existingBreak.startTime ?? 180));
+      setBlockDuration(Number(existingBreak.duration ?? 45));
+      setBlockType(normalizedType);
+      const presetTexts = getBlockPresetTexts(normalizedType);
+      setBlockTitleAr(presetTexts.titleAr);
+      setBlockTitleEn(existingBreak.label || presetTexts.titleEn);
+      if (existingBreak.label) {
+        setBlockTitleAr(existingBreak.label);
+      }
+      loadedBreakIdRef.current = existingBreak.id;
+      return;
+    }
+
+    if (!blockStaffId) {
+      setBlockStaffId(currentStaffId || availableStylists[0]?.id || '');
+    }
+  }, [
+    isCreateDrawerOpen,
+    createMode,
+    existingBreak,
+    availableStylists,
+    currentStaffId
+  ]);
 
   useEffect(() => {
     if (isCartDrawerOpen && initialCartTab) {
@@ -399,6 +467,8 @@ export default function InteractiveDrawers({
   const [blockStartTime, setBlockStartTime] = useState<number>(180); // 12:00 PM
   const [blockDuration, setBlockDuration] = useState<number>(45);
   const [blockType, setBlockType] = useState<'Break' | 'Lunch' | 'Meeting'>('Break');
+  const isEditingBreak = Boolean(existingBreak?.id);
+  const loadedBreakIdRef = useRef<string | null>(null);
 
   // POS CART & GIFT CARDS
   const [cartTab, setCartTab] = useState<'products' | 'giftcards'>('products');
@@ -653,9 +723,9 @@ export default function InteractiveDrawers({
     }
   };
 
-  const handleConfirmBlockCreation = async () => {
+  const handleConfirmBlockSubmit = async () => {
     try {
-      const response = await tenantApiAdapter.createEmployeeBreak(blockStaffId, {
+      const payload = {
         specificDate: getLocalDateKey(selectedDate),
         startTime: buildClockTime(blockStartTime),
         endTime: buildClockTime(blockStartTime + blockDuration),
@@ -663,10 +733,14 @@ export default function InteractiveDrawers({
         label: blockTitleEn,
         isRecurring: false,
         referenceDate: getLocalDateKey(selectedDate)
-      });
+      };
+
+      const response = existingBreak?.id
+        ? await tenantApiAdapter.updateEmployeeBreak(blockStaffId || existingBreak.staffId || '', existingBreak.id, payload)
+        : await tenantApiAdapter.createEmployeeBreak(blockStaffId, payload);
 
       if (!response?.success) {
-        throw new Error(response?.message || 'Failed to create blocked time');
+        throw new Error(response?.message || (existingBreak?.id ? 'Failed to update blocked time' : 'Failed to create blocked time'));
       }
 
       setIsCreateDrawerOpen(false);
@@ -674,15 +748,57 @@ export default function InteractiveDrawers({
         await onBoardChanged();
       }
       addLocalToast(
-        `تم حظر الفترة الزمنية (${blockTitleAr}) بنجاح للأخصائية المعنية`,
-        `Successfully blocked time (${blockTitleEn}) for the stylist`,
+        existingBreak?.id
+          ? `تم تحديث الفترة الزمنية المحجوزة (${blockTitleAr}) بنجاح`
+          : `تم حظر الفترة الزمنية (${blockTitleAr}) بنجاح للأخصائية المعنية`,
+        existingBreak?.id
+          ? `Successfully updated blocked time (${blockTitleEn})`
+          : `Successfully blocked time (${blockTitleEn}) for the stylist`,
         'success'
       );
     } catch (err) {
-      console.error('Failed to create blocked time', err);
+      console.error(existingBreak?.id ? 'Failed to update blocked time' : 'Failed to create blocked time', err);
       addLocalToast(
-        'تعذر حفظ فترة الحظر',
-        'Failed to create blocked time',
+        existingBreak?.id ? 'تعذر تحديث فترة الحظر' : 'تعذر حفظ فترة الحظر',
+        existingBreak?.id ? 'Failed to update blocked time' : 'Failed to create blocked time',
+        'warning'
+      );
+    }
+  };
+
+  const handleBreakDelete = async () => {
+    if (!existingBreak?.id) {
+      return;
+    }
+
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm(isRtl ? 'هل تريد حذف فترة الحظر هذه؟' : 'Delete this blocked time?');
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await tenantApiAdapter.deleteEmployeeBreak(blockStaffId || existingBreak.staffId || '', existingBreak.id);
+      if (!response?.success) {
+        throw new Error(response?.message || 'Failed to delete blocked time');
+      }
+
+      setIsCreateDrawerOpen(false);
+      if (onBoardChanged) {
+        await onBoardChanged();
+      }
+      addLocalToast(
+        'تم حذف فترة الحظر بنجاح',
+        'Blocked time deleted successfully',
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to delete blocked time', err);
+      addLocalToast(
+        'تعذر حذف فترة الحظر',
+        'Failed to delete blocked time',
         'warning'
       );
     }
@@ -882,11 +998,19 @@ export default function InteractiveDrawers({
                       <CalendarIcon size={16} />
                     </span>
                     <h3 className="text-sm font-bold tracking-tight">
-                      {isRtl ? 'حجز موعد ومخطط تشغيل جديد' : 'New Reservation & Operational Booking'}
+                      {createMode === 'blocked'
+                        ? (isEditingBreak
+                          ? (isRtl ? 'تعديل فترة الحظر' : 'Edit Blocked Time')
+                          : (isRtl ? 'حظر وقت' : 'Blocked Time'))
+                        : (isRtl ? 'حجز موعد ومخطط تشغيل جديد' : 'New Reservation & Operational Booking')}
                     </h3>
                   </div>
                   <p className="text-[10px] text-zinc-400 mt-0.5">
-                    {isRtl ? 'جدولة الخدمات والخصومات وتخصيص الدفع لعملاء صالون واستجمام رفاه الفاخر' : 'Schedule luxury services, client profiles, and payment allocations'}
+                    {createMode === 'blocked'
+                      ? (isEditingBreak
+                        ? (isRtl ? 'عدّل أو احذف فترة الحظر الحالية ثم احفظ التغييرات.' : 'Update or delete the selected blocked time.')
+                        : (isRtl ? 'أنشئ فترة حظر أو استراحة جديدة للموظفة.' : 'Create a new blocked interval for the stylist.'))
+                      : (isRtl ? 'جدولة الخدمات والخصومات وتخصيص الدفع لعملاء صالون واستجمام رفاه الفاخر' : 'Schedule luxury services, client profiles, and payment allocations')}
                   </p>
                 </div>
                 <button 
@@ -1690,17 +1814,11 @@ export default function InteractiveDrawers({
                     <div className="grid grid-cols-3 gap-2">
                       {['Break', 'Lunch', 'Meeting'].map(type => (
                         <button key={type} onClick={() => {
-                          setBlockType(type as any);
-                          if (type === 'Break') {
-                            setBlockTitleAr('استراحة فنجان قهوة');
-                            setBlockTitleEn('Coffee Recess Break');
-                          } else if (type === 'Lunch') {
-                            setBlockTitleAr('فترة استراحة الغداء');
-                            setBlockTitleEn('Staff Lunch Break');
-                          } else {
-                            setBlockTitleAr('اجتماع إداري');
-                            setBlockTitleEn('Staff Administrative Sync');
-                          }
+                          const presetType = type as 'Break' | 'Lunch' | 'Meeting';
+                          setBlockType(presetType);
+                          const presetTexts = getBlockPresetTexts(presetType);
+                          setBlockTitleAr(presetTexts.titleAr);
+                          setBlockTitleEn(presetTexts.titleEn);
                         }} className={`py-1.5 rounded-lg border font-bold ${blockType === type ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-slate-50 text-slate-500'}`}>
                           {type}
                         </button>
@@ -1744,8 +1862,13 @@ export default function InteractiveDrawers({
                     <button onClick={() => setIsCreateDrawerOpen(false)} className="py-2 px-4 bg-slate-100 rounded-lg text-slate-600 font-bold">
                       {isRtl ? 'إلغاء' : 'Cancel'}
                     </button>
-                    <button onClick={handleConfirmBlockCreation} className="py-2 px-5 bg-zinc-900 text-white font-bold rounded-lg shadow-sm">
-                      {isRtl ? 'تأكيد الحظر' : 'Block Time'}
+                    {isEditingBreak && (
+                      <button onClick={handleBreakDelete} className="py-2 px-5 bg-rose-600 text-white font-bold rounded-lg shadow-sm">
+                        {isRtl ? 'حذف الحظر' : 'Delete Block'}
+                      </button>
+                    )}
+                    <button onClick={handleConfirmBlockSubmit} className="py-2 px-5 bg-zinc-900 text-white font-bold rounded-lg shadow-sm">
+                      {isEditingBreak ? (isRtl ? 'حفظ التغييرات' : 'Save Changes') : (isRtl ? 'تأكيد الحظر' : 'Block Time')}
                     </button>
                   </div>
                 </div>

@@ -715,6 +715,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   
   // Selection / Detail Drawer State
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [activeBlockedTime, setActiveBlockedTime] = useState<any | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<'overview' | 'financials' | 'timeline' | 'reviews'>('overview');
   const [activeStylistMenuId, setActiveStylistMenuId] = useState<string | null>(null);
@@ -733,6 +734,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const selectedDateKey = getLocalDateKey(selectedDate);
   const riyadhTodayKey = getRiyadhDateKey(new Date());
   const isBoardEditable = selectedDateKey >= riyadhTodayKey;
+
+  useEffect(() => {
+    if (!isCreateDrawerOpen) {
+      setActiveBlockedTime(null);
+    }
+  }, [isCreateDrawerOpen]);
 
   const activeAppointmentServiceSources = Array.isArray(activeAppointment?.bookingSession?.appointments) && activeAppointment.bookingSession.appointments.length > 0
     ? activeAppointment.bookingSession.appointments
@@ -2009,14 +2016,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setCurrentStaffId(contextMenu.staffId);
         setCurrentStartTime(contextMenu.timeInMinutes);
       }
+      setActiveBlockedTime(null);
       setInitialCreateMode('appointment');
       setCreateStep(1);
       setStagedServices([]);
       setIsCreateDrawerOpen(true);
     } else if (actionType === 'block') {
+      setActiveBlockedTime(null);
       if (contextMenu) {
         setBlockStaffId(contextMenu.staffId);
         setBlockStartTime(contextMenu.timeInMinutes);
+        setBlockDuration(45);
+        setBlockType('Break');
         setBlockTitleAr('فترة استراحة وحظر');
         setBlockTitleEn('Break Slot');
         setCurrentStaffId(contextMenu.staffId);
@@ -2071,15 +2082,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // Open Details Drawer
   const openAppointmentDetails = async (apt: Appointment, options: { readOnly?: boolean } = {}) => {
-    if (apt.type === 'blocked') {
-      // For blocked cards, open a simplified popup or handle beautifully
-      addLocalToast(
-        `فترة محظورة: ${apt.customerNameAr}`,
-        `Blocked time interval: ${apt.customerNameEn}`,
-        'info'
-      );
-      return;
-    }
     try {
       const response = await tenantApiAdapter.getAppointment(apt.id);
       const detail = response?.appointment || response?.data?.appointment || response?.data || response;
@@ -2101,6 +2103,23 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setCustomerHistoryData(null);
     setCustomerProfileError(null);
     setDrawerOpen(true);
+  };
+
+  const openBlockedTimeDetails = (apt: Appointment) => {
+    setActiveBlockedTime(apt);
+    setActiveAppointment(null);
+    setCurrentStaffId(apt.staffId || currentStaffId);
+    setCurrentStartTime(apt.startTime);
+    setAppointmentDetailsReadOnly(true);
+    setDrawerOpen(false);
+    setIsCustomerProfileOpen(false);
+    setCustomerTransactionsExpanded(false);
+    setCustomerTransactionDetail(null);
+    setCustomerProfile(null);
+    setCustomerHistoryData(null);
+    setCustomerProfileError(null);
+    setIsCreateDrawerOpen(true);
+    setInitialCreateMode('blocked');
   };
 
   const openHistoricalAppointmentDetails = async (historyItem: any) => {
@@ -3851,9 +3870,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         return (
                           <div
                             key={apt.id}
-                            draggable={viewMode === 'day' && isBoardEditable}
+                            draggable={viewMode === 'day' && isBoardEditable && apt.type !== 'blocked'}
                             onDragStart={(e) => {
-                              if (viewMode !== 'day' || !isBoardEditable) return;
+                              if (viewMode !== 'day' || !isBoardEditable || apt.type === 'blocked') return;
                               e.dataTransfer.setData('text/plain', apt.id);
                               setDraggedAptId(apt.id);
                             }}
@@ -3874,10 +3893,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (apt.type === 'blocked') {
+                                openBlockedTimeDetails(apt);
+                                return;
+                              }
                               openAppointmentDetails(apt, { readOnly: !isBoardEditable });
                             }}
                             onMouseDown={(e) => {
-                              if (viewMode === 'day' && isBoardEditable) {
+                              if (viewMode === 'day' && isBoardEditable && apt.type !== 'blocked') {
                                 handleMouseDown(e, apt.id, false);
                               }
                             }}
@@ -5929,6 +5952,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         products={liveProducts}
         giftCardPackages={giftCardPackages}
         onBoardChanged={loadBoardData}
+        existingBreak={activeBlockedTime}
       />
 
       {/* Render Roster / Employee Weekly Schedule Editor Modal */}
