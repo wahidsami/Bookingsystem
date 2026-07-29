@@ -96,8 +96,7 @@ export function buildSalesOverviewRows(data: SalesOverviewPayload): SalesOvervie
     const refundAmount = refund?.amount ?? row?.refund ?? null;
     const netSales = row?.netSales ?? null;
     const paymentMethod = `${row?.paymentMethodLabel || row?.paymentMethod || '-'}`.trim() || '-';
-    const saleStatus = `${row?.saleStatus || row?.status || '-'}`.trim() || '-';
-    const paymentStatus = `${row?.paymentStatus || row?.status || saleStatus}`.trim() || '-';
+    const status = `${row?.status || '-'}`.trim() || '-';
 
     return {
       id: String(row?.id || reference),
@@ -115,8 +114,7 @@ export function buildSalesOverviewRows(data: SalesOverviewPayload): SalesOvervie
       refund: refundAmount === null || refundAmount === undefined ? null : Number(refundAmount),
       netSales: netSales === null || netSales === undefined ? null : Number(netSales),
       paymentMethod,
-      paymentStatus,
-      saleStatus,
+      status,
       appointmentReference,
       location,
       amountPaid,
@@ -163,7 +161,7 @@ export function buildSalesOverviewFilterOptions(report: SalesOverviewPayload, is
     { label: isRtl ? 'Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø­Ø§Ù„Ø§Øª' : 'All Statuses', value: '' },
     ...Array.from(
       new Set(
-        (buildSalesOverviewRows(report).map((row) => row.saleStatus).filter(Boolean) as string[])
+        (buildSalesOverviewRows(report).map((row) => row.status).filter(Boolean) as string[])
           .map((item) => item.trim())
       )
     ).map((value) => ({ label: value, value }))
@@ -187,6 +185,7 @@ export function buildSalesOverviewBackendGaps(rows: SalesOverviewRow[]) {
   if (rows.some((row) => row.netSales == null)) gaps.add('Net Sales');
   if (rows.some((row) => row.refund == null)) gaps.add('Refund');
   if (rows.some((row) => row.vat == null)) gaps.add('VAT');
+  if (rows.some((row) => row.status === '-' || row.status === 'Unavailable')) gaps.add('Status');
   return Array.from(gaps);
 }
 
@@ -199,6 +198,7 @@ export function buildSalesOverviewDrawerPairs(row: SalesOverviewRow | null, lang
     { label: 'Customer', value: row.customer },
     { label: 'Employee', value: row.employee },
     { label: 'Channel', value: row.channel },
+    { label: 'Status', value: row.status },
     { label: 'Items', value: row.items },
     { label: 'Gross Sales', value: row.grossSales == null ? '-' : formatMoney(row.grossSales, lang) },
     { label: 'Discounts', value: row.discount == null ? '-' : formatMoney(row.discount, lang) },
@@ -206,8 +206,6 @@ export function buildSalesOverviewDrawerPairs(row: SalesOverviewRow | null, lang
     { label: 'Refund', value: row.refund == null ? '-' : formatMoney(row.refund, lang) },
     { label: 'Net Sales', value: row.netSales == null ? '-' : formatMoney(row.netSales, lang) },
     { label: 'Payment Method', value: row.paymentMethod },
-    { label: 'Payment Status', value: row.paymentStatus },
-    { label: 'Sale Status', value: row.saleStatus },
     { label: 'Notes', value: row.notes || '-' },
   ];
 }

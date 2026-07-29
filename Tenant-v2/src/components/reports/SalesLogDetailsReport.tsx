@@ -240,8 +240,7 @@ function buildSalesLogRows(report: SalesLogDetailsPayload): SalesLogDetailsTable
         vat,
         net,
         paymentMethod: formatText(row?.paymentMethodLabel || row?.paymentMethod || 'Unavailable'),
-        saleStatus: formatText(row?.saleStatus || 'Unavailable'),
-        paymentStatus: formatText(row?.paymentStatus || 'Unavailable'),
+        status: formatText(row?.status || 'Unavailable'),
         location: formatText(row?.location || 'Unavailable'),
         sourceRow: row,
         sourceItem: item,
@@ -279,7 +278,7 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
     category: '',
     itemType: '',
     paymentMethod: '',
-    saleStatus: '',
+    status: '',
     location: '',
   });
   const [drawerRow, setDrawerRow] = useState<SalesLogDetailsTableRow | null>(null);
@@ -340,9 +339,9 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
       { label: isRtl ? 'جميع طرق الدفع' : 'All Payment Methods', value: '' },
       ...uniqueValues(rows, (row) => row.paymentMethod),
     ]);
-    const saleStatusOptions = dedupeOptions([
-      { label: isRtl ? 'جميع الحالات' : 'All Sale Statuses', value: '' },
-      ...uniqueValues(rows, (row) => row.saleStatus),
+    const statusOptions = dedupeOptions([
+      { label: isRtl ? 'جميع الحالات' : 'All Statuses', value: '' },
+      ...uniqueValues(rows, (row) => row.status),
     ]);
     const locationOptions = dedupeOptions([
       { label: isRtl ? 'كل المواقع' : 'All Locations', value: '' },
@@ -355,7 +354,7 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
       categories: categoryOptions,
       itemTypes: itemTypeOptions,
       paymentMethods: paymentMethodOptions,
-      saleStatuses: saleStatusOptions,
+      statuses: statusOptions,
       locations: locationOptions,
     };
 
@@ -377,7 +376,7 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
     const selectedCategory = normalizeText(filterValues.category);
     const selectedItemType = normalizeText(filterValues.itemType);
     const selectedPaymentMethod = normalizeText(filterValues.paymentMethod);
-    const selectedSaleStatus = normalizeText(filterValues.saleStatus);
+    const selectedStatus = normalizeText(filterValues.status);
     const selectedLocation = normalizeText(filterValues.location);
 
     return rows.filter((row) => {
@@ -393,8 +392,7 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
           row.itemName,
           row.category,
           row.paymentMethod,
-          row.saleStatus,
-          row.paymentStatus,
+          row.status,
           row.location,
         ].join(' ').toLowerCase();
         if (!text.includes(q)) return false;
@@ -405,7 +403,7 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
       if (selectedCategory && normalizeText(row.category) !== selectedCategory) return false;
       if (selectedItemType && normalizeText(row.itemType) !== selectedItemType) return false;
       if (selectedPaymentMethod && normalizeText(row.paymentMethod) !== selectedPaymentMethod) return false;
-      if (selectedSaleStatus && normalizeText(row.saleStatus) !== selectedSaleStatus) return false;
+      if (selectedStatus && normalizeText(row.status) !== selectedStatus) return false;
       if (selectedLocation && normalizeText(row.location) !== selectedLocation) return false;
 
       return true;
@@ -584,7 +582,7 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
                 category: '',
                 itemType: '',
                 paymentMethod: '',
-                saleStatus: '',
+                status: '',
                 location: '',
               });
               setPage(1);
@@ -663,7 +661,7 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
                   <Field label="VAT" value={formatMoney(row.vat, lang)} />
                   <Field label="Net" value={formatMoney(row.net, lang)} />
                   <Field label="Payment Method" value={row.paymentMethod} />
-                  <Field label="Sale Status" value={row.saleStatus} />
+                  <Field label="Status" value={row.status} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -673,7 +671,7 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
                   <Field label="Team Member" value={row.employee} />
                   <Field label="Customer" value={row.customer} />
                   <Field label="Location" value={row.location} />
-                  <Field label="Payment Status" value={row.paymentStatus} />
+                  <Field label="Status" value={row.status} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -711,11 +709,11 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
                 <div className="mt-3 space-y-2 text-sm">
                   {drawerPaymentRows.length ? (
                     <>
-                      <Field label="Payment Method" value={row.paymentMethod} />
-                      <Field label="Payment Status" value={row.paymentStatus} />
-                      <Field label="Amount Paid" value={formatMoney(row.sourceRow?.amountPaid ?? row.sourceRow?.invoicePaidAmount, lang)} />
-                      <Field label="Remaining Balance" value={formatMoney(row.sourceRow?.remainingBalance ?? row.sourceRow?.invoiceDueAmount, lang)} />
-                      <Field label="Invoice Status" value={row.sourceRow?.invoiceStatus || 'Unavailable'} />
+                  <Field label="Payment Method" value={row.paymentMethod} />
+                  <Field label="Status" value={row.status} />
+                  <Field label="Amount Paid" value={formatMoney(row.sourceRow?.amountPaid ?? row.sourceRow?.invoicePaidAmount, lang)} />
+                  <Field label="Remaining Balance" value={formatMoney(row.sourceRow?.remainingBalance ?? row.sourceRow?.invoiceDueAmount, lang)} />
+                  <Field label="Invoice Status" value={row.sourceRow?.invoiceStatus || 'Unavailable'} />
                     </>
                   ) : <div className="text-slate-500">Unavailable</div>}
                 </div>

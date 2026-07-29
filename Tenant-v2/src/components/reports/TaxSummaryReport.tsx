@@ -281,7 +281,7 @@ function buildTaxSummaryRows(report: TaxSummaryPayload): TaxSummaryTableRow[] {
         taxAmount: taxAmount === null || taxAmount === undefined ? null : Number(taxAmount),
         netSales: netSales === null || netSales === undefined ? null : Number(netSales),
         paymentMethod: formatText(row?.paymentMethodLabel || row?.paymentMethod || 'Unavailable'),
-        saleStatus: formatText(row?.saleStatus || 'Unavailable'),
+        status: formatText(row?.status || 'Unavailable'),
         location: formatText(row?.location || 'Unavailable'),
         itemType: formatText(itemType),
         sourceRow: row,
@@ -434,7 +434,7 @@ export default function TaxSummaryReport({ lang }: { lang: Language }) {
           row.teamMember,
           row.location,
           row.paymentMethod,
-          row.saleStatus,
+          row.status,
           row.itemType,
         ].join(' ').toLowerCase();
         if (!text.includes(q)) return false;
@@ -738,7 +738,7 @@ export default function TaxSummaryReport({ lang }: { lang: Language }) {
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Invoice</div>
                 <div className="mt-3 space-y-2 text-sm">
                   <Field label="Invoice Number" value={row.invoiceNumber} />
-                  <Field label="Sale Status" value={row.saleStatus} />
+                  <Field label="Status" value={row.status} />
                   <Field label="Gross Sales" value={formatMoney(row.grossSales, lang)} />
                   <Field label="Tax Amount" value={formatMoney(row.taxAmount, lang)} />
                   <Field label="Net Sales" value={formatMoney(row.netSales, lang)} />
@@ -750,7 +750,7 @@ export default function TaxSummaryReport({ lang }: { lang: Language }) {
                   <Field label="Item" value={row.item} />
                   <Field label="Category" value={row.category} />
                   <Field label="Item Type" value={row.itemType} />
-                  <Field label="Payment Status" value={row.sourceRow?.paymentStatus || row.saleStatus} />
+                  <Field label="Status" value={row.status} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">

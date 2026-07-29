@@ -29,8 +29,6 @@ import type { Language } from '../../types';
 type DiscountSummaryPayload = SalesOverviewPayload;
 
 type DiscountSummaryRow = DiscountSummaryTableRow & {
-  saleStatus: string;
-  paymentStatus: string;
   paymentMethod: string;
   location: string;
   saleDateTime: string;
@@ -274,8 +272,7 @@ function buildDiscountSummaryRows(report: DiscountSummaryPayload): DiscountSumma
         discountAmount: discountAmount === null || discountAmount === undefined ? null : Number(discountAmount),
         discountPercent: discountPercent === null || discountPercent === undefined ? null : Number(discountPercent),
         netSales: netSales === null || netSales === undefined ? null : Number(netSales),
-        saleStatus: formatText(row?.saleStatus || 'Unavailable'),
-        paymentStatus: formatText(row?.paymentStatus || 'Unavailable'),
+        status: formatText(row?.status || 'Unavailable'),
         paymentMethod: formatText(row?.paymentMethod || 'Unavailable'),
         location: formatText(row?.location || 'Unavailable'),
         saleDateTime: String(saleDate || ''),
@@ -431,13 +428,12 @@ export default function DiscountSummaryReport({ lang }: { lang: Language }) {
           row.discountType,
           row.item,
           row.category,
-          row.customer,
-          row.teamMember,
-          row.location,
-          row.paymentMethod,
-          row.paymentStatus,
-          row.saleStatus,
-        ].join(' ').toLowerCase();
+        row.customer,
+        row.teamMember,
+        row.location,
+        row.paymentMethod,
+        row.status,
+      ].join(' ').toLowerCase();
         if (!text.includes(q)) return false;
       }
 
@@ -736,8 +732,7 @@ export default function DiscountSummaryReport({ lang }: { lang: Language }) {
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Sale</div>
                 <div className="mt-3 space-y-2 text-sm">
                   <Field label="Discount Category" value={row.discountCategory} />
-                  <Field label="Sale Status" value={row.saleStatus} />
-                  <Field label="Payment Status" value={row.paymentStatus} />
+                  <Field label="Status" value={row.status} />
                   <Field label="Discount Type" value={row.discountType} />
                 </div>
               </div>

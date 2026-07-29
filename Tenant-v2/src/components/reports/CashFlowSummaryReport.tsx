@@ -131,7 +131,7 @@ function buildSourceRows(report: CashFlowPayload): CashFlowSourceRow[] {
       paymentMethod: `${paymentRow?.paymentMethod || paymentRow?.method || ''}`.trim(),
       paymentMethodLabel: `${paymentRow?.method || paymentRow?.paymentMethod || ''}`.trim() || 'Unavailable',
       amount: Number(paymentRow?.amount ?? revenueRow?.revenue ?? revenueRow?.amountPaid ?? 0),
-      status: `${paymentRow?.status || revenueRow?.paymentStatus || revenueRow?.status || 'Unavailable'}`.trim() || 'Unavailable',
+      status: `${paymentRow?.status || revenueRow?.status || 'Unavailable'}`.trim() || 'Unavailable',
       type: `${paymentRow?.type || revenueRow?.type || paymentRow?.transactionType || ''}`.trim() || 'Unavailable',
       notes: `${paymentRow?.notes || revenueRow?.notes || 'Unavailable'}`.trim() || 'Unavailable',
       transactionRef: `${paymentRow?.transactionRef || revenueRow?.transactionRef || paymentRow?.id || revenueRow?.id || 'Unavailable'}`.trim() || 'Unavailable',

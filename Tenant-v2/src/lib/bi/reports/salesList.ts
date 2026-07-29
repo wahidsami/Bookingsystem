@@ -14,8 +14,7 @@ export interface SalesListReportOptions {
   customers: BIOption[];
   employees: BIOption[];
   paymentMethods: BIOption[];
-  saleStatuses: BIOption[];
-  paymentStatuses: BIOption[];
+  statuses: BIOption[];
   locations: BIOption[];
   channels: BIOption[];
 }
@@ -38,8 +37,7 @@ export function createSalesListReportDefinition(
       { id: 'customer', label: 'Customer', type: 'customer', options: options.customers },
       { id: 'employee', label: 'Employee', type: 'employee', options: options.employees },
       { id: 'paymentMethod', label: 'Payment Method', type: 'payment-method', options: options.paymentMethods },
-      { id: 'saleStatus', label: 'Sale Status', type: 'status', options: options.saleStatuses },
-      { id: 'paymentStatus', label: 'Payment Status', type: 'status', options: options.paymentStatuses },
+      { id: 'status', label: 'Status', type: 'status', options: options.statuses },
       { id: 'location', label: 'Location', type: 'location', options: options.locations },
       { id: 'channel', label: 'Channel', type: 'dropdown', options: options.channels },
       { id: 'grossSalesRange', label: 'Gross Sales Range', type: 'amount-range', minPlaceholder: 'Min gross sales', maxPlaceholder: 'Max gross sales' }
@@ -53,7 +51,7 @@ export function createSalesListReportDefinition(
       { id: 'employee', header: 'Employee', accessor: 'employee', sortable: true, width: '11rem' },
       { id: 'location', header: 'Location', accessor: 'location', sortable: true, width: '11rem' },
       { id: 'channel', header: 'Channel', accessor: 'channel', sortable: true, width: '9rem' },
-      { id: 'paymentStatus', header: 'Payment Status', accessor: 'paymentStatus', sortable: true, width: '11rem' },
+      { id: 'status', header: 'Status', accessor: 'status', sortable: true, width: '10rem' },
       { id: 'paymentMethod', header: 'Payment Method', accessor: 'paymentMethod', sortable: true, width: '11rem' },
       { id: 'itemsSold', header: 'Items Sold', accessor: 'itemsSold', sortable: true, width: '14rem' },
       { id: 'grossSales', header: 'Gross Sales', accessor: 'grossSales', sortable: true, align: 'right', width: '10rem' },
@@ -61,8 +59,7 @@ export function createSalesListReportDefinition(
       { id: 'vat', header: 'VAT', accessor: 'vat', sortable: true, align: 'right', width: '8rem' },
       { id: 'netSales', header: 'Net Sales', accessor: 'netSales', sortable: true, align: 'right', width: '10rem' },
       { id: 'amountPaid', header: 'Amount Paid', accessor: 'amountPaid', sortable: true, align: 'right', width: '10rem' },
-      { id: 'remainingBalance', header: 'Remaining Balance', accessor: 'remainingBalance', sortable: true, align: 'right', width: '10rem' },
-      { id: 'saleStatus', header: 'Sale Status', accessor: 'saleStatus', sortable: true, width: '10rem' }
+      { id: 'remainingBalance', header: 'Remaining Balance', accessor: 'remainingBalance', sortable: true, align: 'right', width: '10rem' }
     ],
     exports: {
       enabled: { csv: true, excel: true, pdf: true, print: true }

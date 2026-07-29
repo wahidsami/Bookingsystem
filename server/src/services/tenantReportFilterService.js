@@ -134,8 +134,6 @@ function buildReportFilterContext(query = {}) {
     location: parseList(query.location),
     channel: parseList(query.channel),
     paymentMethod: parseList(query.paymentMethod),
-    paymentStatus: parseList(query.paymentStatus),
-    saleStatus: parseList(query.saleStatus),
     status: parseList(query.status),
     source: parseList(query.source),
     customerType: parseList(query.customerType),
@@ -187,7 +185,6 @@ function getAppointmentFilterValues(appointment = {}) {
       appointment.bookingReference,
       appointment.id,
       appointment.status,
-      appointment.paymentStatus,
       appointment.price,
       appointment.rawPrice,
       appointment.taxAmount,
@@ -211,7 +208,6 @@ function getAppointmentFilterValues(appointment = {}) {
     customer: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.displayName || user.email || user.phone,
     location: tenant.city || tenant.name_en || tenant.name_ar || tenant.name || tenant.address,
     paymentMethod: appointment.bookingSession?.paymentMethod || appointment.paymentMethod || null,
-    paymentStatus: appointment.paymentStatus,
     status: appointment.status,
     service: service.name_en || service.name_ar || service.id,
     category: service.category,
@@ -227,8 +223,6 @@ function matchesAppointmentFilters(appointment, filters) {
   if (!matchesSelection(values.customer, filters.customer)) return false;
   if (!matchesSelection(values.location, filters.location)) return false;
   if (!matchesSelection(values.paymentMethod, filters.paymentMethod)) return false;
-  if (!matchesSelection(values.paymentStatus, filters.paymentStatus)) return false;
-  if (!matchesSelection(values.saleStatus || values.status, filters.saleStatus)) return false;
   if (!matchesSelection(values.status, filters.status)) return false;
   if (!matchesSelection(values.service, filters.service)) return false;
   if (!matchesSelection(values.category, filters.category)) return false;
@@ -252,7 +246,6 @@ function getOrderFilterValues(order = {}) {
       order.orderNumber,
       order.id,
       order.status,
-      order.paymentStatus,
       order.paymentMethod,
       order.subtotal,
       order.taxAmount,
@@ -276,7 +269,6 @@ function getOrderFilterValues(order = {}) {
     location: tenant.city || tenant.name_en || tenant.name_ar || tenant.name || tenant.address,
     channel: order.channel || order.source || (order?.id ? 'Order' : null),
     paymentMethod: order.paymentMethod,
-    paymentStatus: order.paymentStatus,
     status: order.status,
     source: 'order',
     product: itemNames,
@@ -294,8 +286,6 @@ function matchesOrderFilters(order, filters) {
   if (!matchesSelection(values.channel, filters.channel)) return false;
   if (!matchesSelection(values.channel, filters.discountCategory)) return false;
   if (!matchesSelection(values.paymentMethod, filters.paymentMethod)) return false;
-  if (!matchesSelection(values.paymentStatus, filters.paymentStatus)) return false;
-  if (!matchesSelection(values.status, filters.saleStatus)) return false;
   if (!matchesSelection(values.status, filters.status)) return false;
   if (!matchesSelection(values.source, filters.source)) return false;
   if (!matchesAnySelection(values.product, filters.product)) return false;
@@ -330,7 +320,6 @@ function getTransactionFilterValues(transaction = {}) {
       transaction.amount,
       appointment.bookingNumber,
       appointment.bookingReference,
-      appointment.paymentStatus,
       appointment.status,
       appointment.price,
       appointment.rawPrice,
@@ -338,7 +327,6 @@ function getTransactionFilterValues(transaction = {}) {
       service.name_ar,
       service.category,
       order.orderNumber,
-      order.paymentStatus,
       order.status,
       order.paymentMethod,
       order.totalAmount,
@@ -361,9 +349,7 @@ function getTransactionFilterValues(transaction = {}) {
     location: tenant.city || tenant.name_en || tenant.name_ar || tenant.name || tenant.address,
     channel: appointment ? 'Appointment' : (order ? 'Order' : 'Transaction'),
     paymentMethod: transaction.paymentMethod,
-    paymentStatus: appointment.paymentStatus || order.paymentStatus || transaction.status,
     status: transaction.status,
-    saleStatus: appointment.status || order.status || transaction.status,
     source: appointment ? 'appointment' : (order ? 'order' : 'transaction'),
     transactionType: transaction.type,
     service: service.name_en || service.name_ar || service.id,
@@ -383,8 +369,6 @@ function matchesTransactionFilters(transaction, filters) {
   if (!matchesSelection(values.channel, filters.channel)) return false;
   if (!matchesSelection(values.channel, filters.discountCategory)) return false;
   if (!matchesSelection(values.paymentMethod, filters.paymentMethod)) return false;
-  if (!matchesSelection(values.paymentStatus, filters.paymentStatus)) return false;
-  if (!matchesSelection(values.saleStatus, filters.saleStatus)) return false;
   if (!matchesSelection(values.status, filters.status)) return false;
   if (!matchesSelection(values.source, filters.source)) return false;
   if (!matchesSelection(values.transactionType, filters.transactionType)) return false;

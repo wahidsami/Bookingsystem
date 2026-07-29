@@ -27,7 +27,7 @@ import type { BIDatePresetValue, BIDateRange, BIOption, BIReportFilterValues, BI
 import type { Language } from '../../types';
 
 type FinanceOverviewRow = FinanceOverviewTableRow & {
-  paymentStatus?: string;
+  status?: string;
   paymentMethodLabel?: string;
   sourceRow?: any;
 };

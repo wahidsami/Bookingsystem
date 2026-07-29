@@ -197,7 +197,7 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
 function mapTransactionType(paymentRow: any, revenueRow: any) {
   const rawType = `${paymentRow?.type || ''}`.trim().toLowerCase();
   const paymentMethod = `${paymentRow?.method || ''}`.trim().toLowerCase();
-  const rawStatus = `${paymentRow?.status || revenueRow?.paymentStatus || ''}`.trim().toLowerCase();
+  const rawStatus = `${paymentRow?.status || revenueRow?.status || ''}`.trim().toLowerCase();
 
   if (rawType === 'refund' || rawStatus === 'refunded') return 'Refund';
   if (paymentMethod === 'wallet') return 'Wallet';
@@ -221,7 +221,7 @@ function buildPaymentTransactionRows(report: PaymentTransactionsPayload): Paymen
     customer: row?.customer,
     method: row?.paymentMethod,
     amount: row?.amountPaid,
-    status: row?.paymentStatus || row?.status,
+    status: row?.status,
     type: row?.paymentMethod === 'wallet' ? 'wallet' : 'adjustment',
     date: row?.date || row?.processedAt || row?.createdAt,
     notes: row?.notes,
@@ -256,7 +256,7 @@ function buildPaymentTransactionRows(report: PaymentTransactionsPayload): Paymen
       location: formatText(revenueRow?.location || 'Unavailable'),
       paymentMethod: formatText(payment?.method || revenueRow?.paymentMethod || 'Unavailable'),
       transactionType: mapTransactionType(payment, revenueRow),
-      paymentStatus: formatText(revenueRow?.paymentStatus || payment?.status || 'Unavailable'),
+      status: formatText(payment?.status || revenueRow?.status || 'Unavailable'),
       paymentAmount,
       invoiceNumber: formatText(revenueRow?.invoiceNumber || 'Unavailable'),
       notes: formatText(notes || 'Unavailable'),
@@ -297,7 +297,7 @@ export default function PaymentTransactionsReport({ lang }: { lang: Language }) 
     location: '',
     paymentMethod: '',
     transactionType: '',
-    paymentStatus: '',
+    status: '',
     amountRange: { min: '', max: '' },
   });
   const [drawerRow, setDrawerRow] = useState<PaymentTransactionsTableRow | null>(null);
@@ -360,9 +360,9 @@ export default function PaymentTransactionsReport({ lang }: { lang: Language }) 
         { label: isRtl ? 'جميع الأنواع' : 'All Transaction Types', value: '' },
         ...uniqueValues(rows, (row) => row.transactionType),
       ]),
-      paymentStatuses: dedupeOptions([
-        { label: isRtl ? 'جميع الحالات' : 'All Payment Statuses', value: '' },
-        ...uniqueValues(rows, (row) => row.paymentStatus),
+      statuses: dedupeOptions([
+        { label: isRtl ? 'جميع الحالات' : 'All Statuses', value: '' },
+        ...uniqueValues(rows, (row) => row.status),
       ]),
     };
 
@@ -383,7 +383,7 @@ export default function PaymentTransactionsReport({ lang }: { lang: Language }) 
     const selectedLocation = normalizeText(filterValues.location);
     const selectedPaymentMethod = normalizeText(filterValues.paymentMethod);
     const selectedTransactionType = normalizeText(filterValues.transactionType);
-    const selectedPaymentStatus = normalizeText(filterValues.paymentStatus);
+    const selectedStatus = normalizeText(filterValues.status);
     const amountRange = typeof filterValues.amountRange === 'object' && filterValues.amountRange
       ? filterValues.amountRange as { min?: string; max?: string }
       : {};
@@ -401,7 +401,7 @@ export default function PaymentTransactionsReport({ lang }: { lang: Language }) 
           row.location,
           row.paymentMethod,
           row.transactionType,
-          row.paymentStatus,
+          row.status,
           row.invoiceNumber,
           row.notes,
         ].join(' ').toLowerCase();
@@ -413,7 +413,7 @@ export default function PaymentTransactionsReport({ lang }: { lang: Language }) 
       if (selectedLocation && normalizeText(row.location) !== selectedLocation) return false;
       if (selectedPaymentMethod && normalizeText(row.paymentMethod) !== selectedPaymentMethod) return false;
       if (selectedTransactionType && normalizeText(row.transactionType) !== selectedTransactionType) return false;
-      if (selectedPaymentStatus && normalizeText(row.paymentStatus) !== selectedPaymentStatus) return false;
+      if (selectedStatus && normalizeText(row.status) !== selectedStatus) return false;
 
       const amount = Number(row.paymentAmount || 0);
       if (min !== null && Number.isFinite(min) && !(Math.abs(amount) >= min)) return false;
@@ -578,7 +578,7 @@ export default function PaymentTransactionsReport({ lang }: { lang: Language }) 
                 location: '',
                 paymentMethod: '',
                 transactionType: '',
-                paymentStatus: '',
+                status: '',
                 amountRange: { min: '', max: '' },
               });
               setPage(1);
@@ -650,7 +650,7 @@ export default function PaymentTransactionsReport({ lang }: { lang: Language }) 
 
           const timeline = [
             { label: 'Payment Date', value: formatDate(row.paymentDate, lang) },
-            { label: 'Payment Status', value: row.paymentStatus || 'Unavailable' },
+            { label: 'Status', value: row.status || 'Unavailable' },
             { label: 'Transaction Type', value: row.transactionType || 'Unavailable' },
             { label: 'Payment Number', value: row.paymentNumber || 'Unavailable' },
           ];
@@ -664,7 +664,7 @@ export default function PaymentTransactionsReport({ lang }: { lang: Language }) 
                     {field('Payment Number', row.paymentNumber)}
                     {field('Payment Date', formatDate(row.paymentDate, lang))}
                     {field('Transaction Type', row.transactionType)}
-                    {field('Payment Status', row.paymentStatus)}
+                    {field('Status', row.status)}
                     {field('Notes', row.notes)}
                   </div>
                 </div>

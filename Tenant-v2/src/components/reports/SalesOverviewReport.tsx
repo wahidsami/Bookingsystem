@@ -278,7 +278,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
       { label: isRtl ? 'جميع الحالات' : 'All Statuses', value: '' },
       ...Array.from(
         new Set(
-          (buildSalesOverviewRows(report).map((row) => row.saleStatus).filter(Boolean) as string[])
+          (buildSalesOverviewRows(report).map((row) => row.status).filter(Boolean) as string[])
             .map((item) => item.trim())
         )
       ).map((value) => ({ label: value, value }))
@@ -339,8 +339,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
           row.channel,
           row.items,
           row.paymentMethod,
-          row.paymentStatus,
-          row.saleStatus,
+          row.status,
           row.notes,
         ].join(' ').toLowerCase();
         if (!text.includes(q)) return false;
@@ -350,7 +349,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
       if (selectedService && normalizeText(row.items) !== selectedService && !normalizeText(row.items).includes(selectedService)) return false;
       if (selectedPaymentMethod && normalizeText(row.paymentMethod) !== selectedPaymentMethod) return false;
       if (selectedCategory && normalizeText(row.category) !== selectedCategory) return false;
-      if (selectedStatus && normalizeText(row.saleStatus) !== selectedStatus && normalizeText(row.paymentStatus) !== selectedStatus) return false;
+      if (selectedStatus && normalizeText(row.status) !== selectedStatus) return false;
       if (refundOnly && !(Number(row.refund || 0) > 0)) return false;
 
       const gross = row.grossSales;
@@ -718,15 +717,15 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
           return (
             <div className="space-y-5">
               <div className="grid gap-4 xl:grid-cols-2">
-                {[
-                  { title: 'General', fields: ['Sale Number', 'Invoice Number', 'Sale Date', 'Channel', 'Sale Status'] },
+                {[ 
+                  { title: 'General', fields: ['Sale Number', 'Invoice Number', 'Sale Date', 'Channel', 'Status'] },
                   { title: 'Customer', fields: ['Customer'] },
                   { title: 'Appointment', fields: ['Employee'] },
                   { title: 'Services', fields: ['Items'] },
                   { title: 'Products', fields: ['Items'] },
                   { title: 'Discounts', fields: ['Discounts'] },
                   { title: 'Taxes', fields: ['Taxes', 'VAT'] },
-                  { title: 'Payments', fields: ['Payment Method', 'Payment Status'] },
+                  { title: 'Payments', fields: ['Payment Method', 'Status'] },
                   { title: 'Gift Cards', fields: ['Notes'] },
                   { title: 'Timeline', fields: ['Sale Date'] },
                   { title: 'Notes', fields: ['Notes'] },

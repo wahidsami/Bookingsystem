@@ -12,7 +12,7 @@ export interface PaymentTransactionsTableRow {
   location: string;
   paymentMethod: string;
   transactionType: string;
-  paymentStatus: string;
+  status: string;
   paymentAmount: number | null;
   invoiceNumber: string;
   notes: string;
@@ -27,7 +27,7 @@ export interface PaymentTransactionsReportOptions {
   locations: BIOption[];
   paymentMethods: BIOption[];
   transactionTypes: BIOption[];
-  paymentStatuses: BIOption[];
+  statuses: BIOption[];
 }
 
 export function createPaymentTransactionsReportDefinition(
@@ -50,7 +50,7 @@ export function createPaymentTransactionsReportDefinition(
       { id: 'location', label: 'Location', type: 'location', options: options.locations },
       { id: 'paymentMethod', label: 'Payment Method', type: 'payment-method', options: options.paymentMethods },
       { id: 'transactionType', label: 'Transaction Type', type: 'dropdown', options: options.transactionTypes },
-      { id: 'paymentStatus', label: 'Payment Status', type: 'status', options: options.paymentStatuses },
+      { id: 'status', label: 'Status', type: 'status', options: options.statuses },
       { id: 'amountRange', label: 'Amount Range', type: 'amount-range', minPlaceholder: 'Min amount', maxPlaceholder: 'Max amount' },
     ],
     columns: [
@@ -63,7 +63,7 @@ export function createPaymentTransactionsReportDefinition(
       { id: 'location', header: 'Location', accessor: 'location', sortable: true, width: '11rem' },
       { id: 'paymentMethod', header: 'Payment Method', accessor: 'paymentMethod', sortable: true, width: '11rem' },
       { id: 'transactionType', header: 'Transaction Type', accessor: 'transactionType', sortable: true, width: '11rem' },
-      { id: 'paymentStatus', header: 'Payment Status', accessor: 'paymentStatus', sortable: true, width: '11rem' },
+      { id: 'status', header: 'Status', accessor: 'status', sortable: true, width: '11rem' },
       { id: 'paymentAmount', header: 'Payment Amount', accessor: 'paymentAmount', sortable: true, align: 'right', width: '10rem' },
       { id: 'invoiceNumber', header: 'Invoice Number', accessor: 'invoiceNumber', sortable: true, width: '11rem' },
       { id: 'notes', header: 'Notes', accessor: 'notes', sortable: true, width: '14rem' },

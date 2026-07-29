@@ -19,8 +19,7 @@ export interface SalesLogDetailsTableRow {
   vat: number | null;
   net: number | null;
   paymentMethod: string;
-  saleStatus: string;
-  paymentStatus: string;
+  status: string;
   location: string;
   sourceRow?: any;
   sourceItem?: any;
@@ -32,7 +31,7 @@ export interface SalesLogDetailsReportOptions {
   categories: BIOption[];
   itemTypes: BIOption[];
   paymentMethods: BIOption[];
-  saleStatuses: BIOption[];
+  statuses: BIOption[];
   locations: BIOption[];
 }
 
@@ -56,7 +55,7 @@ export function createSalesLogDetailsReportDefinition(
       { id: 'category', label: 'Category', type: 'category', options: options.categories },
       { id: 'itemType', label: 'Item Type', type: 'dropdown', options: options.itemTypes },
       { id: 'paymentMethod', label: 'Payment Method', type: 'payment-method', options: options.paymentMethods },
-      { id: 'saleStatus', label: 'Sale Status', type: 'status', options: options.saleStatuses },
+      { id: 'status', label: 'Status', type: 'status', options: options.statuses },
       { id: 'location', label: 'Location', type: 'location', options: options.locations }
     ],
     columns: [
@@ -76,7 +75,7 @@ export function createSalesLogDetailsReportDefinition(
       { id: 'vat', header: 'VAT', accessor: 'vat', sortable: true, align: 'right', width: '8rem' },
       { id: 'net', header: 'Net', accessor: 'net', sortable: true, align: 'right', width: '9rem' },
       { id: 'paymentMethod', header: 'Payment Method', accessor: 'paymentMethod', sortable: true, width: '11rem' },
-      { id: 'saleStatus', header: 'Sale Status', accessor: 'saleStatus', sortable: true, width: '10rem' }
+      { id: 'status', header: 'Status', accessor: 'status', sortable: true, width: '10rem' }
     ],
     exports: {
       enabled: { csv: true, excel: true, pdf: true, print: true }

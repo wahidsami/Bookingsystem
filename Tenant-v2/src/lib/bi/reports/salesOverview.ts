@@ -16,8 +16,7 @@ export interface SalesOverviewTableRow {
   refund: number | null;
   netSales: number | null;
   paymentMethod: string;
-  paymentStatus: string;
-  saleStatus: string;
+  status: string;
   detailPath?: string | null;
   notes?: string | null;
 }
@@ -49,7 +48,7 @@ export function createSalesOverviewReportDefinition(
       { id: 'service', label: 'Service', type: 'dropdown', options: options.services },
       { id: 'paymentMethod', label: 'Payment Method', type: 'payment-method', options: options.paymentMethods },
       { id: 'category', label: 'Category', type: 'category', options: options.categories },
-      { id: 'status', label: 'Sale Status', type: 'status', options: options.statuses },
+      { id: 'status', label: 'Status', type: 'status', options: options.statuses },
       { id: 'refundOnly', label: 'Refunds Only', type: 'boolean', trueLabel: 'Only refunds', falseLabel: 'All sales' },
       { id: 'grossSalesRange', label: 'Gross Sales Range', type: 'amount-range', minPlaceholder: 'Min gross sales', maxPlaceholder: 'Max gross sales' }
     ],
@@ -67,8 +66,7 @@ export function createSalesOverviewReportDefinition(
       { id: 'refund', header: 'Refund', accessor: 'refund', sortable: true, align: 'right', width: '9rem' },
       { id: 'netSales', header: 'Net Sales', accessor: 'netSales', sortable: true, align: 'right', width: '10rem' },
       { id: 'paymentMethod', header: 'Payment Method', accessor: 'paymentMethod', sortable: true, width: '11rem' },
-      { id: 'paymentStatus', header: 'Payment Status', accessor: 'paymentStatus', sortable: true, width: '11rem' },
-      { id: 'saleStatus', header: 'Sale Status', accessor: 'saleStatus', sortable: true, width: '10rem' }
+      { id: 'status', header: 'Status', accessor: 'status', sortable: true, width: '10rem' }
     ],
     kpis: [],
     charts: [],

@@ -17,6 +17,7 @@ export interface DiscountSummaryTableRow {
   discountAmount: number | null;
   discountPercent: number | null;
   netSales: number | null;
+  status: string;
 }
 
 export interface DiscountSummaryReportOptions {

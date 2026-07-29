@@ -200,6 +200,7 @@ function buildSalesListRows(report: SalesOverviewPayload): SalesListTableRow[] {
 
     return {
       ...row,
+      status: formatText(row.status || source.status || 'Unavailable'),
       appointmentReference,
       location,
       amountPaid: amountPaid === null || amountPaid === undefined ? null : Number(amountPaid),
@@ -236,8 +237,7 @@ export default function SalesListReport({ lang }: { lang: Language }) {
     customer: '',
     employee: '',
     paymentMethod: '',
-    saleStatus: '',
-    paymentStatus: '',
+    status: '',
     location: '',
     channel: '',
     grossSalesRange: { min: '', max: '' },
@@ -293,13 +293,9 @@ export default function SalesListReport({ lang }: { lang: Language }) {
       { label: isRtl ? 'جميع طرق الدفع' : 'All Payment Methods', value: '' },
       ...uniqueValues(rows, (row) => row.paymentMethod),
     ]);
-    const saleStatusOptions = dedupeOptions([
-      { label: isRtl ? 'جميع الحالات' : 'All Sale Statuses', value: '' },
-      ...uniqueValues(rows, (row) => row.saleStatus),
-    ]);
-    const paymentStatusOptions = dedupeOptions([
-      { label: isRtl ? 'جميع حالات الدفع' : 'All Payment Statuses', value: '' },
-      ...uniqueValues(rows, (row) => row.paymentStatus),
+    const statusOptions = dedupeOptions([
+      { label: isRtl ? 'جميع الحالات' : 'All Statuses', value: '' },
+      ...uniqueValues(rows, (row) => row.status),
     ]);
     const locationOptions = dedupeOptions([
       { label: isRtl ? 'كل المواقع' : 'All Locations', value: '' },
@@ -314,8 +310,7 @@ export default function SalesListReport({ lang }: { lang: Language }) {
       customers: customerOptions,
       employees: employeeOptions,
       paymentMethods: paymentMethodOptions,
-      saleStatuses: saleStatusOptions,
-      paymentStatuses: paymentStatusOptions,
+      statuses: statusOptions,
       locations: locationOptions,
       channels: channelOptions,
     };
@@ -336,8 +331,7 @@ export default function SalesListReport({ lang }: { lang: Language }) {
     const selectedCustomer = normalizeText(filterValues.customer);
     const selectedEmployee = normalizeText(filterValues.employee);
     const selectedPaymentMethod = normalizeText(filterValues.paymentMethod);
-    const selectedSaleStatus = normalizeText(filterValues.saleStatus);
-    const selectedPaymentStatus = normalizeText(filterValues.paymentStatus);
+    const selectedStatus = normalizeText(filterValues.status);
     const selectedLocation = normalizeText(filterValues.location);
     const selectedChannel = normalizeText(filterValues.channel);
     const amountRange = typeof filterValues.grossSalesRange === 'object' && filterValues.grossSalesRange
@@ -358,8 +352,7 @@ export default function SalesListReport({ lang }: { lang: Language }) {
           row.channel,
           row.itemsSold,
           row.paymentMethod,
-          row.paymentStatus,
-          row.saleStatus,
+          row.status,
           row.notes,
         ].join(' ').toLowerCase();
         if (!text.includes(q)) return false;
@@ -368,8 +361,7 @@ export default function SalesListReport({ lang }: { lang: Language }) {
       if (selectedCustomer && normalizeText(row.customer) !== selectedCustomer) return false;
       if (selectedEmployee && normalizeText(row.employee) !== selectedEmployee) return false;
       if (selectedPaymentMethod && normalizeText(row.paymentMethod) !== selectedPaymentMethod) return false;
-      if (selectedSaleStatus && normalizeText(row.saleStatus) !== selectedSaleStatus) return false;
-      if (selectedPaymentStatus && normalizeText(row.paymentStatus) !== selectedPaymentStatus) return false;
+      if (selectedStatus && normalizeText(row.status) !== selectedStatus) return false;
       if (selectedLocation && normalizeText(row.location) !== selectedLocation) return false;
       if (selectedChannel && normalizeText(row.channel) !== selectedChannel) return false;
 
@@ -530,8 +522,7 @@ export default function SalesListReport({ lang }: { lang: Language }) {
                 customer: '',
                 employee: '',
                 paymentMethod: '',
-                saleStatus: '',
-                paymentStatus: '',
+                status: '',
                 location: '',
                 channel: '',
                 grossSalesRange: { min: '', max: '' },
@@ -618,8 +609,7 @@ export default function SalesListReport({ lang }: { lang: Language }) {
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Items & Status</div>
                 <div className="mt-3 space-y-2 text-sm">
                   <Field label="Items Sold" value={row.itemsSold} />
-                  <Field label="Payment Status" value={row.paymentStatus} />
-                  <Field label="Sale Status" value={row.saleStatus} />
+                  <Field label="Status" value={row.status} />
                   <Field label="Payment Method" value={row.paymentMethod} />
                 </div>
               </div>

@@ -17,7 +17,7 @@ export interface TaxSummaryTableRow {
   taxAmount: number | null;
   netSales: number | null;
   paymentMethod: string;
-  saleStatus: string;
+  status: string;
   location: string;
   itemType: string;
   sourceRow?: any;
