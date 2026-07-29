@@ -722,6 +722,10 @@ function unwrapSettledValue(settledResult, fallback) {
         : fallback;
 }
 
+function logLedgerStage(phase, details = {}) {
+    logFinancialDiagnostics('financial/ledger', phase, details);
+}
+
 async function loadFinancialTransactionsWithFallback(where, order) {
     try {
         return await db.PaymentTransaction.findAll({
@@ -1674,24 +1678,48 @@ exports.getDailyRevenue = async (req, res) => {
  * GET /api/v1/tenant/financial/ledger
  */
 exports.getFinancialLedger = async (req, res) => {
+    let ledgerStage = 'controller_entry';
+    let transactionsRaw = [];
+    let invoices = [];
+    let revenueLedger = [];
+    let paymentLedger = [];
+    let refundLedger = [];
+    let commissionLedger = [];
+    let settlementLedger = [];
+    let cashFlowSummary = { rows: [], totals: {}, grouping: 'day' };
     try {
+        ledgerStage = 'parameter_parsing';
         const tenantId = req.tenantId;
         const { startDate, endDate, groupBy } = req.query;
         const filters = buildReportFilterContext(req.query);
-        logFinancialDiagnostics('financial/ledger', 'start', {
+        logLedgerStage('controller_start', {
             tenantId,
             startDate: startDate || null,
             endDate: endDate || null,
             groupBy: typeof groupBy === 'string' ? groupBy : null
         });
 
+        ledgerStage = 'date_normalization';
         const fallbackEnd = new Date();
         fallbackEnd.setHours(23, 59, 59, 999);
         const end = parseDateValue(endDate, true) || fallbackEnd;
         const fallbackStart = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
         fallbackStart.setHours(0, 0, 0, 0);
         const start = parseDateValue(startDate, false) || fallbackStart;
+        logLedgerStage('parameter_parsing_success', {
+            tenantId,
+            startDate: start.toISOString(),
+            endDate: end.toISOString(),
+            groupBy: typeof groupBy === 'string' ? groupBy : null
+        });
 
+        ledgerStage = 'transaction_loading';
+        logLedgerStage('transaction_loading_start', {
+            tenantId,
+            startDate: start.toISOString(),
+            endDate: end.toISOString(),
+            groupBy: typeof groupBy === 'string' ? groupBy : null
+        });
         const [transactionsRawResult, employeeRevenueResult, payrollRecordsResult] = await Promise.allSettled([
             loadFinancialTransactionsWithFallback({
                 [Op.or]: [
@@ -1728,23 +1756,35 @@ exports.getFinancialLedger = async (req, res) => {
         if (transactionsRawResult.status === 'rejected') {
             throw transactionsRawResult.reason;
         }
-        const transactionsRaw = transactionsRawResult.value;
+        transactionsRaw = transactionsRawResult.value;
         const employeeRevenueResponse = unwrapSettledValue(employeeRevenueResult, createEmptyEmployeeRevenueResponse());
         const payrollRecords = unwrapSettledValue(payrollRecordsResult, []);
         if (employeeRevenueResult.status === 'rejected') {
-            logFinancialDiagnostics('financial/ledger', 'employee_revenue_fallback', {
+            logLedgerStage('employee_revenue_fallback', {
                 tenantId,
                 error: employeeRevenueResult.reason?.message || String(employeeRevenueResult.reason)
             });
         }
         if (payrollRecordsResult.status === 'rejected') {
-            logFinancialDiagnostics('financial/ledger', 'payroll_fallback', {
+            logLedgerStage('payroll_fallback', {
                 tenantId,
                 error: payrollRecordsResult.reason?.message || String(payrollRecordsResult.reason)
             });
         }
+        logLedgerStage('transaction_loading_success', {
+            tenantId,
+            transactions: transactionsRaw.length,
+            employeeRevenueRows: Array.isArray(employeeRevenueResponse?.employees) ? employeeRevenueResponse.employees.length : 0,
+            payrollRecords: Array.isArray(payrollRecords) ? payrollRecords.length : 0
+        });
+        ledgerStage = 'transaction_filtering';
         const transactions = transactionsRaw.filter((transaction) => matchesTransactionFilters(transaction, filters));
 
+        ledgerStage = 'invoice_loading';
+        logLedgerStage('invoice_loading_start', {
+            tenantId,
+            transactionCount: transactions.length
+        });
         const appointmentIds = transactions
             .map((transaction) => transaction?.appointment?.id || null)
             .filter(Boolean);
@@ -1766,7 +1806,7 @@ exports.getFinancialLedger = async (req, res) => {
             });
         }
 
-        const invoices = invoiceConditions.length
+        invoices = invoiceConditions.length
             ? await db.CustomerInvoice.findAll({
                 where: {
                     tenantId,
@@ -1796,14 +1836,26 @@ exports.getFinancialLedger = async (req, res) => {
                 ]
             })
             : [];
+        logLedgerStage('invoice_loading_success', {
+            tenantId,
+            invoiceCount: invoices.length,
+            appointmentIds,
+            orderIds
+        });
 
         const invoiceLookup = new Map(
             invoices.map((invoice) => [`${invoice.entityType}:${invoice.entityId}`, invoice.toJSON ? invoice.toJSON() : invoice])
         );
 
-        const revenueLedger = transactions.map((transaction) => mapLedgerTransaction(transaction, invoiceLookup));
+        ledgerStage = 'payment_loading';
+        logLedgerStage('payment_loading_start', {
+            tenantId,
+            transactionCount: transactions.length,
+            invoiceCount: invoices.length
+        });
+        revenueLedger = transactions.map((transaction) => mapLedgerTransaction(transaction, invoiceLookup));
 
-        const paymentLedger = transactions.map((transaction) => ({
+        paymentLedger = transactions.map((transaction) => ({
             id: transaction.id,
             date: transaction.processedAt || transaction.createdAt,
             reference: getTransactionReference(transaction),
@@ -1828,7 +1880,7 @@ exports.getFinancialLedger = async (req, res) => {
                     : null
         }));
 
-        const refundLedger = transactions
+        refundLedger = transactions
             .filter((transaction) => transaction.type === 'refund' || transaction.status === 'refunded')
             .map(mapRefundLedgerRow);
 
@@ -1853,7 +1905,7 @@ exports.getFinancialLedger = async (req, res) => {
             payrollByStaff.set(key, existing);
         });
 
-        const commissionLedger = employees.map((employee) => {
+        commissionLedger = employees.map((employee) => {
             const payroll = payrollByStaff.get(employee.id) || {
                 commissionPaid: 0,
                 commissionOutstanding: 0,
@@ -1874,6 +1926,23 @@ exports.getFinancialLedger = async (req, res) => {
             };
         });
 
+        ledgerStage = 'payment_loading_success';
+        logLedgerStage('payment_loading_success', {
+            tenantId,
+            revenueRows: revenueLedger.length,
+            paymentRows: paymentLedger.length,
+            refundRows: refundLedger.length,
+            commissionRows: commissionLedger.length
+        });
+
+        ledgerStage = 'aggregation';
+        logLedgerStage('ledger_aggregation_start', {
+            tenantId,
+            revenueRows: revenueLedger.length,
+            paymentRows: paymentLedger.length,
+            refundRows: refundLedger.length,
+            commissionRows: commissionLedger.length
+        });
         const settlementBuckets = new Map();
         transactions.forEach((transaction) => {
             const dateSource = transaction?.processedAt || transaction?.createdAt || start;
@@ -1911,7 +1980,7 @@ exports.getFinancialLedger = async (req, res) => {
             settlementBuckets.set(date, existing);
         });
 
-        const settlementLedger = Array.from(settlementBuckets.values())
+        settlementLedger = Array.from(settlementBuckets.values())
             .sort((left, right) => left.date.localeCompare(right.date))
             .map((row) => ({
                 ...row,
@@ -1924,12 +1993,22 @@ exports.getFinancialLedger = async (req, res) => {
                 online: Number((row.online || 0).toFixed(2)),
                 bankTransfer: Number((row.bankTransfer || 0).toFixed(2))
             }));
-        const cashFlowSummary = buildCashFlowSummaryRows(
+        cashFlowSummary = buildCashFlowSummaryRows(
             settlementLedger,
             paymentLedger,
             typeof groupBy === 'string' && groupBy.trim() ? groupBy.trim() : 'day'
         );
+        logLedgerStage('ledger_aggregation_success', {
+            tenantId,
+            settlementRows: settlementLedger.length,
+            cashFlowRows: cashFlowSummary.rows.length
+        });
 
+        ledgerStage = 'dto_creation';
+        logLedgerStage('dto_creation_start', {
+            tenantId,
+            transactionCount: transactions.length
+        });
         const revenueTotals = revenueLedger.reduce((acc, row) => {
             acc.revenue += Number(row.revenue || 0);
             acc.tax += Number(row.tax || 0);
@@ -1961,7 +2040,7 @@ exports.getFinancialLedger = async (req, res) => {
             return acc;
         }, { grossRevenue: 0, refunds: 0, netCollected: 0, cash: 0, card: 0, wallet: 0, online: 0, bankTransfer: 0 });
 
-        logFinancialDiagnostics('financial/ledger', 'loaded', {
+        logLedgerStage('dto_creation_success', {
             tenantId,
             transactions: transactions.length,
             invoices: invoices.length,
@@ -1973,7 +2052,13 @@ exports.getFinancialLedger = async (req, res) => {
             cashFlowRows: cashFlowSummary.rows.length
         });
 
-        res.json({
+        ledgerStage = 'response_serialization';
+        logLedgerStage('response_serialization_start', {
+            tenantId,
+            transactionCount: transactions.length,
+            invoiceCount: invoices.length
+        });
+        const responsePayload = {
             success: true,
             overview: {
                 totalTransactions: transactions.length,
@@ -2041,8 +2126,16 @@ exports.getFinancialLedger = async (req, res) => {
                 startDate: start.toISOString().split('T')[0],
                 endDate: end.toISOString().split('T')[0]
             }
+        };
+        logLedgerStage('response_serialization_success', {
+            tenantId,
+            responseKeys: Object.keys(responsePayload),
+            transactionCount: transactions.length
         });
-        logFinancialDiagnostics('financial/ledger', 'success', {
+        res.json({
+            ...responsePayload
+        });
+        logLedgerStage('response_serialization_complete', {
             tenantId,
             totalTransactions: transactions.length,
             netCollected: Number(settlementTotals.netCollected.toFixed(2)),
@@ -2051,10 +2144,21 @@ exports.getFinancialLedger = async (req, res) => {
         });
     } catch (error) {
         console.error('Get financial ledger error:', error);
-        logFinancialDiagnostics('financial/ledger', 'error', {
+        logLedgerStage('error', {
             tenantId: req?.tenantId || null,
+            stage: ledgerStage,
+            startDate: req?.query?.startDate || null,
+            endDate: req?.query?.endDate || null,
+            groupBy: typeof req?.query?.groupBy === 'string' ? req.query.groupBy : null,
             message: error.message
         });
+        if (error?.stack) {
+            logLedgerStage('error_stack', {
+                tenantId: req?.tenantId || null,
+                stage: ledgerStage,
+                stack: error.stack
+            });
+        }
         res.status(500).json({
             success: false,
             message: 'Failed to fetch financial ledger',
