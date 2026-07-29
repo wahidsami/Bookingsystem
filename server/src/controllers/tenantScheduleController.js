@@ -637,24 +637,6 @@ exports.updateBreak = async (req, res) => {
                                     }
                                 ]
                             },
-                            {
-                                isRecurring: true,
-                                dayOfWeek: null,
-                                [Op.and]: [
-                                    {
-                                        [Op.or]: [
-                                            { startDate: null },
-                                            { startDate: { [Op.lte]: specificDate } }
-                                        ]
-                                    },
-                                    {
-                                        [Op.or]: [
-                                            { endDate: null },
-                                            { endDate: { [Op.gte]: specificDate } }
-                                        ]
-                                    }
-                                ]
-                            }
                         ]
                     },
                     attributes: ['id', 'startTime', 'endTime', 'status']

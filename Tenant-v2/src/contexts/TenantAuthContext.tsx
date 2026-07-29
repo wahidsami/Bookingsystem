@@ -144,12 +144,19 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
 
   const loadUser = useCallback(async () => {
     const accessToken = tenantApiAdapter.getAccessToken();
-    if (!accessToken) {
+    const refreshToken = tenantApiAdapter.getRefreshToken();
+    if (!accessToken && !refreshToken) {
       setLoading(false);
       return;
     }
 
     try {
+      const refreshed = await tenantApiAdapter.ensureFreshAuthSession();
+      if (!refreshed && !tenantApiAdapter.getAccessToken()) {
+        clearSession();
+        setAuthError('Session expired. Please sign in again.');
+        return;
+      }
       const response = await tenantApiAdapter.getProfile();
       const normalized = normalizeAuthPayload(response);
 

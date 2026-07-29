@@ -157,23 +157,7 @@ function getLedgerTransactionIncludes() {
                     model: db.BookingSession,
                     as: 'bookingSession',
                     attributes: ['id', 'bookingReference', 'paymentMethod', 'paymentStatus'],
-                    required: false,
-                    include: [
-                        {
-                            model: db.Appointment,
-                            as: 'appointments',
-                            attributes: ['id', 'bookingItemIndex', 'status', 'startTime', 'serviceId'],
-                            required: false,
-                            include: [
-                                {
-                                    model: db.Service,
-                                    as: 'service',
-                                    attributes: ['id', 'name_en', 'name_ar', 'category'],
-                                    required: false
-                                }
-                            ]
-                        }
-                    ]
+                    required: false
                 }
             ]
         },

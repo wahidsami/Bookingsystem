@@ -1746,6 +1746,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [initialCartTab, setInitialCartTab] = useState<'products' | 'giftcards'>('products');
 
   useEffect(() => {
+    if (!isCreateDrawerOpen || initialCreateMode !== 'appointment') {
+      return;
+    }
+
+    setCreateSplitActive(false);
+    setCreateSplitAmounts({ card: 0, cash: 0, wallet: 0, bank: 0, gift: 0 });
+  }, [isCreateDrawerOpen, initialCreateMode]);
+
+  useEffect(() => {
     if (!quickLaunchRequest || quickLaunchRequest.target !== 'appointment') {
       return;
     }
@@ -2586,6 +2595,65 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     void (async () => {
       try {
+        const calculateStagedServiceTotal = () => finalStaged.reduce((sum, item) => {
+          const service = liveServices.find((candidate) => candidate.id === item.serviceId);
+          const basePrice = Number(service?.price || 0);
+          const discountType = item.discountType || 'none';
+          const discountValue = Number(item.discountValue || 0);
+
+          let discountedPrice = basePrice;
+          if (discountType === 'flat') {
+            discountedPrice = Math.max(basePrice - discountValue, 0);
+          } else if (discountType === 'percent') {
+            discountedPrice = Math.max(basePrice - (basePrice * (discountValue / 100)), 0);
+          }
+
+          return sum + discountedPrice;
+        }, 0);
+
+        const createAppointmentTotal = Number(calculateStagedServiceTotal().toFixed(2));
+        const createPaymentAllocations = createSplitActive
+          ? (() => {
+              const allocations = Object.entries(createSplitAmounts)
+                .filter(([, amount]) => Number(amount) > 0)
+                .map(([paymentMethod, amount]) => ({
+                  paymentMethod:
+                    paymentMethod === 'card'
+                      ? 'card_pos'
+                      : paymentMethod === 'bank'
+                        ? 'bank_transfer'
+                        : paymentMethod === 'gift'
+                          ? 'gift_card_code'
+                          : paymentMethod,
+                  amount: Number(amount)
+                }));
+
+              if (allocations.length === 0) {
+                return undefined;
+              }
+
+              const totalAllocations = allocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
+              const allocationDifference = Number((createAppointmentTotal - totalAllocations).toFixed(2));
+
+              if (Math.abs(allocationDifference) > 0.5) {
+                return undefined;
+              }
+
+              if (Math.abs(allocationDifference) > 0.0001) {
+                const lastAllocation = allocations[allocations.length - 1];
+                const adjustedAmount = Number((Number(lastAllocation.amount || 0) + allocationDifference).toFixed(2));
+                if (adjustedAmount > 0) {
+                  allocations[allocations.length - 1] = {
+                    ...lastAllocation,
+                    amount: adjustedAmount
+                  };
+                }
+              }
+
+              return allocations;
+            })()
+          : undefined;
+
         const response = await tenantApiAdapter.createAppointment({
           items: payloadItems,
           staffId: resolvedPrimaryStaffId,
@@ -2594,11 +2662,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           assignmentMode: 'tenant_reassigned',
           notifyCustomer: true,
           paymentMethod: 'at-center',
-          paymentAllocations: createSplitActive
-            ? Object.entries(splitAmounts)
-                .filter(([, amount]) => Number(amount) > 0)
-                .map(([paymentMethod, amount]) => ({ paymentMethod, amount: Number(amount) }))
-            : undefined,
+          paymentAllocations: createPaymentAllocations,
           platformUserId: custMode === 'existing' ? selectedCustId : undefined,
           customer: custMode === 'new' || custMode === 'walkin'
             ? {

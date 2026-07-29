@@ -167,6 +167,15 @@ class TenantApiAdapter {
     return false;
   }
 
+  async ensureFreshAuthSession(): Promise<boolean> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      return Boolean(this.getAccessToken());
+    }
+
+    return this.refreshAccessToken();
+  }
+
   async login(email: string, password: string): Promise<any> {
     const response = await this.fetchImpl(`${API_BASE_URL}/auth/tenant/login`, {
       method: 'POST',

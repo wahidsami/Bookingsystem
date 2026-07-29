@@ -460,6 +460,22 @@ export default function InteractiveDrawers({
   });
   const [giftCardCodeInput, setGiftCardCodeInput] = useState('');
 
+  useEffect(() => {
+    if (!isCreateDrawerOpen || initialCreateMode !== 'appointment') {
+      return;
+    }
+
+    setCreateSplitActive(false);
+    setCreateSplitAmounts({
+      card: 0,
+      cash: 0,
+      online: 0,
+      bank_transfer: 0,
+      wallet: 0,
+      gift_card: 0
+    });
+  }, [isCreateDrawerOpen, initialCreateMode]);
+
   // Blocked shift breaks
   const [blockTitleAr, setBlockTitleAr] = useState('استراحة قهوة الموظفين');
   const [blockTitleEn, setBlockTitleEn] = useState('Staff Espresso Recess');
@@ -661,7 +677,7 @@ export default function InteractiveDrawers({
       return;
     }
 
-    const payload = {
+    const payload: any = {
       items,
       staffId: resolvedPrimaryStaffId,
       startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
@@ -672,11 +688,6 @@ export default function InteractiveDrawers({
       assignmentMode: 'tenant_reassigned',
       notifyCustomer: notifyWhatsApp,
       paymentMethod: 'at-center',
-      paymentAllocations: createSplitActive
-        ? Object.entries(createSplitAmounts)
-            .filter(([, amount]) => Number(amount) > 0)
-            .map(([paymentMethod, amount]) => ({ paymentMethod, amount: Number(amount) }))
-        : undefined,
       platformUserId: custMode === 'existing' ? selectedCustId : undefined,
       customer: custMode === 'new' || custMode === 'walkin'
         ? {
@@ -689,6 +700,65 @@ export default function InteractiveDrawers({
     };
 
     try {
+      const appointmentTotal = Number((items as any[]).reduce((sum, item) => {
+        const servicePrice = Number(item?.price || item?.service?.price || item?.subtotal || 0);
+        const discountType = `${item?.discountType || 'none'}`.trim().toLowerCase();
+        const discountValue = Number(item?.discountValue || 0);
+
+        let discountedPrice = servicePrice;
+        if (discountType === 'flat') {
+          discountedPrice = Math.max(servicePrice - discountValue, 0);
+        } else if (discountType === 'percent') {
+          discountedPrice = Math.max(servicePrice - (servicePrice * discountValue / 100), 0);
+        }
+
+        return sum + discountedPrice;
+      }, 0).toFixed(2));
+
+      const paymentAllocations = createSplitActive
+        ? (() => {
+            const allocations = Object.entries(createSplitAmounts)
+              .filter(([, amount]) => Number(amount) > 0)
+              .map(([paymentMethod, amount]) => ({
+                paymentMethod:
+                  paymentMethod === 'bank_transfer'
+                    ? 'bank_transfer'
+                    : paymentMethod === 'gift_card'
+                      ? 'gift_card_code'
+                      : paymentMethod,
+                amount: Number(amount)
+              }));
+
+            if (allocations.length === 0) {
+              return undefined;
+            }
+
+            const totalAllocations = allocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
+            const allocationDifference = Number((appointmentTotal - totalAllocations).toFixed(2));
+
+            if (Math.abs(allocationDifference) > 0.5) {
+              return undefined;
+            }
+
+            if (Math.abs(allocationDifference) > 0.0001) {
+              const lastAllocation = allocations[allocations.length - 1];
+              const adjustedAmount = Number((Number(lastAllocation.amount || 0) + allocationDifference).toFixed(2));
+              if (adjustedAmount > 0) {
+                allocations[allocations.length - 1] = {
+                  ...lastAllocation,
+                  amount: adjustedAmount
+                };
+              }
+            }
+
+            return allocations;
+          })()
+        : undefined;
+
+      if (paymentAllocations) {
+        payload.paymentAllocations = paymentAllocations;
+      }
+
       const response = await tenantApiAdapter.createAppointment(payload);
       if (!response?.success) {
         throw new Error(response?.message || 'Failed to create appointment');
