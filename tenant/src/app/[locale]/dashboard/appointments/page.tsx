@@ -184,8 +184,11 @@ function getPastTodayTimeWarning(dateKey: string, timeKey: string, locale: strin
   const now = new Date();
   if (selected.getTime() >= now.getTime()) return "";
 
-  const suggestedTimeLabel = formatTimeLabel(getRoundedUpFiveMinuteTime(now), locale);
-  return getPastTimeBlockWarning(locale, suggestedTimeLabel);
+  const selectedLabel = formatTimeLabel(selected, locale);
+  const currentLabel = formatTimeLabel(now, locale);
+  return locale === "ar"
+    ? `لا يمكنك الحجز عند ${selectedLabel}. الوقت الحالي هو ${currentLabel}. يرجى اختيار وقت بعد الوقت الحالي.`
+    : `You cannot book at ${selectedLabel}. The current time is ${currentLabel}. Please select a time after the current time.`;
 }
 
 function resolveDisplayHoursFromWorkingHours(workingHours: any): { startHour: number; endHour: number } {

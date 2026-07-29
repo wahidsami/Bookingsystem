@@ -256,6 +256,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'agenda'>('day');
+  const [boardCurrentTime, setBoardCurrentTime] = useState<Date>(new Date());
 
   // Master Data Fetch
   useEffect(() => {
@@ -331,6 +332,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       }
     };
     fetchMasterData();
+  }, []);
+
+  useEffect(() => {
+    const syncCurrentTime = () => setBoardCurrentTime(new Date());
+    syncCurrentTime();
+    const timer = window.setInterval(syncCurrentTime, 30000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const mapBoardAppointment = (a: any, dateKey: string): Appointment => {
@@ -645,6 +653,56 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const hours = Math.floor(absoluteMinutes / 60);
     const mins = absoluteMinutes % 60;
     return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  };
+  const getRiyadhMinutesSinceMidnight = (value = new Date()) => {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Riyadh',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(value);
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value || '0');
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value || '0');
+    return (hour * 60) + minute;
+  };
+  const getRiyadhCurrentTimeLabel = (value = new Date()) => (
+    new Intl.DateTimeFormat(isRtl ? 'ar-SA' : 'en-US', {
+      timeZone: 'Asia/Riyadh',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).format(value)
+  );
+  const isPastBoardCreationSlot = (dateKey: string, timeInMinutesFromNine: number) => {
+    const selectedKey = `${dateKey || ''}`;
+    const todayKey = getRiyadhDateKey(new Date());
+    if (selectedKey < todayKey) return true;
+    if (selectedKey > todayKey) return false;
+    const slotAbsoluteMinutes = (9 * 60) + Math.max(0, Math.round(timeInMinutesFromNine));
+    return slotAbsoluteMinutes <= getRiyadhMinutesSinceMidnight(new Date());
+  };
+  const showPastBoardSlotWarning = (timeInMinutesFromNine: number) => {
+    const slotLabel = formatMinutesToTime(timeInMinutesFromNine);
+    const currentLabel = getRiyadhCurrentTimeLabel();
+    addLocalToast(
+      `لا يمكنك إنشاء موعد عند ${slotLabel}. الوقت الحالي في الرياض هو ${currentLabel}. يرجى اختيار وقت بعد الوقت الحالي.`,
+      `You cannot create an appointment at ${slotLabel}. Riyadh time is currently ${currentLabel}. Please select a time after the current time.`,
+      'warning'
+    );
+  };
+  const openCreateAppointmentAtSlot = (staffId: string, timeInMinutes: number) => {
+    if (isPastBoardCreationSlot(selectedDateKey, timeInMinutes)) {
+      showPastBoardSlotWarning(timeInMinutes);
+      return false;
+    }
+
+    setCurrentStaffId(staffId);
+    setCurrentStartTime(timeInMinutes);
+    setCreateMode('appointment');
+    setCreateStep(1);
+    setStagedServices([]);
+    setIsCreateDrawerOpen(true);
+    return true;
   };
 
   // Board Data Fetch
@@ -1805,11 +1863,33 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     return `${hours}:${minStr} ${ampm}`;
   };
 
+  const getCurrentTimeLinePosition = () => {
+    if (viewMode !== 'day') {
+      return null;
+    }
+
+    if (selectedDateKey !== getRiyadhDateKey(boardCurrentTime)) {
+      return null;
+    }
+
+    const currentMinutes = getRiyadhMinutesSinceMidnight(boardCurrentTime);
+    const visibleStart = START_HOUR * 60;
+    const visibleEnd = END_HOUR * 60;
+
+    if (currentMinutes < visibleStart || currentMinutes > visibleEnd) {
+      return null;
+    }
+
+    return ((currentMinutes - visibleStart) / 60) * SLOT_HEIGHT;
+  };
+
   const handleDayShift = (days: number) => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
     setSelectedDate(newDate);
   };
+
+  const currentTimeLinePosition = getCurrentTimeLinePosition();
 
   // Custom Mouse Drag Handling for Resizing
   const handleMouseDown = (e: React.MouseEvent, aptId: string, isResize: boolean) => {
@@ -1884,6 +1964,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     if (!isBoardEditable) {
       return;
     }
+    if (isPastBoardCreationSlot(selectedDateKey, timeInMinutes)) {
+      e.preventDefault();
+      showPastBoardSlotWarning(timeInMinutes);
+      return;
+    }
     e.preventDefault();
     setContextMenu({
       visible: true,
@@ -1916,6 +2001,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     if (actionType === 'new') {
       if (contextMenu) {
+        if (isPastBoardCreationSlot(selectedDateKey, contextMenu.timeInMinutes)) {
+          showPastBoardSlotWarning(contextMenu.timeInMinutes);
+          setContextMenu(null);
+          return;
+        }
         setCurrentStaffId(contextMenu.staffId);
         setCurrentStartTime(contextMenu.timeInMinutes);
       }
@@ -2436,6 +2526,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     if (finalStaged.length === 0) {
       addLocalToast('يرجى إدراج خدمة واحدة على الأقل لتأكيد الحجز', 'Please add at least one service to confirm booking', 'warning');
+      return;
+    }
+
+    if (isPastBoardCreationSlot(getSelectedDateKey(), finalStaged[0].startTime)) {
+      showPastBoardSlotWarning(finalStaged[0].startTime);
       return;
     }
 
@@ -3484,6 +3579,21 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                   {/* Calendar Body Area */}
                   <div className="flex-1 relative flex">
+                    {currentTimeLinePosition !== null && (
+                      <div
+                        className="absolute inset-x-0 z-20 pointer-events-none"
+                        style={{ top: `${currentTimeLinePosition}px` }}
+                      >
+                        <div className="relative h-px bg-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,0.18)]">
+                          <div className={`absolute -top-2 ${isRtl ? 'left-3' : 'right-3'} flex items-center gap-2`}>
+                            <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-[0_0_0_4px_rgba(244,63,94,0.18)]" />
+                            <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-[10px] font-black text-white shadow-lg">
+                              {isRtl ? 'الوقت الحالي' : 'Current Time'} {getRiyadhCurrentTimeLabel(boardCurrentTime)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     
                     {/* LEFT TIME STRIP COLUMN (2 of 12 columns) - STICKY RAIL */}
                     <div className="w-[16.6666%] border-r border-slate-200 bg-slate-50/50 flex-shrink-0 relative z-10" style={{ height: `${TOTAL_HOURS * SLOT_HEIGHT}px` }}>
@@ -3561,12 +3671,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                               }}
                               onClick={() => {
                                 if (hoveredSlot && isBoardEditable) {
-                                  setCurrentStaffId(hoveredSlot.staffId);
-                                  setCurrentStartTime(hoveredSlot.timeInMinutes);
-                                  setCreateMode('appointment');
-                                  setCreateStep(1);
-                                  setStagedServices([]);
-                                  setIsCreateDrawerOpen(true);
+                                  openCreateAppointmentAtSlot(hoveredSlot.staffId, hoveredSlot.timeInMinutes);
                                 }
                               }}
                               onDragOver={(e) => {
