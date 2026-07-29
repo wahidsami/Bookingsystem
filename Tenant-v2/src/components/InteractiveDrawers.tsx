@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Calendar as CalendarIcon, User, Users, PlusCircle, Check, 
@@ -184,12 +184,30 @@ export default function InteractiveDrawers({
   const [includeGroupGuests, setIncludeGroupGuests] = useState(false);
   const [guestCount, setGuestCount] = useState<number>(1);
   const [guestNames, setGuestNames] = useState('');
+  const existingCustomerSelectRef = useRef<HTMLSelectElement>(null);
+  const newCustomerNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (availableStylists.length > 0 && !availableStylists.some((stylist) => stylist.id === currentStaffId)) {
       setCurrentStaffId(availableStylists[0].id);
     }
   }, [availableStylists, currentStaffId, setCurrentStaffId]);
+
+  useEffect(() => {
+    if (!isCreateDrawerOpen || createStep !== 1) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (custMode === 'new') {
+        newCustomerNameRef.current?.focus();
+      } else {
+        existingCustomerSelectRef.current?.focus();
+      }
+    }, 50);
+
+    return () => window.clearTimeout(timer);
+  }, [isCreateDrawerOpen, createStep, custMode]);
 
   // Structured Guest State
   const [guestsList, setGuestsList] = useState<GuestProfile[]>([
@@ -975,8 +993,10 @@ export default function InteractiveDrawers({
                           <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
                             <label className="text-[10px] font-bold text-slate-400 uppercase block">{isRtl ? 'البحث واختيار عميلة مسجلة' : 'Search & Associate Customer'}</label>
                               <select
+                                ref={existingCustomerSelectRef}
                                 value={selectedCustId}
                                 onChange={(e) => setSelectedCustId(e.target.value)}
+                                autoFocus
                                 className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700"
                             >
                               {customers.map(c => (
@@ -991,7 +1011,15 @@ export default function InteractiveDrawers({
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <label className="text-[10px] text-slate-400 block mb-1">{isRtl ? 'الاسم بالكامل' : 'Full Name'}</label>
-                                <input type="text" value={newCustName} onChange={(e) => setNewCustName(e.target.value)} placeholder="Noura Ahmad" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs" />
+                                <input
+                                  ref={newCustomerNameRef}
+                                  type="text"
+                                  value={newCustName}
+                                  onChange={(e) => setNewCustName(e.target.value)}
+                                  placeholder="Noura Ahmad"
+                                  autoFocus
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs"
+                                />
                               </div>
                               <div>
                                 <label className="text-[10px] text-slate-400 block mb-1">{isRtl ? 'رقم الجوال' : 'Phone'}</label>

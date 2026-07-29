@@ -6,11 +6,12 @@ import {
   Sparkle, Upload, Edit, Eye, Filter, SlidersHorizontal, Search, CheckSquare, Square,
   Activity, RotateCw, AlertTriangle, Image
 } from 'lucide-react';
-import { Language, Service, Employee, Product } from '../types';
+import { Language, Service, Employee, Product, QuickLaunchRequest } from '../types';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface ServicesWorkspaceProps {
   lang: Language;
+  quickLaunchRequest?: QuickLaunchRequest | null;
 }
 
 // Extend service model for full operational data representation
@@ -49,7 +50,7 @@ export interface EnhancedService extends Service {
 }
 
 const defaultImage = 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?q=80&w=600&auto=format&fit=crop';
-export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
+export default function ServicesWorkspace({ lang, quickLaunchRequest }: ServicesWorkspaceProps) {
   const isRtl = lang === 'ar';
 
   // 1. Core Services State
@@ -320,6 +321,14 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
     setActiveSection('basic');
     setActiveView('form');
   };
+
+  React.useEffect(() => {
+    if (quickLaunchRequest?.target !== 'service') {
+      return;
+    }
+
+    handleOpenAddForm();
+  }, [quickLaunchRequest?.nonce]);
 
   // Open edit form
   const handleOpenEditForm = (srv: EnhancedService) => {
@@ -1151,6 +1160,7 @@ export default function ServicesWorkspace({ lang }: ServicesWorkspaceProps) {
                           <input
                             type="text"
                             required
+                            autoFocus
                             value={formData.nameAr}
                             onChange={e => setFormData(p => ({ ...p, nameAr: e.target.value }))}
                             placeholder="مثال: جلسة مساج السويدي الملكي بالأروما"

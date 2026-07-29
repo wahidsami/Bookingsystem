@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, Search, Shield, MapPin, Phone, Mail, Award, Calendar, 
@@ -8,13 +8,14 @@ import {
   ArrowRightLeft, ArrowUpRight, ArrowUpDown, ChevronLeft, ChevronRight,
   Download, Filter, AlertTriangle, RefreshCw, Eye, ShoppingBag, Package
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, QuickLaunchRequest } from '../types';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface CustomersWorkspaceProps {
   lang: Language;
   initialSubTab?: CustomerTab;
+  quickLaunchRequest?: QuickLaunchRequest | null;
 }
 
 type CustomerTab =
@@ -125,7 +126,7 @@ interface CustomerStats {
   avgBookings: number;
 }
 
-export default function CustomersWorkspace({ lang, initialSubTab = 'history' }: CustomersWorkspaceProps) {
+export default function CustomersWorkspace({ lang, initialSubTab = 'history', quickLaunchRequest }: CustomersWorkspaceProps) {
   const isRtl = lang === 'ar';
   const { hasPermission } = useTenantAuth();
   const hasViewCustomersPermission = hasPermission('view_customers');
@@ -178,6 +179,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history' }: 
   
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const customerSearchRef = useRef<HTMLInputElement>(null);
   const [loyaltyTierFilter, setLoyaltyTierFilter] = useState('all');
   const [customerTypeFilter, setCustomerTypeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('lastVisit');
@@ -199,6 +201,26 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history' }: 
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (quickLaunchRequest?.target !== 'customer') {
+      return;
+    }
+
+    setSelectedCustomerId(null);
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setLoyaltyTierFilter('all');
+    setCustomerTypeFilter('all');
+    setSortBy('lastVisit');
+    setSortOrder('desc');
+    setPage(1);
+    setActiveSubTab(initialSubTab);
+    const timer = window.setTimeout(() => {
+      customerSearchRef.current?.focus();
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [quickLaunchRequest?.nonce, initialSubTab]);
 
   const parseApiResponse = (payload: any) => {
     if (!payload) return null;
@@ -1036,6 +1058,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history' }: 
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute top-1/2 -translate-y-1/2 mx-3.5 text-neutral-400" size={16} />
                 <input
+                  ref={customerSearchRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

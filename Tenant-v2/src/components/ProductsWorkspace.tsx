@@ -6,11 +6,12 @@ import {
   RotateCw, AlertTriangle, Image as ImageIcon, ShoppingBag, Package, 
   Layers, Tag, Percent, Truck, Store, FileText
 } from 'lucide-react';
-import { Language, Product } from '../types';
+import { Language, Product, QuickLaunchRequest } from '../types';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface ProductsWorkspaceProps {
   lang: Language;
+  quickLaunchRequest?: QuickLaunchRequest | null;
 }
 
 // Extend Product model for high-fidelity inventory and fulfillment specifications
@@ -59,7 +60,7 @@ const presetCosmeticsImages = [
   { url: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?q=80&w=600&auto=format&fit=crop', labelAr: 'مجموعة التجميل والعناية', labelEn: 'Premium Cosmetic Set' }
 ];
 
-export default function ProductsWorkspace({ lang }: ProductsWorkspaceProps) {
+export default function ProductsWorkspace({ lang, quickLaunchRequest }: ProductsWorkspaceProps) {
   const isRtl = lang === 'ar';
 
   // 1. Core State
@@ -252,6 +253,14 @@ export default function ProductsWorkspace({ lang }: ProductsWorkspaceProps) {
     setActiveSection('basic');
     setActiveView('form');
   };
+
+  React.useEffect(() => {
+    if (quickLaunchRequest?.target !== 'product') {
+      return;
+    }
+
+    handleOpenAdd();
+  }, [quickLaunchRequest?.nonce]);
 
   // Action: Open Edit form
   const handleOpenEdit = (prd: EnhancedProduct) => {
@@ -985,6 +994,7 @@ export default function ProductsWorkspace({ lang }: ProductsWorkspaceProps) {
                       <input
                         type="text"
                         required
+                        autoFocus
                         value={formData.nameAr}
                         onChange={e => setFormData(p => ({ ...p, nameAr: e.target.value }))}
                         className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-indigo-500 rounded-xl p-2.5 text-xs font-semibold text-neutral-800"

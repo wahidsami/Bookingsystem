@@ -9,7 +9,7 @@ import {
   TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy,
   PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift
 } from 'lucide-react';
-import { Language, Product } from '../types';
+import { Language, Product, QuickLaunchRequest } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
 import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
@@ -18,6 +18,7 @@ import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
 interface AppointmentWorkspaceProps {
   lang: Language;
   onQuickAction: (type: any) => void;
+  quickLaunchRequest?: QuickLaunchRequest | null;
 }
 
 // Full types
@@ -234,7 +235,7 @@ const getRiyadhDateKey = (value: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-export default function AppointmentWorkspace({ lang, onQuickAction }: AppointmentWorkspaceProps) {
+export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
   
   // New API States replacing mock data
@@ -1678,6 +1679,28 @@ export default function AppointmentWorkspace({ lang, onQuickAction }: Appointmen
   const [selectedShiftStaffId, setSelectedShiftStaffId] = useState('');
   const [initialCreateMode, setInitialCreateMode] = useState<'appointment' | 'blocked'>('appointment');
   const [initialCartTab, setInitialCartTab] = useState<'products' | 'giftcards'>('products');
+
+  useEffect(() => {
+    if (!quickLaunchRequest || quickLaunchRequest.target !== 'appointment') {
+      return;
+    }
+
+    setInitialCreateMode('appointment');
+    setCreateStep(1);
+    setCustMode('existing');
+    setSelectedCustId('');
+    setNewCustName('');
+    setNewCustPhone('');
+    setNewCustEmail('');
+    setNewCustDob('1998-05-12');
+    setNewCustGender('F');
+    setNewCustIsVip(false);
+    setIncludeGroupGuests(false);
+    setGuestCount(1);
+    setGuestNames('');
+    setStagedServices([]);
+    setIsCreateDrawerOpen(true);
+  }, [quickLaunchRequest]);
 
   // --- POS CART & GIFT CARD COUNTER DRAWER ---
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);

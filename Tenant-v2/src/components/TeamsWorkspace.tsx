@@ -6,12 +6,13 @@ import {
   Settings, Award, Sparkles, Check, X, Download, ShieldCheck, Mail, Phone,
   ArrowLeft, Plus, Trash2, User, Upload, Search, Filter, SlidersHorizontal, Lock, CheckSquare, Square, Globe, Shield, Info
 } from 'lucide-react';
-import { Language } from '../types';
+import { Language, QuickLaunchRequest } from '../types';
 
 interface TeamsWorkspaceProps {
   lang: Language;
   addEmployeeTrigger?: number;
   onAddEmployeeTriggerReset?: () => void;
+  quickLaunchRequest?: QuickLaunchRequest | null;
 }
 
 export type TeamSubTab =
@@ -215,7 +216,8 @@ const defaultTeamMember: TeamMemberData = {
 export default function TeamsWorkspace({ 
   lang, 
   addEmployeeTrigger = 0, 
-  onAddEmployeeTriggerReset 
+  onAddEmployeeTriggerReset,
+  quickLaunchRequest
 }: TeamsWorkspaceProps) {
   const isRtl = lang === 'ar';
 
@@ -387,6 +389,14 @@ export default function TeamsWorkspace({
       }
     }
   }, [addEmployeeTrigger]);
+
+  useEffect(() => {
+    if (quickLaunchRequest?.target !== 'employee') {
+      return;
+    }
+
+    handleOpenAddForm();
+  }, [quickLaunchRequest?.nonce]);
 
   const activeMember = useMemo(() => {
     return teamMembers.find(t => t.id === selectedMemberId) || teamMembers[0] || defaultTeamMember;
@@ -1680,6 +1690,7 @@ export default function TeamsWorkspace({
                         <input
                           type="text"
                           required
+                          autoFocus
                           value={formData.nameAr}
                           onChange={e => setFormData(p => ({ ...p, nameAr: e.target.value }))}
                           placeholder="مثال: نادين الحربي"

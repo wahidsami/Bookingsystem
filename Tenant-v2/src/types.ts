@@ -1,5 +1,12 @@
 export type Language = 'ar' | 'en';
 
+export type QuickLaunchTarget = 'appointment' | 'customer' | 'service' | 'product' | 'employee' | 'giftcard';
+
+export interface QuickLaunchRequest {
+  target: QuickLaunchTarget;
+  nonce: number;
+}
+
 export type ViewType =
   | 'dashboard'
   | 'appointments'

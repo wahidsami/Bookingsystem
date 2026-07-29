@@ -5,7 +5,7 @@ import {
   Receipt, ShoppingBag, CreditCard, ChevronRight, MessageSquare, 
   AlertCircle, Sparkle, ArrowLeft, ArrowRight, Save, Trash2, ShieldCheck, HelpCircle
 } from 'lucide-react';
-import { Language, ViewType } from '../types';
+import { Language, ViewType, QuickLaunchRequest } from '../types';
 import { translations, navigationItems } from '../data/translations';
 import { 
   mockCustomers, mockEmployees, 
@@ -32,6 +32,7 @@ interface WorkspaceProps {
   view: ViewType;
   lang: Language;
   onQuickAction: (type: any) => void;
+  quickLaunchRequest?: QuickLaunchRequest | null;
   
   // Personalization props
   darkMode?: boolean;
@@ -49,9 +50,10 @@ interface WorkspaceProps {
 }
 
 export default function Workspace({ 
-  view, 
-  lang, 
+  view,
+  lang,
   onQuickAction,
+  quickLaunchRequest,
   darkMode = false,
   favoritePages = [],
   onToggleFavoritePage,
@@ -575,12 +577,12 @@ export default function Workspace({
 
       {/* 2. APPOINTMENTS */}
       {view === 'appointments' && (
-        <AppointmentWorkspace lang={lang} onQuickAction={onQuickAction} />
+        <AppointmentWorkspace lang={lang} onQuickAction={onQuickAction} quickLaunchRequest={quickLaunchRequest} />
       )}
 
       {/* 3. CUSTOMERS */}
       {view === 'customers' && (
-        <CustomersWorkspace lang={lang} />
+        <CustomersWorkspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
       )}
 
       {/* 4. EMPLOYEES */}
@@ -589,17 +591,18 @@ export default function Workspace({
           lang={lang} 
           addEmployeeTrigger={addEmployeeTrigger}
           onAddEmployeeTriggerReset={onAddEmployeeTriggerReset}
+          quickLaunchRequest={quickLaunchRequest}
         />
       )}
 
       {/* 5. SERVICES */}
       {view === 'services' && (
-        <ServicesWorkspace lang={lang} />
+        <ServicesWorkspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
       )}
 
       {/* 6. PRODUCTS */}
       {view === 'products' && (
-        <ProductsWorkspace lang={lang} />
+        <ProductsWorkspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
       )}
 
       {/* 7. POS (POINT OF SALE) WITH DETAILED STATES */}
@@ -882,12 +885,12 @@ export default function Workspace({
 
       {/* 10.3 GIFT CARDS (NEW NESTED PATH) */}
       {view === 'marketing-gift-cards' && (
-        <GiftCardsWorkspace lang={lang} darkMode={darkMode} />
+        <GiftCardsWorkspace lang={lang} darkMode={darkMode} quickLaunchRequest={quickLaunchRequest} />
       )}
 
       {/* 11. GIFT CARDS */}
       {view === 'giftcards' && (
-        <GiftCardsWorkspace lang={lang} darkMode={darkMode} />
+        <GiftCardsWorkspace lang={lang} darkMode={darkMode} quickLaunchRequest={quickLaunchRequest} />
       )}
 
       {/* 10.4 REVIEWS (NEW NESTED PATH) */}

@@ -5,11 +5,13 @@ import {
   FileSpreadsheet, ClipboardList, TrendingUp, UserCheck, Settings, 
   Eye, ToggleLeft, ToggleRight, Layers, FileDown, CheckCircle, Info, Edit3
 } from 'lucide-react';
+import { QuickLaunchRequest } from '../types';
 import { API_ORIGIN, tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface GiftCardsWorkspaceProps {
   lang: 'ar' | 'en';
   darkMode?: boolean;
+  quickLaunchRequest?: QuickLaunchRequest | null;
 }
 
 interface GiftCardPackage {
@@ -144,7 +146,7 @@ const normalizeGiftCardSummary = (input: any): ReportsSummary => {
   };
 };
 
-export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCardsWorkspaceProps) {
+export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunchRequest }: GiftCardsWorkspaceProps) {
   const isRtl = lang === 'ar';
 
   // UI state
@@ -231,6 +233,15 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (quickLaunchRequest?.target !== 'giftcard') {
+      return;
+    }
+
+    setActiveTab('builder');
+    resetForm();
+  }, [quickLaunchRequest?.nonce]);
 
   // Form Reset
   const resetForm = () => {
@@ -613,6 +624,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false }: GiftCards
                 <input
                   type="text"
                   required
+                  autoFocus
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   placeholder={isRtl ? 'ادخل اسماً جذاباً للعميل...' : 'Enter enticing spa package title...'}

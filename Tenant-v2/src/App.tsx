@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Sparkle, Info, X, Check } from 'lucide-react';
-import { Language, ViewType, TabItem } from './types';
+import { Language, ViewType, TabItem, QuickLaunchRequest } from './types';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import Workspace from './components/Workspace';
 import GlobalSearch from './components/GlobalSearch';
-import QuickCreateModal from './components/QuickCreateModal';
 import ActivityCenter from './components/ActivityCenter';
 import TenantLoginScreen from './components/TenantLoginScreen';
 import { translations, navigationItems } from './data/translations';
@@ -81,12 +80,9 @@ export default function App() {
 
   // Modal & Search States
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
   const [isActivityCenterOpen, setIsActivityCenterOpen] = useState(false);
-  const [quickCreateType, setQuickCreateType] = useState<
-    'appointment' | 'customer' | 'service' | 'product' | 'employee' | 'giftcard'
-  >('appointment');
   const [addEmployeeTrigger, setAddEmployeeTrigger] = useState<number>(0);
+  const [quickLaunchRequest, setQuickLaunchRequest] = useState<QuickLaunchRequest | null>(null);
 
   // Dynamic accessibility control for the Marketing group modules
   const [accessibleMarketingModules, setAccessibleMarketingModules] = useState<Record<string, boolean>>({
@@ -394,14 +390,54 @@ export default function App() {
   };
 
   const handleQuickAction = (type: 'appointment' | 'customer' | 'service' | 'product' | 'employee' | 'giftcard') => {
+    const launchRequest = {
+      target: type,
+      nonce: Date.now() + Math.floor(Math.random() * 1000),
+    };
+
     if (type === 'employee') {
       handleSelectView('employees');
       setAddEmployeeTrigger(prev => prev + 1);
-    } else {
-      setQuickCreateType(type);
-      setIsQuickCreateOpen(true);
+      return;
     }
+
+    if (type === 'giftcard') {
+      handleSelectView('marketing-gift-cards');
+      setQuickLaunchRequest(launchRequest);
+      return;
+    }
+
+    const targetView =
+      type === 'appointment' ? 'appointments' :
+      type === 'customer' ? 'customers' :
+      type === 'service' ? 'services' :
+      type === 'product' ? 'products' :
+      'dashboard';
+
+    handleSelectView(targetView);
+    setQuickLaunchRequest(launchRequest);
   };
+
+  useEffect(() => {
+    if (!quickLaunchRequest) {
+      return;
+    }
+
+    const targetView =
+      quickLaunchRequest.target === 'appointment' ? 'appointments' :
+      quickLaunchRequest.target === 'customer' ? 'customers' :
+      quickLaunchRequest.target === 'service' ? 'services' :
+      quickLaunchRequest.target === 'product' ? 'products' :
+      quickLaunchRequest.target === 'employee' ? 'employees' :
+      'marketing-gift-cards';
+
+    if (activeView !== targetView) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setQuickLaunchRequest(null), 0);
+    return () => window.clearTimeout(timer);
+  }, [activeView, quickLaunchRequest]);
 
   const handleSwitchTenant = (tenant: string) => {
     setCurrentTenant(tenant);
@@ -414,10 +450,6 @@ export default function App() {
 
   const handleLogout = () => {
     void logout();
-  };
-
-  const handleQuickCreateSuccess = (msgAr: string, msgEn: string) => {
-    addToast(msgAr, msgEn, 'success');
   };
 
   const isRtl = lang === 'ar';
@@ -505,13 +537,14 @@ export default function App() {
             savedViews={savedViews}
             onSaveView={handleSaveView}
             onDeleteSavedView={handleDeleteSavedView}
-            widgetOrder={widgetOrder}
-            onReorderWidgets={setWidgetOrder}
-            addEmployeeTrigger={addEmployeeTrigger}
-            onAddEmployeeTriggerReset={() => setAddEmployeeTrigger(0)}
-            accessibleMarketingModules={accessibleMarketingModules}
-            onChangeAccessibleMarketingModules={setAccessibleMarketingModules}
-          />
+          widgetOrder={widgetOrder}
+          onReorderWidgets={setWidgetOrder}
+          addEmployeeTrigger={addEmployeeTrigger}
+          onAddEmployeeTriggerReset={() => setAddEmployeeTrigger(0)}
+          quickLaunchRequest={quickLaunchRequest}
+          accessibleMarketingModules={accessibleMarketingModules}
+          onChangeAccessibleMarketingModules={setAccessibleMarketingModules}
+        />
         </main>
       </div>
 
@@ -538,19 +571,6 @@ export default function App() {
             onClose={() => setIsActivityCenterOpen(false)}
             lang={lang}
             darkMode={darkMode}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Quick Create Dialog Drawer */}
-      <AnimatePresence>
-        {isQuickCreateOpen && (
-          <QuickCreateModal
-            isOpen={isQuickCreateOpen}
-            onClose={() => setIsQuickCreateOpen(false)}
-            lang={lang}
-            defaultType={quickCreateType}
-            onSuccess={handleQuickCreateSuccess}
           />
         )}
       </AnimatePresence>
