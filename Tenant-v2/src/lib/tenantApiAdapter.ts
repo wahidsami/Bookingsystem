@@ -48,7 +48,7 @@ function isTenantApiPath(pathname: string): boolean {
 }
 
 function shouldRetryUnauthorizedRequest(pathname: string): boolean {
-  return !pathname.endsWith('/tenant/profile');
+  return true;
 }
 
 function createJsonResponse(body: any, init: ResponseInit & { headers?: HeadersInit } = {}): Response {
