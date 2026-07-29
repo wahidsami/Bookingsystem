@@ -22,7 +22,7 @@ import {
   useBISavedViews,
 } from '../../lib/bi';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
-import { createSalesOverviewReportDefinition, type SalesOverviewTableRow } from '../../lib/bi/reports/salesOverview';
+import { createSalesOverviewReportDefinition } from '../../lib/bi/reports/salesOverview';
 import {
   buildSalesOverviewBackendGaps,
   buildSalesOverviewDrawerPairs,
@@ -32,7 +32,7 @@ import {
   type SalesOverviewPayload,
   type SalesOverviewRow,
 } from '../../lib/bi/reports/salesOverviewViewModel';
-import type { BIDatePresetValue, BIDateRange, BIOption, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
+import type { BIDatePresetValue, BIDateRange, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
 import type { Language } from '../../types';
 
 interface SalesOverviewReportProps {
@@ -60,24 +60,6 @@ function formatDate(value: unknown, lang: Language): string {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function dedupeBIOptions(options: BIOption[]) {
-  const seen = new Set<string>();
-  return options.filter((option) => {
-    const nextValue = `${option.value ?? ''}`.trim();
-    if (!nextValue) return false;
-    if (seen.has(nextValue)) return false;
-    seen.add(nextValue);
-    return true;
-  });
-}
-
-function toOption(label: unknown, value: unknown): BIOption | null {
-  const nextLabel = `${label ?? ''}`.trim();
-  const nextValue = `${value ?? ''}`.trim();
-  if (!nextLabel || !nextValue) return null;
-  return { label: nextLabel, value: nextValue };
 }
 
 function buildSeriesPoints(rows: any[], valueKey: string, labelKey = 'date') {
@@ -245,53 +227,10 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
   });
   const [drawerRow, setDrawerRow] = useState<SalesOverviewRow | null>(null);
 
-  const definitionOptions = useMemo(() => {
-    const employeeOptions = dedupeBIOptions([
-      { label: isRtl ? 'جميع الموظفين' : 'All Employees', value: '' },
-      ...(report.employees?.performance || report.employees?.revenue || [])
-        .map((item: any) => toOption(item.name || item.nameEn || item.nameAr || item.id, item.name || item.nameEn || item.nameAr || item.id))
-        .filter(Boolean) as BIOption[]
-    ]);
-
-    const serviceOptions = dedupeBIOptions([
-      { label: isRtl ? 'جميع الخدمات' : 'All Services', value: '' },
-      ...(report.services?.performance || report.services?.revenue || [])
-        .map((item: any) => toOption(item.name_en || item.nameEn || item.name || item.id, item.name_en || item.nameEn || item.name || item.id))
-        .filter(Boolean) as BIOption[]
-    ]);
-
-    const paymentMethodOptions = dedupeBIOptions([
-      { label: isRtl ? 'جميع طرق الدفع' : 'All Payment Methods', value: '' },
-      ...(report.payments?.methods?.rows || [])
-        .map((item: any) => toOption(item.paymentMethodLabel || item.paymentMethod || item.id, item.paymentMethod || item.id))
-        .filter(Boolean) as BIOption[]
-    ]);
-
-    const categoryOptions = dedupeBIOptions([
-      { label: isRtl ? 'جميع التصنيفات' : 'All Categories', value: '' },
-      ...(report.services?.performance || report.services?.revenue || [])
-        .map((item: any) => toOption(item.category || item.categoryEn || item.categoryAr || '-', item.category || item.categoryEn || item.categoryAr || '-'))
-        .filter(Boolean) as BIOption[]
-    ]);
-
-    const statusOptions = dedupeBIOptions([
-      { label: isRtl ? 'جميع الحالات' : 'All Statuses', value: '' },
-      ...Array.from(
-        new Set(
-          (buildSalesOverviewRows(report).map((row) => row.status).filter(Boolean) as string[])
-            .map((item) => item.trim())
-        )
-      ).map((value) => ({ label: value, value }))
-    ]);
-
-    return {
-      employees: employeeOptions,
-      services: serviceOptions,
-      paymentMethods: paymentMethodOptions,
-      categories: categoryOptions,
-      statuses: statusOptions,
-    };
-  }, [isRtl, report]);
+  const definitionOptions = useMemo(
+    () => buildSalesOverviewFilterOptions(report, isRtl),
+    [isRtl, report]
+  );
 
   const reportDefinition = useMemo(
     () =>
@@ -337,7 +276,7 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
           row.customer,
           row.employee,
           row.channel,
-          row.items,
+          row.itemsSold,
           row.paymentMethod,
           row.status,
           row.notes,
@@ -346,11 +285,11 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
       }
 
       if (selectedEmployee && normalizeText(row.employee) !== selectedEmployee) return false;
-      if (selectedService && normalizeText(row.items) !== selectedService && !normalizeText(row.items).includes(selectedService)) return false;
+      if (selectedService && normalizeText(row.itemsSold) !== selectedService && !normalizeText(row.itemsSold).includes(selectedService)) return false;
       if (selectedPaymentMethod && normalizeText(row.paymentMethod) !== selectedPaymentMethod) return false;
       if (selectedCategory && normalizeText(row.category) !== selectedCategory) return false;
       if (selectedStatus && normalizeText(row.status) !== selectedStatus) return false;
-      if (refundOnly && !(Number(row.refund || 0) > 0)) return false;
+      if (refundOnly && !(Number(row.refundAmount || 0) > 0)) return false;
 
       const gross = row.grossSales;
       if (min !== null && Number.isFinite(min) && !(Number(gross ?? 0) >= min)) return false;
@@ -423,7 +362,19 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
     { id: 'gross-sales', label: 'Gross Sales', value: formatMoney(summaryTotals.revenue, lang), note: isRtl ? 'المبيعات قبل الخصومات' : 'Before discounts', icon: <BadgeInfo size={18} /> },
     { id: 'net-sales', label: 'Net Sales', value: formatMoney(summaryTotals.netRevenue, lang), note: isRtl ? 'بعد الخصومات' : 'After discounts', icon: <TrendingUp size={18} /> },
     { id: 'discounts', label: 'Discounts', value: formatMoney(summaryTotals.discount, lang), note: isRtl ? 'الخصومات المطبقة' : 'Applied discounts', icon: <Filter size={18} /> },
-    { id: 'refunds', label: 'Refunds', value: formatMoney(report.finance?.refunds?.totals?.refundAmount || 0, lang), note: isRtl ? 'المرتجعات' : 'Refund amount', icon: <RefreshCw size={18} /> },
+    {
+      id: 'refunds',
+      label: 'Refunds',
+      value: formatMoney(
+        report.finance?.refunds?.totals?.refundAmount
+          ?? report.finance?.refunds?.totals?.totalRefunds
+          ?? report.finance?.refunds?.totals?.amount
+          ?? 0,
+        lang
+      ),
+      note: isRtl ? 'المرتجعات' : 'Refund amount',
+      icon: <RefreshCw size={18} />
+    },
     { id: 'vat', label: 'VAT', value: formatMoney(summaryTotals.tax, lang), note: isRtl ? 'ضريبة القيمة المضافة' : 'Tax amount', icon: <FileText size={18} /> },
     { id: 'customers', label: 'Customers', value: Number(summaryMetrics.uniqueCustomers || report.customers?.analytics?.totalCustomers || 0).toLocaleString(), note: isRtl ? 'العملاء الفريدون' : 'Unique customers', icon: <Users size={18} /> },
     { id: 'appointments', label: 'Appointments', value: Number(summaryMetrics.appointments || 0).toLocaleString(), note: isRtl ? 'الحجوزات في المدة' : 'Appointments in range', icon: <Clock size={18} /> },

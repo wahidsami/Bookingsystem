@@ -49,7 +49,8 @@ function buildSalesOverviewPayload(result, startDate, endDate) {
     const advancedAnalytics = result.advancedAnalytics || {};
     const customerCohorts = advancedAnalytics.customerCohorts || null;
     const paymentMethodTrends = advancedAnalytics.paymentMethodTrends || paymentMethods.trend || [];
-    const refundTrends = advancedAnalytics.refundTrends || result.refunds || null;
+    const refundReport = result.refunds && !Array.isArray(result.refunds) ? result.refunds : null;
+    const refundTrends = Array.isArray(advancedAnalytics.refundTrends) ? advancedAnalytics.refundTrends : [];
     const rebookingAnalytics = advancedAnalytics.rebookingAnalytics || result.rebookings || null;
     const operationalAlerts = advancedAnalytics.operationalAlerts || [];
 
@@ -102,6 +103,21 @@ function buildSalesOverviewPayload(result, startDate, endDate) {
         ? Number(financialLedger.overview.netCollected)
         : Number(businessRevenue || 0);
     const outstandingAmount = Number(overview.pendingPayments || 0);
+    const normalizedRefundTotals = refundReport?.totals
+        ? {
+            ...refundReport.totals,
+            refundAmount: Number(
+                refundReport.totals.refundAmount
+                ?? refundReport.totals.totalRefunds
+                ?? refundReport.totals.amount
+                ?? 0
+            )
+        }
+        : {
+            totalRefunds: 0,
+            refundAmount: 0,
+            amount: 0
+        };
 
     const financeOverview = {
         revenue: businessRevenue,
@@ -190,12 +206,12 @@ function buildSalesOverviewPayload(result, startDate, endDate) {
             totals: productTotals,
             topProduct
         },
-        payments: {
-            methods: {
-                rows: paymentMethods.rows || [],
-                trend: paymentMethods.trend || [],
-                totals: paymentMethods.totals || null
-            },
+            payments: {
+                methods: {
+                    rows: paymentMethods.rows || [],
+                    trend: paymentMethods.trend || [],
+                    totals: paymentMethods.totals || null
+                },
             ledger: {
                 paymentLedger: {
                     rows: paymentLedgerRows,
@@ -236,7 +252,11 @@ function buildSalesOverviewPayload(result, startDate, endDate) {
                     totals: settlementLedger.totals || null
                 }
             },
-            refunds: refundTrends,
+            refunds: {
+                rows: refundReport?.rows || [],
+                totals: normalizedRefundTotals,
+                trend: refundTrends
+            },
             commissions: {
                 ledger: commissionLedgerRows,
                 totals: commissionLedger.totals || null

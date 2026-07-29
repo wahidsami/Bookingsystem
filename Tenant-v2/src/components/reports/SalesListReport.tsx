@@ -63,13 +63,6 @@ function formatText(value: unknown): string {
   return `${value}`;
 }
 
-function toOption(label: unknown, value: unknown): BIOption | null {
-  const nextLabel = `${label ?? ''}`.trim();
-  const nextValue = `${value ?? ''}`.trim();
-  if (!nextLabel || !nextValue) return null;
-  return { label: nextLabel, value: nextValue };
-}
-
 function dedupeOptions(options: BIOption[]) {
   const seen = new Set<string>();
   return options.filter((option) => {
@@ -190,22 +183,19 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
 
 function buildSalesListRows(report: SalesOverviewPayload): SalesListTableRow[] {
   return buildSalesOverviewRows(report).map((row) => {
-    const source = row.sourceRow || {};
-    const appointmentReference = formatText(row.appointmentReference || source.appointmentReference || source.bookingReference || source.bookingNumber || (row.entityType === 'appointment' ? row.saleNumber : 'Unavailable'));
-    const location = formatText(row.location || source.location || source.tenantLocation || source.branch || 'Unavailable');
-    const amountPaid = row.amountPaid ?? source.amountPaid ?? source.totalPaid ?? null;
-    const remainingBalance = row.remainingBalance ?? source.remainingBalance ?? source.remainderAmount ?? null;
-    const itemLabel = row.itemsSold || (row.items && row.items !== '-' ? row.items : '') || source.itemsSold || row.service || '';
-    const itemsSold = formatText(itemLabel);
+    const appointmentReference = formatText(row.appointmentReference || 'Unavailable');
+    const location = formatText(row.location || 'Unavailable');
+    const amountPaid = row.amountPaid ?? null;
+    const remainingBalance = row.remainingBalance ?? null;
 
     return {
       ...row,
-      status: formatText(row.status || source.status || 'Unavailable'),
+      status: formatText(row.status || 'Unavailable'),
       appointmentReference,
       location,
       amountPaid: amountPaid === null || amountPaid === undefined ? null : Number(amountPaid),
       remainingBalance: remainingBalance === null || remainingBalance === undefined ? null : Number(remainingBalance),
-      itemsSold,
+      itemsSold: formatText(row.itemsSold || 'Unavailable'),
     };
   });
 }

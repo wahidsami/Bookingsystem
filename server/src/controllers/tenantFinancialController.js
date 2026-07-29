@@ -516,13 +516,43 @@ function getTransactionEmployeeLabel(transaction) {
     return appointment?.staff?.name || transaction?.processor?.name || 'Tenant Dashboard';
 }
 
-function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
+function buildRefundLookup(transactions = []) {
+    const lookup = new Map();
+
+    transactions
+        .filter((transaction) => transaction?.type === 'refund' || transaction?.status === 'refunded')
+        .forEach((transaction) => {
+            const reference = getTransactionReference(transaction);
+            const amount = Number(transaction.amount || 0);
+            const normalized = {
+                id: transaction.id,
+                reference,
+                amount: Number(amount.toFixed(2)),
+                detailPath: transaction?.appointment?.id
+                    ? `/dashboard/appointments/${transaction.appointment.id}`
+                    : transaction?.order?.id
+                        ? `/dashboard/orders/${transaction.order.id}`
+                        : null
+            };
+
+            if (reference) {
+                lookup.set(reference, normalized);
+            }
+            lookup.set(String(transaction.id), normalized);
+        });
+
+    return lookup;
+}
+
+function mapLedgerTransaction(transaction, invoiceLookup = new Map(), refundLookup = new Map()) {
     const appointment = transaction.appointment;
     const order = transaction.order;
     const user = appointment?.user || order?.user;
     const amount = Number(transaction.amount || 0);
     const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
     const signedAmount = isRefund ? -Math.abs(amount) : Math.abs(amount);
+    const saleNumber = getTransactionReference(transaction);
+    const saleDate = transaction.processedAt || transaction.createdAt;
     const invoiceKey = appointment?.id
         ? `appointment:${appointment.id}`
         : order?.id
@@ -530,6 +560,8 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
             : null;
     const invoice = invoiceKey ? invoiceLookup.get(invoiceKey) || null : null;
     const invoiceItems = Array.isArray(invoice?.items) ? invoice.items : [];
+    const refundRow = refundLookup.get(saleNumber) || refundLookup.get(String(transaction.id)) || null;
+    const refundAmount = Number(refundRow?.amount || 0);
     const amountPaid = appointment
         ? Number(appointment.totalPaid || 0)
         : Number(invoice?.paidAmount || amount || 0);
@@ -582,22 +614,40 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
             metadata: item?.metadata || {}
         };
     });
+    const itemsSold = getTransactionServiceLabel(transaction);
+    const category = appointment?.service?.category
+        || orderItems?.[0]?.product?.category
+        || invoiceItems.find((item) => item?.metadata?.category)?.metadata?.category
+        || null;
+    const netSales = Number(
+        appointment
+            ? (invoice?.totalAmount ?? appointment.price ?? amount)
+            : order
+                ? (invoice?.totalAmount ?? order.totalAmount ?? amount)
+                : amount
+    );
 
     return {
         id: transaction.id,
-        date: transaction.processedAt || transaction.createdAt,
-        reference: getTransactionReference(transaction),
+        saleNumber,
+        saleDate,
+        reference: saleNumber,
+        date: saleDate,
         appointmentReference: getTransactionAppointmentReference(transaction),
         invoiceNumber: invoice?.invoiceNumber || null,
         customer: getLedgerCustomerName(user),
         employee: getTransactionEmployeeLabel(transaction),
-        service: getTransactionServiceLabel(transaction),
-        itemsSold: getTransactionServiceLabel(transaction),
+        service: itemsSold,
+        items: itemsSold,
+        itemsSold,
+        category: category || 'Unavailable',
         channel: appointment ? 'Appointment' : order ? 'Order' : 'Transaction',
         location: getTransactionLocationLabel(transaction),
-        revenue: Number(signedAmount.toFixed(2)),
+        grossSales: Number(signedAmount.toFixed(2)),
         tax: Number((Number(appointment?.taxAmount || order?.taxAmount || 0)).toFixed(2)),
         discount: Number(getTransactionDiscountAmount(transaction, invoice).toFixed(2)),
+        refundAmount: Number(refundAmount.toFixed(2)),
+        netSales: Number(netSales.toFixed(2)),
         paymentMethod: transaction.paymentMethod,
         paymentMethodLabel: formatLedgerPaymentMethodLabel(transaction.paymentMethod),
         status: appointment?.status || order?.status || transaction.status,
@@ -621,7 +671,6 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
             || transaction?.gatewayResponse?.notes
             || transaction?.gatewayResponse?.note
             || null,
-        status: transaction.status,
         entityType: appointment ? 'appointment' : 'order',
         entityId: appointment?.id || order?.id || null,
         detailPath: appointment?.id
@@ -639,13 +688,17 @@ function mapRefundLedgerRow(transaction) {
     const amount = Number(transaction.amount || 0);
     const reference = getTransactionReference(transaction);
     const referenceAmount = getTransactionReferenceAmount(transaction);
+    const saleDate = transaction.processedAt || transaction.createdAt;
     const refundReason = `${transaction.notes || transaction.metadata?.reason || transaction.metadata?.refundReason || transaction.gatewayResponse?.reason || ''}`.trim() || null;
 
     return {
         id: transaction.id,
-        date: transaction.processedAt || transaction.createdAt,
+        saleNumber: reference,
+        saleDate,
+        date: saleDate,
         customer: getLedgerCustomerName(user),
         amount: Number(amount.toFixed(2)),
+        refundAmount: Number(amount.toFixed(2)),
         reference,
         reason: refundReason,
         employee: transaction.processor?.name || null,
@@ -1853,7 +1906,8 @@ exports.getFinancialLedger = async (req, res) => {
             transactionCount: transactions.length,
             invoiceCount: invoices.length
         });
-        revenueLedger = transactions.map((transaction) => mapLedgerTransaction(transaction, invoiceLookup));
+        const refundLookup = buildRefundLookup(transactions);
+        revenueLedger = transactions.map((transaction) => mapLedgerTransaction(transaction, invoiceLookup, refundLookup));
 
         paymentLedger = transactions.map((transaction) => ({
             id: transaction.id,

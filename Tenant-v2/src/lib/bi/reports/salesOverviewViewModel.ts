@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import type { BIOption } from '../types';
 import type { Language } from '../../../types';
 import type { SalesOverviewTableRow } from './salesOverview';
 
@@ -52,66 +51,43 @@ function formatDate(value: unknown, lang: Language): string {
   });
 }
 
-function toOption(label: unknown, value: unknown): BIOption | null {
-  const nextLabel = `${label ?? ''}`.trim();
-  const nextValue = `${value ?? ''}`.trim();
-  if (!nextLabel || !nextValue) return null;
-  return { label: nextLabel, value: nextValue };
-}
-
 export function buildSalesOverviewRows(data: SalesOverviewPayload): SalesOverviewRow[] {
   const revenueRows = Array.isArray(data.finance?.ledger?.revenueLedger?.rows)
     ? data.finance.ledger.revenueLedger.rows
     : [];
-  const refundRows = Array.isArray(data.finance?.ledger?.refundLedger?.rows)
-    ? data.finance.ledger.refundLedger.rows
-    : [];
-  const refundByReference = new Map<string, any>();
-  refundRows.forEach((refund: any) => {
-    const key = `${refund?.reference || refund?.id || ''}`.trim();
-    if (key) refundByReference.set(key, refund);
-  });
-
-  const serviceCategoryLookup = new Map<string, string>();
-  (data.services?.performance || data.services?.revenue || []).forEach((service: any) => {
-    const serviceName = `${service?.name_en || service?.nameEn || service?.name || ''}`.trim().toLowerCase();
-    const category = `${service?.category || service?.categoryEn || service?.categoryAr || '-'}`.trim() || '-';
-    if (serviceName) serviceCategoryLookup.set(serviceName, category);
-  });
 
   return revenueRows.map((row: any) => {
-    const reference = `${row?.reference || row?.saleNumber || row?.id || '-'}`.trim();
-    const refund = refundByReference.get(reference) || refundByReference.get(`${row?.id || ''}`.trim()) || null;
-    const saleDate = row?.date || row?.processedAt || row?.createdAt || '';
-    const items = `${row?.service || row?.entityLabel || row?.items || '-'}`.trim() || '-';
-    const appointmentReference = `${row?.appointmentReference || row?.bookingReference || row?.bookingNumber || ''}`.trim() || 'Unavailable';
-    const invoiceNumber = `${row?.invoiceNumber || ''}`.trim() || 'Unavailable';
-    const location = `${row?.location || row?.tenantLocation || row?.branch || ''}`.trim() || 'Unavailable';
+    const saleNumber = `${row?.saleNumber || '-'}`.trim() || '-';
+    const saleDate = row?.saleDate || '';
+    const itemsSold = `${row?.itemsSold || '-'}`.trim() || '-';
+    const appointmentReference = `${row?.appointmentReference || 'Unavailable'}`.trim() || 'Unavailable';
+    const invoiceNumber = `${row?.invoiceNumber || 'Unavailable'}`.trim() || 'Unavailable';
+    const location = `${row?.location || 'Unavailable'}`.trim() || 'Unavailable';
     const amountPaid = row?.amountPaid === null || row?.amountPaid === undefined ? null : Number(row.amountPaid);
     const remainingBalance = row?.remainingBalance === null || row?.remainingBalance === undefined ? null : Number(row.remainingBalance);
-    const category = serviceCategoryLookup.get(items.toLowerCase()) || '-';
-    const grossSales = row?.grossSales ?? row?.revenue ?? null;
+    const category = `${row?.category || '-'}`.trim() || '-';
+    const grossSales = row?.grossSales ?? null;
     const discount = row?.discount ?? null;
-    const vat = row?.tax ?? null;
-    const refundAmount = refund?.amount ?? row?.refund ?? null;
+    const vat = row?.vat ?? null;
+    const refundAmount = row?.refundAmount ?? 0;
     const netSales = row?.netSales ?? null;
-    const paymentMethod = `${row?.paymentMethodLabel || row?.paymentMethod || '-'}`.trim() || '-';
+    const paymentMethod = `${row?.paymentMethod || '-'}`.trim() || '-';
     const status = `${row?.status || '-'}`.trim() || '-';
 
     return {
-      id: String(row?.id || reference),
-      saleNumber: reference,
-      invoiceNumber,
+      id: String(row?.id || saleNumber),
+      saleNumber,
       saleDate,
+      invoiceNumber,
       customer: `${row?.customer || '-'}`.trim() || '-',
       employee: `${row?.employee || '-'}`.trim() || '-',
-      channel: `${row?.channel || row?.entityType || '-'}`.trim() || '-',
-      items,
-      itemsSold: `${row?.itemsSold || items || '-'}`.trim() || 'Unavailable',
+      channel: `${row?.channel || '-'}`.trim() || '-',
+      items: itemsSold,
+      itemsSold,
       grossSales: grossSales === null || grossSales === undefined ? null : Number(grossSales),
       discount: discount === null || discount === undefined ? null : Number(discount),
       vat: vat === null || vat === undefined ? null : Number(vat),
-      refund: refundAmount === null || refundAmount === undefined ? null : Number(refundAmount),
+      refundAmount: refundAmount === null || refundAmount === undefined ? 0 : Number(refundAmount),
       netSales: netSales === null || netSales === undefined ? null : Number(netSales),
       paymentMethod,
       status,
@@ -120,51 +96,43 @@ export function buildSalesOverviewRows(data: SalesOverviewPayload): SalesOvervie
       amountPaid,
       remainingBalance,
       category,
-      refundMode: refund?.refundMode || null,
-      detailPath: row?.detailPath || refund?.detailPath || null,
-      notes: row?.notes || refund?.reason || null,
+      refundMode: row?.refundMode || null,
+      detailPath: row?.detailPath || null,
+      notes: row?.notes || null,
       sourceRow: row,
     };
   });
 }
 
 export function buildSalesOverviewFilterOptions(report: SalesOverviewPayload, isRtl: boolean) {
+  const rows = buildSalesOverviewRows(report);
+  const uniqueOptions = (values: unknown[]) => Array.from(
+    new Set(values.map((value) => `${value ?? ''}`.trim()).filter(Boolean))
+  ).map((value) => ({ label: value, value }));
+
   const employeeOptions = [
     { label: isRtl ? 'Ø¬Ù…ÙŠØ¹ Ø§Ù„Ù…ÙˆØ¸ÙÙŠÙ†' : 'All Employees', value: '' },
-    ...(report.employees?.performance || report.employees?.revenue || [])
-      .map((item: any) => toOption(item.name || item.nameEn || item.nameAr || item.id, item.name || item.nameEn || item.nameAr || item.id))
-      .filter(Boolean) as BIOption[]
+    ...uniqueOptions(rows.map((row) => row.employee))
   ];
 
   const serviceOptions = [
     { label: isRtl ? 'Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø®Ø¯Ù…Ø§Øª' : 'All Services', value: '' },
-    ...(report.services?.performance || report.services?.revenue || [])
-      .map((item: any) => toOption(item.name_en || item.nameEn || item.name || item.id, item.name_en || item.nameEn || item.name || item.id))
-      .filter(Boolean) as BIOption[]
+    ...uniqueOptions(rows.map((row) => row.itemsSold))
   ];
 
   const paymentMethodOptions = [
     { label: isRtl ? 'Ø¬Ù…ÙŠØ¹ Ø·Ø±Ù‚ Ø§Ù„Ø¯ÙØ¹' : 'All Payment Methods', value: '' },
-    ...(report.payments?.methods?.rows || [])
-      .map((item: any) => toOption(item.paymentMethodLabel || item.paymentMethod || item.id, item.paymentMethod || item.id))
-      .filter(Boolean) as BIOption[]
+    ...uniqueOptions(rows.map((row) => row.paymentMethod))
   ];
 
   const categoryOptions = [
     { label: isRtl ? 'Ø¬Ù…ÙŠØ¹ Ø§Ù„ØªØµÙ†ÙŠÙØ§Øª' : 'All Categories', value: '' },
-    ...(report.services?.performance || report.services?.revenue || [])
-      .map((item: any) => toOption(item.category || item.categoryEn || item.categoryAr || '-', item.category || item.categoryEn || item.categoryAr || '-'))
-      .filter(Boolean) as BIOption[]
+    ...uniqueOptions(rows.map((row) => row.category))
   ];
 
   const statusOptions = [
     { label: isRtl ? 'Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø­Ø§Ù„Ø§Øª' : 'All Statuses', value: '' },
-    ...Array.from(
-      new Set(
-        (buildSalesOverviewRows(report).map((row) => row.status).filter(Boolean) as string[])
-          .map((item) => item.trim())
-      )
-    ).map((value) => ({ label: value, value }))
+    ...uniqueOptions(rows.map((row) => row.status))
   ];
 
   return {
@@ -180,10 +148,10 @@ export function buildSalesOverviewBackendGaps(rows: SalesOverviewRow[]) {
   const gaps = new Set<string>();
   if (rows.some((row) => row.invoiceNumber === '-' || row.invoiceNumber === row.saleNumber)) gaps.add('Invoice Number');
   if (rows.some((row) => row.channel === '-')) gaps.add('Channel');
-  if (rows.some((row) => row.items === '-')) gaps.add('Items');
+  if (rows.some((row) => row.itemsSold === '-')) gaps.add('Items Sold');
   if (rows.some((row) => row.grossSales == null)) gaps.add('Gross Sales');
   if (rows.some((row) => row.netSales == null)) gaps.add('Net Sales');
-  if (rows.some((row) => row.refund == null)) gaps.add('Refund');
+  if (rows.some((row) => row.refundAmount == null)) gaps.add('Refund Amount');
   if (rows.some((row) => row.vat == null)) gaps.add('VAT');
   if (rows.some((row) => row.status === '-' || row.status === 'Unavailable')) gaps.add('Status');
   return Array.from(gaps);
@@ -199,11 +167,11 @@ export function buildSalesOverviewDrawerPairs(row: SalesOverviewRow | null, lang
     { label: 'Employee', value: row.employee },
     { label: 'Channel', value: row.channel },
     { label: 'Status', value: row.status },
-    { label: 'Items', value: row.items },
+    { label: 'Items Sold', value: row.itemsSold },
     { label: 'Gross Sales', value: row.grossSales == null ? '-' : formatMoney(row.grossSales, lang) },
     { label: 'Discounts', value: row.discount == null ? '-' : formatMoney(row.discount, lang) },
     { label: 'Taxes', value: row.vat == null ? '-' : formatMoney(row.vat, lang) },
-    { label: 'Refund', value: row.refund == null ? '-' : formatMoney(row.refund, lang) },
+    { label: 'Refund Amount', value: row.refundAmount == null ? '-' : formatMoney(row.refundAmount, lang) },
     { label: 'Net Sales', value: row.netSales == null ? '-' : formatMoney(row.netSales, lang) },
     { label: 'Payment Method', value: row.paymentMethod },
     { label: 'Notes', value: row.notes || '-' },

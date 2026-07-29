@@ -14,11 +14,19 @@ export interface SalesOverviewTableRow {
   discount: number | null;
   vat: number | null;
   refund: number | null;
+  refundAmount?: number | null;
   netSales: number | null;
   paymentMethod: string;
   status: string;
   detailPath?: string | null;
   notes?: string | null;
+  itemsSold?: string;
+  category?: string;
+  amountPaid?: number | null;
+  remainingBalance?: number | null;
+  service?: string;
+  entityType?: string;
+  sourceRow?: any;
 }
 
 export interface SalesOverviewReportOptions {
