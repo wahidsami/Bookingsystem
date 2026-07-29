@@ -99,7 +99,44 @@ function formatLedgerPaymentMethodLabel(paymentMethod) {
     }[paymentMethod] || paymentMethod || 'Not set');
 }
 
-function getLedgerTransactionIncludes() {
+function getLedgerTransactionIncludes(options = {}) {
+    const includeBookingSession = options.includeBookingSession !== false;
+    const appointmentIncludes = [
+        {
+            model: db.Service,
+            as: 'service',
+            attributes: ['id', 'name_en', 'name_ar', 'category'],
+            required: false
+        },
+        {
+            model: db.Staff,
+            as: 'staff',
+            attributes: ['id', 'name'],
+            required: false
+        },
+        {
+            model: db.PlatformUser,
+            as: 'user',
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+            required: false
+        },
+        {
+            model: db.Tenant,
+            as: 'tenant',
+            attributes: ['id', 'name', 'name_en', 'name_ar', 'city', 'address'],
+            required: false
+        }
+    ];
+
+    if (includeBookingSession) {
+        appointmentIncludes.push({
+            model: db.BookingSession,
+            as: 'bookingSession',
+            attributes: ['id', 'bookingReference', 'paymentMethod', 'status', 'itemCount', 'totalAmount'],
+            required: false
+        });
+    }
+
     return [
         {
             model: db.Appointment,
@@ -128,38 +165,7 @@ function getLedgerTransactionIncludes() {
                 'paidAt'
             ],
             required: false,
-            include: [
-                {
-                    model: db.Service,
-                    as: 'service',
-                    attributes: ['id', 'name_en', 'name_ar', 'category'],
-                    required: false
-                },
-                {
-                    model: db.Staff,
-                    as: 'staff',
-                    attributes: ['id', 'name'],
-                    required: false
-                },
-                {
-                    model: db.PlatformUser,
-                    as: 'user',
-                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
-                    required: false
-                },
-                {
-                    model: db.Tenant,
-                    as: 'tenant',
-                    attributes: ['id', 'name', 'name_en', 'name_ar', 'city', 'address'],
-                    required: false
-                },
-                {
-                    model: db.BookingSession,
-                    as: 'bookingSession',
-                    attributes: ['id', 'bookingReference', 'paymentMethod', 'status', 'itemCount', 'totalAmount'],
-                    required: false
-                }
-            ]
+            include: appointmentIncludes
         },
         {
             model: db.Order,
@@ -696,6 +702,49 @@ function runHandler(handler, req) {
     });
 }
 
+function createEmptyEmployeeRevenueResponse() {
+    return {
+        employees: [],
+        totals: {
+            totalEmployees: 0,
+            totalBookings: 0,
+            totalRevenueGenerated: 0,
+            totalCommissions: 0,
+            totalSalaries: 0,
+            totalPayroll: 0
+        }
+    };
+}
+
+function unwrapSettledValue(settledResult, fallback) {
+    return settledResult && settledResult.status === 'fulfilled'
+        ? settledResult.value
+        : fallback;
+}
+
+async function loadFinancialTransactionsWithFallback(where, order) {
+    try {
+        return await db.PaymentTransaction.findAll({
+            where,
+            include: getLedgerTransactionIncludes(),
+            order,
+            subQuery: false
+        });
+    } catch (primaryError) {
+        logFinancialDiagnostics('financial/transactions', 'primary_include_failed', {
+            message: primaryError.message,
+            fallback: 'booking_session_excluded'
+        });
+
+        return db.PaymentTransaction.findAll({
+            where,
+            include: getLedgerTransactionIncludes({ includeBookingSession: false }),
+            order,
+            subQuery: false
+        });
+    }
+}
+
 async function getLandingCollectionsSummary(req, endDate) {
     const closingResponse = await runHandler(tenantPosController.getClosingSummary, {
         ...req,
@@ -799,20 +848,15 @@ exports.getFinancialOverview = async (req, res) => {
             }
         });
 
-        let paymentTransactions = await db.PaymentTransaction.findAll({
-            where: {
-                [Op.or]: [
-                    { '$appointment.tenantId$': tenantId },
-                    { '$order.tenantId$': tenantId }
-                ],
-                status: { [Op.in]: ['completed', 'refunded'] },
-                type: { [Op.in]: ['deposit', 'remainder', 'full', 'refund'] },
-                ...buildDateRangeWhere('processedAt', startDate, endDate)
-            },
-            include: getLedgerTransactionIncludes(),
-            order: [['processedAt', 'DESC']],
-            subQuery: false
-        });
+        let paymentTransactions = await loadFinancialTransactionsWithFallback({
+            [Op.or]: [
+                { '$appointment.tenantId$': tenantId },
+                { '$order.tenantId$': tenantId }
+            ],
+            status: { [Op.in]: ['completed', 'refunded'] },
+            type: { [Op.in]: ['deposit', 'remainder', 'full', 'refund'] },
+            ...buildDateRangeWhere('processedAt', startDate, endDate)
+        }, [['processedAt', 'DESC']]);
 
         allAppointments = allAppointments.filter((appointment) => matchesAppointmentFilters(appointment, filters));
         appointments = appointments.filter((appointment) => matchesAppointmentFilters(appointment, filters));
@@ -1648,24 +1692,19 @@ exports.getFinancialLedger = async (req, res) => {
         fallbackStart.setHours(0, 0, 0, 0);
         const start = parseDateValue(startDate, false) || fallbackStart;
 
-        const [transactionsRaw, employeeRevenueResponse, payrollRecords] = await Promise.all([
-            db.PaymentTransaction.findAll({
-                where: {
-                    [Op.or]: [
-                        { '$appointment.tenantId$': tenantId },
-                        { '$order.tenantId$': tenantId }
-                    ],
-                    status: { [Op.in]: ['completed', 'refunded'] },
-                    type: { [Op.in]: ['deposit', 'remainder', 'full', 'refund'] },
-                    processedAt: {
-                        [Op.gte]: start,
-                        [Op.lte]: end
-                    }
-                },
-                include: getLedgerTransactionIncludes(),
-                order: [['processedAt', 'DESC']],
-                subQuery: false
-            }),
+        const [transactionsRawResult, employeeRevenueResult, payrollRecordsResult] = await Promise.allSettled([
+            loadFinancialTransactionsWithFallback({
+                [Op.or]: [
+                    { '$appointment.tenantId$': tenantId },
+                    { '$order.tenantId$': tenantId }
+                ],
+                status: { [Op.in]: ['completed', 'refunded'] },
+                type: { [Op.in]: ['deposit', 'remainder', 'full', 'refund'] },
+                processedAt: {
+                    [Op.gte]: start,
+                    [Op.lte]: end
+                }
+            }, [['processedAt', 'DESC']]),
             runHandler(exports.getEmployeeRevenue, {
                 ...req,
                 query: { startDate: start.toISOString().split('T')[0], endDate: end.toISOString().split('T')[0] }
@@ -1686,6 +1725,24 @@ exports.getFinancialLedger = async (req, res) => {
                 order: [['periodStart', 'DESC'], ['createdAt', 'DESC']]
             })
         ]);
+        if (transactionsRawResult.status === 'rejected') {
+            throw transactionsRawResult.reason;
+        }
+        const transactionsRaw = transactionsRawResult.value;
+        const employeeRevenueResponse = unwrapSettledValue(employeeRevenueResult, createEmptyEmployeeRevenueResponse());
+        const payrollRecords = unwrapSettledValue(payrollRecordsResult, []);
+        if (employeeRevenueResult.status === 'rejected') {
+            logFinancialDiagnostics('financial/ledger', 'employee_revenue_fallback', {
+                tenantId,
+                error: employeeRevenueResult.reason?.message || String(employeeRevenueResult.reason)
+            });
+        }
+        if (payrollRecordsResult.status === 'rejected') {
+            logFinancialDiagnostics('financial/ledger', 'payroll_fallback', {
+                tenantId,
+                error: payrollRecordsResult.reason?.message || String(payrollRecordsResult.reason)
+            });
+        }
         const transactions = transactionsRaw.filter((transaction) => matchesTransactionFilters(transaction, filters));
 
         const appointmentIds = transactions
