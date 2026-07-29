@@ -156,7 +156,7 @@ function getLedgerTransactionIncludes() {
                 {
                     model: db.BookingSession,
                     as: 'bookingSession',
-                    attributes: ['id', 'bookingReference', 'paymentMethod', 'paymentStatus'],
+                    attributes: ['id', 'bookingReference', 'paymentMethod', 'status', 'itemCount', 'totalAmount'],
                     required: false
                 }
             ]
@@ -214,6 +214,19 @@ function getLedgerTransactionIncludes() {
             required: false
         }
     ];
+}
+
+function logFinancialDiagnostics(endpoint, phase, details = {}) {
+    try {
+        console.info('[financial-core]', JSON.stringify({
+            endpoint,
+            phase,
+            ...details,
+            timestamp: new Date().toISOString()
+        }));
+    } catch (error) {
+        console.info('[financial-core]', endpoint, phase, details);
+    }
 }
 
 function getCashFlowPeriodStart(date, grouping = 'day') {
@@ -717,6 +730,11 @@ exports.getFinancialOverview = async (req, res) => {
         const tenantId = req.tenantId;
         const { startDate, endDate } = req.query;
         const filters = buildReportFilterContext(req.query);
+        logFinancialDiagnostics('financial/overview', 'start', {
+            tenantId,
+            startDate: startDate || null,
+            endDate: endDate || null
+        });
 
         // Build date filter for appointments
         const dateFilter = buildDateRangeWhere('startTime', startDate, endDate);
@@ -812,6 +830,15 @@ exports.getFinancialOverview = async (req, res) => {
         appointments = appointments.filter((appointment) => matchesAppointmentFilters(appointment, filters));
         orders = orders.filter((order) => matchesOrderFilters(order, filters));
         paymentTransactions = paymentTransactions.filter((transaction) => matchesTransactionFilters(transaction, filters));
+
+        logFinancialDiagnostics('financial/overview', 'loaded', {
+            tenantId,
+            allAppointments: allAppointments.length,
+            appointments: appointments.length,
+            orders: orders.length,
+            giftCards: giftCards.length,
+            paymentTransactions: paymentTransactions.length
+        });
 
         const paymentTransactionTotals = paymentTransactions.reduce((totals, transaction) => {
             const appointment = transaction.appointment;
@@ -1086,8 +1113,19 @@ exports.getFinancialOverview = async (req, res) => {
             success: true,
             overview
         });
+        logFinancialDiagnostics('financial/overview', 'success', {
+            tenantId,
+            totalRevenue: overview.totalRevenue,
+            totalTax: overview.totalTax,
+            totalDiscountAmount: overview.totalDiscountAmount,
+            totalTransactions: paymentTransactionTotals.totalTransactions
+        });
     } catch (error) {
         console.error('Get financial overview error:', error);
+        logFinancialDiagnostics('financial/overview', 'error', {
+            tenantId: req?.tenantId || null,
+            message: error.message
+        });
         res.status(500).json({
             success: false,
             message: 'Failed to fetch financial overview',
@@ -1566,6 +1604,12 @@ exports.getFinancialLedger = async (req, res) => {
         const tenantId = req.tenantId;
         const { startDate, endDate, groupBy } = req.query;
         const filters = buildReportFilterContext(req.query);
+        logFinancialDiagnostics('financial/ledger', 'start', {
+            tenantId,
+            startDate: startDate || null,
+            endDate: endDate || null,
+            groupBy: typeof groupBy === 'string' ? groupBy : null
+        });
 
         const fallbackEnd = new Date();
         fallbackEnd.setHours(23, 59, 59, 999);
@@ -1829,6 +1873,18 @@ exports.getFinancialLedger = async (req, res) => {
             return acc;
         }, { grossRevenue: 0, refunds: 0, netCollected: 0, cash: 0, card: 0, wallet: 0, online: 0, bankTransfer: 0 });
 
+        logFinancialDiagnostics('financial/ledger', 'loaded', {
+            tenantId,
+            transactions: transactions.length,
+            invoices: invoices.length,
+            revenueRows: revenueLedger.length,
+            paymentRows: paymentLedger.length,
+            refundRows: refundLedger.length,
+            commissionRows: commissionLedger.length,
+            settlementRows: settlementLedger.length,
+            cashFlowRows: cashFlowSummary.rows.length
+        });
+
         res.json({
             success: true,
             overview: {
@@ -1896,8 +1952,19 @@ exports.getFinancialLedger = async (req, res) => {
                 endDate: end.toISOString().split('T')[0]
             }
         });
+        logFinancialDiagnostics('financial/ledger', 'success', {
+            tenantId,
+            totalTransactions: transactions.length,
+            netCollected: Number(settlementTotals.netCollected.toFixed(2)),
+            revenueRows: revenueLedger.length,
+            paymentRows: paymentLedger.length
+        });
     } catch (error) {
         console.error('Get financial ledger error:', error);
+        logFinancialDiagnostics('financial/ledger', 'error', {
+            tenantId: req?.tenantId || null,
+            message: error.message
+        });
         res.status(500).json({
             success: false,
             message: 'Failed to fetch financial ledger',
