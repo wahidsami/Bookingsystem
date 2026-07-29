@@ -27,6 +27,7 @@ import PageSetupWorkspace from './PageSetupWorkspace';
 import GiftCardsWorkspace from './GiftCardsWorkspace';
 import ReviewsWorkspace from './ReviewsWorkspace';
 import MessagesWorkspace from './MessagesWorkspace';
+import DashboardPreferencesSection from './settings/DashboardPreferencesSection';
 
 interface WorkspaceProps {
   view: ViewType;
@@ -1022,39 +1023,43 @@ export default function Workspace({
 
       {/* 17. SETTINGS */}
       {view === 'settings' && (
-        <div className={`p-6 rounded-2xl border transition-colors ${
-          darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
-        }`}>
-          <h3 className="font-bold text-base mb-4">{isRtl ? 'الإعدادات العامة وتفاصيل المنشأة' : 'Salon Profile & Tax Regulations'}</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'الاسم التجاري للمركز (عربي)' : 'Salon Brand Name (Arabic)'}</label>
-                <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="سبا لا كولين الفاخر" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'الاسم التجاري للمركز (إنجليزي)' : 'Salon Brand Name (English)'}</label>
-                <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl text-start bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="La Colline Luxury Spa" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'رقم التسجيل الضريبي السعودي (شاملاً VAT 15%)' : 'Saudi VAT Tax Registration Number'}</label>
-                <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl text-start font-mono bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="310029301900003" />
-              </div>
-            </div>
+        <div className="space-y-6">
+          <DashboardPreferencesSection lang={lang} darkMode={darkMode} />
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'العنوان الجغرافي والفرع الرئيسي' : 'Salon Geographic Location'}</label>
-                <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="شارع العليا العام، الرياض" />
+          <div className={`p-6 rounded-2xl border transition-colors ${
+            darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
+          }`}>
+            <h3 className="font-bold text-base mb-4">{isRtl ? 'الإعدادات العامة وتفاصيل المنشأة' : 'Salon Profile & Tax Regulations'}</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'الاسم التجاري للمركز (عربي)' : 'Salon Brand Name (Arabic)'}</label>
+                  <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="سبا لا كولين الفاخر" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'الاسم التجاري للمركز (إنجليزي)' : 'Salon Brand Name (English)'}</label>
+                  <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl text-start bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="La Colline Luxury Spa" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'رقم التسجيل الضريبي السعودي (شاملاً VAT 15%)' : 'Saudi VAT Tax Registration Number'}</label>
+                  <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl text-start font-mono bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="310029301900003" />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'توقيتات العمل اليومي' : 'Daily Opening Hours'}</label>
-                <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="١٠:٠٠ ص - ١٠:٠٠ م (السبت - الخميس)" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'رسالة ترحيب الفاتورة التلقائية' : 'Receipt Greeting Text'}</label>
-                <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="شكراً لزيارتك لسبا لا كولين. يسعدنا دائماً تقديم الرفاهية الكاملة لك." />
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'العنوان الجغرافي والفرع الرئيسي' : 'Salon Geographic Location'}</label>
+                  <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="شارع العليا العام، الرياض" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'توقيتات العمل اليومي' : 'Daily Opening Hours'}</label>
+                  <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="١٠:٠٠ ص - ١٠:٠٠ م (السبت - الخميس)" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-400 mb-1">{isRtl ? 'رسالة ترحيب الفاتورة التلقائية' : 'Receipt Greeting Text'}</label>
+                  <input type="text" className="w-full px-3 py-2 border border-neutral-200 dark:border-zinc-800 rounded-xl bg-transparent focus:ring-1 focus:ring-brand-500 focus:outline-none" defaultValue="شكراً لزيارتك لسبا لا كولين. يسعدنا دائماً تقديم الرفاهية الكاملة لك." />
+                </div>
               </div>
             </div>
           </div>

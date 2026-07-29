@@ -21,7 +21,25 @@ const {
     getDefaultConsultantCommunicationPreferences
 } = require('../services/consultantWorkflowService');
 
-const DASHBOARD_LANDING_PAGES = new Set(['home', 'appointments', 'pos']);
+const DASHBOARD_LANDING_PAGES = new Set([
+    'home',
+    'appointments',
+    'customers',
+    'messages',
+    'pos',
+    'employees',
+    'services',
+    'products',
+    'inventory',
+    'marketing',
+    'giftcards',
+    'loyalty',
+    'financial',
+    'reports',
+    'subscription',
+    'billing',
+    'settings'
+]);
 
 const normalizeDashboardSettings = (value = {}) => ({
     defaultLandingPage: DASHBOARD_LANDING_PAGES.has(value?.defaultLandingPage)
@@ -597,7 +615,7 @@ exports.updateDashboardSettings = async (req, res) => {
         if (incomingSettings.defaultLandingPage !== undefined && !DASHBOARD_LANDING_PAGES.has(incomingSettings.defaultLandingPage)) {
             return res.status(400).json({
                 success: false,
-                message: 'defaultLandingPage must be one of: home, appointments, pos'
+                message: 'defaultLandingPage must be one of: home, appointments, customers, messages, pos, employees, services, products, inventory, marketing, giftcards, loyalty, financial, reports, subscription, billing, settings'
             });
         }
 

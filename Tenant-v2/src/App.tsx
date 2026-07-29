@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Sparkle, Info, X, Check } from 'lucide-react';
 import { Language, ViewType, TabItem, QuickLaunchRequest } from './types';
@@ -16,11 +16,33 @@ import {
   hasPublicPageCustomizationEntitlement,
   hasPushNotificationsEntitlement
 } from './lib/tenantEntitlements';
+import {
+  dashboardLandingPageToView,
+  normalizeDashboardLandingPage
+} from './lib/dashboardLandingPage';
+
+const DEFAULT_DASHBOARD_TAB: TabItem = {
+  id: 'tab-dashboard',
+  view: 'dashboard',
+  titleAr: 'لوحة التحكم',
+  titleEn: 'Dashboard',
+};
+
+const createTabForView = (view: ViewType): TabItem => {
+  const navItem = navigationItems.find(item => item.id === view);
+  return {
+    id: `tab-${view}`,
+    view,
+    titleAr: navItem?.labelAr || view,
+    titleEn: navItem?.labelEn || view,
+  };
+};
 
 export default function App() {
   const {
     user,
     account,
+    tenantSettings,
     sessionType,
     permissions,
     packageEntitlements,
@@ -35,16 +57,10 @@ export default function App() {
   const [currentTenant, setCurrentTenant] = useState('سبا لا كولين الفاخر - فرع العليا الرياض');
 
   // Open Tabs State
-  const [tabs, setTabs] = useState<TabItem[]>([
-    {
-      id: 'tab-dashboard',
-      view: 'dashboard',
-      titleAr: 'لوحة التحكم',
-      titleEn: 'Dashboard',
-    },
-  ]);
+  const [tabs, setTabs] = useState<TabItem[]>([DEFAULT_DASHBOARD_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>('tab-dashboard');
   const activeView = tabs.find(t => t.id === activeTabId)?.view || 'dashboard';
+  const landingPageAppliedRef = useRef<string | null>(null);
 
   // Personalization States (Synced to LocalStorage for premium persistence)
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -123,6 +139,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('refah-widget-order', JSON.stringify(widgetOrder));
   }, [widgetOrder]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      landingPageAppliedRef.current = null;
+      setTabs([DEFAULT_DASHBOARD_TAB]);
+      setActiveTabId(DEFAULT_DASHBOARD_TAB.id);
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const tenantLabel =
@@ -305,18 +329,31 @@ export default function App() {
     } else {
       const navItem = navigationItems.find(n => n.id === viewId);
       if (navItem) {
-        const newTabId = `tab-${viewId}-${Date.now()}`;
-        const newTab: TabItem = {
-          id: newTabId,
-          view: viewId,
-          titleAr: navItem.labelAr,
-          titleEn: navItem.labelEn,
-        };
+        const newTab: TabItem = createTabForView(viewId);
         setTabs(prev => [...prev, newTab]);
-        setActiveTabId(newTabId);
+        setActiveTabId(newTab.id);
       }
     }
   };
+
+  useLayoutEffect(() => {
+    if (!isAuthenticated || authLoading) {
+      return;
+    }
+
+    const sessionKey = user?.id || account?.id || 'tenant-session';
+    if (landingPageAppliedRef.current === sessionKey) {
+      return;
+    }
+
+    const landingPage = dashboardLandingPageToView(
+      normalizeDashboardLandingPage(tenantSettings?.dashboardSettings?.defaultLandingPage)
+    );
+
+    landingPageAppliedRef.current = sessionKey;
+    setTabs([createTabForView(landingPage)]);
+    setActiveTabId(`tab-${landingPage}`);
+  }, [account?.id, authLoading, isAuthenticated, tenantSettings?.dashboardSettings?.defaultLandingPage, user?.id]);
 
   // URL Path & Simulated Routing Synchronization
   useEffect(() => {

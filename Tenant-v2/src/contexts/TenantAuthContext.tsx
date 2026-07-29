@@ -33,6 +33,7 @@ interface TenantAuthContextValue {
   user: TenantAuthUser | null;
   tenant: Record<string, any> | null;
   account: Record<string, any> | null;
+  tenantSettings: Record<string, any> | null;
   permissions: Record<string, boolean> | null;
   packageEntitlements: Record<string, any> | null;
   sessionType: SessionType;
@@ -110,6 +111,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TenantAuthUser | null>(null);
   const [tenant, setTenant] = useState<Record<string, any> | null>(null);
   const [account, setAccount] = useState<Record<string, any> | null>(null);
+  const [tenantSettings, setTenantSettings] = useState<Record<string, any> | null>(null);
   const [permissions, setPermissions] = useState<Record<string, boolean> | null>(null);
   const [packageEntitlements, setPackageEntitlements] = useState<Record<string, any> | null>(null);
   const [sessionType, setSessionType] = useState<SessionType>(null);
@@ -123,9 +125,21 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setTenant(null);
     setAccount(null);
+    setTenantSettings(null);
     setPermissions(null);
     setPackageEntitlements(null);
     setSessionType(null);
+  }, []);
+
+  const loadTenantSettings = useCallback(async () => {
+    try {
+      const response = await tenantApiAdapter.get('/tenant/settings');
+      const payload = response?.data || response || {};
+      return payload?.settings || null;
+    } catch (error) {
+      console.error('Failed to load tenant settings:', error);
+      return null;
+    }
   }, []);
 
   const loadUser = useCallback(async () => {
@@ -145,6 +159,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       setPackageEntitlements(normalized.packageEntitlements);
       setSessionType(normalized.sessionType);
       setUser(normalized.user);
+      const settings = await loadTenantSettings();
+      setTenantSettings(settings);
       setAuthError(null);
     } catch (error) {
       const status = (error as { status?: number } | undefined)?.status;
@@ -159,7 +175,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [clearSession]);
+  }, [clearSession, loadTenantSettings]);
 
   useEffect(() => {
     const uninstallBridge = installTenantApiFetchBridge(() => {
@@ -198,6 +214,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       setPackageEntitlements(normalized.packageEntitlements);
       setSessionType(normalized.sessionType);
       setUser(normalized.user);
+      const settings = await loadTenantSettings();
+      setTenantSettings(settings);
       setAuthError(null);
     } catch (error: any) {
       clearSession();
@@ -206,7 +224,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [clearSession]);
+  }, [clearSession, loadTenantSettings]);
 
   const logout = useCallback(async () => {
     try {
@@ -239,6 +257,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     user,
     tenant,
     account,
+    tenantSettings,
     permissions,
     packageEntitlements,
     sessionType,
@@ -253,6 +272,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     user,
     tenant,
     account,
+    tenantSettings,
     permissions,
     packageEntitlements,
     sessionType,
