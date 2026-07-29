@@ -240,10 +240,10 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
       const customersRes = await tenantApiAdapter.getCustomers({ limit: 1000 });
       const customersMapped = (customersRes?.customers || (customersRes as any)?.data?.customers || []).map((c: any) => ({
         ...c,
-        name: c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.nameEn || c.nameAr || 'Unknown',
+        name: c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.nameEn || c.nameAr || 'Unknown',
         phone: c.phone || c.mobile || 'No Phone',
         email: c.email || 'No Email',
-        appointmentsCount: c.stats?.totalAppointments || c.appointmentsCount || 0
+        appointmentsCount: c.appointmentsCount ?? c.totalBookings ?? c.stats?.totalAppointments ?? 0
       }));
       setCustomers(customersMapped);
       const servicesData = await tenantApiAdapter.getServices();

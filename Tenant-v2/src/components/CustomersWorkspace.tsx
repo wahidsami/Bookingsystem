@@ -263,18 +263,14 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
         setIsPermissionDenied(true);
         return;
       }
-      const res = await fetch('/api/v1/tenant/customers/stats');
-      if (res.status === 403) {
-        setIsPermissionDenied(true);
-        return;
-      }
-      if (!res.ok) throw new Error("Stats fetch failed");
-      const rawData = await res.json();
-      const data = parseApiResponse(rawData);
+      const data = await tenantApiAdapter.getCustomerStats();
       setStats(data || null);
       setIsPermissionDenied(false);
     } catch (err) {
       console.error("Error loading stats:", err);
+      if ((err as any)?.status === 403) {
+        setIsPermissionDenied(true);
+      }
     } finally {
       setIsLoadingStats(false);
     }
@@ -297,22 +293,18 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
       if (sortOrder) params.append('sortOrder', sortOrder.toUpperCase());
       params.append('page', String(page));
       params.append('limit', '20');
-      const res = await fetch(`/api/v1/tenant/customers?${params.toString()}`);
-      if (res.status === 403) {
-        setIsPermissionDenied(true);
-        return;
-      }
-      if (!res.ok) throw new Error("Failed to load customer catalog");
-      const rawData = await res.json();
-      const data = parseApiResponse(rawData) || {};
+      const data = await tenantApiAdapter.getCustomers(Object.fromEntries(params.entries()) as Record<string, string>);
       const customers = Array.isArray(data.customers) ? data.customers : [];
-      const pagination = data.pagination || {};
+      const pagination = (data.pagination || {}) as { total?: number; totalPages?: number };
       setCustomersList(customers);
       setTotalPages(typeof pagination.totalPages === 'number' ? pagination.totalPages : 1);
       setTotalRecords(typeof pagination.total === 'number' ? pagination.total : customers.length);
       setIsPermissionDenied(false);
     } catch (err) {
       console.error("Error loading customers:", err);
+      if ((err as any)?.status === 403) {
+        setIsPermissionDenied(true);
+      }
       setIsError(true);
       setCustomersList([]);
       setTotalPages(1);
@@ -340,7 +332,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
       if (customerTypeFilter && customerTypeFilter !== 'all') params.append('customerType', customerTypeFilter);
       if (sortBy) params.append('sortBy', sortBy);
       if (sortOrder) params.append('sortOrder', sortOrder.toUpperCase());
-      const res = await fetch(`/api/v1/tenant/customers/export?${params.toString()}`);
+      const res = await tenantApiAdapter.exportCustomers(Object.fromEntries(params.entries()) as Record<string, string>);
       if (res.status === 403) {
         setIsPermissionDenied(true);
         return;
@@ -420,10 +412,13 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
         limit: historyLimit
       });
       setHistoryData(data.history || []);
-      setHistoryMetrics(data.metrics || null);
+      setHistoryMetrics(data.summary || data.metrics || null);
       setIsPermissionDenied(false);
     } catch (err) {
       console.error(err);
+      if ((err as any)?.status === 403) {
+        setIsPermissionDenied(true);
+      }
       setIsErrorHistory(true);
     } finally {
       setIsLoadingHistory(false);
@@ -451,6 +446,9 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
       setIsPermissionDenied(false);
     } catch (err) {
       console.error("Error loading wallet history:", err);
+      if ((err as any)?.status === 403) {
+        setIsPermissionDenied(true);
+      }
       setIsErrorWalletHistory(true);
     } finally {
       setIsLoadingWalletHistory(false);
@@ -491,62 +489,8 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
       try {
         setIsLoadingDetail(true);
         setIsErrorDetail(false);
-        const data = await tenantApiAdapter.getCustomer(selectedCustomerId);
-        
-        const profile: CustomerProfileData = {
-          ...data,
-          name: `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Guest',
-          nameAr: `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'ضيف',
-          birthdate: data.dateOfBirth || data.birthdate || null,
-          assignedStylist: data.preferredStaff?.[0]?.name || 'Unassigned',
-          assignedStylistAr: data.preferredStaff?.[0]?.name || 'غير محدد',
-          visitsCount: data.totalBookings || 0,
-          noShowsCount: data.noShowCount || 0,
-          spentServices: data.totalSpent || 0,
-          spentProducts: data.totalProductsPurchased || 0,
-          avgTicket: data.averageBookingValue || 0,
-          unpaidBalance: data.unpaidBalance || 0,
-          prefDrink: '',
-          prefDrinkAr: '',
-          prefTemp: '',
-          prefTempAr: '',
-          prefChat: '',
-          prefChatAr: '',
-          allergies: '',
-          allergiesAr: '',
-          favServices: (data.favoriteServices || []).map((s: any) => s.name),
-          favServicesAr: (data.favoriteServices || []).map((s: any) => s.name),
-          communication: data.communication || [],
-          appointments: (data.recentAppointments || []).map((a: any) => ({
-            id: a.id,
-            service: a.service?.name_en || 'Service',
-            serviceAr: a.service?.name_ar || 'الخدمة',
-            stylist: a.staff?.name || 'Stylist',
-            stylistAr: a.staff?.name || 'خبير التجميل',
-            date: a.date?.split('T')[0] || a.date,
-            time: new Date(a.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            price: parseFloat(a.price || 0),
-            status: a.status
-          })),
-          transactions: (data.recentOrders || []).map((o: any) => ({
-            id: o.id,
-            date: o.date?.split('T')[0] || o.date,
-            type: 'Order ' + o.orderNumber,
-            typeAr: 'طلب ' + o.orderNumber,
-            amount: parseFloat(o.totalAmount || 0),
-            method: o.paymentStatus || 'Unknown',
-            methodAr: o.paymentStatus || 'غير معروف',
-            status: o.status === 'completed' ? 'paid' : 'pending'
-          })),
-          walletBalance: data.walletBalance || 0,
-          walletCashback: data.walletCashback || 0,
-          loyaltyPoints: data.loyaltyPoints || 0,
-          reviews: data.reviews || [],
-          notes: data.notes || [],
-          tags: data.tags || [],
-          documents: data.documents || []
-        };
-        setInspectedCustomer(profile);
+        const profile = await tenantApiAdapter.getCustomer(selectedCustomerId, { walletHistory: 'full' });
+        setInspectedCustomer(profile as CustomerProfileData);
         setIsPermissionDenied(false);
         
         // Prefill form states on load
@@ -559,6 +503,9 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
         setEditPreferredLanguage(profile.preferredLanguage || 'ar');
       } catch (err) {
         console.error(err);
+        if ((err as any)?.status === 403) {
+          setIsPermissionDenied(true);
+        }
         setIsErrorDetail(true);
       } finally {
         setIsLoadingDetail(false);
@@ -572,17 +519,16 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
   const saveNotesAndTags = async (newNotes: string[], newTags: string[]) => {
     if (!inspectedCustomer) return;
     try {
-      const response = await tenantApiAdapter.patch(`/tenant/customers/${inspectedCustomer.id}/notes`, {
+      const updated = await tenantApiAdapter.updateCustomerNotes(inspectedCustomer.id, {
         notes: newNotes,
         tags: newTags
       });
-      const updated = response;
       setInspectedCustomer(prev => {
         if (!prev) return null;
         return {
           ...prev,
-          notes: updated.notes,
-          tags: updated.tags
+          notes: updated.notes || [],
+          tags: updated.tags || []
         };
       });
       loadCustomersList(); // Refresh main list too
@@ -603,7 +549,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
 
     try {
       setIsLoadingDetail(true);
-      const response = await tenantApiAdapter.patch(`/tenant/customers/${inspectedCustomer.id}/profile`, {
+      const updated = await tenantApiAdapter.updateCustomerProfile(inspectedCustomer.id, {
         firstName: editFirstName.trim(),
         lastName: editLastName.trim(),
         email: editEmail.trim(),
@@ -612,20 +558,19 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
         birthdate: editBirthdate,
         preferredLanguage: editPreferredLanguage
       });
-      const updated = response;
       setInspectedCustomer(prev => {
         if (!prev) return null;
         return {
           ...prev,
           ...updated,
-          name: updated.name,
-          firstName: updated.firstName,
-          lastName: updated.lastName,
-          email: updated.email,
-          phone: updated.phone,
-          gender: updated.gender,
-          birthdate: updated.birthdate,
-          preferredLanguage: updated.preferredLanguage
+          name: updated.name || `${updated.firstName || ''} ${updated.lastName || ''}`.trim(),
+          firstName: updated.firstName || '',
+          lastName: updated.lastName || '',
+          email: updated.email || '',
+          phone: updated.phone || '',
+          gender: updated.gender || '',
+          birthdate: updated.birthdate || '',
+          preferredLanguage: updated.preferredLanguage || 'ar'
         };
       });
 

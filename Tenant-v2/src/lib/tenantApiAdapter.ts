@@ -30,6 +30,10 @@ type CustomerListResponse<T = any> = {
 };
 
 type NormalizedCustomerStats = Record<string, any>;
+type CanonicalCustomerListItem = Record<string, any>;
+type CanonicalCustomerProfile = Record<string, any>;
+type CanonicalCustomerHistory = Record<string, any>;
+type CanonicalCustomerTransaction = Record<string, any>;
 
 function toAbsoluteUrl(input: RequestInfo | URL): URL {
   if (input instanceof URL) {
@@ -76,6 +80,508 @@ function pick<T = any>(value: any, keys: string[]): T | undefined {
     if (value[key] !== undefined) return value[key];
   }
   return undefined;
+}
+
+function unwrapPayload(payload: any): any {
+  if (!payload || typeof payload !== 'object') {
+    return payload;
+  }
+
+  if ('data' in payload && payload.data !== undefined) {
+    return payload.data;
+  }
+
+  return payload;
+}
+
+function toArray(value: any): any[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function toNumber(value: any, fallback = 0): number {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toStringValue(value: any, fallback = ''): string {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  const normalized = `${value}`.trim();
+  return normalized.length > 0 ? normalized : fallback;
+}
+
+function normalizePersonName(source: any, fallback = 'Guest'): string {
+  const firstName = toStringValue(source?.firstName || source?.first_name || '');
+  const lastName = toStringValue(source?.lastName || source?.last_name || '');
+  return toStringValue(
+    source?.name || source?.fullName || source?.displayName || `${firstName} ${lastName}`.trim(),
+    fallback
+  );
+}
+
+function normalizeCustomerListItem(record: any): CanonicalCustomerListItem {
+  const firstName = toStringValue(record?.firstName || record?.first_name || '');
+  const lastName = toStringValue(record?.lastName || record?.last_name || '');
+  const avatar = record?.avatar || record?.photo || record?.profileImage || null;
+  const joinedAt = record?.joinedAt || record?.memberSince || record?.createdAt || '';
+  const totalProductsPurchased = toNumber(record?.totalProductsPurchased ?? record?.productsPurchased ?? 0);
+  const averageBookings = toNumber(record?.averageBookingsPerCustomer ?? record?.avgBookings ?? 0);
+  const notes = Array.isArray(record?.notes)
+    ? record.notes
+    : typeof record?.notes === 'string' && record.notes.trim().length > 0
+      ? [record.notes]
+      : [];
+
+  return {
+    ...record,
+    id: record?.id || '',
+    firstName,
+    lastName,
+    name: normalizePersonName(record, 'Guest'),
+    nameEn: normalizePersonName(record, 'Guest'),
+    nameAr: normalizePersonName(record, 'ضيف'),
+    fullName: normalizePersonName(record, 'Guest'),
+    avatar,
+    photo: avatar,
+    profileImage: avatar,
+    joinedAt,
+    memberSince: record?.memberSince || joinedAt,
+    totalBookings: toNumber(record?.totalBookings ?? record?.stats?.totalAppointments ?? 0),
+    totalOrders: toNumber(record?.totalOrders ?? 0),
+    totalProductsPurchased,
+    productsPurchased: totalProductsPurchased,
+    totalSpent: toNumber(record?.totalSpent ?? 0),
+    lastVisit: record?.lastVisit || '',
+    firstVisit: record?.firstVisit || '',
+    loyaltyTier: record?.loyaltyTier || '',
+    loyaltyPoints: toNumber(record?.loyaltyPoints ?? 0),
+    noShowCount: toNumber(record?.noShowCount ?? 0),
+    cancellationCount: toNumber(record?.cancellationCount ?? 0),
+    avgBookings: averageBookings,
+    averageBookingsPerCustomer: averageBookings,
+    tags: Array.isArray(record?.tags) ? record.tags : [],
+    notes,
+    customerType: record?.customerType || record?.type || '',
+    isWalkIn: Boolean(record?.isWalkIn),
+    gender: record?.gender || '',
+    email: record?.email || '',
+    phone: record?.phone || ''
+  };
+}
+
+function normalizeCustomerStatsPayload(payload: any): NormalizedCustomerStats {
+  const data = unwrapPayload(payload) || {};
+  const averageBookingsPerCustomer = toNumber(data?.averageBookingsPerCustomer ?? data?.avgBookings ?? 0);
+  return {
+    ...data,
+    totalCustomers: toNumber(data?.totalCustomers ?? 0),
+    newCustomersThisMonth: toNumber(data?.newCustomersThisMonth ?? data?.newCustomers ?? 0),
+    returningCustomers: toNumber(data?.returningCustomers ?? 0),
+    returningRate: toNumber(data?.returningRate ?? 0),
+    averageBookingsPerCustomer,
+    avgBookings: averageBookingsPerCustomer,
+    loyaltyTierDistribution: data?.loyaltyTierDistribution || {}
+  };
+}
+
+function normalizeCustomerTransactionRecord(record: any, sourceHint = ''): CanonicalCustomerTransaction {
+  const source = toStringValue(record?.source || sourceHint || 'transaction');
+  const paymentMethod = toStringValue(record?.paymentMethod || record?.method || record?.payment_method || '');
+  const paymentMethodLabel = toStringValue(record?.paymentMethodLabel || record?.paymentMethod || record?.method || paymentMethod || '—');
+  const rawKind = toStringValue(record?.kind || record?.entityType || record?.recordType || record?.type || record?.sourceType || '');
+  const canonicalKind = (() => {
+    if (['booking_session', 'appointment', 'booking', 'visit', 'session'].includes(rawKind)) return 'booking_session';
+    if (['order', 'product_order'].includes(rawKind)) return 'order';
+    if (['wallet', 'wallet_ledger'].includes(rawKind)) return 'wallet';
+    if (['gift', 'gift_card', 'giftcard'].includes(rawKind)) return 'gift_card';
+    if (['refund', 'reversal'].includes(rawKind)) return 'refund';
+    if (['payment', 'transaction', 'sale', 'deposit', 'remainder', 'adjustment'].includes(rawKind)) return 'payment';
+    if (source === 'wallet') return 'wallet';
+    if (source === 'order') return 'order';
+    if (source === 'gift_card') return 'gift_card';
+    if (source === 'refund') return 'refund';
+    return rawKind || 'payment';
+  })();
+
+  const appointment = record?.appointment || null;
+  const bookingSession = record?.bookingSession || null;
+  const order = record?.order || null;
+  const processedAt = record?.processedAt || record?.date || record?.createdAt || record?.time || record?.timestamp || '';
+  const amount = toNumber(record?.amount ?? record?.totalAmount ?? record?.value ?? record?.price ?? 0);
+  const status = toStringValue(record?.status || record?.paymentStatus || 'completed', 'completed').toLowerCase();
+
+  return {
+    ...record,
+    source,
+    sourceType: record?.sourceType || canonicalKind,
+    kind: canonicalKind,
+    entityType: record?.entityType || canonicalKind,
+    recordType: record?.recordType || canonicalKind,
+    type: record?.type || canonicalKind,
+    paymentStatus: record?.paymentStatus || status,
+    normalizedPaymentStatus: record?.normalizedPaymentStatus || record?.paymentStatus || status,
+    status,
+    statusLabel: record?.statusLabel || status,
+    amount,
+    totalAmount: toNumber(record?.totalAmount ?? amount),
+    currency: record?.currency || 'SAR',
+    paymentMethod,
+    paymentMethodLabel,
+    method: record?.method || paymentMethodLabel,
+    methodAr: record?.methodAr || paymentMethodLabel,
+    date: processedAt,
+    processedAt,
+    transactionRef: record?.transactionRef || record?.referenceId || record?.reference || null,
+    referenceType: record?.referenceType || null,
+    referenceId: record?.referenceId || null,
+    notes: record?.notes || '',
+    appointment,
+    bookingSession,
+    order,
+    detailPath: record?.detailPath || null
+  };
+}
+
+function normalizeCustomerHistoryResponse(payload: any): CanonicalCustomerHistory {
+  const data = unwrapPayload(payload) || {};
+  const historySource = [
+    ...toArray(data?.history),
+    ...toArray(data?.appointments),
+    ...toArray(data?.records),
+    ...toArray(data?.items),
+    ...toArray(data?.timeline)
+  ];
+
+  const historyDeduped = (() => {
+    const seen = new Set<string>();
+    return historySource.filter((row: any, index: number) => {
+      const key = [
+        row?.bookingSessionId || row?.details?.bookingSessionId || '',
+        row?.bookingReference || row?.details?.bookingReference || '',
+        row?.id || '',
+        row?.date || row?.startTime || row?.createdAt || '',
+        row?.kind || row?.entityType || row?.recordType || row?.type || ''
+      ].join('|');
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  })();
+
+  const normalizedHistory = historyDeduped.map((row: any) => {
+    const kind = toStringValue(row?.kind || row?.entityType || row?.recordType || row?.type || row?.sourceType || '', '');
+    const canonicalKind = kind === 'booking_session' ? 'booking_session'
+      : ['appointment', 'booking', 'visit', 'session'].includes(kind) ? 'booking_session'
+      : ['order', 'product_order'].includes(kind) ? 'order'
+      : ['wallet', 'wallet_ledger'].includes(kind) ? 'wallet'
+      : ['gift', 'gift_card', 'giftcard'].includes(kind) ? 'gift_card'
+      : ['refund', 'reversal'].includes(kind) ? 'refund'
+      : ['payment', 'transaction', 'sale', 'deposit', 'remainder', 'adjustment'].includes(kind) ? 'payment'
+      : kind || 'booking_session';
+    const normalizedType = canonicalKind === 'booking_session' ? 'appointment' : canonicalKind;
+    const services = toArray(row?.details?.services || row?.serviceLines || row?.serviceItems).filter(Boolean);
+    const appointmentDate = row?.date || row?.startTime || row?.processedAt || row?.createdAt || '';
+    return {
+      ...row,
+      type: normalizedType,
+      kind: canonicalKind,
+      entityType: canonicalKind,
+      recordType: canonicalKind,
+      sourceType: row?.sourceType || canonicalKind,
+      date: appointmentDate,
+      startTime: row?.startTime || appointmentDate || '',
+      status: row?.status || row?.appointmentStatus || row?.bookingStatus || row?.normalizedStatus || row?.details?.status || 'completed',
+      appointmentStatus: row?.appointmentStatus || row?.status || 'completed',
+      paymentStatus: row?.paymentStatus || row?.normalizedPaymentStatus || 'paid',
+      normalizedPaymentStatus: row?.normalizedPaymentStatus || row?.paymentStatus || 'paid',
+      amount: toNumber(row?.amount ?? row?.paidAmount ?? row?.totalAmount ?? row?.price ?? 0),
+      paidAmount: toNumber(row?.paidAmount ?? row?.amount ?? row?.totalPaid ?? 0),
+      totalPaid: toNumber(row?.totalPaid ?? row?.paidAmount ?? row?.amount ?? 0),
+      outstandingAmount: toNumber(row?.outstandingAmount ?? row?.remainderAmount ?? 0),
+      details: {
+        ...(row?.details || {}),
+        services,
+        service: row?.details?.service || row?.service || null,
+        staff: row?.details?.staff || row?.staff || null,
+        staffName: row?.details?.staffName || row?.assignedStaffName || row?.staffName || '',
+        startTime: row?.details?.startTime || row?.startTime || appointmentDate || '',
+        endTime: row?.details?.endTime || row?.endTime || '',
+        duration: toNumber(row?.details?.duration ?? row?.duration ?? 0),
+        branch: row?.details?.branch || row?.branch || null,
+        bookingSessionId: row?.bookingSessionId || row?.details?.bookingSessionId || null,
+        bookingReference: row?.bookingReference || row?.details?.bookingReference || null,
+        bookingItemCount: toNumber(row?.details?.bookingItemCount ?? row?.bookingItemCount ?? services.length),
+        notes: row?.details?.notes || row?.notes || ''
+      },
+      serviceNameEn: row?.serviceNameEn || row?.service?.name_en || row?.service?.name || row?.title || '',
+      serviceNameAr: row?.serviceNameAr || row?.service?.name_ar || row?.service?.name || row?.title || '',
+      assignedStaffName: row?.assignedStaffName || row?.details?.staffName || row?.staff?.name || '',
+      bookingSessionId: row?.bookingSessionId || row?.details?.bookingSessionId || null,
+      bookingReference: row?.bookingReference || row?.details?.bookingReference || null,
+      price: toNumber(row?.price ?? row?.amount ?? row?.totalAmount ?? 0)
+    };
+  });
+
+  const walletTransactions = toArray(data?.walletTransactions).map((entry: any) => ({
+    ...entry,
+    type: entry?.type || 'wallet',
+    kind: entry?.kind || 'wallet',
+    entityType: entry?.entityType || 'wallet',
+    sourceType: entry?.sourceType || 'wallet',
+    amount: toNumber(entry?.amount ?? 0),
+    date: entry?.createdAt || entry?.date || '',
+    createdAt: entry?.createdAt || entry?.date || '',
+    status: entry?.status || 'completed',
+    paymentStatus: entry?.direction === 'credit' ? 'credited' : 'debited'
+  }));
+
+  const summary = unwrapPayload(data?.summary) || unwrapPayload(data?.metrics) || {};
+  return {
+    ...data,
+    history: normalizedHistory,
+    appointments: normalizedHistory.filter((row: any) => row.kind === 'booking_session'),
+    records: normalizedHistory,
+    items: normalizedHistory,
+    timeline: normalizedHistory,
+    walletTransactions,
+    transactions: normalizedHistory.filter((row: any) => ['order', 'wallet', 'payment', 'refund', 'gift_card'].includes(row.kind)),
+    summary,
+    metrics: summary
+  };
+}
+
+function normalizeCustomerTransactionsResponse(payload: any): any {
+  const data = unwrapPayload(payload) || {};
+  const transactionsSource = [
+    ...toArray(data?.transactions),
+    ...toArray(data?.items),
+    ...toArray(data?.records)
+  ];
+
+  const transactions = transactionsSource.map((row: any) => normalizeCustomerTransactionRecord(row, row?.source || row?.kind || 'transaction'));
+  const summary = unwrapPayload(data?.summary) || {};
+
+  return {
+    ...data,
+    transactions,
+    items: transactions,
+    records: transactions,
+    summary
+  };
+}
+
+function normalizeCustomerProfileResponse(payload: any): CanonicalCustomerProfile {
+  const data = unwrapPayload(payload) || {};
+  const customer = data?.customer || data || {};
+  const firstName = toStringValue(customer?.firstName || customer?.first_name || '');
+  const lastName = toStringValue(customer?.lastName || customer?.last_name || '');
+  const name = normalizePersonName(customer, 'Guest');
+  const avatar = customer?.avatar || customer?.photo || customer?.profileImage || null;
+  const walletLedgerEntries = toArray(customer?.walletLedgerEntries);
+  const giftCardTransactions = toArray(customer?.giftCardTransactions);
+  const favorites = toArray(customer?.favoriteServices);
+  const preferredStaff = toArray(customer?.preferredStaff);
+  const recentAppointments = toArray(customer?.recentAppointments);
+  const recentOrders = toArray(customer?.recentOrders);
+  const allAppointments = toArray(customer?.allAppointments);
+  const allOrders = toArray(customer?.allOrders);
+  const reviews = toArray(customer?.reviews);
+  const notes = Array.isArray(customer?.notes)
+    ? customer.notes
+    : typeof customer?.notes === 'string' && customer.notes.trim().length > 0
+      ? [customer.notes]
+      : [];
+  const walletSummary = customer?.walletSummary || {};
+  const walletBalance = toNumber(customer?.walletBalance ?? walletSummary?.currentBalance ?? 0);
+  const totalBookings = toNumber(customer?.totalBookings ?? recentAppointments.length ?? 0);
+  const totalOrders = toNumber(customer?.totalOrders ?? recentOrders.length ?? 0);
+  const totalProductsPurchased = toNumber(customer?.totalProductsPurchased ?? customer?.productsPurchased ?? 0);
+  const totalSpent = toNumber(customer?.totalSpent ?? 0);
+  const averageBookingValue = toNumber(customer?.averageBookingValue ?? customer?.avgTicket ?? 0);
+  const spentServices = toNumber(customer?.spentServices ?? recentAppointments.reduce((sum: number, appointment: any) => sum + toNumber(appointment?.totalPaid ?? appointment?.price ?? 0), 0));
+  const spentProducts = toNumber(customer?.spentProducts ?? allOrders.reduce((sum: number, order: any) => sum + toNumber(order?.totalAmount ?? 0), 0));
+  const futureAppointments = recentAppointments
+    .filter((appointment: any) => appointment?.startTime && new Date(appointment.startTime).getTime() > Date.now())
+    .sort((a: any, b: any) => new Date(a.startTime || a.date || 0).getTime() - new Date(b.startTime || b.date || 0).getTime());
+  const favoredServices = favorites.map((service: any) => service?.name || service?.name_en || service?.nameAr || service?.name_ar || service).filter(Boolean);
+  const assignedStylist = preferredStaff[0]?.name || customer?.assignedStylist || '';
+  const transactions = normalizeCustomerTransactionsResponse({
+    transactions: [
+      ...recentOrders.map((order: any) => ({
+        id: order.id,
+        source: 'order',
+        kind: 'order',
+        entityType: 'order',
+        date: order.createdAt || order.date || '',
+        processedAt: order.createdAt || order.date || '',
+        amount: toNumber(order.totalAmount ?? order.amount ?? 0),
+        currency: 'SAR',
+        type: order.paymentStatus || order.status || 'order',
+        status: order.status || order.paymentStatus || 'completed',
+        paymentStatus: order.paymentStatus || order.status || 'completed',
+        paymentMethod: order.paymentMethod || 'order',
+        paymentMethodLabel: order.paymentMethod || 'order',
+        order
+      })),
+      ...walletLedgerEntries.map((entry: any) => normalizeCustomerTransactionRecord({
+        id: entry.id,
+        source: 'wallet',
+        kind: 'wallet',
+        entityType: 'wallet',
+        date: entry.createdAt || entry.date || '',
+        processedAt: entry.createdAt || entry.date || '',
+        amount: toNumber(entry.amount ?? 0),
+        currency: entry.currency || 'SAR',
+        type: entry.type || 'wallet',
+        status: entry.direction === 'credit' ? 'completed' : 'completed',
+        paymentStatus: entry.direction === 'credit' ? 'credited' : 'debited',
+        paymentMethod: entry.referenceType || 'wallet',
+        paymentMethodLabel: entry.referenceType || 'wallet',
+        referenceType: entry.referenceType || null,
+        referenceId: entry.referenceId || null
+      }, 'wallet')),
+      ...giftCardTransactions.map((tx: any) => normalizeCustomerTransactionRecord({
+        id: tx.id,
+        source: 'gift_card',
+        kind: 'gift_card',
+        entityType: 'gift_card',
+        date: tx.createdAt || '',
+        processedAt: tx.createdAt || '',
+        amount: toNumber(tx.totalCreditAmount ?? tx.creditAmount ?? tx.purchaseAmount ?? 0),
+        currency: 'SAR',
+        type: tx.status || 'gift_card',
+        status: tx.status || 'completed',
+        paymentStatus: tx.status || 'completed',
+        paymentMethod: tx.deliveryChannel || 'gift_card',
+        paymentMethodLabel: tx.deliveryChannel || 'gift_card',
+        transactionRef: tx.id,
+        notes: tx.packageTitle || ''
+      }, 'gift_card'))
+    ]
+  }).transactions;
+
+  const profile: CanonicalCustomerProfile = {
+    ...customer,
+    id: customer?.id || '',
+    firstName,
+    lastName,
+    name,
+    nameEn: name,
+    nameAr: customer?.nameAr || name,
+    fullName: name,
+    avatar,
+    photo: avatar,
+    profileImage: avatar,
+    email: customer?.email || '',
+    phone: customer?.phone || '',
+    gender: customer?.gender || '',
+    birthdate: customer?.birthdate || customer?.dateOfBirth || '',
+    dateOfBirth: customer?.dateOfBirth || customer?.birthdate || '',
+    preferredLanguage: customer?.preferredLanguage || 'ar',
+    memberSince: customer?.memberSince || customer?.createdAt || '',
+    createdAt: customer?.createdAt || '',
+    loyaltyTier: customer?.loyaltyTier || '',
+    loyaltyPoints: toNumber(customer?.loyaltyPoints ?? 0),
+    walletBalance,
+    walletCashback: toNumber(customer?.walletCashback ?? 0),
+    walletSummary: {
+      currentBalance: walletBalance,
+      walletLedgerCount: toNumber(walletSummary?.walletLedgerCount ?? walletLedgerEntries.length),
+      sentGiftCardCount: toNumber(walletSummary?.sentGiftCardCount ?? giftCardTransactions.filter((tx: any) => tx?.senderPlatformUserId === customer?.id).length),
+      receivedGiftCardCount: toNumber(walletSummary?.receivedGiftCardCount ?? giftCardTransactions.filter((tx: any) => tx?.recipientPlatformUserId === customer?.id).length)
+    },
+    walletEntriesCount: toNumber(walletSummary?.walletLedgerCount ?? walletLedgerEntries.length),
+    giftCardsSent: toNumber(walletSummary?.sentGiftCardCount ?? giftCardTransactions.filter((tx: any) => tx?.senderPlatformUserId === customer?.id).length),
+    giftCardsReceived: toNumber(walletSummary?.receivedGiftCardCount ?? giftCardTransactions.filter((tx: any) => tx?.recipientPlatformUserId === customer?.id).length),
+    walletLedgerEntries,
+    walletLedger: walletLedgerEntries,
+    giftCardTransactions,
+    giftCards: giftCardTransactions,
+    totalBookings,
+    appointmentsCount: totalBookings,
+    totalOrders,
+    totalProductsPurchased,
+    productsPurchased: totalProductsPurchased,
+    totalSpent,
+    spentServices,
+    spentProducts,
+    averageBookingValue,
+    avgTicket: averageBookingValue,
+    unpaidBalance: toNumber(customer?.unpaidBalance ?? customer?.outstandingAmount ?? 0),
+    firstVisit: customer?.firstVisit || '',
+    lastVisit: customer?.lastVisit || '',
+    nextVisit: futureAppointments[0]?.startTime || futureAppointments[0]?.date || '',
+    noShowCount: toNumber(customer?.noShowCount ?? 0),
+    noShowsCount: toNumber(customer?.noShowCount ?? 0),
+    cancellationCount: toNumber(customer?.cancellationCount ?? 0),
+    favoriteServices: toArray(customer?.favoriteServices),
+    favoriteProducts: toArray(customer?.favoriteProducts),
+    favServices: favoredServices,
+    favServicesAr: favoredServices,
+    preferredStaff: preferredStaff,
+    assignedStylist,
+    assignedStylistAr: customer?.assignedStylistAr || assignedStylist,
+    preferredTime: customer?.preferredTime || '',
+    preferredDeliveryType: customer?.preferredDeliveryType || '',
+    prefDrink: customer?.prefDrink || '',
+    prefDrinkAr: customer?.prefDrinkAr || '',
+    prefTemp: customer?.prefTemp || '',
+    prefTempAr: customer?.prefTempAr || '',
+    prefChat: customer?.prefChat || '',
+    prefChatAr: customer?.prefChatAr || '',
+    allergies: customer?.allergies || '',
+    allergiesAr: customer?.allergiesAr || '',
+    customerType: customer?.customerType || customer?.type || '',
+    isWalkIn: Boolean(customer?.isWalkIn),
+    tags: Array.isArray(customer?.tags) ? customer.tags : [],
+    notes,
+    reviews,
+    communication: Array.isArray(customer?.communication) ? customer.communication : [],
+    history: Array.isArray(customer?.history) ? customer.history : [],
+    appointments: recentAppointments.map((appointment: any) => ({
+      id: appointment.id,
+      service: appointment?.service?.name_en || appointment?.service?.name || appointment?.serviceName || 'Service',
+      serviceAr: appointment?.service?.name_ar || appointment?.service?.name || appointment?.serviceName || 'الخدمة',
+      stylist: appointment?.staff?.name || appointment?.assignedStaffName || 'Stylist',
+      stylistAr: appointment?.staff?.name || appointment?.assignedStaffName || 'خبير التجميل',
+      date: appointment?.date || appointment?.startTime || '',
+      time: appointment?.time || '',
+      price: toNumber(appointment?.price ?? 0),
+      status: appointment?.status || 'completed',
+      paymentStatus: appointment?.paymentStatus || 'paid',
+      normalizedPaymentStatus: appointment?.normalizedPaymentStatus || appointment?.paymentStatus || 'paid',
+      paymentMethod: appointment?.paymentMethod || '',
+      bookingSessionId: appointment?.bookingSessionId || null,
+      bookingReference: appointment?.bookingReference || null
+    })),
+    transactions,
+    documents: Array.isArray(customer?.documents) ? customer.documents : [],
+    reviewsSummary: customer?.reviewsSummary || null,
+    allAppointments: allAppointments,
+    allOrders: allOrders,
+    recentAppointments: recentAppointments,
+    recentOrders: recentOrders,
+    favoriteServicesCanonical: favoredServices
+  };
+
+  return profile;
+}
+
+function normalizeCustomerUpdateProfileResponse(payload: any): CanonicalCustomerProfile {
+  return normalizeCustomerProfileResponse(payload);
+}
+
+function normalizeCustomerNotesResponse(payload: any): any {
+  const data = unwrapPayload(payload) || {};
+  return {
+    ...data,
+    notes: Array.isArray(data?.data?.notes) ? data.data.notes : Array.isArray(data?.notes) ? data.notes : [],
+    tags: Array.isArray(data?.data?.tags) ? data.data.tags : Array.isArray(data?.tags) ? data.tags : []
+  };
 }
 
 function translateRequestBody(pathname: string, method: string, body: any): any {
@@ -364,22 +870,57 @@ class TenantApiAdapter {
 
   async getCustomers(params: Record<string, string | number | undefined>): Promise<CustomerListResponse> {
     const query = this.buildQueryString(params);
-    return this.get(`/tenant/customers${query ? `?${query}` : ''}`);
+    const response = await this.get(`/tenant/customers${query ? `?${query}` : ''}`);
+    const payload = unwrapPayload(response) || {};
+    const customers = toArray(payload?.customers).map(normalizeCustomerListItem);
+    return {
+      ...payload,
+      customers,
+      pagination: payload?.pagination || {
+        total: customers.length,
+        page: 1,
+        limit: customers.length,
+        totalPages: 1
+      }
+    };
   }
 
   async getCustomer(id: string, params?: Record<string, string | number | undefined>): Promise<any> {
     const query = this.buildQueryString(params);
-    return this.get(`/tenant/customers/${id}${query ? `?${query}` : ''}`);
+    const response = await this.get(`/tenant/customers/${id}${query ? `?${query}` : ''}`);
+    return normalizeCustomerProfileResponse(response);
   }
 
   async getCustomerHistory(id: string, params?: Record<string, string | number | undefined>): Promise<any> {
     const query = this.buildQueryString(params);
-    return this.get(`/tenant/customers/${id}/history${query ? `?${query}` : ''}`);
+    const response = await this.get(`/tenant/customers/${id}/history${query ? `?${query}` : ''}`);
+    return normalizeCustomerHistoryResponse(response);
   }
 
   async getCustomerTransactions(id: string, params?: Record<string, string | number | undefined>): Promise<any> {
     const query = this.buildQueryString(params);
-    return this.get(`/tenant/customers/${id}/transactions${query ? `?${query}` : ''}`);
+    const response = await this.get(`/tenant/customers/${id}/transactions${query ? `?${query}` : ''}`);
+    return normalizeCustomerTransactionsResponse(response);
+  }
+
+  async getCustomerStats(): Promise<NormalizedCustomerStats> {
+    const response = await this.get('/tenant/customers/stats');
+    return normalizeCustomerStatsPayload(response);
+  }
+
+  async updateCustomerProfile(id: string, data: Record<string, any>): Promise<CanonicalCustomerProfile> {
+    const response = await this.patch(`/tenant/customers/${id}/profile`, data);
+    return normalizeCustomerUpdateProfileResponse(response);
+  }
+
+  async updateCustomerNotes(id: string, data: Record<string, any>): Promise<any> {
+    const response = await this.patch(`/tenant/customers/${id}/notes`, data);
+    return normalizeCustomerNotesResponse(response);
+  }
+
+  async exportCustomers(params: Record<string, string | number | undefined>): Promise<Response> {
+    const query = this.buildQueryString(params);
+    return this.request(`/tenant/customers/export${query ? `?${query}` : ''}`, { method: 'GET' });
   }
 
   async getEmployees(): Promise<any> {

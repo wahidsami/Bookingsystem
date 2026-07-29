@@ -824,26 +824,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     || activeAppointment?.membershipTier
     || '';
 
-  const getArrayFromPayload = (payload: any, key: string) => {
-    if (!payload) return [];
-    if (Array.isArray(payload)) {
-      return ['history', 'transactions', 'walletTransactions', 'walletHistory'].includes(key) ? payload : [];
-    }
-    const candidates = [
-      payload?.[key],
-      payload?.data?.[key],
-      payload?.customer?.[key],
-      payload?.history?.[key],
-      payload?.result?.[key]
-    ];
-    for (const candidate of candidates) {
-      if (Array.isArray(candidate)) {
-        return candidate;
-      }
-    }
-    return [];
-  };
-
   const getTransactionIdentityKey = (entry: any) => {
     if (!entry || typeof entry !== 'object') {
       return '';
@@ -905,12 +885,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   const customerHistoryEntries = (() => {
     const combined = [
-      ...getArrayFromPayload(customerHistoryData, 'history'),
-      ...getArrayFromPayload(customerHistoryData, 'appointments'),
-      ...getArrayFromPayload(customerHistoryData, 'records'),
-      ...getArrayFromPayload(customerHistoryData, 'items'),
-      ...getArrayFromPayload(customerHistoryData, 'timeline'),
-      ...getArrayFromPayload(customerProfile, 'history')
+      ...(Array.isArray(customerHistoryData?.history) ? customerHistoryData.history : []),
+      ...(Array.isArray(customerHistoryData?.appointments) ? customerHistoryData.appointments : []),
+      ...(Array.isArray(customerHistoryData?.records) ? customerHistoryData.records : []),
+      ...(Array.isArray(customerHistoryData?.items) ? customerHistoryData.items : []),
+      ...(Array.isArray(customerHistoryData?.timeline) ? customerHistoryData.timeline : []),
+      ...(Array.isArray(customerProfile?.history) ? customerProfile.history : [])
     ];
     const seen = new Set<string>();
     return combined.filter((item: any) => {
@@ -1404,48 +1384,26 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           tenantApiAdapter.getCustomerHistory(activeAppointment.customerId, { limit: 20 }),
           tenantApiAdapter.getCustomerTransactions(activeAppointment.customerId, { limit: 20 })
         ]);
-        const profile = normalizeCustomerProfile(profileResponse);
-        const historyPayload = historyResponse?.data || historyResponse || {};
-        const transactionsPayload = transactionsResponse?.data || transactionsResponse || [];
-        const historyEntries = [
-          ...getArrayFromPayload(historyPayload, 'history'),
-          ...getArrayFromPayload(historyPayload, 'appointments'),
-          ...getArrayFromPayload(historyPayload, 'records'),
-          ...getArrayFromPayload(historyPayload, 'items'),
-          ...getArrayFromPayload(historyPayload, 'timeline'),
-          ...getArrayFromPayload(historyResponse, 'history'),
-          ...getArrayFromPayload(historyResponse, 'appointments'),
-          ...getArrayFromPayload(historyResponse, 'records'),
-          ...getArrayFromPayload(historyResponse, 'items'),
-          ...getArrayFromPayload(historyResponse, 'timeline'),
-          ...getArrayFromPayload(profile, 'history')
-        ];
-        const summaryPayload = historyPayload?.summary || historyPayload?.metrics || historyResponse?.summary || historyResponse?.metrics || {};
-        const walletTransactionsPayload = [
-          ...getArrayFromPayload(historyPayload, 'walletTransactions'),
-          ...getArrayFromPayload(historyPayload, 'walletHistory'),
-          ...getArrayFromPayload(historyResponse, 'walletTransactions'),
-          ...getArrayFromPayload(historyResponse, 'walletHistory')
-        ];
-        const historyTransactions = [
-          ...getArrayFromPayload(historyPayload, 'transactions'),
-          ...getArrayFromPayload(historyResponse, 'transactions')
-        ];
+        const profile = profileResponse;
+        const historyEntries = Array.isArray(historyResponse?.history) ? historyResponse.history : [];
+        const summaryPayload = historyResponse?.summary || historyResponse?.metrics || {};
+        const walletTransactionsPayload = Array.isArray(historyResponse?.walletTransactions) ? historyResponse.walletTransactions : [];
+        const historyTransactions = Array.isArray(historyResponse?.transactions) ? historyResponse.transactions : [];
         const transactionRows = [
           ...historyTransactions,
-          ...getArrayFromPayload(transactionsPayload, 'transactions'),
-          ...getArrayFromPayload(transactionsPayload, 'items'),
-          ...getArrayFromPayload(transactionsPayload, 'records'),
-          ...(Array.isArray(transactionsPayload) ? transactionsPayload : [])
+          ...(Array.isArray(transactionsResponse?.transactions) ? transactionsResponse.transactions : []),
+          ...(Array.isArray(transactionsResponse?.items) ? transactionsResponse.items : []),
+          ...(Array.isArray(transactionsResponse?.records) ? transactionsResponse.records : []),
+          ...(Array.isArray(transactionsResponse) ? transactionsResponse : [])
         ];
         const dedupedTransactionRows = dedupeTransactionRows(transactionRows);
         if (!cancelled) {
           setCustomerProfile(profile);
           setCustomerHistoryData({
             history: historyEntries,
-            appointments: getArrayFromPayload(historyPayload, 'appointments').length > 0 ? getArrayFromPayload(historyPayload, 'appointments') : getArrayFromPayload(historyResponse, 'appointments'),
-            records: getArrayFromPayload(historyPayload, 'records').length > 0 ? getArrayFromPayload(historyPayload, 'records') : getArrayFromPayload(historyResponse, 'records'),
-            items: getArrayFromPayload(historyPayload, 'items').length > 0 ? getArrayFromPayload(historyPayload, 'items') : getArrayFromPayload(historyResponse, 'items'),
+            appointments: Array.isArray(historyResponse?.appointments) ? historyResponse.appointments : [],
+            records: Array.isArray(historyResponse?.records) ? historyResponse.records : [],
+            items: Array.isArray(historyResponse?.items) ? historyResponse.items : [],
             summary: summaryPayload,
             walletTransactions: walletTransactionsPayload,
             notes: Array.isArray(profile.notes) ? profile.notes : [],
@@ -1632,50 +1590,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       };
     }
     return { ar: fallbackAr, en: fallbackEn };
-  };
-
-  const normalizeCustomerProfile = (payload: any) => {
-    const customer = payload?.customer || payload?.data?.customer || payload?.data || payload || {};
-    const firstName = customer.firstName || customer.first_name || '';
-    const lastName = customer.lastName || customer.last_name || '';
-    const fullName = customer.name || customer.fullName || `${firstName} ${lastName}`.trim() || activeAppointment?.customerNameEn || activeAppointment?.customerNameAr || 'Guest';
-    const reviews = Array.isArray(customer.reviews) ? customer.reviews : [];
-    const notes = Array.isArray(customer.notes)
-      ? customer.notes
-      : typeof customer.notes === 'string' && customer.notes.trim().length > 0
-        ? [customer.notes]
-        : [];
-
-    return {
-      id: customer.id || activeAppointment?.customerId || '',
-      nameEn: fullName,
-      nameAr: customer.nameAr || fullName,
-      email: customer.email || activeAppointment?.customerEmail || '',
-      phone: customer.phone || activeAppointment?.customerPhone || '',
-      gender: customer.gender || '',
-      birthdate: customer.birthdate || customer.birthDate || '',
-      preferredLanguage: customer.preferredLanguage || 'ar',
-      memberSince: customer.memberSince || customer.createdAt || '',
-      loyaltyTier: customer.loyaltyTier || activeAppointment?.loyaltyTier || '',
-      walletBalance: customer.walletBalance ?? activeAppointment?.walletBalance ?? 0,
-      appointmentsCount: customer.appointmentsCount ?? customer.totalBookings ?? 0,
-      totalSpent: customer.totalSpent ?? 0,
-      lastVisit: customer.lastVisit || '',
-      tags: Array.isArray(customer.tags) ? customer.tags : [],
-      notes,
-      reviews,
-      communication: Array.isArray(customer.communication) ? customer.communication : [],
-      history: Array.isArray(customer.history) ? customer.history : [],
-      assignedStylist: customer.assignedStylist || '',
-      assignedStylistAr: customer.assignedStylistAr || customer.assignedStylist || '',
-      customerType: customer.customerType || customer.type || '',
-      favServices: Array.isArray(customer.favServices) ? customer.favServices : [],
-      favServicesAr: Array.isArray(customer.favServicesAr) ? customer.favServicesAr : [],
-      visitsCount: customer.visitsCount ?? 0,
-      noShowsCount: customer.noShowsCount ?? 0,
-      documents: Array.isArray(customer.documents) ? customer.documents : [],
-      transactions: Array.isArray(customer.transactions) ? customer.transactions : []
-    };
   };
 
   // --- INTERACTIVE ADD APPOINTMENT / BLOCK TIME DRAWER ---
@@ -4172,7 +4086,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         {isRtl ? 'حالة الموعد' : 'Status'}
                       </label>
                       <select
-                        value={normalizeWorkspaceAppointmentStatus(activeAppointment.status)}
+                        value={normalizeWorkspaceAppointmentStatus(activeAppointment.status) || ''}
                         disabled={statusUpdating || appointmentDetailsReadOnly || ['completed', 'cancelled', 'no_show'].includes(normalizeWorkspaceAppointmentStatus(activeAppointment.status))}
                         onChange={(event) => {
                           const nextStatus = event.target.value as Appointment['status'];
@@ -4544,7 +4458,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <div className="space-y-1">
                           <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
                           <select
-                            value={activeAppointment.staffId}
+                            value={activeAppointment.staffId || ''}
                             disabled={appointmentDetailsReadOnly}
                             onChange={async (e) => {
                               if (appointmentDetailsReadOnly) {
@@ -4593,7 +4507,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           <div className="space-y-1">
                             <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
                           <select
-                            value={activeAppointment.startTime}
+                            value={activeAppointment.startTime || ''}
                             disabled={appointmentDetailsReadOnly}
                             onChange={async (e) => {
                               if (appointmentDetailsReadOnly) {
@@ -4650,7 +4564,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
                           <input
                               type="date"
-                              value={activeAppointment.date || getSelectedDateKey()}
+                              value={activeAppointment.date || getSelectedDateKey() || ''}
                               disabled={appointmentDetailsReadOnly}
                               onChange={async (e) => {
                                 if (appointmentDetailsReadOnly) {
@@ -5151,7 +5065,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           {isRtl ? 'طريقة الدفع' : 'Payment method'}
                         </label>
                         <select
-                          value={selectedPaymentMethod}
+                          value={selectedPaymentMethod || ''}
                           onChange={(e) => setSelectedPaymentMethod(e.target.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700"
                         >
