@@ -2,9 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
     Image,
+    Modal,
+    Platform,
     ScrollView,
     StyleSheet,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -14,10 +18,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
 import { api, getImageUrl, getServicePrice, Service, ServiceVariant, SlotItem, Staff, Tenant } from '../api/client';
-import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
+import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { buildGroupGuestPayload, GroupGuestPayload } from '../utils/groupGuest';
 
 type BookingStep = 'date' | 'time' | 'review';
 
@@ -40,6 +45,28 @@ type DateCard = {
     date: Date;
     available: boolean;
     slotCount: number;
+};
+
+type BookingServiceOption = {
+    id: string;
+    label: string;
+};
+
+type ParticipantDraft = {
+    name: string;
+    phone: string;
+    email: string;
+    selectedServiceIds: string[];
+};
+
+type GuestParticipant = {
+    id: string;
+    name: string;
+    phone: string;
+    email: string;
+    serviceIds: string[];
+    serviceLabels: string[];
+    payload: GroupGuestPayload | null;
 };
 
 const BOOKING_WINDOW_DAYS = 14;
@@ -86,6 +113,38 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
         || '';
     const servicePrice = getServicePrice(service, initialVariant || undefined);
     const serviceDuration = initialVariant?.duration || service?.duration || 0;
+    const bookingServiceOptions: BookingServiceOption[] = useMemo(() => {
+        const rawSelectedServices = Array.isArray(route.params?.selectedServices) ? route.params.selectedServices : [];
+        const mappedSelectedServices = rawSelectedServices
+            .map((entry: any) => {
+                const id = `${entry?.id || entry?.serviceId || ''}`.trim();
+                if (!id) {
+                    return null;
+                }
+
+                const label = `${entry?.name || entry?.name_en || entry?.serviceName || entry?.title || id}`.trim();
+                return { id, label };
+            })
+            .filter(Boolean) as BookingServiceOption[];
+
+        if (mappedSelectedServices.length > 0) {
+            return mappedSelectedServices;
+        }
+
+        return [{
+            id: `${service?.id || ''}`,
+            label: `${serviceName || service?.name_en || service?.name_ar || service?.id || ''}`.trim(),
+        }].filter((item) => item.id) as BookingServiceOption[];
+    }, [route.params?.selectedServices, service?.id, service?.name_ar, service?.name_en, serviceName]);
+    const [participants, setParticipants] = useState<GuestParticipant[]>([]);
+    const [guestModalVisible, setGuestModalVisible] = useState(false);
+    const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
+    const [participantDraft, setParticipantDraft] = useState<ParticipantDraft>({
+        name: '',
+        phone: '',
+        email: '',
+        selectedServiceIds: [bookingServiceOptions[0]?.id].filter(Boolean) as string[],
+    });
     const bookingPaymentSettings = useMemo(() => ({
         ...DEFAULT_BOOKING_PAYMENT_SETTINGS,
         ...(tenant?.paymentSettings || {}),
@@ -420,6 +479,118 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
         );
     };
 
+    const openGuestModal = (participant?: GuestParticipant | null) => {
+        if (participant) {
+            setEditingParticipantId(participant.id);
+            setParticipantDraft({
+                name: participant.name,
+                phone: participant.phone,
+                email: participant.email,
+                selectedServiceIds: participant.serviceIds.length > 0
+                    ? participant.serviceIds
+                    : bookingServiceOptions.map((item) => item.id),
+            });
+        } else {
+            setEditingParticipantId(null);
+            setParticipantDraft({
+                name: '',
+                phone: '',
+                email: '',
+                selectedServiceIds: bookingServiceOptions.map((item) => item.id),
+            });
+        }
+
+        setGuestModalVisible(true);
+    };
+
+    const closeGuestModal = () => {
+        setGuestModalVisible(false);
+        setEditingParticipantId(null);
+    };
+
+    const toggleGuestService = (serviceId: string) => {
+        setParticipantDraft((prev) => {
+            const exists = prev.selectedServiceIds.includes(serviceId);
+            const nextSelectedServiceIds = exists
+                ? prev.selectedServiceIds.filter((entry) => entry !== serviceId)
+                : [...prev.selectedServiceIds, serviceId];
+
+            return {
+                ...prev,
+                selectedServiceIds: nextSelectedServiceIds.length > 0
+                    ? nextSelectedServiceIds
+                    : prev.selectedServiceIds,
+            };
+        });
+    };
+
+    const handleSaveGuest = () => {
+        const name = participantDraft.name.trim();
+        if (!name) {
+            Alert.alert(
+                isRTL ? 'اسم الضيف مطلوب' : 'Guest name is required',
+                isRTL
+                    ? 'أدخلي اسم الضيف قبل الحفظ.'
+                    : 'Please enter the guest name before saving.'
+            );
+            return;
+        }
+
+        const selectedServices = bookingServiceOptions.filter((item) => participantDraft.selectedServiceIds.includes(item.id));
+        if (selectedServices.length === 0) {
+            Alert.alert(
+                isRTL ? 'اختاري خدمة' : 'Select a service',
+                isRTL
+                    ? 'اختاري خدمة واحدة على الأقل لهذا الضيف.'
+                    : 'Please select at least one service for this guest.'
+            );
+            return;
+        }
+
+        const [firstName, ...restNameParts] = name.split(/\s+/).filter(Boolean);
+        const lastName = restNameParts.length > 0 ? restNameParts.join(' ') : firstName;
+        const serviceIds = selectedServices.map((item) => item.id);
+        const serviceLabels = selectedServices.map((item) => item.label);
+        const payload = buildGroupGuestPayload({
+            firstName,
+            lastName,
+            email: participantDraft.email.trim(),
+            phone: participantDraft.phone.trim(),
+            serviceId: serviceIds[0],
+            serviceIds,
+            serviceName: serviceLabels.join(' · '),
+            isFree: false,
+        });
+
+        const nextParticipant: GuestParticipant = {
+            id: editingParticipantId || `guest-${Date.now()}`,
+            name,
+            phone: participantDraft.phone.trim(),
+            email: participantDraft.email.trim(),
+            serviceIds,
+            serviceLabels,
+            payload,
+        };
+
+        setParticipants((prev) => {
+            if (editingParticipantId) {
+                return prev.map((item) => (item.id === editingParticipantId ? nextParticipant : item));
+            }
+
+            return [...prev, nextParticipant];
+        });
+
+        closeGuestModal();
+    };
+
+    const handleRemoveGuest = (guestId: string) => {
+        setParticipants((prev) => prev.filter((item) => item.id !== guestId));
+    };
+
+    const guestModalServiceLabels = bookingServiceOptions
+        .map((item) => item.label)
+        .join(' · ');
+
     const renderPriceRow = (label: string, value: string, emphasized?: boolean) => (
         <View style={styles.priceRow}>
             <Text style={[styles.priceRowLabel, emphasized ? styles.priceRowLabelEmphasized : null]}>{label}</Text>
@@ -675,25 +846,81 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                 <View style={styles.sectionCardHeader}>
                     <Text style={styles.sectionCardLabel}>{isRTL ? 'المشاركون' : 'Participants'}</Text>
                 </View>
-                <View style={styles.participantsRow}>
-                    <View style={styles.participantBadge}>
-                        <AppIcon name="verified_user" size={12} color={colors.primary} />
-                        <Text style={styles.participantBadgeText}>{isRTL ? 'أنتِ' : 'You'}</Text>
+                <View style={styles.participantsStack}>
+                    <View style={styles.primaryParticipantRow}>
+                        <View style={styles.participantBadge}>
+                            <AppIcon name="verified_user" size={12} color={colors.primary} />
+                            <Text style={styles.participantBadgeText}>{isRTL ? 'أنتِ' : 'You'}</Text>
+                        </View>
+                        <Text style={styles.primaryParticipantHint}>
+                            {isRTL ? 'العميلة الأساسية وصاحبة الحجز' : 'Primary customer and booking owner'}
+                        </Text>
                     </View>
+
+                    {participants.map((participant) => (
+                        <View key={participant.id} style={styles.participantCard}>
+                            <View style={styles.participantCardTopRow}>
+                                <View style={styles.participantCardTitleWrap}>
+                                    <Text style={styles.participantCardTitle}>{participant.name}</Text>
+                                    <Text style={styles.participantCardSubtitle}>
+                                        {participant.serviceLabels.length > 0
+                                            ? participant.serviceLabels.join(' · ')
+                                            : (isRTL ? 'خدمات مضافة' : 'Added services')}
+                                    </Text>
+                                </View>
+                                <View style={styles.participantBadgeMini}>
+                                    <AppIcon name="user" size={12} color={colors.primary} />
+                                    <Text style={styles.participantBadgeMiniText}>{isRTL ? 'ضيف' : 'Guest'}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.participantMetaList}>
+                                {participant.phone ? (
+                                    <Text style={styles.participantMetaItem}>{participant.phone}</Text>
+                                ) : null}
+                                {participant.email ? (
+                                    <Text style={styles.participantMetaItem}>{participant.email}</Text>
+                                ) : null}
+                            </View>
+
+                            <View style={styles.participantServiceChips}>
+                                {participant.serviceLabels.map((serviceLabel) => (
+                                    <View key={`${participant.id}-${serviceLabel}`} style={styles.participantServiceChip}>
+                                        <Text style={styles.participantServiceChipText}>{serviceLabel}</Text>
+                                    </View>
+                                ))}
+                            </View>
+
+                            <View style={styles.participantActionsRow}>
+                                <TouchableOpacity
+                                    style={styles.participantActionButton}
+                                    onPress={() => openGuestModal(participant)}
+                                    activeOpacity={0.9}
+                                >
+                                    <AppIcon name="settings" size={12} color={colors.primary} />
+                                    <Text style={styles.participantActionText}>{isRTL ? 'تعديل' : 'Edit'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.participantActionButton, styles.participantActionButtonDanger]}
+                                    onPress={() => handleRemoveGuest(participant.id)}
+                                    activeOpacity={0.9}
+                                >
+                                    <AppIcon name="delete" size={12} color="#D64545" />
+                                    <Text style={[styles.participantActionText, styles.participantActionTextDanger]}>
+                                        {isRTL ? 'حذف' : 'Remove'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ))}
+
                     <TouchableOpacity
                         style={styles.addParticipantButton}
-                        onPress={() => {
-                            Alert.alert(
-                                isRTL ? 'قريباً' : 'Coming soon',
-                                isRTL
-                                    ? 'سيتم تفعيل إضافة الضيوف في مرحلة لاحقة.'
-                                    : 'Guest navigation will be enabled in a later phase.'
-                            );
-                        }}
+                        onPress={() => openGuestModal()}
                         activeOpacity={0.9}
                     >
                         <AppIcon name="plus" size={14} color={colors.primary} />
-                        <Text style={styles.addParticipantText}>{isRTL ? 'إضافة شخص' : 'Bring Someone'}</Text>
+                        <Text style={styles.addParticipantText}>{isRTL ? 'إضافة ضيف' : 'Bring Someone'}</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -733,6 +960,102 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                         : 'The Continue action will connect to the final booking step in the next phase.'}
                 </Text>
             </View>
+
+            <Modal visible={guestModalVisible} transparent animationType="fade" onRequestClose={closeGuestModal}>
+                <View style={styles.modalOverlay}>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        style={styles.modalKeyboardWrap}
+                    >
+                        <View style={styles.modalCard}>
+                            <View style={styles.modalHeader}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.modalTitle}>{isRTL ? 'إضافة ضيف' : 'Add Guest'}</Text>
+                                    <Text style={styles.modalSubtitle}>
+                                        {isRTL
+                                            ? 'أضيفي مشاركاً جديداً إلى نفس الزيارة.'
+                                            : 'Add another participant to this same visit.'}
+                                    </Text>
+                                </View>
+                                <TouchableOpacity style={styles.modalCloseButton} onPress={closeGuestModal}>
+                                    <AppIcon name="close" size={18} color={colors.text} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+                                <View style={styles.modalField}>
+                                    <Text style={styles.modalFieldLabel}>{isRTL ? 'الاسم *' : 'Name *'}</Text>
+                                    <TextInput
+                                        value={participantDraft.name}
+                                        onChangeText={(value) => setParticipantDraft((prev) => ({ ...prev, name: value }))}
+                                        placeholder={isRTL ? 'اسم الضيف الكامل' : 'Guest full name'}
+                                        placeholderTextColor={colors.textSecondary}
+                                        style={styles.modalInput}
+                                    />
+                                </View>
+
+                                <View style={styles.modalField}>
+                                    <Text style={styles.modalFieldLabel}>{isRTL ? 'الجوال' : 'Phone'}</Text>
+                                    <TextInput
+                                        value={participantDraft.phone}
+                                        onChangeText={(value) => setParticipantDraft((prev) => ({ ...prev, phone: value }))}
+                                        placeholder={isRTL ? 'رقم الجوال' : 'Guest phone'}
+                                        placeholderTextColor={colors.textSecondary}
+                                        style={styles.modalInput}
+                                        keyboardType="phone-pad"
+                                    />
+                                </View>
+
+                                <View style={styles.modalField}>
+                                    <Text style={styles.modalFieldLabel}>{isRTL ? 'البريد الإلكتروني' : 'Email'}</Text>
+                                    <TextInput
+                                        value={participantDraft.email}
+                                        onChangeText={(value) => setParticipantDraft((prev) => ({ ...prev, email: value }))}
+                                        placeholder={isRTL ? 'البريد الإلكتروني' : 'Guest email'}
+                                        placeholderTextColor={colors.textSecondary}
+                                        style={styles.modalInput}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                    />
+                                </View>
+
+                                <View style={styles.modalField}>
+                                    <Text style={styles.modalFieldLabel}>{isRTL ? 'الخدمات المختارة' : 'Selected services'}</Text>
+                                    <Text style={styles.modalFieldHint}>
+                                        {guestModalServiceLabels || (isRTL ? 'الخدمة الحالية' : 'Current service')}
+                                    </Text>
+                                    <View style={styles.serviceSelectGrid}>
+                                        {bookingServiceOptions.map((item) => {
+                                            const selected = participantDraft.selectedServiceIds.includes(item.id);
+                                            return (
+                                                <TouchableOpacity
+                                                    key={item.id}
+                                                    style={[styles.serviceSelectChip, selected ? styles.serviceSelectChipActive : null]}
+                                                    onPress={() => toggleGuestService(item.id)}
+                                                    activeOpacity={0.9}
+                                                >
+                                                    <Text style={[styles.serviceSelectChipText, selected ? styles.serviceSelectChipTextActive : null]}>
+                                                        {item.label}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+                            </ScrollView>
+
+                            <View style={styles.modalFooter}>
+                                <TouchableOpacity style={styles.modalSecondaryButton} onPress={closeGuestModal}>
+                                    <Text style={styles.modalSecondaryButtonText}>{isRTL ? 'إلغاء' : 'Cancel'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.modalPrimaryButton} onPress={handleSaveGuest}>
+                                    <Text style={styles.modalPrimaryButtonText}>{isRTL ? 'حفظ' : 'Save'}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </KeyboardAvoidingView>
+                </View>
+            </Modal>
         </View>
     );
 
@@ -1325,6 +1648,12 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
         flexWrap: 'wrap',
     },
+    participantsStack: {
+        gap: spacing.md,
+    },
+    primaryParticipantRow: {
+        gap: 8,
+    },
     participantBadge: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1340,6 +1669,109 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         fontWeight: '800',
         color: colors.text,
+    },
+    primaryParticipantHint: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+        fontWeight: '600',
+    },
+    participantCard: {
+        borderRadius: 22,
+        backgroundColor: '#FAF8FF',
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
+        padding: spacing.md,
+        gap: spacing.sm,
+    },
+    participantCardTopRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+    },
+    participantCardTitleWrap: {
+        flex: 1,
+        gap: 3,
+    },
+    participantCardTitle: {
+        fontSize: fontSize.md,
+        fontWeight: '900',
+        color: colors.text,
+    },
+    participantCardSubtitle: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+        fontWeight: '700',
+        lineHeight: 18,
+    },
+    participantBadgeMini: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: '#F8F5FF',
+    },
+    participantBadgeMiniText: {
+        fontSize: fontSize.xs,
+        fontWeight: '900',
+        color: colors.primary,
+    },
+    participantMetaList: {
+        gap: 4,
+    },
+    participantMetaItem: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+        lineHeight: 18,
+    },
+    participantServiceChips: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    participantServiceChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
+    },
+    participantServiceChipText: {
+        fontSize: fontSize.xs,
+        color: colors.text,
+        fontWeight: '800',
+    },
+    participantActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        flexWrap: 'wrap',
+    },
+    participantActionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
+    },
+    participantActionButtonDanger: {
+        borderColor: '#F2CDCD',
+        backgroundColor: '#FFF9F9',
+    },
+    participantActionText: {
+        fontSize: fontSize.xs,
+        color: colors.primary,
+        fontWeight: '900',
+    },
+    participantActionTextDanger: {
+        color: '#D64545',
     },
     addParticipantButton: {
         flexDirection: 'row',
@@ -1399,6 +1831,145 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         color: colors.textSecondary,
         lineHeight: 20,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(22, 15, 42, 0.58)',
+        padding: spacing.lg,
+        justifyContent: 'center',
+    },
+    modalKeyboardWrap: {
+        width: '100%',
+    },
+    modalCard: {
+        borderRadius: 30,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#EDE4FB',
+        overflow: 'hidden',
+        maxHeight: '92%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+        padding: spacing.lg,
+        paddingBottom: spacing.md,
+        backgroundColor: '#FBF9FF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#EFE7FB',
+    },
+    modalTitle: {
+        fontSize: fontSize.xl,
+        fontWeight: '900',
+        color: colors.text,
+    },
+    modalSubtitle: {
+        marginTop: 4,
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        lineHeight: 20,
+    },
+    modalCloseButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
+    },
+    modalScrollContent: {
+        padding: spacing.lg,
+        gap: spacing.md,
+    },
+    modalField: {
+        gap: 8,
+    },
+    modalFieldLabel: {
+        fontSize: fontSize.xs,
+        color: colors.primary,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
+    modalFieldHint: {
+        fontSize: fontSize.xs,
+        color: colors.textSecondary,
+        fontWeight: '700',
+    },
+    modalInput: {
+        minHeight: 52,
+        borderRadius: 18,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
+        paddingHorizontal: spacing.md,
+        color: colors.text,
+        fontSize: fontSize.md,
+    },
+    serviceSelectGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    serviceSelectChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 999,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
+    },
+    serviceSelectChipActive: {
+        backgroundColor: '#F4EEFF',
+        borderColor: colors.primary,
+    },
+    serviceSelectChipText: {
+        fontSize: fontSize.xs,
+        color: colors.text,
+        fontWeight: '800',
+    },
+    serviceSelectChipTextActive: {
+        color: colors.primary,
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        padding: spacing.lg,
+        paddingTop: spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: '#EFE7FB',
+    },
+    modalSecondaryButton: {
+        flex: 1,
+        minHeight: 50,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
+    },
+    modalSecondaryButtonText: {
+        fontSize: fontSize.sm,
+        color: colors.text,
+        fontWeight: '900',
+    },
+    modalPrimaryButton: {
+        flex: 1,
+        minHeight: 50,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary,
+    },
+    modalPrimaryButtonText: {
+        fontSize: fontSize.sm,
+        color: '#FFFFFF',
+        fontWeight: '900',
     },
     placeholderNote: {
         flexDirection: 'row',
