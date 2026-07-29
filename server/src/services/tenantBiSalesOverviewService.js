@@ -89,13 +89,25 @@ function buildSalesOverviewPayload(result, startDate, endDate) {
     const revenueByCustomerType = buildGroupedRevenue(customerSales, 'customerType', 'revenue');
     const customerGrowth = customerCohorts?.rows || [];
     const walkInCustomers = customerSales.filter((row) => row.customerType === 'walk_in_customer').length;
+    const operationalRevenue = Number.isFinite(Number(overview.operationalRevenue))
+        ? Number(overview.operationalRevenue)
+        : Number(overview.totalRevenue || 0);
+    const giftCardSales = Number.isFinite(Number(overview.giftCardSales))
+        ? Number(overview.giftCardSales)
+        : 0;
+    const businessRevenue = Number.isFinite(Number(overview.businessRevenue))
+        ? Number(overview.businessRevenue)
+        : Number(operationalRevenue + giftCardSales);
     const collectedAmount = Number.isFinite(Number(financialLedger?.overview?.netCollected))
         ? Number(financialLedger.overview.netCollected)
-        : Number(overview.totalRevenue || 0);
+        : Number(businessRevenue || 0);
     const outstandingAmount = Number(overview.pendingPayments || 0);
 
     const financeOverview = {
-        revenue: Number(overview.totalRevenue || 0),
+        revenue: businessRevenue,
+        operationalRevenue,
+        giftCardSales,
+        businessRevenue,
         netRevenue: Number(overview.netRevenue || 0),
         tax: Number(overview.totalTax || 0),
         discount: Number(overview.totalDiscountAmount || 0),

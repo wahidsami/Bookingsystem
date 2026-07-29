@@ -27,6 +27,26 @@ function normalizeInvoiceAmounts(totalInput, vatInput) {
     };
 }
 
+function getAppointmentInvoiceDiscountAmount(appointments = []) {
+    return formatAmount(appointments.reduce((sum, appointment) => {
+        const rawPrice = formatAmount(appointment?.rawPrice || 0);
+        const finalPrice = formatAmount(appointment?.price || 0);
+        return sum + Math.max(rawPrice - finalPrice, 0);
+    }, 0));
+}
+
+function getOrderInvoiceDiscountAmount(order) {
+    if (!order) {
+        return 0;
+    }
+
+    const subtotal = formatAmount(order.subtotal || 0);
+    const taxAmount = formatAmount(order.taxAmount || 0);
+    const shippingFee = formatAmount(order.shippingFee || 0);
+    const totalAmount = formatAmount(order.totalAmount || 0);
+    return formatAmount(Math.max((subtotal + taxAmount + shippingFee) - totalAmount, 0));
+}
+
 function safeJsonObject(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
@@ -148,6 +168,7 @@ async function ensureOrderInvoice(orderId, options = {}) {
         vatAmount,
         totalAmount
     } = normalizeInvoiceAmounts(order.totalAmount, order.taxAmount);
+    const discountAmount = getOrderInvoiceDiscountAmount(order);
 
     let invoice = await db.CustomerInvoice.findOne({
         where: { entityType: 'order', entityId: order.id },
@@ -166,6 +187,7 @@ async function ensureOrderInvoice(orderId, options = {}) {
             subtotalAmount,
             vatAmount,
             totalAmount,
+            discountAmount,
             paidAmount: order.paymentStatus === 'paid' ? totalAmount : 0,
             dueAmount: order.paymentStatus === 'paid' ? 0 : totalAmount,
             paymentMethodSnapshot: { paymentMethod: order.paymentMethod },
@@ -219,6 +241,7 @@ async function syncOrderInvoiceStatus(orderId, options = {}) {
     }
 
     const { totalAmount } = normalizeInvoiceAmounts(order.totalAmount, order.taxAmount);
+    const discountAmount = getOrderInvoiceDiscountAmount(order);
     let nextStatus = 'UNPAID';
     let paidAmount = 0;
     let dueAmount = totalAmount;
@@ -238,6 +261,7 @@ async function syncOrderInvoiceStatus(orderId, options = {}) {
         status: nextStatus,
         paidAmount,
         dueAmount,
+        discountAmount,
         paidAt: nextStatus === 'PAID' ? (order.paidAt || new Date()) : invoice.paidAt,
         paymentMethodSnapshot: { paymentMethod: order.paymentMethod },
         paymentStatusSnapshot: { orderPaymentStatus: order.paymentStatus },
@@ -330,6 +354,7 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
     const subtotalAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.rawPrice || 0), 0));
     const vatAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.taxAmount || 0), 0));
     const totalAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.price || 0), 0));
+    const discountAmount = getAppointmentInvoiceDiscountAmount(invoiceAppointments);
     const paidAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.totalPaid || 0), 0));
     const dueAmount = formatAmount(Math.max(0, totalAmount - paidAmount));
     const invoiceItems = invoiceAppointments.map((sourceAppointment, index) => ({
@@ -396,6 +421,7 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
             subtotalAmount,
             vatAmount,
             totalAmount,
+            discountAmount,
             paidAmount,
             dueAmount,
             paymentMethodSnapshot: {
@@ -443,6 +469,7 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
             subtotalAmount,
             vatAmount,
             totalAmount,
+            discountAmount,
             paidAmount,
             dueAmount,
             paidAt: status === 'PAID' ? (appointment.paidAt || new Date()) : invoice.paidAt,

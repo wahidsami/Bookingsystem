@@ -470,14 +470,19 @@ function getTransactionReferenceAmount(transaction) {
     return Number(transaction?.amount || 0);
 }
 
-function getTransactionDiscountAmount(transaction) {
+function getTransactionDiscountAmount(transaction, invoice = null) {
     const appointment = transaction?.appointment;
     const order = transaction?.order;
+    const invoiceDiscount = Number(invoice?.discountAmount || 0);
+
+    if (Number.isFinite(invoiceDiscount) && invoiceDiscount > 0) {
+        return invoiceDiscount;
+    }
 
     if (appointment) {
         const rawPrice = Number(appointment.rawPrice || 0);
         const price = Number(appointment.price || 0);
-        return Math.max(rawPrice - price, 0);
+        return Math.max(Number.isFinite(invoiceDiscount) ? invoiceDiscount : 0, Math.max(rawPrice - price, 0));
     }
 
     if (order) {
@@ -485,10 +490,10 @@ function getTransactionDiscountAmount(transaction) {
         const taxAmount = Number(order.taxAmount || 0);
         const shippingFee = Number(order.shippingFee || 0);
         const totalAmount = Number(order.totalAmount || 0);
-        return Math.max((subtotal + taxAmount + shippingFee) - totalAmount, 0);
+        return Math.max(Number.isFinite(invoiceDiscount) ? invoiceDiscount : 0, Math.max((subtotal + taxAmount + shippingFee) - totalAmount, 0));
     }
 
-    return 0;
+    return Number.isFinite(invoiceDiscount) ? invoiceDiscount : 0;
 }
 
 function getTransactionServiceLabel(transaction) {
@@ -586,7 +591,7 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map()) {
         location: getTransactionLocationLabel(transaction),
         revenue: Number(signedAmount.toFixed(2)),
         tax: Number((Number(appointment?.taxAmount || order?.taxAmount || 0)).toFixed(2)),
-        discount: Number(getTransactionDiscountAmount(transaction).toFixed(2)),
+        discount: Number(getTransactionDiscountAmount(transaction, invoice).toFixed(2)),
         paymentMethod: transaction.paymentMethod,
         paymentMethodLabel: formatLedgerPaymentMethodLabel(transaction.paymentMethod),
         status: appointment?.status || order?.status || transaction.status,
@@ -677,23 +682,6 @@ function getTenantAppointmentIncludes() {
             required: false
         }
     ];
-}
-
-function getAppointmentDiscountAmount(appointment) {
-    const serviceRawPrice = parseFloat(appointment?.service?.rawPrice || 0);
-    const discountedRawPrice = parseFloat(appointment?.rawPrice || 0);
-    const discountAmount = serviceRawPrice - discountedRawPrice;
-    return Number.isFinite(discountAmount) && discountAmount > 0 ? discountAmount : 0;
-}
-
-function getOrderDiscountAmount(order) {
-    const subtotal = parseFloat(order?.subtotal || 0);
-    const taxAmount = parseFloat(order?.taxAmount || 0);
-    const shippingFee = parseFloat(order?.shippingFee || 0);
-    const totalAmount = parseFloat(order?.totalAmount || 0);
-    const baseAmount = subtotal + taxAmount + shippingFee;
-    const discountAmount = baseAmount - totalAmount;
-    return Number.isFinite(discountAmount) && discountAmount > 0 ? discountAmount : 0;
 }
 
 function runHandler(handler, req) {
@@ -831,6 +819,34 @@ exports.getFinancialOverview = async (req, res) => {
         orders = orders.filter((order) => matchesOrderFilters(order, filters));
         paymentTransactions = paymentTransactions.filter((transaction) => matchesTransactionFilters(transaction, filters));
 
+        const overviewInvoiceConditions = [];
+        if (appointments.length > 0) {
+            overviewInvoiceConditions.push({
+                entityType: 'appointment',
+                entityId: { [Op.in]: appointments.map((appointment) => appointment.id).filter(Boolean) }
+            });
+        }
+        if (orders.length > 0) {
+            overviewInvoiceConditions.push({
+                entityType: 'order',
+                entityId: { [Op.in]: orders.map((order) => order.id).filter(Boolean) }
+            });
+        }
+
+        const overviewInvoices = overviewInvoiceConditions.length
+            ? await db.CustomerInvoice.findAll({
+                where: {
+                    tenantId,
+                    [Op.or]: overviewInvoiceConditions
+                },
+                attributes: ['entityType', 'entityId', 'discountAmount']
+            })
+            : [];
+
+        const overviewInvoiceLookup = new Map(
+            overviewInvoices.map((invoice) => [`${invoice.entityType}:${invoice.entityId}`, invoice.toJSON ? invoice.toJSON() : invoice])
+        );
+
         logFinancialDiagnostics('financial/overview', 'loaded', {
             tenantId,
             allAppointments: allAppointments.length,
@@ -846,9 +862,15 @@ exports.getFinancialOverview = async (req, res) => {
             const amount = Number(transaction.amount || 0);
             const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
             const signedAmount = isRefund ? -Math.abs(amount) : Math.abs(amount);
+            const invoiceKey = appointment?.id
+                ? `appointment:${appointment.id}`
+                : order?.id
+                    ? `order:${order.id}`
+                    : null;
+            const invoice = invoiceKey ? overviewInvoiceLookup.get(invoiceKey) || null : null;
 
             totals.totalRevenue += signedAmount;
-            totals.totalDiscountAmount += getTransactionDiscountAmount(transaction);
+            totals.totalDiscountAmount += getTransactionDiscountAmount(transaction, invoice);
             totals.totalTransactions += 1;
 
             if (transaction.status === 'completed') {
@@ -928,7 +950,8 @@ exports.getFinancialOverview = async (req, res) => {
             appointmentTotals.totalTenantRevenue += parseFloat(appt.tenantRevenue || 0);
             appointmentTotals.totalEmployeeCommissions += parseFloat(appt.employeeCommission || 0);
 
-            const discountAmount = getAppointmentDiscountAmount(appt);
+            const appointmentInvoice = overviewInvoiceLookup.get(`appointment:${appt.id}`) || null;
+            const discountAmount = getTransactionDiscountAmount({ appointment: appt }, appointmentInvoice);
             if (discountAmount > 0) {
                 appointmentTotals.totalDiscountAmount += discountAmount;
                 appointmentTotals.discountedBookings += 1;
@@ -979,7 +1002,8 @@ exports.getFinancialOverview = async (req, res) => {
             const totalAmount = parseFloat(order.totalAmount || 0);
             const platformFee = parseFloat(order.platformFee || 0);
             const tenantRevenue = totalAmount - platformFee;
-            const discountAmount = getOrderDiscountAmount(order);
+            const orderInvoice = overviewInvoiceLookup.get(`order:${order.id}`) || null;
+            const discountAmount = getTransactionDiscountAmount({ order }, orderInvoice);
             
             orderTotals.totalRevenue += totalAmount;
             orderTotals.totalPlatformFees += platformFee;
@@ -1010,26 +1034,32 @@ exports.getFinancialOverview = async (req, res) => {
 
         // Combine totals
         const usePaymentTransactions = paymentTransactions.length > 0;
+        const operationalRevenue = usePaymentTransactions
+            ? paymentTransactionTotals.totalRevenue
+            : appointmentTotals.totalRevenue + orderTotals.totalRevenue;
+        const giftCardSales = giftCardTotals.totalRevenue;
+        const businessRevenue = operationalRevenue + giftCardSales;
 
         const overview = {
             // Combined totals
-            totalRevenue: usePaymentTransactions
-                ? paymentTransactionTotals.totalRevenue + giftCardTotals.totalRevenue
-                : appointmentTotals.totalRevenue + orderTotals.totalRevenue + giftCardTotals.totalRevenue,
+            totalRevenue: businessRevenue,
+            operationalRevenue,
+            giftCardSales,
+            businessRevenue,
             totalRawPrice: usePaymentTransactions ? paymentTransactionTotals.totalRawPrice : appointmentTotals.totalRawPrice,
             totalTax: usePaymentTransactions ? paymentTransactionTotals.totalTax : appointmentTotals.totalTax,
             totalPlatformFees: usePaymentTransactions
                 ? paymentTransactionTotals.totalPlatformFees
                 : appointmentTotals.totalPlatformFees + orderTotals.totalPlatformFees,
             totalTenantRevenue: usePaymentTransactions
-                ? paymentTransactionTotals.totalTenantRevenue + giftCardTotals.totalRevenue
-                : appointmentTotals.totalTenantRevenue + orderTotals.totalTenantRevenue + giftCardTotals.totalRevenue,
+                ? paymentTransactionTotals.totalTenantRevenue + giftCardSales
+                : appointmentTotals.totalTenantRevenue + orderTotals.totalTenantRevenue + giftCardSales,
             totalEmployeeCommissions: usePaymentTransactions
                 ? paymentTransactionTotals.totalEmployeeCommissions
                 : appointmentTotals.totalEmployeeCommissions,
             netRevenue: usePaymentTransactions
-                ? (paymentTransactionTotals.totalTenantRevenue + giftCardTotals.totalRevenue) - paymentTransactionTotals.totalEmployeeCommissions
-                : (appointmentTotals.totalTenantRevenue + orderTotals.totalTenantRevenue + giftCardTotals.totalRevenue) - appointmentTotals.totalEmployeeCommissions,
+                ? (paymentTransactionTotals.totalTenantRevenue + giftCardSales) - paymentTransactionTotals.totalEmployeeCommissions
+                : (appointmentTotals.totalTenantRevenue + orderTotals.totalTenantRevenue + giftCardSales) - appointmentTotals.totalEmployeeCommissions,
             // Booking/Order counts
             totalBookings: appointmentTotals.totalBookings,
             totalOrders: orderTotals.totalOrders,
@@ -1061,11 +1091,11 @@ exports.getFinancialOverview = async (req, res) => {
             // Separate breakdowns
             appointmentRevenue: usePaymentTransactions ? paymentTransactionTotals.appointmentRevenue : appointmentTotals.totalRevenue,
             orderRevenue: usePaymentTransactions ? paymentTransactionTotals.orderRevenue : orderTotals.totalRevenue,
-            giftCardRevenue: giftCardTotals.totalRevenue,
+            giftCardRevenue: giftCardSales,
             giftCardTransactions: giftCardTotals.totalTransactions,
             appointmentTenantRevenue: usePaymentTransactions ? paymentTransactionTotals.totalTenantRevenue : appointmentTotals.totalTenantRevenue,
             orderTenantRevenue: usePaymentTransactions ? 0 : orderTotals.totalTenantRevenue,
-            giftCardTenantRevenue: giftCardTotals.totalRevenue,
+            giftCardTenantRevenue: giftCardSales,
             discountTotals: {
                 totalDiscountAmount: usePaymentTransactions
                     ? parseFloat(paymentTransactionTotals.totalDiscountAmount.toFixed(2))
@@ -1692,6 +1722,7 @@ exports.getFinancialLedger = async (req, res) => {
                     'status',
                     'subtotalAmount',
                     'vatAmount',
+                    'discountAmount',
                     'totalAmount',
                     'paidAmount',
                     'dueAmount',
@@ -1889,6 +1920,8 @@ exports.getFinancialLedger = async (req, res) => {
             success: true,
             overview: {
                 totalTransactions: transactions.length,
+                operationalRevenue: Number(revenueTotals.revenue.toFixed(2)),
+                businessRevenue: Number(revenueTotals.revenue.toFixed(2)),
                 totalRevenue: Number(revenueTotals.revenue.toFixed(2)),
                 totalTax: Number(revenueTotals.tax.toFixed(2)),
                 totalDiscount: Number(revenueTotals.discount.toFixed(2)),

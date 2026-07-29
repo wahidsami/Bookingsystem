@@ -735,6 +735,75 @@ function aggregateAppointmentsByBookingSession(appointments = []) {
         .sort((a, b) => getAppointmentComparableTimestamp(b) - getAppointmentComparableTimestamp(a));
 }
 
+async function buildCustomerSpendMap({ tenantId, customerIds = [], transaction = null } = {}) {
+    const normalizedCustomerIds = [...new Set((Array.isArray(customerIds) ? customerIds : [])
+        .map((value) => `${value || ''}`.trim())
+        .filter(Boolean))];
+
+    const where = {
+        status: { [Op.in]: ['completed', 'refunded'] },
+        [Op.and]: [
+            {
+                [Op.or]: [
+                    { '$appointment.tenantId$': tenantId },
+                    { '$order.tenantId$': tenantId }
+                ]
+            }
+        ]
+    };
+
+    if (normalizedCustomerIds.length > 0) {
+        where[Op.and].push({
+            [Op.or]: [
+                { '$appointment.platformUserId$': { [Op.in]: normalizedCustomerIds } },
+                { '$order.platformUserId$': { [Op.in]: normalizedCustomerIds } }
+            ]
+        });
+    }
+
+    const paymentTransactions = await db.PaymentTransaction.findAll({
+        where,
+        include: [
+            {
+                model: db.Appointment,
+                as: 'appointment',
+                required: false,
+                attributes: ['id', 'platformUserId', 'tenantId', 'bookingSessionId']
+            },
+            {
+                model: db.Order,
+                as: 'order',
+                required: false,
+                attributes: ['id', 'platformUserId', 'tenantId']
+            }
+        ],
+        attributes: ['id', 'appointmentId', 'orderId', 'amount', 'type', 'status', 'processedAt', 'createdAt'],
+        transaction,
+        subQuery: false
+    });
+
+    const spendMap = new Map();
+    paymentTransactions.forEach((paymentTransaction) => {
+        const appointment = paymentTransaction.appointment;
+        const order = paymentTransaction.order;
+        const customerId = appointment?.platformUserId || order?.platformUserId || null;
+
+        if (!customerId) {
+            return;
+        }
+
+        const customerKey = `${customerId}`;
+        const amount = Number(paymentTransaction.amount || 0);
+        const signedAmount = paymentTransaction.status === 'refunded' || paymentTransaction.type === 'refund'
+            ? -Math.abs(amount)
+            : Math.abs(amount);
+        const current = Number(spendMap.get(customerKey) || 0);
+        spendMap.set(customerKey, Number((current + signedAmount).toFixed(2)));
+    });
+
+    return spendMap;
+}
+
 /**
  * Get all customers who have booked with this tenant
  */
@@ -839,6 +908,10 @@ exports.getCustomers = async (req, res) => {
             orderMap.set(customerId, bucket);
         });
 
+        const customerSpendMap = customerIds.length > 0
+            ? await buildCustomerSpendMap({ tenantId, customerIds })
+            : new Map();
+
         let allCustomers = baseCustomers.map((customer) => ({
             ...(typeof customer.toJSON === 'function' ? customer.toJSON() : { ...customer }),
             appointments: appointmentMap.get(customer.id) || [],
@@ -887,21 +960,10 @@ exports.getCustomers = async (req, res) => {
                 .map(o => o.createdAt)
                 .filter(Boolean)
                 .sort((a, b) => new Date(a) - new Date(b));
-
-            // Calculate from appointments
-            const completedAppointments = bookingSessions.filter(a => a.status === 'completed');
-            const appointmentSpending = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || a.totalAmount || 0), 0);
-            
-            // Calculate from orders
-            const completedOrders = orders.filter(o => o.status === 'completed' || o.status === 'delivered');
-            const orderSpending = completedOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || 0), 0);
             const totalProductsPurchased = orders.reduce((sum, o) => {
                 const items = o.items || [];
                 return sum + items.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0);
             }, 0);
-
-            // Combined totals
-            const totalSpent = appointmentSpending + orderSpending;
             const firstAppointment = appointmentDates.length > 0 ? appointmentDates[0] : null;
             const firstOrder = orderDates.length > 0 ? orderDates[0] : null;
             
@@ -940,7 +1002,7 @@ exports.getCustomers = async (req, res) => {
                 totalBookings: insight?.totalBookings || bookingSessions.length,
                 totalOrders: orders.length,
                 totalProductsPurchased: totalProductsPurchased,
-                totalSpent: insight?.totalSpent || totalSpent,
+                totalSpent: customerSpendMap.get(`${customer.id}`) ?? 0,
                 lastVisit: insight?.lastVisit || lastVisit,
                 firstVisit: insight?.firstVisit || (firstAppointment && firstOrder
                     ? (new Date(firstAppointment) < new Date(firstOrder) ? firstAppointment : firstOrder)
@@ -1085,6 +1147,11 @@ exports.getCustomer = async (req, res) => {
             order: [['createdAt', 'DESC']]
         });
 
+        const customerSpendMap = await buildCustomerSpendMap({
+            tenantId,
+            customerIds: [id]
+        });
+
         const [walletLedgerEntries, giftCardTransactions] = await Promise.all([
             db.WalletLedgerEntry.findAll({
                 where: {
@@ -1149,21 +1216,14 @@ exports.getCustomer = async (req, res) => {
             where: { platformUserId: id, tenantId }
         });
 
-        // Calculate stats from booking sessions
+        // Calculate stats from canonical payment records
         const completedAppointments = bookingSessions.filter(a => a.status === 'completed');
-        const appointmentSpending = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || a.totalAmount || 0), 0);
-        const avgBookingValue = completedAppointments.length > 0 ? appointmentSpending / completedAppointments.length : 0;
-
-        // Calculate stats from orders
-        const completedOrders = orders.filter(o => o.status === 'completed' || o.status === 'delivered');
-        const orderSpending = completedOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || 0), 0);
+        const canonicalTotalSpent = customerSpendMap.get(`${id}`) ?? 0;
+        const avgBookingValue = completedAppointments.length > 0 ? canonicalTotalSpent / completedAppointments.length : 0;
         const totalProductsPurchased = orders.reduce((sum, o) => {
             const items = o.items || [];
             return sum + items.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0);
         }, 0);
-
-        // Combined totals
-        const totalSpent = appointmentSpending + orderSpending;
 
         // Service frequency
         const serviceFrequency = {};
@@ -1289,7 +1349,7 @@ exports.getCustomer = async (req, res) => {
             totalOrders: orders.length,
             completedBookings: completedAppointments.length,
             totalProductsPurchased: totalProductsPurchased,
-            totalSpent,
+            totalSpent: canonicalTotalSpent,
             averageBookingValue: avgBookingValue,
             // Dates
             firstVisit: firstVisit,
@@ -1655,14 +1715,6 @@ exports.getCustomerStats = async (req, res) => {
         });
         const returningCustomers = Object.values(customerBookingCounts).filter(count => count > 1).length;
 
-        // Top spenders
-        const customerSpending = {};
-        uniqueBookingAppointments.filter(a => a.status === 'completed').forEach(a => {
-            if (a.platformUserId) {
-                customerSpending[a.platformUserId] = (customerSpending[a.platformUserId] || 0) + parseFloat(a.price || 0);
-            }
-        });
-
         // Get loyalty tier distribution
         const insights = await db.CustomerInsight.findAll({
             where: { tenantId },
@@ -1859,11 +1911,11 @@ exports.getCustomerHistory = async (req, res) => {
         // Sort by date (most recent first)
         history.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        // Calculate summary
-        const completedAppointments = bookingSessions.filter(a => a.status === 'completed');
-        const completedOrders = orders.filter(o => o.status === 'completed' || o.status === 'delivered');
-        const appointmentSpending = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || a.totalAmount || 0), 0);
-        const orderSpending = completedOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || 0), 0);
+        const customerSpendMap = await buildCustomerSpendMap({
+            tenantId,
+            customerIds: [id]
+        });
+        const canonicalTotalSpent = customerSpendMap.get(`${id}`) ?? 0;
 
         res.json({
             success: true,
@@ -1888,9 +1940,9 @@ exports.getCustomerHistory = async (req, res) => {
                     totalAppointments: bookingSessions.length,
                     totalOrders: orders.length,
                     totalWalletTransactions: walletTransactions.length,
-                    totalSpent: appointmentSpending + orderSpending,
-                    appointmentSpending: appointmentSpending,
-                    orderSpending: orderSpending,
+                    totalSpent: canonicalTotalSpent,
+                    appointmentSpending: canonicalTotalSpent,
+                    orderSpending: 0,
                     firstInteraction: history.length > 0 ? history[history.length - 1].date : null,
                     lastInteraction: history.length > 0 ? history[0].date : null
                 }
@@ -2652,6 +2704,11 @@ exports.exportCustomers = async (req, res) => {
             insightsMap[i.platformUserId] = i;
         });
 
+        const customerSpendMap = await buildCustomerSpendMap({
+            tenantId,
+            customerIds
+        });
+
         // Build CSV
         const csvRows = [
             ['Name', 'Email', 'Phone', 'Gender', 'Total Bookings', 'Total Spent', 'Loyalty Tier', 'First Visit', 'Last Visit', 'Tags'].join(',')
@@ -2660,8 +2717,7 @@ exports.exportCustomers = async (req, res) => {
         customers.forEach(customer => {
             const insight = insightsMap[customer.id];
             const appointments = customer.appointments || [];
-            const completedAppointments = appointments.filter(a => a.status === 'completed');
-            const totalSpent = completedAppointments.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
+            const totalSpent = customerSpendMap.get(`${customer.id}`) ?? 0;
 
             csvRows.push([
                 `"${customer.firstName} ${customer.lastName}"`,

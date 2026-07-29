@@ -500,16 +500,23 @@ function buildCustomerSalesRows(transactions) {
             visits: 0,
             averageSpend: 0,
             lastVisit: null,
-            firstVisit: null
+            firstVisit: null,
+            visitKeys: new Set()
         };
 
         const amount = Number(transaction.amount || 0);
         const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
         const delta = isRefund ? -Math.abs(amount) : Math.abs(amount);
         const visitedAt = transaction.processedAt || appointment?.startTime || order?.createdAt || transaction.createdAt;
+        const visitKey = appointment
+            ? `appointment:${appointment.bookingSessionId || appointment.id}`
+            : order
+                ? `order:${order.id}`
+                : null;
 
         current.totalSpent += delta;
-        if (!isRefund) {
+        if (!isRefund && visitKey && !current.visitKeys.has(visitKey)) {
+            current.visitKeys.add(visitKey);
             current.visits += 1;
             current.lastVisit = !current.lastVisit || new Date(visitedAt) > new Date(current.lastVisit) ? visitedAt : current.lastVisit;
             current.firstVisit = !current.firstVisit || new Date(visitedAt) < new Date(current.firstVisit) ? visitedAt : current.firstVisit;
@@ -521,21 +528,24 @@ function buildCustomerSalesRows(transactions) {
 
     return Array.from(customers.values())
         .sort((left, right) => right.totalSpent - left.totalSpent)
-        .map((item) => ({
-            ...item,
-            customerName: item.name,
-            customer: item.customerDisplayName || item.name,
-            customerDisplayName: item.customerDisplayName || item.name,
-            customerBadge: item.customerBadge || 'Guest Customer',
-            customerBadgeKey: item.customerBadgeKey || 'guest_customer',
-            customerIdentityLine: item.customerIdentityLine || item.id || 'Guest Customer',
-            customerType: item.customerType || 'guest_customer',
-            bookings: item.visits,
-            completed: item.visits,
-            revenue: item.totalSpent,
-            totalSpent: Number(item.totalSpent.toFixed(2)),
-            averageSpend: Number(item.averageSpend.toFixed(2))
-        }));
+        .map((item) => {
+            const { visitKeys, ...rest } = item;
+            return {
+                ...rest,
+                customerName: item.name,
+                customer: item.customerDisplayName || item.name,
+                customerDisplayName: item.customerDisplayName || item.name,
+                customerBadge: item.customerBadge || 'Guest Customer',
+                customerBadgeKey: item.customerBadgeKey || 'guest_customer',
+                customerIdentityLine: item.customerIdentityLine || item.id || 'Guest Customer',
+                customerType: item.customerType || 'guest_customer',
+                bookings: item.visits,
+                completed: item.visits,
+                revenue: item.totalSpent,
+                totalSpent: Number(item.totalSpent.toFixed(2)),
+                averageSpend: Number(item.averageSpend.toFixed(2))
+            };
+        });
 }
 
 function parseDateValue(value, endOfDay = false) {
