@@ -606,6 +606,16 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         });
     };
 
+    const openServiceBrowser = () => {
+        navigation.navigate('ServiceBrowser', {
+            tenant,
+            tenantId: tenant?.id || tenantId,
+            slug: tenant?.slug || slug,
+            bookingSessionId: route.params?.bookingSessionId || null,
+            bookingReference: route.params?.bookingReference || null,
+        });
+    };
+
     const openProviderProfile = (provider: Staff) => {
         navigation.navigate('EmployeeProfile', { provider, tenant });
     };
@@ -928,22 +938,55 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     );
 
     const renderServices = () => {
-        const categories = Array.from(new Set(services.map(s => s.category || 'General')));
+        const categories = Array.from(new Set(services.map((s) => s.category || 'General')));
         const filteredServices = serviceFilterCategory === 'all'
             ? services
             : services.filter((s) => (s.category || 'General') === serviceFilterCategory);
-        const groupedCategories = Array.from(new Set(filteredServices.map((s) => s.category || 'General')));
+        const featuredServices = filteredServices.slice(0, 4);
+        const hasMoreServices = filteredServices.length > featuredServices.length;
 
         return (
             <View style={styles.contentSection}>
-                <View style={styles.servicesHeaderRow}>
-                    <View style={styles.servicesHeaderCopy}>
-                        <Text style={styles.servicesHeaderTitle}>{isRTL ? 'خدماتنا' : 'Our Services'}</Text>
-                        <Text style={styles.servicesHeaderSubtitle}>
-                            {isRTL ? 'اختر من خدماتنا المميزة' : 'Choose from our premium services'}
-                        </Text>
+                <View style={styles.storefrontIntroCard}>
+                    <View style={styles.storefrontIntroTopRow}>
+                        <View style={styles.storefrontIntroBadge}>
+                            <AppIcon name="sparkles" size={14} color={colors.primary} />
+                            <Text style={styles.storefrontIntroBadgeText}>
+                                {isRTL ? 'واجهة الخدمات' : 'Service storefront'}
+                            </Text>
+                        </View>
+                        <View style={styles.storefrontIntroMetaPill}>
+                            <AppIcon name="clock" size={14} color={colors.primary} />
+                            <Text style={styles.storefrontIntroMetaText}>
+                                {services.length} {isRTL ? 'خدمة' : 'services'}
+                            </Text>
+                        </View>
+                    </View>
+                    <Text style={styles.storefrontIntroTitle}>
+                        {isRTL ? 'ابدئي من الخدمات' : 'Start with services'}
+                    </Text>
+                    <Text style={styles.storefrontIntroSubtitle}>
+                        {isRTL
+                            ? 'اكتشفي ما يقدّمه المركز واحجزي الخدمة المناسبة لك بسرعة وبأسلوب عصري.'
+                            : 'Discover what this salon offers and book the right service in a fast, modern flow.'}
+                    </Text>
+                    <View style={styles.storefrontIntroActions}>
+                        <TouchableOpacity style={styles.primaryStorefrontButton} onPress={openServiceBrowser}>
+                            <Text style={styles.primaryStorefrontButtonText}>
+                                {isRTL ? 'عرض كل الخدمات' : 'View All Services'}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.secondaryStorefrontButton}
+                            onPress={() => setActiveTab('products')}
+                        >
+                            <Text style={styles.secondaryStorefrontButtonText}>
+                                {isRTL ? 'المنتجات' : 'Products'}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
+
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipRow}>
                     <TouchableOpacity
                         style={[styles.filterChip, serviceFilterCategory === 'all' ? styles.filterChipActive : null]}
@@ -993,68 +1036,162 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         </TouchableOpacity>
                     </View>
                 )}
+
                 {services.length === 0 ? (
                     renderEmptyState(isRTL ? 'لا توجد خدمات متاحة حالياً.' : 'No services available yet.')
                 ) : (
-                    groupedCategories.map(category => (
-                        <View key={category} style={styles.categorySection}>
-                            <Text style={styles.categoryTitle}>{category}</Text>
-                            {filteredServices.filter(s => (s.category || 'General') === category).map(service => {
-                                const serviceName = isRTL ? service.name_ar : service.name_en;
-                                const serviceDesc = getServiceDescription(service);
-                                return (
-                                    <TouchableOpacity
-                                        key={service.id}
-                                        style={styles.serviceCard}
-                                        onPress={() => openServiceDetails(service)}
-                                        activeOpacity={0.92}
-                                    >
-                                        <View style={[styles.serviceContentRow, isRTL ? styles.serviceContentRowRtl : null]}>
-                                            {resolveServiceImageUri(service) && !serviceImageErrors[service.id] ? (
-                                                <Image
-                                                    source={{ uri: resolveServiceImageUri(service)! }}
-                                                    style={styles.serviceThumbnail}
-                                                    onError={() => setServiceImageErrors((prev) => ({ ...prev, [service.id]: true }))}
-                                                />
-                                            ) : (
-                                                <LinearGradient
-                                                    colors={['#8B5CF6', '#A78BFA']}
-                                                    start={{ x: 0, y: 0 }}
-                                                    end={{ x: 1, y: 1 }}
-                                                    style={styles.serviceThumbnailFallback}
-                                                >
-                                                    <Text style={styles.serviceThumbnailFallbackText}>
-                                                        {(serviceName || 'S').charAt(0).toUpperCase()}
-                                                    </Text>
-                                                </LinearGradient>
-                                            )}
-                                            <View style={[styles.serviceInfo, isRTL ? styles.serviceInfoRtl : null]}>
-                                                <Text style={[styles.serviceName, isRTL ? styles.serviceNameRtl : null]} numberOfLines={1}>
+                    <View style={styles.featuredServicesBlock}>
+                        <View style={styles.featuredServicesHeader}>
+                            <Text style={styles.featuredServicesTitle}>
+                                {isRTL ? 'الخدمات المختارة' : 'Featured services'}
+                            </Text>
+                            <Text style={styles.featuredServicesSubtitle}>
+                                {isRTL
+                                    ? 'باقات وخدمات مختارة بعناية لبدء الحجز بسرعة.'
+                                    : 'Carefully selected services to help customers start booking faster.'}
+                            </Text>
+                        </View>
+
+                        {featuredServices.map((service) => {
+                            const serviceName = isRTL ? service.name_ar : service.name_en;
+                            const serviceDesc = getServiceDescription(service);
+                            const serviceImage = resolveServiceImageUri(service);
+                            return (
+                                <TouchableOpacity
+                                    key={service.id}
+                                    style={styles.featuredServiceCard}
+                                    onPress={() => openServiceDetails(service)}
+                                    activeOpacity={0.92}
+                                >
+                                    <View style={[styles.featuredServiceMediaRow, isRTL ? styles.featuredServiceMediaRowRtl : null]}>
+                                        {serviceImage && !serviceImageErrors[service.id] ? (
+                                            <Image
+                                                source={{ uri: serviceImage }}
+                                                style={styles.featuredServiceImage}
+                                                onError={() => setServiceImageErrors((prev) => ({ ...prev, [service.id]: true }))}
+                                            />
+                                        ) : (
+                                            <LinearGradient
+                                                colors={['#8B5CF6', '#A78BFA']}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 1 }}
+                                                style={styles.featuredServiceImageFallback}
+                                            >
+                                                <Text style={styles.featuredServiceImageFallbackText}>
+                                                    {(serviceName || 'S').charAt(0).toUpperCase()}
+                                                </Text>
+                                            </LinearGradient>
+                                        )}
+
+                                        <View style={[styles.featuredServiceInfo, isRTL ? styles.featuredServiceInfoRtl : null]}>
+                                            <View style={styles.featuredServiceTopRow}>
+                                                <Text style={[styles.featuredServiceName, isRTL ? styles.featuredServiceNameRtl : null]} numberOfLines={1}>
                                                     {serviceName}
                                                 </Text>
-                                                {serviceDesc ? (
-                                                    <Text style={[styles.serviceDescription, isRTL ? styles.serviceDescriptionRtl : null]} numberOfLines={2}>
-                                                        {serviceDesc}
+                                                <View style={styles.featuredServiceCategoryPill}>
+                                                    <Text style={styles.featuredServiceCategoryText} numberOfLines={1}>
+                                                        {service.category || (isRTL ? 'عام' : 'General')}
                                                     </Text>
-                                                ) : null}
-                                                <View style={[styles.serviceCardMetaRow, isRTL ? styles.serviceCardMetaRowRtl : null]}>
-                                                    <View style={styles.serviceCardMetaPill}>
-                                                        <AppIcon name="clock" size={12} color={colors.textSecondary} />
-                                                        <Text style={styles.serviceDuration}>{service.duration} {isRTL ? 'دقيقة' : 'min'}</Text>
-                                                    </View>
-                                                    <Text style={[styles.servicePrice, isRTL ? styles.servicePriceRtl : null]}>{formatRiyal(getServicePrice(service), isRTL ? 'ar' : 'en')}</Text>
                                                 </View>
                                             </View>
-                                            <View style={styles.serviceArrowButton}>
-                                                <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={18} color={colors.primary} />
+
+                                            {serviceDesc ? (
+                                                <Text style={[styles.featuredServiceDescription, isRTL ? styles.featuredServiceDescriptionRtl : null]} numberOfLines={2}>
+                                                    {serviceDesc}
+                                                </Text>
+                                            ) : null}
+
+                                            <View style={styles.featuredServiceMetaRow}>
+                                                <View style={styles.featuredServiceMetaPill}>
+                                                    <AppIcon name="clock" size={12} color={colors.primary} />
+                                                    <Text style={styles.featuredServiceMetaText}>
+                                                        {service.duration} {isRTL ? 'دقيقة' : 'min'}
+                                                    </Text>
+                                                </View>
+                                                <Text style={[styles.featuredServicePrice, isRTL ? styles.featuredServicePriceRtl : null]}>
+                                                    {formatRiyal(getServicePrice(service), isRTL ? 'ar' : 'en')}
+                                                </Text>
                                             </View>
+
+                                            <TouchableOpacity
+                                                style={styles.featuredServiceBookButton}
+                                                onPress={() => openServiceDetails(service)}
+                                            >
+                                                <Text style={styles.featuredServiceBookButtonText}>
+                                                    {isRTL ? 'احجزي الآن' : 'Book'}
+                                                </Text>
+                                                <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={14} color="#FFFFFF" />
+                                            </TouchableOpacity>
                                         </View>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+
+                        {hasMoreServices ? (
+                            <TouchableOpacity style={styles.viewAllServicesButton} onPress={openServiceBrowser}>
+                                <Text style={styles.viewAllServicesText}>
+                                    {isRTL ? 'عرض جميع الخدمات' : 'View All Services'}
+                                </Text>
+                                <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={16} color={colors.primary} />
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
+                )}
+
+                {products.length > 0 ? (
+                    <View style={styles.productsTeaserCard}>
+                        <View style={styles.productsTeaserHeader}>
+                            <View>
+                                <Text style={styles.productsTeaserTitle}>{isRTL ? 'المنتجات' : 'Products'}</Text>
+                                <Text style={styles.productsTeaserSubtitle}>
+                                    {isRTL
+                                        ? 'المنتجات متاحة كمسار ثانوي للعناية المنزلية.'
+                                        : 'Products remain available as a secondary shopping path.'}
+                                </Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setActiveTab('products')} style={styles.productsTeaserLink}>
+                                <Text style={styles.productsTeaserLinkText}>
+                                    {isRTL ? 'عرض المنتجات' : 'Browse Products'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productPreviewRow}>
+                            {products.slice(0, 3).map((product) => {
+                                const productName = isRTL ? product.name_ar : product.name_en;
+                                const productImage = product.images && product.images.length > 0
+                                    ? getImageUrl(product.images[0])
+                                    : null;
+                                const productPrice = Number((product as any).price || (product as any).salePrice || (product as any).finalPrice || 0);
+                                return (
+                                    <TouchableOpacity
+                                        key={product.id}
+                                        style={styles.productPreviewCard}
+                                        onPress={() => setActiveTab('products')}
+                                    >
+                                        {productImage ? (
+                                            <Image source={{ uri: productImage }} style={styles.productPreviewImage} />
+                                        ) : (
+                                            <LinearGradient
+                                                colors={['#111827', '#4B5563']}
+                                                style={styles.productPreviewImageFallback}
+                                            >
+                                                <AppIcon name="cart" size={16} color="#FFFFFF" />
+                                            </LinearGradient>
+                                        )}
+                                        <Text style={styles.productPreviewName} numberOfLines={2}>
+                                            {productName}
+                                        </Text>
+                                        <Text style={styles.productPreviewPrice}>
+                                            {formatRiyal(productPrice, isRTL ? 'ar' : 'en')}
+                                        </Text>
                                     </TouchableOpacity>
                                 );
                             })}
-                        </View>
-                    ))
-                )}
+                        </ScrollView>
+                    </View>
+                ) : null}
             </View>
         );
     };
@@ -1851,6 +1988,331 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         color: colors.text,
         lineHeight: 18,
+    },
+    storefrontIntroCard: {
+        borderRadius: 28,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#EDE4FB',
+        padding: spacing.lg,
+        marginBottom: spacing.md,
+        shadowColor: '#28174B',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+        elevation: 2,
+        gap: spacing.sm,
+    },
+    storefrontIntroTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+    },
+    storefrontIntroBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: '#F7F0FF',
+    },
+    storefrontIntroBadgeText: {
+        fontSize: fontSize.xs,
+        fontWeight: '800',
+        color: colors.primary,
+    },
+    storefrontIntroMetaPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: '#F8F5FF',
+    },
+    storefrontIntroMetaText: {
+        fontSize: fontSize.xs,
+        fontWeight: '800',
+        color: colors.primary,
+    },
+    storefrontIntroTitle: {
+        fontSize: fontSize.xxl,
+        fontWeight: '900',
+        color: colors.text,
+    },
+    storefrontIntroSubtitle: {
+        fontSize: fontSize.sm,
+        lineHeight: 22,
+        color: colors.textSecondary,
+    },
+    storefrontIntroActions: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        flexWrap: 'wrap',
+    },
+    primaryStorefrontButton: {
+        minHeight: 44,
+        borderRadius: 16,
+        backgroundColor: colors.primary,
+        paddingHorizontal: spacing.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+    },
+    primaryStorefrontButtonText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.sm,
+        fontWeight: '800',
+    },
+    secondaryStorefrontButton: {
+        minHeight: 44,
+        borderRadius: 16,
+        backgroundColor: '#F7F1FF',
+        borderWidth: 1,
+        borderColor: '#E8D8FF',
+        paddingHorizontal: spacing.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+    },
+    secondaryStorefrontButtonText: {
+        color: colors.primary,
+        fontSize: fontSize.sm,
+        fontWeight: '800',
+    },
+    featuredServicesBlock: {
+        gap: spacing.md,
+        marginTop: spacing.sm,
+        marginBottom: spacing.lg,
+    },
+    featuredServicesHeader: {
+        gap: 4,
+    },
+    featuredServicesTitle: {
+        fontSize: fontSize.xl,
+        fontWeight: '900',
+        color: colors.text,
+    },
+    featuredServicesSubtitle: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        lineHeight: 20,
+    },
+    featuredServiceCard: {
+        borderRadius: 26,
+        overflow: 'hidden',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#ECE5F8',
+        shadowColor: '#23133E',
+        shadowOpacity: 0.05,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 10 },
+        elevation: 2,
+    },
+    featuredServiceMediaRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        padding: spacing.md,
+        alignItems: 'stretch',
+    },
+    featuredServiceMediaRowRtl: {
+        flexDirection: 'row-reverse',
+    },
+    featuredServiceImage: {
+        width: 108,
+        height: 108,
+        borderRadius: 22,
+        backgroundColor: '#F3F0FA',
+    },
+    featuredServiceImageFallback: {
+        width: 108,
+        height: 108,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    featuredServiceImageFallbackText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.xxl,
+        fontWeight: '900',
+    },
+    featuredServiceInfo: {
+        flex: 1,
+        gap: 8,
+    },
+    featuredServiceInfoRtl: {
+        alignItems: 'flex-end',
+    },
+    featuredServiceTopRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    featuredServiceName: {
+        flex: 1,
+        fontSize: fontSize.lg,
+        fontWeight: '900',
+        color: colors.text,
+    },
+    featuredServiceNameRtl: {
+        textAlign: 'right',
+    },
+    featuredServiceCategoryPill: {
+        borderRadius: 999,
+        backgroundColor: '#F5EDFF',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    featuredServiceCategoryText: {
+        fontSize: fontSize.xs,
+        color: colors.primary,
+        fontWeight: '800',
+    },
+    featuredServiceDescription: {
+        fontSize: fontSize.sm,
+        lineHeight: 20,
+        color: colors.textSecondary,
+    },
+    featuredServiceDescriptionRtl: {
+        textAlign: 'right',
+    },
+    featuredServiceMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+        flexWrap: 'wrap',
+    },
+    featuredServiceMetaPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: '#F8F5FF',
+    },
+    featuredServiceMetaText: {
+        fontSize: fontSize.xs,
+        color: colors.primary,
+        fontWeight: '800',
+    },
+    featuredServicePrice: {
+        fontSize: fontSize.md,
+        fontWeight: '900',
+        color: colors.text,
+    },
+    featuredServicePriceRtl: {
+        textAlign: 'right',
+    },
+    featuredServiceBookButton: {
+        minHeight: 44,
+        borderRadius: 16,
+        paddingHorizontal: spacing.md,
+        backgroundColor: colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    featuredServiceBookButtonText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.sm,
+        fontWeight: '800',
+    },
+    viewAllServicesButton: {
+        minHeight: 48,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#E8D8FF',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    viewAllServicesText: {
+        color: colors.primary,
+        fontSize: fontSize.sm,
+        fontWeight: '900',
+    },
+    productsTeaserCard: {
+        borderRadius: 26,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#ECE5F8',
+        padding: spacing.lg,
+        gap: spacing.md,
+    },
+    productsTeaserHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+    },
+    productsTeaserTitle: {
+        fontSize: fontSize.lg,
+        fontWeight: '900',
+        color: colors.text,
+    },
+    productsTeaserSubtitle: {
+        fontSize: fontSize.xs,
+        lineHeight: 18,
+        color: colors.textSecondary,
+        marginTop: 3,
+        maxWidth: 240,
+    },
+    productsTeaserLink: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: '#F7F1FF',
+    },
+    productsTeaserLinkText: {
+        color: colors.primary,
+        fontSize: fontSize.xs,
+        fontWeight: '800',
+    },
+    productPreviewRow: {
+        gap: 12,
+    },
+    productPreviewCard: {
+        width: 138,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#EDE4FB',
+        backgroundColor: '#FFFFFF',
+        padding: 10,
+        gap: 8,
+    },
+    productPreviewImage: {
+        width: '100%',
+        height: 96,
+        borderRadius: 16,
+        backgroundColor: '#F1EDF8',
+    },
+    productPreviewImageFallback: {
+        width: '100%',
+        height: 96,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    productPreviewName: {
+        fontSize: fontSize.sm,
+        fontWeight: '800',
+        color: colors.text,
+        minHeight: 38,
+    },
+    productPreviewPrice: {
+        fontSize: fontSize.xs,
+        fontWeight: '900',
+        color: colors.primary,
     },
     categorySection: {
         marginBottom: spacing.lg,

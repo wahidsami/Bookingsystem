@@ -20,6 +20,7 @@ import { EmployeeProfileScreen } from '../screens/EmployeeProfileScreen';
 import { ReviewScreen } from '../screens/ReviewScreen';
 import { GiftsScreen } from '../screens/GiftsScreen';
 import { ServiceDetailsScreen } from '../screens/ServiceDetailsScreen';
+import { ServiceBrowserScreen } from '../screens/ServiceBrowserScreen';
 import { ProductDetailsScreen } from '../screens/ProductDetailsScreen';
 import { WalletBalanceDetailsScreen } from '../screens/WalletBalanceDetailsScreen';
 import { CentersBalanceScreen } from '../screens/CentersBalanceScreen';
@@ -53,6 +54,7 @@ export function RootNavigator() {
             <Stack.Screen name="AppointmentInvite" component={AppointmentInviteScreen} />
             <Stack.Screen name="EmployeeProfile" component={EmployeeProfileScreen} />
             <Stack.Screen name="ServiceDetails" component={ServiceDetailsScreen} />
+            <Stack.Screen name="ServiceBrowser" component={ServiceBrowserScreen} />
             <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
             <Stack.Screen name="Review" component={ReviewScreen} />
             <Stack.Screen name="Gifts" component={GiftsScreen} />
