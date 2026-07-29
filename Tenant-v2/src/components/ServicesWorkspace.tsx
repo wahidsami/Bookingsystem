@@ -14,8 +14,18 @@ interface ServicesWorkspaceProps {
   quickLaunchRequest?: QuickLaunchRequest | null;
 }
 
+type ServiceCategoryOption = {
+  id: string;
+  slug: string;
+  labelAr: string;
+  labelEn: string;
+  icon?: string | null;
+  sortOrder?: number;
+};
+
 // Extend service model for full operational data representation
 export interface EnhancedService extends Service {
+  category?: string;
   descriptionAr: string;
   descriptionEn: string;
   image: string;
@@ -57,13 +67,15 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
   const [services, setServices] = useState<EnhancedService[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategoryOption[]>([]);
 
   const fetchData = async () => {
     try {
-      const [srvRes, empRes, prdRes] = await Promise.all([
+      const [srvRes, empRes, prdRes, catRes] = await Promise.all([
         tenantApiAdapter.getServices(),
         tenantApiAdapter.getEmployees(),
-        tenantApiAdapter.getProducts()
+        tenantApiAdapter.getProducts(),
+        tenantApiAdapter.getServiceCategories()
       ]);
       const normalizedServices: EnhancedService[] = ((srvRes as any).services || []).map((srv: any) => ({
         ...srv,
@@ -84,6 +96,22 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
       setServices(normalizedServices);
       setEmployees((empRes as any).employees || []);
       setProducts((prdRes as any).products || []);
+      const normalizedCategories: ServiceCategoryOption[] = Array.isArray((catRes as any)?.categories)
+        ? (catRes as any).categories
+            .map((cat: any) => ({
+              id: `${cat?.id || cat?.slug || cat?.name_en || cat?.name_ar || ''}`.trim(),
+              slug: `${cat?.slug || cat?.id || cat?.name_en || cat?.name_ar || ''}`.trim(),
+              labelAr: `${cat?.name_ar || cat?.nameAr || cat?.labelAr || cat?.title_ar || cat?.title || cat?.slug || ''}`.trim(),
+              labelEn: `${cat?.name_en || cat?.nameEn || cat?.labelEn || cat?.title_en || cat?.title || cat?.slug || ''}`.trim(),
+              icon: cat?.icon || null,
+              sortOrder: Number(cat?.sortOrder ?? cat?.sort_order ?? 0)
+            }))
+            .filter((cat: ServiceCategoryOption) => cat.id && (cat.labelEn || cat.labelAr))
+            .sort((left: ServiceCategoryOption, right: ServiceCategoryOption) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0) || left.labelEn.localeCompare(right.labelEn))
+        : [];
+      if (normalizedCategories.length > 0) {
+        setServiceCategories(normalizedCategories);
+      }
     } catch (err) {
       console.error('Failed to load services data:', err);
     }
@@ -148,6 +176,36 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
     hasGift: false
   });
 
+  React.useEffect(() => {
+    if (activeView !== 'form' || formMode !== 'add' || serviceCategories.length === 0) {
+      return;
+    }
+
+    const currentCategory = `${formData.categoryEn || formData.categoryAr || formData.category || ''}`.trim();
+    const hasLiveCategory = serviceCategories.some((category) =>
+      category.id === currentCategory
+      || category.slug === currentCategory
+      || category.labelEn === currentCategory
+      || category.labelAr === currentCategory
+    );
+
+    if (hasLiveCategory) {
+      return;
+    }
+
+    const liveDefault = serviceCategories[0];
+    if (!liveDefault) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      category: liveDefault.slug,
+      categoryEn: liveDefault.labelEn,
+      categoryAr: liveDefault.labelAr
+    }));
+  }, [activeView, formMode, serviceCategories, formData.categoryEn, formData.categoryAr, formData.category]);
+
   // Auxiliary form temp states
   const [tempIncludeAr, setTempIncludeAr] = useState('');
   const [tempIncludeEn, setTempIncludeEn] = useState('');
@@ -206,14 +264,47 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
     reader.readAsDataURL(file);
   };
 
-  // Static list of categories
-  const categories = [
-    { id: 'all', labelAr: 'كل الفئات', labelEn: 'All Categories' },
-    { id: 'Massage & Therapy', labelAr: 'علاجات ومساج', labelEn: 'Massage & Therapy' },
-    { id: 'Skincare', labelAr: 'عناية بالبشرة', labelEn: 'Skincare' },
-    { id: 'Hair Care', labelAr: 'العناية بالشعر', labelEn: 'Hair Care' },
-    { id: 'Nail Care', labelAr: 'عناية بالأظافر', labelEn: 'Nail Care' }
+  const fallbackCategories: ServiceCategoryOption[] = [
+    { id: 'massage-therapy', slug: 'massage-therapy', labelAr: 'علاجات ومساج', labelEn: 'Massage & Therapy' },
+    { id: 'skincare', slug: 'skincare', labelAr: 'عناية بالبشرة', labelEn: 'Skincare' },
+    { id: 'hair-care', slug: 'hair-care', labelAr: 'العناية بالشعر', labelEn: 'Hair Care' },
+    { id: 'nail-care', slug: 'nail-care', labelAr: 'عناية بالأظافر', labelEn: 'Nail Care' }
   ];
+
+  const categories = [
+    { id: 'all', slug: 'all', labelAr: 'كل الفئات', labelEn: 'All Categories' },
+    ...(serviceCategories.length > 0 ? serviceCategories : fallbackCategories)
+  ];
+
+  const resolveCategoryOption = (value: string) => {
+    const normalized = `${value || ''}`.trim();
+    if (!normalized) {
+      return categories[1] || fallbackCategories[0] || categories[0];
+    }
+
+    return categories.find((category) =>
+      category.id === normalized
+      || category.slug === normalized
+      || category.labelEn === normalized
+      || category.labelAr === normalized
+    ) || categories[1] || fallbackCategories[0] || categories[0];
+  };
+
+  const getServiceCategoryOption = (service: Partial<EnhancedService> & { category?: string; categoryEn?: string; categoryAr?: string }) => {
+    const rawValue = service.category || service.categoryEn || service.categoryAr || '';
+    return resolveCategoryOption(rawValue);
+  };
+
+  const matchesCategoryValue = (service: Partial<EnhancedService> & { category?: string; categoryEn?: string; categoryAr?: string }, categoryId: string) => {
+    if (categoryId === 'all') return true;
+    const resolvedCategory = getServiceCategoryOption(service);
+    const candidates = new Set(
+      [service.category, service.categoryEn, service.categoryAr, resolvedCategory.id, resolvedCategory.slug, resolvedCategory.labelEn, resolvedCategory.labelAr]
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .map(value => value.trim())
+    );
+    return candidates.has(categoryId.trim());
+  };
 
   const presetImages = [
     { url: 'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?q=80&w=600&auto=format&fit=crop', labelAr: 'جلسة تدليك ومساج', labelEn: 'Massage Session' },
@@ -288,13 +379,14 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
 
   // Open creation form
   const handleOpenAddForm = () => {
+    const defaultCategory = categories[1] || fallbackCategories[0] || categories[0];
     setFormMode('add');
     setFormData({
       id: '',
       nameAr: '',
       nameEn: '',
-      categoryAr: 'Massage & Therapy',
-      categoryEn: 'Massage & Therapy',
+      categoryAr: defaultCategory?.labelAr || 'علاجات ومساج',
+      categoryEn: defaultCategory?.labelEn || 'Massage & Therapy',
       duration: 60,
       price: 150,
       descriptionAr: '',
@@ -332,9 +424,13 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
 
   // Open edit form
   const handleOpenEditForm = (srv: EnhancedService) => {
+    const selectedCategoryOption = getServiceCategoryOption(srv);
     setFormMode('edit');
     setFormData({
       ...srv,
+      category: selectedCategoryOption.slug,
+      categoryEn: selectedCategoryOption.labelEn,
+      categoryAr: selectedCategoryOption.labelAr,
       includes: [...srv.includes],
       variants: srv.variants ? srv.variants.map(v => ({ ...v })) : [],
       paymentOptions: [...srv.paymentOptions],
@@ -403,11 +499,11 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
     }
 
     // Auto assign category texts based on selection
-    let matchedCat = categories.find(c => c.id === formData.categoryEn || c.labelEn === formData.categoryEn);
-    if (!matchedCat) matchedCat = categories[1]; // default to massage
+    const matchedCat = resolveCategoryOption(formData.categoryEn);
 
     const finalFormData: any = {
       ...formData,
+      category: matchedCat.slug,
       categoryEn: matchedCat.labelEn,
       categoryAr: matchedCat.labelAr
     };
@@ -545,8 +641,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
       (srv.descriptionEn && srv.descriptionEn.toLowerCase().includes(query));
 
     const matchesCategory = selectedCategory === 'all' || 
-      srv.categoryEn === selectedCategory || 
-      srv.categoryAr === selectedCategory;
+      matchesCategoryValue(srv, selectedCategory);
 
     const matchesGender = selectedGender === 'all' || srv.targetGender === selectedGender;
 
@@ -570,7 +665,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
   // Calculate unique category count dynamically helper
   const getCategoryCount = (catId: string) => {
     if (catId === 'all') return services.length;
-    return services.filter(s => s.categoryEn === catId || s.categoryAr === catId).length;
+    return services.filter(s => matchesCategoryValue(s, catId)).length;
   };
 
   const isLimitReached = services.length >= subscriptionLimit.max;
@@ -897,7 +992,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                               <div className="space-y-1.5 flex-1 min-w-0">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className="text-[9px] bg-slate-100 text-neutral-600 px-2 py-0.5 rounded-md font-bold uppercase">
-                                    {isRtl ? srv.categoryAr : srv.categoryEn}
+                                    {isRtl ? getServiceCategoryOption(srv).labelAr : getServiceCategoryOption(srv).labelEn}
                                   </span>
                                   <span className={`text-[9px] px-2 py-0.5 rounded-md font-black uppercase ${
                                     srv.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-neutral-50 text-neutral-500 border border-neutral-200'
@@ -1231,12 +1326,13 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                             {isRtl ? 'فئة الخدمة الرئيسية *' : 'Service Main Category *'}
                           </label>
                           <select
-                            value={categories.find(c => c.labelEn === formData.categoryEn || c.id === formData.categoryEn)?.id || 'all'}
+                            value={resolveCategoryOption(formData.categoryEn)?.id || 'all'}
                             onChange={e => {
                               const val = e.target.value;
-                              const matched = categories.find(c => c.id === val) || categories.find(c => c.labelEn === val);
+                              const matched = categories.find(c => c.id === val || c.slug === val || c.labelEn === val || c.labelAr === val);
                               setFormData(p => ({
                                 ...p,
+                                category: matched?.slug || val,
                                 categoryEn: matched ? matched.labelEn : val,
                                 categoryAr: matched ? matched.labelAr : val
                               }));
@@ -1244,7 +1340,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-indigo-500 text-neutral-800 cursor-pointer"
                           >
                             {categories.slice(1).map(c => (
-                              <option key={c.id} value={c.id}>{isRtl ? c.labelAr : c.labelEn}</option>
+                              <option key={c.slug || c.id} value={c.slug || c.id}>{isRtl ? c.labelAr : c.labelEn}</option>
                             ))}
                           </select>
                         </div>

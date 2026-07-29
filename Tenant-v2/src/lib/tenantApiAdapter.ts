@@ -443,6 +443,10 @@ class TenantApiAdapter {
     return this.get('/tenant/services');
   }
 
+  async getServiceCategories(): Promise<any> {
+    return this.get('/tenant/services/categories');
+  }
+
   async createService(data: any): Promise<any> {
     if (data instanceof FormData) {
       const response = await fetch(`${this.baseUrl}/tenant/services`, {
