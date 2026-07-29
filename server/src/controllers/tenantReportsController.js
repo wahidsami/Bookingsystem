@@ -35,6 +35,12 @@ const {
     matchesSelection,
     matchesRange
 } = require('../services/tenantReportFilterService');
+const {
+    normalizeFinancialPaymentMethodGroup,
+    getRefundModeLabel,
+    buildPaymentMethodSummaryRows,
+    buildPaymentMethodBucketRows
+} = require('../services/tenantFinancialFormulaService');
 
 function getCustomerName(user) {
     const firstName = user?.firstName || '';
@@ -126,18 +132,6 @@ function formatPaymentMethodLabel(paymentMethod) {
     }[paymentMethod] || paymentMethod || 'Not set');
 }
 
-function normalizePaymentMethodGroup(paymentMethod) {
-    const method = `${paymentMethod || ''}`.trim().toLowerCase();
-
-    if (['cash', 'pay_on_visit', 'cash_on_delivery'].includes(method)) return 'cash';
-    if (['card_pos', 'online', 'online-full', 'mock_online'].includes(method)) return 'card';
-    if (method === 'bank_transfer') return 'bank_transfer';
-    if (['wallet'].includes(method)) return 'wallet';
-    if (['gift_card_code'].includes(method)) return 'gift_card';
-    if (method === 'split') return 'split';
-    return 'other';
-}
-
 function normalizeScheduleConfig(scheduleConfig = {}) {
     const cadence = `${scheduleConfig.cadence || 'daily'}`.trim().toLowerCase();
     const normalizedCadence = cadence === 'weekly' || cadence === 'monthly' ? cadence : 'daily';
@@ -207,14 +201,6 @@ function calcNextRunAt(scheduleConfig = {}, fromDate = new Date()) {
     return next;
 }
 
-function getRefundModeLabel(amount, referenceAmount) {
-    const numericAmount = Number(amount || 0);
-    const numericReference = Number(referenceAmount || 0);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) return 'Partial';
-    if (!Number.isFinite(numericReference) || numericReference <= 0) return 'Partial';
-    return numericAmount >= (numericReference - 0.01) ? 'Full' : 'Partial';
-}
-
 function getDateBucketKey(dateValue, groupBy = 'day') {
     const date = new Date(dateValue);
     if (Number.isNaN(date.getTime())) {
@@ -240,56 +226,7 @@ function getTrendSeriesPointDateLabel(bucketKey, groupBy = 'day') {
 }
 
 function buildTimeSeriesBuckets(transactions, groupBy = 'day') {
-    const buckets = new Map();
-
-    transactions.forEach((transaction) => {
-        if (transaction.status !== 'completed' && transaction.status !== 'refunded') {
-            return;
-        }
-
-        const bucketKey = getDateBucketKey(transaction.processedAt || transaction.createdAt, groupBy);
-        if (!bucketKey) return;
-
-        const group = normalizePaymentMethodGroup(transaction.paymentMethod);
-        const paymentMethod = group === 'split' ? 'split' : group;
-        const amount = Number(transaction.amount || 0);
-        const signedAmount = transaction.status === 'refunded' || transaction.type === 'refund'
-            ? -Math.abs(amount)
-            : Math.abs(amount);
-
-        const mapKey = `${bucketKey}:${paymentMethod}`;
-        const existing = buckets.get(mapKey) || {
-            date: getTrendSeriesPointDateLabel(bucketKey, groupBy),
-            paymentMethod,
-            paymentMethodLabel: ({
-                cash: 'Cash',
-                card: 'Card',
-                bank_transfer: 'Bank transfer',
-                wallet: 'Wallet',
-                gift_card: 'Gift Card',
-                split: 'Split Payments',
-                other: 'Other'
-            }[paymentMethod] || paymentMethod),
-            revenue: 0,
-            transactionCount: 0
-        };
-
-        existing.revenue += signedAmount;
-        existing.transactionCount += 1;
-        buckets.set(mapKey, existing);
-    });
-
-    return Array.from(buckets.values())
-        .map((row) => ({
-            ...row,
-            revenue: Number(row.revenue.toFixed(2))
-        }))
-        .sort((left, right) => {
-            if (left.date === right.date) {
-                return left.paymentMethod.localeCompare(right.paymentMethod);
-            }
-            return left.date.localeCompare(right.date);
-        });
+    return buildPaymentMethodBucketRows(transactions, { groupBy, includeRefunds: true });
 }
 
 async function buildRebookingAnalytics(req, startDate, endDate, groupBy = 'day') {
@@ -1180,49 +1117,10 @@ async function buildRefundsReport(req, startDate, endDate) {
 
 async function buildPaymentMethodsReport(req, startDate, endDate, groupBy = 'day') {
     const transactions = await getPaymentTransactions(req, { startDate, endDate, limit: 400 });
-    const buckets = new Map();
-
-    transactions.forEach((transaction) => {
-        if (transaction.status !== 'completed' && transaction.status !== 'refunded') {
-            return;
-        }
-
-        const group = normalizePaymentMethodGroup(transaction.paymentMethod);
-        const key = group === 'split' ? 'split' : group;
-        const amount = Number(transaction.amount || 0);
-        const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
-        const signedAmount = isRefund ? -Math.abs(amount) : Math.abs(amount);
-
-        const existing = buckets.get(key) || {
-            paymentMethod: key,
-            paymentMethodLabel: ({
-                cash: 'Cash',
-                card: 'Card',
-                bank_transfer: 'Bank transfer',
-                wallet: 'Wallet',
-                gift_card: 'Gift Card',
-                split: 'Split Payments',
-                other: 'Other'
-            }[key] || key),
-            revenue: 0,
-            transactionCount: 0
-        };
-
-        existing.revenue += signedAmount;
-        existing.transactionCount += 1;
-        buckets.set(key, existing);
-    });
-
-    const rows = Array.from(buckets.values())
-        .map((row) => ({
-            ...row,
-            revenue: Number(row.revenue.toFixed(2))
-        }))
-        .sort((left, right) => right.revenue - left.revenue);
-
+    const rows = buildPaymentMethodSummaryRows(transactions, { includeRefunds: true });
+    const trend = buildPaymentMethodBucketRows(transactions, { groupBy, includeRefunds: true });
     const totalRevenue = rows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
     const totalTransactions = rows.reduce((sum, row) => sum + Number(row.transactionCount || 0), 0);
-    const trend = buildTimeSeriesBuckets(transactions, groupBy);
 
     return {
         rows,
@@ -2289,4 +2187,5 @@ exports.downloadReportPdf = async (req, res) => {
         }
     }
 };
+
 

@@ -2,6 +2,11 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const {
+    normalizeFinancialPaymentMethodGroup,
+    getRefundModeLabel,
+    buildPaymentMethodBucketRows
+} = require('./tenantFinancialFormulaService');
 
 function parseDateValue(value, endOfDay = false) {
     if (!value) return null;
@@ -154,17 +159,6 @@ function buildPaymentTransactionIncludes() {
     ];
 }
 
-function normalizePaymentMethodGroup(paymentMethod) {
-    const method = `${paymentMethod || ''}`.trim().toLowerCase();
-    if (['cash', 'pay_on_visit', 'cash_on_delivery'].includes(method)) return 'cash';
-    if (['card_pos', 'card', 'online', 'online-full', 'mock_online'].includes(method)) return 'card';
-    if (method === 'bank_transfer') return 'bank_transfer';
-    if (['wallet'].includes(method)) return 'wallet';
-    if (['gift_card_code'].includes(method)) return 'gift_card';
-    if (method === 'split') return 'split';
-    return 'other';
-}
-
 function getCustomerName(user) {
     const firstName = user?.firstName || '';
     const lastName = user?.lastName || '';
@@ -188,7 +182,7 @@ function mapRefundRow(transaction) {
         : order
             ? Number(order.totalAmount || 0)
             : amount;
-    const refundMode = amount >= (referenceAmount - 0.01) ? 'Full' : 'Partial';
+    const refundMode = getRefundModeLabel(amount, referenceAmount);
     const refundReason = `${transaction.notes || transaction.metadata?.reason || transaction.metadata?.refundReason || transaction.gatewayResponse?.reason || ''}`.trim() || null;
 
     return {
@@ -416,7 +410,7 @@ async function summarizeRange(tenantId, start, end) {
         if (transaction.type === 'refund' || transaction.status === 'refunded') {
             return;
         }
-        const group = normalizePaymentMethodGroup(transaction.paymentMethod);
+        const group = normalizeFinancialPaymentMethodGroup(transaction.paymentMethod);
         const amount = Number(transaction.amount || 0);
         if (group === 'cash') paymentTotals.cash += amount;
         else if (group === 'card') paymentTotals.card += amount;
@@ -525,44 +519,7 @@ async function buildPaymentMethodTrends(req, startDate, endDate, groupBy = 'day'
     const tenantId = req.tenantId;
     const range = buildRange(startDate, endDate, 30);
     const transactions = await loadTransactions(tenantId, range.start, range.end, 900);
-    const buckets = new Map();
-
-    transactions.forEach((transaction) => {
-        if (transaction.type === 'refund' || transaction.status === 'refunded') return;
-        const bucketKey = bucketByDate(transaction.processedAt || transaction.createdAt, groupBy);
-        if (!bucketKey) return;
-
-        const method = normalizePaymentMethodGroup(transaction.paymentMethod);
-        const amount = Number(transaction.amount || 0);
-        const mapKey = `${bucketKey}:${method}`;
-        const existing = buckets.get(mapKey) || {
-            date: trendPointLabel(bucketKey, groupBy),
-            paymentMethod: method,
-            paymentMethodLabel: ({
-                cash: 'Cash',
-                card: 'Card',
-                bank_transfer: 'Bank transfer',
-                online: 'Online',
-                wallet: 'Wallet',
-                gift_card: 'Gift Card',
-                split: 'Split payments',
-                other: 'Other'
-            }[method] || method),
-            revenue: 0,
-            transactionCount: 0
-        };
-
-        existing.revenue += amount;
-        existing.transactionCount += 1;
-        buckets.set(mapKey, existing);
-    });
-
-    const trends = Array.from(buckets.values())
-        .map((row) => ({
-            ...row,
-            revenue: Number(row.revenue.toFixed(2))
-        }))
-        .sort((left, right) => left.date.localeCompare(right.date) || left.paymentMethod.localeCompare(right.paymentMethod));
+    const trends = buildPaymentMethodBucketRows(transactions, { groupBy, includeRefunds: false });
 
     return {
         range: {

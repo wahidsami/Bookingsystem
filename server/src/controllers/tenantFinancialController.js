@@ -16,6 +16,10 @@ const {
     matchesTransactionFilters,
     matchesSelection
 } = require('../services/tenantReportFilterService');
+const {
+    normalizeFinancialPaymentMethodGroup,
+    getRefundModeLabel
+} = require('../services/tenantFinancialFormulaService');
 const tenantPosController = require('./tenantPosController');
 
 function parseDateValue(value, endOfDay = false) {
@@ -93,17 +97,6 @@ function formatLedgerPaymentMethodLabel(paymentMethod) {
         cash_on_delivery: 'Cash on delivery',
         split: 'Split payments'
     }[paymentMethod] || paymentMethod || 'Not set');
-}
-
-function normalizeLedgerPaymentMethodGroup(paymentMethod) {
-    const method = `${paymentMethod || ''}`.trim().toLowerCase();
-    if (['cash', 'pay_on_visit', 'cash_on_delivery'].includes(method)) return 'cash';
-    if (['card_pos', 'online', 'online-full', 'mock_online'].includes(method)) return 'card';
-    if (method === 'bank_transfer') return 'bank_transfer';
-    if (method === 'wallet') return 'wallet';
-    if (method === 'gift_card_code') return 'gift_card';
-    if (method === 'split') return 'split';
-    return 'other';
 }
 
 function getLedgerTransactionIncludes() {
@@ -373,7 +366,7 @@ function buildCashFlowSummaryRows(settlementRows = [], paymentRows = [], groupin
         };
 
         const amount = Math.abs(Number(row?.amount || 0));
-        const method = normalizeLedgerPaymentMethodGroup(row?.paymentMethod || row?.method);
+        const method = normalizeFinancialPaymentMethodGroup(row?.paymentMethod || row?.method);
         if (method === 'online') existing.onlinePayments += amount;
         if (method === 'bank_transfer') existing.bankTransferPayments += amount;
         existing.sourceRows = [...(existing.sourceRows || []), row];
@@ -660,14 +653,6 @@ function mapRefundLedgerRow(transaction) {
                 ? `/dashboard/orders/${order.id}`
                 : null
     };
-}
-
-function getRefundModeLabel(amount, referenceAmount) {
-    const numericAmount = Number(amount || 0);
-    const numericReference = Number(referenceAmount || 0);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) return 'Partial';
-    if (!Number.isFinite(numericReference) || numericReference <= 0) return 'Partial';
-    return numericAmount >= (numericReference - 0.01) ? 'Full' : 'Partial';
 }
 
 function buildTenantAppointmentScope(tenantId) {
@@ -1782,7 +1767,7 @@ exports.getFinancialLedger = async (req, res) => {
                 : dateValue.toISOString().split('T')[0];
             const amount = Number(transaction.amount || 0);
             const isRefund = transaction.status === 'refunded' || transaction.type === 'refund';
-            const method = normalizeLedgerPaymentMethodGroup(transaction.paymentMethod);
+            const method = normalizeFinancialPaymentMethodGroup(transaction.paymentMethod);
             const signedAmount = isRefund ? -Math.abs(amount) : Math.abs(amount);
 
             const existing = settlementBuckets.get(date) || {
