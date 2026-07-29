@@ -735,12 +735,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const riyadhTodayKey = getRiyadhDateKey(new Date());
   const isBoardEditable = selectedDateKey >= riyadhTodayKey;
 
-  useEffect(() => {
-    if (!isCreateDrawerOpen) {
-      setActiveBlockedTime(null);
-    }
-  }, [isCreateDrawerOpen]);
-
   const activeAppointmentServiceSources = Array.isArray(activeAppointment?.bookingSession?.appointments) && activeAppointment.bookingSession.appointments.length > 0
     ? activeAppointment.bookingSession.appointments
     : Array.isArray(activeAppointment?.serviceItems) && activeAppointment.serviceItems.length > 0
@@ -1738,6 +1732,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [blockStartTime, setBlockStartTime] = useState<number>(180); // 12:00 PM
   const [blockDuration, setBlockDuration] = useState<number>(45);
   const [blockType, setBlockType] = useState<'Break' | 'Lunch' | 'Meeting'>('Break');
+
+  useEffect(() => {
+    if (!isCreateDrawerOpen) {
+      setActiveBlockedTime(null);
+    }
+  }, [isCreateDrawerOpen]);
 
   // Shift Editor Modal states
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);

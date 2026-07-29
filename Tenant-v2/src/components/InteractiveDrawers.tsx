@@ -186,6 +186,8 @@ export default function InteractiveDrawers({
     }
   }, [isCreateDrawerOpen, initialCreateMode]);
 
+  const availableStylists = stylists;
+
   useEffect(() => {
     if (!isCreateDrawerOpen || createMode !== 'blocked') {
       loadedBreakIdRef.current = null;
@@ -237,8 +239,6 @@ export default function InteractiveDrawers({
       setPosCheckoutComplete(false);
     }
   }, [isCartDrawerOpen]);
-
-  const availableStylists = stylists;
 
   // Step 1: Customer Info
   const [custMode, setCustMode] = useState<'existing' | 'new' | 'walkin'>('existing');
