@@ -149,6 +149,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
 
     const handleBook = (provider?: Staff | null, variant?: ServiceVariant | null) => {
         navigation.navigate('Booking', {
+            initialStep: 'date',
             service: resolvedService,
             tenant,
             selectedStaff: provider || undefined,
