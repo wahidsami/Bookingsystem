@@ -111,6 +111,20 @@ const getTicketDetails = async (req, res) => {
     }
 };
 
+const listCategories = async (req, res) => {
+    try {
+        const actor = getActor(req);
+        const result = await supportService.listCategories({
+            actor,
+            filters: req.query
+        });
+
+        return sendSuccess(res, result);
+    } catch (error) {
+        return sendError(res, error, 'Failed to fetch support categories');
+    }
+};
+
 const replyToTicket = async (req, res) => {
     try {
         const actor = getActor(req);
@@ -264,6 +278,7 @@ const markTicketRead = async (req, res) => {
 module.exports = {
     createTicket,
     listTickets,
+    listCategories,
     getTicketDetails,
     replyToTicket,
     uploadAttachmentsToTicket,

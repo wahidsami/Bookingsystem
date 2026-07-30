@@ -313,6 +313,28 @@ function normalizeMessage(message, actorContext = {}) {
     };
 }
 
+function normalizeSupportCategory(category) {
+    const json = typeof category?.toJSON === 'function' ? category.toJSON() : (category || {});
+    return {
+        id: json.id,
+        tenantId: json.tenantId || null,
+        slug: json.slug,
+        scope: json.scope,
+        name: json.name,
+        nameAr: json.nameAr || null,
+        description: json.description || null,
+        descriptionAr: json.descriptionAr || null,
+        icon: json.icon || null,
+        color: json.color || null,
+        sortOrder: Number(json.sortOrder || 0),
+        isActive: Boolean(json.isActive),
+        metadata: json.metadata || {},
+        createdAt: json.createdAt || null,
+        updatedAt: json.updatedAt || null,
+        deletedAt: json.deletedAt || null
+    };
+}
+
 function normalizeTicket(ticket, actorContext = {}) {
     if (!ticket) {
         return null;
@@ -517,6 +539,10 @@ async function getExistingTicketOrThrow(ticketId, actorContext, options = {}) {
     }
 
     const ticketJson = typeof ticket.toJSON === 'function' ? ticket.toJSON() : ticket;
+    if (actorContext.tenantId && ticketJson.tenantId !== actorContext.tenantId) {
+        throw createSupportError('You do not have access to this ticket', 403);
+    }
+
     if (actorContext.isCustomer && ticketJson.customerPlatformUserId !== actorContext.actorId) {
         throw createSupportError('You do not have access to this ticket', 403);
     }
@@ -528,6 +554,36 @@ async function getExistingTicketOrThrow(ticketId, actorContext, options = {}) {
     }
 
     return ticket;
+}
+
+async function listCategories({ actor, filters = {} }) {
+    const actorContext = getActorContext(actor);
+    const where = {
+        isActive: true
+    };
+
+    if (filters.scope) {
+        const scope = `${filters.scope}`.trim().toLowerCase();
+        if (scope === 'global' || scope === 'tenant') {
+            where.scope = scope;
+        }
+    }
+
+    if (actorContext.tenantId) {
+        where[Op.or] = [
+            { scope: 'global' },
+            { tenantId: actorContext.tenantId }
+        ];
+    }
+
+    const rows = await db.SupportCategory.findAll({
+        where,
+        order: [['sortOrder', 'ASC'], ['name', 'ASC']]
+    });
+
+    return {
+        categories: rows.map(normalizeSupportCategory)
+    };
 }
 
 async function createSupportNotificationEvents({
@@ -1845,8 +1901,10 @@ module.exports = {
     markTicketRead,
     getExistingTicketOrThrow,
     getActorContext,
+    listCategories,
     normalizeTicket,
     normalizeMessage,
+    normalizeSupportCategory,
     normalizeAttachment,
     normalizeNotificationEvent,
     normalizeTicketEvent,

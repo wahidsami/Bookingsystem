@@ -26,6 +26,7 @@ export type ViewType =
   | 'billing'
   | 'settings'
   | 'messages'
+  | 'support'
   | 'marketing-hot-deals'
   | 'marketing-gift-cards'
   | 'marketing-notifications'

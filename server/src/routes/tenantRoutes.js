@@ -28,8 +28,10 @@ const tenantGiftCardController = require('../controllers/tenantGiftCardControlle
 const tenantCartController = require('../controllers/tenantCartController');
 const customerInvoiceController = require('../controllers/customerInvoiceController');
 const tenantDashboardAccountRoutes = require('./tenantDashboardAccountRoutes');
+const supportRoutes = require('./supportRoutes');
 const aiController = require('../controllers/tenant/aiController');
 const { authenticateTenant, checkTenantFeature, rateLimitTenant } = require('../middleware/authTenant');
+const { buildTenantSupportContext } = require('../middleware/supportContext');
 const { createLimiter } = require('../middleware/rateLimiter');
 const {
     requireActiveSubscription,
@@ -71,6 +73,7 @@ const giftCardRedeemLimiter = createLimiter(20, 15 * 60 * 1000);
 // All routes require authentication
 router.use(authenticateTenant);
 router.use(rateLimitTenant(900, 60 * 1000));
+router.use('/support', buildTenantSupportContext, supportRoutes);
 
 // Onboarding: resubmit after more_info_required
 router.put('/resubmit-request', tenantRegistrationController.resubmitRequest);

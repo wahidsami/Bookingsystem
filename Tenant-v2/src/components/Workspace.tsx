@@ -27,6 +27,7 @@ import PageSetupWorkspace from './PageSetupWorkspace';
 import GiftCardsWorkspace from './GiftCardsWorkspace';
 import ReviewsWorkspace from './ReviewsWorkspace';
 import MessagesWorkspace from './MessagesWorkspace';
+import SupportWorkspace from './SupportWorkspace';
 import DashboardPreferencesSection from './settings/DashboardPreferencesSection';
 
 interface WorkspaceProps {
@@ -872,6 +873,11 @@ export default function Workspace({
       {/* INTERNAL STAFF MESSAGES */}
       {view === 'messages' && (
         <MessagesWorkspace lang={lang} darkMode={darkMode} />
+      )}
+
+      {/* SUPPORT EXPERIENCE */}
+      {view === 'support' && (
+        <SupportWorkspace lang={lang} darkMode={darkMode} />
       )}
 
       {/* 10.1 HOT DEALS */}

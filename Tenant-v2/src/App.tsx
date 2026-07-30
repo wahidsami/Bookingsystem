@@ -103,10 +103,11 @@ export default function App() {
   // Dynamic accessibility control for the Marketing group modules
   const [accessibleMarketingModules, setAccessibleMarketingModules] = useState<Record<string, boolean>>({
     'marketing-hot-deals': true,
-    'marketing-gift-cards': true,
-    'marketing-notifications': true,
-    'marketing-reviews': true,
-    'marketing-page-setup': true,
+  'marketing-gift-cards': true,
+  'marketing-notifications': true,
+  'marketing-reviews': true,
+  'marketing-page-setup': true,
+  'support': true,
   });
   const hasFullDashboardAccess =
     sessionType === 'tenant_owner' ||
@@ -171,6 +172,7 @@ export default function App() {
         'marketing-notifications': true,
         'marketing-reviews': true,
         'marketing-page-setup': true,
+        'support': true,
       });
       return;
     }
@@ -180,7 +182,8 @@ export default function App() {
       'marketing-gift-cards': hasProductsAndOrdersEntitlement(packageEntitlements),
       'marketing-notifications': hasPushNotificationsEntitlement(packageEntitlements),
       'marketing-reviews': Boolean(permissions?.view_reviews),
-      'marketing-page-setup': hasPublicPageCustomizationEntitlement(packageEntitlements)
+      'marketing-page-setup': hasPublicPageCustomizationEntitlement(packageEntitlements),
+      'support': Boolean(permissions?.view_messages || permissions?.view_dashboard)
     });
   }, [packageEntitlements, permissions, hasFullDashboardAccess]);
 
@@ -365,6 +368,7 @@ export default function App() {
       else if (path === '/dashboard/notifications') targetView = 'marketing-notifications';
       else if (path === '/dashboard/reviews') targetView = 'marketing-reviews';
       else if (path === '/dashboard/page-setup') targetView = 'marketing-page-setup';
+      else if (path === '/dashboard/support') targetView = 'support';
       else if (path === '/dashboard/messages') targetView = 'messages';
       else if (path === '/dashboard/customers' || path.startsWith('/dashboard/customers/')) targetView = 'customers';
       
@@ -386,6 +390,7 @@ export default function App() {
     else if (activeView === 'marketing-notifications') path = '/dashboard/notifications';
     else if (activeView === 'marketing-reviews') path = '/dashboard/reviews';
     else if (activeView === 'marketing-page-setup') path = '/dashboard/page-setup';
+    else if (activeView === 'support') path = '/dashboard/support';
     else if (activeView === 'messages') path = '/dashboard/messages';
     else if (activeView === 'customers') {
       if (window.location.pathname.startsWith('/dashboard/customers/')) {

@@ -1184,6 +1184,89 @@ class TenantApiAdapter {
     return this.get(`/tenant/reports/booking-trends${query ? `?${query}` : ''}`);
   }
 
+  // --- Support Platform ---
+  async getSupportCategories(params: Record<string, string | number | undefined> = {}): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/support/categories${query ? `?${query}` : ''}`);
+  }
+
+  async getSupportTickets(params: Record<string, string | number | undefined> = {}): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/support/tickets${query ? `?${query}` : ''}`);
+  }
+
+  async getSupportTicket(id: string): Promise<any> {
+    return this.get(`/tenant/support/tickets/${id}`);
+  }
+
+  async createSupportTicket(data: any): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await this.request('/tenant/support/tickets', {
+        method: 'POST',
+        body: data
+      });
+      return response.json();
+    }
+
+    return this.post('/tenant/support/tickets', data);
+  }
+
+  async replyToSupportTicket(id: string, data: any): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await this.request(`/tenant/support/tickets/${id}/messages`, {
+        method: 'POST',
+        body: data
+      });
+      return response.json();
+    }
+
+    return this.post(`/tenant/support/tickets/${id}/messages`, data);
+  }
+
+  async uploadSupportTicketAttachments(id: string, data: any): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await this.request(`/tenant/support/tickets/${id}/attachments`, {
+        method: 'POST',
+        body: data
+      });
+      return response.json();
+    }
+
+    return this.post(`/tenant/support/tickets/${id}/attachments`, data);
+  }
+
+  async assignSupportTicket(id: string, supportAgentId: string): Promise<any> {
+    return this.post(`/tenant/support/tickets/${id}/assign`, { supportAgentId });
+  }
+
+  async unassignSupportTicket(id: string): Promise<any> {
+    return this.post(`/tenant/support/tickets/${id}/unassign`, {});
+  }
+
+  async changeSupportTicketStatus(id: string, status: string): Promise<any> {
+    return this.post(`/tenant/support/tickets/${id}/status`, { status });
+  }
+
+  async changeSupportTicketPriority(id: string, priority: string): Promise<any> {
+    return this.post(`/tenant/support/tickets/${id}/priority`, { priority });
+  }
+
+  async changeSupportTicketCategory(id: string, supportCategoryId: string | null): Promise<any> {
+    return this.post(`/tenant/support/tickets/${id}/category`, { supportCategoryId });
+  }
+
+  async reopenSupportTicket(id: string): Promise<any> {
+    return this.post(`/tenant/support/tickets/${id}/reopen`, {});
+  }
+
+  async closeSupportTicket(id: string): Promise<any> {
+    return this.post(`/tenant/support/tickets/${id}/close`, {});
+  }
+
+  async markSupportTicketRead(id: string): Promise<any> {
+    return this.post(`/tenant/support/tickets/${id}/read`, {});
+  }
+
   async getFullReport(
     startDate: string,
     endDate: string,

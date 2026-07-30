@@ -27,6 +27,15 @@ export const navigationItems: NavigationItem[] = [
     badgeEn: 'Staff',
   },
   {
+    id: 'support',
+    labelAr: 'الدعم',
+    labelEn: 'Support',
+    iconName: 'MessageSquare',
+    category: 'core',
+    badgeAr: 'جديد',
+    badgeEn: 'New',
+  },
+  {
     id: 'customers',
     labelAr: 'العملاء',
     labelEn: 'Customers',
