@@ -48,6 +48,26 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'recipientPlatformUserId',
                 as: 'receivedGiftCards'
             });
+
+            PlatformUser.hasMany(models.SupportTicket, {
+                foreignKey: 'customerPlatformUserId',
+                as: 'supportTickets'
+            });
+
+            PlatformUser.hasMany(models.SupportMessage, {
+                foreignKey: 'customerPlatformUserId',
+                as: 'supportMessages'
+            });
+
+            PlatformUser.hasMany(models.SupportAttachment, {
+                foreignKey: 'customerPlatformUserId',
+                as: 'supportAttachments'
+            });
+
+            PlatformUser.hasMany(models.SupportTicketEvent, {
+                foreignKey: 'customerPlatformUserId',
+                as: 'supportTicketEvents'
+            });
         }
 
         // Instance method to check password

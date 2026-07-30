@@ -86,6 +86,13 @@ module.exports = (sequelize, DataTypes) => {
         return safeData;
     };
 
+    SuperAdmin.associate = (models) => {
+        SuperAdmin.hasOne(models.SupportAgent, {
+            foreignKey: 'superAdminId',
+            as: 'supportAgentProfile'
+        });
+    };
+
     return SuperAdmin;
 };
 

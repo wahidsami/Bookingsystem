@@ -23,6 +23,16 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'tenantId',
                 as: 'hotDeals'
             });
+
+            Tenant.hasMany(models.SupportTicket, {
+                foreignKey: 'tenantId',
+                as: 'supportTickets'
+            });
+
+            Tenant.hasMany(models.SupportCategory, {
+                foreignKey: 'tenantId',
+                as: 'supportCategories'
+            });
         }
     }
     Tenant.init({
