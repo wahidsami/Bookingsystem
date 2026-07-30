@@ -15,9 +15,12 @@ const adminCategoryController = require('../controllers/adminCategoryController'
 const adminFeaturePricingController = require('../controllers/adminFeaturePricingController');
 const adminGiftCardPackageController = require('../controllers/adminGiftCardPackageController');
 const customerInvoiceController = require('../controllers/customerInvoiceController');
+const supportRoutes = require('./supportRoutes');
+const { buildAdminSupportContext } = require('../middleware/supportContext');
 
 // All routes require super admin authentication
 router.use(authenticateSuperAdmin);
+router.use('/support', buildAdminSupportContext, supportRoutes);
 
 // ===== FINANCIAL REPORTING =====
 router.get('/bills/:id', requirePermission('financial', 'view'), adminBillsController.getBillDetails);

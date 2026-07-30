@@ -8,6 +8,8 @@ const userTenantGiftController = require('../controllers/userTenantGiftControlle
 const customerInvoiceController = require('../controllers/customerInvoiceController');
 const userWalletSummaryController = require('../controllers/userWalletSummaryController');
 const { authenticateUser } = require('../middleware/authUser');
+const { buildCustomerSupportContext } = require('../middleware/supportContext');
+const supportRoutes = require('./supportRoutes');
 
 // Get user profile
 router.get('/profile', authenticateUser, userController.getProfile);
@@ -69,6 +71,9 @@ router.get('/invoices', authenticateUser, customerInvoiceController.listUserInvo
 router.get('/invoices/:id', authenticateUser, customerInvoiceController.getUserInvoiceById);
 router.get('/invoices/:id/invoice-pdf', authenticateUser, customerInvoiceController.getUserInvoicePdf);
 router.get('/invoices/:id/receipt-pdf', authenticateUser, customerInvoiceController.getUserReceiptPdf);
+
+// Support platform
+router.use('/support', authenticateUser, buildCustomerSupportContext, supportRoutes);
 
 module.exports = router;
 
