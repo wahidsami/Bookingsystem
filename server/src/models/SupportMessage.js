@@ -10,6 +10,7 @@ module.exports = (sequelize, DataTypes) => {
             SupportMessage.belongsTo(models.SupportAgent, { foreignKey: 'supportAgentId', as: 'supportAgent' });
             SupportMessage.belongsTo(SupportMessage, { foreignKey: 'replyToMessageId', as: 'replyToMessage' });
             SupportMessage.hasMany(models.SupportAttachment, { foreignKey: 'supportMessageId', as: 'attachments' });
+            SupportMessage.hasMany(models.SupportTicketNotificationEvent, { foreignKey: 'supportMessageId', as: 'notificationEvents' });
             SupportMessage.hasMany(SupportMessage, { foreignKey: 'replyToMessageId', as: 'replies' });
         }
     }

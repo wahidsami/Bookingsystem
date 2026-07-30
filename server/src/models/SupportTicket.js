@@ -36,6 +36,8 @@ module.exports = (sequelize, DataTypes) => {
             SupportTicket.hasMany(models.SupportMessage, { foreignKey: 'supportTicketId', as: 'messages' });
             SupportTicket.hasMany(models.SupportAttachment, { foreignKey: 'supportTicketId', as: 'attachments' });
             SupportTicket.hasMany(models.SupportTicketEvent, { foreignKey: 'supportTicketId', as: 'events' });
+            SupportTicket.hasMany(models.SupportTicketNotificationEvent, { foreignKey: 'supportTicketId', as: 'notificationEvents' });
+            SupportTicket.hasMany(models.SupportTicketReadState, { foreignKey: 'supportTicketId', as: 'readStates' });
             SupportTicket.hasMany(models.SupportTicketLink, { foreignKey: 'ticketId', as: 'links' });
         }
 
@@ -178,7 +180,7 @@ module.exports = (sequelize, DataTypes) => {
                 const origin = normalizeSource(this.source || this.sourceChannel);
 
                 if (origin === 'mobile' && !this.customerPlatformUserId) {
-                    throw new Error('customerPlatformUserId is required when sourceChannel is customer_app');
+                    throw new Error('customerPlatformUserId is required when the ticket source is mobile');
                 }
             }
         },
