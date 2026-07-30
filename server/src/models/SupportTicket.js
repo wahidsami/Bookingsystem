@@ -1,6 +1,31 @@
 'use strict';
 const { Model } = require('sequelize');
 
+const CANONICAL_SOURCES = new Set(['dashboard', 'ai', 'api', 'email', 'mobile', 'system']);
+const SOURCE_CHANNEL_TO_SOURCE = {
+    customer_app: 'mobile',
+    tenant_dashboard: 'dashboard',
+    support_portal: 'dashboard',
+    email: 'email',
+    chat: 'dashboard',
+    live_chat: 'dashboard',
+    ai_assistant: 'ai',
+    api: 'api',
+    system: 'system'
+};
+
+function normalizeSource(value) {
+    if (!value) {
+        return 'dashboard';
+    }
+
+    if (CANONICAL_SOURCES.has(value)) {
+        return value;
+    }
+
+    return SOURCE_CHANNEL_TO_SOURCE[value] || 'dashboard';
+}
+
 module.exports = (sequelize, DataTypes) => {
     class SupportTicket extends Model {
         static associate(models) {
@@ -11,6 +36,7 @@ module.exports = (sequelize, DataTypes) => {
             SupportTicket.hasMany(models.SupportMessage, { foreignKey: 'supportTicketId', as: 'messages' });
             SupportTicket.hasMany(models.SupportAttachment, { foreignKey: 'supportTicketId', as: 'attachments' });
             SupportTicket.hasMany(models.SupportTicketEvent, { foreignKey: 'supportTicketId', as: 'events' });
+            SupportTicket.hasMany(models.SupportTicketLink, { foreignKey: 'ticketId', as: 'links' });
         }
 
         static async generateTicketNumber(options = {}) {
@@ -73,6 +99,11 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
             references: { model: 'support_agents', key: 'id' },
             onDelete: 'SET NULL'
+        },
+        source: {
+            type: DataTypes.ENUM('dashboard', 'ai', 'api', 'email', 'mobile', 'system'),
+            allowNull: false,
+            defaultValue: 'dashboard'
         },
         sourceChannel: {
             type: DataTypes.ENUM('customer_app', 'tenant_dashboard', 'support_portal', 'email', 'chat', 'live_chat', 'ai_assistant', 'api', 'system'),
@@ -144,7 +175,9 @@ module.exports = (sequelize, DataTypes) => {
         paranoid: true,
         validate: {
             customerReferenceConsistency() {
-                if (this.sourceChannel === 'customer_app' && !this.customerPlatformUserId) {
+                const origin = normalizeSource(this.source || this.sourceChannel);
+
+                if (origin === 'mobile' && !this.customerPlatformUserId) {
                     throw new Error('customerPlatformUserId is required when sourceChannel is customer_app');
                 }
             }
@@ -164,6 +197,10 @@ module.exports = (sequelize, DataTypes) => {
         if (!ticket.ticketNumber) {
             ticket.ticketNumber = await SupportTicket.generateTicketNumber({ transaction: options?.transaction });
         }
+    });
+
+    SupportTicket.beforeValidate((ticket) => {
+        ticket.source = normalizeSource(ticket.source || ticket.sourceChannel);
     });
 
     return SupportTicket;
