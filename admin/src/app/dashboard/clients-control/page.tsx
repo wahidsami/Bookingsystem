@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { adminApi } from "@/lib/api";
 import { useAppDialog } from "@/components/AppDialogProvider";
+import { SupportTaxonomyManager } from "@/components/SupportTaxonomyManager";
 
 interface ServiceCategory {
     id: string;
@@ -20,6 +21,7 @@ interface ServiceCategory {
 const TABS = [
     { id: "categories", label: "Service Categories", icon: "🏷️", active: true },
     { id: "feature-pricing", label: "Features Pricing", icon: "💰", active: true },
+    { id: "support-categories", label: "Support Categories", icon: "🎧", active: true },
 ];
 
 export default function ClientsControlPage() {
@@ -66,6 +68,7 @@ export default function ClientsControlPage() {
             {/* Tab Content */}
             {activeTab === "categories" && <CategoriesTab />}
             {activeTab === "feature-pricing" && <FeaturePricingTab />}
+            {activeTab === "support-categories" && <SupportTaxonomyManager />}
             <div className="card border-primary-500/20">
                 <div className="flex items-start gap-4">
                     <div className="w-10 h-10 rounded-lg bg-primary-500/10 flex items-center justify-center text-xl">

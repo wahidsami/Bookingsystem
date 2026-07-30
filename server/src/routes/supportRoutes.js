@@ -45,6 +45,10 @@ const supportUpload = multer({
 
 router.get('/tickets', supportController.listTickets);
 router.get('/categories', supportController.listCategories);
+router.post('/categories', supportController.createSupportCategory);
+router.patch('/categories/reorder', supportController.reorderSupportCategories);
+router.patch('/categories/:id', supportController.updateSupportCategory);
+router.delete('/categories/:id', supportController.deleteSupportCategory);
 router.post('/tickets', supportUpload.any(), supportController.createTicket);
 router.get('/tickets/:id', supportController.getTicketDetails);
 router.post('/tickets/:id/messages', supportUpload.any(), supportController.replyToTicket);

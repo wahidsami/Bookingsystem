@@ -318,6 +318,7 @@ function normalizeSupportCategory(category) {
     return {
         id: json.id,
         tenantId: json.tenantId || null,
+        parentId: json.parentId || null,
         slug: json.slug,
         scope: json.scope,
         name: json.name,
@@ -326,6 +327,8 @@ function normalizeSupportCategory(category) {
         descriptionAr: json.descriptionAr || null,
         icon: json.icon || null,
         color: json.color || null,
+        featureKey: json.featureKey || null,
+        featureRoute: json.featureRoute || null,
         sortOrder: Number(json.sortOrder || 0),
         isActive: Boolean(json.isActive),
         metadata: json.metadata || {},
@@ -333,6 +336,155 @@ function normalizeSupportCategory(category) {
         updatedAt: json.updatedAt || null,
         deletedAt: json.deletedAt || null
     };
+}
+
+function buildSupportCategoryTree(rows = []) {
+    const nodeMap = new Map();
+    const orderedRoots = [];
+
+    rows
+        .map((row) => normalizeSupportCategory(row))
+        .sort((left, right) => {
+            const leftParent = left.parentId || '';
+            const rightParent = right.parentId || '';
+            if (leftParent !== rightParent) {
+                return leftParent.localeCompare(rightParent);
+            }
+
+            if (left.sortOrder !== right.sortOrder) {
+                return left.sortOrder - right.sortOrder;
+            }
+
+            return `${left.name || ''}`.localeCompare(`${right.name || ''}`);
+        })
+        .forEach((node) => {
+            node.children = [];
+            nodeMap.set(node.id, node);
+        });
+
+    nodeMap.forEach((node) => {
+        if (node.parentId && nodeMap.has(node.parentId)) {
+            nodeMap.get(node.parentId).children.push(node);
+            return;
+        }
+
+        orderedRoots.push(node);
+    });
+
+    const sortRecursive = (nodes) => nodes
+        .sort((left, right) => {
+            if (left.sortOrder !== right.sortOrder) {
+                return left.sortOrder - right.sortOrder;
+            }
+
+            return `${left.name || ''}`.localeCompare(`${right.name || ''}`);
+        })
+        .map((node) => ({
+            ...node,
+            children: sortRecursive(Array.isArray(node.children) ? node.children : [])
+        }));
+
+    return sortRecursive(orderedRoots);
+}
+
+function flattenSupportCategoryTree(nodes = [], bucket = []) {
+    for (const node of nodes) {
+        bucket.push(node);
+        if (Array.isArray(node.children) && node.children.length > 0) {
+            flattenSupportCategoryTree(node.children, bucket);
+        }
+    }
+    return bucket;
+}
+
+async function collectSupportCategoryIds(categoryId, transaction) {
+    if (!categoryId) {
+        return [];
+    }
+
+    const rows = await db.SupportCategory.findAll({
+        where: {
+            isActive: true
+        },
+        attributes: ['id', 'parentId'],
+        transaction
+    });
+
+    const childrenByParent = new Map();
+    rows.forEach((row) => {
+        const json = typeof row.toJSON === 'function' ? row.toJSON() : row;
+        const parentKey = json.parentId || null;
+        if (!childrenByParent.has(parentKey)) {
+            childrenByParent.set(parentKey, []);
+        }
+        childrenByParent.get(parentKey).push(json.id);
+    });
+
+    const collected = new Set();
+    const stack = [categoryId];
+
+    while (stack.length > 0) {
+        const currentId = stack.pop();
+        if (!currentId || collected.has(currentId)) {
+            continue;
+        }
+
+        collected.add(currentId);
+        const childIds = childrenByParent.get(currentId) || [];
+        childIds.forEach((childId) => stack.push(childId));
+    }
+
+    return Array.from(collected);
+}
+
+function sanitizeSupportCategorySlug(value) {
+    return `${value || ''}`
+        .trim()
+        .toLowerCase()
+        .replace(/[&]/g, 'and')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 120);
+}
+
+async function generateUniqueSupportCategorySlug(baseValue, transaction, excludeId = null) {
+    const normalizedBase = sanitizeSupportCategorySlug(baseValue) || 'support-category';
+    let candidate = normalizedBase;
+    let counter = 1;
+
+    while (true) {
+        const existing = await db.SupportCategory.findOne({
+            where: {
+                slug: candidate,
+                ...(excludeId ? { id: { [Op.ne]: excludeId } } : {})
+            },
+            transaction,
+            paranoid: false
+        });
+
+        if (!existing) {
+            return candidate;
+        }
+
+        counter += 1;
+        candidate = `${normalizedBase}-${counter}`;
+    }
+}
+
+function getSupportCategoryDisplayPath(category, categoryMap) {
+    if (!category) return null;
+
+    const segments = [];
+    let current = category;
+    const seen = new Set();
+
+    while (current && !seen.has(current.id)) {
+        seen.add(current.id);
+        segments.unshift(current.nameAr || current.name || current.slug || current.id);
+        current = current.parentId ? categoryMap.get(current.parentId) : null;
+    }
+
+    return segments.join(' / ');
 }
 
 function normalizeTicket(ticket, actorContext = {}) {
@@ -397,6 +549,7 @@ function normalizeTicket(ticket, actorContext = {}) {
         } : null,
         category: json.category ? {
             id: json.category.id,
+            parentId: json.category.parentId || null,
             slug: json.category.slug,
             scope: json.category.scope,
             name: json.category.name,
@@ -405,6 +558,8 @@ function normalizeTicket(ticket, actorContext = {}) {
             descriptionAr: json.category.descriptionAr || null,
             icon: json.category.icon || null,
             color: json.category.color || null,
+            featureKey: json.category.featureKey || null,
+            featureRoute: json.category.featureRoute || null,
             sortOrder: Number(json.category.sortOrder || 0),
             isActive: Boolean(json.category.isActive)
         } : null,
@@ -458,7 +613,7 @@ function buildTicketInclude({ includeMessages = false, includeEvents = false, in
         {
             model: db.SupportCategory,
             as: 'category',
-            attributes: ['id', 'slug', 'scope', 'name', 'nameAr', 'description', 'descriptionAr', 'icon', 'color', 'sortOrder', 'isActive']
+            attributes: ['id', 'parentId', 'slug', 'scope', 'name', 'nameAr', 'description', 'descriptionAr', 'icon', 'color', 'featureKey', 'featureRoute', 'sortOrder', 'isActive']
         },
         {
             model: db.SupportAgent,
@@ -581,8 +736,12 @@ async function listCategories({ actor, filters = {} }) {
         order: [['sortOrder', 'ASC'], ['name', 'ASC']]
     });
 
+    const tree = buildSupportCategoryTree(rows);
     return {
-        categories: rows.map(normalizeSupportCategory)
+        categories: rows.map(normalizeSupportCategory),
+        tree,
+        modules: tree,
+        flatCategories: flattenSupportCategoryTree(tree)
     };
 }
 
@@ -753,7 +912,7 @@ async function resolveCustomer(tenantId, customerPlatformUserId, transaction) {
     return customer;
 }
 
-async function resolveCategoryOrNull(categoryId, tenantId, transaction) {
+async function resolveCategoryOrNull(categoryId, tenantId, transaction, options = {}) {
     if (!categoryId) return null;
 
     const category = await db.SupportCategory.findOne({
@@ -773,7 +932,251 @@ async function resolveCategoryOrNull(categoryId, tenantId, transaction) {
     if (!category.isActive) {
         throw createSupportError('Support category is inactive', 400);
     }
+
+    if (options.requireLeaf !== false) {
+        const childCount = await db.SupportCategory.count({
+            where: {
+                parentId: category.id,
+                isActive: true
+            },
+            transaction
+        });
+
+        if (childCount > 0) {
+            throw createSupportError('Please select a feature category instead of a module category', 400);
+        }
+    }
+
     return category;
+}
+
+async function createSupportCategory({ actor, payload = {} }) {
+    const actorContext = getActorContext(actor);
+    if (!actorContext.isSuperAdmin) {
+        throw createSupportError('Only super admins can manage support taxonomy', 403);
+    }
+
+    const name = ensureSubjectLength(payload.name || payload.nameEn || payload.name_en || payload.title || '');
+    const nameAr = normalizeOptionalText(payload.nameAr || payload.name_ar);
+    const featureKey = normalizeOptionalText(payload.featureKey || payload.feature_key);
+    const featureRoute = normalizeOptionalText(payload.featureRoute || payload.feature_route);
+    const icon = normalizeOptionalText(payload.icon);
+    const description = normalizeOptionalText(payload.description);
+    const descriptionAr = normalizeOptionalText(payload.descriptionAr || payload.description_ar);
+    const parentId = normalizeOptionalText(payload.parentId);
+    const scope = normalizeText(payload.scope).toLowerCase() === 'tenant' ? 'tenant' : 'global';
+    const tenantId = scope === 'tenant' ? normalizeOptionalText(payload.tenantId) || actorContext.tenantId || null : null;
+    const isActive = payload.isActive !== undefined ? Boolean(payload.isActive) : true;
+    const color = normalizeOptionalText(payload.color);
+
+    return db.sequelize.transaction(async (transaction) => {
+        const parent = parentId
+            ? await db.SupportCategory.findByPk(parentId, { transaction })
+            : null;
+
+        if (parentId && !parent) {
+            throw createSupportError('Parent support category not found', 404);
+        }
+
+        const baseSlug = featureKey || name;
+        const slug = await generateUniqueSupportCategorySlug(baseSlug, transaction);
+        const siblingWhere = {
+            parentId: parent ? parent.id : null,
+            scope,
+            tenantId: tenantId || null
+        };
+        const maxSortOrder = await db.SupportCategory.max('sortOrder', {
+            where: siblingWhere,
+            transaction
+        });
+
+        const category = await db.SupportCategory.create({
+            tenantId,
+            parentId: parent ? parent.id : null,
+            slug,
+            scope,
+            name,
+            nameAr,
+            description,
+            descriptionAr,
+            icon,
+            color,
+            featureKey: featureKey || slug,
+            featureRoute,
+            sortOrder: payload.sortOrder !== undefined && payload.sortOrder !== null
+                ? Number(payload.sortOrder)
+                : Number(maxSortOrder || 0) + 1,
+            isActive,
+            metadata: normalizeOptionalText(payload.metadata) ? payload.metadata : (payload.metadata || {})
+        }, { transaction });
+
+        return normalizeSupportCategory(category);
+    });
+}
+
+async function updateSupportCategory({ actor, categoryId, payload = {} }) {
+    const actorContext = getActorContext(actor);
+    if (!actorContext.isSuperAdmin) {
+        throw createSupportError('Only super admins can manage support taxonomy', 403);
+    }
+
+    return db.sequelize.transaction(async (transaction) => {
+        const category = await db.SupportCategory.findByPk(categoryId, { transaction });
+        if (!category) {
+            throw createSupportError('Support category not found', 404);
+        }
+
+        const nextParentId = payload.parentId === undefined
+            ? category.parentId
+            : (payload.parentId ? payload.parentId : null);
+
+        if (nextParentId && String(nextParentId) === String(category.id)) {
+            throw createSupportError('A category cannot be its own parent', 400);
+        }
+
+        if (nextParentId) {
+            const parent = await db.SupportCategory.findByPk(nextParentId, { transaction });
+            if (!parent) {
+                throw createSupportError('Parent support category not found', 404);
+            }
+            category.parentId = parent.id;
+            category.scope = parent.scope;
+            category.tenantId = parent.tenantId || null;
+        } else if (payload.parentId !== undefined) {
+            category.parentId = null;
+            if (payload.scope !== undefined) {
+                category.scope = normalizeText(payload.scope).toLowerCase() === 'tenant' ? 'tenant' : 'global';
+                if (category.scope === 'global') {
+                    category.tenantId = null;
+                }
+            }
+        }
+
+        if (payload.name !== undefined || payload.nameEn !== undefined || payload.name_en !== undefined) {
+            const nextName = ensureSubjectLength(payload.name || payload.nameEn || payload.name_en || '');
+            category.name = nextName;
+        }
+        if (payload.nameAr !== undefined || payload.name_ar !== undefined) {
+            category.nameAr = normalizeOptionalText(payload.nameAr || payload.name_ar);
+        }
+        if (payload.description !== undefined) {
+            category.description = normalizeOptionalText(payload.description);
+        }
+        if (payload.descriptionAr !== undefined || payload.description_ar !== undefined) {
+            category.descriptionAr = normalizeOptionalText(payload.descriptionAr || payload.description_ar);
+        }
+        if (payload.icon !== undefined) {
+            category.icon = normalizeOptionalText(payload.icon);
+        }
+        if (payload.color !== undefined) {
+            category.color = normalizeOptionalText(payload.color);
+        }
+        if (payload.featureKey !== undefined || payload.feature_key !== undefined) {
+            category.featureKey = normalizeOptionalText(payload.featureKey || payload.feature_key);
+        }
+        if (payload.featureRoute !== undefined || payload.feature_route !== undefined) {
+            category.featureRoute = normalizeOptionalText(payload.featureRoute || payload.feature_route);
+        }
+        if (payload.sortOrder !== undefined) {
+            category.sortOrder = Number(payload.sortOrder);
+        }
+        if (payload.isActive !== undefined) {
+            category.isActive = Boolean(payload.isActive);
+        }
+        if (payload.metadata !== undefined) {
+            category.metadata = payload.metadata || {};
+        }
+
+        if (payload.name !== undefined || payload.nameEn !== undefined || payload.name_en !== undefined || payload.featureKey !== undefined || payload.feature_key !== undefined) {
+            category.slug = await generateUniqueSupportCategorySlug(category.featureKey || category.name, transaction, category.id);
+        }
+
+        await category.save({ transaction });
+        return normalizeSupportCategory(category);
+    });
+}
+
+async function deleteSupportCategory({ actor, categoryId, hard = false }) {
+    const actorContext = getActorContext(actor);
+    if (!actorContext.isSuperAdmin) {
+        throw createSupportError('Only super admins can manage support taxonomy', 403);
+    }
+
+    return db.sequelize.transaction(async (transaction) => {
+        const category = await db.SupportCategory.findByPk(categoryId, {
+            include: [
+                { model: db.SupportCategory, as: 'children', attributes: ['id'] }
+            ],
+            transaction
+        });
+
+        if (!category) {
+            throw createSupportError('Support category not found', 404);
+        }
+
+        const childCount = Array.isArray(category.children) ? category.children.length : 0;
+        if (childCount > 0) {
+            throw createSupportError('Delete child categories first before removing this category', 400);
+        }
+
+        const ticketCount = await db.SupportTicket.count({
+            where: { supportCategoryId: category.id },
+            transaction
+        });
+
+        if (ticketCount > 0) {
+            throw createSupportError('This support category is referenced by existing tickets and cannot be deleted', 400);
+        }
+
+        if (hard) {
+            await category.destroy({ transaction });
+            return { deleted: true, hardDeleted: true };
+        }
+
+        await category.destroy({ transaction });
+        return { deleted: true, hardDeleted: false };
+    });
+}
+
+async function reorderSupportCategories({ actor, orderMap = [] }) {
+    const actorContext = getActorContext(actor);
+    if (!actorContext.isSuperAdmin) {
+        throw createSupportError('Only super admins can manage support taxonomy', 403);
+    }
+
+    if (!Array.isArray(orderMap) || orderMap.length === 0) {
+        throw createSupportError('orderMap array is required', 400);
+    }
+
+    return db.sequelize.transaction(async (transaction) => {
+        for (const item of orderMap) {
+            if (!item?.id) continue;
+            const updatePayload = {};
+            if (item.sortOrder !== undefined && item.sortOrder !== null) {
+                updatePayload.sortOrder = Number(item.sortOrder);
+            }
+            if (item.parentId !== undefined) {
+                updatePayload.parentId = item.parentId || null;
+            }
+            if (Object.keys(updatePayload).length > 0) {
+                await db.SupportCategory.update(updatePayload, {
+                    where: { id: item.id },
+                    transaction
+                });
+            }
+        }
+
+        const categories = await db.SupportCategory.findAll({
+            order: [['parentId', 'ASC'], ['sortOrder', 'ASC'], ['name', 'ASC']],
+            transaction
+        });
+
+        return {
+            categories: categories.map(normalizeSupportCategory),
+            tree: buildSupportCategoryTree(categories),
+            flatCategories: categories.map(normalizeSupportCategory)
+        };
+    });
 }
 
 async function resolveSupportAgentById(supportAgentId, transaction) {
@@ -1102,7 +1505,14 @@ async function listTickets({
     }
 
     if (filters.supportCategoryId) {
-        where.supportCategoryId = normalizeText(filters.supportCategoryId);
+        const categoryIds = await collectSupportCategoryIds(normalizeText(filters.supportCategoryId));
+        if (categoryIds.length === 1) {
+            where.supportCategoryId = categoryIds[0];
+        } else if (categoryIds.length > 1) {
+            where.supportCategoryId = { [Op.in]: categoryIds };
+        } else {
+            where.supportCategoryId = normalizeText(filters.supportCategoryId);
+        }
     }
 
     if (filters.assignedSupportAgentId) {
@@ -1902,6 +2312,10 @@ module.exports = {
     getExistingTicketOrThrow,
     getActorContext,
     listCategories,
+    createSupportCategory,
+    updateSupportCategory,
+    deleteSupportCategory,
+    reorderSupportCategories,
     normalizeTicket,
     normalizeMessage,
     normalizeSupportCategory,

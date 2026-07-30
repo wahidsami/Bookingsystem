@@ -9,6 +9,16 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'tenant'
             });
 
+            SupportCategory.belongsTo(models.SupportCategory, {
+                foreignKey: 'parentId',
+                as: 'parent'
+            });
+
+            SupportCategory.hasMany(models.SupportCategory, {
+                foreignKey: 'parentId',
+                as: 'children'
+            });
+
             SupportCategory.hasMany(models.SupportTicket, {
                 foreignKey: 'supportCategoryId',
                 as: 'tickets'
@@ -32,6 +42,12 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(120),
             allowNull: false,
             unique: true
+        },
+        parentId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: { model: 'support_categories', key: 'id' },
+            onDelete: 'SET NULL'
         },
         scope: {
             type: DataTypes.ENUM('global', 'tenant'),
@@ -62,6 +78,14 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(32),
             allowNull: true
         },
+        featureKey: {
+            type: DataTypes.STRING(160),
+            allowNull: true
+        },
+        featureRoute: {
+            type: DataTypes.STRING(255),
+            allowNull: true
+        },
         sortOrder: {
             type: DataTypes.INTEGER,
             allowNull: false,
@@ -86,7 +110,10 @@ module.exports = (sequelize, DataTypes) => {
         paranoid: true,
         indexes: [
             { fields: ['tenantId'], name: 'idx_support_categories_tenant' },
+            { fields: ['parentId'], name: 'idx_support_categories_parent' },
             { fields: ['scope'], name: 'idx_support_categories_scope' },
+            { fields: ['featureKey'], name: 'idx_support_categories_feature_key' },
+            { fields: ['featureRoute'], name: 'idx_support_categories_feature_route' },
             { fields: ['isActive'], name: 'idx_support_categories_is_active' }
         ]
     });

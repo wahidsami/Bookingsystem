@@ -7,16 +7,18 @@ import { adminApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppDialog } from "@/components/AppDialogProvider";
 import { humanizeValue } from "@/lib/display";
+import {
+  buildSupportCategoryTree,
+  flattenSupportCategoryTree,
+  getChildSupportCategories,
+  getRootSupportCategories,
+  getSupportCategoryById,
+  getSupportCategoryLabel,
+  getSupportTaxonomySelectionFromRoute,
+  type SupportTaxonomyNode,
+} from "@/lib/supportTaxonomy";
 
-type SupportCategory = {
-  id: string;
-  name: string;
-  nameAr?: string | null;
-  color?: string | null;
-  icon?: string | null;
-  scope?: string | null;
-  isActive?: boolean;
-};
+type SupportCategory = SupportTaxonomyNode;
 
 type SupportAgentProfile = {
   id: string;
@@ -144,7 +146,8 @@ type TicketFilters = {
   search: string;
   status: string;
   priority: string;
-  categoryId: string;
+  moduleCategoryId: string;
+  featureCategoryId: string;
   assigned: "all" | "mine" | "unassigned";
   datePreset: "all" | "today" | "7d" | "30d" | "90d" | "custom";
   dateFrom: string;
@@ -155,7 +158,8 @@ type TicketFilters = {
 };
 
 type NewTicketForm = {
-  categoryId: string;
+  moduleCategoryId: string;
+  featureCategoryId: string;
   priority: string;
   subject: string;
   initialMessage: string;
@@ -379,7 +383,8 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
     search: "",
     status: "",
     priority: "",
-    categoryId: "",
+    moduleCategoryId: "",
+    featureCategoryId: "",
     assigned: "all",
     datePreset: "all",
     dateFrom: "",
@@ -389,7 +394,8 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
     limit: 20,
   });
   const [newTicketForm, setNewTicketForm] = useState<NewTicketForm>({
-    categoryId: "",
+    moduleCategoryId: "",
+    featureCategoryId: "",
     priority: "medium",
     subject: "",
     initialMessage: "",
@@ -439,7 +445,9 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
     try {
       const response = await adminApi.getSupportCategories();
       if (response.success) {
-        setCategories(response.categories || []);
+        const normalized = (response.flatCategories || response.categories || []) as SupportCategory[];
+        const tree = (response.tree && response.tree.length > 0 ? response.tree : buildSupportCategoryTree(normalized)) as SupportCategory[];
+        setCategories(flattenSupportCategoryTree(tree));
       }
     } catch (error) {
       void error;
@@ -457,7 +465,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
         search: appliedSearch || undefined,
         status: filters.status || undefined,
         priority: filters.priority || undefined,
-        supportCategoryId: filters.categoryId || undefined,
+        supportCategoryId: filters.featureCategoryId || filters.moduleCategoryId || undefined,
         assignedSupportAgentId: filters.assigned === "mine" ? supportAgentId || undefined : undefined,
       });
 
@@ -532,7 +540,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
     loadTickets(1);
     setFilters((current) => ({ ...current, page: 1 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedSearch, filters.status, filters.priority, filters.categoryId, filters.assigned, filters.datePreset, filters.dateFrom, filters.dateTo, filters.sortBy, filters.limit, supportAgentId]);
+  }, [appliedSearch, filters.status, filters.priority, filters.moduleCategoryId, filters.featureCategoryId, filters.assigned, filters.datePreset, filters.dateFrom, filters.dateTo, filters.sortBy, filters.limit, supportAgentId]);
 
   useEffect(() => {
     if (!selectedTicketId && tickets.length > 0) {
@@ -619,7 +627,50 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
     };
   }, [supportAgentId, visibleTickets]);
 
-  const selectedCategory = useMemo(() => categories.find((category) => category.id === newTicketForm.categoryId) || null, [categories, newTicketForm.categoryId]);
+  const moduleCategories = useMemo(
+    () => getRootSupportCategories(categories).sort((left, right) => {
+      if ((left.sortOrder || 0) !== (right.sortOrder || 0)) {
+        return (left.sortOrder || 0) - (right.sortOrder || 0);
+      }
+      return getSupportCategoryLabel(left, "en").localeCompare(getSupportCategoryLabel(right, "en"));
+    }),
+    [categories]
+  );
+  const filterFeatureOptions = useMemo(
+    () => getChildSupportCategories(categories, filters.moduleCategoryId).sort((left, right) => {
+      if ((left.sortOrder || 0) !== (right.sortOrder || 0)) {
+        return (left.sortOrder || 0) - (right.sortOrder || 0);
+      }
+      return getSupportCategoryLabel(left, "en").localeCompare(getSupportCategoryLabel(right, "en"));
+    }),
+    [categories, filters.moduleCategoryId]
+  );
+  const formFeatureOptions = useMemo(
+    () => getChildSupportCategories(categories, newTicketForm.moduleCategoryId).sort((left, right) => {
+      if ((left.sortOrder || 0) !== (right.sortOrder || 0)) {
+        return (left.sortOrder || 0) - (right.sortOrder || 0);
+      }
+      return getSupportCategoryLabel(left, "en").localeCompare(getSupportCategoryLabel(right, "en"));
+    }),
+    [categories, newTicketForm.moduleCategoryId]
+  );
+  const routeBasedSelection = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const sourceRoute = new URLSearchParams(window.location.search).get("supportSourceRoute") || window.location.pathname;
+    return getSupportTaxonomySelectionFromRoute(sourceRoute, categories as SupportTaxonomyNode[]);
+  }, [categories]);
+
+  useEffect(() => {
+    if (!newTicketOpen || !routeBasedSelection) return;
+    setNewTicketForm((current) => {
+      if (current.moduleCategoryId || current.featureCategoryId) return current;
+      return {
+        ...current,
+        moduleCategoryId: routeBasedSelection.moduleId,
+        featureCategoryId: routeBasedSelection.featureId,
+      };
+    });
+  }, [newTicketOpen, routeBasedSelection]);
 
   const currentTicket = selectedTicket || visibleTickets.find((ticket) => ticket.id === selectedTicketId) || null;
 
@@ -813,7 +864,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
     try {
       const response = await adminApi.createSupportTicket(
         {
-          supportCategoryId: newTicketForm.categoryId || undefined,
+          supportCategoryId: newTicketForm.featureCategoryId || newTicketForm.moduleCategoryId || undefined,
           priority: newTicketForm.priority,
           subject: newTicketForm.subject.trim(),
           description: newTicketForm.initialMessage.trim(),
@@ -828,7 +879,8 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
         const ticket = response.ticket as SupportTicket;
         setNewTicketOpen(false);
         setNewTicketForm({
-          categoryId: "",
+          moduleCategoryId: "",
+          featureCategoryId: "",
           priority: "medium",
           subject: "",
           initialMessage: "",
@@ -1017,16 +1069,38 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
                     </select>
                   </label>
                   <label className="space-y-2">
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-dark-400">Category</span>
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-dark-400">Module</span>
                     <select
-                      value={filters.categoryId}
-                      onChange={(event) => setFilters((current) => ({ ...current, categoryId: event.target.value, page: 1 }))}
+                      value={filters.moduleCategoryId}
+                      onChange={(event) =>
+                        setFilters((current) => ({
+                          ...current,
+                          moduleCategoryId: event.target.value,
+                          featureCategoryId: "",
+                          page: 1
+                        }))
+                      }
                       className="select"
                     >
-                      <option value="">All</option>
-                      {categories.map((category) => (
+                      <option value="">All Modules</option>
+                      {moduleCategories.map((category) => (
                         <option key={category.id} value={category.id}>
-                          {category.nameAr || category.name || "Uncategorized"}
+                          {getSupportCategoryLabel(category, "ar")}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-dark-400">Feature</span>
+                    <select
+                      value={filters.featureCategoryId}
+                      onChange={(event) => setFilters((current) => ({ ...current, featureCategoryId: event.target.value, page: 1 }))}
+                      className="select"
+                    >
+                      <option value="">All Features</option>
+                      {filterFeatureOptions.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {getSupportCategoryLabel(category, "ar")}
                         </option>
                       ))}
                     </select>
@@ -1123,7 +1197,8 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
                         search: "",
                         status: "",
                         priority: "",
-                        categoryId: "",
+                        moduleCategoryId: "",
+                        featureCategoryId: "",
                         assigned: "all",
                         datePreset: "all",
                         dateFrom: "",
@@ -1364,14 +1439,30 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
                     ))}
                   </select>
                   <select
+                    value={getSupportCategoryById(categories, currentTicket.supportCategoryId)?.parentId || ""}
+                    onChange={(event) => {
+                      const nextModuleId = event.target.value;
+                      const nextFeature = nextModuleId ? getChildSupportCategories(categories, nextModuleId)[0] : null;
+                      handleCategoryChange(nextFeature?.id || nextModuleId || "");
+                    }}
+                    className="select !w-52"
+                  >
+                    <option value="">All Modules</option>
+                    {moduleCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {getSupportCategoryLabel(category, "ar")}
+                      </option>
+                    ))}
+                  </select>
+                  <select
                     value={currentTicket.supportCategoryId || ""}
                     onChange={(event) => handleCategoryChange(event.target.value)}
                     className="select !w-52"
                   >
-                    <option value="">Uncategorized</option>
-                    {categories.map((category) => (
+                    <option value="">All Features</option>
+                    {getChildSupportCategories(categories, getSupportCategoryById(categories, currentTicket.supportCategoryId)?.parentId || "").map((category) => (
                       <option key={category.id} value={category.id}>
-                        {category.nameAr || category.name || "Category"}
+                        {getSupportCategoryLabel(category, "ar")}
                       </option>
                     ))}
                   </select>
@@ -1714,16 +1805,40 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
             <div className="space-y-4 px-6 py-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-xs uppercase tracking-[0.18em] text-dark-400">Category</span>
+                  <span className="text-xs uppercase tracking-[0.18em] text-dark-400">Module</span>
                   <select
-                    value={newTicketForm.categoryId}
-                    onChange={(event) => setNewTicketForm((current) => ({ ...current, categoryId: event.target.value }))}
+                    value={newTicketForm.moduleCategoryId}
+                    onChange={(event) => {
+                      const nextModuleId = event.target.value;
+                      const nextFeature = nextModuleId ? getChildSupportCategories(categories, nextModuleId)[0] : null;
+                      setNewTicketForm((current) => ({
+                        ...current,
+                        moduleCategoryId: nextModuleId,
+                        featureCategoryId: nextFeature?.id || "",
+                      }));
+                    }}
                     className="select"
                   >
-                    <option value="">Uncategorized</option>
-                    {categories.map((category) => (
+                    <option value="">Select Module</option>
+                    {moduleCategories.map((category) => (
                       <option key={category.id} value={category.id}>
-                        {category.nameAr || category.name || "Category"}
+                        {getSupportCategoryLabel(category, "ar")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs uppercase tracking-[0.18em] text-dark-400">Feature</span>
+                  <select
+                    value={newTicketForm.featureCategoryId}
+                    onChange={(event) => setNewTicketForm((current) => ({ ...current, featureCategoryId: event.target.value }))}
+                    className="select"
+                    disabled={!newTicketForm.moduleCategoryId}
+                  >
+                    <option value="">Select Feature</option>
+                    {formFeatureOptions.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {getSupportCategoryLabel(category, "ar")}
                       </option>
                     ))}
                   </select>

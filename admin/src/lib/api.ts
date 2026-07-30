@@ -160,7 +160,26 @@ class AdminApi {
     const query = new URLSearchParams();
     if (params.scope) query.append('scope', params.scope);
     const suffix = query.toString() ? `?${query.toString()}` : '';
-    return this.request<{ success: boolean; categories: any[] }>(`/admin/support/categories${suffix}`);
+    return this.request<{ success: boolean; categories: any[]; tree: any[]; modules: any[]; flatCategories: any[] }>(`/admin/support/categories${suffix}`);
+  }
+
+  async createSupportCategory(data: Record<string, any>) {
+    return this.request<{ success: boolean; category: any }>(`/admin/support/categories`, 'POST', { body: data });
+  }
+
+  async updateSupportCategory(id: string, data: Record<string, any>) {
+    return this.request<{ success: boolean; category: any }>(`/admin/support/categories/${id}`, 'PATCH', { body: data });
+  }
+
+  async deleteSupportCategory(id: string, hard: boolean = false) {
+    const suffix = hard ? '?hard=true' : '';
+    return this.request<{ success: boolean; deleted: boolean; hardDeleted: boolean }>(`/admin/support/categories/${id}${suffix}`, 'DELETE');
+  }
+
+  async reorderSupportCategories(orderMap: { id: string; sortOrder?: number; parentId?: string | null }[]) {
+    return this.request<{ success: boolean; categories: any[]; tree: any[]; flatCategories: any[] }>(`/admin/support/categories/reorder`, 'PATCH', {
+      body: { orderMap }
+    });
   }
 
   async getSupportTickets(params: {

@@ -125,6 +125,64 @@ const listCategories = async (req, res) => {
     }
 };
 
+const createSupportCategory = async (req, res) => {
+    try {
+        const actor = getActor(req);
+        const category = await supportService.createSupportCategory({
+            actor,
+            payload: parseJsonMaybe(req.body, {})
+        });
+
+        return sendSuccess(res, { category }, 201);
+    } catch (error) {
+        return sendError(res, error, 'Failed to create support category');
+    }
+};
+
+const updateSupportCategory = async (req, res) => {
+    try {
+        const actor = getActor(req);
+        const category = await supportService.updateSupportCategory({
+            actor,
+            categoryId: req.params.id,
+            payload: parseJsonMaybe(req.body, {})
+        });
+
+        return sendSuccess(res, { category });
+    } catch (error) {
+        return sendError(res, error, 'Failed to update support category');
+    }
+};
+
+const deleteSupportCategory = async (req, res) => {
+    try {
+        const actor = getActor(req);
+        const result = await supportService.deleteSupportCategory({
+            actor,
+            categoryId: req.params.id,
+            hard: `${req.query.hard || req.body?.hard || ''}`.toLowerCase() === 'true'
+        });
+
+        return sendSuccess(res, result);
+    } catch (error) {
+        return sendError(res, error, 'Failed to delete support category');
+    }
+};
+
+const reorderSupportCategories = async (req, res) => {
+    try {
+        const actor = getActor(req);
+        const result = await supportService.reorderSupportCategories({
+            actor,
+            orderMap: parseJsonMaybe(req.body.orderMap || req.body.categories || req.body, [])
+        });
+
+        return sendSuccess(res, result);
+    } catch (error) {
+        return sendError(res, error, 'Failed to reorder support categories');
+    }
+};
+
 const replyToTicket = async (req, res) => {
     try {
         const actor = getActor(req);
@@ -279,6 +337,10 @@ module.exports = {
     createTicket,
     listTickets,
     listCategories,
+    createSupportCategory,
+    updateSupportCategory,
+    deleteSupportCategory,
+    reorderSupportCategories,
     getTicketDetails,
     replyToTicket,
     uploadAttachmentsToTicket,
