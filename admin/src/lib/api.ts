@@ -155,6 +155,133 @@ class AdminApi {
     return this.request<{ success: boolean }>('/admin/notifications/read-all', 'PATCH');
   }
 
+  // Support Operations
+  async getSupportCategories(params: { scope?: string } = {}) {
+    const query = new URLSearchParams();
+    if (params.scope) query.append('scope', params.scope);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request<{ success: boolean; categories: any[] }>(`/admin/support/categories${suffix}`);
+  }
+
+  async getSupportTickets(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    priority?: string;
+    supportCategoryId?: string;
+    assignedSupportAgentId?: string;
+    source?: string;
+    ticketNumber?: string;
+  } = {}) {
+    const query = new URLSearchParams();
+    if (params.page != null) query.append('page', String(params.page));
+    if (params.limit != null) query.append('limit', String(params.limit));
+    if (params.search) query.append('search', params.search);
+    if (params.status) query.append('status', params.status);
+    if (params.priority) query.append('priority', params.priority);
+    if (params.supportCategoryId) query.append('supportCategoryId', params.supportCategoryId);
+    if (params.assignedSupportAgentId) query.append('assignedSupportAgentId', params.assignedSupportAgentId);
+    if (params.source) query.append('source', params.source);
+    if (params.ticketNumber) query.append('ticketNumber', params.ticketNumber);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request<{
+      success: boolean;
+      tickets: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/admin/support/tickets${suffix}`);
+  }
+
+  async getSupportTicket(id: string) {
+    return this.request<{ success: boolean; ticket: any }>(`/admin/support/tickets/${id}`);
+  }
+
+  async createSupportTicket(data: any, attachments?: File[]) {
+    const formData = new FormData();
+    Object.entries(data || {}).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      if (Array.isArray(value)) {
+        formData.append(key, JSON.stringify(value));
+        return;
+      }
+      if (typeof value === 'object') {
+        formData.append(key, JSON.stringify(value));
+        return;
+      }
+      formData.append(key, String(value));
+    });
+    (attachments || []).forEach((file) => {
+      formData.append('files', file);
+    });
+    return this.requestFormData<{ success: boolean; ticket: any }>('/admin/support/tickets', 'POST', formData);
+  }
+
+  async replyToSupportTicket(id: string, data: { content: string; visibility?: string; replyToMessageId?: string | null }, attachments?: File[]) {
+    const formData = new FormData();
+    formData.append('content', data.content);
+    if (data.visibility) formData.append('visibility', data.visibility);
+    if (data.replyToMessageId) formData.append('replyToMessageId', data.replyToMessageId);
+    (attachments || []).forEach((file) => {
+      formData.append('attachments', file);
+    });
+    return this.requestFormData<{ success: boolean; ticket: any; message: any; attachments: any[] }>(
+      `/admin/support/tickets/${id}/messages`,
+      'POST',
+      formData
+    );
+  }
+
+  async uploadSupportTicketAttachments(id: string, messageId: string, attachments: File[]) {
+    const formData = new FormData();
+    formData.append('supportMessageId', messageId);
+    attachments.forEach((file) => formData.append('files', file));
+    return this.requestFormData<{ success: boolean; ticket: any; attachments: any[] }>(
+      `/admin/support/tickets/${id}/attachments`,
+      'POST',
+      formData
+    );
+  }
+
+  async assignSupportTicket(id: string, supportAgentId: string) {
+    return this.request<{ success: boolean; ticket: any }>(`/admin/support/tickets/${id}/assign`, 'POST', {
+      body: { supportAgentId }
+    });
+  }
+
+  async unassignSupportTicket(id: string) {
+    return this.request<{ success: boolean; ticket: any }>(`/admin/support/tickets/${id}/unassign`, 'POST');
+  }
+
+  async changeSupportTicketStatus(id: string, status: string) {
+    return this.request<{ success: boolean; ticket: any }>(`/admin/support/tickets/${id}/status`, 'POST', {
+      body: { status }
+    });
+  }
+
+  async changeSupportTicketPriority(id: string, priority: string) {
+    return this.request<{ success: boolean; ticket: any }>(`/admin/support/tickets/${id}/priority`, 'POST', {
+      body: { priority }
+    });
+  }
+
+  async changeSupportTicketCategory(id: string, supportCategoryId: string | null) {
+    return this.request<{ success: boolean; ticket: any }>(`/admin/support/tickets/${id}/category`, 'POST', {
+      body: { supportCategoryId }
+    });
+  }
+
+  async reopenSupportTicket(id: string) {
+    return this.request<{ success: boolean; ticket: any }>(`/admin/support/tickets/${id}/reopen`, 'POST');
+  }
+
+  async closeSupportTicket(id: string) {
+    return this.request<{ success: boolean; ticket: any }>(`/admin/support/tickets/${id}/close`, 'POST');
+  }
+
+  async markSupportTicketRead(id: string) {
+    return this.request<{ success: boolean; ticket: any }>(`/admin/support/tickets/${id}/read`, 'POST');
+  }
+
   async getChartData(period: string = '30d') {
     return this.request<{ success: boolean; chartData: any }>(`/admin/stats/charts?period=${period}`);
   }

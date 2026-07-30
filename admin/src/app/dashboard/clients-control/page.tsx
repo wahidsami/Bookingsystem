@@ -399,7 +399,7 @@ function CategoriesTab() {
                             {categories.length === 0 && (
                                 <tr>
                                     <td colSpan={7} className="px-4 py-12 text-center text-dark-400">
-                                        No categories found. Click "Add Category" to create one.
+                                        No categories found. Click &quot;Add Category&quot; to create one.
                                     </td>
                                 </tr>
                             )}

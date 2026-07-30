@@ -12,6 +12,15 @@ interface Admin {
   role: string;
   permissions: any;
   profileImage?: string;
+  supportAgentProfile?: {
+    id: string;
+    displayName?: string;
+    displayNameAr?: string;
+    title?: string | null;
+    avatarUrl?: string | null;
+    status?: string;
+    presenceStatus?: string;
+  } | null;
 }
 
 interface AuthContextType {

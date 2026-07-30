@@ -6,6 +6,21 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const JWT_EXPIRES_IN = '24h';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
+const buildAdminProfileResponse = async (admin) => {
+    if (!admin) {
+        return null;
+    }
+
+    const supportAgentProfile = await db.SupportAgent.findOne({
+        where: { superAdminId: admin.id }
+    });
+
+    return {
+        ...admin.toSafeObject(),
+        supportAgentProfile: supportAgentProfile ? supportAgentProfile.toJSON() : null
+    };
+};
+
 /**
  * Super Admin Login
  */
@@ -88,7 +103,7 @@ const login = async (req, res) => {
             message: 'Login successful',
             accessToken,
             refreshToken,
-            admin: admin.toSafeObject()
+            admin: await buildAdminProfileResponse(admin)
         });
 
     } catch (error) {
@@ -150,7 +165,7 @@ const refreshToken = async (req, res) => {
         res.json({
             success: true,
             accessToken,
-            admin: admin.toSafeObject()
+            admin: await buildAdminProfileResponse(admin)
         });
 
     } catch (error) {
@@ -178,7 +193,7 @@ const getProfile = async (req, res) => {
 
         res.json({
             success: true,
-            admin: admin.toSafeObject()
+            admin: await buildAdminProfileResponse(admin)
         });
 
     } catch (error) {

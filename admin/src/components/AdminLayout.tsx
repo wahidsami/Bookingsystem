@@ -22,21 +22,6 @@ interface AdminNotification {
   createdAt: string;
 }
 
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: "📊" },
-  { name: "Clients", href: "/dashboard/clients", icon: "🏢" },
-  { name: "Pending", href: "/dashboard/clients/pending", icon: "⏳", badge: true },
-  { name: "Users", href: "/dashboard/users", icon: "👥" },
-  { name: "Financial", href: "/dashboard/financial", icon: "💰" },
-  { name: "Packages", href: "/dashboard/packages", icon: "📦" },
-  { name: "Gift Cards", href: "/dashboard/gift-cards", icon: "🎁" },
-  { name: "Marketing", href: "/dashboard/marketing", icon: "🔥" },
-  { name: "Clients Control", href: "/dashboard/clients-control", icon: "🎛️" },
-  { name: "Notifications", href: "/dashboard/notifications", icon: "🔔" },
-  { name: "Activities", href: "/dashboard/activities", icon: "📋" },
-  { name: "Settings", href: "/dashboard/settings", icon: "⚙️" },
-];
-
 export function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const { admin, logout, isAuthenticated, isLoading } = useAuth();
@@ -49,6 +34,21 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const notificationPollTimeoutRef = useRef<number | null>(null);
   const notificationRequestInFlightRef = useRef(false);
   const notificationFailureCountRef = useRef(0);
+  const navigation = [
+    { name: "Dashboard", href: "/dashboard", icon: "📊" },
+    { name: "Support", href: "/dashboard/support", icon: "🎧", roles: ["super_admin", "support"] },
+    { name: "Clients", href: "/dashboard/clients", icon: "🏢" },
+    { name: "Pending", href: "/dashboard/clients/pending", icon: "⏳", badge: true },
+    { name: "Users", href: "/dashboard/users", icon: "👥" },
+    { name: "Financial", href: "/dashboard/financial", icon: "💰" },
+    { name: "Packages", href: "/dashboard/packages", icon: "📦" },
+    { name: "Gift Cards", href: "/dashboard/gift-cards", icon: "🎁" },
+    { name: "Marketing", href: "/dashboard/marketing", icon: "🔥" },
+    { name: "Clients Control", href: "/dashboard/clients-control", icon: "🎛️" },
+    { name: "Notifications", href: "/dashboard/notifications", icon: "🔔" },
+    { name: "Activities", href: "/dashboard/activities", icon: "📋" },
+    { name: "Settings", href: "/dashboard/settings", icon: "⚙️" },
+  ].filter((item) => !item.roles || item.roles.includes(admin?.role || ''));
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
