@@ -442,7 +442,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
         setCategories(response.categories || []);
       }
     } catch (error) {
-      console.error("Failed to load support categories:", error);
+      void error;
     }
   };
 
@@ -470,7 +470,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
       }
     } catch (error) {
       setTicketError(error instanceof Error ? error.message : "Failed to load support tickets");
-      console.error("Failed to load support tickets:", error);
+      void error;
     } finally {
       setTicketListLoading(false);
     }
@@ -498,7 +498,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
     } catch (error) {
       setCustomerProfile(null);
       setCustomerProfileError(error instanceof Error ? error.message : "Failed to load customer context");
-      console.error("Failed to load customer profile:", error);
+      void error;
     } finally {
       setCustomerProfileLoading(false);
     }
@@ -517,7 +517,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
         await loadTickets(ticketPagination.page);
       }
     } catch (error) {
-      console.error("Failed to load ticket details:", error);
+      void error;
       setTicketError(error instanceof Error ? error.message : "Failed to load ticket details");
     } finally {
       setTicketLoading(false);
@@ -668,7 +668,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
       try {
         await adminApi.markSupportTicketRead(ticketId);
       } catch (error) {
-        console.error("Failed to mark ticket read:", ticketId, error);
+        void error;
       }
     }
     await loadTickets(ticketPagination.page);
@@ -683,7 +683,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
       try {
         await adminApi.closeSupportTicket(ticketId);
       } catch (error) {
-        console.error("Failed to close ticket:", ticketId, error);
+        void error;
       }
     }
     handleClearSelection();
@@ -1497,7 +1497,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
                                   setReplyFiles((current) => [...current, ...files]);
                                 }
                               } catch (error) {
-                                console.warn("Clipboard paste unavailable:", error);
+                                void error;
                               }
                             }}
                             className="rounded-lg border border-dark-700 px-3 py-2 text-xs text-dark-200 transition hover:border-primary-500 hover:text-white"

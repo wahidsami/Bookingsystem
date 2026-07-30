@@ -97,7 +97,6 @@ const buildTenantSupportContext = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error('Build tenant support context error:', error);
         return res.status(500).json({
             success: false,
             message: 'Failed to initialize tenant support context'
@@ -153,7 +152,6 @@ const buildAdminSupportContext = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error('Build admin support context error:', error);
         return res.status(500).json({
             success: false,
             message: 'Failed to initialize support context'
