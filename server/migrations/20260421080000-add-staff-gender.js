@@ -2,19 +2,25 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.addColumn('staff', 'gender', {
-      type: Sequelize.STRING(32),
-      allowNull: true,
-      comment: 'Employee gender for filtering and sorting'
-    });
+    await queryInterface.sequelize.query(`
+      ALTER TABLE public.staff
+      ADD COLUMN IF NOT EXISTS gender VARCHAR(32);
+    `);
 
-    await queryInterface.addIndex('staff', ['tenantId', 'gender'], {
-      name: 'idx_staff_tenant_gender'
-    });
+    await queryInterface.sequelize.query(`
+      CREATE INDEX IF NOT EXISTS idx_staff_tenant_gender
+      ON public.staff ("tenantId", gender);
+    `);
   },
 
   async down(queryInterface) {
-    await queryInterface.removeIndex('staff', 'idx_staff_tenant_gender');
-    await queryInterface.removeColumn('staff', 'gender');
+    await queryInterface.sequelize.query(`
+      DROP INDEX IF EXISTS public.idx_staff_tenant_gender;
+    `);
+
+    await queryInterface.sequelize.query(`
+      ALTER TABLE public.staff
+      DROP COLUMN IF EXISTS gender;
+    `);
   }
 };

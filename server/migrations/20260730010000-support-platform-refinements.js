@@ -2,15 +2,23 @@
 
 module.exports = {
     async up(queryInterface, Sequelize) {
-        await queryInterface.addColumn('support_tickets', 'source', {
-            type: Sequelize.ENUM('dashboard', 'ai', 'api', 'email', 'mobile', 'system'),
-            allowNull: false,
-            defaultValue: 'dashboard'
-        });
+        await queryInterface.sequelize.query(`
+            DO $$
+            BEGIN
+                CREATE TYPE "public"."enum_support_tickets_source" AS ENUM ('dashboard', 'ai', 'api', 'email', 'mobile', 'system');
+            EXCEPTION
+                WHEN duplicate_object THEN NULL;
+            END $$;
+        `);
+
+        await queryInterface.sequelize.query(`
+            ALTER TABLE public.support_tickets
+            ADD COLUMN IF NOT EXISTS source "public"."enum_support_tickets_source" NOT NULL DEFAULT 'dashboard';
+        `);
 
         await queryInterface.sequelize.query(`
             UPDATE support_tickets
-            SET source = CASE sourceChannel
+            SET "source" = CASE "sourceChannel"
                 WHEN 'customer_app' THEN 'mobile'
                 WHEN 'tenant_dashboard' THEN 'dashboard'
                 WHEN 'support_portal' THEN 'dashboard'
@@ -21,8 +29,8 @@ module.exports = {
                 WHEN 'api' THEN 'api'
                 WHEN 'system' THEN 'system'
                 ELSE 'dashboard'
-            END
-            WHERE source IS NULL OR source = '';
+            END::public."enum_support_tickets_source"
+            WHERE "source" IS NULL OR "source"::text = '';
         `);
 
         await queryInterface.createTable('support_ticket_links', {
@@ -81,8 +89,11 @@ module.exports = {
     async down(queryInterface) {
         await queryInterface.dropTable('support_ticket_links');
 
-        await queryInterface.removeColumn('support_tickets', 'source');
+        await queryInterface.sequelize.query(`
+            ALTER TABLE public.support_tickets
+            DROP COLUMN IF EXISTS source;
+        `);
 
-        await queryInterface.sequelize.query('DROP TYPE IF EXISTS "enum_support_tickets_source";');
+        await queryInterface.sequelize.query('DROP TYPE IF EXISTS "public"."enum_support_tickets_source";');
     }
 };

@@ -24,11 +24,11 @@ function materializeTaxonomy(nodes, parentId = null, bucket = [], level = 0) {
             featureRoute: node.featureRoute || null,
             sortOrder: Number.isFinite(node.sortOrder) ? node.sortOrder : index + 1,
             isActive: node.isActive !== false,
-            metadata: {
+            metadata: JSON.stringify({
                 ...(node.metadata || {}),
                 level,
                 seedSource: 'support_taxonomy_catalog'
-            },
+            }),
             createdAt: new Date(),
             updatedAt: new Date()
         });
