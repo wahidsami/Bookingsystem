@@ -21,6 +21,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import { createFinanceOverviewReportDefinition, type FinanceOverviewTableRow } from '../../lib/bi/reports/financeOverview';
 import type { BIDatePresetValue, BIDateRange, BIOption, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
@@ -257,6 +258,8 @@ export default function FinanceOverviewReport({ lang }: FinanceOverviewReportPro
     amountRange: { min: '', max: '' },
   });
   const [drawerRow, setDrawerRow] = useState<FinanceOverviewRow | null>(null);
+
+  useBIReportRefreshSignal(() => setRefreshTick((tick) => tick + 1));
 
   const rows = useMemo(() => buildFinanceRows(report), [report]);
 

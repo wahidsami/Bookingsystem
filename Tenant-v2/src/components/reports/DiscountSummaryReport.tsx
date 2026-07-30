@@ -20,6 +20,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import { createDiscountSummaryReportDefinition, type DiscountSummaryReportOptions, type DiscountSummaryTableRow } from '../../lib/bi/reports/discountSummary';
 import { buildSalesOverviewRows, type SalesOverviewPayload } from '../../lib/bi/reports/salesOverviewViewModel';
@@ -314,6 +315,8 @@ export default function DiscountSummaryReport({ lang }: { lang: Language }) {
     product: '',
   });
   const [drawerRow, setDrawerRow] = useState<DiscountSummaryRow | null>(null);
+
+  useBIReportRefreshSignal(() => setRefreshTick((tick) => tick + 1));
 
   useEffect(() => {
     let cancelled = false;

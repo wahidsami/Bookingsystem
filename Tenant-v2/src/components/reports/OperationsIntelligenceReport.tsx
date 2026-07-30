@@ -26,6 +26,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import SalesOverviewReport from './SalesOverviewReport';
 import SalesListReport from './SalesListReport';
@@ -1784,6 +1785,9 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
 
 export default function OperationsIntelligenceReport({ lang }: { lang: Language }) {
   const [activeTab, setActiveTab] = useState<OperationsTab>('sales-overview');
+  const [refreshEpoch, setRefreshEpoch] = useState(0);
+
+  useBIReportRefreshSignal(() => setRefreshEpoch((epoch) => epoch + 1));
 
   const tabs: Array<{ id: OperationsTab; labelEn: string; labelAr: string; icon: ReactNode }> = [
     { id: 'sales-overview', labelEn: 'Sales Overview', labelAr: 'نظرة عامة على المبيعات', icon: <TrendingUp size={16} /> },
@@ -1820,16 +1824,16 @@ export default function OperationsIntelligenceReport({ lang }: { lang: Language 
         </div>
       </section>
 
-      {activeTab === 'sales-overview' ? <SalesOverviewReport lang={lang} /> : null}
-      {activeTab === 'sales-list' ? <SalesListReport lang={lang} /> : null}
-      {activeTab === 'sales-log-details' ? <SalesLogDetailsReport lang={lang} /> : null}
-      {activeTab === 'discount-summary' ? <DiscountSummaryReport lang={lang} /> : null}
-      {activeTab === 'tax-summary' ? <TaxSummaryReport lang={lang} /> : null}
-      {activeTab === 'gift-card-list' ? <GiftCardListReport lang={lang} /> : null}
-      {activeTab === 'customer-overview' ? <CustomerOverviewReport lang={lang} /> : null}
-      {activeTab === 'employee-performance' ? <EmployeePerformanceReport lang={lang} /> : null}
-      {activeTab === 'service-performance' ? <ServicePerformanceReport lang={lang} /> : null}
-      {activeTab === 'product-performance' ? <ProductPerformanceReport lang={lang} /> : null}
+      {activeTab === 'sales-overview' ? <div key={`sales-overview-${refreshEpoch}`} className="contents"><SalesOverviewReport lang={lang} /></div> : null}
+      {activeTab === 'sales-list' ? <div key={`sales-list-${refreshEpoch}`} className="contents"><SalesListReport lang={lang} /></div> : null}
+      {activeTab === 'sales-log-details' ? <div key={`sales-log-details-${refreshEpoch}`} className="contents"><SalesLogDetailsReport lang={lang} /></div> : null}
+      {activeTab === 'discount-summary' ? <div key={`discount-summary-${refreshEpoch}`} className="contents"><DiscountSummaryReport lang={lang} /></div> : null}
+      {activeTab === 'tax-summary' ? <div key={`tax-summary-${refreshEpoch}`} className="contents"><TaxSummaryReport lang={lang} /></div> : null}
+      {activeTab === 'gift-card-list' ? <div key={`gift-card-list-${refreshEpoch}`} className="contents"><GiftCardListReport lang={lang} /></div> : null}
+      {activeTab === 'customer-overview' ? <div key={`customer-overview-${refreshEpoch}`} className="contents"><CustomerOverviewReport lang={lang} /></div> : null}
+      {activeTab === 'employee-performance' ? <div key={`employee-performance-${refreshEpoch}`} className="contents"><EmployeePerformanceReport lang={lang} /></div> : null}
+      {activeTab === 'service-performance' ? <div key={`service-performance-${refreshEpoch}`} className="contents"><ServicePerformanceReport lang={lang} /></div> : null}
+      {activeTab === 'product-performance' ? <div key={`product-performance-${refreshEpoch}`} className="contents"><ProductPerformanceReport lang={lang} /></div> : null}
     </div>
   );
 }

@@ -29,6 +29,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import { createSalesListReportDefinition, type SalesListReportOptions, type SalesListTableRow } from '../../lib/bi/reports/salesList';
 import { buildSalesOverviewRows, type SalesOverviewPayload } from '../../lib/bi/reports/salesOverviewViewModel';
@@ -233,6 +234,8 @@ export default function SalesListReport({ lang }: { lang: Language }) {
     grossSalesRange: { min: '', max: '' },
   });
   const [drawerRow, setDrawerRow] = useState<SalesListTableRow | null>(null);
+
+  useBIReportRefreshSignal(() => setRefreshTick((tick) => tick + 1));
 
   useEffect(() => {
     let cancelled = false;

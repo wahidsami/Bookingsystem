@@ -29,6 +29,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import { createSalesLogDetailsReportDefinition, type SalesLogDetailsReportOptions, type SalesLogDetailsTableRow } from '../../lib/bi/reports/salesLogDetails';
 import type { BIDatePresetValue, BIDateRange, BIOption, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
@@ -282,6 +283,8 @@ export default function SalesLogDetailsReport({ lang }: { lang: Language }) {
     location: '',
   });
   const [drawerRow, setDrawerRow] = useState<SalesLogDetailsTableRow | null>(null);
+
+  useBIReportRefreshSignal(() => setRefreshTick((tick) => tick + 1));
 
   useEffect(() => {
     let cancelled = false;

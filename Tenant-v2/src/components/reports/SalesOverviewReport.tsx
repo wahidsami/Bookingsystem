@@ -21,6 +21,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import { createSalesOverviewReportDefinition } from '../../lib/bi/reports/salesOverview';
 import {
@@ -226,6 +227,8 @@ export default function SalesOverviewReport({ lang }: SalesOverviewReportProps) 
     grossSalesRange: { min: '', max: '' },
   });
   const [drawerRow, setDrawerRow] = useState<SalesOverviewRow | null>(null);
+
+  useBIReportRefreshSignal(() => setRefreshTick((tick) => tick + 1));
 
   const definitionOptions = useMemo(
     () => buildSalesOverviewFilterOptions(report, isRtl),

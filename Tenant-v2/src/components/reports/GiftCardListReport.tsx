@@ -29,6 +29,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import {
   createGiftCardListReportDefinition,
@@ -261,6 +262,8 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
     giftCardCode: '',
   });
   const [drawerRow, setDrawerRow] = useState<GiftCardListTableRow | null>(null);
+
+  useBIReportRefreshSignal(() => setRefreshTick((tick) => tick + 1));
 
   useEffect(() => {
     let cancelled = false;

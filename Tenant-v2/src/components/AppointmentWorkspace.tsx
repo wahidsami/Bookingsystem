@@ -7,13 +7,14 @@ import {
   SlidersHorizontal, Star, Split, Share2, Printer, CheckCircle2,
   Lock, Scissors, Sparkles, Smile, ShieldCheck, Mail, Phone,
   TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy,
-  PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift
+  PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift, Banknote
 } from 'lucide-react';
 import { Language, Product, QuickLaunchRequest } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
 import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
+import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
 
 interface AppointmentWorkspaceProps {
   lang: Language;
@@ -50,6 +51,9 @@ interface Appointment {
   status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
   paymentStatus: 'paid' | 'unpaid' | 'partial';
   normalizedPaymentStatus?: string | null;
+  paymentMethod?: string | null;
+  invoiceNumber?: string | null;
+  paymentTransactions?: any[];
   isGroupBooking: boolean;
   guestCount?: number;
   hasNotes: boolean;
@@ -80,6 +84,7 @@ interface Appointment {
   serviceItems?: any[];
   lineItems?: any[];
   invoiceItems?: any[];
+  invoice?: any;
   products?: any[];
   productItems?: any[];
   retailItems?: any[];
@@ -157,6 +162,15 @@ const displayAppointmentStatus = (status: any): string => {
 const toMoney = (value: any) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const roundMoney = (value: any) => Number.parseFloat(Number(value || 0).toFixed(2));
+
+const normalizeRefundPaymentMethod = (value: any) => {
+  const raw = `${value || ''}`.trim().toLowerCase();
+  if (raw === 'card') return 'card_pos';
+  if (raw === 'bank') return 'bank_transfer';
+  return raw;
 };
 
 function resolveEffectivePaymentStatus(item?: {
@@ -429,6 +443,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       customerEmail: a.user?.email || a.customerEmail,
       loyaltyTier: a.loyaltyTier,
       walletBalance: a.walletBalance,
+      paymentMethod: a.paymentMethod || a.paymentMethodLabel || a.paymentAllocations?.[0]?.paymentMethod || null,
+      invoiceNumber: a.invoiceNumber || a.invoice?.number || a.invoice?.invoiceNumber || null,
       totalPaid,
       depositAmount,
       depositPaid,
@@ -457,6 +473,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       medicalNotes: a.medicalNotes || '',
       notesSummary: a.notesSummary || '',
       internalNotes: a.internalNotes || '',
+      paymentTransactions: Array.isArray(a.paymentTransactions) ? a.paymentTransactions : [],
+      invoice: a.invoice || null,
       type: 'appointment',
       serviceCategory: a.service?.category || a.serviceCategory || 'hair',
       date: getLocalDateKey(a.startTime || a.date || dateKey)
@@ -1465,6 +1483,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
   const [checkoutReceiptData, setCheckoutReceiptData] = useState<any | null>(null);
   const [showPaymentConfirmModal, setShowPaymentConfirmModal] = useState<boolean>(false);
+  const [showRefundModal, setShowRefundModal] = useState<boolean>(false);
+  const [refundAmountInput, setRefundAmountInput] = useState<string>('');
+  const [refundReasonInput, setRefundReasonInput] = useState<string>('');
+  const [refundSubmitting, setRefundSubmitting] = useState<boolean>(false);
+  const [refundDialogError, setRefundDialogError] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('cash');
   const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<string | null>(null);
 
@@ -1548,6 +1571,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     currentPaymentStatus === 'deposit_paid'
       ? Math.max(0, Number(activeAppointment?.remainderAmount ?? activeAppointment?.outstandingAmount ?? activeInvoiceRemaining))
       : Math.max(0, Number(activeAppointment?.outstandingAmount ?? activeInvoiceRemaining))
+  );
+  const activePaymentTransactions = Array.isArray(activeAppointment?.paymentTransactions) ? activeAppointment.paymentTransactions : [];
+  const refundTransactions = activePaymentTransactions.filter((transaction: any) => {
+    const status = `${transaction?.status || transaction?.paymentStatus || ''}`.trim().toLowerCase();
+    const type = `${transaction?.type || transaction?.kind || ''}`.trim().toLowerCase();
+    return status === 'refunded' || status === 'partially_refunded' || type === 'refund';
+  });
+  const alreadyRefundedAmount = roundMoney(refundTransactions.reduce((sum: number, transaction: any) => sum + Math.abs(Number(transaction?.amount || 0)), 0));
+  const originalPaymentAmount = roundMoney(Number(activeAppointment?.totalPaid || 0) + alreadyRefundedAmount);
+  const refundableAmount = roundMoney(Math.max(0, Number(activeAppointment?.totalPaid || 0)));
+  const refundPaymentMethod = normalizeRefundPaymentMethod(
+    activeAppointment?.paymentMethod
+      || activeAppointment?.paymentAllocations?.[0]?.paymentMethod
+      || activeAppointment?.paymentAllocations?.[0]?.method
+      || activeAppointment?.paymentMethodLabel
+      || ''
   );
   const paymentMethodOptions = [
     { value: 'cash', labelEn: 'Cash', labelAr: 'نقداً' },
@@ -2018,6 +2057,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setCheckoutProducts([]);
     setAppliedGiftCardCode('');
     setAppliedGiftCardAmount(0);
+    setShowRefundModal(false);
+    setRefundAmountInput('');
+    setRefundReasonInput('');
+    setRefundDialogError(null);
+    setRefundSubmitting(false);
     setAppointmentDetailsReadOnly(Boolean(options.readOnly) || !isBoardEditable);
     setIsCustomerProfileOpen(false);
     setCustomerTransactionsExpanded(false);
@@ -2072,6 +2116,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       totalPaid: Number(historyItem?.paidAmount ?? historyItem?.amount ?? 0),
       price: Number(historyItem?.amount ?? 0),
       branchName: activeAppointment?.branchName || activeCustomerBranch || '',
+      paymentMethod: historyItem?.paymentMethod || historyItem?.paymentMethodLabel || activeAppointment?.paymentMethod || null,
+      invoiceNumber: historyItem?.invoiceNumber || historyItem?.invoice?.number || historyItem?.invoice?.invoiceNumber || null,
       invoiceStatus: historyItem?.paymentStatus || historyItem?.normalizedPaymentStatus || 'paid',
       notes: historyItem?.details?.notes || '',
       services: historyItem?.details?.service ? [historyItem.details.service] : [],
@@ -2082,6 +2128,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       }] : [],
       lineItems: [],
       invoiceItems: [],
+      paymentTransactions: Array.isArray(historyItem?.paymentTransactions) ? historyItem.paymentTransactions : [],
+      invoice: historyItem?.invoice || null,
       products: [],
       productItems: [],
       retailItems: [],
@@ -2106,6 +2154,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setCheckoutProducts([]);
     setAppliedGiftCardCode('');
     setAppliedGiftCardAmount(0);
+    setShowRefundModal(false);
+    setRefundAmountInput('');
+    setRefundReasonInput('');
+    setRefundDialogError(null);
+    setRefundSubmitting(false);
     setDrawerTab('overview');
     setAppointmentDetailsReadOnly(true);
     setIsCustomerProfileOpen(false);
@@ -2114,6 +2167,118 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setCustomerTransactionDetail(null);
     setCustomerProfileError(null);
     setDrawerOpen(true);
+  };
+
+  const openRefundDialog = () => {
+    if (!activeAppointment) {
+      return;
+    }
+
+    if (appointmentDetailsReadOnly) {
+      addLocalToast(
+        isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+        isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+        'info'
+      );
+      return;
+    }
+
+    if (refundableAmount <= 0) {
+      addLocalToast(
+        isRtl ? 'لا يوجد مبلغ قابل للاسترداد لهذا الموعد.' : 'No refundable balance is available for this appointment.',
+        isRtl ? 'No refundable balance is available for this appointment.' : 'لا يوجد مبلغ قابل للاسترداد لهذا الموعد.',
+        'warning'
+      );
+      return;
+    }
+
+    setRefundAmountInput(refundableAmount.toFixed(2));
+    setRefundReasonInput('');
+    setRefundDialogError(null);
+    setShowRefundModal(true);
+  };
+
+  const submitRefundAppointment = async () => {
+    if (!activeAppointment || refundSubmitting) {
+      return;
+    }
+
+    if (appointmentDetailsReadOnly) {
+      addLocalToast(
+        isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+        isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+        'info'
+      );
+      return;
+    }
+
+    const parsedRefundAmount = Number(refundAmountInput);
+    if (!Number.isFinite(parsedRefundAmount) || parsedRefundAmount <= 0) {
+      const message = isRtl ? 'أدخل مبلغ استرداد أكبر من صفر.' : 'Enter a refund amount greater than zero.';
+      setRefundDialogError(message);
+      addLocalToast(message, message, 'warning');
+      return;
+    }
+
+    if (parsedRefundAmount - originalPaymentAmount > 0.009) {
+      const message = isRtl ? 'لا يمكن أن يتجاوز الاسترداد إجمالي المبلغ المدفوع الأصلي.' : 'Refund cannot exceed the original payment amount.';
+      setRefundDialogError(message);
+      addLocalToast(message, message, 'warning');
+      return;
+    }
+
+    if (parsedRefundAmount - refundableAmount > 0.009) {
+      const message = isRtl ? 'لا يمكن أن يتجاوز الاسترداد الرصيد القابل للاسترداد.' : 'Refund cannot exceed the remaining refundable balance.';
+      setRefundDialogError(message);
+      addLocalToast(message, message, 'warning');
+      return;
+    }
+
+    setRefundSubmitting(true);
+    setRefundDialogError(null);
+
+    try {
+      const refundResponse = await tenantApiAdapter.refundAppointment(activeAppointment.id, {
+        amount: parsedRefundAmount,
+        reason: refundReasonInput.trim() || undefined,
+        paymentMethod: refundPaymentMethod || undefined
+      });
+      const payload = refundResponse?.data || refundResponse;
+      if (payload?.success === false) {
+        throw new Error(payload?.message || 'Failed to process refund');
+      }
+
+      await loadBoardData();
+      setCustomerProfileRefreshToken((token) => token + 1);
+      emitBIReportRefresh({
+        source: 'refund',
+        appointmentId: activeAppointment.id
+      });
+
+      const confirmedAppointmentId = payload?.refund?.appointmentId || activeAppointment.id;
+      if (confirmedAppointmentId) {
+        const refreshedAppointment = await tenantApiAdapter.getAppointment(confirmedAppointmentId);
+        const refreshedData = refreshedAppointment?.appointment || refreshedAppointment?.data?.appointment || refreshedAppointment?.data || refreshedAppointment;
+        if (refreshedData) {
+          setActiveAppointment(mapBoardAppointment(refreshedData, getSelectedDateKey()));
+        }
+      }
+
+      setShowRefundModal(false);
+      setRefundAmountInput('');
+      setRefundReasonInput('');
+      addLocalToast(
+        isRtl ? 'تم تنفيذ الاسترداد بنجاح.' : 'Refund processed successfully.',
+        isRtl ? 'Refund processed successfully.' : 'تم تنفيذ الاسترداد بنجاح.',
+        'success'
+      );
+    } catch (err: any) {
+      const message = err?.message || (isRtl ? 'تعذر تنفيذ الاسترداد.' : 'Failed to process refund.');
+      setRefundDialogError(message);
+      addLocalToast(message, message, 'warning');
+    } finally {
+      setRefundSubmitting(false);
+    }
   };
 
   const handleCheckoutPayment = async () => {
@@ -2201,6 +2366,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
       await loadBoardData();
       setCustomerProfileRefreshToken(token => token + 1);
+      emitBIReportRefresh({
+        source: 'payment',
+        appointmentId: activeAppointment.id
+      });
       const confirmedAppointmentId = paymentResponse?.appointment?.id || paymentResponse?.data?.appointment?.id || activeAppointment.id;
       if (confirmedAppointmentId) {
         const refreshedAppointment = await tenantApiAdapter.getAppointment(confirmedAppointmentId);
@@ -5162,6 +5331,34 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           <span>{t.checkout}</span>
                         </button>
                       )}
+
+                      {refundableAmount > 0.009 && (
+                        <div className="mt-3 space-y-2">
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{isRtl ? 'المبلغ الأصلي' : 'Original Payment'}</p>
+                              <p className="mt-1 font-mono font-black text-slate-800">{originalPaymentAmount.toFixed(2)} {t.riyal}</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{isRtl ? 'الاسترداد السابق' : 'Already Refunded'}</p>
+                              <p className="mt-1 font-mono font-black text-slate-800">{alreadyRefundedAmount.toFixed(2)} {t.riyal}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={openRefundDialog}
+                            disabled={appointmentDetailsReadOnly || refundableAmount <= 0.009}
+                            className={`w-full py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all shadow-sm flex items-center justify-center gap-2 border ${
+                              appointmentDetailsReadOnly || refundableAmount <= 0.009
+                                ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 cursor-pointer'
+                            }`}
+                          >
+                            <RefreshCw size={14} />
+                            <span>{isRtl ? 'استرداد' : 'Refund'}</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                   </div>
@@ -6096,6 +6293,208 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 >
                   {isRtl ? 'تأكيد الدفع' : 'Confirm Payment'}
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRefundModal && activeAppointment && (
+          <div className="fixed inset-0 z-[156] flex items-center justify-center px-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-zinc-950/50 backdrop-blur-sm"
+              onClick={() => {
+                if (!refundSubmitting) {
+                  setShowRefundModal(false);
+                }
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 220 }}
+              className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-rose-50 px-5 py-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-rose-600">
+                    {isRtl ? 'استرداد دفعة' : 'Refund Payment'}
+                  </p>
+                  <h3 className="mt-1 text-sm font-black text-slate-900">
+                    {isRtl ? 'إنشاء استرداد حقيقي عبر الخادم' : 'Create a canonical backend refund'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !refundSubmitting && setShowRefundModal(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-label={isRtl ? 'إغلاق' : 'Close'}
+                  disabled={refundSubmitting}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="grid gap-4 p-5 lg:grid-cols-[1.3fr_0.9fr]">
+                <div className="space-y-4">
+                  <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center gap-2">
+                      <Receipt size={16} className="text-amber-500" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                        {isRtl ? 'معلومات القراءة فقط' : 'Read-only information'}
+                      </h4>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {[
+                        { label: isRtl ? 'العميل' : 'Customer', value: activeAppointment.customerNameEn || activeAppointment.customerNameAr || '—' },
+                        { label: isRtl ? 'الموعد' : 'Appointment', value: `${activeAppointment.serviceNameEn || activeAppointment.serviceNameAr || '—'} · ${activeAppointment.bookingReference || activeAppointment.id}` },
+                        { label: isRtl ? 'المبلغ الأصلي' : 'Original Payment', value: `${originalPaymentAmount.toFixed(2)} ${t.riyal}` },
+                        { label: isRtl ? 'تم استرداده مسبقاً' : 'Already Refunded', value: `${alreadyRefundedAmount.toFixed(2)} ${t.riyal}` },
+                        { label: isRtl ? 'الرصيد القابل للاسترداد' : 'Remaining Refundable', value: `${refundableAmount.toFixed(2)} ${t.riyal}` },
+                        { label: isRtl ? 'طريقة الدفع' : 'Payment Method', value: refundPaymentMethod || '—' },
+                        { label: isRtl ? 'رقم الفاتورة' : 'Invoice Number', value: activeAppointment.invoiceNumber || activeAppointment.invoice?.number || activeAppointment.invoice?.invoiceNumber || '—' },
+                        { label: isRtl ? 'حالة الفاتورة الحالية' : 'Current Invoice Status', value: activeAppointment.invoiceStatus || activeAppointment.normalizedPaymentStatus || activeAppointment.paymentStatus || '—' }
+                      ].map((field, idx) => (
+                        <div key={`${field.label}-${idx}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{field.label}</p>
+                          <p className="mt-1 text-sm font-bold text-slate-900 break-words">{field.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle size={16} className="text-rose-500" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                        {isRtl ? 'تفاصيل الاسترداد' : 'Refund details'}
+                      </h4>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          {isRtl ? 'مبلغ الاسترداد' : 'Refund Amount'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={refundAmountInput}
+                          disabled={refundSubmitting}
+                          onChange={(event) => {
+                            setRefundAmountInput(event.target.value);
+                            setRefundDialogError(null);
+                          }}
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none focus:border-rose-400"
+                        />
+                      </label>
+
+                      <label className="space-y-1">
+                        <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          {isRtl ? 'سبب الاسترداد' : 'Reason'}
+                        </span>
+                        <input
+                          type="text"
+                          value={refundReasonInput}
+                          disabled={refundSubmitting}
+                          onChange={(event) => setRefundReasonInput(event.target.value)}
+                          placeholder={isRtl ? 'مثل: إلغاء خدمة' : 'e.g. service cancellation'}
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-rose-400"
+                        />
+                      </label>
+                    </div>
+
+                    {refundDialogError && (
+                      <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                        {refundDialogError}
+                      </div>
+                    )}
+
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-800">{isRtl ? 'المبلغ الأصلي' : 'Original payment'}</span>
+                        <span className="font-mono font-black">{originalPaymentAmount.toFixed(2)} {t.riyal}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-800">{isRtl ? 'مبلغ الاسترداد' : 'Refund amount'}</span>
+                        <span className="font-mono font-black text-rose-700">{Number(refundAmountInput || 0).toFixed(2)} {t.riyal}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-800">{isRtl ? 'الرصيد المتبقي' : 'Remaining balance'}</span>
+                        <span className="font-mono font-black text-emerald-700">{Math.max(0, refundableAmount - Number(refundAmountInput || 0)).toFixed(2)} {t.riyal}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-800">{isRtl ? 'حالة الفاتورة الجديدة' : 'New invoice status'}</span>
+                        <span className="font-semibold text-slate-500">
+                          {isRtl ? 'سيتم إرجاعها من الخادم بعد الحفظ' : 'Returned by backend after submission'}
+                        </span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <aside className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-rose-600">
+                      {isRtl ? 'تأكيد قبل الإرسال' : 'Confirmation before submission'}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-700 leading-6">
+                      {isRtl
+                        ? 'سيُرسل الاسترداد إلى الخادم أولاً. لا يتم تعديل الحالة أو المحاسبة في الواجهة.'
+                        : 'The refund is sent to the backend first. The UI never mutates accounting state locally.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Banknote size={16} className="text-slate-600" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                        {isRtl ? 'ملخص الاسترداد' : 'Refund summary'}
+                      </h4>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-500">{isRtl ? 'المبلغ الأصلي' : 'Original payment'}</span>
+                        <span className="font-mono font-black text-slate-900">{originalPaymentAmount.toFixed(2)} {t.riyal}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-500">{isRtl ? 'الاسترداد الحالي' : 'Current refund'}</span>
+                        <span className="font-mono font-black text-rose-600">{Number(refundAmountInput || 0).toFixed(2)} {t.riyal}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-500">{isRtl ? 'المتبقي قابل للاسترداد' : 'Still refundable'}</span>
+                        <span className="font-mono font-black text-emerald-700">{Math.max(0, refundableAmount - Number(refundAmountInput || 0)).toFixed(2)} {t.riyal}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => !refundSubmitting && setShowRefundModal(false)}
+                      disabled={refundSubmitting}
+                      className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isRtl ? 'إلغاء' : 'Cancel'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void submitRefundAppointment()}
+                      disabled={refundSubmitting}
+                      className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {refundSubmitting
+                        ? (isRtl ? 'جارٍ الإرسال...' : 'Submitting...')
+                        : (isRtl ? 'تنفيذ الاسترداد' : 'Process Refund')}
+                    </button>
+                  </div>
+                </aside>
               </div>
             </motion.div>
           </div>

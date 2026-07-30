@@ -27,6 +27,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import { createCashFlowSummaryReportDefinition, type CashFlowSummaryReportOptions, type CashFlowSummaryTableRow } from '../../lib/bi/reports/cashFlowSummary';
 import type { BIDatePresetValue, BIDateRange, BIOption, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
@@ -328,6 +329,8 @@ export default function CashFlowSummaryReport({ lang }: { lang: Language }) {
     location: '',
   });
   const [drawerRow, setDrawerRow] = useState<CashFlowSummaryTableRow | null>(null);
+
+  useBIReportRefreshSignal(() => setRefreshTick((tick) => tick + 1));
 
   useEffect(() => {
     let cancelled = false;

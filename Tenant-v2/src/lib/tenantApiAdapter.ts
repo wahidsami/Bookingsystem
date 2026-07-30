@@ -1265,6 +1265,13 @@ class TenantApiAdapter {
     return this.post(`/tenant/appointments/${id}/record-payment`, payload);
   }
 
+  async refundAppointment(
+    id: string,
+    payload: { amount: number; reason?: string; paymentMethod?: string }
+  ): Promise<any> {
+    return this.post(`/tenant/appointments/${id}/refund`, payload);
+  }
+
   async topUpCustomerWallet(id: string, payload: any): Promise<any> {
     return this.post(`/tenant/customers/${id}/wallet/topup`, payload);
   }

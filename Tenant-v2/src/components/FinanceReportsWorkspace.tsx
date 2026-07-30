@@ -5,6 +5,7 @@ import type { Language } from '../types';
 import FinanceOverviewReport from './reports/FinanceOverviewReport';
 import CashFlowSummaryReport from './reports/CashFlowSummaryReport';
 import PaymentTransactionsReport from './reports/PaymentTransactionsReport';
+import { useBIReportRefreshSignal } from '../lib/bi/refreshSignals';
 
 type FinanceTab = 'overview' | 'payment-transactions' | 'cash-flow-summary';
 
@@ -15,6 +16,9 @@ interface FinanceReportsWorkspaceProps {
 export default function FinanceReportsWorkspace({ lang }: FinanceReportsWorkspaceProps) {
   const isRtl = lang === 'ar';
   const [activeTab, setActiveTab] = useState<FinanceTab>('overview');
+  const [refreshEpoch, setRefreshEpoch] = useState(0);
+
+  useBIReportRefreshSignal(() => setRefreshEpoch((epoch) => epoch + 1));
 
   const tabs: Array<{ id: FinanceTab; labelEn: string; labelAr: string; icon: ReactNode }> = [
     { id: 'overview', labelEn: 'Finance Overview', labelAr: 'نظرة عامة مالية', icon: <TrendingUp size={16} /> },
@@ -44,9 +48,9 @@ export default function FinanceReportsWorkspace({ lang }: FinanceReportsWorkspac
         </div>
       </section>
 
-      {activeTab === 'overview' ? <FinanceOverviewReport lang={lang} /> : null}
-      {activeTab === 'payment-transactions' ? <PaymentTransactionsReport lang={lang} /> : null}
-      {activeTab === 'cash-flow-summary' ? <CashFlowSummaryReport lang={lang} /> : null}
+      {activeTab === 'overview' ? <div key={`finance-overview-${refreshEpoch}`} className="contents"><FinanceOverviewReport lang={lang} /></div> : null}
+      {activeTab === 'payment-transactions' ? <div key={`payment-transactions-${refreshEpoch}`} className="contents"><PaymentTransactionsReport lang={lang} /></div> : null}
+      {activeTab === 'cash-flow-summary' ? <div key={`cash-flow-summary-${refreshEpoch}`} className="contents"><CashFlowSummaryReport lang={lang} /></div> : null}
     </div>
   );
 }

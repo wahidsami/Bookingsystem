@@ -20,6 +20,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import { createTaxSummaryReportDefinition, type TaxSummaryReportOptions, type TaxSummaryTableRow } from '../../lib/bi/reports/taxSummary';
 import type { BIDatePresetValue, BIDateRange, BIOption, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
@@ -323,6 +324,8 @@ export default function TaxSummaryReport({ lang }: { lang: Language }) {
     product: '',
   });
   const [drawerRow, setDrawerRow] = useState<TaxSummaryTableRow | null>(null);
+
+  useBIReportRefreshSignal(() => setRefreshTick((tick) => tick + 1));
 
   useEffect(() => {
     let cancelled = false;

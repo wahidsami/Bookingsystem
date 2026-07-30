@@ -26,6 +26,7 @@ import {
   useBIColumnPreferences,
   useBISavedViews,
 } from '../../lib/bi';
+import { useBIReportRefreshSignal } from '../../lib/bi/refreshSignals';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import {
   createPaymentTransactionsReportDefinition,
@@ -301,6 +302,8 @@ export default function PaymentTransactionsReport({ lang }: { lang: Language }) 
     amountRange: { min: '', max: '' },
   });
   const [drawerRow, setDrawerRow] = useState<PaymentTransactionsTableRow | null>(null);
+
+  useBIReportRefreshSignal(() => setRefreshTick((tick) => tick + 1));
 
   useEffect(() => {
     let cancelled = false;
