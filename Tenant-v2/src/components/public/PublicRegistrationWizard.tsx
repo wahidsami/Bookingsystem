@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
-import { CheckCircle2, LoaderCircle } from 'lucide-react';
+import { CheckCircle2, House, LoaderCircle, LogIn, Sparkles } from 'lucide-react';
 import type { Language } from '../../types';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import PublicWizardEngine, { type PublicWizardStepDefinition } from './PublicWizardEngine';
@@ -177,13 +177,19 @@ function Field({
 }
 
 const wizardStepDefinitions = (isRtl: boolean): PublicWizardStepDefinition[] => [
-  { id: 'business', title: isRtl ? 'المنشأة' : 'Business' },
-  { id: 'documents', title: isRtl ? 'المستندات' : 'Documents' },
-  { id: 'contact', title: isRtl ? 'جهة الاتصال' : 'Contact' },
-  { id: 'owner', title: isRtl ? 'المالك' : 'Owner' },
-  { id: 'plan', title: isRtl ? 'الباقة' : 'Plan' },
-  { id: 'agreement', title: isRtl ? 'الاتفاقية' : 'Agreement' }
+  { id: 'business', title: isRtl ? 'هوية المنشأة' : 'Business identity', description: isRtl ? 'أضف اسم المنشأة ونوع النشاط والهوية البصرية.' : 'Business name, activity type and brand basics.' },
+  { id: 'documents', title: isRtl ? 'المستندات الرسمية' : 'Official documents', description: isRtl ? 'السجل التجاري والضريبة والترخيص.' : 'Commercial registration, tax and licensing files.' },
+  { id: 'contact', title: isRtl ? 'بيانات التواصل' : 'Contact details', description: isRtl ? 'جهة الاتصال الأساسية للتواصل اليومي.' : 'Primary contact details for the onboarding flow.' },
+  { id: 'owner', title: isRtl ? 'بيانات المالك' : 'Owner profile', description: isRtl ? 'تفاصيل المالك المسؤولة عن الحساب.' : 'Account owner identity and contact data.' },
+  { id: 'plan', title: isRtl ? 'اختيار الباقة' : 'Choose package', description: isRtl ? 'اختر الباقة المناسبة وخطة الفوترة.' : 'Select the subscription package and billing period.' },
+  { id: 'agreement', title: isRtl ? 'المراجعة والإرسال' : 'Review & submit', description: isRtl ? 'راجع البيانات ووافق على الاتفاقية.' : 'Review the application and accept the agreement.' }
 ];
+
+const premiumFieldClass =
+  'w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-zinc-500 transition focus:border-amber-300/50 focus:bg-white/10 focus:ring-2 focus:ring-amber-300/20';
+
+const premiumSelectClass =
+  'w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-white outline-none transition focus:border-amber-300/50 focus:ring-2 focus:ring-amber-300/20';
 
 export default function PublicRegistrationWizard({ lang, onNavigate }: PublicRegistrationWizardProps) {
   const isRtl = lang === 'ar';
@@ -411,40 +417,50 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
       return (
         <div className="grid gap-4 md:grid-cols-2">
           <Field label={isRtl ? 'اسم المنشأة بالعربية' : 'Business name (Arabic)'} required error={errors.name_ar}>
-            <input value={formData.name_ar} onChange={handleChange} name="name_ar" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input value={formData.name_ar} onChange={handleChange} name="name_ar" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'اسم المنشأة بالإنجليزية' : 'Business name (English)'} required error={errors.name_en}>
-            <input value={formData.name_en} onChange={handleChange} name="name_en" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input value={formData.name_en} onChange={handleChange} name="name_en" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'نوع النشاط' : 'Business types'} required error={errors.businessType} hint={isRtl ? 'اختيارات متعددة' : 'Multi-select'}>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
-                { value: 'salon', label: isRtl ? 'صالون' : 'Salon', emoji: '💇' },
-                { value: 'spa', label: isRtl ? 'سبا' : 'Spa', emoji: '🧖' },
-                { value: 'beauty_center', label: isRtl ? 'مركز تجميل' : 'Beauty center', emoji: '💅' },
-                { value: 'barbershop', label: isRtl ? 'حلاقة' : 'Barbershop', emoji: '💈' },
-                { value: 'clinic', label: isRtl ? 'عيادة' : 'Clinic', emoji: '🏥' }
+                { value: 'salon', label: isRtl ? 'صالون' : 'Salon', emoji: '💇', note: isRtl ? 'خدمات شعر وجمال' : 'Hair and beauty services' },
+                { value: 'spa', label: isRtl ? 'سبا' : 'Spa', emoji: '🧖', note: isRtl ? 'عافية واسترخاء' : 'Wellness and relaxation' },
+                { value: 'beauty_center', label: isRtl ? 'مركز تجميل' : 'Beauty center', emoji: '💅', note: isRtl ? 'تجميل شامل' : 'Full-service beauty' },
+                { value: 'barbershop', label: isRtl ? 'حلاقة' : 'Barbershop', emoji: '💈', note: isRtl ? 'حلاقة وعناية' : 'Barbering and grooming' },
+                { value: 'clinic', label: isRtl ? 'عيادة' : 'Clinic', emoji: '🏥', note: isRtl ? 'خدمات متخصصة' : 'Specialized services' }
               ].map((type) => {
                 const checked = formData.businessType.includes(type.value);
                 return (
                   <label
                     key={type.value}
-                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-3 py-3 transition ${
-                      checked ? 'border-amber-300 bg-amber-400/10 text-white' : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10'
+                    className={`group flex min-h-[88px] cursor-pointer items-center gap-3 rounded-[1.5rem] border px-4 py-4 transition ${
+                      checked
+                        ? 'border-amber-300/70 bg-amber-400/10 text-white shadow-[0_14px_40px_rgba(251,191,36,0.12)]'
+                        : 'border-white/10 bg-white/5 text-zinc-300 hover:-translate-y-0.5 hover:bg-white/10'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        const next = checked
-                          ? formData.businessType.filter((item) => item !== type.value)
-                          : [...formData.businessType, type.value];
-                        handleFieldChange('businessType', next);
-                      }}
-                    />
-                    <span>{type.emoji}</span>
-                    <span className="text-sm font-medium">{type.label}</span>
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${checked ? 'border-amber-300/40 bg-amber-400/15 text-amber-100' : 'border-white/10 bg-black/20 text-zinc-300'}`}>
+                      <span>{type.emoji}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-white">{type.label}</span>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            const next = checked
+                              ? formData.businessType.filter((item) => item !== type.value)
+                              : [...formData.businessType, type.value];
+                            handleFieldChange('businessType', next);
+                          }}
+                          className="h-4 w-4 rounded border-white/20 bg-zinc-950 text-amber-400 accent-amber-400"
+                        />
+                      </div>
+                      <p className="mt-1 text-[11px] leading-5 text-zinc-400">{type.note}</p>
+                    </div>
                   </label>
                 );
               })}
@@ -461,37 +477,37 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             />
           </Field>
           <Field label={isRtl ? 'البريد الإلكتروني' : 'Email'} required error={errors.email}>
-            <input type="email" value={formData.email} onChange={handleChange} name="email" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input type="email" value={formData.email} onChange={handleChange} name="email" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'الهاتف' : 'Phone'} required error={errors.phone}>
-            <input type="tel" value={formData.phone} onChange={handleChange} name="phone" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input type="tel" value={formData.phone} onChange={handleChange} name="phone" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'الجوال' : 'Mobile'} required error={errors.mobile}>
-            <input type="tel" value={formData.mobile} onChange={handleChange} name="mobile" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input type="tel" value={formData.mobile} onChange={handleChange} name="mobile" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'الموقع الإلكتروني' : 'Website'} error={errors.website}>
-            <input type="url" value={formData.website} onChange={handleChange} name="website" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" placeholder="https://" />
+            <input type="url" value={formData.website} onChange={handleChange} name="website" className={premiumFieldClass} placeholder="https://" />
           </Field>
           <Field label={isRtl ? 'رابط خرائط Google' : 'Google Maps link'} error={errors.googleMapLink}>
-            <input type="url" value={formData.googleMapLink} onChange={handleChange} name="googleMapLink" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" placeholder="https://maps.google.com/..." />
+            <input type="url" value={formData.googleMapLink} onChange={handleChange} name="googleMapLink" className={premiumFieldClass} placeholder="https://maps.google.com/..." />
           </Field>
           <Field label={isRtl ? 'كلمة المرور' : 'Password'} required error={errors.password}>
-            <input type="password" value={formData.password} onChange={handleChange} name="password" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input type="password" value={formData.password} onChange={handleChange} name="password" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'تأكيد كلمة المرور' : 'Confirm password'} required error={errors.confirmPassword}>
-            <input type="password" value={formData.confirmPassword} onChange={handleChange} name="confirmPassword" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input type="password" value={formData.confirmPassword} onChange={handleChange} name="confirmPassword" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'الحي' : 'District'} error={errors.district}>
-            <input value={formData.district} onChange={handleChange} name="district" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input value={formData.district} onChange={handleChange} name="district" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'الشارع' : 'Street'} error={errors.street}>
-            <input value={formData.street} onChange={handleChange} name="street" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input value={formData.street} onChange={handleChange} name="street" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'رقم المبنى' : 'Building number'} error={errors.buildingNumber}>
-            <input value={formData.buildingNumber} onChange={handleChange} name="buildingNumber" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-500" />
+            <input value={formData.buildingNumber} onChange={handleChange} name="buildingNumber" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'المدينة' : 'City'} error={errors.city}>
-            <select value={formData.city} onChange={handleChange} name="city" className="w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none">
+            <select value={formData.city} onChange={handleChange} name="city" className={premiumSelectClass}>
               <option value="">{isRtl ? 'اختر المدينة' : 'Select city'}</option>
               {SAUDI_CITIES.map((city) => (
                 <option key={city.en} value={city.en}>
@@ -501,7 +517,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             </select>
           </Field>
           <Field label={isRtl ? 'الدولة' : 'Country'}>
-            <input value={formData.country} disabled className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white opacity-80" />
+            <input value={formData.country} disabled className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white/80 opacity-90" />
           </Field>
         </div>
       );
@@ -511,7 +527,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
       return (
         <div className="grid gap-4 md:grid-cols-2">
           <Field label={isRtl ? 'رقم السجل التجاري' : 'Commercial registration number'} required error={errors.crNumber}>
-            <input value={formData.crNumber} onChange={handleChange} name="crNumber" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input value={formData.crNumber} onChange={handleChange} name="crNumber" className={premiumFieldClass} />
           </Field>
           <PublicFileUploadField
             inputId="cr-document-upload"
@@ -523,7 +539,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             hint={isRtl ? 'مستند رسمي مطلوب' : 'Required official file'}
           />
           <Field label={isRtl ? 'الرقم الضريبي' : 'Tax number'} required error={errors.taxNumber}>
-            <input value={formData.taxNumber} onChange={handleChange} name="taxNumber" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input value={formData.taxNumber} onChange={handleChange} name="taxNumber" className={premiumFieldClass} />
           </Field>
           <PublicFileUploadField
             inputId="tax-document-upload"
@@ -535,7 +551,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             hint={isRtl ? 'PDF أو صورة' : 'PDF or image'}
           />
           <Field label={isRtl ? 'رقم الترخيص' : 'License number'} required error={errors.licenseNumber}>
-            <input value={formData.licenseNumber} onChange={handleChange} name="licenseNumber" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input value={formData.licenseNumber} onChange={handleChange} name="licenseNumber" className={premiumFieldClass} />
           </Field>
           <PublicFileUploadField
             inputId="license-document-upload"
@@ -554,19 +570,19 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
       return (
         <div className="grid gap-4 md:grid-cols-2">
           <Field label={isRtl ? 'اسم جهة الاتصال بالعربية' : 'Contact name (Arabic)'} required error={errors.contactPersonNameAr}>
-            <input value={formData.contactPersonNameAr} onChange={handleChange} name="contactPersonNameAr" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input value={formData.contactPersonNameAr} onChange={handleChange} name="contactPersonNameAr" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'اسم جهة الاتصال بالإنجليزية' : 'Contact name (English)'} required error={errors.contactPersonNameEn}>
-            <input value={formData.contactPersonNameEn} onChange={handleChange} name="contactPersonNameEn" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input value={formData.contactPersonNameEn} onChange={handleChange} name="contactPersonNameEn" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'البريد الإلكتروني' : 'Email'} required error={errors.contactPersonEmail}>
-            <input type="email" value={formData.contactPersonEmail} onChange={handleChange} name="contactPersonEmail" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input type="email" value={formData.contactPersonEmail} onChange={handleChange} name="contactPersonEmail" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'الجوال' : 'Mobile'} required error={errors.contactPersonMobile}>
-            <input type="tel" value={formData.contactPersonMobile} onChange={handleChange} name="contactPersonMobile" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input type="tel" value={formData.contactPersonMobile} onChange={handleChange} name="contactPersonMobile" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'المسمى الوظيفي' : 'Position'} required error={errors.contactPersonPosition}>
-            <input value={formData.contactPersonPosition} onChange={handleChange} name="contactPersonPosition" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input value={formData.contactPersonPosition} onChange={handleChange} name="contactPersonPosition" className={premiumFieldClass} />
           </Field>
         </div>
       );
@@ -576,19 +592,19 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
       return (
         <div className="grid gap-4 md:grid-cols-2">
           <Field label={isRtl ? 'اسم المالك بالعربية' : 'Owner name (Arabic)'} required error={errors.ownerNameAr}>
-            <input value={formData.ownerNameAr} onChange={handleChange} name="ownerNameAr" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input value={formData.ownerNameAr} onChange={handleChange} name="ownerNameAr" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'اسم المالك بالإنجليزية' : 'Owner name (English)'} required error={errors.ownerNameEn}>
-            <input value={formData.ownerNameEn} onChange={handleChange} name="ownerNameEn" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input value={formData.ownerNameEn} onChange={handleChange} name="ownerNameEn" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'جوال المالك' : 'Owner phone'} required error={errors.ownerPhone}>
-            <input type="tel" value={formData.ownerPhone} onChange={handleChange} name="ownerPhone" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input type="tel" value={formData.ownerPhone} onChange={handleChange} name="ownerPhone" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'بريد المالك' : 'Owner email'} required error={errors.ownerEmail}>
-            <input type="email" value={formData.ownerEmail} onChange={handleChange} name="ownerEmail" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input type="email" value={formData.ownerEmail} onChange={handleChange} name="ownerEmail" className={premiumFieldClass} />
           </Field>
           <Field label={isRtl ? 'رقم الهوية الوطنية' : 'National ID'} required error={errors.ownerNationalId}>
-            <input value={formData.ownerNationalId} onChange={handleChange} name="ownerNationalId" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0" />
+            <input value={formData.ownerNationalId} onChange={handleChange} name="ownerNationalId" className={premiumFieldClass} />
           </Field>
         </div>
       );
@@ -597,14 +613,14 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
     if (currentStep === 5) {
       return (
         <div className="space-y-5">
-          <div className="flex gap-2 border-b border-white/10">
+          <div className="flex flex-wrap gap-2 border-b border-white/10 pb-2">
             {(['monthly', 'sixMonth', 'annual'] as const).map((period) => (
               <button
                 key={period}
                 type="button"
                 onClick={() => setSelectedTab(period)}
-                className={`px-5 py-3 text-sm font-semibold transition ${
-                  selectedTab === period ? 'border-b-2 border-amber-300 text-amber-200' : 'text-zinc-400 hover:text-white'
+                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                  selectedTab === period ? 'border border-amber-300/40 bg-amber-400/10 text-amber-100' : 'border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'
                 }`}
               >
                 {period === 'monthly'
@@ -639,8 +655,10 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
                         selectedBillingPeriod: selectedTab
                       }))
                     }
-                    className={`rounded-[1.5rem] border p-5 text-start transition ${
-                      selected ? 'border-amber-300 bg-amber-400/10' : 'border-white/10 bg-white/5 hover:bg-white/10'
+                    className={`rounded-[1.75rem] border p-5 text-start transition ${
+                      selected
+                        ? 'border-amber-300/70 bg-amber-400/10 shadow-[0_18px_45px_rgba(251,191,36,0.12)]'
+                        : 'border-white/10 bg-white/5 hover:-translate-y-0.5 hover:bg-white/10'
                     }`}
                   >
                     {pkg?.isFeatured ? (
@@ -650,7 +668,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
                     ) : null}
                     <div className="space-y-2">
                       <h3 className="text-lg font-bold text-white">{pkg?.name || (isRtl ? 'باقة' : 'Plan')}</h3>
-                      <p className="text-sm text-zinc-300">{pkg?.description || ''}</p>
+                      <p className="text-sm leading-6 text-zinc-300">{pkg?.description || ''}</p>
                       <p className="text-3xl font-black text-white">
                         <span className="text-sm font-medium text-zinc-400">SAR</span> {Number(price || 0).toFixed(2)}
                       </p>
@@ -660,11 +678,11 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
                         </p>
                       ) : null}
                     </div>
-                    <div className="mt-4 space-y-1 text-xs text-zinc-400">
-                      <div>{isRtl ? 'الحد الأقصى للحجوزات' : 'Bookings limit'}: {pkg?.limits?.maxBookingsPerMonth === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : `${pkg?.limits?.maxBookingsPerMonth ?? 0}/mo`}</div>
-                      <div>{isRtl ? 'الفرق' : 'Staff'}: {pkg?.limits?.maxStaff === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxStaff ?? 0}</div>
-                      <div>{isRtl ? 'الخدمات' : 'Services'}: {pkg?.limits?.maxServices === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxServices ?? 0}</div>
-                      <div>{isRtl ? 'العمولة' : 'Commission'}: {pkg?.platformCommission ?? 0}%</div>
+                    <div className="mt-4 grid gap-2 text-xs text-zinc-400">
+                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الحد الأقصى للحجوزات' : 'Bookings limit'}: {pkg?.limits?.maxBookingsPerMonth === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : `${pkg?.limits?.maxBookingsPerMonth ?? 0}/mo`}</div>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الفرق' : 'Staff'}: {pkg?.limits?.maxStaff === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxStaff ?? 0}</div>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الخدمات' : 'Services'}: {pkg?.limits?.maxServices === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxServices ?? 0}</div>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'العمولة' : 'Commission'}: {pkg?.platformCommission ?? 0}%</div>
                     </div>
                   </button>
                 );
@@ -709,68 +727,146 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
   })();
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="rounded-[1.75rem] border border-white/10 bg-zinc-950/70 p-6 md:p-8 shadow-2xl backdrop-blur-xl">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-5">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
-              <CheckCircle2 size={14} />
-              <span>{isRtl ? 'تسجيل منشأة جديدة' : 'New tenant registration'}</span>
-            </div>
-            <h2 className="text-2xl md:text-3xl font-black text-white">
-              {isRtl ? 'رحلة التسجيل متعددة الخطوات' : 'Multi-step tenant onboarding wizard'}
-            </h2>
-            <p className="max-w-3xl text-sm md:text-base leading-7 text-zinc-300">
-              {isRtl
-                ? 'نفس العقد الخلفي، نفس خطوات التسجيل، لكن داخل واجهة V2 أكثر وضوحاً وهدوءاً وقابلية للتوسعة.'
-                : 'Same backend contract and same registration behavior, delivered in a calmer V2-first experience.'}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
+    <div dir={isRtl ? 'rtl' : 'ltr'} className="relative min-h-screen overflow-hidden bg-zinc-950 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.2),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(244,114,182,0.16),_transparent_24%),linear-gradient(135deg,_rgba(9,9,11,0.98),_rgba(24,24,27,0.92))]" />
+      <div className="relative z-10 min-h-screen">
+        <header className="px-4 pt-5 md:px-8">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 rounded-full border border-white/10 bg-white/5 px-4 py-3 shadow-2xl backdrop-blur-xl">
             <button
               type="button"
               onClick={() => onNavigate('/')}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
+              className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-amber-300/40 hover:bg-white/10"
             >
-              {isRtl ? 'الرئيسية' : 'Home'}
+              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-300/20 bg-amber-400/10 text-amber-200">
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-200/70">Refah</p>
+                <h1 className="text-sm font-black text-white">{isRtl ? 'تجربة التسجيل العامة' : 'Public registration experience'}</h1>
+              </div>
             </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('/login')}
-              className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-400/20"
-            >
-              {isRtl ? 'تسجيل الدخول' : 'Sign in'}
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigate('/')}
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                <House size={16} />
+                <span>{isRtl ? 'الرئيسية' : 'Home'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate('/login')}
+                className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:bg-amber-400/20"
+              >
+                <LogIn size={16} />
+                <span>{isRtl ? 'تسجيل الدخول' : 'Login'}</span>
+              </button>
+            </div>
           </div>
-        </div>
+        </header>
 
-        <div className="mt-8">
-          <PublicWizardEngine
-            langDirection={isRtl ? 'rtl' : 'ltr'}
-            steps={stepDefinitions}
-            activeStepIndex={currentStep - 1}
-            loading={loading}
-            error={error}
-            isFirstStep={currentStep === 1}
-            isLastStep={currentStep === totalSteps}
-            onBack={prevStep}
-            onNext={nextStep}
-            backLabel={isRtl ? 'السابق' : 'Previous'}
-            nextLabel={isRtl ? 'التالي' : 'Next'}
-            submitLabel={isRtl ? 'إرسال الطلب' : 'Submit application'}
-          >
-            {currentStepContent}
-          </PublicWizardEngine>
-        </div>
-      </div>
+        <main className="px-4 pb-10 pt-6 md:px-8">
+          <div className="mx-auto flex max-w-5xl flex-col gap-6">
+            <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+              <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 md:p-8 shadow-[0_30px_100px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
+                  <CheckCircle2 size={14} />
+                  <span>{isRtl ? 'تسجيل منشأة جديدة' : 'New tenant registration'}</span>
+                </div>
+                <h2 className="mt-4 text-3xl font-black leading-tight text-white md:text-4xl">
+                  {isRtl ? 'رحلة تسجيل هادئة، واضحة، ومتوافقة مع الإنتاج' : 'A calm, clear registration journey that stays production-aligned'}
+                </h2>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-300 md:text-base">
+                  {isRtl
+                    ? 'نفس العقد الخلفي ونفس payload التسجيل، لكن داخل واجهة عامة أكثر فخامة ووضوحاً مع تنقل مريح ودعم كامل لقراءة المحتوى من اليمين إلى اليسار.'
+                    : 'Same backend contract and same registration payload, wrapped in a premium public interface with comfortable navigation and RTL support.'}
+                </p>
 
-      <div className="text-center text-xs text-zinc-500">
-        {isRtl
-          ? 'سيتم إرسال نفس payload التسجيل الإنتاجي إلى /auth/tenant/register.'
-          : 'The production registration payload is sent to /auth/tenant/register without contract drift.'}
+                <div className="mt-6 flex flex-wrap gap-2">
+                  {stepDefinitions.map((step, index) => {
+                    const active = currentStep - 1 === index;
+                    const done = currentStep - 1 > index;
+                    return (
+                      <div
+                        key={step.id}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                          active
+                            ? 'border-amber-300/60 bg-amber-400/10 text-amber-100'
+                            : done
+                              ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
+                              : 'border-white/10 bg-black/20 text-zinc-400'
+                        }`}
+                      >
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full border border-current/20 text-[10px] font-black">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                        <span>{step.title}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] border border-white/10 bg-black/25 p-6 md:p-8 shadow-[0_24px_90px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-amber-200/70">
+                  {isRtl ? 'ماذا تتوقع؟' : 'What to expect'}
+                </p>
+                <div className="mt-4 space-y-3">
+                  {[
+                    isRtl ? 'تنقل بسيط بين الخطوات دون تغيير في العقد الخلفي.' : 'Simple step navigation with the same backend contract.',
+                    isRtl ? 'رفع الملفات مع معاينة واضحة قبل الإرسال.' : 'File uploads with a clear preview before submission.',
+                    isRtl ? 'اختيار الباقة عبر بطاقات مميزة وسهلة القراءة.' : 'Package selection with refined, readable cards.'
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-200">
+                      <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-400" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">{isRtl ? 'الخطوة الحالية' : 'Current step'}</p>
+                      <p className="mt-1 text-lg font-black text-white">{stepDefinitions[currentStep - 1]?.title}</p>
+                    </div>
+                    <div className="rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
+                      {String(currentStep).padStart(2, '0')} / {String(totalSteps).padStart(2, '0')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <PublicWizardEngine
+                langDirection={isRtl ? 'rtl' : 'ltr'}
+                steps={stepDefinitions}
+                activeStepIndex={currentStep - 1}
+                loading={loading}
+                error={error}
+                isFirstStep={currentStep === 1}
+                isLastStep={currentStep === totalSteps}
+                onBack={prevStep}
+                onNext={nextStep}
+                backLabel={isRtl ? 'السابق' : 'Previous'}
+                nextLabel={isRtl ? 'التالي' : 'Next'}
+                submitLabel={isRtl ? 'إرسال الطلب' : 'Submit application'}
+              >
+                {currentStepContent}
+              </PublicWizardEngine>
+            </form>
+
+            <div className="text-center text-xs text-zinc-500">
+              {isRtl
+                ? 'سيتم إرسال نفس payload التسجيل الإنتاجي إلى /auth/tenant/register.'
+                : 'The production registration payload is sent to /auth/tenant/register without contract drift.'}
+            </div>
+          </div>
+        </main>
       </div>
-    </form>
+    </div>
   );
 }
-
