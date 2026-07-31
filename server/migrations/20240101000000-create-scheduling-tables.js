@@ -8,7 +8,7 @@
 
 'use strict';
 
-const { ensureIdempotentIndexing } = require('./_index-utils');
+const { ensureIdempotentIndexing } = require('../utils/migration-utils');
 
 module.exports = {
   async up(queryInterface, Sequelize) {

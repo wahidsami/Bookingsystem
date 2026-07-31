@@ -1,6 +1,6 @@
 'use strict';
 
-const { ensureIdempotentIndexing } = require('./_index-utils');
+const { ensureIdempotentIndexing } = require('../utils/migration-utils');
 
 const path = require('path');
 

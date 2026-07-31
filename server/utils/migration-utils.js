@@ -77,6 +77,8 @@ async function ensureIdempotentColumnChanges(queryInterface) {
 }
 
 module.exports = {
+  addIndexIfMissing: ensureIdempotentIndexing,
+  addColumnIfMissing: ensureIdempotentColumnChanges,
   ensureIdempotentIndexing,
   ensureIdempotentColumnChanges,
   normalizeFieldName,

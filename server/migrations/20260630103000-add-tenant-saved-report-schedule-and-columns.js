@@ -1,6 +1,6 @@
 'use strict';
 
-const { ensureIdempotentIndexing, ensureIdempotentColumnChanges } = require('./_index-utils');
+const { ensureIdempotentIndexing, ensureIdempotentColumnChanges } = require('../utils/migration-utils');
 
 module.exports = {
     async up(queryInterface, Sequelize) {

@@ -1,6 +1,6 @@
 'use strict';
 
-const { ensureIdempotentIndexing, ensureIdempotentColumnChanges } = require('./_index-utils');
+const { ensureIdempotentIndexing, ensureIdempotentColumnChanges } = require('../utils/migration-utils');
 
 const { randomUUID } = require('crypto');
 const { SUPPORT_TAXONOMY_CATALOG } = require('../src/utils/supportTaxonomyCatalog');
