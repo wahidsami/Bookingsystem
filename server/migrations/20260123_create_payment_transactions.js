@@ -1,5 +1,7 @@
 'use strict';
 
+const { ensureIdempotentIndexing } = require('./_index-utils');
+
 const path = require('path');
 
 function cloneAttribute(attribute) {
@@ -16,7 +18,8 @@ function cloneAttribute(attribute) {
 }
 
 module.exports = {
-  async up(queryInterface) {
+  async up(queryInterface, Sequelize) {
+    ensureIdempotentIndexing(queryInterface);
     const models = require(path.resolve(__dirname, '..', 'src', 'models'));
     const model = models.PaymentTransaction;
 

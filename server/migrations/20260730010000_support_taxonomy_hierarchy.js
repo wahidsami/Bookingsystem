@@ -1,5 +1,7 @@
 'use strict';
 
+const { ensureIdempotentIndexing } = require('./_index-utils');
+
 const { randomUUID } = require('crypto');
 const { SUPPORT_TAXONOMY_CATALOG } = require('../src/utils/supportTaxonomyCatalog');
 
@@ -43,6 +45,7 @@ function materializeTaxonomy(nodes, parentId = null, bucket = [], level = 0) {
 
 module.exports = {
     async up(queryInterface, Sequelize) {
+    ensureIdempotentIndexing(queryInterface);
         await queryInterface.addColumn('support_categories', 'parentId', {
             type: Sequelize.UUID,
             allowNull: true,

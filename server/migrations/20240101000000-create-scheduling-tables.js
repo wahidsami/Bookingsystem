@@ -1,15 +1,18 @@
 /**
  * Migration: Create Scheduling Tables
  * Creates StaffShift, StaffBreak, StaffTimeOff, and StaffScheduleOverride tables
- * 
+ *
  * Run with: npx sequelize-cli db:migrate
  * Or manually execute the SQL below
  */
 
 'use strict';
 
+const { ensureIdempotentIndexing } = require('./_index-utils');
+
 module.exports = {
   async up(queryInterface, Sequelize) {
+    ensureIdempotentIndexing(queryInterface);
     const { DataTypes } = Sequelize;
 
     // Create staff_shifts table
