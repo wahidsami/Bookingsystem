@@ -4,7 +4,8 @@
     "description": "Backend API for Rifah Multi-Tenant Platform",
     "main": "src/index.js",
     "scripts": {
-        "start": "node src/index.js",
+        "start": "node src/start.js",
+        "start:app": "node src/index.js",
         "dev": "nodemon src/index.js",
         "test": "jest",
         "test:report-export": "jest src/services/tenantReportPdfService.test.js",

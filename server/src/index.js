@@ -732,92 +732,18 @@ const startServer = async () => {
         await db.sequelize.authenticate();
         console.log('Database connection established successfully.');
 
-        // Sync models in dependency order
-        await db.SuperAdmin.sync({ force: false });
-        await db.ActivityLog.sync({ force: false });
-        await db.AdminNotification.sync({ force: false });
-        await db.GlobalSettings.sync({ force: false });
-
-        // Subscription System (must be before Tenant sync for foreign keys)
-        await db.SubscriptionPackage.sync({ force: false }); // Base packages
-        await db.FeaturePricing.sync({ force: false }); // Package builder pricing master list
-        await db.ServiceCategory.sync({ force: false }); // Global service categories
-
-        await db.Tenant.sync({ force: false });
-
-        // Subscription relationships (after Tenant)
-        await db.TenantSubscription.sync({ force: false }); // Tenant subscriptions
-        await db.Bill.sync({ force: false }); // Subscription invoices
+        // Database schema is managed by migrations. Runtime only verifies
+        // critical compatibility columns and supporting metadata.
         await ensureBillStatusSchema();
-        await db.BillPaymentAttempt.sync({ force: false }); // Bill payment reconciliation and audit trail
-        await db.TenantUsage.sync({ force: false }); // Usage tracking
-        await db.UsageAlert.sync({ force: false }); // Usage alerts
-        await db.TenantPushUsage.sync({ force: false }); // Marketing push quota usage
-        await db.TenantFeatureUsage.sync({ force: false }); // Monthly feature quota usage such as AI
-        await db.TenantPushCampaign.sync({ force: false }); // Marketing push campaign history
-        await db.StaffMessage.sync({ force: false }); // Internal tenant-to-staff messages
-        await db.NotificationDeliveryLog.sync({ force: false }); // Unified delivery logging (push + inbox/staff)
-
-        await db.PlatformUser.sync({ force: false }); // Must be before PaymentMethod, Transaction, CustomerInsight
         await ensurePlatformUserAuthSchema();
         await ensureTenantGiftCardSchema();
-        await db.PaymentMethod.sync({ force: false });
-        await db.User.sync({ force: false });
-        await db.Service.sync({ force: false });
-        await db.Product.sync({ force: false }); // New: Product catalog
-        await db.Customer.sync({ force: false });
-        await db.Staff.sync({ force: false });
         await ensureStaffSchema();
-        await db.StaffPermission.sync({ force: false });
         await ensureStaffPermissionSchema();
-        await db.MobilePushToken.sync({ force: false });
-        await db.ServiceEmployee.sync({ force: false }); // New: Service-Employee junction
-        await db.StaffSchedule.sync({ force: false }); // Legacy schedule (kept for backward compatibility)
-        // New scheduling models (Phase 3)
-        try {
-            await db.StaffShift.sync({ force: false });
-        } catch (err) {
-            console.warn('⚠️  StaffShift sync warning:', err.message);
-        }
-        try {
-            await db.StaffBreak.sync({ force: false });
-        } catch (err) {
-            console.warn('⚠️  StaffBreak sync warning:', err.message);
-        }
-        try {
-            await db.StaffTimeOff.sync({ force: false });
-        } catch (err) {
-            console.warn('⚠️  StaffTimeOff sync warning:', err.message);
-        }
-        try {
-            await db.StaffScheduleOverride.sync({ force: false });
-        } catch (err) {
-            console.warn('⚠️  StaffScheduleOverride sync warning:', err.message);
-        }
-        await db.Appointment.sync({ force: false });
-        await db.AppointmentEvent.sync({ force: false }); // Appointment lifecycle events (cancel/reschedule timeline)
-        await db.TenantOperationalAlertRead.sync({ force: false }); // Server-side unread tracking for tenant operational alerts
         await ensureAppointmentSchema();
         await ensureBookingSessionSchema();
-        await db.Review.sync({ force: false }); // Customer reviews
-        await db.CustomerInsight.sync({ force: false });
-        await db.Transaction.sync({ force: false });
         await ensurePaymentTransactionSchema();
-        await db.TenantPushCampaignRecipient.sync({ force: false }); // Marketing push recipients
-        await db.StaffPayroll.sync({ force: false }); // Payroll records
-        await db.Order.sync({ force: false }); // Order system
-        await db.OrderItem.sync({ force: false }); // Order items
-        await db.CustomerInvoice.sync({ force: false }); // Customer commerce invoices
-        await db.CustomerInvoiceItem.sync({ force: false }); // Customer invoice line items
-        await db.CustomerInvoiceEvent.sync({ force: false }); // Customer invoice audit trail
-        await db.TenantSavedReport.sync({ force: false }); // Tenant custom reports
-        await db.ConsultantSnapshot.sync({ force: false }); // AI consultant analytics snapshots
-        await db.ConsultantReport.sync({ force: false }); // AI consultant generated reports
-        await db.ConsultantConversation.sync({ force: false }); // AI consultant conversation history
-        await db.AdminSavedReport.sync({ force: false }); // Admin custom reports
-        await db.PublicPageData.sync({ force: false }); // Public page data
 
-        console.log('✅ Database synced successfully.');
+        console.log('✅ Database connectivity verified successfully.');
 
         // Create default super admin if none exists
         await createDefaultSuperAdmin();
