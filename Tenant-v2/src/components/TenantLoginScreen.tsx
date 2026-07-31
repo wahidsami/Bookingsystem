@@ -9,6 +9,9 @@ interface TenantLoginScreenProps {
   lang: Language;
   onToggleLang: () => void;
   onLogin: (email: string, password: string) => Promise<void>;
+  onForgotPassword?: () => void;
+  onRegister?: () => void;
+  onHome?: () => void;
   loading?: boolean;
   error?: string | null;
 }
@@ -17,6 +20,9 @@ export default function TenantLoginScreen({
   lang,
   onToggleLang,
   onLogin,
+  onForgotPassword,
+  onRegister,
+  onHome,
   loading = false,
   error = null
 }: TenantLoginScreenProps) {
@@ -24,6 +30,7 @@ export default function TenantLoginScreen({
   const isRtl = lang === 'ar';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,14 +78,25 @@ export default function TenantLoginScreen({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onToggleLang}
-            className="shrink-0 p-2 rounded-xl border border-zinc-800 bg-zinc-950 hover:bg-zinc-800 transition-colors text-zinc-300"
-            aria-label={isRtl ? 'تبديل اللغة' : 'Toggle language'}
-          >
-            <Globe size={16} />
-          </button>
+          <div className="flex flex-col gap-2 items-end">
+            {onHome && (
+              <button
+                type="button"
+                onClick={onHome}
+                className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+              >
+                {isRtl ? 'الرئيسية' : 'Home'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onToggleLang}
+              className="shrink-0 p-2 rounded-xl border border-zinc-800 bg-zinc-950 hover:bg-zinc-800 transition-colors text-zinc-300"
+              aria-label={isRtl ? 'تبديل اللغة' : 'Toggle language'}
+            >
+              <Globe size={16} />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -106,6 +124,16 @@ export default function TenantLoginScreen({
             />
           </label>
 
+          <label className="flex items-center gap-3 text-sm text-zinc-400">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500/50"
+            />
+            <span>{isRtl ? 'تذكرني على هذا الجهاز' : 'Remember me on this device'}</span>
+          </label>
+
           {(localError || error) && (
             <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
               {localError || error}
@@ -120,6 +148,23 @@ export default function TenantLoginScreen({
             {busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}
             <span>{isRtl ? 'تسجيل الدخول' : 'Sign in'}</span>
           </button>
+
+          <div className="flex items-center justify-between gap-3 text-xs text-zinc-500 pt-1">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="hover:text-zinc-200 transition-colors"
+            >
+              {isRtl ? 'نسيت كلمة المرور؟' : 'Forgot password?'}
+            </button>
+            <button
+              type="button"
+              onClick={onRegister}
+              className="hover:text-zinc-200 transition-colors"
+            >
+              {isRtl ? 'إنشاء منشأة جديدة' : 'Create a new tenant'}
+            </button>
+          </div>
         </form>
 
         <div className="px-6 pb-6 text-xs text-zinc-500 leading-6">

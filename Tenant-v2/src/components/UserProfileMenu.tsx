@@ -3,6 +3,20 @@ import { LogOut, Building, Shield, Check, ExternalLink, CalendarDays, Coins } fr
 import { Language } from '../types';
 import { translations } from '../data/translations';
 
+const PROFILE_AVATAR_SRC = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="User avatar">
+    <defs>
+      <linearGradient id="avatarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#f59e0b" />
+        <stop offset="100%" stop-color="#ec4899" />
+      </linearGradient>
+    </defs>
+    <rect width="120" height="120" rx="32" fill="url(#avatarGradient)" />
+    <circle cx="60" cy="48" r="24" fill="#fff" fill-opacity="0.92" />
+    <path d="M24 108c7-22 24-32 36-32s29 10 36 32" fill="#fff" fill-opacity="0.92" />
+  </svg>
+`)}`;
+
 interface UserProfileMenuProps {
   lang: Language;
   onClose: () => void;
@@ -32,7 +46,7 @@ export default function UserProfileMenu({
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full border-2 border-brand-200 overflow-hidden shrink-0">
             <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150&auto=format&fit=crop"
+              src={PROFILE_AVATAR_SRC}
               alt="User Avatar"
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"

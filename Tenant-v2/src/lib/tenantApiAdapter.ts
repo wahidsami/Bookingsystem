@@ -706,6 +706,32 @@ class TenantApiAdapter {
     }
   }
 
+  async getSubscriptionPackages(): Promise<any> {
+    return this.get('/api/v1/subscriptions/packages');
+  }
+
+  async registerTenant(formData: FormData): Promise<any> {
+    const response = await this.request('/auth/tenant/register', {
+      method: 'POST',
+      body: formData
+    });
+    return response.json();
+  }
+
+  async requestTenantForgotPassword(email: string, locale?: string): Promise<any> {
+    return this.post('/auth/tenant/forgot-password', {
+      email,
+      locale
+    });
+  }
+
+  async resetTenantPassword(token: string, password: string, confirmPassword?: string): Promise<any> {
+    return this.post(`/auth/tenant/reset-password/${encodeURIComponent(token)}`, {
+      password,
+      confirmPassword: confirmPassword || password
+    });
+  }
+
   private buildUrl(input: RequestInfo | URL): URL {
     const url = toAbsoluteUrl(input);
     if (url.pathname.startsWith('/api/v1/')) {

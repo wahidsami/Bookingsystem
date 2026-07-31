@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Sparkle, Info, X, Check } from 'lucide-react';
 import { Language, ViewType, TabItem, QuickLaunchRequest } from './types';
@@ -7,9 +7,10 @@ import Topbar from './components/Topbar';
 import Workspace from './components/Workspace';
 import GlobalSearch from './components/GlobalSearch';
 import ActivityCenter from './components/ActivityCenter';
-import TenantLoginScreen from './components/TenantLoginScreen';
+import PublicExperience from './components/PublicExperience';
 import { translations, navigationItems } from './data/translations';
 import { isElevatedDashboardRoleKey, useTenantAuth } from './contexts/TenantAuthContext';
+import { tenantApiAdapter } from './lib/tenantApiAdapter';
 import {
   hasHotDealsEntitlement,
   hasProductsAndOrdersEntitlement,
@@ -27,6 +28,8 @@ const DEFAULT_DASHBOARD_TAB: TabItem = {
   titleAr: 'لوحة التحكم',
   titleEn: 'Dashboard',
 };
+
+const LOGOUT_PENDING_KEY = 'refah-logout-pending';
 
 const createTabForView = (view: ViewType): TabItem => {
   const navItem = navigationItems.find(item => item.id === view);
@@ -53,6 +56,12 @@ export default function App() {
     logout
   } = useTenantAuth();
   const [lang, setLang] = useState<Language>('ar');
+  const [currentPath, setCurrentPath] = useState<string>(() =>
+    typeof window !== 'undefined' ? window.location.pathname : '/'
+  );
+  const [currentSearch, setCurrentSearch] = useState<string>(() =>
+    typeof window !== 'undefined' ? window.location.search : ''
+  );
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [currentTenant, setCurrentTenant] = useState('سبا لا كولين الفاخر - فرع العليا الرياض');
 
@@ -140,6 +149,64 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('refah-widget-order', JSON.stringify(widgetOrder));
   }, [widgetOrder]);
+
+  const navigateToPath = useCallback((nextPath: string, options?: { replace?: boolean }) => {
+    if (typeof window === 'undefined') return;
+
+    const normalizedPath = nextPath.startsWith('/') ? nextPath : `/${nextPath}`;
+    const nextSearch = '';
+    const current = `${window.location.pathname}${window.location.search}`;
+    const target = `${normalizedPath}${nextSearch}`;
+
+    if (current === target) {
+      return;
+    }
+
+    if (options?.replace) {
+      window.history.replaceState(null, '', normalizedPath);
+    } else {
+      window.history.pushState(null, '', normalizedPath);
+    }
+    setCurrentPath(normalizedPath);
+    setCurrentSearch(nextSearch);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+      setCurrentSearch(window.location.search);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    const isLogoutPending =
+      typeof window !== 'undefined' && window.sessionStorage.getItem(LOGOUT_PENDING_KEY) === '1';
+
+    if (isLogoutPending && currentPath.startsWith('/dashboard')) {
+      navigateToPath('/', { replace: true });
+      return;
+    }
+
+    if (isLogoutPending) {
+      return;
+    }
+
+    if (!isAuthenticated && currentPath.startsWith('/dashboard')) {
+      navigateToPath('/login', { replace: true });
+      return;
+    }
+
+    if (isAuthenticated && !currentPath.startsWith('/dashboard')) {
+      navigateToPath('/dashboard', { replace: true });
+    }
+  }, [authLoading, currentPath, isAuthenticated, navigateToPath]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -490,8 +557,21 @@ export default function App() {
     );
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(LOGOUT_PENDING_KEY, '1');
+    }
+    tenantApiAdapter.clearTokens();
     void logout();
+    window.location.replace('/');
+  };
+
+  const handleLogin = async (email: string, password: string) => {
+    await login(email, password);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(LOGOUT_PENDING_KEY);
+    }
+    navigateToPath('/dashboard', { replace: true });
   };
 
   const isRtl = lang === 'ar';
@@ -514,11 +594,15 @@ export default function App() {
 
   if (!isAuthenticated) {
     return (
-      <TenantLoginScreen
+      <PublicExperience
+        path={currentPath}
+        search={currentSearch}
         lang={lang}
         onToggleLang={handleToggleLang}
-        onLogin={login}
-        error={authError}
+        onNavigate={navigateToPath}
+        onLogin={handleLogin}
+        loginLoading={authLoading}
+        loginError={authError}
       />
     );
   }

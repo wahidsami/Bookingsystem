@@ -11,6 +11,20 @@ import Tabs from './Tabs';
 import NotificationCenter from './NotificationCenter';
 import UserProfileMenu from './UserProfileMenu';
 
+const PROFILE_AVATAR_SRC = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="User avatar">
+    <defs>
+      <linearGradient id="avatarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#f59e0b" />
+        <stop offset="100%" stop-color="#ec4899" />
+      </linearGradient>
+    </defs>
+    <rect width="96" height="96" rx="24" fill="url(#avatarGradient)" />
+    <circle cx="48" cy="38" r="18" fill="#fff" fill-opacity="0.92" />
+    <path d="M18 86c6-18 19-26 30-26s24 8 30 26" fill="#fff" fill-opacity="0.92" />
+  </svg>
+`)}`;
+
 interface TopbarProps {
   lang: Language;
   onToggleLang: () => void;
@@ -284,7 +298,7 @@ export default function Topbar({
             >
               <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-neutral-200 dark:border-zinc-700">
                 <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=100&auto=format&fit=crop"
+                  src={PROFILE_AVATAR_SRC}
                   alt="User Portrait"
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
