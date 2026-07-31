@@ -1,10 +1,11 @@
 'use strict';
 
-const { ensureIdempotentIndexing } = require('./_index-utils');
+const { ensureIdempotentIndexing, ensureIdempotentColumnChanges } = require('./_index-utils');
 
 module.exports = {
   async up(queryInterface, Sequelize) {
     ensureIdempotentIndexing(queryInterface);
+    ensureIdempotentColumnChanges(queryInterface);
     await queryInterface.addColumn('appointments', 'serviceVariantId', {
       type: Sequelize.STRING(120),
       allowNull: true

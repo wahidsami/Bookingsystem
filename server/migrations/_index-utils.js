@@ -56,9 +56,29 @@ async function ensureIdempotentIndexing(queryInterface) {
   queryInterface.__idempotentIndexingPatched = true;
 }
 
+async function ensureIdempotentColumnChanges(queryInterface) {
+  if (queryInterface.__idempotentColumnChangesPatched) {
+    return;
+  }
+
+  const originalAddColumn = queryInterface.addColumn.bind(queryInterface);
+
+  queryInterface.addColumn = async (tableName, columnName, attribute, ...rest) => {
+    const tableDefinition = await queryInterface.describeTable(tableName).catch(() => null);
+
+    if (tableDefinition && Object.prototype.hasOwnProperty.call(tableDefinition, columnName)) {
+      return;
+    }
+
+    return originalAddColumn(tableName, columnName, attribute, ...rest);
+  };
+
+  queryInterface.__idempotentColumnChangesPatched = true;
+}
+
 module.exports = {
   ensureIdempotentIndexing,
+  ensureIdempotentColumnChanges,
   normalizeFieldName,
   normalizeFields
 };
-

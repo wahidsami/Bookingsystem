@@ -1,10 +1,11 @@
 'use strict';
 
-const { ensureIdempotentIndexing } = require('./_index-utils');
+const { ensureIdempotentIndexing, ensureIdempotentColumnChanges } = require('./_index-utils');
 
 module.exports = {
     async up(queryInterface, Sequelize) {
     ensureIdempotentIndexing(queryInterface);
+    ensureIdempotentColumnChanges(queryInterface);
         await queryInterface.createTable('payment_idempotency_keys', {
             id: {
                 type: Sequelize.UUID,

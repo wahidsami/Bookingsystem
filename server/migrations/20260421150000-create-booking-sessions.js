@@ -1,10 +1,11 @@
 'use strict';
 
-const { ensureIdempotentIndexing } = require('./_index-utils');
+const { ensureIdempotentIndexing, ensureIdempotentColumnChanges } = require('./_index-utils');
 
 module.exports = {
   async up(queryInterface, Sequelize) {
     ensureIdempotentIndexing(queryInterface);
+    ensureIdempotentColumnChanges(queryInterface);
     await queryInterface.createTable('booking_sessions', {
       id: {
         type: Sequelize.UUID,

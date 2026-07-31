@@ -1,8 +1,11 @@
 'use strict';
 
+const { ensureIdempotentIndexing, ensureIdempotentColumnChanges } = require('./_index-utils');
+
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
+    ensureIdempotentColumnChanges(queryInterface);
     await queryInterface.addColumn('services', 'priceType', {
       type: Sequelize.STRING(20),
       allowNull: false,
