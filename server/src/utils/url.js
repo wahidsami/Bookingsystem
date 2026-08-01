@@ -3,7 +3,12 @@ const normalizeBaseUrl = (value) => {
         return '';
     }
 
-    return value.trim().replace(/\/+$/, '');
+    const candidate = value
+        .split(',')
+        .map((part) => part.trim())
+        .find(Boolean) || '';
+
+    return candidate.replace(/\/+$/, '');
 };
 
 const stripLoginPath = (value) => value.replace(/\/[a-z]{2}\/login$/i, '').replace(/\/login$/i, '');
