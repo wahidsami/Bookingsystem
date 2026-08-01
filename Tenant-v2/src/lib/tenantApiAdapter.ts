@@ -745,6 +745,36 @@ class TenantApiAdapter {
     return this.post('/tenant/subscription/pay', payload);
   }
 
+  async getBillPaymentDetails(token: string): Promise<any> {
+    return this.get(`/public/bills/by-token/${encodeURIComponent(token)}`);
+  }
+
+  async payBillByToken(
+    token: string,
+    options?: {
+      success?: boolean;
+      paymentProvider?: string;
+      paymentReference?: string;
+      paymentMethod?: string;
+      checkoutSessionId?: string;
+      gatewayStatus?: string;
+      paymentFailureReason?: string;
+      idempotencyKey?: string;
+    }
+  ): Promise<any> {
+    const success = options?.success !== false;
+    return this.post(`/public/bills/by-token/${encodeURIComponent(token)}/pay`, {
+      paymentStatus: success ? 'succeeded' : 'failed',
+      paymentProvider: options?.paymentProvider || 'refah_test_gateway',
+      paymentReference: options?.paymentReference,
+      paymentMethod: options?.paymentMethod || 'test_card',
+      checkoutSessionId: options?.checkoutSessionId,
+      gatewayStatus: options?.gatewayStatus || (success ? 'authorized' : 'declined'),
+      paymentFailureReason: options?.paymentFailureReason,
+      idempotencyKey: options?.idempotencyKey
+    });
+  }
+
   private buildUrl(input: RequestInfo | URL): URL {
     const url = toAbsoluteUrl(input);
     if (url.pathname.startsWith('/api/v1/')) {
@@ -756,6 +786,10 @@ class TenantApiAdapter {
     }
 
     if (url.pathname.startsWith('/auth/tenant/')) {
+      return new URL(`${API_BASE_URL}${url.pathname}${url.search}${url.hash}`);
+    }
+
+    if (url.pathname.startsWith('/public/')) {
       return new URL(`${API_BASE_URL}${url.pathname}${url.search}${url.hash}`);
     }
 

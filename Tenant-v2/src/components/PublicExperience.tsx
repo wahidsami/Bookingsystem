@@ -372,8 +372,11 @@ function PaymentGatewayScreen({
   const effectiveLang = locale || lang;
   const isRtl = effectiveLang === 'ar';
   const token = useMemo(() => new URLSearchParams(search).get('token') || '', [search]);
+  const isJwtToken = Boolean(token && token.includes('.'));
+  const isPublicBillLink = Boolean(token && !isJwtToken);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [session, setSession] = useState<{
     packageName: string;
     amount: number;
@@ -391,6 +394,27 @@ function PaymentGatewayScreen({
         setLoading(true);
         setError(null);
         setResultMessage(null);
+
+        if (isPublicBillLink) {
+          const response = await tenantApiAdapter.getBillPaymentDetails(token);
+          if (!active) return;
+
+          if (!response?.success) {
+            throw new Error(response?.message || (isRtl ? 'رابط الدفع غير صالح أو منتهي الصلاحية' : 'Invalid or expired payment link'));
+          }
+
+          setAlreadyPaid(Boolean(response?.alreadyPaid));
+          setSession({
+            packageName:
+              effectiveLang === 'ar'
+                ? response?.bill?.planSnapshot?.packageNameAr || response?.bill?.planSnapshot?.packageName || (isRtl ? 'الاشتراك' : 'Subscription')
+                : response?.bill?.planSnapshot?.packageName || response?.bill?.planSnapshot?.packageNameAr || (isRtl ? 'الاشتراك' : 'Subscription'),
+            amount: Number(response?.bill?.amount || 0),
+            currency: response?.bill?.currency || 'SAR',
+            paymentDueAt: response?.bill?.paymentTokenExpiresAt || response?.bill?.dueDate
+          });
+          return;
+        }
 
         const response = await tenantApiAdapter.getSubscriptionPaymentSession(token || undefined);
         if (!active) return;
@@ -424,6 +448,46 @@ function PaymentGatewayScreen({
     setResultMessage(null);
 
     try {
+      if (isPublicBillLink) {
+        const billPaymentToken = token;
+        if (!billPaymentToken) {
+          throw new Error(isRtl ? 'تعذر العثور على رابط الدفع لهذه الفاتورة' : 'Could not find a payment token for this invoice');
+        }
+
+        await tenantApiAdapter.payBillByToken(billPaymentToken, {
+          success,
+          paymentProvider: 'refah_test_gateway',
+          paymentMethod: 'test_card',
+          paymentReference: session?.packageName ? `${session.packageName}-${success ? 'TEST-SUCCESS' : `TEST-FAILED-${Date.now()}`}` : undefined,
+          gatewayStatus: success ? 'authorized' : 'declined',
+          paymentFailureReason: success
+            ? undefined
+            : 'Simulated test payment failure from the Refah test gateway',
+          idempotencyKey: success
+            ? `public_payment_link:${billPaymentToken}:success`
+            : `public_payment_link:${billPaymentToken}:failed:${Date.now()}`
+        });
+
+        if (!success) {
+          setResultMessage(isRtl ? 'تمت محاكاة فشل الدفع. يمكنك المحاولة مرة أخرى.' : 'Payment failure simulated. You can try again.');
+          return;
+        }
+
+        setResultMessage(
+          isRtl
+            ? 'تم الدفع بنجاح. يتم تحويلك الآن...'
+            : 'Payment completed successfully. Redirecting...'
+        );
+
+        const hasActiveTenantSession = typeof window !== 'undefined'
+          && Boolean(sessionStorage.getItem('rifah_tenant_access_token'));
+
+        window.setTimeout(() => {
+          onNavigate(hasActiveTenantSession ? '/dashboard/subscription' : '/login', { replace: true });
+        }, 1200);
+        return;
+      }
+
       const response = await tenantApiAdapter.submitSubscriptionPayment(success, token || undefined);
       if (!response?.success && success) {
         throw new Error(response?.message || (isRtl ? 'تعذّر إتمام الدفع' : 'Unable to complete payment'));
@@ -451,7 +515,11 @@ function PaymentGatewayScreen({
   };
 
   const localeBase = locale ? `/${locale}` : '';
-  const backHref = token ? `${localeBase}/login` : `${localeBase || ''}/`;
+  const backHref = isPublicBillLink
+    ? `${localeBase}/login`
+    : token
+      ? `${localeBase}/login`
+      : `${localeBase || ''}/`;
 
   if (loading) {
     return (
@@ -550,12 +618,22 @@ function PaymentGatewayScreen({
               </p>
             ) : null}
 
-            <p className="text-sm leading-7 text-zinc-300">
-              {isRtl
-                ? 'هذه صفحة دفع تجريبية آمنة. اضغط نجاح لإكمال التفعيل أو فشل لتجربة المسار الآخر.'
-                : 'This is a safe test payment page. Choose success to activate the tenant or failure to test the alternate path.'}
-            </p>
-          </div>
+          <p className="text-sm leading-7 text-zinc-300">
+            {isPublicBillLink
+              ? (isRtl
+                  ? 'هذه صفحة دفع آمنة لرابط الفاتورة المرسل بالبريد الإلكتروني.'
+                  : 'This is the secure bill payment page opened from your email link.')
+              : (isRtl
+                  ? 'هذه صفحة دفع تجريبية آمنة. اضغط نجاح لإكمال التفعيل أو فشل لتجربة المسار الآخر.'
+                  : 'This is a safe test payment page. Choose success to activate the tenant or failure to test the alternate path.')}
+          </p>
+        </div>
+
+          {alreadyPaid ? (
+            <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+              {isRtl ? 'هذه الفاتورة مدفوعة بالفعل.' : 'This invoice has already been paid.'}
+            </div>
+          ) : null}
 
           {resultMessage ? (
             <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
@@ -572,7 +650,7 @@ function PaymentGatewayScreen({
           <div className="mt-5 space-y-3">
             <button
               type="button"
-              disabled={paying}
+              disabled={paying || alreadyPaid}
               onClick={() => handlePay(true)}
               className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -582,7 +660,7 @@ function PaymentGatewayScreen({
 
             <button
               type="button"
-              disabled={paying}
+              disabled={paying || alreadyPaid}
               onClick={() => handlePay(false)}
               className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
