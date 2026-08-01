@@ -732,6 +732,19 @@ class TenantApiAdapter {
     });
   }
 
+  async getSubscriptionPaymentSession(token?: string): Promise<any> {
+    const query = this.buildQueryString({ token });
+    return this.get(`/tenant/subscription/payment${query ? `?${query}` : ''}`);
+  }
+
+  async submitSubscriptionPayment(success: boolean, token?: string): Promise<any> {
+    const payload: Record<string, any> = { success };
+    if (token) {
+      payload.token = token;
+    }
+    return this.post('/tenant/subscription/pay', payload);
+  }
+
   private buildUrl(input: RequestInfo | URL): URL {
     const url = toAbsoluteUrl(input);
     if (url.pathname.startsWith('/api/v1/')) {

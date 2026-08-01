@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type ReactNode, type FormEvent } from 'react';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
@@ -19,7 +19,18 @@ import { PublicLandingFramework } from './public/LandingFramework';
 import PublicRegistrationWizard from './public/PublicRegistrationWizard';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
-type PublicRoute = 'landing' | 'login' | 'register' | 'forgot-password' | 'reset-password' | 'register-success';
+type PublicRoute = 'landing' | 'login' | 'register' | 'forgot-password' | 'reset-password' | 'register-success' | 'payment';
+
+function stripLocalePrefix(path: string): { pathWithoutLocale: string; locale: Language | null } {
+  const match = path.match(/^\/(ar|en)(?=\/|$)/);
+  if (!match) {
+    return { pathWithoutLocale: path, locale: null };
+  }
+
+  const locale = match[1] as Language;
+  const pathWithoutLocale = path.slice(match[0].length) || '/';
+  return { pathWithoutLocale, locale };
+}
 
 interface PublicExperienceProps {
   path: string;
@@ -33,11 +44,14 @@ interface PublicExperienceProps {
 }
 
 function resolvePublicRoute(path: string): PublicRoute {
-  if (path.startsWith('/login')) return 'login';
-  if (path.startsWith('/register/success') || path.startsWith('/registration-success')) return 'register-success';
-  if (path.startsWith('/register')) return 'register';
-  if (path.startsWith('/forgot-password')) return 'forgot-password';
-  if (path.startsWith('/reset-password')) return 'reset-password';
+  const { pathWithoutLocale } = stripLocalePrefix(path);
+
+  if (pathWithoutLocale.startsWith('/login')) return 'login';
+  if (pathWithoutLocale.startsWith('/register/success') || pathWithoutLocale.startsWith('/registration-success')) return 'register-success';
+  if (pathWithoutLocale.startsWith('/register')) return 'register';
+  if (pathWithoutLocale.startsWith('/forgot-password')) return 'forgot-password';
+  if (pathWithoutLocale.startsWith('/reset-password')) return 'reset-password';
+  if (pathWithoutLocale.startsWith('/payment')) return 'payment';
   return 'landing';
 }
 
@@ -341,6 +355,256 @@ function ResetPasswordScreen({
   );
 }
 
+function PaymentGatewayScreen({
+  lang,
+  path,
+  search,
+  onToggleLang,
+  onNavigate
+}: {
+  lang: Language;
+  path: string;
+  search: string;
+  onToggleLang: () => void;
+  onNavigate: (path: string, options?: { replace?: boolean }) => void;
+}) {
+  const { locale } = stripLocalePrefix(path);
+  const effectiveLang = locale || lang;
+  const isRtl = effectiveLang === 'ar';
+  const token = useMemo(() => new URLSearchParams(search).get('token') || '', [search]);
+  const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [session, setSession] = useState<{
+    packageName: string;
+    amount: number;
+    currency: string;
+    paymentDueAt?: string;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        setResultMessage(null);
+
+        const response = await tenantApiAdapter.getSubscriptionPaymentSession(token || undefined);
+        if (!active) return;
+
+        if (!response?.success) {
+          throw new Error(response?.message || (isRtl ? 'رابط الدفع غير صالح أو منتهي الصلاحية' : 'Invalid or expired payment link'));
+        }
+
+        setSession({
+          packageName: response.packageName || (isRtl ? 'الاشتراك' : 'Subscription'),
+          amount: Number(response.amount || 0),
+          currency: response.currency || 'SAR',
+          paymentDueAt: response.paymentDueAt
+        });
+      } catch (loadError: any) {
+        if (!active) return;
+        setError(loadError?.message || (isRtl ? 'تعذر تحميل تفاصيل الدفع' : 'Failed to load payment details'));
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isRtl, token]);
+
+  const handlePay = async (success: boolean) => {
+    setPaying(true);
+    setError(null);
+    setResultMessage(null);
+
+    try {
+      const response = await tenantApiAdapter.submitSubscriptionPayment(success, token || undefined);
+      if (!response?.success && success) {
+        throw new Error(response?.message || (isRtl ? 'تعذّر إتمام الدفع' : 'Unable to complete payment'));
+      }
+
+      if (!success) {
+        setResultMessage(isRtl ? 'تمت محاكاة فشل الدفع. يمكنك المحاولة مرة أخرى.' : 'Payment failure simulated. You can try again.');
+        return;
+      }
+
+      setResultMessage(
+        isRtl
+          ? 'تم الدفع وتفعيل الحساب بنجاح. يتم تحويلك الآن...'
+          : 'Payment successful and account activated. Redirecting...'
+      );
+
+      window.setTimeout(() => {
+        onNavigate('/dashboard', { replace: true });
+      }, 1200);
+    } catch (submitError: any) {
+      setError(submitError?.message || (isRtl ? 'فشل الدفع' : 'Payment failed'));
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const localeBase = locale ? `/${locale}` : '';
+  const backHref = token ? `${localeBase}/login` : `${localeBase || ''}/`;
+
+  if (loading) {
+    return (
+      <PublicAuthShell
+        lang={effectiveLang}
+        onToggleLang={onToggleLang}
+        title={isRtl ? 'جارٍ تحميل بوابة الدفع' : 'Loading payment gateway'}
+        subtitle={isRtl ? 'لحظات قليلة بينما نُحضّر تفاصيل الاشتراك.' : 'Preparing your subscription payment details.'}
+      >
+        <div className="flex items-center justify-center py-12">
+          <LoaderCircle size={28} className="animate-spin text-amber-300" />
+        </div>
+      </PublicAuthShell>
+    );
+  }
+
+  if (error || !session) {
+    return (
+      <PublicAuthShell
+        lang={effectiveLang}
+        onToggleLang={onToggleLang}
+        title={isRtl ? 'تعذر فتح بوابة الدفع' : 'Unable to open payment gateway'}
+        subtitle={isRtl ? 'راجع الرابط في البريد الإلكتروني أو جرّب مرة أخرى.' : 'Check the email link or try again.'}
+      >
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            {error || (isRtl ? 'رابط الدفع غير صالح' : 'Invalid payment link')}
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => onNavigate(backHref || '/', { replace: true })}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              {isRtl ? 'العودة' : 'Back'}
+            </button>
+          </div>
+        </div>
+      </PublicAuthShell>
+    );
+  }
+
+  return (
+    <PublicAuthShell
+      lang={effectiveLang}
+      onToggleLang={onToggleLang}
+      title={isRtl ? 'إكمال سداد الاشتراك' : 'Complete subscription payment'}
+      subtitle={isRtl ? 'بوابة اختبار آمنة لإكمال تفعيل حساب المنشأة.' : 'Secure test gateway to finish activating the tenant account.'}
+    >
+      <div className="space-y-5">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-amber-200">
+              <ShieldCheck size={18} />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-200/70">Refah</p>
+              <p className="text-sm font-semibold text-white">{isRtl ? 'بوابة الدفع التجريبية' : 'Test payment gateway'}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onToggleLang}
+            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+          >
+            <Globe size={16} className="inline-block" /> <span className="ms-2">{isRtl ? 'English' : 'العربية'}</span>
+          </button>
+        </div>
+
+        <div className="rounded-[1.75rem] border border-white/10 bg-black/25 p-6 shadow-2xl">
+          <div className="mb-5 flex items-center justify-center">
+            <img src="/RifahNewLogoWhite.png" alt="Refah" className="h-12 w-auto object-contain" />
+          </div>
+
+          <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.22em] text-zinc-400">{isRtl ? 'الباقة' : 'Package'}</p>
+                <p className="mt-1 text-lg font-bold text-white">{session.packageName}</p>
+              </div>
+              <div className="text-end">
+                <p className="text-xs uppercase tracking-[0.22em] text-zinc-400">{isRtl ? 'المبلغ' : 'Amount'}</p>
+                <p className="mt-1 text-3xl font-black text-amber-300">
+                  {session.amount.toLocaleString()} {session.currency}
+                </p>
+              </div>
+            </div>
+
+            {session.paymentDueAt ? (
+              <p className="text-sm text-zinc-300">
+                {isRtl ? 'آخر موعد للسداد' : 'Payment due'}:{' '}
+                {new Date(session.paymentDueAt).toLocaleString(isRtl ? 'ar-SA' : 'en-GB', {
+                  dateStyle: 'medium',
+                  timeStyle: 'short'
+                })}
+              </p>
+            ) : null}
+
+            <p className="text-sm leading-7 text-zinc-300">
+              {isRtl
+                ? 'هذه صفحة دفع تجريبية آمنة. اضغط نجاح لإكمال التفعيل أو فشل لتجربة المسار الآخر.'
+                : 'This is a safe test payment page. Choose success to activate the tenant or failure to test the alternate path.'}
+            </p>
+          </div>
+
+          {resultMessage ? (
+            <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+              {resultMessage}
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="mt-5 space-y-3">
+            <button
+              type="button"
+              disabled={paying}
+              onClick={() => handlePay(true)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {paying ? <LoaderCircle size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              <span>{isRtl ? 'دفع الآن (نجاح تجريبي)' : 'Pay now (test success)'}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={paying}
+              onClick={() => handlePay(false)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span>{isRtl ? 'محاكاة فشل الدفع' : 'Simulate payment failure'}</span>
+            </button>
+          </div>
+
+          <div className="mt-5 text-center">
+            <button
+              type="button"
+              onClick={() => onNavigate(backHref || '/', { replace: true })}
+              className="text-sm font-semibold text-zinc-300 transition hover:text-white"
+            >
+              {isRtl ? 'العودة' : 'Back'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </PublicAuthShell>
+  );
+}
+
 function RegistrationSuccessScreen({
   lang,
   onToggleLang,
@@ -425,6 +689,10 @@ export default function PublicExperience({
 
   if (route === 'reset-password') {
     return <ResetPasswordScreen lang={lang} onToggleLang={onToggleLang} onNavigate={onNavigate} search={search} />;
+  }
+
+  if (route === 'payment') {
+    return <PaymentGatewayScreen lang={lang} path={path} search={search} onToggleLang={onToggleLang} onNavigate={onNavigate} />;
   }
 
   if (route === 'register-success') {
