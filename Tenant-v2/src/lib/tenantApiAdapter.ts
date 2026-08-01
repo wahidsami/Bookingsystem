@@ -1,8 +1,7 @@
-export const API_BASE_URL =
-  ((import.meta as any).env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ||
-  'http://localhost:5000/api/v1';
+import { API_BASE_URL, API_ORIGIN } from './apiConfig';
+import { normalizeEmployeeAvatarCollection } from './employeeImage';
 
-export const API_ORIGIN = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+export { API_BASE_URL, API_ORIGIN } from './apiConfig';
 
 const ACCESS_TOKEN_KEY = 'rifah_tenant_access_token';
 const REFRESH_TOKEN_KEY = 'rifah_tenant_refresh_token';
@@ -1005,7 +1004,36 @@ class TenantApiAdapter {
   }
 
   async getEmployees(): Promise<any> {
-    return this.get('/tenant/employees');
+    const response = await this.get('/tenant/employees');
+    const sourceEmployees = Array.isArray(response?.employees)
+      ? response.employees
+      : Array.isArray(response?.data?.employees)
+        ? response.data.employees
+        : Array.isArray(response?.data)
+          ? response.data
+          : [];
+    const employees = normalizeEmployeeAvatarCollection(sourceEmployees);
+
+    if (Array.isArray(response?.employees)) {
+      return { ...response, employees };
+    }
+
+    if (response?.data && Array.isArray(response.data.employees)) {
+      return {
+        ...response,
+        employees,
+        data: {
+          ...response.data,
+          employees
+        }
+      };
+    }
+
+    if (Array.isArray(response?.data)) {
+      return { ...response, employees, data: employees };
+    }
+
+    return { ...response, employees };
   }
 
   async getSubscriptionLimits(): Promise<any> {

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { API_ORIGIN, tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { DEFAULT_EMPLOYEE_AVATAR, resolveEmployeeImageUrl } from '../lib/employeeImage';
 import { 
   UserCheck, Calendar, TrendingUp, DollarSign, Clock, Star, 
   Settings, Award, Sparkles, Check, X, Download, ShieldCheck, Mail, Phone,
@@ -15,7 +16,6 @@ interface TeamsWorkspaceProps {
   quickLaunchRequest?: QuickLaunchRequest | null;
 }
 
-const DEFAULT_EMPLOYEE_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
 const EMPLOYEE_POSITION_OPTIONS = [
   { value: 'accountant', en: 'Accountant', ar: 'محاسب', uiPosition: 'dashboard-admin' },
   { value: 'receptionist', en: 'Receptionist', ar: 'استقبال', uiPosition: 'dashboard-admin' },
@@ -53,23 +53,6 @@ const DEFAULT_STAFF_APP_PERMISSIONS: Record<StaffAppPermissionKey, boolean> = {
   can_mark_no_show: true
 };
 
-const resolveEmployeePhotoUrl = (value: unknown) => {
-  const raw = `${value ?? ''}`.trim();
-  if (!raw) return DEFAULT_EMPLOYEE_AVATAR;
-  if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
-
-  const normalized = raw.replace(/^\/+/, '');
-  if (normalized.startsWith('uploads/')) {
-    return `${API_ORIGIN}/${normalized}`;
-  }
-
-  if (normalized.startsWith('tenants/') || normalized.startsWith('profiles/') || normalized.startsWith('support/')) {
-    return `${API_ORIGIN}/uploads/${normalized}`;
-  }
-
-  return `${API_ORIGIN}/uploads/${normalized}`;
-};
-
 const WEEKDAY_ROWS = [
   { dayOfWeek: 0, dayEn: 'Sunday', dayAr: 'الأحد' },
   { dayOfWeek: 1, dayEn: 'Monday', dayAr: 'الاثنين' },
@@ -91,44 +74,6 @@ const formatScheduleTime = (value: string) => {
   const period = hour >= 12 ? 'PM' : 'AM';
   const hour12 = hour % 12 || 12;
   return `${hour12}:${minutes} ${period}`;
-};
-
-const parseScheduleRange = (value: string) => {
-  const raw = `${value ?? ''}`.trim();
-  if (!raw || /^day off$/i.test(raw)) return null;
-
-  const parts = raw
-    .replace(/[–—]/g, '-')
-    .split('-')
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (parts.length < 2) return null;
-
-  return {
-    startTime: formatScheduleTime(parts[0]),
-    endTime: formatScheduleTime(parts.slice(1).join(' - '))
-  };
-};
-
-const normalizeWorkingHoursSchedule = (workingHours: any): TeamMemberData['schedule'] => {
-  return WEEKDAY_ROWS.map((day) => {
-    const dayKey = day.dayEn.toLowerCase();
-    const dayHours = workingHours?.[dayKey];
-    const isOpen = Boolean(dayHours?.isOpen);
-    const open = formatScheduleTime(dayHours?.open || '');
-    const close = formatScheduleTime(dayHours?.close || '');
-    const hours = isOpen && open && close ? `${open} - ${close}` : 'Day Off';
-
-    return {
-      dayEn: day.dayEn,
-      dayAr: day.dayAr,
-      hours,
-      status: isOpen ? 'working' : 'off',
-      slots: [],
-      subShifts: []
-    };
-  });
 };
 
 const normalizeShiftsToSchedule = (shifts: any[]): TeamMemberData['schedule'] => {
@@ -181,12 +126,92 @@ const buildScheduleFromWorkingData = (employee: any, shifts: any[]): TeamMemberD
     return normalizeShiftsToSchedule(shifts);
   }
 
-  if (employee?.workingHours && typeof employee.workingHours === 'object') {
-    return normalizeWorkingHoursSchedule(employee.workingHours);
-  }
-
   return [];
 };
+
+const DEFAULT_WORKING_HOURS = {
+  startTime: '10:00 AM',
+  endTime: '08:00 PM'
+};
+
+function to12HourTime(value: string) {
+  const raw = `${value || ''}`.trim();
+  if (!raw) return '';
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return raw;
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${suffix}`;
+}
+
+function to24HourTime(value: string) {
+  const raw = `${value || ''}`.trim();
+  if (!raw) return '';
+
+  const amPmMatch = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (amPmMatch) {
+    let hours = Number(amPmMatch[1]);
+    const minutes = amPmMatch[2];
+    const period = amPmMatch[3].toUpperCase();
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, '0')}:${minutes}`;
+  }
+
+  const timeMatch = raw.match(/^(\d{2}):(\d{2})/);
+  if (timeMatch) {
+    return `${timeMatch[1]}:${timeMatch[2]}`;
+  }
+
+  return raw.length >= 5 ? raw.slice(0, 5) : raw;
+}
+
+function createDefaultWeeklySchedule(): TeamMemberData['schedule'] {
+  return WEEKDAY_ROWS.map((day) => {
+    const isWorking = ![0, 5].includes(day.dayOfWeek);
+    return {
+      dayEn: day.dayEn,
+      dayAr: day.dayAr,
+      hours: isWorking
+        ? `${DEFAULT_WORKING_HOURS.startTime} - ${DEFAULT_WORKING_HOURS.endTime}`
+        : 'Day Off',
+      status: isWorking ? 'working' : 'off',
+      slots: [],
+      subShifts: []
+    };
+  });
+}
+
+function parseScheduleRange(hours: string) {
+  const raw = `${hours || ''}`.trim();
+  if (!raw || /^day off$/i.test(raw)) {
+    return { startTime: '', endTime: '', isOff: true };
+  }
+
+  const [startRaw, ...rest] = raw.replace(/[–—]/g, '-').split('-').map((part) => part.trim()).filter(Boolean);
+  const endRaw = rest.join(' - ');
+
+  return {
+    startTime: to24HourTime(startRaw || ''),
+    endTime: to24HourTime(endRaw || ''),
+    isOff: false
+  };
+}
+
+function formatScheduleRange(startTime: string, endTime: string) {
+  const start = to12HourTime(startTime);
+  const end = to12HourTime(endTime);
+  if (!start || !end) {
+    return 'Day Off';
+  }
+  return `${start} - ${end}`;
+}
+
+function parseTimeForInput(value: string) {
+  return to24HourTime(value);
+}
 
 const canonicalEmployeePosition = (value: string) => {
   const normalized = `${value || ''}`.trim().toLowerCase();
@@ -242,6 +267,7 @@ export interface TeamMemberData {
 
   // Schedule fields
   scheduleVisibilityWeeks: number;
+  workingHours?: Record<string, { isOpen?: boolean; open?: string; close?: string }>;
   schedule: Array<{
     dayEn: string;
     dayAr: string;
@@ -358,6 +384,15 @@ export default function TeamsWorkspace({
     allowed: null,
     loading: true
   });
+  const [scheduleState, setScheduleState] = useState<{
+    loading: boolean;
+    error: string | null;
+    lastEmployeeId: string | null;
+  }>({
+    loading: false,
+    error: null,
+    lastEmployeeId: null
+  });
 
   // Complete Form Data State
   const [formData, setFormData] = useState<TeamMemberData>({
@@ -389,14 +424,7 @@ export default function TeamsWorkspace({
     serviceCommissionEnabled: true,
     productCommissionEnabled: false,
     scheduleVisibilityWeeks: 2,
-    schedule: [
-      { dayEn: 'Sunday', dayAr: 'الأحد', hours: '10:00 AM - 08:00 PM', status: 'working', slots: [] },
-      { dayEn: 'Monday', dayAr: 'الاثنين', hours: '10:00 AM - 08:00 PM', status: 'working', slots: [] },
-      { dayEn: 'Tuesday', dayAr: 'الثلاثاء', hours: '10:00 AM - 08:00 PM', status: 'working', slots: [] },
-      { dayEn: 'Wednesday', dayAr: 'الأربعاء', hours: '10:00 AM - 08:00 PM', status: 'working', slots: [] },
-      { dayEn: 'Thursday', dayAr: 'الخميس', hours: '10:00 AM - 09:00 PM', status: 'working', slots: [] },
-      { dayEn: 'Friday', dayAr: 'الجمعة', hours: 'Day Off', status: 'off', slots: [] }
-    ],
+    schedule: createDefaultWeeklySchedule(),
     staffAppPassword: 'Password123!',
     dashboardPermissions: {
       view_dashboard: true,
@@ -477,7 +505,7 @@ export default function TeamsWorkspace({
         nameAr: emp.name || '',
         roleEn: getRoleLabel(emp.position).roleEn,
         roleAr: getRoleLabel(emp.position).roleAr,
-        avatar: resolveEmployeePhotoUrl(emp.photo),
+        avatar: emp.avatar || resolveEmployeeImageUrl(emp.photo || emp.profileImage),
         rating: parseFloat(emp.rating || 5.0),
         status: emp.isActive ? 'active' : 'off',
         email: emp.email || '',
@@ -500,7 +528,7 @@ export default function TeamsWorkspace({
         serviceCommissionEnabled: Boolean(emp.serviceCommissionEnabled),
         productCommissionEnabled: Boolean(emp.productCommissionEnabled),
         scheduleVisibilityWeeks: parseInt(emp.scheduleVisibilityWeeks || 2),
-        schedule: [],
+        schedule: buildScheduleFromWorkingData(emp, []),
         bookingsCount: parseInt(emp.totalBookings || 0),
         utilizationRate: 100,
         retentionRate: 100,
@@ -576,7 +604,7 @@ export default function TeamsWorkspace({
     }
   };
 
-  const syncSelectedMemberSchedule = async (employeeId: string) => {
+  const loadEmployeeSchedule = async (employeeId: string, employeeFallback?: Partial<TeamMemberData>) => {
     try {
       const response = await tenantApiAdapter.getEmployeeShifts(employeeId);
       const shifts = Array.isArray(response?.shifts)
@@ -585,29 +613,102 @@ export default function TeamsWorkspace({
           ? response.data.shifts
           : [];
 
-      setTeamMembers((prev) => prev.map((member) => {
-        if (member.id !== employeeId) {
-          return member;
-        }
-
-        return {
-          ...member,
-          schedule: buildScheduleFromWorkingData(member, shifts)
-        };
-      }));
+      return {
+        schedule: buildScheduleFromWorkingData(employeeFallback || null, shifts),
+        error: null
+      };
     } catch (err) {
       console.warn('Failed to load employee shifts:', err);
-      setTeamMembers((prev) => prev.map((member) => {
-        if (member.id !== employeeId) {
-          return member;
-        }
-
-        return {
-          ...member,
-          schedule: buildScheduleFromWorkingData(member, [])
-        };
-      }));
+      return {
+        schedule: buildScheduleFromWorkingData(employeeFallback || null, []),
+        error: err instanceof Error ? err.message : 'Failed to fetch employee shifts'
+      };
     }
+  };
+
+  const persistEmployeeSchedule = async (
+    employeeId: string,
+    schedule: TeamMemberData['schedule'],
+    scheduleStartDate: string,
+    scheduleEndDate: string,
+    scheduleContinues: boolean
+  ) => {
+    const existingResponse = await tenantApiAdapter.getEmployeeShifts(employeeId);
+    const existingShifts = Array.isArray(existingResponse?.shifts)
+      ? existingResponse.shifts
+      : Array.isArray(existingResponse?.data?.shifts)
+        ? existingResponse.data.shifts
+        : [];
+
+    await Promise.allSettled(
+      existingShifts.map((shift: any) => tenantApiAdapter.deleteEmployeeShift(employeeId, shift.id))
+    );
+
+    const saveTasks: Promise<any>[] = [];
+    const recurringStart = scheduleStartDate || new Date().toISOString().split('T')[0];
+    const recurringEnd = scheduleContinues ? null : (scheduleEndDate || null);
+
+    schedule.forEach((day, index) => {
+      if (day.status !== 'working') {
+        return;
+      }
+
+      const { startTime, endTime } = parseScheduleRange(day.hours);
+      if (!startTime || !endTime) {
+        return;
+      }
+
+      saveTasks.push(tenantApiAdapter.createEmployeeShift(employeeId, {
+        dayOfWeek: WEEKDAY_ROWS[index]?.dayOfWeek ?? null,
+        specificDate: null,
+        startTime,
+        endTime,
+        isRecurring: true,
+        startDate: recurringStart,
+        endDate: recurringEnd,
+        label: `${day.dayEn} Shift`
+      }));
+
+      (day.subShifts || []).forEach((subShift) => {
+        saveTasks.push(tenantApiAdapter.createEmployeeShift(employeeId, {
+          dayOfWeek: WEEKDAY_ROWS[index]?.dayOfWeek ?? null,
+          specificDate: null,
+          startTime: to24HourTime(subShift.startTime),
+          endTime: to24HourTime(subShift.endTime),
+          isRecurring: true,
+          startDate: recurringStart,
+          endDate: recurringEnd,
+          label: subShift.label
+        }));
+      });
+    });
+
+    await Promise.all(saveTasks);
+  };
+
+  const syncSelectedMemberSchedule = async (employeeId: string) => {
+    setScheduleState({
+      loading: true,
+      error: null,
+      lastEmployeeId: employeeId
+    });
+    const memberFallback = teamMembers.find((member) => member.id === employeeId);
+    const { schedule, error } = await loadEmployeeSchedule(employeeId, memberFallback);
+    setTeamMembers((prev) => prev.map((member) => {
+      if (member.id !== employeeId) {
+        return member;
+      }
+
+      return {
+        ...member,
+        schedule
+      };
+    }));
+    setScheduleState({
+      loading: false,
+      error,
+      lastEmployeeId: employeeId
+    });
   };
 
   useEffect(() => {
@@ -726,14 +827,7 @@ export default function TeamsWorkspace({
       scheduleEndDate: '',
       scheduleContinues: true,
       draftShifts: [],
-      schedule: [
-        { dayEn: 'Sunday', dayAr: 'الأحد', hours: '10:00 AM - 08:00 PM', status: 'working', slots: [], subShifts: [] },
-        { dayEn: 'Monday', dayAr: 'الاثنين', hours: '10:00 AM - 08:00 PM', status: 'working', slots: [], subShifts: [] },
-        { dayEn: 'Tuesday', dayAr: 'الثلاثاء', hours: '10:00 AM - 08:00 PM', status: 'working', slots: [], subShifts: [] },
-        { dayEn: 'Wednesday', dayAr: 'الأربعاء', hours: '10:00 AM - 08:00 PM', status: 'working', slots: [], subShifts: [] },
-        { dayEn: 'Thursday', dayAr: 'الخميس', hours: '10:00 AM - 09:00 PM', status: 'working', slots: [], subShifts: [] },
-        { dayEn: 'Friday', dayAr: 'الجمعة', hours: 'Day Off', status: 'off', slots: [], subShifts: [] }
-      ],
+      schedule: createDefaultWeeklySchedule(),
       staffAppPassword: 'Password123!',
       isActive: true,
       dashboardPermissions: {
@@ -791,11 +885,13 @@ export default function TeamsWorkspace({
       scheduleEndDate: member.scheduleEndDate ?? '',
       scheduleContinues: member.scheduleContinues ?? true,
       draftShifts: member.draftShifts ?? [],
-      schedule: member.schedule.map(s => ({ 
-        ...s, 
-        slots: [...s.slots],
-        subShifts: s.subShifts ? s.subShifts.map(sub => ({ ...sub })) : []
-      })),
+      schedule: Array.isArray(member.schedule) && member.schedule.length > 0
+        ? member.schedule.map(s => ({
+            ...s,
+            slots: [...s.slots],
+            subShifts: s.subShifts ? s.subShifts.map(sub => ({ ...sub })) : []
+          }))
+        : createDefaultWeeklySchedule(),
       isActive: member.isActive ?? true,
       dashboardPermissions: { 
         view_dashboard: member.dashboardPermissions.view_dashboard ?? true,
@@ -828,6 +924,25 @@ export default function TeamsWorkspace({
     if (member.position === 'service_provider') {
       void fetchStaffAppPermissions(member.id);
     }
+    void loadEmployeeSchedule(member.id, member).then(({ schedule }) => {
+      setTeamMembers((prev) => prev.map((existing) => (
+        existing.id === member.id ? { ...existing, schedule } : existing
+      )));
+      setFormData((prev) => (
+        prev.id === member.id
+          ? {
+              ...prev,
+              schedule: schedule.length > 0
+                ? schedule.map((day) => ({
+                    ...day,
+                    slots: [...day.slots],
+                    subShifts: day.subShifts ? day.subShifts.map((sub) => ({ ...sub })) : []
+                  }))
+                : createDefaultWeeklySchedule()
+            }
+          : prev
+      ));
+    });
     setActiveFormSection('basic');
     setActiveView('form');
   };
@@ -917,6 +1032,25 @@ export default function TeamsWorkspace({
           `تم تحديث بيانات عضو الفريق "${formData.nameEn || formData.nameAr}" بنجاح!`,
           'success'
         );
+      }
+
+      if (savedEmployeeId) {
+        try {
+          await persistEmployeeSchedule(
+            savedEmployeeId,
+            formData.schedule,
+            formData.scheduleStartDate || formData.joinedDate || new Date().toISOString().split('T')[0],
+            formData.scheduleEndDate || '',
+            Boolean(formData.scheduleContinues)
+          );
+        } catch (scheduleError) {
+          console.error('Failed to persist weekly schedule:', scheduleError);
+          triggerToast(
+            isRtl ? 'تعذر حفظ شيفتات العمل الأسبوعية' : 'Failed to save weekly working schedule',
+            isRtl ? 'تم حفظ الملف المهني لكن تعذر حفظ الجدول الأسبوعي.' : 'The employee profile was saved, but the weekly schedule could not be saved.',
+            'error'
+          );
+        }
       }
 
       if (isServiceProvider && savedEmployeeId) {
@@ -1058,18 +1192,26 @@ export default function TeamsWorkspace({
       updated[dayIndex] = {
         ...target,
         status: nextStatus,
-        hours: nextStatus === 'off' ? 'Day Off' : '10:00 AM - 08:00 PM'
+        hours: nextStatus === 'off'
+          ? 'Day Off'
+          : `${DEFAULT_WORKING_HOURS.startTime} - ${DEFAULT_WORKING_HOURS.endTime}`
       };
       return { ...prev, schedule: updated };
     });
   };
 
-  const handleScheduleHoursChange = (dayIndex: number, val: string) => {
+  const handleScheduleTimeChange = (dayIndex: number, field: 'startTime' | 'endTime', val: string) => {
     setFormData(prev => {
       const updated = [...prev.schedule];
+      const current = parseScheduleRange(updated[dayIndex].hours);
+      const nextStart = field === 'startTime' ? val : current.startTime;
+      const nextEnd = field === 'endTime' ? val : current.endTime;
       updated[dayIndex] = {
         ...updated[dayIndex],
-        hours: val
+        status: updated[dayIndex].status === 'working' ? 'working' : (nextStart || nextEnd ? 'working' : updated[dayIndex].status),
+        hours: nextStart && nextEnd
+          ? formatScheduleRange(nextStart, nextEnd)
+          : updated[dayIndex].hours
       };
       return { ...prev, schedule: updated };
     });
@@ -1083,8 +1225,8 @@ export default function TeamsWorkspace({
       subShifts.push({
         id: `sub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         label: isRtl ? 'شيفت مسائي' : 'Evening Shift',
-        startTime: '06:00 PM',
-        endTime: '09:00 PM'
+        startTime: '18:00',
+        endTime: '21:00'
       });
       updated[dayIndex] = { ...day, subShifts };
       return { ...prev, schedule: updated };
@@ -1796,18 +1938,46 @@ export default function TeamsWorkspace({
                     {activeSubTab === 'availability' && (
                       <div className="space-y-3 text-xs font-bold text-neutral-600">
                         <p className="text-[10px] font-black text-neutral-400 uppercase tracking-wider">{isRtl ? 'أوقات العمل الأسبوعية المعتمدة' : 'Official Registered Weekly Shifts'}</p>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {activeMember.schedule.map((day, idx) => (
-                            <div key={idx} className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 flex justify-between items-center">
-                              <span className="text-neutral-700">📅 {isRtl ? day.dayAr : day.dayEn}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-neutral-500">{day.hours}</span>
-                                <span className={`w-2 h-2 rounded-full ${day.status === 'working' ? 'bg-emerald-500' : 'bg-neutral-300'}`} />
+
+                        {scheduleState.loading && scheduleState.lastEmployeeId === activeMember.id ? (
+                          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center space-y-2">
+                            <div className="mx-auto h-8 w-8 rounded-full border-2 border-neutral-200 border-t-zinc-950 animate-spin" />
+                            <p className="text-xs text-neutral-500 font-bold">
+                              {isRtl ? 'جاري تحميل الشيفتات وساعات العمل...' : 'Loading shifts and working hours...'}
+                            </p>
+                          </div>
+                        ) : scheduleState.error && scheduleState.lastEmployeeId === activeMember.id ? (
+                          <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4 text-center space-y-2">
+                            <p className="text-sm font-black text-rose-700">
+                              {isRtl ? 'تعذر تحميل ساعات العمل' : 'Failed to load working hours'}
+                            </p>
+                            <p className="text-xs text-rose-600 font-medium">
+                              {scheduleState.error}
+                            </p>
+                          </div>
+                        ) : activeMember.schedule.length === 0 ? (
+                          <div className="rounded-2xl border border-slate-100 bg-white p-6 text-center space-y-2">
+                            <Calendar size={28} className="mx-auto text-neutral-300" />
+                            <p className="text-sm font-black text-neutral-700">
+                              {isRtl ? 'لا توجد شيفتات محددة.' : 'No shifts configured.'}
+                            </p>
+                            <p className="text-xs text-neutral-400">
+                              {isRtl ? 'لم يتم العثور على جدول عمل محفوظ لهذا الموظف بعد.' : 'No working schedule has been saved for this employee yet.'}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {activeMember.schedule.map((day, idx) => (
+                              <div key={idx} className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 flex justify-between items-center">
+                                <span className="text-neutral-700">📅 {isRtl ? day.dayAr : day.dayEn}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-neutral-500">{day.hours}</span>
+                                  <span className={`w-2 h-2 rounded-full ${day.status === 'working' ? 'bg-emerald-500' : 'bg-neutral-300'}`} />
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -2471,10 +2641,24 @@ export default function TeamsWorkspace({
                               
                               <div className="flex items-center gap-2 flex-1 sm:max-w-md">
                                 <input
-                                  type="text"
+                                  type="time"
+                                  step={900}
                                   disabled={day.status !== 'working'}
-                                  value={day.hours}
-                                  onChange={e => handleScheduleHoursChange(idx, e.target.value)}
+                                  value={parseScheduleRange(day.hours).startTime}
+                                  onChange={e => handleScheduleTimeChange(idx, 'startTime', e.target.value)}
+                                  className={`flex-1 text-center font-bold text-xs font-mono p-2 rounded-xl border transition-all ${
+                                    day.status === 'working'
+                                      ? 'bg-white border-slate-200 text-neutral-800 focus:ring-1 focus:ring-zinc-900'
+                                      : 'bg-neutral-100 border-neutral-100 text-neutral-400 cursor-not-allowed'
+                                  }`}
+                                />
+                                <span className="text-neutral-300 font-black text-[10px]">→</span>
+                                <input
+                                  type="time"
+                                  step={900}
+                                  disabled={day.status !== 'working'}
+                                  value={parseScheduleRange(day.hours).endTime}
+                                  onChange={e => handleScheduleTimeChange(idx, 'endTime', e.target.value)}
                                   className={`flex-1 text-center font-bold text-xs font-mono p-2 rounded-xl border transition-all ${
                                     day.status === 'working'
                                       ? 'bg-white border-slate-200 text-neutral-800 focus:ring-1 focus:ring-zinc-900'
@@ -2512,19 +2696,19 @@ export default function TeamsWorkspace({
                                         <option value="Restock & Prep">{isRtl ? 'تجهيز وتحضير' : 'Restock & Prep'}</option>
                                       </select>
                                       <input
-                                        type="text"
-                                        value={sub.startTime}
+                                        type="time"
+                                        step={900}
+                                        value={parseTimeForInput(sub.startTime)}
                                         onChange={e => handleSubShiftChange(idx, sub.id, 'startTime', e.target.value)}
                                         className="w-16 text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
-                                        placeholder="09:00 AM"
                                       />
                                       <span className="text-[10px] text-neutral-400 font-black font-mono">→</span>
                                       <input
-                                        type="text"
-                                        value={sub.endTime}
+                                        type="time"
+                                        step={900}
+                                        value={parseTimeForInput(sub.endTime)}
                                         onChange={e => handleSubShiftChange(idx, sub.id, 'endTime', e.target.value)}
                                         className="w-16 text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
-                                        placeholder="01:00 PM"
                                       />
                                       <button
                                         type="button"
