@@ -1,7 +1,64 @@
 const { Op } = require('sequelize');
 const db = require('../models');
+const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
 
 const ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'trial', 'past_due'];
+
+async function getPlanFallbackPackage(tenant) {
+    const tenantPlan = tenant?.plan ? String(tenant.plan).trim() : '';
+    if (!tenantPlan) return null;
+
+    const planBase = tenantPlan.split('_')[0].trim();
+    if (!planBase) return null;
+
+    return db.SubscriptionPackage.findOne({
+        where: {
+            [Op.or]: [
+                { slug: { [Op.iLike]: `%${planBase}%` } },
+                { name: { [Op.iLike]: `%${planBase}%` } }
+            ],
+            isActive: true
+        }
+    });
+}
+
+async function buildCanonicalSubscriptionResult(subscription, tenant) {
+    if (!subscription) {
+        return null;
+    }
+
+    const tenantSettings = tenant?.id
+        ? await db.TenantSettings.findOne({
+            where: { tenantId: tenant.id },
+            attributes: ['features']
+        })
+        : null;
+
+    const planPackage = tenant ? await getPlanFallbackPackage(tenant) : null;
+    const packageLimits = normalizePackageEntitlements(subscription.package?.limits || {});
+    const tenantFeatures = normalizePackageEntitlements(tenantSettings?.features || {});
+    const planFallbackLimits = normalizePackageEntitlements(planPackage?.limits || {});
+    const resolvedLimits = normalizePackageEntitlements(
+        planFallbackLimits,
+        tenantFeatures,
+        packageLimits
+    );
+
+    if (subscription.package) {
+        subscription.package.limits = resolvedLimits;
+    } else if (planPackage) {
+        planPackage.limits = resolvedLimits;
+        subscription.package = planPackage;
+    }
+
+    return {
+        subscription,
+        package: subscription.package || planPackage || null,
+        limits: resolvedLimits,
+        tenantFeatures,
+        planPackage
+    };
+}
 
 async function getActiveSubscriptionForTenant(tenantId, options = {}) {
     if (!tenantId) return null;
@@ -33,14 +90,15 @@ async function getActiveSubscriptionForTenant(tenantId, options = {}) {
             subscription = tenant?.subscription || null;
         }
 
-        if (!subscription || !subscription.package) {
+        if (!subscription) {
             return null;
         }
 
-        return {
-            subscription,
-            package: subscription.package
-        };
+        const tenant = await db.Tenant.findByPk(tenantId, {
+            attributes: ['id', 'plan']
+        });
+
+        return buildCanonicalSubscriptionResult(subscription, tenant);
     } catch (error) {
         console.error('[TenantSubscriptionService] getActiveSubscriptionForTenant error:', error.message);
         return null;

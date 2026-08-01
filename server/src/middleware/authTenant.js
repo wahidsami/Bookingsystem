@@ -261,7 +261,6 @@ const checkTenantFeature = (feature) => {
         });
       }
 
-      const { Op } = require('sequelize');
       const tenantId = req.tenantId;
       const featureKeys = getFeatureKeys(feature);
 
@@ -271,30 +270,6 @@ const checkTenantFeature = (feature) => {
       });
       const packageFeatures = normalizePackageEntitlements(subResult?.package?.limits || {});
       if (featureKeys.some((key) => isFeatureEnabled(packageFeatures[key]))) {
-        return next();
-      }
-
-      const settings = await db.TenantSettings.findOne({ where: { tenantId } });
-      const tenantFeatures = normalizePackageEntitlements(settings?.features || {});
-      if (featureKeys.some((key) => isFeatureEnabled(tenantFeatures[key]))) {
-        return next();
-      }
-
-      const tenantPlan = req.tenant.plan || '';
-      const planBase = tenantPlan.split('_')[0];
-
-      const planPackage = await db.SubscriptionPackage.findOne({
-        where: {
-          [Op.or]: [
-            { slug: { [Op.iLike]: `%${planBase}%` } },
-            { name: { [Op.iLike]: `%${planBase}%` } }
-          ],
-          isActive: true
-        }
-      });
-
-      const fallbackPackageFeatures = normalizePackageEntitlements(planPackage?.limits || {});
-      if (featureKeys.some((key) => isFeatureEnabled(fallbackPackageFeatures[key]))) {
         return next();
       }
 

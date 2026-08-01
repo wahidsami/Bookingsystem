@@ -1,4 +1,5 @@
 const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
 
 const checkResourceLimit = async (tenantId, resourceName, getCurrentCountFn) => {
     const result = await getActiveSubscriptionForTenant(tenantId, {
@@ -14,7 +15,7 @@ const checkResourceLimit = async (tenantId, resourceName, getCurrentCountFn) => 
         };
     }
 
-    const packageLimits = result.package?.limits || {};
+    const packageLimits = normalizePackageEntitlements(result.package?.limits || {});
     const limit = packageLimits[resourceName];
     const packageName = result.package?.name || 'Unknown';
 
