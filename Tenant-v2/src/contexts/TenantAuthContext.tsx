@@ -165,7 +165,13 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (usageResult.status === 'fulfilled') {
-      setSubscriptionUsage(normalizeTenantSubscriptionUsage(usageResult.value));
+      const normalizedUsage = normalizeTenantSubscriptionUsage(usageResult.value);
+      setSubscriptionUsage(normalizedUsage);
+
+      const livePackageEntitlements = usageResult.value?.limits || usageResult.value?.data?.limits || null;
+      if (livePackageEntitlements) {
+        setPackageEntitlements(normalizePackageEntitlements(livePackageEntitlements));
+      }
     } else {
       setSubscriptionUsage(null);
     }

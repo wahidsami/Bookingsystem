@@ -265,18 +265,18 @@ const checkTenantFeature = (feature) => {
       const tenantId = req.tenantId;
       const featureKeys = getFeatureKeys(feature);
 
-      const settings = await db.TenantSettings.findOne({ where: { tenantId } });
-      const tenantFeatures = normalizePackageEntitlements(settings?.features || {});
-      if (featureKeys.some((key) => isFeatureEnabled(tenantFeatures[key]))) {
-        return next();
-      }
-
       const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
       const subResult = await getActiveSubscriptionForTenant(tenantId, {
         statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
       });
       const packageFeatures = normalizePackageEntitlements(subResult?.package?.limits || {});
       if (featureKeys.some((key) => isFeatureEnabled(packageFeatures[key]))) {
+        return next();
+      }
+
+      const settings = await db.TenantSettings.findOne({ where: { tenantId } });
+      const tenantFeatures = normalizePackageEntitlements(settings?.features || {});
+      if (featureKeys.some((key) => isFeatureEnabled(tenantFeatures[key]))) {
         return next();
       }
 

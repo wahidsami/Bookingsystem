@@ -155,14 +155,15 @@ const getTenantFeatures = async (tenantId) => {
     }
 
     const limits = normalizePackageEntitlements(subscription.package.limits || {});
+    const maxHotDeals = toNumericEntitlement(limits.maxHotDeals, 0);
 
     return {
         packageName: subscription.package.name,
         packageSlug: subscription.package.slug,
         featuredCarousel: limits.featuredCarousel || false,
         carouselPriority: limits.carouselPriority || null,
-        maxHotDeals: limits.maxHotDeals || 0,
-        hotDealsAutoApprove: (limits.maxHotDeals || 0) !== 0,
+        maxHotDeals,
+        hotDealsAutoApprove: maxHotDeals !== 0,
         searchRankingBoost: limits.searchRankingBoost || 'standard',
         homepageBanner: limits.homepageBanner || false,
         featuredProducts: limits.featuredProducts || 0,

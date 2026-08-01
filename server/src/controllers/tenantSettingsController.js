@@ -72,7 +72,9 @@ exports.getSubscriptionLimits = async (req, res) => {
             statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
         });
         const packageLimits = subResult?.package?.limits || {};
-        const mergedFeatures = normalizePackageEntitlements(packageLimits, tenantFeatures);
+        // Package limits are the canonical source of truth. Tenant settings may
+        // add supplemental aliases, but they must never override the live plan.
+        const mergedFeatures = normalizePackageEntitlements(tenantFeatures, packageLimits);
 
         const [staff, services, products, bookings] = await Promise.all([
             checkResourceLimit(tenantId, 'maxStaff', async () => db.Staff.count({ where: { tenantId } })),

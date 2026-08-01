@@ -5,6 +5,8 @@
 
 const db = require('../models');
 const promotionService = require('../services/promotionService');
+const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const { normalizePackageEntitlements, toNumericEntitlement } = require('../utils/packageEntitlements');
 const fs = require('fs');
 const path = require('path');
 
@@ -85,21 +87,11 @@ const getHotDealsLimits = async (req, res) => {
     try {
         const tenantId = req.tenantId;
 
-        // Get tenant's subscription
-        const tenant = await db.Tenant.findByPk(tenantId, {
-            include: [{
-                model: db.TenantSubscription,
-                as: 'subscription',
-                where: { status: 'active' },
-                required: false,
-                include: [{
-                    model: db.SubscriptionPackage,
-                    as: 'package'
-                }]
-            }]
+        const subscriptionResult = await getActiveSubscriptionForTenant(tenantId, {
+            statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE', 'past_due']
         });
 
-        if (!tenant || !tenant.subscription) {
+        if (!subscriptionResult?.subscription || !subscriptionResult?.package) {
             return res.json({
                 success: true,
                 canCreate: false,
@@ -112,9 +104,9 @@ const getHotDealsLimits = async (req, res) => {
             });
         }
 
-        const packageLimits = tenant.subscription.package?.limits || {};
-        const maxHotDeals = packageLimits.maxHotDeals || 0;
-        const autoApprove = packageLimits.autoApproveHotDeals || false;
+        const packageLimits = normalizePackageEntitlements(subscriptionResult.package.limits || {});
+        const maxHotDeals = toNumericEntitlement(packageLimits.maxHotDeals, 0);
+        const autoApprove = Boolean(packageLimits.autoApproveHotDeals);
 
         // Count all created deals for the tenant so the quota never resets after
         // pausing, hiding, or expiring a deal.
@@ -128,7 +120,7 @@ const getHotDealsLimits = async (req, res) => {
             success: true,
             canCreate,
             limits: {
-                packageName: tenant.subscription.package?.name || 'Unknown',
+                packageName: subscriptionResult.package?.name || 'Unknown',
                 maxHotDeals,
                 autoApprove,
                 currentCount
