@@ -57,7 +57,135 @@ const resolveEmployeePhotoUrl = (value: unknown) => {
   const raw = `${value ?? ''}`.trim();
   if (!raw) return DEFAULT_EMPLOYEE_AVATAR;
   if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
-  return `${API_ORIGIN}${raw.startsWith('/') ? raw : `/${raw}`}`;
+
+  const normalized = raw.replace(/^\/+/, '');
+  if (normalized.startsWith('uploads/')) {
+    return `${API_ORIGIN}/${normalized}`;
+  }
+
+  if (normalized.startsWith('tenants/') || normalized.startsWith('profiles/') || normalized.startsWith('support/')) {
+    return `${API_ORIGIN}/uploads/${normalized}`;
+  }
+
+  return `${API_ORIGIN}/uploads/${normalized}`;
+};
+
+const WEEKDAY_ROWS = [
+  { dayOfWeek: 0, dayEn: 'Sunday', dayAr: 'الأحد' },
+  { dayOfWeek: 1, dayEn: 'Monday', dayAr: 'الاثنين' },
+  { dayOfWeek: 2, dayEn: 'Tuesday', dayAr: 'الثلاثاء' },
+  { dayOfWeek: 3, dayEn: 'Wednesday', dayAr: 'الأربعاء' },
+  { dayOfWeek: 4, dayEn: 'Thursday', dayAr: 'الخميس' },
+  { dayOfWeek: 5, dayEn: 'Friday', dayAr: 'الجمعة' },
+  { dayOfWeek: 6, dayEn: 'Saturday', dayAr: 'السبت' }
+] as const;
+
+const formatScheduleTime = (value: string) => {
+  const raw = `${value ?? ''}`.trim();
+  if (!raw) return '';
+  const normalized = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!normalized) return raw;
+  const hour = Number(normalized[1]);
+  const minutes = normalized[2];
+  if (!Number.isFinite(hour)) return raw;
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${period}`;
+};
+
+const parseScheduleRange = (value: string) => {
+  const raw = `${value ?? ''}`.trim();
+  if (!raw || /^day off$/i.test(raw)) return null;
+
+  const parts = raw
+    .replace(/[–—]/g, '-')
+    .split('-')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length < 2) return null;
+
+  return {
+    startTime: formatScheduleTime(parts[0]),
+    endTime: formatScheduleTime(parts.slice(1).join(' - '))
+  };
+};
+
+const normalizeWorkingHoursSchedule = (workingHours: any): TeamMemberData['schedule'] => {
+  return WEEKDAY_ROWS.map((day) => {
+    const dayKey = day.dayEn.toLowerCase();
+    const dayHours = workingHours?.[dayKey];
+    const isOpen = Boolean(dayHours?.isOpen);
+    const open = formatScheduleTime(dayHours?.open || '');
+    const close = formatScheduleTime(dayHours?.close || '');
+    const hours = isOpen && open && close ? `${open} - ${close}` : 'Day Off';
+
+    return {
+      dayEn: day.dayEn,
+      dayAr: day.dayAr,
+      hours,
+      status: isOpen ? 'working' : 'off',
+      slots: [],
+      subShifts: []
+    };
+  });
+};
+
+const normalizeShiftsToSchedule = (shifts: any[]): TeamMemberData['schedule'] => {
+  const grouped = new Map<number, any[]>();
+  WEEKDAY_ROWS.forEach((day) => grouped.set(day.dayOfWeek, []));
+
+  shifts.forEach((shift) => {
+    const dayOfWeek = Number.isInteger(shift?.dayOfWeek) ? Number(shift.dayOfWeek) : null;
+    let normalizedDay = dayOfWeek;
+
+    if (normalizedDay === null && shift?.specificDate) {
+      const parsedDate = new Date(shift.specificDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        normalizedDay = parsedDate.getDay();
+      }
+    }
+
+    if (normalizedDay === null || !grouped.has(normalizedDay)) {
+      return;
+    }
+
+    grouped.get(normalizedDay)!.push(shift);
+  });
+
+  return WEEKDAY_ROWS.map((day) => {
+    const items = (grouped.get(day.dayOfWeek) || []).filter((shift) => shift?.isActive !== false);
+    const ranges = items
+      .map((shift) => `${formatScheduleTime(shift.startTime || '')} - ${formatScheduleTime(shift.endTime || '')}`.trim())
+      .filter((range) => range && !range.startsWith(' - ') && !range.endsWith(' - '));
+    const subShifts = items.map((shift: any, shiftIndex: number) => ({
+      id: shift.id || `shift-${day.dayOfWeek}-${shiftIndex}`,
+      label: shift.label || (shift.isRecurring !== false ? 'Shift' : 'One-time shift'),
+      startTime: formatScheduleTime(shift.startTime || ''),
+      endTime: formatScheduleTime(shift.endTime || '')
+    }));
+
+    return {
+      dayEn: day.dayEn,
+      dayAr: day.dayAr,
+      hours: ranges.length > 0 ? ranges.join(' • ') : 'Day Off',
+      status: items.length > 0 ? 'working' : 'off',
+      slots: [],
+      subShifts
+    };
+  });
+};
+
+const buildScheduleFromWorkingData = (employee: any, shifts: any[]): TeamMemberData['schedule'] => {
+  if (Array.isArray(shifts) && shifts.length > 0) {
+    return normalizeShiftsToSchedule(shifts);
+  }
+
+  if (employee?.workingHours && typeof employee.workingHours === 'object') {
+    return normalizeWorkingHoursSchedule(employee.workingHours);
+  }
+
+  return [];
 };
 
 const canonicalEmployeePosition = (value: string) => {
@@ -391,11 +519,14 @@ export default function TeamsWorkspace({
         },
         reviewsList: []
       }));
-      setTeamMembers(mapped);
-      if (mapped.length > 0) {
-        setSelectedMemberId((prev) => (prev && mapped.some((member) => member.id === prev) ? prev : mapped[0].id));
-      } else {
-        setSelectedMemberId('');
+      const uniqueMembers = Array.from(new Map(mapped.map((member) => [member.id, member])).values());
+      setTeamMembers(uniqueMembers);
+      const nextSelected = selectedMemberId && uniqueMembers.some((member) => member.id === selectedMemberId)
+        ? selectedMemberId
+        : '';
+      setSelectedMemberId(nextSelected);
+      if (nextSelected) {
+        void syncSelectedMemberSchedule(nextSelected);
       }
     } catch (err) {
       console.error(err);
@@ -445,6 +576,40 @@ export default function TeamsWorkspace({
     }
   };
 
+  const syncSelectedMemberSchedule = async (employeeId: string) => {
+    try {
+      const response = await tenantApiAdapter.getEmployeeShifts(employeeId);
+      const shifts = Array.isArray(response?.shifts)
+        ? response.shifts
+        : Array.isArray(response?.data?.shifts)
+          ? response.data.shifts
+          : [];
+
+      setTeamMembers((prev) => prev.map((member) => {
+        if (member.id !== employeeId) {
+          return member;
+        }
+
+        return {
+          ...member,
+          schedule: buildScheduleFromWorkingData(member, shifts)
+        };
+      }));
+    } catch (err) {
+      console.warn('Failed to load employee shifts:', err);
+      setTeamMembers((prev) => prev.map((member) => {
+        if (member.id !== employeeId) {
+          return member;
+        }
+
+        return {
+          ...member,
+          schedule: buildScheduleFromWorkingData(member, [])
+        };
+      }));
+    }
+  };
+
   useEffect(() => {
     fetchTeamMembers();
     fetchSubscriptionLimits();
@@ -471,6 +636,14 @@ export default function TeamsWorkspace({
   const activeMember = useMemo(() => {
     return teamMembers.find((t) => t.id === selectedMemberId) || null;
   }, [teamMembers, selectedMemberId]);
+
+  useEffect(() => {
+    if (!selectedMemberId) {
+      return;
+    }
+
+    void syncSelectedMemberSchedule(selectedMemberId);
+  }, [selectedMemberId]);
 
   // Search & Filtered Directory List
   const filteredMembers = useMemo(() => {
@@ -758,7 +931,7 @@ export default function TeamsWorkspace({
           );
         }
       }
-      
+
       // Refresh list
       fetchTeamMembers();
       setActiveView('list');

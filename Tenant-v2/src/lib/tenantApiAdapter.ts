@@ -1192,7 +1192,7 @@ class TenantApiAdapter {
   }
 
   async getEmployeeShifts(employeeId: string): Promise<any> {
-    return this.request(`/tenant/employees/${employeeId}/shifts`);
+    return this.get(`/tenant/employees/${employeeId}/shifts`);
   }
 
   async createEmployeeShift(employeeId: string, shiftData: {
