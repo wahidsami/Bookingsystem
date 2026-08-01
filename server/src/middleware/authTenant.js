@@ -263,13 +263,52 @@ const checkTenantFeature = (feature) => {
 
       const tenantId = req.tenantId;
       const featureKeys = getFeatureKeys(feature);
+      const shouldTraceEntitlement =
+        feature === 'hasProductsAndOrders' &&
+        req.method === 'GET' &&
+        String(req.originalUrl || req.url || '').includes('/products');
 
       const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
       const subResult = await getActiveSubscriptionForTenant(tenantId, {
         statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
       });
       const packageFeatures = normalizePackageEntitlements(subResult?.package?.limits || {});
-      if (featureKeys.some((key) => isFeatureEnabled(packageFeatures[key]))) {
+      const isAllowed = featureKeys.some((key) => isFeatureEnabled(packageFeatures[key]));
+
+      if (shouldTraceEntitlement) {
+        const commitSha =
+          process.env.GIT_COMMIT_SHA ||
+          process.env.GITHUB_SHA ||
+          process.env.CI_COMMIT_SHA ||
+          process.env.VERCEL_GIT_COMMIT_SHA ||
+          process.env.HEROKU_SLUG_COMMIT ||
+          process.env.COMMIT_SHA ||
+          'unknown';
+
+        console.log('=== checkTenantFeature ===');
+        console.log('tenantId:', tenantId);
+        console.log('feature requested:', feature);
+        console.log('statuses used in getActiveSubscriptionForTenant():', ['active', 'trial', 'APPROVED_FREE_ACTIVE']);
+        console.log('process.env.GIT_COMMIT_SHA:', commitSha);
+        console.log('getActiveSubscriptionForTenant() result:', subResult);
+        console.log('subscription returned:', {
+          id: subResult?.subscription?.id ?? null,
+          status: subResult?.subscription?.status ?? null,
+          packageId: subResult?.subscription?.packageId ?? null
+        });
+        console.log('subscription.package:', subResult?.subscription?.package || null);
+        console.log('subscription.package.limits (raw JSON):', subResult?.subscription?.package?.limits || null);
+        console.log('normalized entitlements:', packageFeatures);
+        console.log('packageFeatures.hasProductsAndOrders:', packageFeatures?.hasProductsAndOrders);
+        console.log('packageFeatures.maxProducts:', packageFeatures?.maxProducts);
+        console.log('decision:', isAllowed ? 'ALLOW' : 'DENY');
+        console.log(
+          'exact boolean expression evaluated:',
+          `featureKeys.some((key) => isFeatureEnabled(packageFeatures[key])) => ${isAllowed}`
+        );
+      }
+
+      if (isAllowed) {
         return next();
       }
 
