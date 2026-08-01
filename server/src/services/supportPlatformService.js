@@ -1193,6 +1193,7 @@ async function resolveSupportAgentById(supportAgentId, transaction) {
 
 function buildRecipientListForTicketAction(ticket, actorContext, actionType) {
     const recipients = [];
+    const hasCustomerRecipient = Boolean(ticket?.customerPlatformUserId);
 
     if (actionType === 'ticket_created') {
         if (ticket.assignedSupportAgentId) {
@@ -1201,7 +1202,7 @@ function buildRecipientListForTicketAction(ticket, actorContext, actionType) {
             recipients.push({ recipientType: 'support_queue', recipientId: null });
         }
 
-        if (actorContext.isSupportAgent || actorContext.isSuperAdmin) {
+        if ((actorContext.isSupportAgent || actorContext.isSuperAdmin) && hasCustomerRecipient) {
             recipients.push({
                 recipientType: 'customer',
                 recipientId: ticket.customerPlatformUserId
@@ -1218,7 +1219,7 @@ function buildRecipientListForTicketAction(ticket, actorContext, actionType) {
             } else {
                 recipients.push({ recipientType: 'support_queue', recipientId: null });
             }
-        } else {
+        } else if (hasCustomerRecipient) {
             recipients.push({ recipientType: 'customer', recipientId: ticket.customerPlatformUserId });
         }
         return recipients;
@@ -1230,12 +1231,16 @@ function buildRecipientListForTicketAction(ticket, actorContext, actionType) {
         } else {
             recipients.push({ recipientType: 'support_queue', recipientId: null });
         }
-        recipients.push({ recipientType: 'customer', recipientId: ticket.customerPlatformUserId });
+        if (hasCustomerRecipient) {
+            recipients.push({ recipientType: 'customer', recipientId: ticket.customerPlatformUserId });
+        }
         return recipients;
     }
 
     if (['status_changed', 'priority_changed', 'category_changed', 'closed', 'reopened'].includes(actionType)) {
-        recipients.push({ recipientType: 'customer', recipientId: ticket.customerPlatformUserId });
+        if (hasCustomerRecipient) {
+            recipients.push({ recipientType: 'customer', recipientId: ticket.customerPlatformUserId });
+        }
         if (ticket.assignedSupportAgentId) {
             recipients.push({ recipientType: 'support_agent', recipientId: ticket.assignedSupportAgentId });
         } else {
@@ -1297,7 +1302,7 @@ async function createTicket({
         ? actorContext.actorId
         : normalizeText(customerPlatformUserId) || null;
 
-    if (!normalizedCustomerId) {
+    if (actorContext.isCustomer && !normalizedCustomerId) {
         throw createSupportError('customerPlatformUserId is required', 400);
     }
 
@@ -1315,7 +1320,9 @@ async function createTicket({
             throw createSupportError('Tenant not found', 404);
         }
 
-        const customer = await resolveCustomer(normalizedTenantId, normalizedCustomerId, transaction);
+        if (normalizedCustomerId) {
+            await resolveCustomer(normalizedTenantId, normalizedCustomerId, transaction);
+        }
         const category = await resolveCategoryOrNull(supportCategoryId, normalizedTenantId, transaction);
 
         const ticket = await db.SupportTicket.create({
@@ -1432,15 +1439,17 @@ async function createTicket({
             transaction
         });
 
-        await upsertReadState({
-            ticket,
-            participantType: 'customer',
-            participantId: normalizedCustomerId,
-            unreadCount: 0,
-            lastReadMessageId: initialMessage.id,
-            lastReadAt: new Date(),
-            transaction
-        });
+        if (normalizedCustomerId) {
+            await upsertReadState({
+                ticket,
+                participantType: 'customer',
+                participantId: normalizedCustomerId,
+                unreadCount: 0,
+                lastReadMessageId: initialMessage.id,
+                lastReadAt: new Date(),
+                transaction
+            });
+        }
 
         if (recipients.some((recipient) => recipient.recipientType === 'support_agent')) {
             await upsertReadState({
@@ -1754,13 +1763,15 @@ async function replyToTicket({
                 transaction
             });
 
-            await adjustReadStateUnreadCount({
-                ticket,
-                participantType: 'customer',
-                participantId: ticket.customerPlatformUserId,
-                delta: 1,
-                transaction
-            });
+            if (ticket.customerPlatformUserId) {
+                await adjustReadStateUnreadCount({
+                    ticket,
+                    participantType: 'customer',
+                    participantId: ticket.customerPlatformUserId,
+                    delta: 1,
+                    transaction
+                });
+            }
         }
 
         const freshTicket = await getExistingTicketOrThrow(ticket.id, actorContext, {

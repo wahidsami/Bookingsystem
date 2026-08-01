@@ -235,9 +235,13 @@ export default function SupportWorkspace({ lang, darkMode = false }: SupportWork
   const newTicketFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const actorCustomerId = useMemo(() => {
-    const candidate = tenant?.id || account?.id || user?.id || null;
+    const candidate =
+      account?.platformUserId ||
+      user?.platformUserId ||
+      tenant?.platformUserId ||
+      null;
     return candidate ? String(candidate) : null;
-  }, [account?.id, tenant?.id, user?.id]);
+  }, [account?.platformUserId, tenant?.platformUserId, user?.platformUserId]);
 
   const activeCategoryMap = useMemo(() => {
     const map = new Map<string, any>();
@@ -574,16 +578,13 @@ export default function SupportWorkspace({ lang, darkMode = false }: SupportWork
       setNewTicketValidation(isRtl ? 'الرسالة الأولى مطلوبة.' : 'Initial message is required.');
       return;
     }
-    if (!customerPlatformUserId) {
-      setNewTicketValidation(isRtl ? 'تعذر تحديد صاحب التذكرة من الجلسة الحالية.' : 'Unable to determine the ticket owner from the current session.');
-      return;
-    }
-
     setNewTicketSubmitting(true);
     try {
       const formData = new FormData();
       formData.append('tenantId', toText(tenant?.id || tenant?.tenantId || account?.tenantId || user?.tenantId || ''));
-      formData.append('customerPlatformUserId', customerPlatformUserId);
+      if (customerPlatformUserId) {
+        formData.append('customerPlatformUserId', customerPlatformUserId);
+      }
       formData.append('supportCategoryId', newTicketCategory);
       formData.append('priority', newTicketPriority);
       formData.append('subject', subject);
