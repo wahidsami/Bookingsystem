@@ -16,13 +16,41 @@ interface TeamsWorkspaceProps {
 }
 
 const DEFAULT_EMPLOYEE_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
-const POSITION_LABELS: Record<string, { en: string; ar: string; uiPosition: 'service-provider' | 'dashboard-admin' }> = {
-  service_provider: { en: 'Service Provider', ar: 'مقدم خدمة', uiPosition: 'service-provider' },
-  manager: { en: 'Manager', ar: 'مدير', uiPosition: 'dashboard-admin' },
-  receptionist: { en: 'Receptionist', ar: 'استقبال', uiPosition: 'dashboard-admin' },
-  accountant: { en: 'Accountant', ar: 'محاسب', uiPosition: 'dashboard-admin' },
-  marketing: { en: 'Marketing', ar: 'تسويق', uiPosition: 'dashboard-admin' },
-  other: { en: 'Staff', ar: 'موظف', uiPosition: 'dashboard-admin' }
+const EMPLOYEE_POSITION_OPTIONS = [
+  { value: 'accountant', en: 'Accountant', ar: 'محاسب', uiPosition: 'dashboard-admin' },
+  { value: 'receptionist', en: 'Receptionist', ar: 'استقبال', uiPosition: 'dashboard-admin' },
+  { value: 'service_provider', en: 'Service Provider', ar: 'مقدم خدمة', uiPosition: 'service-provider' },
+  { value: 'marketing', en: 'Marketing', ar: 'تسويق', uiPosition: 'dashboard-admin' },
+  { value: 'manager', en: 'Manager', ar: 'مدير', uiPosition: 'dashboard-admin' },
+  { value: 'other', en: 'Other', ar: 'أخرى', uiPosition: 'dashboard-admin' }
+] as const;
+
+type EmployeePosition = typeof EMPLOYEE_POSITION_OPTIONS[number]['value'];
+
+const EMPLOYEE_POSITION_LOOKUP = Object.fromEntries(
+  EMPLOYEE_POSITION_OPTIONS.map((option) => [option.value, option])
+) as Record<EmployeePosition, (typeof EMPLOYEE_POSITION_OPTIONS)[number]>;
+
+const STAFF_APP_PERMISSION_KEYS = [
+  'view_earnings',
+  'view_reviews',
+  'reply_reviews',
+  'view_clients',
+  'view_booking_notes',
+  'can_start_service',
+  'can_mark_no_show'
+] as const;
+
+type StaffAppPermissionKey = typeof STAFF_APP_PERMISSION_KEYS[number];
+
+const DEFAULT_STAFF_APP_PERMISSIONS: Record<StaffAppPermissionKey, boolean> = {
+  view_earnings: false,
+  view_reviews: true,
+  reply_reviews: false,
+  view_clients: false,
+  view_booking_notes: false,
+  can_start_service: true,
+  can_mark_no_show: true
 };
 
 const resolveEmployeePhotoUrl = (value: unknown) => {
@@ -34,9 +62,14 @@ const resolveEmployeePhotoUrl = (value: unknown) => {
 
 const canonicalEmployeePosition = (value: string) => {
   const normalized = `${value || ''}`.trim().toLowerCase();
+  if (!normalized) return 'other';
   if (normalized === 'service-provider') return 'service_provider';
   if (normalized === 'dashboard-admin') return 'manager';
-  return normalized || 'other';
+  if (normalized === 'service_provider') return 'service_provider';
+  if (normalized === 'accountant' || normalized === 'receptionist' || normalized === 'marketing' || normalized === 'manager' || normalized === 'other') {
+    return normalized as EmployeePosition;
+  }
+  return 'other';
 };
 
 export type TeamSubTab =
@@ -67,7 +100,7 @@ export interface TeamMemberData {
   nationalityAr: string;
   nationalityEn: string;
   gender: 'female' | 'male';
-  position: 'service-provider' | 'dashboard-admin';
+  position: EmployeePosition;
   specialtiesEn: string[];
   specialtiesAr: string[];
   languagesEn: string[];
@@ -162,71 +195,6 @@ export interface TeamMemberData {
   }>;
 }
 
-const defaultTeamMember: TeamMemberData = {
-  id: '',
-  nameEn: 'Unknown',
-  nameAr: 'غير معروف',
-  roleEn: 'Staff',
-  roleAr: 'موظف',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-  rating: 5,
-  status: 'active',
-  email: '',
-  phone: '',
-  joinedDate: new Date().toISOString().split('T')[0],
-  bioEn: '',
-  bioAr: '',
-  experienceEn: '',
-  experienceAr: '',
-  nationalityAr: 'سعودية',
-  nationalityEn: 'Saudi',
-  gender: 'female',
-  position: 'service-provider',
-  specialtiesEn: [],
-  specialtiesAr: [],
-  languagesEn: ['English', 'Arabic'],
-  languagesAr: ['الإنجليزية', 'العربية'],
-  baseSalary: 0,
-  commissionRatePct: 0,
-  serviceCommissionEnabled: false,
-  productCommissionEnabled: false,
-  scheduleVisibilityWeeks: 2,
-  schedule: [],
-  dashboardPermissions: {
-    view_dashboard: true,
-    manage_appointments: false,
-    view_employees: false,
-    manage_financials: false,
-    view_reports: false,
-    manage_settings: false,
-    view_appointments: false,
-    view_schedules: false,
-    view_customers: false,
-    view_services: false,
-    view_products: false,
-    view_orders: false,
-    view_financial: false,
-    view_bills: false,
-    view_pos: false,
-    view_messages: false,
-    view_reviews: false,
-    view_hot_deals: false,
-    view_notifications: false,
-    view_payroll: false,
-    view_subscription: false,
-    view_settings: false,
-    manage_accounts: false
-  },
-  bookingsCount: 0,
-  utilizationRate: 0,
-  retentionRate: 0,
-  noShowCount: 0,
-  servicesSales: 0,
-  productSales: 0,
-  tips: 0,
-  reviewsList: []
-};
-
 export default function TeamsWorkspace({ 
   lang, 
   addEmployeeTrigger = 0, 
@@ -236,7 +204,7 @@ export default function TeamsWorkspace({
   const isRtl = lang === 'ar';
 
   // State Management
-  const [selectedMemberId, setSelectedMemberId] = useState<string>('emp-1');
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('');
   const [activeSubTab, setActiveSubTab] = useState<TeamSubTab>('profile');
   const [activeView, setActiveView] = useState<'list' | 'form'>('list');
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
@@ -247,12 +215,21 @@ export default function TeamsWorkspace({
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [genderFilter, setGenderFilter] = useState<'all' | 'female' | 'male'>('all');
-  const [positionFilter, setPositionFilter] = useState<'all' | 'service-provider' | 'dashboard-admin'>('all');
+  const [positionFilter, setPositionFilter] = useState<'all' | EmployeePosition>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'break' | 'off'>('all');
   const [sortBy, setSortBy] = useState<'none' | 'name-asc' | 'name-desc' | 'rating-desc' | 'bookings-desc'>('none');
 
-  // Quota Subscription Limit Check (Max 20 members)
-  const quotaLimit = 20;
+  const [subscriptionLimits, setSubscriptionLimits] = useState<{
+    current: number | null;
+    limit: number | null;
+    allowed: boolean | null;
+    loading: boolean;
+  }>({
+    current: null,
+    limit: null,
+    allowed: null,
+    loading: true
+  });
 
   // Complete Form Data State
   const [formData, setFormData] = useState<TeamMemberData>({
@@ -274,7 +251,7 @@ export default function TeamsWorkspace({
     nationalityAr: 'سعودية',
     nationalityEn: 'Saudi',
     gender: 'female',
-    position: 'service-provider',
+    position: 'service_provider',
     specialtiesEn: [],
     specialtiesAr: [],
     languagesEn: ['English', 'Arabic'],
@@ -315,6 +292,9 @@ export default function TeamsWorkspace({
   const [toasts, setToasts] = useState<Array<{ id: string; msgEn: string; msgAr: string; type: 'success' | 'info' | 'error' }>>([]);
   const [employeePhotoFile, setEmployeePhotoFile] = useState<File | null>(null);
   const employeePhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const [staffAppPermissions, setStaffAppPermissions] = useState<Record<StaffAppPermissionKey, boolean>>({
+    ...DEFAULT_STAFF_APP_PERMISSIONS
+  });
   
   const triggerToast = (en: string, ar: string, type: 'success' | 'info' | 'error' = 'success') => {
     const id = Date.now().toString();
@@ -325,12 +305,13 @@ export default function TeamsWorkspace({
   };
 
   const getRoleLabel = (position: string) => {
-    const normalized = `${position || ''}`.trim().toLowerCase();
-    const labels = POSITION_LABELS[normalized] || POSITION_LABELS.other;
+    const normalized = canonicalEmployeePosition(position);
+    const labels = EMPLOYEE_POSITION_LOOKUP[normalized] || EMPLOYEE_POSITION_LOOKUP.other;
     return {
       uiPosition: labels.uiPosition,
       roleEn: labels.en,
-      roleAr: labels.ar
+      roleAr: labels.ar,
+      position: normalized
     };
   };
 
@@ -354,6 +335,9 @@ export default function TeamsWorkspace({
   const [teamMembers, setTeamMembers] = useState<TeamMemberData[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const quotaLimit = subscriptionLimits.limit;
+  const quotaUsed = subscriptionLimits.current ?? teamMembers.length;
+  const quotaRemaining = quotaLimit == null ? null : Math.max(quotaLimit - quotaUsed, 0);
 
   const fetchTeamMembers = async () => {
     try {
@@ -378,7 +362,7 @@ export default function TeamsWorkspace({
         nationalityAr: emp.nationality || '',
         nationalityEn: emp.nationality || '',
         gender: emp.gender === 'male' ? 'male' : 'female',
-        position: getRoleLabel(emp.position).uiPosition,
+        position: getRoleLabel(emp.position).position,
         specialtiesEn: Array.isArray(emp.skills) ? emp.skills : [],
         specialtiesAr: Array.isArray(emp.skills) ? emp.skills : [],
         languagesEn: Array.isArray(emp.spokenLanguages) ? emp.spokenLanguages : [],
@@ -398,17 +382,20 @@ export default function TeamsWorkspace({
         tips: 0,
         dashboardPermissions: {
           view_dashboard: true,
-          manage_appointments: true,
-          view_employees: true,
+          manage_appointments: false,
+          view_employees: false,
           manage_financials: false,
           view_reports: false,
-          manage_settings: false
+          manage_settings: false,
+          ...(emp.dashboardPermissions || {})
         },
         reviewsList: []
       }));
       setTeamMembers(mapped);
       if (mapped.length > 0) {
-        setSelectedMemberId(prev => prev === 'emp-1' ? mapped[0].id : prev);
+        setSelectedMemberId((prev) => (prev && mapped.some((member) => member.id === prev) ? prev : mapped[0].id));
+      } else {
+        setSelectedMemberId('');
       }
     } catch (err) {
       console.error(err);
@@ -418,8 +405,49 @@ export default function TeamsWorkspace({
     }
   };
 
+  const fetchSubscriptionLimits = async () => {
+    try {
+      const response = await tenantApiAdapter.getSubscriptionLimits();
+      const staff = response?.data?.staff || {};
+      setSubscriptionLimits({
+        current: Number.isFinite(Number(staff.current)) ? Number(staff.current) : null,
+        limit: Number.isFinite(Number(staff.limit)) ? Number(staff.limit) : null,
+        allowed: typeof staff.allowed === 'boolean' ? staff.allowed : null,
+        loading: false
+      });
+    } catch (err) {
+      console.error(err);
+      setSubscriptionLimits({
+        current: null,
+        limit: null,
+        allowed: null,
+        loading: false
+      });
+    }
+  };
+
+  const fetchStaffAppPermissions = async (employeeId: string) => {
+    try {
+      const response = await tenantApiAdapter.getEmployeePermissions(employeeId);
+      const nextPermissions = response?.permissions || {};
+      setStaffAppPermissions({
+        view_earnings: Boolean(nextPermissions.view_earnings),
+        view_reviews: nextPermissions.view_reviews !== undefined ? Boolean(nextPermissions.view_reviews) : DEFAULT_STAFF_APP_PERMISSIONS.view_reviews,
+        reply_reviews: Boolean(nextPermissions.reply_reviews),
+        view_clients: Boolean(nextPermissions.view_clients),
+        view_booking_notes: Boolean(nextPermissions.view_booking_notes),
+        can_start_service: nextPermissions.can_start_service !== undefined ? Boolean(nextPermissions.can_start_service) : DEFAULT_STAFF_APP_PERMISSIONS.can_start_service,
+        can_mark_no_show: nextPermissions.can_mark_no_show !== undefined ? Boolean(nextPermissions.can_mark_no_show) : DEFAULT_STAFF_APP_PERMISSIONS.can_mark_no_show
+      });
+    } catch (err) {
+      console.error(err);
+      setStaffAppPermissions({ ...DEFAULT_STAFF_APP_PERMISSIONS });
+    }
+  };
+
   useEffect(() => {
     fetchTeamMembers();
+    fetchSubscriptionLimits();
   }, []);
 
   // Handle outside trigger to open add form
@@ -441,7 +469,7 @@ export default function TeamsWorkspace({
   }, [quickLaunchRequest?.nonce]);
 
   const activeMember = useMemo(() => {
-    return teamMembers.find(t => t.id === selectedMemberId) || teamMembers[0] || defaultTeamMember;
+    return teamMembers.find((t) => t.id === selectedMemberId) || null;
   }, [teamMembers, selectedMemberId]);
 
   // Search & Filtered Directory List
@@ -480,7 +508,7 @@ export default function TeamsWorkspace({
 
   // Form Open Triggers
   const handleOpenAddForm = () => {
-    if (teamMembers.length >= quotaLimit) {
+    if (quotaLimit !== null && quotaUsed >= quotaLimit) {
       triggerToast(
         `Subscription team limit of ${quotaLimit} reached! Upgrade plan to add more.`,
         `لقد بلغت الحد الأقصى لباقة الاشتراك (${quotaLimit} أعضاء). يرجى ترقية الباقة لتعيين المزيد.`,
@@ -490,6 +518,7 @@ export default function TeamsWorkspace({
     }
     setFormMode('add');
     setEmployeePhotoFile(null);
+    setStaffAppPermissions({ ...DEFAULT_STAFF_APP_PERMISSIONS });
     setFormData({
       id: '',
       nameEn: '',
@@ -509,7 +538,7 @@ export default function TeamsWorkspace({
       nationalityAr: 'سعودية',
       nationalityEn: 'Saudi',
       gender: 'female',
-      position: 'service-provider',
+      position: 'service_provider',
       specialtiesEn: [],
       specialtiesAr: [],
       languagesEn: ['English', 'Arabic'],
@@ -577,6 +606,7 @@ export default function TeamsWorkspace({
   const handleOpenEditForm = (member: TeamMemberData) => {
     setFormMode('edit');
     setEmployeePhotoFile(null);
+    setStaffAppPermissions({ ...DEFAULT_STAFF_APP_PERMISSIONS });
     setFormData({
       ...member,
       specialtiesEn: [...member.specialtiesEn],
@@ -622,12 +652,18 @@ export default function TeamsWorkspace({
         manage_accounts: member.dashboardPermissions.manage_accounts ?? false
       }
     });
+    if (member.position === 'service_provider') {
+      void fetchStaffAppPermissions(member.id);
+    }
     setActiveFormSection('basic');
     setActiveView('form');
   };
 
   // Toggle Live Duty Status on active member
   const handleLiveStatusChange = (newStatus: 'active' | 'break' | 'off') => {
+    if (!activeMember) {
+      return;
+    }
     setTeamMembers(prev => prev.map(m => {
       if (m.id === activeMember.id) {
         return { ...m, status: newStatus };
@@ -660,6 +696,8 @@ export default function TeamsWorkspace({
       const canonicalPosition = canonicalEmployeePosition(formData.position);
       const primaryBio = isRtl ? formData.bioAr || formData.bioEn : formData.bioEn || formData.bioAr;
       const primaryExperience = isRtl ? formData.experienceAr || formData.experienceEn : formData.experienceEn || formData.experienceAr;
+      const isServiceProvider = canonicalPosition === 'service_provider';
+      let savedEmployeeId = formData.id;
 
       payload.append('name', formData.nameEn || formData.nameAr);
       if (formData.email.trim()) {
@@ -691,19 +729,34 @@ export default function TeamsWorkspace({
       }
 
       if (formMode === 'add') {
-        await tenantApiAdapter.createEmployee(payload);
+        const response = await tenantApiAdapter.createEmployee(payload);
+        savedEmployeeId = response?.employee?.id || savedEmployeeId;
         triggerToast(
           `Team member "${formData.nameEn || formData.nameAr}" added successfully!`,
           `تم إضافة عضو الفريق الجديد "${formData.nameEn || formData.nameAr}" بنجاح!`,
           'success'
         );
       } else {
-        await tenantApiAdapter.updateEmployee(formData.id, payload);
+        const response = await tenantApiAdapter.updateEmployee(formData.id, payload);
+        savedEmployeeId = response?.employee?.id || savedEmployeeId || formData.id;
         triggerToast(
           `Team member "${formData.nameEn || formData.nameAr}" updated successfully!`,
           `تم تحديث بيانات عضو الفريق "${formData.nameEn || formData.nameAr}" بنجاح!`,
           'success'
         );
+      }
+
+      if (isServiceProvider && savedEmployeeId) {
+        try {
+          await tenantApiAdapter.updateEmployeePermissions(savedEmployeeId, staffAppPermissions);
+        } catch (permissionsError) {
+          console.error(permissionsError);
+          triggerToast(
+            isRtl ? 'تعذر حفظ صلاحيات تطبيق الموظف' : 'Failed to save staff app permissions',
+            isRtl ? 'تم حفظ الملف المهني، لكن تعذر حفظ صلاحيات تطبيق الموظف.' : 'The profile was saved, but the staff app permissions could not be saved.',
+            'error'
+          );
+        }
       }
       
       // Refresh list
@@ -949,7 +1002,7 @@ export default function TeamsWorkspace({
       updated.view_employees = true;
       updated.view_payroll = true;
       updated.view_schedules = true;
-    } else if (preset === 'service-provider') {
+    } else if (preset === 'service_provider') {
       updated.view_dashboard = true;
       updated.view_schedules = true;
       updated.view_appointments = true;
@@ -966,12 +1019,15 @@ export default function TeamsWorkspace({
   };
 
   // Net Payable salary calculations
-  const serviceCommEarned = Math.round((activeMember.servicesSales * activeMember.commissionRatePct) / 100);
-  const productCommEarned = activeMember.productCommissionEnabled ? Math.round((activeMember.productSales * 5) / 100) : 0;
-  const netPayrollTotal = activeMember.baseSalary + serviceCommEarned + productCommEarned + activeMember.tips;
+  const serviceCommEarned = Math.round(((activeMember?.servicesSales || 0) * (activeMember?.commissionRatePct || 0)) / 100);
+  const productCommEarned = activeMember?.productCommissionEnabled ? Math.round(((activeMember?.productSales || 0) * 5) / 100) : 0;
+  const netPayrollTotal = (activeMember?.baseSalary || 0) + serviceCommEarned + productCommEarned + (activeMember?.tips || 0);
 
   // Export CSV Payslip
   const handleExportPayslip = () => {
+    if (!activeMember) {
+      return;
+    }
     let csvContent = "data:text/csv;charset=utf-8,";
     csvContent += `Refah Beauty Salon - Official Teams Payslip\r\n`;
     csvContent += `Employee: ${activeMember.nameEn} (${activeMember.nameAr})\r\n`;
@@ -1057,18 +1113,26 @@ export default function TeamsWorkspace({
               <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl border border-white/10 shrink-0 md:w-64 space-y-2">
                 <div className="flex justify-between text-xs font-black">
                   <span>{isRtl ? 'حصة الفريق المستهلكة' : 'Teams Quota Used'}</span>
-                  <span>{teamMembers.length} / {quotaLimit}</span>
+                  <span>{teamMembers.length} / {quotaLimit ?? (subscriptionLimits.loading ? '...' : '—')}</span>
                 </div>
                 <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
                   <div 
                     className="bg-amber-400 h-full transition-all duration-500" 
-                    style={{ width: `${(teamMembers.length / quotaLimit) * 100}%` }}
+                    style={{
+                      width: quotaLimit && quotaLimit > 0
+                        ? `${Math.min(100, (teamMembers.length / quotaLimit) * 100)}%`
+                        : '0%'
+                    }}
                   />
                 </div>
                 <p className="text-[9px] text-neutral-400 font-bold">
-                  {isRtl 
-                    ? `متبقي لك تعيين ${quotaLimit - teamMembers.length} موظفين في باقتك` 
-                    : `You can add ${quotaLimit - teamMembers.length} more specialists.`}
+                  {quotaLimit == null
+                    ? (isRtl ? 'جاري تحميل حدود الباقة...' : 'Loading subscription limits...')
+                    : quotaRemaining == null
+                      ? (isRtl ? 'تمت مزامنة حدود الفريق.' : 'Team limits synced.')
+                      : isRtl
+                        ? `متبقي لك تعيين ${quotaRemaining} موظفين في باقتك`
+                        : `You can add ${quotaRemaining} more specialists.`}
                 </p>
               </div>
             </div>
@@ -1100,12 +1164,15 @@ export default function TeamsWorkspace({
                 {/* Position / Role type filter */}
                 <select
                   value={positionFilter}
-                  onChange={e => setPositionFilter(e.target.value as any)}
+                  onChange={e => setPositionFilter(e.target.value as 'all' | EmployeePosition)}
                   className="bg-slate-50 border border-slate-200 focus:ring-1 focus:ring-zinc-900 text-xs font-bold text-neutral-700 py-2.5 px-3 rounded-xl"
                 >
                   <option value="all">{isRtl ? 'كل أنواع الوظائف' : 'All Access Types'}</option>
-                  <option value="service-provider">{isRtl ? 'كادر فني (تطبيق)' : 'Service Provider'}</option>
-                  <option value="dashboard-admin">{isRtl ? 'إدارة (لوحة تحكم)' : 'Dashboard Admin'}</option>
+                  {EMPLOYEE_POSITION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {isRtl ? option.ar : option.en}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Duty status filter */}
@@ -1202,11 +1269,11 @@ export default function TeamsWorkspace({
                           {/* Mini badges */}
                           <div className="flex gap-2 mt-1 items-center">
                             <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
-                              member.position === 'service-provider' 
-                                ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
+                              member.position === 'service_provider'
+                                ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
                                 : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                             }`}>
-                              {member.position === 'service-provider' ? (isRtl ? 'مقدم خدمة' : 'Provider') : (isRtl ? 'إدارة' : 'Admin')}
+                              {member.position === 'service_provider' ? (isRtl ? 'مقدم خدمة' : 'Provider') : (isRtl ? 'إدارة' : 'Admin')}
                             </span>
                             <span className="text-[8px] text-neutral-400 font-bold flex items-center gap-0.5">
                               ⭐ {member.rating.toFixed(1)}
@@ -1244,6 +1311,8 @@ export default function TeamsWorkspace({
 
             {/* Right Column: Tabbed Member Profile Workspace Details */}
             <div className="xl:col-span-8 space-y-4">
+              {activeMember ? (
+                <>
               
               {/* Upper Header info card */}
               <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1648,6 +1717,22 @@ export default function TeamsWorkspace({
                 </AnimatePresence>
               </div>
 
+                </>
+              ) : (
+                <div className="bg-white p-8 rounded-2xl border border-neutral-100 shadow-xs min-h-[350px] flex items-center justify-center text-center">
+                  <div className="space-y-2 max-w-sm">
+                    <UserCheck size={28} className="mx-auto text-neutral-300" />
+                    <p className="text-sm font-black text-neutral-700">
+                      {isRtl ? 'لا يوجد عضو فريق محدد بعد' : 'No team member selected yet'}
+                    </p>
+                    <p className="text-xs text-neutral-400">
+                      {isRtl
+                        ? 'اختر أحد أعضاء الفريق من القائمة لعرض التفاصيل أو أضف عضواً جديداً.'
+                        : 'Select a team member from the list to view details or add a new one.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1839,32 +1924,23 @@ export default function TeamsWorkspace({
 
                       <div className="space-y-1 md:col-span-2">
                         <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'مسار الوصول والوظيفة التنظيمية *' : 'Roster Position & Security Level *'}</label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-1.5 bg-slate-50 rounded-2xl border border-slate-200">
-                          <button
-                            type="button"
-                            onClick={() => setFormData(p => ({ ...p, position: 'service-provider' }))}
-                            className={`p-3 rounded-xl text-xs font-black text-start transition-all cursor-pointer border ${
-                              formData.position === 'service-provider'
-                                ? 'bg-zinc-950 text-white border-zinc-950 shadow-sm'
-                                : 'bg-white hover:bg-neutral-50 text-neutral-600 border-slate-200'
-                            }`}
-                          >
-                            <p>{isRtl ? 'مقدم خدمة فنية (تطبيق رفاه)' : 'Service Provider (Staff App Access)'}</p>
-                            <span className="text-[9px] font-bold text-neutral-400 mt-1 block">Renders in booking screens, can receive client appointments and use the Staff App password path.</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setFormData(p => ({ ...p, position: 'dashboard-admin' }))}
-                            className={`p-3 rounded-xl text-xs font-black text-start transition-all cursor-pointer border ${
-                              formData.position === 'dashboard-admin'
-                                ? 'bg-zinc-950 text-white border-zinc-950 shadow-sm'
-                                : 'bg-white hover:bg-neutral-50 text-neutral-600 border-slate-200'
-                            }`}
-                          >
-                            <p>{isRtl ? 'إدارة لوحة التحكم وصلاحيات الفروع' : 'Dashboard Admin (Dashboard Access)'}</p>
-                            <span className="text-[9px] font-bold text-neutral-400 mt-1 block">Grants admin login privileges. Use standard dashboard module permission checklist.</span>
-                          </button>
-                        </div>
+                        <select
+                          value={formData.position}
+                          onChange={e => setFormData(p => ({ ...p, position: canonicalEmployeePosition(e.target.value) }))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
+                          required
+                        >
+                          {EMPLOYEE_POSITION_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {isRtl ? option.ar : option.en}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-neutral-400 font-medium leading-relaxed">
+                          {isRtl
+                            ? 'مقدمو الخدمة يحصلون على تطبيق الموظفين، أما بقية الوظائف فتستخدم حسابات لوحة التحكم مع الصلاحيات المناسبة.'
+                            : 'Service providers use the staff app path. All other positions use dashboard access with the appropriate preset and permissions.'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -2328,7 +2404,7 @@ export default function TeamsWorkspace({
                       </button>
                     </div>
 
-                    {formData.position === 'service-provider' ? (
+                    {formData.position === 'service_provider' ? (
                       /* Staff App passcode credentials path */
                       <div className="p-5 bg-indigo-50/40 rounded-2xl border border-indigo-100 space-y-4 text-xs font-bold">
                         <div className="flex items-center gap-2 text-indigo-900">
@@ -2355,6 +2431,43 @@ export default function TeamsWorkspace({
                             </p>
                           )}
                         </div>
+
+                        <div className="rounded-2xl border border-indigo-100 bg-white/90 p-4 space-y-3">
+                          <div>
+                            <h5 className="text-[11px] font-black text-neutral-800">
+                              {isRtl ? 'صلاحيات تطبيق الموظف' : 'Staff app permissions'}
+                            </h5>
+                            <p className="text-[10px] text-neutral-500 font-medium">
+                              {isRtl
+                                ? 'هذه الصلاحيات تتحكم بما يظهر في تطبيق الموظف لهذا العضو.'
+                                : 'These permissions control what this employee can access in the staff app.'}
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {STAFF_APP_PERMISSION_KEYS.map((key) => (
+                              <label key={key} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5">
+                                <span className="text-[11px] font-semibold text-neutral-700">
+                                  {key === 'view_earnings' && (isRtl ? 'عرض الأرباح' : 'View earnings')}
+                                  {key === 'view_reviews' && (isRtl ? 'عرض التقييمات' : 'View reviews')}
+                                  {key === 'reply_reviews' && (isRtl ? 'الرد على التقييمات' : 'Reply to reviews')}
+                                  {key === 'view_clients' && (isRtl ? 'عرض العملاء' : 'View clients')}
+                                  {key === 'view_booking_notes' && (isRtl ? 'عرض ملاحظات الحجز' : 'View booking notes')}
+                                  {key === 'can_start_service' && (isRtl ? 'إظهار زر بدء الخدمة' : 'Show Start button')}
+                                  {key === 'can_mark_no_show' && (isRtl ? 'إظهار زر عدم الحضور' : 'Show No-show button')}
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  checked={staffAppPermissions[key]}
+                                  onChange={(event) => setStaffAppPermissions((prev) => ({
+                                    ...prev,
+                                    [key]: event.target.checked
+                                  }))}
+                                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       /* Dashboard Admin permissions matrix with Role Presets */
@@ -2374,7 +2487,7 @@ export default function TeamsWorkspace({
                               { key: 'receptionist', labelEn: 'Receptionist / Front Desk', labelAr: 'موظف الاستقبال' },
                               { key: 'marketing', labelEn: 'Marketing Planner', labelAr: 'التسويق والعروض' },
                               { key: 'hr', labelEn: 'HR / Personnel', labelAr: 'شؤون الموظفين' },
-                              { key: 'service-provider', labelEn: 'Senior Specialist', labelAr: 'الأخصائية الكبرى' }
+                              { key: 'service_provider', labelEn: 'Senior Specialist', labelAr: 'الأخصائية الكبرى' }
                             ].map(preset => (
                               <button
                                 key={preset.key}

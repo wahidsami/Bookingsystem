@@ -1000,6 +1000,18 @@ class TenantApiAdapter {
     return this.get('/tenant/employees');
   }
 
+  async getSubscriptionLimits(): Promise<any> {
+    return this.get('/tenant/settings/limits');
+  }
+
+  async getEmployeePermissions(id: string): Promise<any> {
+    return this.get(`/tenant/employees/${id}/permissions`);
+  }
+
+  async updateEmployeePermissions(id: string, permissions: Record<string, boolean>): Promise<any> {
+    return this.put(`/tenant/employees/${id}/permissions`, permissions);
+  }
+
   async createEmployee(data: Record<string, any>): Promise<any> {
     if (data instanceof FormData) {
       const response = await fetch(`${this.baseUrl}/tenant/employees`, {
