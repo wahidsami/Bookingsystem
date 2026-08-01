@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Language } from '../types';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { resolveEmployeeImageUrl } from '../lib/employeeImage';
 
 interface ReportsWorkspaceProps {
   lang: Language;
@@ -639,7 +640,7 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
           productSales: 0,
           tips: Number(row.commission || 0),
           totalSales: Number(row.revenue || 0),
-          photo: row.photo || null
+          photo: resolveEmployeeImageUrl(row.photo || row.avatar || row.profileImage)
         }));
         const productRevenueById = new Map<string, any>((productRevenueData.rows || []).map((row: any) => [row.id, row]));
         const mappedProducts = productCatalogData.map((product: any) => {

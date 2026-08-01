@@ -15,6 +15,7 @@ import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
 import SchedulerGrid, { SchedulerColumn, SchedulerEvent, SchedulerSlot } from './SchedulerGrid';
+import { resolveEmployeeImageUrl } from '../lib/employeeImage';
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
 
 interface AppointmentWorkspaceProps {
@@ -293,7 +294,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           nameAr: emp.name,
           roleEn: emp.title || 'Staff',
           roleAr: emp.title || 'موظف',
-          avatar: emp.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(emp.name),
+          avatar: resolveEmployeeImageUrl(emp.avatar || emp.photo || emp.profileImage),
           color: API_COLORS[index % API_COLORS.length]
         })));
 

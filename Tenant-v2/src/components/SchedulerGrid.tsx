@@ -370,10 +370,13 @@ export default function SchedulerGrid({
           {isRtl ? 'الفترة' : 'Time'}
         </div>
 
-        {columns.map((column) => (
+        {columns.map((column, columnIndex) => {
+          const isActiveLane = hoveredSlot?.columnId === column.id;
+          const laneShade = columnIndex % 2 === 0 ? 'bg-slate-50/80' : 'bg-white';
+          return (
           <div
             key={column.id}
-            className={`min-w-0 border-r last:border-r-0 border-slate-200 px-3 py-2 bg-white flex items-center justify-between gap-3 ${column.isToday ? 'bg-amber-500/5' : ''}`}
+            className={`min-w-0 border-r last:border-r-0 border-slate-200 px-3 py-2 flex items-center justify-between gap-3 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''}`}
           >
             <div className="min-w-0 flex items-center gap-2">
               {column.avatar ? (
@@ -407,7 +410,7 @@ export default function SchedulerGrid({
               </span>
             )}
           </div>
-        ))}
+        );})}
       </div>
 
       <div className="relative" style={{ minHeight: `${slotCount * slotHeight}px` }}>
@@ -454,6 +457,7 @@ export default function SchedulerGrid({
                   const slot = resolveSlot(column, columnIndex, row.slotIndex);
                   const isHovered = hoveredSlot?.columnId === slot.columnId && hoveredSlot.slotIndex === slot.slotIndex;
                   const isSelected = isSlotInsideSelection(slot);
+                  const laneShade = columnIndex % 2 === 0 ? 'bg-slate-50/70' : 'bg-white';
                   return (
                     <button
                       key={`${column.id}-${row.slotIndex}`}
@@ -463,7 +467,7 @@ export default function SchedulerGrid({
                       data-date-key={slot.dateKey}
                       data-start-minutes={slot.startMinutes}
                       data-end-minutes={slot.endMinutes}
-                      className={slotCellClassName(hourBoundary, isHovered || isSelected)}
+                      className={`${slotCellClassName(hourBoundary, isHovered || isSelected)} ${laneShade} ${isHovered ? 'ring-1 ring-inset ring-amber-400/50 bg-amber-500/10' : ''} ${isSelected ? 'bg-amber-500/12' : ''}`}
                       style={{ height: `${slotHeight}px` }}
                       aria-label={`${column.title} ${formatSlotTime(slot.startMinutes, startHour, isRtl)}`}
                       onMouseDown={(event) => {
