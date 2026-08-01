@@ -5,8 +5,6 @@ import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import PublicWizardEngine, { type PublicWizardStepDefinition } from './PublicWizardEngine';
 import PublicFileUploadField from './PublicFileUploadField';
 
-const rifahLogoWhite = new URL('../../../../RifahNewLogoWhite.png', import.meta.url).href;
-
 type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 const SAUDI_CITIES = [
@@ -739,7 +737,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
               onClick={() => onNavigate('/')}
               className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-amber-300/40 hover:bg-white/10"
             >
-              <img src={rifahLogoWhite} alt="Rifah" className="h-9 w-auto sm:h-10" />
+              <img src="/RifahNewLogoWhite.png" alt="Rifah" className="h-9 w-auto sm:h-10" />
             </button>
 
             <div className="flex items-center gap-2">
