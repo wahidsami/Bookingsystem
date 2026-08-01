@@ -5,7 +5,7 @@
 
 const db = require('../models');
 const promotionService = require('../services/promotionService');
-const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const { ACTIVE_SUBSCRIPTION_STATUSES, getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const { normalizePackageEntitlements, toNumericEntitlement } = require('../utils/packageEntitlements');
 const fs = require('fs');
 const path = require('path');
@@ -88,7 +88,7 @@ const getHotDealsLimits = async (req, res) => {
         const tenantId = req.tenantId;
 
         const subscriptionResult = await getActiveSubscriptionForTenant(tenantId, {
-            statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE', 'past_due']
+            statuses: ACTIVE_SUBSCRIPTION_STATUSES
         });
 
         if (!subscriptionResult?.subscription || !subscriptionResult?.package) {

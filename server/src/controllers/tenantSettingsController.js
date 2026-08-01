@@ -6,7 +6,7 @@
 const db = require('../models');
 const { Op } = require('sequelize');
 const { checkResourceLimit } = require('../utils/tenantLimitsUtil');
-const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const { ACTIVE_SUBSCRIPTION_STATUSES, getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
 const {
     normalizeTenantPaymentSettings,
@@ -69,7 +69,7 @@ exports.getSubscriptionLimits = async (req, res) => {
         const tenantFeatures = settings?.features || {};
 
         const subResult = await getActiveSubscriptionForTenant(tenantId, {
-            statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
+            statuses: ACTIVE_SUBSCRIPTION_STATUSES
         });
         const packageLimits = subResult?.package?.limits || {};
         // Package limits are the canonical source of truth. Tenant settings may

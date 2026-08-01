@@ -12,7 +12,7 @@ const {
     getDefaultConsultantCommunicationPreferences,
     normalizeCommunicationPreferences
 } = require('../../services/consultantWorkflowService');
-const { getActiveSubscriptionForTenant } = require('../../services/tenantSubscriptionService');
+const { ACTIVE_SUBSCRIPTION_STATUSES, getActiveSubscriptionForTenant } = require('../../services/tenantSubscriptionService');
 const { normalizePackageEntitlements } = require('../../utils/packageEntitlements');
 const { successResponse, errorResponse, paginatedResponse } = require('../../utils/responses');
 const crypto = require('crypto');
@@ -59,7 +59,7 @@ async function requireConsultantSubscription(req, res, next) {
         }
 
         const subscription = await getActiveSubscriptionForTenant(tenantId, {
-            statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
+            statuses: ACTIVE_SUBSCRIPTION_STATUSES
         });
         const packageFeatures = normalizePackageEntitlements(subscription?.package?.limits || {});
         if (packageFeatures.aiConsultant) {

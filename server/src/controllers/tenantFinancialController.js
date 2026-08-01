@@ -6,7 +6,7 @@
 const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
-const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const { ACTIVE_SUBSCRIPTION_STATUSES, getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const { buildSubscriptionConsumption } = require('../services/subscriptionConsumptionService');
 const { PAYABLE_BILL_STATUSES } = require('../utils/billStatus');
 const {
@@ -1277,7 +1277,7 @@ exports.getLandingSummary = async (req, res) => {
         const [overviewResponse, subscriptionResult, subscriptionConsumption, landingCollections] = await Promise.all([
             runHandler(exports.getFinancialOverview, req),
             getActiveSubscriptionForTenant(tenantId, {
-                statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE', 'past_due']
+                statuses: ACTIVE_SUBSCRIPTION_STATUSES
             }),
             buildSubscriptionConsumption(tenantId),
             getLandingCollectionsSummary(req, endDate)

@@ -1,9 +1,9 @@
-const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const { ACTIVE_SUBSCRIPTION_STATUSES, getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
 
 const checkResourceLimit = async (tenantId, resourceName, getCurrentCountFn) => {
     const result = await getActiveSubscriptionForTenant(tenantId, {
-        statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
+        statuses: ACTIVE_SUBSCRIPTION_STATUSES
     });
 
     if (!result) {

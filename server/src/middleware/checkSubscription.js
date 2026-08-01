@@ -1,6 +1,6 @@
 const db = require('../models');
 const { Op } = require('sequelize');
-const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
+const { ACTIVE_SUBSCRIPTION_STATUSES, getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const {
     getFeatureKeys,
     isFeatureEnabled,
@@ -16,7 +16,7 @@ const loadSubscriptionContext = async (req) => {
     }
 
     const result = await getActiveSubscriptionForTenant(req.tenantId, {
-        statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE', 'past_due']
+        statuses: ACTIVE_SUBSCRIPTION_STATUSES
     });
 
     if (!result?.subscription || !result?.package) {

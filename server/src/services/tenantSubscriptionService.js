@@ -3,6 +3,16 @@ const db = require('../models');
 const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
 
 const ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'trial', 'past_due'];
+const LEGAL_SUBSCRIPTION_STATUSES = new Set(ACTIVE_SUBSCRIPTION_STATUSES);
+
+function sanitizeSubscriptionStatuses(statuses = ACTIVE_SUBSCRIPTION_STATUSES) {
+    const values = Array.isArray(statuses) ? statuses : [statuses];
+    const sanitized = values
+        .map((status) => (status == null ? null : String(status).trim()))
+        .filter((status) => status && LEGAL_SUBSCRIPTION_STATUSES.has(status));
+
+    return sanitized.length > 0 ? [...new Set(sanitized)] : ACTIVE_SUBSCRIPTION_STATUSES;
+}
 
 async function getPlanFallbackPackage(tenant) {
     const tenantPlan = tenant?.plan ? String(tenant.plan).trim() : '';
@@ -63,7 +73,7 @@ async function buildCanonicalSubscriptionResult(subscription, tenant) {
 async function getActiveSubscriptionForTenant(tenantId, options = {}) {
     if (!tenantId) return null;
 
-    const statuses = options.statuses || ACTIVE_SUBSCRIPTION_STATUSES;
+    const statuses = sanitizeSubscriptionStatuses(options.statuses || ACTIVE_SUBSCRIPTION_STATUSES);
 
     try {
         let subscription = await db.TenantSubscription.findOne({
@@ -112,6 +122,7 @@ async function getPackageLimitsForTenant(tenantId) {
 
 module.exports = {
     ACTIVE_SUBSCRIPTION_STATUSES,
+    sanitizeSubscriptionStatuses,
     getActiveSubscriptionForTenant,
     getPackageLimitsForTenant
 };

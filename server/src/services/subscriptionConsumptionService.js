@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const db = require('../models');
-const { getActiveSubscriptionForTenant } = require('./tenantSubscriptionService');
+const { ACTIVE_SUBSCRIPTION_STATUSES, getActiveSubscriptionForTenant } = require('./tenantSubscriptionService');
 const { normalizePackageEntitlements, toNumericEntitlement, isFeatureEnabled } = require('../utils/packageEntitlements');
 
 const THRESHOLDS = [
@@ -314,7 +314,7 @@ async function sendConsumptionAlert(tenantId, metric) {
 
 async function buildSubscriptionConsumption(tenantId) {
     const result = await getActiveSubscriptionForTenant(tenantId, {
-        statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE', 'past_due']
+        statuses: ACTIVE_SUBSCRIPTION_STATUSES
     });
 
     if (!result?.subscription || !result?.package) {
@@ -395,7 +395,7 @@ async function buildSubscriptionConsumption(tenantId) {
 
 async function assertFeatureQuotaAvailable(tenantId, featureKey, amount = 1) {
     const result = await getActiveSubscriptionForTenant(tenantId, {
-        statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE', 'past_due']
+        statuses: ACTIVE_SUBSCRIPTION_STATUSES
     });
 
     if (!result?.package) {

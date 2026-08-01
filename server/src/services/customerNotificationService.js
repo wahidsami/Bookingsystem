@@ -2,7 +2,7 @@
 
 const db = require('../models');
 const pushNotificationService = require('./pushNotificationService');
-const { getActiveSubscriptionForTenant } = require('./tenantSubscriptionService');
+const { ACTIVE_SUBSCRIPTION_STATUSES, getActiveSubscriptionForTenant } = require('./tenantSubscriptionService');
 
 function getCurrentMonthKey() {
     const date = new Date();
@@ -88,7 +88,7 @@ async function getTenantPushUsage(tenantId) {
 
     try {
         const subscription = await getActiveSubscriptionForTenant(tenantId, {
-            statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
+            statuses: ACTIVE_SUBSCRIPTION_STATUSES
         });
 
         const limit = subscription?.package?.limits
@@ -117,7 +117,7 @@ async function getTenantPushUsage(tenantId) {
 async function sendTenantMarketingPush(tenantId, platformUserIds, title, body, data = {}) {
     const monthKey = getCurrentMonthKey();
     const subscription = await getActiveSubscriptionForTenant(tenantId, {
-        statuses: ['active', 'trial', 'APPROVED_FREE_ACTIVE']
+        statuses: ACTIVE_SUBSCRIPTION_STATUSES
     });
     const limit = subscription?.package?.limits
         ? resolvePushLimit(subscription.package.limits)
