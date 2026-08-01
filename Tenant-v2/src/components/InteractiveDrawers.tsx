@@ -48,6 +48,7 @@ interface InteractiveDrawersProps {
   currentStaffId: string;
   setCurrentStaffId: (id: string) => void;
   initialCreateMode?: 'appointment' | 'blocked';
+  initialDuration?: number;
   initialCartTab?: 'products' | 'giftcards';
   selectedDate: Date;
   customers: any[];
@@ -164,6 +165,7 @@ export default function InteractiveDrawers({
   currentStaffId,
   setCurrentStaffId,
   initialCreateMode,
+  initialDuration,
   initialCartTab,
   selectedDate,
   customers,
@@ -185,6 +187,12 @@ export default function InteractiveDrawers({
       setCreateMode(initialCreateMode);
     }
   }, [isCreateDrawerOpen, initialCreateMode]);
+
+  useEffect(() => {
+    if (isCreateDrawerOpen && typeof initialDuration === 'number' && Number.isFinite(initialDuration) && initialDuration > 0) {
+      setCurrentDuration(Math.max(5, Math.round(initialDuration / 5) * 5));
+    }
+  }, [isCreateDrawerOpen, initialDuration]);
 
   const availableStylists = stylists;
 

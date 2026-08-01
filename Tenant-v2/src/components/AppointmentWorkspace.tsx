@@ -14,6 +14,7 @@ import InteractiveDrawers from './InteractiveDrawers';
 import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
+import SchedulerGrid, { SchedulerColumn, SchedulerEvent, SchedulerSlot } from './SchedulerGrid';
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
 
 interface AppointmentWorkspaceProps {
@@ -248,6 +249,8 @@ const getRiyadhDateKey = (value: Date) => {
   const day = parts.find((part) => part.type === 'day')?.value || '00';
   return `${year}-${month}-${day}`;
 };
+
+const getRiyadhCalendarDate = (value = new Date()) => parseLocalDateKey(getRiyadhDateKey(value));
 
 export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
@@ -708,14 +711,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       'warning'
     );
   };
-  const openCreateAppointmentAtSlot = (staffId: string, timeInMinutes: number) => {
-    if (isPastBoardCreationSlot(selectedDateKey, timeInMinutes)) {
+  const openCreateAppointmentAtSlot = (staffId: string, timeInMinutes: number, dateKey = selectedDateKey, durationMinutes?: number) => {
+    if (isPastBoardCreationSlot(dateKey, timeInMinutes)) {
       showPastBoardSlotWarning(timeInMinutes);
       return false;
     }
 
+    if (dateKey !== selectedDateKey) {
+      setSelectedDate(parseLocalDateKey(dateKey));
+    }
     setCurrentStaffId(staffId);
     setCurrentStartTime(timeInMinutes);
+    if (typeof durationMinutes === 'number' && Number.isFinite(durationMinutes) && durationMinutes > 0) {
+      setCurrentDuration(durationMinutes);
+    }
     setCreateMode('appointment');
     setCreateStep(1);
     setStagedServices([]);
@@ -728,9 +737,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     void loadBoardData();
   }, [selectedDate, selectedStylistFilter, statusFilter, searchQuery]);
 
-  // Interactive hover tracking
-  const [hoveredSlot, setHoveredSlot] = useState<{ staffId?: string; date?: string; timeInMinutes: number } | null>(null);
-  
   // Selection / Detail Drawer State
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
   const [activeBlockedTime, setActiveBlockedTime] = useState<any | null>(null);
@@ -1378,8 +1384,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   
   // Custom Drag State & Interactive Preview
   const [draggedAptId, setDraggedAptId] = useState<string | null>(null);
-  const [dragOverStaffId, setDragOverStaffId] = useState<string | null>(null);
-  const [dragOverTime, setDragOverTime] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1455,6 +1459,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     y: number;
     staffId: string;
     timeInMinutes: number;
+    dateKey?: string;
     appointmentId?: string;
   } | null>(null);
 
@@ -1929,11 +1934,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   }, [dragState]);
 
   // Context Menu Helpers
-  const handleContextMenu = (e: React.MouseEvent, staffId: string, timeInMinutes: number, appointmentId?: string) => {
+  const handleContextMenu = (e: React.MouseEvent, staffId: string, timeInMinutes: number, appointmentId?: string, dateKey = selectedDateKey) => {
     if (!isBoardEditable) {
       return;
     }
-    if (isPastBoardCreationSlot(selectedDateKey, timeInMinutes)) {
+    if (isPastBoardCreationSlot(dateKey, timeInMinutes)) {
       e.preventDefault();
       showPastBoardSlotWarning(timeInMinutes);
       return;
@@ -1945,6 +1950,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       y: e.clientY,
       staffId,
       timeInMinutes,
+      dateKey,
       appointmentId,
     });
   };
@@ -3043,6 +3049,202 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   // Calculate coordinates of the dragged element's ghost card
   const draggedApt = draggedAptId ? appointments.find(a => a.id === draggedAptId) : null;
 
+  const schedulerColumns: SchedulerColumn[] = viewMode === 'day'
+    ? liveStylists.map((stylist) => ({
+        id: stylist.id,
+        title: isRtl ? stylist.nameAr : stylist.nameEn,
+        subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
+        avatar: stylist.avatar,
+        statusLabel: stylistStatuses[stylist.id]
+          ? (stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active') : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break') : (isRtl ? 'خارج' : 'Off'))
+          : undefined,
+        statusTone: stylistStatuses[stylist.id] || 'neutral',
+        isToday: false,
+      }))
+    : getDaysOfActiveBlock(selectedDate).map((dayStr, idx) => {
+        const dateValue = parseLocalDateKey(dayStr);
+        const dayName = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
+        const dateLabel = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
+        const isTodayDate = getLocalDateKey(new Date()) === dayStr;
+        return {
+          id: dayStr,
+          title: `${dayName}`,
+          subtitle: dateLabel,
+          statusLabel: isTodayDate ? (isRtl ? 'اليوم' : 'Today') : undefined,
+          statusTone: isTodayDate ? 'today' : 'neutral',
+          dateKey: dayStr,
+          isToday: isTodayDate,
+        };
+      });
+
+  const schedulerEvents: SchedulerEvent[] = filteredAppointments.map((apt) => {
+    const staff = liveStylists.find((stylist) => stylist.id === apt.staffId);
+    const columnId = viewMode === 'day' ? apt.staffId : (apt.date || getSelectedDateKey());
+    const title = isRtl ? apt.customerNameAr : apt.customerNameEn;
+    const subtitle = isRtl ? apt.serviceNameAr : apt.serviceNameEn;
+
+    return {
+      id: apt.id,
+      columnId,
+      dateKey: apt.date || getSelectedDateKey(),
+      startMinutes: Math.max(0, apt.startTime),
+      durationMinutes: Math.max(5, apt.duration),
+      title,
+      subtitle,
+      notes: apt.notes,
+      price: apt.price,
+      paymentStatus: apt.paymentStatus,
+      status: apt.status,
+      kind: apt.type || 'appointment',
+      blockedType: apt.blockedType,
+      isGroupBooking: apt.isGroupBooking,
+      guestCount: apt.guestCount,
+      hasNotes: apt.hasNotes,
+      avatar: staff?.avatar,
+      role: isRtl ? staff?.roleAr : staff?.roleEn,
+      raw: apt,
+    };
+  });
+
+  const handleSchedulerSlotClick = (slot: SchedulerSlot) => {
+    if (!isBoardEditable) {
+      return;
+    }
+
+    if (viewMode === 'day') {
+      void openCreateAppointmentAtSlot(slot.employeeId || slot.columnId, slot.startMinutes, slot.dateKey, slot.endMinutes - slot.startMinutes);
+      return;
+    }
+
+    const dateValue = parseLocalDateKey(slot.dateKey);
+    if (!currentStaffId) {
+      addLocalToast(
+        'يرجى تحديد موظف قبل إنشاء موعد في العرض الأسبوعي.',
+        'Please select a staff member before creating an appointment in Week view.',
+        'warning'
+      );
+      return;
+    }
+    setSelectedDate(dateValue);
+    setCurrentStartTime(slot.startMinutes);
+    setCurrentStaffId(currentStaffId);
+    setCreateMode('appointment');
+    setCreateStep(1);
+    setStagedServices([]);
+    setIsCreateDrawerOpen(true);
+  };
+
+  const handleSchedulerSlotContextMenu = (event: React.MouseEvent, slot: SchedulerSlot) => {
+    if (!isBoardEditable) {
+      return;
+    }
+
+    if (viewMode === 'day') {
+      handleContextMenu(event, slot.employeeId || slot.columnId, slot.startMinutes, undefined, slot.dateKey);
+      return;
+    }
+
+    if (!currentStaffId) {
+      addLocalToast(
+        'يرجى تحديد موظف قبل فتح قائمة الإنشاء السريع في العرض الأسبوعي.',
+        'Please select a staff member before opening quick create in Week view.',
+        'warning'
+      );
+      return;
+    }
+    handleContextMenu(event, currentStaffId, slot.startMinutes, undefined, slot.dateKey);
+  };
+
+  const handleSchedulerSlotDrop = (slot: SchedulerSlot, draggedEventId: string) => {
+    if (!isBoardEditable) {
+      return;
+    }
+
+    const movedAppointment = appointments.find((item) => item.id === draggedEventId);
+    if (!movedAppointment) {
+      return;
+    }
+
+    const targetDateKey = slot.dateKey || getSelectedDateKey();
+    const targetStaffId = viewMode === 'day' ? slot.employeeId || slot.columnId : movedAppointment.staffId;
+    const patchDate = buildIsoFromMinutes(targetDateKey, slot.startMinutes);
+
+    tenantApiAdapter.reassignRescheduleAppointment(draggedEventId, {
+      staffId: targetStaffId,
+      startTime: patchDate,
+      notifyCustomer: true
+    }).then(() => {
+      void loadBoardData();
+    }).catch((err) => {
+      console.error('Failed to persist drag/drop change', err);
+      const toast = getSchedulingErrorToast(err, 'تعذر نقل الموعد إلى الخانة الجديدة', 'Unable to move appointment to the new slot.');
+      addLocalToast(toast.ar, toast.en, 'warning');
+      void loadBoardData();
+    });
+  };
+
+  const handleSchedulerSlotRangeSelect = (range: { startSlot: SchedulerSlot; endSlot: SchedulerSlot; durationMinutes: number }) => {
+    if (!isBoardEditable) {
+      return;
+    }
+
+    if (viewMode === 'day') {
+      void openCreateAppointmentAtSlot(
+        range.startSlot.employeeId || range.startSlot.columnId,
+        range.startSlot.startMinutes,
+        range.startSlot.dateKey,
+        range.durationMinutes
+      );
+      return;
+    }
+
+    if (!currentStaffId) {
+      addLocalToast(
+        'يرجى تحديد موظف قبل إنشاء مدة محددة في العرض الأسبوعي.',
+        'Please select a staff member before creating a time range in Week view.',
+        'warning'
+      );
+      return;
+    }
+
+    const dateValue = parseLocalDateKey(range.startSlot.dateKey);
+    setSelectedDate(dateValue);
+    setCurrentStaffId(currentStaffId);
+    setCurrentStartTime(range.startSlot.startMinutes);
+    setCurrentDuration(range.durationMinutes);
+    setCreateMode('appointment');
+    setCreateStep(1);
+    setStagedServices([]);
+    setIsCreateDrawerOpen(true);
+  };
+
+  const handleSchedulerEventClick = (eventItem: SchedulerEvent) => {
+    const sourceAppointment = eventItem.raw || appointments.find((item) => item.id === eventItem.id);
+    if (!sourceAppointment) {
+      return;
+    }
+
+    if (sourceAppointment.type === 'blocked') {
+      openBlockedTimeDetails(sourceAppointment);
+      return;
+    }
+
+    openAppointmentDetails(sourceAppointment, { readOnly: !isBoardEditable });
+  };
+
+  const handleSchedulerEventContextMenu = (event: React.MouseEvent, eventItem: SchedulerEvent) => {
+    const sourceAppointment = eventItem.raw || appointments.find((item) => item.id === eventItem.id);
+    if (!sourceAppointment) {
+      return;
+    }
+
+    if (sourceAppointment.type === 'blocked') {
+      return;
+    }
+
+    handleContextMenu(event, sourceAppointment.staffId, sourceAppointment.startTime, sourceAppointment.id, sourceAppointment.date || eventItem.dateKey);
+  };
+
   return (
     <div className="space-y-4 select-none font-sans" id="appointments-workspace">
       
@@ -3063,7 +3265,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <ChevronLeft size={14} />
               </button>
               <button 
-                onClick={() => setSelectedDate(new Date(2026, 5, 28))} 
+                onClick={() => setSelectedDate(getRiyadhCalendarDate())}
                 className="px-2.5 py-1 font-bold text-xs hover:bg-white rounded-md text-slate-700 transition-all"
               >
                 {t.today}
@@ -3534,596 +3736,41 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   )}
                 </div>
               ) : (
-                /* 2. INTERACTIVE TIMELINE SATELLITE BOARD (Day or Week) */
-                <div className="min-w-[920px] relative flex flex-col" style={{ height: `${(TOTAL_HOURS * SLOT_HEIGHT) + 60}px` }}>
-                  
-                  {/* Board Columns Header */}
-                  <div className="grid grid-cols-12 bg-slate-50 border-b border-slate-200 sticky top-0 z-20 h-12 items-center text-center">
-                    {/* Left corner time column header */}
-                    <div className="col-span-2 border-r border-slate-200 h-full flex items-center justify-center font-bold text-xs text-slate-500 bg-slate-50">
-                      {isRtl ? 'الفترة' : 'Time Slot'}
-                    </div>
-
-                    {viewMode === 'day' ? (
-                      /* Staff columns headers */
-                      <div className="col-span-10 grid grid-cols-4 h-full relative">
-                        {liveStylists.map((stylist) => {
-                          const name = isRtl ? stylist.nameAr : stylist.nameEn;
-                          const role = isRtl ? stylist.roleAr : stylist.roleEn;
-                          const status = stylistStatuses[stylist.id] || 'active';
-                          
-                          // Status mapping helpers
-                          const statusColor = 
-                            status === 'active' ? 'bg-emerald-500' :
-                            status === 'break' ? 'bg-amber-500' : 'bg-rose-500';
-
-                          const statusText = 
-                            status === 'active' ? (isRtl ? 'نشط' : 'Active') :
-                            status === 'break' ? (isRtl ? 'في استراحة' : 'On Break') : (isRtl ? 'خارج العمل' : 'Off-duty');
-
-                          return (
-                            <div 
-                              key={stylist.id} 
-                              className="border-r last:border-r-0 border-slate-200 h-full flex items-center justify-between px-3 bg-white relative min-w-0"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                {/* Avatar with status indicator badge */}
-                                <div className="relative w-7 h-7 rounded-full border border-slate-200 shrink-0 select-none">
-                                  <img src={stylist.avatar} alt={name} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
-                                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${statusColor} border-2 border-white animate-pulse shadow-xs`} />
-                                </div>
-                                
-                                <div className="text-left min-w-0">
-                                  <p className="text-xs font-black text-slate-800 truncate leading-none flex items-center gap-1">
-                                    {name}
-                                  </p>
-                                  <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase leading-none">
-                                    {role} • <span className="font-semibold text-slate-500">{statusText}</span>
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Lane Configuration Action Trigger */}
-                              <div className="relative shrink-0">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveStylistMenuId(activeStylistMenuId === stylist.id ? null : stylist.id);
-                                  }}
-                                  className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-all cursor-pointer"
-                                  title={isRtl ? 'تعديل حالة الخبيرة' : 'Lane Actions'}
-                                >
-                                  <ChevronDown size={14} />
-                                </button>
-
-                                {/* Dynamic Lane Settings Dropdown Overlay */}
-                                <AnimatePresence>
-                                  {activeStylistMenuId === stylist.id && (
-                                    <>
-                                      {/* Invisible click backdrop to dismiss */}
-                                      <div className="fixed inset-0 z-40" onClick={() => setActiveStylistMenuId(null)} />
-                                      
-                                      <motion.div
-                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        className={`absolute top-6 ${isRtl ? 'left-0' : 'right-0'} w-40 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 z-50 space-y-1`}
-                                      >
-                                        <div className="px-2 py-1 border-b border-slate-100 mb-1 text-left">
-                                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'تحديث حالة خبيرة التجميل' : 'PROVIDER STATUS'}</p>
-                                        </div>
-                                        
-                                        <button
-                                          onClick={() => {
-                                            setStylistStatuses(prev => ({ ...prev, [stylist.id]: 'active' }));
-                                            setActiveStylistMenuId(null);
-                                            addLocalToast(
-                                              `تم تعيين ${name} في وضع النشاط والجاهزية! 🟢`,
-                                              `${stylist.nameEn} is now marked as Active and ready! 🟢`,
-                                              'success'
-                                            );
-                                          }}
-                                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 cursor-pointer ${
-                                            status === 'active' ? 'text-emerald-700 bg-emerald-50/50' : 'text-slate-700'
-                                          }`}
-                                        >
-                                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                          <span>{isRtl ? 'جاهزة ومتاحة (نشط)' : 'Active & Ready'}</span>
-                                        </button>
-
-                                        <button
-                                          onClick={() => {
-                                            setStylistStatuses(prev => ({ ...prev, [stylist.id]: 'break' }));
-                                            setActiveStylistMenuId(null);
-                                            addLocalToast(
-                                              `تم تعيين ${name} في فترة استراحة مؤقتة ☕`,
-                                              `${stylist.nameEn} is now On Break ☕`,
-                                              'warning'
-                                            );
-                                          }}
-                                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 cursor-pointer ${
-                                            status === 'break' ? 'text-amber-700 bg-amber-50/50' : 'text-slate-700'
-                                          }`}
-                                        >
-                                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                          <span>{isRtl ? 'في استراحة قصيرة ☕' : 'On Short Break'}</span>
-                                        </button>
-
-                                        <button
-                                          onClick={() => {
-                                            setStylistStatuses(prev => ({ ...prev, [stylist.id]: 'off' }));
-                                            setActiveStylistMenuId(null);
-                                            addLocalToast(
-                                              `تم تعيين ${name} كخارج العمل للوردية الحالية 🛑`,
-                                              `${stylist.nameEn} is now marked as Off-duty 🛑`,
-                                              'warning'
-                                            );
-                                          }}
-                                          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 cursor-pointer ${
-                                            status === 'off' ? 'text-rose-700 bg-rose-50/50' : 'text-slate-700'
-                                          }`}
-                                        >
-                                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                          <span>{isRtl ? 'خارج العمل اليوم 🛑' : 'Off-duty / Shift End'}</span>
-                                        </button>
-                                      </motion.div>
-                                    </>
-                                  )}
-                                </AnimatePresence>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      /* Date columns headers (Week View) */
-                      <div className="col-span-10 grid grid-cols-4 h-full relative">
-                        {getDaysOfActiveBlock(selectedDate).map((dayStr, idx) => {
-                          const d = parseLocalDateKey(dayStr);
-                          const dayName = d.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
-                          const dateFormatted = d.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
-                          const isTodayStr = getLocalDateKey(new Date()) === dayStr;
-                          
-                          return (
-                            <div 
-                              key={idx} 
-                              className={`border-r last:border-r-0 border-slate-200 h-full flex flex-col items-center justify-center px-2 select-none ${
-                                isTodayStr ? 'bg-amber-500/5' : 'bg-white'
-                              }`}
-                            >
-                              <span className={`text-xs font-black leading-tight ${isTodayStr ? 'text-amber-600' : 'text-slate-800'}`}>
-                                {dayName} {isTodayStr && (isRtl ? '(اليوم)' : '(Today)')}
-                              </span>
-                              <span className="text-[10px] font-bold text-slate-400 mt-0.5 leading-none">{dateFormatted}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Loading Skeleton Overlays */}
-                  <AnimatePresence>
-                    {isLoading && (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-white/75 backdrop-blur-xs z-30 flex flex-col justify-center items-center gap-3"
-                      >
-                        <div className="flex gap-1.5">
-                          <span className="w-2.5 h-2.5 bg-zinc-900 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-2.5 h-2.5 bg-zinc-900 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-2.5 h-2.5 bg-zinc-900 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                        <span className="text-xs font-bold text-zinc-600">{isRtl ? 'مزامنة لوحة المواعيد...' : 'Synchronizing schedule...'}</span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Empty State Overlay if filtered list is empty */}
-                  {filteredAppointments.length === 0 && !isLoading && (
-                    <div className="absolute inset-x-0 bottom-0 top-12 bg-slate-50/80 z-10 flex flex-col justify-center items-center p-8 text-center">
-                      <div className="p-4 bg-slate-100 rounded-full text-slate-400 mb-3 border border-slate-200">
-                        <Search size={32} />
-                      </div>
-                      <p className="font-bold text-slate-800 text-sm">{t.emptyStateText}</p>
-                      <p className="text-xs text-slate-500 mt-1">{isRtl ? 'حاول إزالة أو تعديل بعض معايير التصفية والبحث.' : 'Try adjusting your search criteria or stylist selection.'}</p>
-                      <button 
-                        onClick={() => {
-                          setSelectedStylistFilter('all');
-                          setServiceCategoryFilter('all');
-                          setStatusFilter('all');
-                          setSearchQuery('');
-                        }}
-                        className="mt-4 px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-bold hover:bg-zinc-800 cursor-pointer"
-                      >
-                        {t.clearFilters}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Calendar Body Area */}
-                  <div className="flex-1 relative flex">
-                    {currentTimeLinePosition !== null && (
-                      <div
-                        className="absolute inset-x-0 z-20 pointer-events-none"
-                        style={{ top: `${currentTimeLinePosition}px` }}
-                      >
-                        <div className="relative h-px bg-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,0.18)]">
-                          <div className={`absolute -top-2 ${isRtl ? 'left-3' : 'right-3'} flex items-center gap-2`}>
-                            <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-[0_0_0_4px_rgba(244,63,94,0.18)]" />
-                            <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-[10px] font-black text-white shadow-lg">
-                              {isRtl ? 'الوقت الحالي' : 'Current Time'} {getRiyadhCurrentTimeLabel(boardCurrentTime)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* LEFT TIME STRIP COLUMN (2 of 12 columns) - STICKY RAIL */}
-                    <div className="w-[16.6666%] border-r border-slate-200 bg-slate-50/50 flex-shrink-0 relative z-10" style={{ height: `${TOTAL_HOURS * SLOT_HEIGHT}px` }}>
-                      {Array.from({ length: TOTAL_HOURS }).map((_, index) => {
-                        const hourNum = START_HOUR + index;
-                        const timeStr = formatMinutesToTime(index * 60);
-                        return (
-                          <div 
-                            key={index} 
-                            className="absolute w-full border-b border-slate-100/80 flex items-start justify-center pt-2 px-2"
-                            style={{ 
-                              top: `${index * SLOT_HEIGHT}px`, 
-                              height: `${SLOT_HEIGHT}px` 
-                            }}
-                          >
-                            <span className="text-[10px] font-black text-slate-400 font-mono tracking-tight">{timeStr}</span>
-                          </div>
-                        );
-                      })}
-
-                      {/* Left Timeline exact active hover zone marker */}
-                      {hoveredSlot && (
-                        <div 
-                          className="absolute left-0 right-0 h-8 bg-amber-500/10 border-r-4 border-amber-500 z-20 flex items-center justify-center pointer-events-none transition-all"
-                          style={{ top: `${(hoveredSlot.timeInMinutes / 60) * SLOT_HEIGHT}px`, marginTop: '-4px' }}
-                        >
-                          <span className="text-[10px] font-bold text-amber-700 font-mono">
-                            {formatMinutesToTime(hoveredSlot.timeInMinutes)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* CENTER SCHEDULER GRID (10 of 12 columns) */}
-                    <div className="flex-1 relative" style={{ height: `${TOTAL_HOURS * SLOT_HEIGHT}px` }}>
-                      
-                      {/* Horizontal Hourly gridlines */}
-                      {Array.from({ length: TOTAL_HOURS }).map((_, index) => (
-                        <div 
-                          key={index} 
-                          className="absolute left-0 right-0 border-b border-slate-100 pointer-events-none"
-                          style={{ 
-                            top: `${index * SLOT_HEIGHT}px`, 
-                            height: `${SLOT_HEIGHT}px` 
-                          }}
-                        />
-                      ))}
-
-                      {/* Column Dividers for columns (4 Columns) */}
-                      <div className="absolute inset-0 grid grid-cols-4 pointer-events-none">
-                        {Array.from({ length: 4 }).map((_, colIdx) => (
-                          <div key={colIdx} className="border-r last:border-r-0 border-slate-200/60 h-full" />
-                        ))}
-                      </div>
-
-                      {/* Interactivity Grid Cell Blocks - Mouse Tracker for 5-minute precision */}
-                      <div className="absolute inset-0 grid grid-cols-4">
-                        {viewMode === 'day' ? (
-                          liveStylists.map((stylist) => (
-                            <div 
-                              key={stylist.id} 
-                              className="h-full relative select-none cursor-pointer"
-                              onMouseMove={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const relativeY = e.clientY - rect.top;
-                                const totalMins = (relativeY / SLOT_HEIGHT) * 60;
-                                const stepMins = Math.round(totalMins / 5) * 5;
-                                setHoveredSlot({ staffId: stylist.id, timeInMinutes: stepMins });
-                              }}
-                              onMouseLeave={() => setHoveredSlot(null)}
-                              onContextMenu={(e) => {
-                                if (hoveredSlot && isBoardEditable) {
-                                  handleContextMenu(e, stylist.id, hoveredSlot.timeInMinutes);
-                                }
-                              }}
-                              onClick={() => {
-                                if (hoveredSlot && isBoardEditable) {
-                                  openCreateAppointmentAtSlot(hoveredSlot.staffId, hoveredSlot.timeInMinutes);
-                                }
-                              }}
-                              onDragOver={(e) => {
-                                if (!isBoardEditable) {
-                                  return;
-                                }
-                                e.preventDefault();
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const relativeY = e.clientY - rect.top;
-                                const totalMins = (relativeY / SLOT_HEIGHT) * 60;
-                                const stepMins = Math.round(totalMins / 5) * 5;
-                                setDragOverStaffId(stylist.id);
-                                setDragOverTime(stepMins);
-                              }}
-                              onDrop={(e) => {
-                                if (!isBoardEditable) {
-                                  return;
-                                }
-                                e.preventDefault();
-                                const aptId = e.dataTransfer.getData('text/plain');
-                                if (aptId && dragOverStaffId && dragOverTime !== null) {
-                                  const patchDate = buildIsoFromMinutes(getSelectedDateKey(), dragOverTime);
-                                  tenantApiAdapter.reassignRescheduleAppointment(aptId, {
-                                    staffId: dragOverStaffId,
-                                    startTime: patchDate,
-                                    notifyCustomer: true
-                                  }).then(() => {
-                                    void loadBoardData();
-                                  }).catch((err) => {
-                                    console.error('Failed to persist drag/drop change', err);
-                                    const toast = getSchedulingErrorToast(err, 'تعذر نقل الموعد إلى الخانة الجديدة', 'Unable to move appointment to the new slot.');
-                                    addLocalToast(toast.ar, toast.en, 'warning');
-                                    void loadBoardData();
-                                  });
-                                }
-                                setDraggedAptId(null);
-                                setDragOverStaffId(null);
-                                setDragOverTime(null);
-                              }}
-                            >
-                              {/* 5-minute slot hover indicator */}
-                              {hoveredSlot && hoveredSlot.staffId === stylist.id && (
-                                <div 
-                                  className="absolute left-0 right-0 z-10 pointer-events-none flex justify-end border-t border-amber-500/50"
-                                  style={{ 
-                                    top: `${(hoveredSlot.timeInMinutes / 60) * SLOT_HEIGHT}px`,
-                                    height: '16px',
-                                    backgroundImage: 'repeating-linear-gradient(-45deg, rgba(245, 158, 11, 0.08) 0px, rgba(245, 158, 11, 0.08) 4px, transparent 4px, transparent 8px)'
-                                  }}
-                                >
-                                  <span className="bg-zinc-900 text-amber-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-md -mt-2.5 mr-2 ml-2 tracking-tight">
-                                    {formatMinutesToTime(hoveredSlot.timeInMinutes)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        ) : (
-                          /* Week view column block listeners */
-                          getDaysOfActiveBlock(selectedDate).map((dayStr, idx) => (
-                            <div 
-                              key={idx} 
-                              className="h-full relative select-none cursor-pointer"
-                              onMouseMove={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const relativeY = e.clientY - rect.top;
-                                const totalMins = (relativeY / SLOT_HEIGHT) * 60;
-                                const stepMins = Math.round(totalMins / 5) * 5;
-                                setHoveredSlot({ date: dayStr, timeInMinutes: stepMins });
-                              }}
-                              onMouseLeave={() => setHoveredSlot(null)}
-                              onClick={() => {
-                                if (hoveredSlot && isBoardEditable) {
-                                  const d = parseLocalDateKey(dayStr);
-                                  setSelectedDate(d);
-                                  setCurrentStartTime(hoveredSlot.timeInMinutes);
-                                setCurrentStaffId(liveStylists[0]?.id || hoveredSlot.staffId || currentStaffId);
-                                  setCreateMode('appointment');
-                                  setCreateStep(1);
-                                  setStagedServices([]);
-                                  setIsCreateDrawerOpen(true);
-                                }
-                              }}
-                            >
-                              {/* 5-minute slot hover indicator for Week Columns */}
-                              {hoveredSlot && hoveredSlot.date === dayStr && (
-                                <div 
-                                  className="absolute left-0 right-0 z-10 pointer-events-none flex justify-end border-t border-amber-500/50"
-                                  style={{ 
-                                    top: `${(hoveredSlot.timeInMinutes / 60) * SLOT_HEIGHT}px`,
-                                    height: '16px',
-                                    backgroundImage: 'repeating-linear-gradient(-45deg, rgba(245, 158, 11, 0.08) 0px, rgba(245, 158, 11, 0.08) 4px, transparent 4px, transparent 8px)'
-                                  }}
-                                >
-                                  <span className="bg-zinc-900 text-amber-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-md -mt-2.5 mr-2 ml-2 tracking-tight">
-                                    {formatMinutesToTime(hoveredSlot.timeInMinutes)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </div>
-
-                      {/* GHOST PREVIEW OF DRAGGED APPOINTMENT (Only in Day View) */}
-                      {viewMode === 'day' && draggedApt && dragOverStaffId && dragOverTime !== null && (
-                        (() => {
-                          const sIdx = getStaffLaneIndex(dragOverStaffId);
-                          if (sIdx === -1) return null;
-                          const leftPct = (sIdx / TOTAL_STAFF_LANES) * 100;
-                          const topPos = minutesToTop(dragOverTime);
-                          const hPos = minutesToHeight(draggedApt.duration);
-                          return (
-                            <div
-                              className="absolute border-2 border-dashed border-amber-500 bg-amber-500/10 rounded-lg pointer-events-none z-30 flex flex-col justify-between p-2 opacity-85"
-                              style={{
-                                left: `calc(${leftPct}% + 4px)`,
-                                width: 'calc(25% - 8px)',
-                                top: `${topPos}px`,
-                                height: `${hPos}px`,
-                              }}
-                            >
-                              <div className="space-y-1">
-                                <span className="bg-amber-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded uppercase">
-                                  MOVE TO: {formatMinutesToTime(dragOverTime)}
-                                </span>
-                                <p className="text-xs font-bold text-amber-900 truncate">{draggedApt.customerNameEn}</p>
-                                <p className="text-[9px] text-amber-700 font-bold truncate">{isRtl ? liveStylists.find(s=>s.id === dragOverStaffId)?.nameAr : liveStylists.find(s=>s.id === dragOverStaffId)?.nameEn}</p>
-                              </div>
-                              <span className="text-[9px] text-amber-800 font-bold">{draggedApt.duration} mins</span>
-                            </div>
-                          );
-                        })()
-                      )}
-
-                      {/* FLOATING APPOINTMENT CARDS (ABSOLUTELY POSITIONED) */}
-                      {filteredAppointments.map((apt) => {
-                        let leftPercent = 0;
-                        
-                        if (viewMode === 'day') {
-                          const staffIdx = getStaffLaneIndex(apt.staffId);
-                          if (staffIdx === -1) return null;
-                          leftPercent = (staffIdx / TOTAL_STAFF_LANES) * 100;
-                        } else {
-                          const activeBlock = getDaysOfActiveBlock(selectedDate);
-                          const dayIdx = activeBlock.indexOf(apt.date || getSelectedDateKey());
-                          if (dayIdx === -1) return null;
-                          leftPercent = dayIdx * 25;
-                        }
-
-                        const cardTop = minutesToTop(apt.startTime);
-                        const cardHeight = minutesToHeight(apt.duration);
-                        const isDragged = draggedAptId === apt.id;
-
-                        // Style variants
-                        let cardStyle = {};
-                        let classNames = "";
-
-                        if (apt.type === 'blocked') {
-                          classNames = "bg-slate-50 text-slate-500 border-slate-200 shadow-none hover:shadow-none";
-                          cardStyle = {
-                            backgroundImage: 'repeating-linear-gradient(45deg, #f1f5f9 0px, #f1f5f9 8px, #f8fafc 8px, #f8fafc 16px)'
-                          };
-                        } else {
-                          // Color categories based on status
-                          if (apt.status === 'confirmed') {
-                            classNames = "bg-amber-50 text-amber-900 border-amber-200/80 shadow-xs hover:border-amber-300";
-                          } else if (apt.status === 'checked_in') {
-                            classNames = "bg-emerald-50 text-emerald-900 border-emerald-200 shadow-xs hover:border-emerald-300";
-                          } else if (apt.status === 'completed') {
-                            classNames = "bg-zinc-100 text-zinc-700 border-zinc-200 shadow-xs opacity-90";
-                          } else {
-                            classNames = "bg-rose-50 text-rose-900 border-rose-200 shadow-xs";
-                          }
-                        }
-
-                        return (
-                          <div
-                            key={apt.id}
-                            draggable={viewMode === 'day' && isBoardEditable && apt.type !== 'blocked'}
-                            onDragStart={(e) => {
-                              if (viewMode !== 'day' || !isBoardEditable || apt.type === 'blocked') return;
-                              e.dataTransfer.setData('text/plain', apt.id);
-                              setDraggedAptId(apt.id);
-                            }}
-                            onDragEnd={() => {
-                              setDraggedAptId(null);
-                              setDragOverStaffId(null);
-                              setDragOverTime(null);
-                            }}
-                            className={`absolute p-2.5 rounded-xl border transition-all cursor-pointer select-none group flex flex-col justify-between overflow-hidden ${
-                              isDragged ? 'opacity-30 scale-95 ring-2 ring-amber-500 z-0' : 'hover:shadow-md z-10 hover:-translate-y-0.5'
-                            } ${classNames}`}
-                            style={{
-                              left: `calc(${leftPercent}% + 4px)`,
-                              width: 'calc(25% - 8px)',
-                              top: `${cardTop}px`,
-                              height: `${cardHeight}px`,
-                              ...cardStyle
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (apt.type === 'blocked') {
-                                openBlockedTimeDetails(apt);
-                                return;
-                              }
-                              openAppointmentDetails(apt, { readOnly: !isBoardEditable });
-                            }}
-                            onMouseDown={(e) => {
-                              if (viewMode === 'day' && isBoardEditable && apt.type !== 'blocked') {
-                                handleMouseDown(e, apt.id, false);
-                              }
-                            }}
-                            onContextMenu={(e) => {
-                              if (viewMode === 'day' && isBoardEditable) {
-                                handleContextMenu(e, apt.staffId, apt.startTime, apt.id);
-                              }
-                            }}
-                          >
-                            {/* Inner container to hold items */}
-                            <div className="flex flex-col gap-0.5 min-w-0">
-                              
-                              {/* Card Header Info */}
-                              <div className="flex items-center justify-between gap-1.5 min-w-0">
-                                <span className="text-[9px] uppercase font-black tracking-tight bg-zinc-900/10 px-1.5 py-0.5 rounded leading-none">
-                                  {formatMinutesToTime(apt.startTime)}
-                                </span>
-                                
-                                {/* Group booking or notes indicators */}
-                                <div className="flex items-center gap-1 shrink-0 text-slate-500">
-                                  {apt.isGroupBooking && (
-                                    <div className="flex items-center gap-0.5 bg-zinc-900/10 px-1 rounded text-[8px] font-bold">
-                                      <Users size={9} />
-                                      <span>{apt.guestCount || 2}</span>
-                                    </div>
-                                  )}
-                                  {apt.hasNotes && <MessageSquare size={10} className="text-zinc-700" />}
-                                </div>
-                              </div>
-
-                              {/* Customer Name */}
-                              <p className="text-xs font-bold truncate mt-1.5 leading-tight text-slate-900">
-                                {isRtl ? apt.customerNameAr : apt.customerNameEn}
-                              </p>
-
-                              {/* Service name */}
-                              <p className="text-[10px] opacity-90 font-medium truncate leading-tight text-slate-600 mt-0.5">
-                                {isRtl ? apt.serviceNameAr : apt.serviceNameEn}
-                              </p>
-                            </div>
-
-                            {/* Footer Info of Card */}
-                            <div className="flex items-center justify-between gap-1 mt-1 text-[9px] opacity-90 pt-1.5 border-t border-slate-900/5 shrink-0">
-                              <span className="font-bold font-mono text-slate-500">{apt.duration} {t.durationMin}</span>
-                              
-                              {/* Blocked vs Paid status indicators */}
-                              {apt.type === 'blocked' ? (
-                                <span className="bg-zinc-900/5 text-zinc-600 px-1 py-0.5 rounded text-[8px] font-black tracking-wide uppercase">
-                                  {apt.blockedType}
-                                </span>
-                              ) : (
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
-                                  apt.paymentStatus === 'paid' ? 'bg-emerald-500/10 text-emerald-700' : apt.paymentStatus === 'partial' ? 'bg-amber-500/10 text-amber-700' : 'bg-red-500/10 text-red-700'
-                                }`}>
-                                  {apt.paymentStatus === 'paid' ? t.paid : apt.paymentStatus === 'partial' ? t.partial : t.unpaid}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Absolute Bottom resize handle bar (Only in Day View) */}
-                            {viewMode === 'day' && apt.type !== 'blocked' && (
-                              <div
-                                className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/5 hover:bg-black/15 cursor-ns-resize transition-all"
-                                onMouseDown={(e) => handleMouseDown(e, apt.id, true)}
-                                title="Drag to resize duration"
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-
-                    </div>
-
-                  </div>
-
-                </div>
+                <SchedulerGrid
+                  viewMode={viewMode}
+                  selectedDateKey={selectedDateKey}
+                  isEditable={isBoardEditable}
+                  isRtl={isRtl}
+                  boardCurrentTime={boardCurrentTime}
+                  columns={schedulerColumns}
+                  events={schedulerEvents}
+                  timeColumnWidth={84}
+                  onSlotClick={handleSchedulerSlotClick}
+                  onSlotContextMenu={handleSchedulerSlotContextMenu}
+                  onSlotDrop={handleSchedulerSlotDrop}
+                  onSlotRangeSelect={handleSchedulerSlotRangeSelect}
+                  onEventClick={handleSchedulerEventClick}
+                  onEventContextMenu={handleSchedulerEventContextMenu}
+                  onEventDragStart={(eventItem) => setDraggedAptId(eventItem.id)}
+                  onEventDragEnd={() => {
+                    setDraggedAptId(null);
+                    setDragOverStaffId(null);
+                    setDragOverTime(null);
+                  }}
+                  onEventResizeStart={(eventItem, mouseEvent) => {
+                    if (viewMode === 'day' && isBoardEditable && eventItem.kind !== 'blocked') {
+                      handleMouseDown(mouseEvent, eventItem.id, true);
+                    }
+                  }}
+                  onAddSlotHover={(slot) => {
+                    if (slot) {
+                      setHoveredSlot({ staffId: slot.columnId, date: slot.dateKey, timeInMinutes: slot.startMinutes });
+                    } else {
+                      setHoveredSlot(null);
+                    }
+                  }}
+                  emptyHint={t.emptyStateText}
+                />
               )}
 
             </div>
@@ -6118,6 +5765,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setCurrentStartTime={setCurrentStartTime}
         currentStaffId={currentStaffId}
         setCurrentStaffId={setCurrentStaffId}
+        initialDuration={currentDuration}
         stylists={liveStylists}
         initialCreateMode={initialCreateMode}
         initialCartTab={initialCartTab}
