@@ -1313,6 +1313,7 @@ async function createTicket({
     }
 
     const subjectText = ensureSubjectLength(subject);
+    const subjectArText = normalizeOptionalText(subjectAr);
     const descriptionText = normalizeOptionalText(description);
     const descriptionArText = normalizeOptionalText(descriptionAr);
     const priorityValue = normalizePriority(priority);
