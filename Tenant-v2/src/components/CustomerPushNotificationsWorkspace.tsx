@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
+import {
   Bell, Send, Users, Sparkles, AlertCircle, RefreshCw, Layers, Eye, 
   CheckCircle2, History, Trash2, Calendar, ChevronDown, ChevronUp, 
   Search, Check, ShieldAlert, Code, Clock, Upload, ArrowRight, ArrowLeft,
   X, HelpCircle, Database, Smartphone, FileJson, Layers3, Flame
 } from 'lucide-react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { useTenantAuth } from '../contexts/TenantAuthContext';
+import {
+  buildTenantPlanSummary,
+  formatTenantPlanLimit
+} from '../lib/tenantSubscription';
 
 interface PushNotificationsWorkspaceProps {
   lang: 'ar' | 'en';
@@ -153,15 +158,24 @@ const normalizeUsageStats = (input: any, lastAttempt: NotificationHistoryItem | 
 
 export default function CustomerPushNotificationsWorkspace({ lang, darkMode = false }: PushNotificationsWorkspaceProps) {
   const isRtl = lang === 'ar';
+  const { tenant, tenantSettings, packageEntitlements, subscription, subscriptionUsage } = useTenantAuth();
+  const planSummary = buildTenantPlanSummary({
+    locale: isRtl ? 'ar' : 'en',
+    tenant,
+    tenantSettings,
+    packageEntitlements,
+    subscription,
+    usageSnapshot: subscriptionUsage
+  });
 
   // State Management
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageStats>({
-    limit: 5000,
+    limit: 0,
     sent: 0,
-    remaining: 5000,
-    deliverySuccessRate: 99.4,
+    remaining: 0,
+    deliverySuccessRate: 0,
     lastAttempt: null
   });
   const [history, setHistory] = useState<NotificationHistoryItem[]>([]);
@@ -494,7 +508,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
               {isRtl ? 'إحصائيات استهلاك الحصة الشهرية' : 'Monthly Usage Allocation'}
             </span>
             <h3 className="text-lg font-extrabold font-sans">
-              {isRtl ? 'ملخص استخدام الباقة الحالية' : 'Push Subscription Status'}
+              {isRtl ? planSummary.planNameAr : planSummary.planNameEn}
             </h3>
             <p className="text-xs text-neutral-400">
               {isRtl 
@@ -522,13 +536,21 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
         {/* Progress Bar */}
         <div className="mt-6 space-y-2">
           <div className="flex justify-between text-[11px] text-zinc-400">
-            <span>{isRtl ? `تم استخدام ${usage.sent.toLocaleString()} من أصل ${usage.limit.toLocaleString()}` : `${usage.sent.toLocaleString()} utilized out of ${usage.limit.toLocaleString()}`}</span>
-            <span>{Math.round((usage.sent / usage.limit) * 100)}%</span>
+            <span>
+              {isRtl
+                ? `تم استخدام ${usage.sent.toLocaleString()} من أصل ${formatTenantPlanLimit(usage.limit, 'ar')}`
+                : `${usage.sent.toLocaleString()} utilized out of ${formatTenantPlanLimit(usage.limit, 'en')}`}
+            </span>
+            <span>{usage.limit > 0 ? `${Math.round((usage.sent / usage.limit) * 100)}%` : '—'}</span>
           </div>
           <div className={`w-full h-2.5 rounded-full overflow-hidden ${darkMode ? 'bg-zinc-950' : 'bg-neutral-100'}`}>
             <div 
               className="h-full bg-brand-500 rounded-full transition-all duration-500" 
-              style={{ width: `${Math.min(100, Math.max(2, (usage.sent / usage.limit) * 100))}%` }}
+              style={{
+                width: usage.limit > 0
+                  ? `${Math.min(100, Math.max(2, (usage.sent / usage.limit) * 100))}%`
+                  : '0%'
+              }}
             />
           </div>
         </div>

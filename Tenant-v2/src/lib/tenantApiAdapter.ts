@@ -710,6 +710,14 @@ class TenantApiAdapter {
     return this.get('/api/v1/subscriptions/packages');
   }
 
+  async getCurrentSubscription(): Promise<any> {
+    return this.get('/api/v1/subscription/current');
+  }
+
+  async getTenantBills(): Promise<any> {
+    return this.get('/tenant/bills');
+  }
+
   async registerTenant(formData: FormData): Promise<any> {
     const response = await this.request('/auth/tenant/register', {
       method: 'POST',

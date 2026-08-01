@@ -8,6 +8,12 @@ import {
 } from 'lucide-react';
 import { Language, Service, Employee, Product, QuickLaunchRequest } from '../types';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { useTenantAuth } from '../contexts/TenantAuthContext';
+import {
+  buildTenantPlanSummary,
+  formatTenantPlanLimit,
+  getTenantPlanUsageCount
+} from '../lib/tenantSubscription';
 
 interface ServicesWorkspaceProps {
   lang: Language;
@@ -62,6 +68,7 @@ export interface EnhancedService extends Service {
 const defaultImage = 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?q=80&w=600&auto=format&fit=crop';
 export default function ServicesWorkspace({ lang, quickLaunchRequest }: ServicesWorkspaceProps) {
   const isRtl = lang === 'ar';
+  const { tenant, tenantSettings, packageEntitlements, subscription, subscriptionUsage } = useTenantAuth();
 
   // 1. Core Services State
   const [services, setServices] = useState<EnhancedService[]>([]);
@@ -135,13 +142,17 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
   const [giftFilter, setGiftFilter] = useState(false);
   const [sortBy, setSortBy] = useState<'none' | 'price-asc' | 'price-desc' | 'duration-asc' | 'duration-desc'>('none');
 
-  // 4. Subscription Limit State
-  const [subscriptionLimit] = useState({
-    current: services.length,
-    max: 12,
-    planNameAr: 'باقة المتاجر المتقدمة',
-    planNameEn: 'Advanced Enterprise Plan'
+  const planSummary = buildTenantPlanSummary({
+    locale: isRtl ? 'ar' : 'en',
+    tenant,
+    tenantSettings,
+    packageEntitlements,
+    subscription,
+    usageSnapshot: subscriptionUsage
   });
+  const serviceLimit = planSummary.usage.services?.limit ?? planSummary.packageLimits?.maxServices ?? null;
+  const serviceUsage = getTenantPlanUsageCount(planSummary.usage.services, services.length);
+  const servicePlanName = isRtl ? planSummary.planNameAr : planSummary.planNameEn;
 
   // 5. Active form section guided editor
   const [activeSection, setActiveSection] = useState<'basic' | 'team' | 'options' | 'settings'>('basic');
@@ -668,7 +679,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
     return services.filter(s => matchesCategoryValue(s, catId)).length;
   };
 
-  const isLimitReached = services.length >= subscriptionLimit.max;
+  const isLimitReached = serviceLimit !== null && serviceLimit !== -1 && serviceUsage >= serviceLimit;
 
   return (
     <div className="font-sans relative space-y-6" id="services-management-workspace">
@@ -721,12 +732,12 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                 </div>
                 <div>
                   <span className="text-[9px] font-black uppercase text-indigo-700 tracking-wider block leading-none mb-1">
-                    {isRtl ? subscriptionLimit.planNameAr : subscriptionLimit.planNameEn}
+                    {servicePlanName}
                   </span>
                   <span className="text-xs font-bold text-neutral-700 block leading-none">
                     {isRtl 
-                      ? `تم استخدام ${services.length} من أصل ${subscriptionLimit.max} خدمات` 
-                      : `${services.length} of ${subscriptionLimit.max} Services Used`}
+                      ? `تم استخدام ${serviceUsage} من أصل ${formatTenantPlanLimit(serviceLimit, 'ar')} خدمات` 
+                      : `${serviceUsage} of ${formatTenantPlanLimit(serviceLimit, 'en')} Services Used`}
                   </span>
                 </div>
               </div>
@@ -809,8 +820,8 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                   <p className="font-extrabold">{isRtl ? 'لقد وصلت للحد الأقصى للخدمات مسبقة التفعيل في باقتك الحالية' : 'Subscription catalog limit reached'}</p>
                   <p className="text-[11px] text-amber-700/95 mt-0.5">
                     {isRtl 
-                      ? `باقة المتاجر المتقدمة تدعم بحد أقصى ${subscriptionLimit.max} خدمات نشطة. لإنشاء المزيد من الخدمات، يرجى الترقية إلى الباقة اللامحدودة أو أرشفة الخدمات القديمة.` 
-                      : `The Advanced Enterprise Plan supports up to ${subscriptionLimit.max} active catalog services. To add more, archive existing services or upgrade your subscription plan.`}
+                      ? `الباقة الحالية تدعم بحد أقصى ${formatTenantPlanLimit(serviceLimit, 'ar')} خدمات نشطة. لإنشاء المزيد من الخدمات، يرجى الترقية إلى باقة أعلى أو أرشفة الخدمات القديمة.` 
+                      : `The current plan supports up to ${formatTenantPlanLimit(serviceLimit, 'en')} active catalog services. To add more, archive existing services or upgrade your subscription plan.`}
                   </p>
                 </div>
               </div>

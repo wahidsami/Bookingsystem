@@ -4,6 +4,10 @@ import {
   normalizeDashboardPermissions,
   normalizePackageEntitlements
 } from '../lib/tenantEntitlements';
+import {
+  normalizeTenantSubscriptionSnapshot,
+  normalizeTenantSubscriptionUsage
+} from '../lib/tenantSubscription';
 
 type SessionType = 'tenant_owner' | 'tenant_account' | null;
 
@@ -36,6 +40,8 @@ interface TenantAuthContextValue {
   tenantSettings: Record<string, any> | null;
   permissions: Record<string, boolean> | null;
   packageEntitlements: Record<string, any> | null;
+  subscription: Record<string, any> | null;
+  subscriptionUsage: Record<string, any> | null;
   sessionType: SessionType;
   error: string | null;
   loading: boolean;
@@ -125,6 +131,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const [tenantSettings, setTenantSettings] = useState<Record<string, any> | null>(null);
   const [permissions, setPermissions] = useState<Record<string, boolean> | null>(null);
   const [packageEntitlements, setPackageEntitlements] = useState<Record<string, any> | null>(null);
+  const [subscription, setSubscription] = useState<Record<string, any> | null>(null);
+  const [subscriptionUsage, setSubscriptionUsage] = useState<Record<string, any> | null>(null);
   const [sessionType, setSessionType] = useState<SessionType>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -139,7 +147,28 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     setTenantSettings(null);
     setPermissions(null);
     setPackageEntitlements(null);
+    setSubscription(null);
+    setSubscriptionUsage(null);
     setSessionType(null);
+  }, []);
+
+  const loadSubscriptionState = useCallback(async () => {
+    const [subscriptionResult, usageResult] = await Promise.allSettled([
+      tenantApiAdapter.getCurrentSubscription(),
+      tenantApiAdapter.getSubscriptionLimits()
+    ]);
+
+    if (subscriptionResult.status === 'fulfilled') {
+      setSubscription(normalizeTenantSubscriptionSnapshot(subscriptionResult.value));
+    } else {
+      setSubscription(null);
+    }
+
+    if (usageResult.status === 'fulfilled') {
+      setSubscriptionUsage(normalizeTenantSubscriptionUsage(usageResult.value));
+    } else {
+      setSubscriptionUsage(null);
+    }
   }, []);
 
   const loadTenantSettings = useCallback(async () => {
@@ -177,7 +206,10 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       setPackageEntitlements(normalized.packageEntitlements);
       setSessionType(normalized.sessionType);
       setUser(normalized.user);
-      const settings = await loadTenantSettings();
+      const [settings] = await Promise.all([
+        loadTenantSettings(),
+        loadSubscriptionState()
+      ]);
       setTenantSettings(settings);
       setAuthError(null);
     } catch (error) {
@@ -193,7 +225,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [clearSession, loadTenantSettings]);
+  }, [clearSession, loadTenantSettings, loadSubscriptionState]);
 
   useEffect(() => {
     const uninstallBridge = installTenantApiFetchBridge(() => {
@@ -237,7 +269,10 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       setPackageEntitlements(normalized.packageEntitlements);
       setSessionType(normalized.sessionType);
       setUser(normalized.user);
-      const settings = await loadTenantSettings();
+      const [settings] = await Promise.all([
+        loadTenantSettings(),
+        loadSubscriptionState()
+      ]);
       setTenantSettings(settings);
       setAuthError(null);
     } catch (error: any) {
@@ -247,7 +282,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [clearSession, loadTenantSettings]);
+  }, [clearSession, loadTenantSettings, loadSubscriptionState]);
 
   const logout = useCallback(async () => {
     try {
@@ -283,6 +318,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     tenantSettings,
     permissions,
     packageEntitlements,
+    subscription,
+    subscriptionUsage,
     sessionType,
     error: authError,
     loading,
@@ -298,6 +335,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     tenantSettings,
     permissions,
     packageEntitlements,
+    subscription,
+    subscriptionUsage,
     sessionType,
     authError,
     loading,

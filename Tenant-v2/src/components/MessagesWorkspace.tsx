@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { useTenantAuth } from '../contexts/TenantAuthContext';
+import { buildTenantPlanSummary } from '../lib/tenantSubscription';
+import { hasInternalMessagingEntitlement } from '../lib/tenantEntitlements';
 import { 
   Inbox, Pin, Megaphone, Users, Archive, Search, SlidersHorizontal, 
   Plus, Send, ArrowLeft, ArrowRight, Star, Paperclip, Trash2, 
@@ -79,6 +82,16 @@ interface MessageThread {
 
 export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWorkspaceProps) {
   const isRtl = lang === 'ar';
+  const { tenant, tenantSettings, packageEntitlements, subscription, subscriptionUsage } = useTenantAuth();
+  const planSummary = buildTenantPlanSummary({
+    locale: isRtl ? 'ar' : 'en',
+    tenant,
+    tenantSettings,
+    packageEntitlements,
+    subscription,
+    usageSnapshot: subscriptionUsage
+  });
+  const hasMessagingAccess = hasInternalMessagingEntitlement(packageEntitlements);
 
   const panelTexts = {
     ar: {
@@ -746,6 +759,20 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
           <p className="text-xs text-neutral-400">
             {t.subtitle}
           </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="inline-flex items-center rounded-full border border-brand-500/20 bg-brand-500/10 px-2.5 py-1 text-[10px] font-bold text-brand-500">
+              {isRtl ? `الباقة الحالية: ${planSummary.planNameAr}` : `Current plan: ${planSummary.planNameEn}`}
+            </span>
+            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold ${
+              hasMessagingAccess
+                ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'
+                : 'border-amber-500/20 bg-amber-500/10 text-amber-500'
+            }`}>
+              {hasMessagingAccess
+                ? (isRtl ? 'الرسائل الداخلية مفعلة في الباقة' : 'Internal messaging included')
+                : (isRtl ? 'الرسائل الداخلية غير مفعلة' : 'Internal messaging not included')}
+            </span>
+          </div>
         </div>
 
         {/* Search, Filters and Compose Button Wrapper */}

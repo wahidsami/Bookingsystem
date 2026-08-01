@@ -10,7 +10,7 @@ import { translations, navigationItems } from '../data/translations';
 import { 
   mockCustomers, mockEmployees, 
   mockServices, mockProducts, mockTransactions, mockCampaigns, 
-  mockGiftCards, mockLoyalty, mockReviews, mockInvoices 
+  mockGiftCards, mockLoyalty, mockReviews
 } from '../data/mockData';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import LucideIcon from './LucideIcon';
@@ -29,6 +29,12 @@ import ReviewsWorkspace from './ReviewsWorkspace';
 import MessagesWorkspace from './MessagesWorkspace';
 import SupportWorkspace from './SupportWorkspace';
 import DashboardPreferencesSection from './settings/DashboardPreferencesSection';
+import { useTenantAuth } from '../contexts/TenantAuthContext';
+import {
+  buildTenantPlanSummary,
+  formatTenantPlanBillingAmount,
+  formatTenantPlanLimit
+} from '../lib/tenantSubscription';
 
 interface WorkspaceProps {
   view: ViewType;
@@ -71,6 +77,7 @@ export default function Workspace({
 }: WorkspaceProps) {
   const t = translations[lang];
   const isRtl = lang === 'ar';
+  const { tenant, tenantSettings, packageEntitlements, subscription, subscriptionUsage } = useTenantAuth();
 
   // Local state for POS Cart
   const [posCart, setPosCart] = useState<{ item: any; quantity: number }[]>([]);
@@ -85,6 +92,9 @@ export default function Workspace({
   // Real Data State
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [todaysAppointments, setTodaysAppointments] = useState<any[]>([]);
+  const [tenantBills, setTenantBills] = useState<any[]>([]);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
 
   // Simulated Loading State to display skeleton loading on view change (gives premium feel)
   const [isLoading, setIsLoading] = useState(false);
@@ -124,6 +134,52 @@ export default function Workspace({
   
   const revenueGrowth = dashboardStats ? computeGrowth(dashboardStats.todaysRevenue, dashboardStats.yesterdayRevenue) : '0%';
   const bookingsGrowth = dashboardStats ? computeGrowth(dashboardStats.todaysBookings, dashboardStats.yesterdayBookings) : '0%';
+  const planSummary = buildTenantPlanSummary({
+    locale: isRtl ? 'ar' : 'en',
+    tenant,
+    tenantSettings,
+    packageEntitlements,
+    subscription,
+    usageSnapshot: subscriptionUsage
+  });
+
+  const teamSeatLimit = planSummary.usage.staff?.limit ?? planSummary.packageLimits?.maxStaff ?? null;
+  const serviceLimit = planSummary.usage.services?.limit ?? planSummary.packageLimits?.maxServices ?? null;
+  const productLimit = planSummary.usage.products?.limit ?? planSummary.packageLimits?.maxProducts ?? null;
+  const marketingSmsLimit = planSummary.packageLimits?.smsMarketingCampaigns ?? null;
+  const currentTenantDisplay = isRtl ? planSummary.planNameAr : planSummary.planNameEn;
+
+  useEffect(() => {
+    let active = true;
+
+    const loadTenantBills = async () => {
+      if (view !== 'billing') {
+        return;
+      }
+
+      setBillingLoading(true);
+      setBillingError(null);
+      try {
+        const response = await tenantApiAdapter.getTenantBills();
+        if (!active) return;
+        setTenantBills(Array.isArray(response?.bills) ? response.bills : []);
+      } catch (error: any) {
+        if (!active) return;
+        setBillingError(error?.message || (isRtl ? 'تعذر تحميل الفواتير.' : 'Failed to load invoices.'));
+        setTenantBills([]);
+      } finally {
+        if (active) {
+          setBillingLoading(false);
+        }
+      }
+    };
+
+    void loadTenantBills();
+
+    return () => {
+      active = false;
+    };
+  }, [view, isRtl]);
 
   // POS operations
   const handleAddToPosCart = (item: any) => {
@@ -450,7 +506,11 @@ export default function Workspace({
                       <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'فريق العمل النشط' : 'Active Team Members'}</span>
                       <p className="text-2xl font-black mt-1 font-mono">{dashboardStats?.activeEmployees || 0}</p>
                       <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {isRtl ? 'متاحين للخدمة' : 'Ready to serve'}
+                        {teamSeatLimit === null
+                          ? (isRtl ? 'مزامنة حدود الباقة جارية' : 'Syncing plan limits')
+                          : teamSeatLimit === -1
+                            ? (isRtl ? 'عدد المقاعد غير محدود' : 'Unlimited plan seats')
+                            : `${dashboardStats?.activeEmployees || 0} / ${formatTenantPlanLimit(teamSeatLimit, isRtl ? 'ar' : 'en')} ${isRtl ? 'مقعد' : 'seats'}`}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
@@ -957,22 +1017,24 @@ export default function Workspace({
           <div className="flex justify-between items-start mb-6 pb-4 border-b border-neutral-100 dark:border-zinc-800">
             <div>
               <span className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-widest">{isRtl ? 'تفاصيل باقة المنشأة' : 'REFAH SAAS TENANT BILLING PLAN'}</span>
-              <h3 className="text-lg md:text-xl font-extrabold mt-1">{isRtl ? 'باقة صالونات بريميوم بلس السحابية' : 'REFAH Premium Plus Salon Suite'}</h3>
+              <h3 className="text-lg md:text-xl font-extrabold mt-1">{currentTenantDisplay}</h3>
             </div>
             <span className="bg-brand-50 dark:bg-brand-950/30 text-brand-800 dark:text-brand-300 border border-brand-100 dark:border-brand-900 px-3 py-1 rounded-full text-xs font-bold">
-              {isRtl ? 'نشط وتعمل بشكل مثالي' : 'Active & Compliant'}
+              {isRtl ? (planSummary.status ? `الحالة: ${planSummary.status}` : 'نشط وتعمل بشكل مثالي') : (planSummary.status ? `Status: ${planSummary.status}` : 'Active & Compliant')}
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
             <div className="space-y-3">
               <div className="flex justify-between py-1.5 border-b border-neutral-50 dark:border-zinc-800">
-                <span className="font-medium text-neutral-400">{isRtl ? 'سعر الاشتراك الشهري' : 'Monthly Fee'}</span>
-                <span className="font-bold font-mono">450 ر.س / شهرياً</span>
+                <span className="font-medium text-neutral-400">{isRtl ? 'سعر الاشتراك' : 'Billing Amount'}</span>
+                <span className="font-bold font-mono">
+                  {formatTenantPlanBillingAmount(planSummary.billingAmount, planSummary.currency, planSummary.billingCycle, isRtl ? 'ar' : 'en')}
+                </span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-neutral-50 dark:border-zinc-800">
                 <span className="font-medium text-neutral-400">{isRtl ? 'الحد الأقصى لأعضاء الفريق' : 'Team Seats Allowed'}</span>
-                <span className="font-bold font-mono">{isRtl ? 'غير محدود' : 'Unlimited'}</span>
+                <span className="font-bold font-mono">{formatTenantPlanLimit(teamSeatLimit, isRtl ? 'ar' : 'en')}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-neutral-50 dark:border-zinc-800">
                 <span className="font-medium text-neutral-400">{isRtl ? 'خدمات الحجز الذاتي المدمجة' : 'Self-booking link'}</span>
@@ -982,8 +1044,12 @@ export default function Workspace({
 
             <div className="bg-brand-50/50 dark:bg-brand-950/10 p-4 rounded-xl border border-brand-100 dark:border-brand-950 flex flex-col justify-between">
               <div>
-                <p className="font-bold mb-1">{isRtl ? 'الحد الائتماني المتاح لحملات التسويق' : 'Sms Campaign Monthly Balance'}</p>
-                <p className="text-xs text-neutral-400">{isRtl ? 'تم استهلاك 1,420 من أصل 10,000 رسالة مجانية مخصصة شهرياً' : 'Used 1,420 out of 10,000 complimentary marketing SMS.'}</p>
+                <p className="font-bold mb-1">{isRtl ? 'رصيد الإشعارات / التسويق' : 'Marketing & Notifications Balance'}</p>
+                <p className="text-xs text-neutral-400">
+                  {isRtl
+                    ? `الخدمات: ${formatTenantPlanLimit(serviceLimit, 'ar')} • المنتجات: ${formatTenantPlanLimit(productLimit, 'ar')} • الرسائل التسويقية: ${formatTenantPlanLimit(marketingSmsLimit, 'ar')}`
+                    : `Services: ${formatTenantPlanLimit(serviceLimit, 'en')} • Products: ${formatTenantPlanLimit(productLimit, 'en')} • Marketing SMS: ${formatTenantPlanLimit(marketingSmsLimit, 'en')}`}
+                </p>
               </div>
               <div className="w-full bg-neutral-200 dark:bg-zinc-800 h-2 rounded-full mt-4 overflow-hidden">
                 <div className="bg-brand-600 h-full w-[14%]" />
@@ -999,6 +1065,11 @@ export default function Workspace({
           darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
         }`}>
           <h3 className="font-bold text-base mb-4">{isRtl ? 'سجل فواتير اشتراك منصة رفاه' : 'SaaS Subscription Invoices'}</h3>
+          {billingError && (
+            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+              {billingError}
+            </div>
+          )}
           
           <div className="overflow-x-auto">
             <table className="w-full text-start text-xs border-collapse">
@@ -1012,15 +1083,51 @@ export default function Workspace({
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/30">
-                {mockInvoices.map(inv => (
-                  <tr key={inv.id} className="hover:bg-neutral-50/50 dark:hover:bg-zinc-800/20">
-                    <td className="p-3 font-mono font-bold">{inv.id}</td>
-                    <td className="p-3 font-semibold">{isRtl ? inv.periodAr : inv.periodEn}</td>
-                    <td className="p-3 text-neutral-400 font-mono">{inv.date}</td>
-                    <td className="p-3 font-mono font-bold">{inv.amount}</td>
-                    <td className="p-3"><span className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 px-2.5 py-1 rounded font-bold text-[10px]">{isRtl ? inv.statusAr : inv.statusEn}</span></td>
+                {billingLoading ? (
+                  <tr>
+                    <td className="p-4 text-center text-neutral-400" colSpan={5}>
+                      {isRtl ? 'جارٍ تحميل الفواتير...' : 'Loading subscription invoices...'}
+                    </td>
                   </tr>
-                ))}
+                ) : tenantBills.length > 0 ? tenantBills.map((bill) => {
+                  const billStatus = String(bill?.status || '').toLowerCase();
+                  const statusLabel = billStatus === 'paid'
+                    ? (isRtl ? 'مدفوعة' : 'Paid')
+                    : billStatus === 'unpaid'
+                      ? (isRtl ? 'غير مدفوعة' : 'Unpaid')
+                      : billStatus === 'void'
+                        ? (isRtl ? 'ملغاة' : 'Void')
+                        : billStatus || (isRtl ? 'غير معروف' : 'Unknown');
+
+                  const issuedDate = bill?.issueDate || bill?.createdAt || bill?.created_at || bill?.updatedAt || '';
+                  const amountValue = bill?.amount ?? bill?.totalAmount ?? bill?.planSnapshot?.amount ?? null;
+
+                  return (
+                    <tr key={bill.id} className="hover:bg-neutral-50/50 dark:hover:bg-zinc-800/20">
+                      <td className="p-3 font-mono font-bold">{bill.billNumber || bill.id}</td>
+                      <td className="p-3 font-semibold">{bill?.billingCycle || bill?.planSnapshot?.billingCycle || '—'}</td>
+                      <td className="p-3 text-neutral-400 font-mono">
+                        {issuedDate ? new Date(issuedDate).toLocaleDateString(isRtl ? 'ar-SA' : 'en-GB') : '—'}
+                      </td>
+                      <td className="p-3 font-mono font-bold">
+                        {amountValue !== null && amountValue !== undefined
+                          ? `${Number(amountValue).toLocaleString(isRtl ? 'ar-SA' : 'en-GB')} ${bill.currency || planSummary.currency || 'SAR'}`
+                          : '—'}
+                      </td>
+                      <td className="p-3">
+                        <span className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 px-2.5 py-1 rounded font-bold text-[10px]">
+                          {statusLabel}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                }) : (
+                  <tr>
+                    <td className="p-4 text-center text-neutral-400" colSpan={5}>
+                      {isRtl ? 'لا توجد فواتير اشتراك حالياً.' : 'No subscription invoices available.'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

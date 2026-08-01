@@ -8,6 +8,12 @@ import {
 } from 'lucide-react';
 import { Language, Product, QuickLaunchRequest } from '../types';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { useTenantAuth } from '../contexts/TenantAuthContext';
+import {
+  buildTenantPlanSummary,
+  formatTenantPlanLimit,
+  getTenantPlanUsageCount
+} from '../lib/tenantSubscription';
 
 interface ProductsWorkspaceProps {
   lang: Language;
@@ -62,6 +68,7 @@ const presetCosmeticsImages = [
 
 export default function ProductsWorkspace({ lang, quickLaunchRequest }: ProductsWorkspaceProps) {
   const isRtl = lang === 'ar';
+  const { tenant, tenantSettings, packageEntitlements, subscription, subscriptionUsage } = useTenantAuth();
 
   // 1. Core State
   const [products, setProducts] = useState<EnhancedProduct[]>([]);
@@ -88,13 +95,17 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'outofstock' | 'featured'>('all');
   const [sortBy, setSortBy] = useState<'none' | 'price-asc' | 'price-desc' | 'stock-asc' | 'stock-desc' | 'name-asc' | 'name-desc'>('none');
 
-  // 3. Subscription quotas
-  const quotaLimit = {
-    current: products.length,
-    max: 20,
-    planNameAr: 'باقة المتاجر الفاخرة المعتمدة',
-    planNameEn: 'Certified Premium Enterprise Plan'
-  };
+  const planSummary = buildTenantPlanSummary({
+    locale: isRtl ? 'ar' : 'en',
+    tenant,
+    tenantSettings,
+    packageEntitlements,
+    subscription,
+    usageSnapshot: subscriptionUsage
+  });
+  const productLimit = planSummary.usage.products?.limit ?? planSummary.packageLimits?.maxProducts ?? null;
+  const productUsage = getTenantPlanUsageCount(planSummary.usage.products, products.length);
+  const productPlanName = isRtl ? planSummary.planNameAr : planSummary.planNameEn;
 
   // 4. Form State
   const [formData, setFormData] = useState<EnhancedProduct>({
@@ -210,7 +221,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
 
   // Action: Open Add form
   const handleOpenAdd = () => {
-    if (products.length >= quotaLimit.max) {
+    if (productLimit !== null && productLimit !== -1 && productUsage >= productLimit) {
       triggerToast(
         'Subscription quota limit reached! Upgrade plan to add more products.',
         'لقد تجاوزت الحد الأقصى للمنتجات المسموح بها لباقة اشتراكك الحالية.',
@@ -494,7 +505,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] uppercase font-black tracking-widest bg-white/20 px-2.5 py-1 rounded-full text-blue-100">
-                    {isRtl ? quotaLimit.planNameAr : quotaLimit.planNameEn}
+                    {productPlanName}
                   </span>
                   <span className="text-[10px] font-bold bg-emerald-500/30 px-2 py-0.5 rounded text-emerald-200 border border-emerald-500/20">
                     {isRtl ? 'المخزون نشط' : 'Inventory Active'}
@@ -513,18 +524,27 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
               <div className="bg-white/10 backdrop-blur-xs p-4 rounded-xl border border-white/10 shrink-0 md:w-64 space-y-2">
                 <div className="flex justify-between text-xs font-black">
                   <span>{isRtl ? 'حصة المنتجات المستخدمة' : 'Used Products Quota'}</span>
-                  <span>{quotaLimit.current} / {quotaLimit.max}</span>
+                  <span>{productUsage} / {formatTenantPlanLimit(productLimit, isRtl ? 'ar' : 'en')}</span>
                 </div>
                 <div className="w-full bg-white/15 rounded-full h-2 overflow-hidden">
                   <div 
                     className="bg-emerald-400 h-full transition-all duration-500" 
-                    style={{ width: `${(quotaLimit.current / quotaLimit.max) * 100}%` }}
+                    style={{
+                      width:
+                        productLimit && productLimit > 0
+                          ? `${Math.min(100, (productUsage / productLimit) * 100)}%`
+                          : '0%'
+                    }}
                   />
                 </div>
                 <p className="text-[9px] text-blue-200 font-bold">
                   {isRtl 
-                    ? `باقي لك ${quotaLimit.max - quotaLimit.current} منتج متاح للإضافة` 
-                    : `You have ${quotaLimit.max - quotaLimit.current} available product slots left.`}
+                    ? (productLimit === -1
+                        ? 'الإضافة متاحة بدون حد للمنتجات.'
+                        : `باقي لك ${formatTenantPlanLimit(productLimit === null ? null : Math.max(productLimit - productUsage, 0), 'ar')} منتج متاح للإضافة`)
+                    : (productLimit === -1
+                        ? 'Product creation is unlimited on the current plan.'
+                        : `You have ${formatTenantPlanLimit(productLimit === null ? null : Math.max(productLimit - productUsage, 0), 'en')} available product slots left.`)}
                 </p>
               </div>
             </div>
