@@ -53,7 +53,8 @@ export default function App() {
     loading: authLoading,
     isAuthenticated,
     login,
-    logout
+    logout,
+    refreshUser
   } = useTenantAuth();
   const [lang, setLang] = useState<Language>('ar');
   const [currentPath, setCurrentPath] = useState<string>(() =>
@@ -108,6 +109,7 @@ export default function App() {
   const [isActivityCenterOpen, setIsActivityCenterOpen] = useState(false);
   const [addEmployeeTrigger, setAddEmployeeTrigger] = useState<number>(0);
   const [quickLaunchRequest, setQuickLaunchRequest] = useState<QuickLaunchRequest | null>(null);
+  const dashboardBootstrapAttemptedRef = useRef(false);
 
   // Dynamic accessibility control for the Marketing group modules
   const [accessibleMarketingModules, setAccessibleMarketingModules] = useState<Record<string, boolean>>({
@@ -198,7 +200,13 @@ export default function App() {
       return;
     }
 
-    if (!isAuthenticated && currentPath.startsWith('/dashboard')) {
+    if (currentPath.startsWith('/dashboard') && !isAuthenticated) {
+      if (!dashboardBootstrapAttemptedRef.current) {
+        dashboardBootstrapAttemptedRef.current = true;
+        void refreshUser();
+        return;
+      }
+
       navigateToPath('/login', { replace: true });
       return;
     }
@@ -206,15 +214,24 @@ export default function App() {
     if (isAuthenticated && !currentPath.startsWith('/dashboard')) {
       navigateToPath('/dashboard', { replace: true });
     }
-  }, [authLoading, currentPath, isAuthenticated, navigateToPath]);
+  }, [authLoading, currentPath, isAuthenticated, navigateToPath, refreshUser]);
 
   useEffect(() => {
     if (!isAuthenticated) {
       landingPageAppliedRef.current = null;
       setTabs([DEFAULT_DASHBOARD_TAB]);
       setActiveTabId(DEFAULT_DASHBOARD_TAB.id);
+      return;
     }
+
+    dashboardBootstrapAttemptedRef.current = false;
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!currentPath.startsWith('/dashboard')) {
+      dashboardBootstrapAttemptedRef.current = false;
+    }
+  }, [currentPath]);
 
   useEffect(() => {
     const tenantLabel =

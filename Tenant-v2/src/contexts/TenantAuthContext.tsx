@@ -48,6 +48,17 @@ interface TenantAuthContextValue {
 
 const TenantAuthContext = createContext<TenantAuthContextValue | undefined>(undefined);
 
+function isPublicAuthRoute(pathname: string): boolean {
+  return (
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/forgot-password') ||
+    pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/registration-success')
+  );
+}
+
 function pick<T = any>(source: any, keys: string[]): T | undefined {
   if (!source || typeof source !== 'object') return undefined;
   for (const key of keys) {
@@ -191,7 +202,12 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    void loadUser();
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+    if (!isPublicAuthRoute(currentPath)) {
+      void loadUser();
+    } else {
+      setLoading(false);
+    }
 
     return () => {
       uninstallBridge();
