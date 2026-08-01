@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { API_ORIGIN, tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { 
   UserCheck, Calendar, TrendingUp, DollarSign, Clock, Star, 
   Settings, Award, Sparkles, Check, X, Download, ShieldCheck, Mail, Phone,
@@ -14,6 +14,30 @@ interface TeamsWorkspaceProps {
   onAddEmployeeTriggerReset?: () => void;
   quickLaunchRequest?: QuickLaunchRequest | null;
 }
+
+const DEFAULT_EMPLOYEE_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
+const POSITION_LABELS: Record<string, { en: string; ar: string; uiPosition: 'service-provider' | 'dashboard-admin' }> = {
+  service_provider: { en: 'Service Provider', ar: 'مقدم خدمة', uiPosition: 'service-provider' },
+  manager: { en: 'Manager', ar: 'مدير', uiPosition: 'dashboard-admin' },
+  receptionist: { en: 'Receptionist', ar: 'استقبال', uiPosition: 'dashboard-admin' },
+  accountant: { en: 'Accountant', ar: 'محاسب', uiPosition: 'dashboard-admin' },
+  marketing: { en: 'Marketing', ar: 'تسويق', uiPosition: 'dashboard-admin' },
+  other: { en: 'Staff', ar: 'موظف', uiPosition: 'dashboard-admin' }
+};
+
+const resolveEmployeePhotoUrl = (value: unknown) => {
+  const raw = `${value ?? ''}`.trim();
+  if (!raw) return DEFAULT_EMPLOYEE_AVATAR;
+  if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
+  return `${API_ORIGIN}${raw.startsWith('/') ? raw : `/${raw}`}`;
+};
+
+const canonicalEmployeePosition = (value: string) => {
+  const normalized = `${value || ''}`.trim().toLowerCase();
+  if (normalized === 'service-provider') return 'service_provider';
+  if (normalized === 'dashboard-admin') return 'manager';
+  return normalized || 'other';
+};
 
 export type TeamSubTab =
   | 'profile'
@@ -137,16 +161,6 @@ export interface TeamMemberData {
     date: string;
   }>;
 }
-
-// Preset Avatars for Elite Refah Staff
-const presetAvatars = [
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=200',
-  'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&q=80&w=200',
-  'https://images.unsplash.com/photo-1594744803329-e58b31de215f?auto=format&fit=crop&q=80&w=200',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=200',
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'
-];
 
 const defaultTeamMember: TeamMemberData = {
   id: '',
@@ -299,6 +313,8 @@ export default function TeamsWorkspace({
 
   // Custom Toast Notification State
   const [toasts, setToasts] = useState<Array<{ id: string; msgEn: string; msgAr: string; type: 'success' | 'info' | 'error' }>>([]);
+  const [employeePhotoFile, setEmployeePhotoFile] = useState<File | null>(null);
+  const employeePhotoInputRef = useRef<HTMLInputElement | null>(null);
   
   const triggerToast = (en: string, ar: string, type: 'success' | 'info' | 'error' = 'success') => {
     const id = Date.now().toString();
@@ -306,6 +322,32 @@ export default function TeamsWorkspace({
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4000);
+  };
+
+  const getRoleLabel = (position: string) => {
+    const normalized = `${position || ''}`.trim().toLowerCase();
+    const labels = POSITION_LABELS[normalized] || POSITION_LABELS.other;
+    return {
+      uiPosition: labels.uiPosition,
+      roleEn: labels.en,
+      roleAr: labels.ar
+    };
+  };
+
+  const applyEmployeePhotoFile = (file: File | null) => {
+    setEmployeePhotoFile(file);
+
+    if (!file) {
+      setFormData((prev) => ({ ...prev, avatar: DEFAULT_EMPLOYEE_AVATAR }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const preview = typeof reader.result === 'string' ? reader.result : DEFAULT_EMPLOYEE_AVATAR;
+      setFormData((prev) => ({ ...prev, avatar: preview || DEFAULT_EMPLOYEE_AVATAR }));
+    };
+    reader.readAsDataURL(file);
   };
 
   // Raw mock Team members (preserving old dataset and enriching it)
@@ -321,33 +363,33 @@ export default function TeamsWorkspace({
         id: emp.id,
         nameEn: emp.name || '',
         nameAr: emp.name || '',
-        roleEn: emp.role_en || emp.position || 'Staff',
-        roleAr: emp.role_ar || emp.position || 'موظف',
-        avatar: emp.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        roleEn: getRoleLabel(emp.position).roleEn,
+        roleAr: getRoleLabel(emp.position).roleAr,
+        avatar: resolveEmployeePhotoUrl(emp.photo),
         rating: parseFloat(emp.rating || 5.0),
         status: emp.isActive ? 'active' : 'off',
         email: emp.email || '',
         phone: emp.phone || '',
         joinedDate: emp.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
-        bioEn: emp.bio_en || '',
-        bioAr: emp.bio_ar || '',
+        bioEn: emp.bio || '',
+        bioAr: emp.bio || '',
         experienceEn: '',
         experienceAr: '',
         nationalityAr: emp.nationality || '',
         nationalityEn: emp.nationality || '',
         gender: emp.gender === 'male' ? 'male' : 'female',
-        position: emp.position === 'admin' ? 'dashboard-admin' : 'service-provider',
-        specialtiesEn: emp.specialties_en || [],
-        specialtiesAr: emp.specialties_ar || [],
-        languagesEn: emp.languages_en || [],
-        languagesAr: emp.languages_ar || [],
-        baseSalary: parseFloat(emp.baseSalary || 0),
+        position: getRoleLabel(emp.position).uiPosition,
+        specialtiesEn: Array.isArray(emp.skills) ? emp.skills : [],
+        specialtiesAr: Array.isArray(emp.skills) ? emp.skills : [],
+        languagesEn: Array.isArray(emp.spokenLanguages) ? emp.spokenLanguages : [],
+        languagesAr: Array.isArray(emp.spokenLanguages) ? emp.spokenLanguages : [],
+        baseSalary: parseFloat(emp.salary || 0),
         commissionRatePct: parseFloat(emp.commissionRate || 0),
-        serviceCommissionEnabled: true,
-        productCommissionEnabled: false,
-        scheduleVisibilityWeeks: 2,
+        serviceCommissionEnabled: Boolean(emp.serviceCommissionEnabled),
+        productCommissionEnabled: Boolean(emp.productCommissionEnabled),
+        scheduleVisibilityWeeks: parseInt(emp.scheduleVisibilityWeeks || 2),
         schedule: [],
-        bookingsCount: parseInt(emp.reviewsCount || 0),
+        bookingsCount: parseInt(emp.totalBookings || 0),
         utilizationRate: 100,
         retentionRate: 100,
         noShowCount: 0,
@@ -447,13 +489,14 @@ export default function TeamsWorkspace({
       return;
     }
     setFormMode('add');
+    setEmployeePhotoFile(null);
     setFormData({
       id: '',
       nameEn: '',
       nameAr: '',
       roleEn: '',
       roleAr: '',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+      avatar: DEFAULT_EMPLOYEE_AVATAR,
       rating: 5.0,
       status: 'active',
       email: '',
@@ -533,6 +576,7 @@ export default function TeamsWorkspace({
 
   const handleOpenEditForm = (member: TeamMemberData) => {
     setFormMode('edit');
+    setEmployeePhotoFile(null);
     setFormData({
       ...member,
       specialtiesEn: [...member.specialtiesEn],
@@ -612,38 +656,52 @@ export default function TeamsWorkspace({
 
     try {
       setIsSaving(true);
-      const payload = {
-        name: formData.nameEn || formData.nameAr,
-        email: formData.email,
-        phone: formData.phone,
-        gender: formData.gender,
-        position: formData.position === 'dashboard-admin' ? 'admin' : 'staff',
-        nationality: formData.nationalityEn || formData.nationalityAr,
-        bio_en: formData.bioEn,
-        bio_ar: formData.bioAr,
-        role_en: formData.roleEn,
-        role_ar: formData.roleAr,
-        baseSalary: formData.baseSalary,
-        commissionRate: formData.commissionRatePct,
-        specialties_en: formData.specialtiesEn,
-        specialties_ar: formData.specialtiesAr,
-        languages_en: formData.languagesEn,
-        languages_ar: formData.languagesAr,
-        isActive: formData.status === 'active'
-      };
+      const payload = new FormData();
+      const canonicalPosition = canonicalEmployeePosition(formData.position);
+      const primaryBio = isRtl ? formData.bioAr || formData.bioEn : formData.bioEn || formData.bioAr;
+      const primaryExperience = isRtl ? formData.experienceAr || formData.experienceEn : formData.experienceEn || formData.experienceAr;
+
+      payload.append('name', formData.nameEn || formData.nameAr);
+      if (formData.email.trim()) {
+        payload.append('email', formData.email.trim());
+      }
+      if (formData.phone.trim()) {
+        payload.append('phone', formData.phone.trim());
+      }
+      if (formData.nationalityEn.trim() || formData.nationalityAr.trim()) {
+        payload.append('nationality', formData.nationalityEn || formData.nationalityAr);
+      }
+      payload.append('gender', formData.gender);
+      payload.append('position', canonicalPosition);
+      payload.append('bio', primaryBio || '');
+      payload.append('experience', primaryExperience || '');
+      payload.append('skills', JSON.stringify(formData.specialtiesEn || []));
+      payload.append('spokenLanguages', JSON.stringify(formData.languagesEn || []));
+      payload.append('salary', String(formData.baseSalary || 0));
+      payload.append('commissionRate', String(formData.commissionRatePct || 0));
+      payload.append('serviceCommissionEnabled', String(formData.serviceCommissionEnabled));
+      payload.append('productCommissionEnabled', String(formData.productCommissionEnabled));
+      payload.append('scheduleVisibilityWeeks', String(formData.scheduleVisibilityWeeks || 1));
+      payload.append('staffAppPassword', formData.staffAppPassword || '');
+      payload.append('dashboardPermissions', JSON.stringify(formData.dashboardPermissions || {}));
+      payload.append('isActive', String(formData.status === 'active'));
+
+      if (employeePhotoFile) {
+        payload.append('photo', employeePhotoFile);
+      }
 
       if (formMode === 'add') {
         await tenantApiAdapter.createEmployee(payload);
         triggerToast(
-          `Team member "${payload.name}" added successfully!`,
-          `تم إضافة عضو الفريق الجديد "${payload.name}" بنجاح!`,
+          `Team member "${formData.nameEn || formData.nameAr}" added successfully!`,
+          `تم إضافة عضو الفريق الجديد "${formData.nameEn || formData.nameAr}" بنجاح!`,
           'success'
         );
       } else {
         await tenantApiAdapter.updateEmployee(formData.id, payload);
         triggerToast(
-          `Team member "${payload.name}" updated successfully!`,
-          `تم تحديث بيانات عضو الفريق "${payload.name}" بنجاح!`,
+          `Team member "${formData.nameEn || formData.nameAr}" updated successfully!`,
+          `تم تحديث بيانات عضو الفريق "${formData.nameEn || formData.nameAr}" بنجاح!`,
           'success'
         );
       }
@@ -1912,33 +1970,67 @@ export default function TeamsWorkspace({
                         </div>
                       </div>
 
-                      {/* Photo Avatar Preset selector */}
+                      {/* Employee Photo Upload */}
                       <div className="space-y-2">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'صورة الهوية المهنية (اختر من المعرض المعتمد)' : 'Photo Avatar Gallery'}</label>
-                        <div className="flex items-center gap-3">
-                          <img src={formData.avatar} alt="Current" className="w-12 h-12 rounded-xl object-cover border border-neutral-200 shadow-sm" />
-                          <div className="grid grid-cols-6 gap-1 flex-1">
-                            {presetAvatars.map((av, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setFormData(p => ({ ...p, avatar: av }))}
-                                className={`aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 cursor-pointer ${
-                                  formData.avatar === av ? 'border-zinc-950 scale-105' : 'border-neutral-200'
-                                }`}
-                              >
-                                <img src={av} alt="Preset avatar option" className="w-full h-full object-cover" />
-                              </button>
-                            ))}
+                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'صورة الموظفة/الموظف' : 'Employee Photo'}</label>
+                        <div
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            const file = event.dataTransfer.files?.[0];
+                            if (file && file.type.startsWith('image/')) {
+                              applyEmployeePhotoFile(file);
+                            }
+                          }}
+                          className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4"
+                        >
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
+                              <img src={formData.avatar} alt="Employee preview" className="h-full w-full object-cover" />
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                  ref={employeePhotoInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0] || null;
+                                    applyEmployeePhotoFile(file);
+                                    event.currentTarget.value = '';
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => employeePhotoInputRef.current?.click()}
+                                  className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-3 py-2 text-[11px] font-black text-white shadow-sm"
+                                >
+                                  <Upload size={14} />
+                                  <span>{isRtl ? 'رفع صورة' : 'Upload image'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => applyEmployeePhotoFile(null)}
+                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-black text-neutral-500 hover:bg-white"
+                                >
+                                  <X size={14} />
+                                  <span>{isRtl ? 'إزالة الصورة' : 'Remove'}</span>
+                                </button>
+                              </div>
+                              <p className="text-[10px] font-medium text-neutral-400">
+                                {isRtl
+                                  ? 'اسحب وأفلت صورة JPG أو PNG أو WEBP، أو اختر ملفاً من الجهاز. سيتم حفظها في ملف الموظف.'
+                                  : 'Drag and drop a JPG, PNG, or WEBP image, or choose a file from your device. It will be saved to the employee profile.'}
+                              </p>
+                              {employeePhotoFile ? (
+                                <p className="text-[10px] font-bold text-emerald-600">{employeePhotoFile.name}</p>
+                              ) : (
+                                <p className="text-[10px] font-bold text-neutral-400">{isRtl ? 'لم يتم اختيار ملف بعد' : 'No file selected yet'}</p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <input
-                          type="url"
-                          value={formData.avatar}
-                          onChange={e => setFormData(p => ({ ...p, avatar: e.target.value }))}
-                          placeholder="Or paste custom image web URL..."
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-[10px] font-mono"
-                        />
                       </div>
 
                     </div>

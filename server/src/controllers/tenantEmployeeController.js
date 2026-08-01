@@ -14,6 +14,19 @@ const { normalizeEmployeeGender, VALID_EMPLOYEE_GENDERS } = require('../utils/em
 const { normalizeDashboardPermissions, ROLE_PRESETS } = require('../utils/tenantDashboardPermissions');
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
+const normalizeEmployeePositionInput = (value) => {
+    const normalized = `${value ?? ''}`.trim().toLowerCase().replace(/\s+/g, '_');
+
+    if (normalized === 'dashboard-admin' || normalized === 'dashboard_admin') {
+        return 'manager';
+    }
+
+    if (normalized === 'staff' || normalized === 'employee') {
+        return 'service_provider';
+    }
+
+    return normalized;
+};
 const DEFAULT_STAFF_PERMISSIONS = {
     view_earnings: false,
     view_reviews: true,
@@ -526,12 +539,15 @@ exports.getEmployees = async (req, res) => {
             'bio',
             'experience',
             'skills',
+            'spokenLanguages',
             'dashboardPermissions',
             'photo',
             'rating',
             'totalBookings',
             'salary',
             'commissionRate',
+            'serviceCommissionEnabled',
+            'productCommissionEnabled',
             'workingHours',
             'scheduleVisibilityWeeks',
             'isActive',
@@ -627,12 +643,15 @@ exports.getEmployee = async (req, res) => {
                 'bio',
                 'experience',
                 'skills',
+                'spokenLanguages',
                 'dashboardPermissions',
                 'photo',
                 'rating',
                 'totalBookings',
                 'salary',
                 'commissionRate',
+                'serviceCommissionEnabled',
+                'productCommissionEnabled',
                 'workingHours',
                 'scheduleVisibilityWeeks',
                 'isActive',
@@ -1096,7 +1115,7 @@ exports.createEmployee = async (req, res) => {
         }
 
         const normalizedEmail = email && email.trim() ? normalizeEmail(email) : null;
-        const positionValue = `${position ?? ''}`.trim();
+        const positionValue = normalizeEmployeePositionInput(position);
         const normalizedPosition = normalizeEmployeePosition(positionValue);
         const genderValue = `${gender ?? ''}`.trim();
         const normalizedGender = normalizeEmployeeGender(genderValue);
@@ -1624,7 +1643,7 @@ exports.updateEmployee = async (req, res) => {
         if (nationality !== undefined) employee.nationality = nationality || null;
         if (gender !== undefined) employee.gender = normalizedGender;
         if (position !== undefined) {
-            const positionValue = `${position}`.trim();
+            const positionValue = normalizeEmployeePositionInput(position);
             const normalizedPosition = normalizeEmployeePosition(positionValue);
             if (positionValue && !normalizedPosition) {
                 await transaction.rollback();

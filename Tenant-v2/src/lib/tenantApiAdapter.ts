@@ -1001,10 +1001,30 @@ class TenantApiAdapter {
   }
 
   async createEmployee(data: Record<string, any>): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await fetch(`${this.baseUrl}/tenant/employees`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
     return this.post('/tenant/employees', data);
   }
 
   async updateEmployee(id: string, data: Record<string, any>): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await fetch(`${this.baseUrl}/tenant/employees/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
     return this.put(`/tenant/employees/${id}`, data);
   }
 
