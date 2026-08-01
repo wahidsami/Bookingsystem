@@ -123,13 +123,19 @@ function fileCategoryFromMimeType(mimeType = '', originalName = '') {
     return null;
 }
 
-function ensureFileAttachmentAllowed(file) {
-    const fileSize = Number(file?.size || 0);
-    if (!Number.isFinite(fileSize) || fileSize <= 0) {
-        throw createSupportError('Attachment file is empty or invalid', 400);
-    }
+function ensureFileAttachmentAllowed(file, options = {}) {
+    const { validateSize = true } = options || {};
+    const fileSize = Number(file?.size);
 
-    if (fileSize > ATTACHMENT_MAX_SIZE_BYTES) {
+    if (validateSize) {
+        if (!Number.isFinite(fileSize) || fileSize <= 0) {
+            throw createSupportError('Attachment file is empty or invalid', 400);
+        }
+
+        if (fileSize > ATTACHMENT_MAX_SIZE_BYTES) {
+            throw createSupportError('Attachment exceeds the maximum allowed size', 400);
+        }
+    } else if (Number.isFinite(fileSize) && fileSize > ATTACHMENT_MAX_SIZE_BYTES) {
         throw createSupportError('Attachment exceeds the maximum allowed size', 400);
     }
 

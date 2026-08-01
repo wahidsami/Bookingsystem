@@ -35,7 +35,7 @@ const supportUpload = multer({
     },
     fileFilter: (req, file, cb) => {
         try {
-            supportService.ensureFileAttachmentAllowed(file);
+            supportService.ensureFileAttachmentAllowed(file, { validateSize: false });
             return cb(null, true);
         } catch (error) {
             return cb(error);
