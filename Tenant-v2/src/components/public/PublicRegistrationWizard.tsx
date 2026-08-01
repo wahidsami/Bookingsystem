@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
-import { CheckCircle2, House, LoaderCircle, LogIn, Sparkles } from 'lucide-react';
+import { House, LoaderCircle, LogIn } from 'lucide-react';
 import type { Language } from '../../types';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import PublicWizardEngine, { type PublicWizardStepDefinition } from './PublicWizardEngine';
 import PublicFileUploadField from './PublicFileUploadField';
+
+const rifahLogoWhite = new URL('../../../../RifahNewLogoWhite.png', import.meta.url).href;
 
 type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -177,12 +179,12 @@ function Field({
 }
 
 const wizardStepDefinitions = (isRtl: boolean): PublicWizardStepDefinition[] => [
-  { id: 'business', title: isRtl ? 'هوية المنشأة' : 'Business identity', description: isRtl ? 'أضف اسم المنشأة ونوع النشاط والهوية البصرية.' : 'Business name, activity type and brand basics.' },
-  { id: 'documents', title: isRtl ? 'المستندات الرسمية' : 'Official documents', description: isRtl ? 'السجل التجاري والضريبة والترخيص.' : 'Commercial registration, tax and licensing files.' },
-  { id: 'contact', title: isRtl ? 'بيانات التواصل' : 'Contact details', description: isRtl ? 'جهة الاتصال الأساسية للتواصل اليومي.' : 'Primary contact details for the onboarding flow.' },
-  { id: 'owner', title: isRtl ? 'بيانات المالك' : 'Owner profile', description: isRtl ? 'تفاصيل المالك المسؤولة عن الحساب.' : 'Account owner identity and contact data.' },
-  { id: 'plan', title: isRtl ? 'اختيار الباقة' : 'Choose package', description: isRtl ? 'اختر الباقة المناسبة وخطة الفوترة.' : 'Select the subscription package and billing period.' },
-  { id: 'agreement', title: isRtl ? 'المراجعة والإرسال' : 'Review & submit', description: isRtl ? 'راجع البيانات ووافق على الاتفاقية.' : 'Review the application and accept the agreement.' }
+  { id: 'business', title: isRtl ? 'هوية المنشأة' : 'Business identity' },
+  { id: 'documents', title: isRtl ? 'المستندات الرسمية' : 'Official documents' },
+  { id: 'contact', title: isRtl ? 'بيانات التواصل' : 'Contact details' },
+  { id: 'owner', title: isRtl ? 'بيانات المالك' : 'Owner profile' },
+  { id: 'plan', title: isRtl ? 'اختيار الباقة' : 'Choose package' },
+  { id: 'agreement', title: isRtl ? 'المراجعة والإرسال' : 'Review & submit' }
 ];
 
 const premiumFieldClass =
@@ -737,13 +739,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
               onClick={() => onNavigate('/')}
               className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-amber-300/40 hover:bg-white/10"
             >
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-300/20 bg-amber-400/10 text-amber-200">
-                <Sparkles size={18} />
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-200/70">Refah</p>
-                <h1 className="text-sm font-black text-white">{isRtl ? 'تجربة التسجيل العامة' : 'Public registration experience'}</h1>
-              </div>
+              <img src={rifahLogoWhite} alt="Rifah" className="h-9 w-auto sm:h-10" />
             </button>
 
             <div className="flex items-center gap-2">
@@ -769,78 +765,18 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
 
         <main className="px-4 pb-10 pt-6 md:px-8">
           <div className="mx-auto flex max-w-5xl flex-col gap-6">
-            <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
-              <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 md:p-8 shadow-[0_30px_100px_rgba(0,0,0,0.32)] backdrop-blur-xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
-                  <CheckCircle2 size={14} />
-                  <span>{isRtl ? 'تسجيل منشأة جديدة' : 'New tenant registration'}</span>
-                </div>
-                <h2 className="mt-4 text-3xl font-black leading-tight text-white md:text-4xl">
-                  {isRtl ? 'رحلة تسجيل هادئة، واضحة، ومتوافقة مع الإنتاج' : 'A calm, clear registration journey that stays production-aligned'}
-                </h2>
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-300 md:text-base">
-                  {isRtl
-                    ? 'نفس العقد الخلفي ونفس payload التسجيل، لكن داخل واجهة عامة أكثر فخامة ووضوحاً مع تنقل مريح ودعم كامل لقراءة المحتوى من اليمين إلى اليسار.'
-                    : 'Same backend contract and same registration payload, wrapped in a premium public interface with comfortable navigation and RTL support.'}
-                </p>
-
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {stepDefinitions.map((step, index) => {
-                    const active = currentStep - 1 === index;
-                    const done = currentStep - 1 > index;
-                    return (
-                      <div
-                        key={step.id}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
-                          active
-                            ? 'border-amber-300/60 bg-amber-400/10 text-amber-100'
-                            : done
-                              ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
-                              : 'border-white/10 bg-black/20 text-zinc-400'
-                        }`}
-                      >
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full border border-current/20 text-[10px] font-black">
-                          {String(index + 1).padStart(2, '0')}
-                        </span>
-                        <span>{step.title}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="rounded-[2rem] border border-white/10 bg-black/25 p-6 md:p-8 shadow-[0_24px_90px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-amber-200/70">
-                  {isRtl ? 'ماذا تتوقع؟' : 'What to expect'}
-                </p>
-                <div className="mt-4 space-y-3">
-                  {[
-                    isRtl ? 'تنقل بسيط بين الخطوات دون تغيير في العقد الخلفي.' : 'Simple step navigation with the same backend contract.',
-                    isRtl ? 'رفع الملفات مع معاينة واضحة قبل الإرسال.' : 'File uploads with a clear preview before submission.',
-                    isRtl ? 'اختيار الباقة عبر بطاقات مميزة وسهلة القراءة.' : 'Package selection with refined, readable cards.'
-                  ].map((item) => (
-                    <div key={item} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-200">
-                      <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-400" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">{isRtl ? 'الخطوة الحالية' : 'Current step'}</p>
-                      <p className="mt-1 text-lg font-black text-white">{stepDefinitions[currentStep - 1]?.title}</p>
-                    </div>
-                    <div className="rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
-                      {String(currentStep).padStart(2, '0')} / {String(totalSteps).padStart(2, '0')}
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <section className="rounded-[1.5rem] border border-white/10 bg-white/5 px-5 py-4 shadow-[0_16px_45px_rgba(0,0,0,0.18)] backdrop-blur-xl md:px-6 md:py-5">
+              <h2 className="text-2xl font-black leading-tight text-white md:text-[2rem]">
+                {isRtl ? 'ابدأ التسجيل بثقة' : 'Start registration with confidence'}
+              </h2>
+              <p className="mt-2 max-w-xl text-sm leading-7 text-zinc-300 md:text-[0.98rem]">
+                {isRtl
+                  ? 'أكمل بيانات منشأتك وابدأ الإعداد بخطوات واضحة وسريعة.'
+                  : 'Tell us about your business and complete setup in a calm, guided flow.'}
+              </p>
             </section>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <PublicWizardEngine
                 langDirection={isRtl ? 'rtl' : 'ltr'}
                 steps={stepDefinitions}
@@ -858,12 +794,6 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
                 {currentStepContent}
               </PublicWizardEngine>
             </form>
-
-            <div className="text-center text-xs text-zinc-500">
-              {isRtl
-                ? 'سيتم إرسال نفس payload التسجيل الإنتاجي إلى /auth/tenant/register.'
-                : 'The production registration payload is sent to /auth/tenant/register without contract drift.'}
-            </div>
           </div>
         </main>
       </div>

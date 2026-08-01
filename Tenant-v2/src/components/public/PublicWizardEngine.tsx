@@ -46,19 +46,16 @@ export default function PublicWizardEngine({
   const progress = steps.length > 1 ? ((activeStepIndex + 1) / steps.length) * 100 : 100;
 
   return (
-    <div dir={langDirection} className="space-y-6">
-      <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4 md:p-5 shadow-[0_20px_70px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+    <div dir={langDirection} className="space-y-5">
+      <div className="rounded-[1.35rem] border border-white/10 bg-white/5 p-4 md:p-4 shadow-[0_20px_60px_rgba(0,0,0,0.16)] backdrop-blur-xl">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200/80">
               {String(activeStepIndex + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
             </p>
             <h3 className="mt-1 text-lg font-black text-white">{activeStep?.title || ''}</h3>
-            {activeStep?.description ? (
-              <p className="mt-1 text-sm leading-6 text-zinc-300">{activeStep.description}</p>
-            ) : null}
           </div>
-          <div className="hidden rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 md:inline-flex">
+          <div className="rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
             {Math.round(progress)}%
           </div>
         </div>
@@ -69,46 +66,9 @@ export default function PublicWizardEngine({
             style={{ width: `${progress}%` }}
           />
         </div>
-
-        <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
-        {steps.map((step, index) => {
-          const active = index === activeStepIndex;
-          const complete = index < activeStepIndex;
-          return (
-            <div
-              key={step.id}
-              className={`rounded-2xl border px-4 py-4 text-start text-xs font-semibold transition ${
-                active
-                  ? 'border-amber-300/60 bg-amber-400/10 text-amber-100 shadow-[0_12px_30px_rgba(251,191,36,0.15)]'
-                  : complete
-                    ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
-                    : 'border-white/10 bg-black/20 text-zinc-400'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full border text-[11px] font-black ${
-                    active
-                      ? 'border-amber-300/70 bg-amber-400/20 text-amber-100'
-                      : complete
-                        ? 'border-emerald-400/30 bg-emerald-400/15 text-emerald-100'
-                        : 'border-white/10 bg-white/5 text-zinc-400'
-                  }`}
-                >
-                  {String(index + 1).padStart(2, '0')}
-                </div>
-                <div className="space-y-0.5">
-                  <div className="text-sm font-semibold text-white">{step.title}</div>
-                  {step.description ? <div className="text-[11px] leading-5 text-zinc-400">{step.description}</div> : null}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        </div>
       </div>
 
-      <div className="min-h-[20rem] rounded-[1.75rem] border border-white/10 bg-zinc-950/55 p-5 md:p-6 shadow-[0_30px_100px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+      <div className="min-h-[16rem] rounded-[1.5rem] border border-white/10 bg-zinc-950/55 p-4 md:p-5 shadow-[0_24px_70px_rgba(0,0,0,0.24)] backdrop-blur-xl">
         {children}
       </div>
 
@@ -128,12 +88,6 @@ export default function PublicWizardEngine({
           <ArrowLeft size={16} />
           <span>{backLabel}</span>
         </button>
-
-        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.24em] text-zinc-500">
-          <span>{activeStep?.title || ''}</span>
-          <span className="hidden h-1.5 w-1.5 rounded-full bg-zinc-500 sm:inline-block" />
-          <span>{Math.round(progress)}%</span>
-        </div>
 
         {isLastStep ? (
           <button
