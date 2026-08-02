@@ -283,6 +283,9 @@ export default function SchedulerGrid({
   const currentTimeLinePosition = showCurrentTimeIndicator && viewMode === 'day' && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
     ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
     : null;
+  const eventLayerInsetStyle = isRtl
+    ? { right: `${timeColumnWidth}px`, left: 0 }
+    : { left: `${timeColumnWidth}px`, right: 0 };
 
   const rows = useMemo(() => Array.from({ length: slotCount }, (_, slotIndex) => {
     const startMinutes = slotIndex * slotMinutes;
@@ -635,7 +638,10 @@ export default function SchedulerGrid({
           })}
         </div>
 
-        <div className="pointer-events-none absolute inset-0 z-10">
+        <div
+          className="pointer-events-none absolute inset-y-0 z-10 overflow-hidden"
+          style={eventLayerInsetStyle}
+        >
           {positionedEvents.map((event) => {
             const columnIndex = getColumnIndex(event.columnId);
             if (columnIndex === -1) return null;
@@ -680,7 +686,8 @@ export default function SchedulerGrid({
                   maxWidth: `calc(${laneWidth}% - 8px)`,
                   top: `${top}px`,
                   height: `${height}px`,
-                  maxHeight: '100%'
+                  maxHeight: '100%',
+                  boxSizing: 'border-box',
                 }}
               >
                 <div
