@@ -150,7 +150,13 @@ const resolveCustomer = async (payload = {}, transaction = null) => {
     if (!firstName) {
       throw new Error('Customer name is required');
     }
-    return { customer: null, created: false };
+    const guest = await userService.findOrCreatePlatformUser({
+      email: `guest+${Date.now()}${crypto.randomBytes(4).toString('hex')}@guest.refah.local`,
+      phone: await userService.generateGuestPhonePlaceholder(),
+      firstName,
+      lastName
+    }, transaction ? { transaction } : {});
+    return { customer: guest, created: true };
   }
 
   const existing = await userService.findUserByEmailOrPhone(email, phone);

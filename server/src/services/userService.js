@@ -9,6 +9,21 @@ const { Op } = require('sequelize');
 const { linkPendingGiftRecipients } = require('./giftRecipientLinkingService');
 
 class UserService {
+    async generateGuestEmailPlaceholder() {
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+            const candidate = `guest+${Date.now()}${crypto.randomInt(1000, 9999)}@guest.refah.local`;
+            const existing = await db.PlatformUser.findOne({
+                where: { email: candidate }
+            });
+
+            if (!existing) {
+                return candidate;
+            }
+        }
+
+        return `guest+${Date.now()}@guest.refah.local`;
+    }
+
     async generateGuestPhonePlaceholder() {
         for (let attempt = 0; attempt < 8; attempt += 1) {
             const candidate = `+99${crypto.randomInt(100000000000, 999999999999)}`;
@@ -33,8 +48,11 @@ class UserService {
      */
     async findOrCreatePlatformUser({ email, phone, firstName, lastName }, options = {}) {
         const transaction = options.transaction || null;
-        if (!phone && !email) {
-            throw new Error('Phone or email is required');
+        const trimmedFirstName = `${firstName || ''}`.trim();
+        const trimmedLastName = `${lastName || ''}`.trim();
+
+        if (!phone && !email && !trimmedFirstName) {
+            throw new Error('Phone, email, or customer name is required');
         }
 
         // Try to find by email or phone
@@ -55,24 +73,19 @@ class UserService {
         if (!user) {
             // Create a soft account with a generated password so DB constraints are satisfied.
             const generatedPassword = `guest_${crypto.randomBytes(24).toString('hex')}`;
+            const normalizedEmail = email ? email.toLowerCase().trim() : await this.generateGuestEmailPlaceholder();
+            const normalizedPhone = phone ? phone.trim() : await this.generateGuestPhonePlaceholder();
             const userData = {
-                email: email ? email.toLowerCase().trim() : null,
-                phone: phone ? phone.trim() : null,
-                firstName: firstName || 'Guest',
-                lastName: lastName || 'User',
+                email: normalizedEmail,
+                phone: normalizedPhone,
+                firstName: trimmedFirstName || 'Guest',
+                lastName: trimmedLastName || 'User',
                 emailVerified: false,
                 phoneVerified: false,
                 password: generatedPassword,
                 isActive: true,
                 // Password can be reset or claimed later by support flows.
             };
-
-            // PlatformUser model requires phone, so generate a valid placeholder if missing
-            if (!userData.phone && userData.email) {
-                userData.phone = await this.generateGuestPhonePlaceholder();
-            } else if (!userData.phone) {
-                throw new Error('Phone number is required');
-            }
 
             user = await db.PlatformUser.create(userData, transaction ? { transaction } : undefined);
 
