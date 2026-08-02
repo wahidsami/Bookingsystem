@@ -2625,6 +2625,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       loyalty = 'Guest Account';
     }
 
+    const splitCustomerName = (value: string) => {
+      const parts = `${value || ''}`.trim().split(/\s+/).filter(Boolean);
+      if (parts.length === 0) {
+        return { firstName: '', lastName: '' };
+      }
+      if (parts.length === 1) {
+        return { firstName: parts[0], lastName: 'Guest' };
+      }
+      return {
+        firstName: parts.shift() || '',
+        lastName: parts.join(' ')
+      };
+    };
+
     let finalStaged = [...stagedServices];
     if (finalStaged.length === 0) {
       const srv = liveServices.find(s => s.id === currentServiceId);
@@ -2756,8 +2770,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           platformUserId: custMode === 'existing' ? selectedCustId : undefined,
           customer: custMode === 'new' || custMode === 'walkin'
             ? {
-                firstName: custNameEn.trim(),
-                lastName: '',
+                ...splitCustomerName(custNameEn.trim() || custNameAr.trim()),
                 email: custEmail.trim(),
                 phone: custPhone.trim()
               }
