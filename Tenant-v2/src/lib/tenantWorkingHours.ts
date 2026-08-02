@@ -24,6 +24,17 @@ export interface TenantSchedulerConfig {
   businessHours: Record<WorkingHoursDayKey, WorkingHoursDayState>;
 }
 
+export interface SchedulerBoardSettings {
+  gridWidth: number;
+  gridHeight: number;
+  timeSlotHeight: number;
+  staffColumnWidth: number;
+  showCurrentTimeIndicator: boolean;
+  showLunchBreaks: boolean;
+  showStaffPhotos: boolean;
+  showAppointmentStatusBadges: boolean;
+}
+
 const DAY_DEFINITIONS: WorkingHoursDayState[] = [
   { key: 'sunday', labelEn: 'Sunday', labelAr: 'الأحد', dayOfWeek: 0, isOpen: true, open: '09:00', close: '21:00' },
   { key: 'monday', labelEn: 'Monday', labelAr: 'الاثنين', dayOfWeek: 1, isOpen: true, open: '09:00', close: '21:00' },
@@ -37,6 +48,17 @@ const DAY_DEFINITIONS: WorkingHoursDayState[] = [
 const DEFAULT_START_HOUR = 9;
 const DEFAULT_END_HOUR = 21;
 const DEFAULT_SLOT_MINUTES = 5;
+
+export const DEFAULT_SCHEDULER_BOARD_SETTINGS: SchedulerBoardSettings = {
+  gridWidth: 100,
+  gridHeight: 760,
+  timeSlotHeight: 10,
+  staffColumnWidth: 240,
+  showCurrentTimeIndicator: true,
+  showLunchBreaks: true,
+  showStaffPhotos: true,
+  showAppointmentStatusBadges: true
+};
 
 function normalizeHourComponent(value: string): string {
   return String(Math.max(0, Math.min(23, Number(value) || 0))).padStart(2, '0');
@@ -137,6 +159,20 @@ export function getTenantSchedulerConfig(settings?: any, tenant?: any): TenantSc
   };
 }
 
+export function normalizeSchedulerBoardSettings(value?: any): SchedulerBoardSettings {
+  const source = value && typeof value === 'object' ? value : {};
+  return {
+    gridWidth: Math.max(80, Math.min(160, Number(source.gridWidth ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.gridWidth))),
+    gridHeight: Math.max(420, Math.min(1400, Number(source.gridHeight ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.gridHeight))),
+    timeSlotHeight: Math.max(8, Math.min(24, Number(source.timeSlotHeight ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.timeSlotHeight))),
+    staffColumnWidth: Math.max(180, Math.min(360, Number(source.staffColumnWidth ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.staffColumnWidth))),
+    showCurrentTimeIndicator: source.showCurrentTimeIndicator !== undefined ? Boolean(source.showCurrentTimeIndicator) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showCurrentTimeIndicator,
+    showLunchBreaks: source.showLunchBreaks !== undefined ? Boolean(source.showLunchBreaks) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showLunchBreaks,
+    showStaffPhotos: source.showStaffPhotos !== undefined ? Boolean(source.showStaffPhotos) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showStaffPhotos,
+    showAppointmentStatusBadges: source.showAppointmentStatusBadges !== undefined ? Boolean(source.showAppointmentStatusBadges) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showAppointmentStatusBadges
+  };
+}
+
 export function buildWeeklyHoursDisplay(settings?: any, tenant?: any) {
   const businessHours = getTenantBusinessHours(settings, tenant);
   return DAY_DEFINITIONS.map((day) => {
@@ -149,4 +185,3 @@ export function buildWeeklyHoursDisplay(settings?: any, tenant?: any) {
     };
   });
 }
-

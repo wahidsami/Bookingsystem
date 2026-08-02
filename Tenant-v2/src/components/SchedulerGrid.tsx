@@ -76,6 +76,12 @@ export interface SchedulerGridProps {
   startHour?: number;
   endHour?: number;
   timeColumnWidth?: number;
+  slotHeight?: number;
+  staffColumnWidth?: number;
+  showCurrentTimeIndicator?: boolean;
+  showLunchBreaks?: boolean;
+  showStaffPhotos?: boolean;
+  showAppointmentStatusBadges?: boolean;
   onSlotClick?: (slot: SchedulerSlot) => void;
   onSlotContextMenu?: (event: React.MouseEvent, slot: SchedulerSlot) => void;
   onSlotDrop?: (slot: SchedulerSlot, draggedEventId: string) => void;
@@ -245,6 +251,12 @@ export default function SchedulerGrid({
   startHour = DEFAULT_START_HOUR,
   endHour = DEFAULT_END_HOUR,
   timeColumnWidth = DEFAULT_TIME_COLUMN_WIDTH,
+  slotHeight = DEFAULT_SLOT_HEIGHT,
+  staffColumnWidth = 200,
+  showCurrentTimeIndicator = true,
+  showLunchBreaks = true,
+  showStaffPhotos = true,
+  showAppointmentStatusBadges = true,
   onSlotClick,
   onSlotContextMenu,
   onSlotDrop,
@@ -260,16 +272,15 @@ export default function SchedulerGrid({
   const [selectionAnchor, setSelectionAnchor] = useState<SchedulerSlot | null>(null);
   const [selectionFocus, setSelectionFocus] = useState<SchedulerSlot | null>(null);
   const suppressNextClickRef = useRef(false);
-  const slotHeight = DEFAULT_SLOT_HEIGHT;
   const slotsPerHour = 60 / slotMinutes;
   const slotCount = Math.max(1, Math.round(((endHour - startHour) * 60) / slotMinutes));
   const gridTemplateColumns = useMemo(
-    () => `${timeColumnWidth}px repeat(${Math.max(columns.length, 1)}, minmax(0, 1fr))`,
-    [columns.length, timeColumnWidth]
+    () => `${timeColumnWidth}px repeat(${Math.max(columns.length, 1)}, minmax(${Math.max(120, staffColumnWidth)}px, 1fr))`,
+    [columns.length, staffColumnWidth, timeColumnWidth]
   );
   const visibleDateKey = getRiyadhDateKey(boardCurrentTime);
   const currentMinutesSinceMidnight = getRiyadhMinutesSinceMidnight(boardCurrentTime);
-  const currentTimeLinePosition = viewMode === 'day' && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
+  const currentTimeLinePosition = showCurrentTimeIndicator && viewMode === 'day' && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
     ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
     : null;
 
@@ -645,8 +656,9 @@ export default function SchedulerGrid({
             const assignedStaffRole = event.assignedStaffRole || event.role || '';
             const variantLabel = event.variantLabel || event.raw?.serviceVariantName || event.raw?.serviceVariantDescription || '';
             const variantDescription = event.variantDescription || event.raw?.serviceVariantDescription || '';
-            const isCompact = height < 38;
-            const isMedium = height >= 38 && height < 58;
+            const isCompact = height < 42;
+            const isMedium = height >= 42 && height < 64;
+            const showStatusMeta = showAppointmentStatusBadges;
 
             const styleVariant = event.kind === 'blocked'
               ? 'bg-slate-50 text-slate-500 border-slate-200'
@@ -665,8 +677,10 @@ export default function SchedulerGrid({
                 style={{
                   left,
                   width: `calc(${laneWidth}% - 8px)`,
+                  maxWidth: `calc(${laneWidth}% - 8px)`,
                   top: `${top}px`,
                   height: `${height}px`,
+                  maxHeight: '100%'
                 }}
               >
                 <div
@@ -692,13 +706,13 @@ export default function SchedulerGrid({
                     contextEvent.stopPropagation();
                     onEventContextMenu?.(contextEvent, event);
                   }}
-                  className={`pointer-events-auto relative flex h-full flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${styleVariant} ${event.kind !== 'blocked' ? serviceStyles.card : ''} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'}`}
+                  className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${styleVariant} ${event.kind !== 'blocked' ? serviceStyles.card : ''} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'}`}
                 >
                   {event.kind !== 'blocked' && (
                     <div className={`absolute inset-x-0 top-0 h-1 ${serviceStyles.accent}`} />
                   )}
 
-                  <div className="flex items-start justify-between gap-2 min-w-0">
+                  <div className="flex min-w-0 items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-1 items-start gap-2">
                       <div className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border text-[10px] font-black ${serviceStyles.avatar}`}>
                         {customerAvatar ? (
@@ -729,7 +743,7 @@ export default function SchedulerGrid({
                       <span className="rounded bg-zinc-900/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tight text-slate-700">
                         {formatSlotTime(event.startMinutes, startHour, isRtl)}
                       </span>
-                      {!isCompact && (
+                      {!isCompact && showStatusMeta && (
                         <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${
                           event.kind === 'blocked'
                             ? 'border-slate-200 bg-slate-50 text-slate-600'
@@ -742,7 +756,7 @@ export default function SchedulerGrid({
                           {formatAppointmentStatusLabel(event.status, event.kind)}
                         </span>
                       )}
-                      {!isCompact && event.kind !== 'blocked' && (
+                      {!isCompact && event.kind !== 'blocked' && showStatusMeta && (
                         <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${event.paymentStatus === 'paid'
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                           : event.paymentStatus === 'partial'
@@ -755,10 +769,10 @@ export default function SchedulerGrid({
                     </div>
                   </div>
 
-                  {!isCompact && (
+                  {!isCompact && (showStaffPhotos || assignedStaffName || assignedStaffRole) && (
                     <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[9px]">
                       <div className="flex min-w-0 items-center gap-1.5">
-                        {staffAvatar ? (
+                        {showStaffPhotos && staffAvatar ? (
                           <div className="h-4 w-4 shrink-0 overflow-hidden rounded-full border border-white shadow-sm">
                             <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                           </div>

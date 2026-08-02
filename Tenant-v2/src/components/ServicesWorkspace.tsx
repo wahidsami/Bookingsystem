@@ -129,6 +129,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
 
   // 6. Refreshing and synchronization feedback
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pendingQuickLaunch, setPendingQuickLaunch] = useState<QuickLaunchRequest | null>(null);
 
   // 7. Form Lifecycle State
   const [formData, setFormData] = useState<ServiceDraft>(() => createEmptyServiceDraft());
@@ -360,13 +361,38 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
       return;
     }
 
+    setPendingQuickLaunch(quickLaunchRequest);
+  }, [quickLaunchRequest?.nonce, quickLaunchRequest?.serviceId, quickLaunchRequest?.section, quickLaunchRequest?.target]);
+
+  React.useEffect(() => {
+    const request = pendingQuickLaunch;
+    if (!request || request.target !== 'service') {
+      return;
+    }
+
+    if (request.serviceId) {
+      const targetService = services.find((service) => `${service.id}` === `${request.serviceId}`);
+      if (!targetService) {
+        return;
+      }
+
+      handleOpenEditForm(targetService);
+      if (request.section) {
+        setActiveSection(request.section);
+      }
+      setPendingQuickLaunch(null);
+      return;
+    }
+
     handleOpenAddForm();
-  }, [quickLaunchRequest?.nonce]);
+    setPendingQuickLaunch(null);
+  }, [pendingQuickLaunch, services]);
 
   // Open edit form
   const handleOpenEditForm = (srv: EnhancedService) => {
     const selectedCategoryOption = getServiceCategoryOption(srv);
     const normalizedService = normalizeServiceRecord(srv);
+    setSelectedServiceId(normalizedService.id);
     setFormMode('edit');
     setSelectedImageFile(null);
     setFormData({

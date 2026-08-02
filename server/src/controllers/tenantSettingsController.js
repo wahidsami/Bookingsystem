@@ -55,6 +55,36 @@ const normalizeNotificationSettings = (value = {}, communicationFallback = undef
     )
 });
 
+const DEFAULT_SCHEDULER_BOARD_SETTINGS = {
+    gridWidth: 100,
+    gridHeight: 760,
+    timeSlotHeight: 10,
+    staffColumnWidth: 240,
+    showCurrentTimeIndicator: true,
+    showLunchBreaks: true,
+    showStaffPhotos: true,
+    showAppointmentStatusBadges: true
+};
+
+const normalizeSchedulerBoardSettings = (value = {}) => ({
+    gridWidth: Math.max(80, Math.min(160, Number(value?.gridWidth ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.gridWidth))),
+    gridHeight: Math.max(420, Math.min(1400, Number(value?.gridHeight ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.gridHeight))),
+    timeSlotHeight: Math.max(8, Math.min(24, Number(value?.timeSlotHeight ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.timeSlotHeight))),
+    staffColumnWidth: Math.max(180, Math.min(360, Number(value?.staffColumnWidth ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.staffColumnWidth))),
+    showCurrentTimeIndicator: value?.showCurrentTimeIndicator !== undefined
+        ? Boolean(value.showCurrentTimeIndicator)
+        : DEFAULT_SCHEDULER_BOARD_SETTINGS.showCurrentTimeIndicator,
+    showLunchBreaks: value?.showLunchBreaks !== undefined
+        ? Boolean(value.showLunchBreaks)
+        : DEFAULT_SCHEDULER_BOARD_SETTINGS.showLunchBreaks,
+    showStaffPhotos: value?.showStaffPhotos !== undefined
+        ? Boolean(value.showStaffPhotos)
+        : DEFAULT_SCHEDULER_BOARD_SETTINGS.showStaffPhotos,
+    showAppointmentStatusBadges: value?.showAppointmentStatusBadges !== undefined
+        ? Boolean(value.showAppointmentStatusBadges)
+        : DEFAULT_SCHEDULER_BOARD_SETTINGS.showAppointmentStatusBadges
+});
+
 /**
  * Get subscription limits and current usage for the tenant.
  */
@@ -156,7 +186,8 @@ exports.getSettings = async (req, res) => {
                     defaultBufferAfter: 5,
                     allowAnyStaff: true,
                     maxBookingsPerCustomerPerDay: null,
-                    allowWalkInBooking: true
+                    allowWalkInBooking: true,
+                    schedulerBoard: DEFAULT_SCHEDULER_BOARD_SETTINGS
                 },
                 maxAdvanceBookingDays: 30,
                 cancellationHours: 24,
@@ -350,7 +381,8 @@ exports.updateBookingSettings = async (req, res) => {
             allowAnyStaff,
             maxBookingsPerCustomerPerDay,
             allowWalkInBooking,
-            minimumAdvanceBookingMinutes
+            minimumAdvanceBookingMinutes,
+            schedulerBoard
         } = req.body;
 
         let [settings] = await db.TenantSettings.findOrCreate({
@@ -406,6 +438,13 @@ exports.updateBookingSettings = async (req, res) => {
                 });
             }
             newBookingSettings.minimumAdvanceBookingMinutes = parsedAdvance;
+        }
+
+        if (schedulerBoard !== undefined) {
+            newBookingSettings.schedulerBoard = normalizeSchedulerBoardSettings({
+                ...(currentBookingSettings.schedulerBoard || {}),
+                ...(schedulerBoard || {})
+            });
         }
 
         updateData.bookingSettings = newBookingSettings;

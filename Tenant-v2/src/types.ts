@@ -5,6 +5,8 @@ export type QuickLaunchTarget = 'appointment' | 'customer' | 'service' | 'produc
 export interface QuickLaunchRequest {
   target: QuickLaunchTarget;
   nonce: number;
+  serviceId?: string;
+  section?: 'basic' | 'team' | 'options' | 'settings';
 }
 
 export type ViewType =

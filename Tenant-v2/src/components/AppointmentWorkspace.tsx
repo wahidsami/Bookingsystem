@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar as CalendarIcon, Clock, Plus, Search, User, Users, Check, X, 
@@ -6,7 +6,7 @@ import {
   Activity, Wallet, ChevronDown, Trash, Undo2, AlertCircle, Filter, 
   SlidersHorizontal, Star, Split, Share2, Printer, CheckCircle2,
   Lock, Scissors, Sparkles, Smile, ShieldCheck, Mail, Phone,
-  TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy,
+  TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy, Settings2,
   PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift, Banknote
 } from 'lucide-react';
 import { Language, Product, QuickLaunchRequest } from '../types';
@@ -18,7 +18,7 @@ import SchedulerGrid, { SchedulerColumn, SchedulerEvent, SchedulerSlot } from '.
 import { resolveEmployeeImageUrl } from '../lib/employeeImage';
 import { normalizeServiceRecord } from '../lib/serviceContract';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
-import { getTenantSchedulerConfig } from '../lib/tenantWorkingHours';
+import { DEFAULT_SCHEDULER_BOARD_SETTINGS, getTenantSchedulerConfig, normalizeSchedulerBoardSettings, type SchedulerBoardSettings } from '../lib/tenantWorkingHours';
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
 
 interface AppointmentWorkspaceProps {
@@ -262,10 +262,82 @@ const getRiyadhDateKey = (value: Date) => {
 
 const getRiyadhCalendarDate = (value = new Date()) => parseLocalDateKey(getRiyadhDateKey(value));
 
+const buildSchedulerBoardStorageKey = (tenantId?: string | null, userId?: string | null) => {
+  return ['refah-scheduler-board', tenantId || 'tenant', userId || 'user'].join(':');
+};
+
+const readSchedulerBoardOverride = (storageKey: string): Partial<SchedulerBoardSettings> | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (error) {
+    console.warn('Failed to read scheduler board preferences', error);
+    return null;
+  }
+};
+
+const writeSchedulerBoardOverride = (storageKey: string, value: SchedulerBoardSettings | null) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (!value) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+    window.localStorage.setItem(storageKey, JSON.stringify(value));
+  } catch (error) {
+    console.warn('Failed to persist scheduler board preferences', error);
+  }
+};
+
 export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
-  const { tenant, tenantSettings } = useTenantAuth();
+  const { tenant, tenantSettings, user } = useTenantAuth();
   const schedulerConfig = useMemo(() => getTenantSchedulerConfig(tenantSettings, tenant), [tenantSettings, tenant]);
+  const schedulerStorageKey = useMemo(() => buildSchedulerBoardStorageKey(tenant?.id, user?.id), [tenant?.id, user?.id]);
+  const canonicalSchedulerBoardSettings = useMemo(
+    () => normalizeSchedulerBoardSettings(tenantSettings?.bookingSettings?.schedulerBoard || DEFAULT_SCHEDULER_BOARD_SETTINGS),
+    [tenantSettings?.bookingSettings?.schedulerBoard]
+  );
+  const [schedulerBoardSettings, setSchedulerBoardSettings] = useState<SchedulerBoardSettings>(() => {
+    const localOverride = readSchedulerBoardOverride(buildSchedulerBoardStorageKey(tenant?.id, user?.id));
+    return normalizeSchedulerBoardSettings({
+      ...canonicalSchedulerBoardSettings,
+      ...(localOverride || {})
+    });
+  });
+  const [schedulerBoardDraft, setSchedulerBoardDraft] = useState<SchedulerBoardSettings>(schedulerBoardSettings);
+  const [isSchedulerSettingsOpen, setIsSchedulerSettingsOpen] = useState(false);
+  const [isSchedulerSettingsSaving, setIsSchedulerSettingsSaving] = useState(false);
+  const [dragMoveDialog, setDragMoveDialog] = useState<{
+    appointmentId: string;
+    targetStaffId: string;
+    targetStaffName: string;
+    sourceStaffName: string;
+    sourceStaffId: string;
+    targetStartMinutes: number;
+    targetDateKey: string;
+    sourceTimeLabel: string;
+    targetTimeLabel: string;
+    notifyCustomer: boolean;
+  } | null>(null);
+  const [dragConflictDialog, setDragConflictDialog] = useState<{
+    serviceName: string;
+    destinationStaffName: string;
+    serviceId?: string;
+    serviceSection?: 'basic' | 'team' | 'options' | 'settings';
+  } | null>(null);
   
   // New API States replacing mock data
   const [liveStylists, setLiveStylists] = useState<Stylist[]>([]);
@@ -286,6 +358,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'agenda'>('day');
   const [boardCurrentTime, setBoardCurrentTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const localOverride = readSchedulerBoardOverride(schedulerStorageKey);
+    const merged = normalizeSchedulerBoardSettings({
+      ...canonicalSchedulerBoardSettings,
+      ...(localOverride || {})
+    });
+    setSchedulerBoardSettings(merged);
+    setSchedulerBoardDraft(merged);
+  }, [canonicalSchedulerBoardSettings, schedulerStorageKey]);
 
   // Master Data Fetch
   useEffect(() => {
@@ -1688,6 +1770,81 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }, 600);
   };
 
+  const saveSchedulerBoardSettings = useCallback(async (nextSettings: SchedulerBoardSettings) => {
+    const normalized = normalizeSchedulerBoardSettings(nextSettings);
+    setIsSchedulerSettingsSaving(true);
+    try {
+      await tenantApiAdapter.put('/tenant/settings/booking', {
+        schedulerBoard: normalized
+      });
+      setSchedulerBoardSettings(normalized);
+      setSchedulerBoardDraft(normalized);
+      writeSchedulerBoardOverride(schedulerStorageKey, normalized);
+      setIsSchedulerSettingsOpen(false);
+      addLocalToast(
+        isRtl ? 'تم حفظ إعدادات لوحة الجدولة.' : 'Scheduler layout preferences saved successfully.',
+        isRtl ? 'تم تثبيت إعدادات الجدولة بنجاح.' : 'Scheduler preferences saved successfully.',
+        'success'
+      );
+    } catch (error) {
+      console.error('Failed to save scheduler board settings', error);
+      addLocalToast(
+        isRtl ? 'تعذر حفظ إعدادات لوحة الجدولة.' : 'Unable to save scheduler layout preferences.',
+        isRtl ? 'تعذر حفظ إعدادات الجدولة.' : 'Unable to save scheduler preferences.',
+        'warning'
+      );
+    } finally {
+      setIsSchedulerSettingsSaving(false);
+    }
+  }, [isRtl, schedulerStorageKey]);
+
+  const resetSchedulerBoardSettings = useCallback(() => {
+    const normalized = normalizeSchedulerBoardSettings(DEFAULT_SCHEDULER_BOARD_SETTINGS);
+    setSchedulerBoardDraft(normalized);
+    void saveSchedulerBoardSettings(normalized);
+  }, [saveSchedulerBoardSettings]);
+
+  const getServiceAssignment = useCallback((serviceId?: string | null) => {
+    if (!serviceId) {
+      return null;
+    }
+
+    return liveServices.find((service) => {
+      const normalizedServiceId = `${service?.id || service?.serviceId || ''}`.trim();
+      return normalizedServiceId === `${serviceId}`.trim();
+    }) || null;
+  }, [liveServices]);
+
+  const canAssignServiceToStaff = useCallback((serviceId: string | undefined, staffId: string | undefined) => {
+    if (!serviceId || !staffId) {
+      return true;
+    }
+
+    const service = getServiceAssignment(serviceId);
+    const assignedStaffIds = Array.isArray(service?.employeeAssignments)
+      ? service.employeeAssignments.map((id: any) => `${id}`.trim()).filter(Boolean)
+      : [];
+
+    if (assignedStaffIds.length === 0) {
+      return true;
+    }
+
+    return assignedStaffIds.includes(`${staffId}`.trim());
+  }, [getServiceAssignment]);
+
+  const openServiceForStaffAssignment = useCallback((serviceId?: string) => {
+    if (!serviceId) {
+      return;
+    }
+
+    onQuickAction({
+      target: 'service',
+      nonce: Date.now(),
+      serviceId,
+      section: 'team'
+    });
+  }, [onQuickAction]);
+
   // Conversions for layout
   const SLOT_HEIGHT = 100; // 100px per hour
   const START_HOUR = schedulerConfig.startHour;
@@ -2938,6 +3095,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // Calculate coordinates of the dragged element's ghost card
   const draggedApt = draggedAptId ? appointments.find(a => a.id === draggedAptId) : null;
+  const schedulerAppointments = filteredAppointments.filter((appointment) => {
+    if (appointment.kind !== 'blocked') {
+      return true;
+    }
+
+    if (showLunchBreaks) {
+      return true;
+    }
+
+    return `${appointment.blockedType || ''}`.trim().toLowerCase() !== 'lunch';
+  });
 
   const schedulerColumns: SchedulerColumn[] = viewMode === 'day'
     ? liveStylists.map((stylist) => ({
@@ -2967,7 +3135,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         };
       });
 
-  const schedulerEvents: SchedulerEvent[] = filteredAppointments.map((apt) => {
+  const schedulerEvents: SchedulerEvent[] = schedulerAppointments.map((apt) => {
     const staff = liveStylists.find((stylist) => stylist.id === apt.staffId);
     const columnId = viewMode === 'day' ? apt.staffId : (apt.date || getSelectedDateKey());
     const title = isRtl ? apt.customerNameAr : apt.customerNameEn;
@@ -3063,21 +3231,81 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     const targetDateKey = slot.dateKey || getSelectedDateKey();
     const targetStaffId = viewMode === 'day' ? slot.employeeId || slot.columnId : movedAppointment.staffId;
-    const patchDate = buildIsoFromMinutes(targetDateKey, slot.startMinutes);
+    const serviceName = isRtl ? movedAppointment.serviceNameAr : movedAppointment.serviceNameEn;
+    const targetStaff = liveStylists.find((staff) => staff.id === targetStaffId);
+    const sourceStaff = liveStylists.find((staff) => staff.id === movedAppointment.staffId);
+    const canMove = canAssignServiceToStaff(movedAppointment.serviceId, targetStaffId);
 
-    tenantApiAdapter.reassignRescheduleAppointment(draggedEventId, {
-      staffId: targetStaffId,
-      startTime: patchDate,
+    if (!canMove) {
+      setDragConflictDialog({
+        serviceName,
+        destinationStaffName: targetStaff ? (isRtl ? targetStaff.nameAr : targetStaff.nameEn) : (isRtl ? 'الموظف المحدد' : 'Selected staff'),
+        serviceId: movedAppointment.serviceId || undefined,
+        serviceSection: 'team'
+      });
+      return;
+    }
+
+    setDragMoveDialog({
+      appointmentId: draggedEventId,
+      targetStaffId,
+      targetStaffName: targetStaff ? (isRtl ? targetStaff.nameAr : targetStaff.nameEn) : (isRtl ? 'الموظف المحدد' : 'Selected staff'),
+      sourceStaffName: sourceStaff ? (isRtl ? sourceStaff.nameAr : sourceStaff.nameEn) : (isRtl ? 'الموظف الحالي' : 'Current staff'),
+      sourceStaffId: movedAppointment.staffId,
+      targetStartMinutes: slot.startMinutes,
+      targetDateKey,
+      sourceTimeLabel: formatMinutesToTime(movedAppointment.startTime),
+      targetTimeLabel: formatMinutesToTime(slot.startMinutes),
       notifyCustomer: true
-    }).then(() => {
-      void loadBoardData();
-    }).catch((err) => {
-      console.error('Failed to persist drag/drop change', err);
-      const toast = getSchedulingErrorToast(err, 'تعذر نقل الموعد إلى الخانة الجديدة', 'Unable to move appointment to the new slot.');
-      addLocalToast(toast.ar, toast.en, 'warning');
-      void loadBoardData();
     });
   };
+
+  const confirmSchedulerMove = useCallback(async () => {
+    if (!dragMoveDialog) {
+      return;
+    }
+
+    const movedAppointment = appointments.find((item) => item.id === dragMoveDialog.appointmentId);
+    if (!movedAppointment) {
+      setDragMoveDialog(null);
+      return;
+    }
+
+    try {
+      await tenantApiAdapter.reassignRescheduleAppointment(dragMoveDialog.appointmentId, {
+        staffId: dragMoveDialog.targetStaffId,
+        startTime: buildIsoFromMinutes(dragMoveDialog.targetDateKey, dragMoveDialog.targetStartMinutes),
+        notifyCustomer: dragMoveDialog.notifyCustomer
+      });
+      setActiveAppointment((current) => current && current.id === movedAppointment.id
+        ? {
+            ...current,
+            staffId: dragMoveDialog.targetStaffId,
+            assignedStaffName: dragMoveDialog.targetStaffName,
+            startTime: dragMoveDialog.targetStartMinutes,
+            date: dragMoveDialog.targetDateKey
+          }
+        : current
+      );
+      setDragMoveDialog(null);
+      await loadBoardData();
+      emitBIReportRefresh({
+        source: 'appointment-workspace',
+        kind: 'appointment-moved',
+        appointmentId: movedAppointment.id,
+        staffId: dragMoveDialog.targetStaffId
+      });
+      if (drawerOpen && activeAppointment?.customerId) {
+        setCustomerProfileRefreshToken((current) => current + 1);
+      }
+    } catch (error) {
+      console.error('Failed to persist drag/drop change', error);
+      const toast = getSchedulingErrorToast(error, 'تعذر نقل الموعد إلى الخانة الجديدة', 'Unable to move appointment to the new slot.');
+      addLocalToast(toast.ar, toast.en, 'warning');
+      await loadBoardData();
+      setDragMoveDialog(null);
+    }
+  }, [activeAppointment?.customerId, dragMoveDialog, drawerOpen, loadBoardData, appointments, isRtl]);
 
   const handleSchedulerSlotRangeSelect = (range: { startSlot: SchedulerSlot; endSlot: SchedulerSlot; durationMinutes: number }) => {
     if (!isBoardEditable) {
@@ -3226,6 +3454,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               title="Refresh Schedule"
             >
               <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin text-amber-500' : ''}`} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsSchedulerSettingsOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              title={isRtl ? 'إعدادات لوحة الجدولة' : 'Scheduler settings'}
+            >
+              <Settings2 size={12} />
+              <span>{isRtl ? 'الإعدادات' : 'Settings'}</span>
             </button>
 
             <button
@@ -3460,42 +3698,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           )}
 
           {/* Real-time ZATCA & Platform Status card */}
-          <div className="bg-zinc-950 text-white p-4 rounded-xl border border-zinc-800 space-y-3 shadow-md relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-              <Scissors size={80} className="text-white" />
-            </div>
-            <h3 className="text-xs font-bold tracking-wider text-amber-400 uppercase flex items-center gap-1.5">
-              <Sparkles size={12} className="animate-spin text-amber-400" />
-              {isRtl ? 'أدوات تخطيط ذكية' : 'Intelligent Planners'}
-            </h3>
-            <div className="space-y-2 text-xs text-zinc-300">
-              <p className="leading-relaxed">
-                {isRtl 
-                  ? 'الجدول يدعم السحب والإفلات وتغيير مدة المواعيد مباشرة. انقر بالزر الأيمن في أي خلية.' 
-                  : 'Board features live drag & drop rescheduling, vertical handles to stretch duration, and custom context actions.'}
-              </p>
-              <div className="pt-2 border-t border-zinc-800 space-y-1 text-[10px] text-zinc-400">
-                <div className="flex justify-between">
-                  <span>{isRtl ? 'حالة التزامن' : 'Integration Status'}</span>
-                  <span className="font-mono text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-ping" />
-                    Online
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>{isRtl ? 'توقيت الخادم' : 'Server Time Zone'}</span>
-                  <span className="font-mono text-zinc-400">UTC+3 (Riyadh)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
         </div>
 
         {/* CENTER COLUMN: INTERACTIVE SCHEDULER BOARD (col-span-9) */}
         <div className={`${isSidebarCollapsed ? 'lg:col-span-11' : 'lg:col-span-9'}`}>
           
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
+          <div
+            className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative"
+            style={{
+              width: `${schedulerBoardSettings.gridWidth}%`,
+              minWidth: `${schedulerBoardSettings.gridWidth}%`
+            }}
+          >
             
             {/* Timeline Scheduler Navigation Bar */}
             <div className="p-3.5 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
@@ -3515,7 +3729,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             </div>
 
             {/* THE INTERACTIVE SCHEDULE BOARD CONTAINER */}
-            <div className="overflow-x-auto scrollbar-thin relative" id="interactive-board-scroll">
+            <div
+              className="overflow-auto scrollbar-thin relative"
+              id="interactive-board-scroll"
+              style={{
+                height: viewMode === 'agenda' ? 'auto' : `${schedulerBoardSettings.gridHeight}px`
+              }}
+            >
               
               {viewMode === 'agenda' ? (
                 /* 1. COMPREHENSIVE AGENDA SCHEDULE VIEW */
@@ -3644,6 +3864,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   startHour={START_HOUR}
                   endHour={END_HOUR}
                   timeColumnWidth={84}
+                  slotHeight={schedulerBoardSettings.timeSlotHeight}
+                  staffColumnWidth={schedulerBoardSettings.staffColumnWidth}
+                  showCurrentTimeIndicator={schedulerBoardSettings.showCurrentTimeIndicator}
+                  showLunchBreaks={schedulerBoardSettings.showLunchBreaks}
+                  showStaffPhotos={schedulerBoardSettings.showStaffPhotos}
+                  showAppointmentStatusBadges={schedulerBoardSettings.showAppointmentStatusBadges}
                   onSlotClick={handleSchedulerSlotClick}
                   onSlotContextMenu={handleSchedulerSlotContextMenu}
                   onSlotDrop={handleSchedulerSlotDrop}
@@ -3672,6 +3898,291 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         </div>
 
       </div>
+
+      <AnimatePresence>
+        {isSchedulerSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs"
+              onClick={() => setIsSchedulerSettingsOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="relative z-10 w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                    {isRtl ? 'إعدادات لوحة الجدولة' : 'Scheduler settings'}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black text-slate-900">
+                    {isRtl ? 'تخصيص عرض الجدول' : 'Customize the scheduler board'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSchedulerSettingsOpen(false)}
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {[
+                  { key: 'gridWidth', labelEn: 'Grid Width', labelAr: 'عرض اللوحة', min: 80, max: 160, step: 1, suffix: '%' },
+                  { key: 'gridHeight', labelEn: 'Grid Height', labelAr: 'ارتفاع اللوحة', min: 420, max: 1400, step: 10, suffix: 'px' },
+                  { key: 'timeSlotHeight', labelEn: 'Time Slot Height', labelAr: 'ارتفاع الخانة الزمنية', min: 8, max: 24, step: 1, suffix: 'px' },
+                  { key: 'staffColumnWidth', labelEn: 'Staff Column Width', labelAr: 'عرض عمود الموظف', min: 180, max: 360, step: 5, suffix: 'px' }
+                ].map((field) => (
+                  <label key={field.key} className="space-y-2 rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+                        {isRtl ? field.labelAr : field.labelEn}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {schedulerBoardDraft[field.key as keyof SchedulerBoardSettings] as number}{field.suffix}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={field.min}
+                      max={field.max}
+                      step={field.step}
+                      value={schedulerBoardDraft[field.key as keyof SchedulerBoardSettings] as number}
+                      onChange={(event) => setSchedulerBoardDraft((current) => ({
+                        ...current,
+                        [field.key]: Number(event.target.value)
+                      }))}
+                      className="w-full accent-amber-500"
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {[
+                  { key: 'showCurrentTimeIndicator', labelEn: 'Show Current Time Indicator', labelAr: 'إظهار مؤشر الوقت الحالي' },
+                  { key: 'showLunchBreaks', labelEn: 'Show Lunch Breaks', labelAr: 'إظهار فترات الغداء' },
+                  { key: 'showStaffPhotos', labelEn: 'Show Staff Photos', labelAr: 'إظهار صور الموظفين' },
+                  { key: 'showAppointmentStatusBadges', labelEn: 'Show Appointment Status Badges', labelAr: 'إظهار شارات حالة المواعيد' }
+                ].map((field) => (
+                  <label key={field.key} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-white px-4 py-3">
+                    <span className="text-xs font-bold text-slate-700">
+                      {isRtl ? field.labelAr : field.labelEn}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(schedulerBoardDraft[field.key as keyof SchedulerBoardSettings])}
+                      onChange={(event) => setSchedulerBoardDraft((current) => ({
+                        ...current,
+                        [field.key]: event.target.checked
+                      }))}
+                      className="h-4 w-4 accent-amber-500"
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={resetSchedulerBoardSettings}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  {isRtl ? 'إعادة تعيين التخطيط' : 'Reset Layout'}
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSchedulerSettingsOpen(false)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    {isRtl ? 'إلغاء' : 'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSchedulerSettingsSaving}
+                    onClick={() => void saveSchedulerBoardSettings(schedulerBoardDraft)}
+                    className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSchedulerSettingsSaving ? (isRtl ? 'جارٍ الحفظ...' : 'Saving...') : (isRtl ? 'حفظ' : 'Save')}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {dragMoveDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs"
+              onClick={() => setDragMoveDialog(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="relative z-10 w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                    {isRtl ? 'تأكيد نقل الموعد' : 'Confirm appointment move'}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black text-slate-900">
+                    {isRtl ? `نقل الموعد إلى ${dragMoveDialog.targetStaffName}` : `Move appointment to ${dragMoveDialog.targetStaffName}`}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDragMoveDialog(null)}
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-3 rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-sm text-slate-700">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-slate-500">{isRtl ? 'الوقت القديم' : 'Old time'}</span>
+                  <span className="font-black text-slate-900">{dragMoveDialog.sourceTimeLabel}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-slate-500">{isRtl ? 'الوقت الجديد' : 'New time'}</span>
+                  <span className="font-black text-slate-900">{dragMoveDialog.targetTimeLabel}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-slate-500">{isRtl ? 'الموظف القديم' : 'Old staff'}</span>
+                  <span className="font-black text-slate-900">{dragMoveDialog.sourceStaffName}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-slate-500">{isRtl ? 'الموظف الجديد' : 'New staff'}</span>
+                  <span className="font-black text-slate-900">{dragMoveDialog.targetStaffName}</span>
+                </div>
+              </div>
+
+              <label className="mt-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={dragMoveDialog.notifyCustomer}
+                  onChange={(event) => setDragMoveDialog((current) => current ? { ...current, notifyCustomer: event.target.checked } : current)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                <span>{isRtl ? 'إخطار العميل بالبريد الإلكتروني' : 'Notify customer by email'}</span>
+              </label>
+
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDragMoveDialog(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmSchedulerMove()}
+                  className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                >
+                  {isRtl ? 'تأكيد' : 'Confirm'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {dragConflictDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs"
+              onClick={() => setDragConflictDialog(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="relative z-10 w-full max-w-2xl rounded-2xl border border-rose-200 bg-white p-5 shadow-2xl"
+            >
+              <div className="flex items-start gap-3 border-b border-rose-100 pb-4">
+                <div className="rounded-xl bg-rose-50 p-2 text-rose-600">
+                  <AlertTriangle size={18} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-400">
+                    {isRtl ? 'تعذر النقل' : 'Move rejected'}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black text-slate-900">
+                    {isRtl ? 'الموظف المحدد لا يقدم هذه الخدمة' : 'Destination staff cannot perform this service'}
+                  </h3>
+                </div>
+              </div>
+
+              <p className="mt-4 text-sm leading-6 text-slate-700">
+                {isRtl
+                  ? `${dragConflictDialog.destinationStaffName} لا يمكنه تقديم خدمة "${dragConflictDialog.serviceName}" لأنه غير مرتبط بها حالياً.`
+                  : `${dragConflictDialog.destinationStaffName} cannot perform "${dragConflictDialog.serviceName}" because this staff member is not currently assigned to provide that service.`}
+              </p>
+
+              <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-sm leading-6 text-slate-700">
+                <p className="font-semibold">
+                  {isRtl
+                    ? 'إذا كنت ترغب في إسناد هذه الخدمة لهذا الموظف، انتقل إلى:'
+                    : 'If you would like to assign this service to the staff member, go to:'}
+                </p>
+                <p className="mt-2 font-black text-slate-900">
+                  Services → {dragConflictDialog.serviceName} → Assigned Staff
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {isRtl
+                    ? 'قم بإسناد الموظف من هناك ثم أعد المحاولة.'
+                    : 'Assign the staff member there, then return and move the appointment again.'}
+                </p>
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDragConflictDialog(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  {isRtl ? 'حسناً' : 'OK'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    openServiceForStaffAssignment(dragConflictDialog.serviceId);
+                    setDragConflictDialog(null);
+                  }}
+                  className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                >
+                  {isRtl ? 'فتح الخدمة' : 'Open Service'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* 3. ABSOLUTE PORTAL POPUP CONTEXT MENU */}
       <AnimatePresence>

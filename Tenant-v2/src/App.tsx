@@ -515,10 +515,13 @@ export default function App() {
     setActiveTabId(id);
   };
 
-  const handleQuickAction = (type: 'appointment' | 'customer' | 'service' | 'product' | 'employee' | 'giftcard') => {
+  const handleQuickAction = (action: any) => {
+    const type = typeof action === 'string' ? action : action?.type;
     const launchRequest = {
       target: type,
       nonce: Date.now() + Math.floor(Math.random() * 1000),
+      serviceId: typeof action === 'object' && action?.serviceId ? action.serviceId : undefined,
+      section: typeof action === 'object' && action?.section ? action.section : undefined
     };
 
     if (type === 'employee') {
