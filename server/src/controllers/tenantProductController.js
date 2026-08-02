@@ -77,6 +77,22 @@ function parseArrayField(value) {
     return [];
 }
 
+function normalizeLegacyProductImagePath(value) {
+    const raw = `${value ?? ''}`.trim();
+    if (!raw) {
+        return null;
+    }
+
+    // The legacy `products.image` column is VARCHAR(255), so inline data URLs or
+    // overly long absolute URLs must not be written there. The canonical image
+    // payload is stored in `products.images` (JSONB) instead.
+    if (raw.length > 255 || /^data:/i.test(raw)) {
+        return null;
+    }
+
+    return raw;
+}
+
 function isFilesystemManagedImage(value) {
     const normalized = `${value ?? ''}`.trim();
     if (!normalized) return false;
@@ -353,8 +369,8 @@ exports.createProduct = async (req, res) => {
             });
         }
 
-        // Set legacy image field to first image for backward compatibility
-        const imagePath = imagePaths[0];
+        // Set legacy image field only when it safely fits the legacy VARCHAR(255) column.
+        const imagePath = normalizeLegacyProductImagePath(imagePaths[0]);
 
         // Create product
         const product = await db.Product.create({
@@ -612,7 +628,7 @@ exports.updateProduct = async (req, res) => {
         
         // Update images
         product.images = imagePaths;
-        product.image = imagePaths[0] || product.image; // Legacy field (first image)
+        product.image = normalizeLegacyProductImagePath(imagePaths[0]) ?? product.image; // Legacy field (first image)
         
         if (isAvailable !== undefined) product.isAvailable = isAvailable === true || isAvailable === 'true';
         if (isFeatured !== undefined) product.isFeatured = isFeatured === true || isFeatured === 'true';
