@@ -16,6 +16,7 @@ import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
 import SchedulerGrid, { SchedulerColumn, SchedulerEvent, SchedulerSlot } from './SchedulerGrid';
 import { resolveEmployeeImageUrl } from '../lib/employeeImage';
+import { resolveProductImageUrl } from '../lib/productContract';
 import { normalizeServiceRecord } from '../lib/serviceContract';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import { DEFAULT_SCHEDULER_BOARD_SETTINGS, getTenantSchedulerConfig, normalizeSchedulerBoardSettings, type SchedulerBoardSettings } from '../lib/tenantWorkingHours';
@@ -419,7 +420,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           price: p.finalPrice || p.price || 0,
           stock: p.stockQuantity || p.stock || 0,
           categoryAr: p.category || '',
-          categoryEn: p.category || ''
+          categoryEn: p.category || '',
+          imageUrl: resolveProductImageUrl(p.imageUrl || p.primaryImage || p.image || p.images?.[0] || ''),
+          image: resolveProductImageUrl(p.image || p.imageUrl || p.primaryImage || p.images?.[0] || ''),
+          images: Array.isArray(p.images) ? p.images : (p.images ? [p.images] : [])
         })));
 
         if (employees.length > 0) {
@@ -1707,6 +1711,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   // --- POS CART & GIFT CARD COUNTER DRAWER ---
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [cartTab, setCartTab] = useState<'products' | 'giftcards'>('products');
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   
   // Cart items sequence
   interface CartItem {
@@ -2976,6 +2981,89 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       `Added "${isRtl ? prod.nameAr : prod.nameEn}" to cart`,
       'success'
     );
+  };
+
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProductIds((prev) => (
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId]
+    ));
+  };
+
+  const handleAddSelectedProductsToCart = () => {
+    const selectedProducts = liveProducts.filter((prod) => selectedProductIds.includes(prod.id));
+
+    if (selectedProducts.length === 0) {
+      addLocalToast(
+        isRtl ? 'يرجى اختيار منتج واحد على الأقل أولاً' : 'Please select at least one product first',
+        isRtl ? 'يرجى اختيار منتج واحد على الأقل أولاً' : 'Please select at least one product first',
+        'warning'
+      );
+      return;
+    }
+
+    const availableProducts = selectedProducts.filter((prod) => prod.stock > 0);
+    const unavailableProducts = selectedProducts.filter((prod) => prod.stock <= 0);
+
+    if (availableProducts.length === 0) {
+      addLocalToast(
+        isRtl ? 'كل المنتجات المختارة غير متوفرة حالياً بالمخزون' : 'All selected products are currently out of stock',
+        isRtl ? 'كل المنتجات المختارة غير متوفرة حالياً بالمخزون' : 'All selected products are currently out of stock',
+        'warning'
+      );
+      return;
+    }
+
+    setCartItems(prev => {
+      const next = [...prev];
+
+      for (const prod of availableProducts) {
+        const existingIndex = next.findIndex((item) => item.id === prod.id);
+        if (existingIndex >= 0) {
+          next[existingIndex] = {
+            ...next[existingIndex],
+            quantity: next[existingIndex].quantity + 1
+          };
+        } else {
+          next.push({
+            id: prod.id,
+            type: 'product',
+            nameAr: prod.nameAr,
+            nameEn: prod.nameEn,
+            price: prod.price,
+            quantity: 1,
+            skuOrCode: prod.sku
+          });
+        }
+      }
+
+      return next;
+    });
+
+    setSelectedProductIds([]);
+
+    addLocalToast(
+      isRtl
+        ? `تمت إضافة ${availableProducts.length} منتج(ات) إلى السلة`
+        : `${availableProducts.length} product(s) added to the cart`,
+      isRtl
+        ? `تمت إضافة ${availableProducts.length} منتج(ات) إلى السلة`
+        : `${availableProducts.length} product(s) added to the cart`,
+      'success'
+    );
+
+    if (unavailableProducts.length > 0) {
+      addLocalToast(
+        isRtl
+          ? `${unavailableProducts.length} منتج غير متاح حالياً بالمخزون`
+          : `${unavailableProducts.length} selected product(s) are out of stock`,
+        isRtl
+          ? `${unavailableProducts.length} منتج غير متاح حالياً بالمخزون`
+          : `${unavailableProducts.length} selected product(s) are out of stock`,
+        'info'
+      );
+    }
   };
 
   const handleUpdateCartItemQty = (id: string, newQty: number) => {
@@ -5256,34 +5344,115 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           {isRtl ? 'إضافة منتجات التجميل للفاتورة 🧴' : 'ADD RETAIL PRODUCTS TO TICKET 🧴'}
                         </span>
                         
-                        {/* Inline list of available products to add */}
-                        <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
-                          {liveProducts.map(prod => (
-                            <button
-                              key={prod.id}
-                              type="button"
-                              onClick={() => {
-                                setCheckoutProducts(prev => {
-                                  const exists = prev.find(p => p.id === prod.id);
-                                  if (exists) {
-                                    return prev.map(p => p.id === prod.id ? { ...p, quantity: p.quantity + 1 } : p);
-                                  } else {
-                                    return [...prev, { id: prod.id, nameAr: prod.nameAr, nameEn: prod.nameEn, price: prod.price, quantity: 1, sku: prod.sku }];
-                                  }
-                                });
-                                addLocalToast(
-                                  `تمت إضافة "${isRtl ? prod.nameAr : prod.nameEn}" لفاتورة الموعد.`,
-                                  `Added "${isRtl ? prod.nameAr : prod.nameEn}" to appointment bill.`,
-                                  'success'
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                            {isRtl ? 'اختر المنتجات من القائمة' : 'Pick products from the list'}
+                          </span>
+                          <div className="flex items-center gap-2 text-[10px]">
+                            <span className="rounded-full bg-slate-100 px-2 py-1 font-bold text-slate-600">
+                              {selectedProductIds.length} {isRtl ? 'مختار' : 'selected'}
+                            </span>
+                            {selectedProductIds.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedProductIds([])}
+                                className="rounded-full border border-slate-200 bg-white px-2 py-1 font-bold text-slate-600 hover:bg-slate-50"
+                              >
+                                {isRtl ? 'إلغاء التحديد' : 'Clear'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                          {liveProducts.length > 0 ? (
+                            <div className="divide-y divide-slate-100">
+                              {liveProducts.map((prod) => {
+                                const isSelected = selectedProductIds.includes(prod.id);
+                                const imageSrc = resolveProductImageUrl(prod.imageUrl || prod.primaryImage || prod.image || prod.images?.[0] || '');
+                                return (
+                                  <button
+                                    key={prod.id}
+                                    type="button"
+                                    onClick={() => toggleProductSelection(prod.id)}
+                                    className={`w-full text-start p-3 flex items-center gap-3 transition-all cursor-pointer ${
+                                      isSelected ? 'bg-amber-50/80' : 'hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                                      {imageSrc ? (
+                                        <img src={imageSrc} alt={isRtl ? prod.nameAr : prod.nameEn} className="h-full w-full object-cover" />
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-[9px] font-black text-slate-400">
+                                          {isRtl ? 'صورة' : 'IMG'}
+                                        </div>
+                                      )}
+                                      {isSelected && (
+                                        <div className="absolute inset-0 bg-amber-500/10 ring-2 ring-amber-400" />
+                                      )}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <p className="truncate text-sm font-black text-slate-800">
+                                            {isRtl ? prod.nameAr : prod.nameEn}
+                                          </p>
+                                          <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                            {prod.sku || '—'}
+                                          </p>
+                                        </div>
+                                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-slate-500">
+                                          {isRtl ? (prod.stock > 0 ? 'متوفر' : 'نفد') : (prod.stock > 0 ? 'In Stock' : 'Out')}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold">
+                                        <span className="rounded-full bg-slate-50 px-2 py-1 text-slate-500">
+                                          {isRtl ? prod.categoryAr || 'فئة' : prod.categoryEn || 'Category'}
+                                        </span>
+                                        <span className="rounded-full bg-amber-50 px-2 py-1 font-mono text-amber-700">
+                                          {Number(prod.price || 0).toFixed(2)} {t.riyal}
+                                        </span>
+                                        <span className="rounded-full bg-slate-50 px-2 py-1 text-slate-500">
+                                          {isRtl ? `${prod.stock} في المخزون` : `${prod.stock} in stock`}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="shrink-0">
+                                      <div className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-black ${
+                                        isSelected
+                                          ? 'border-amber-500 bg-amber-500 text-white'
+                                          : 'border-slate-300 bg-white text-transparent'
+                                      }`}>
+                                        ✓
+                                      </div>
+                                    </div>
+                                  </button>
                                 );
-                              }}
-                              className="px-2.5 py-1.5 bg-slate-50 hover:bg-amber-500/10 hover:border-amber-400 border border-slate-200 rounded-lg text-[10px] font-bold shrink-0 text-slate-700 transition-all flex items-center gap-1 cursor-pointer"
-                            >
-                              <span>+</span>
-                              <span>{isRtl ? prod.nameAr.split(' ')[0] + ' ' + (prod.nameAr.split(' ')[1] || '') : prod.nameEn.split(' ')[0] + ' ' + (prod.nameEn.split(' ')[1] || '')}</span>
-                              <span className="text-amber-600 font-mono font-black">{prod.price} {t.riyal}</span>
-                            </button>
-                          ))}
+                              })}
+                            </div>
+                          ) : (
+                            <div className="px-4 py-10 text-center text-[10px] text-slate-500">
+                              {isRtl ? 'لا توجد منتجات متاحة حالياً.' : 'No products available right now.'}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 pt-1">
+                          <p className="text-[10px] text-slate-400">
+                            {isRtl ? 'يمكنك اختيار عدة منتجات ثم إضافتها دفعة واحدة إلى الفاتورة' : 'Select multiple products and add them to the appointment basket together'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleAddSelectedProductsToCart}
+                            className="rounded-xl bg-zinc-950 px-3 py-2 text-[10px] font-black text-white transition-all hover:bg-zinc-800 cursor-pointer"
+                          >
+                            {selectedProductIds.length > 0
+                              ? (isRtl ? `إضافة ${selectedProductIds.length} للفاتورة` : `Add ${selectedProductIds.length} to basket`)
+                              : (isRtl ? 'إضافة للفاتورة' : 'Add to basket')}
+                          </button>
                         </div>
 
                         {/* List of currently added products */}
