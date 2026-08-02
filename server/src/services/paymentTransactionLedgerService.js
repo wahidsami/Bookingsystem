@@ -1,5 +1,24 @@
 const db = require('../models');
 
+const PAYMENT_TRANSACTION_TYPES = Object.freeze([
+    'deposit',
+    'remainder',
+    'full',
+    'refund'
+]);
+
+const LEGACY_PAYMENT_TRANSACTION_TYPE_MAP = Object.freeze({
+    booking: 'full',
+    booking_fee: 'deposit',
+    'booking-fee': 'deposit',
+    deposit_paid: 'deposit',
+    remainder_paid: 'remainder',
+    paid_in_full: 'full',
+    full_paid: 'full',
+    completed: 'full',
+    refunded: 'refund'
+});
+
 const DIRECT_PAYMENT_METHODS = new Set([
     'online',
     'cash',
@@ -27,6 +46,19 @@ const resolveLedgerPaymentMethod = (paymentMethod, fallbackSource = 'cash') => {
     return DIRECT_PAYMENT_METHODS.has(fallbackSource) ? fallbackSource : 'cash';
 };
 
+const normalizePaymentTransactionType = (type, fallbackType = 'full') => {
+    const normalizedType = `${type || ''}`.trim().toLowerCase().replace(/\s+/g, '_');
+    if (PAYMENT_TRANSACTION_TYPES.includes(normalizedType)) {
+        return normalizedType;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(LEGACY_PAYMENT_TRANSACTION_TYPE_MAP, normalizedType)) {
+        return LEGACY_PAYMENT_TRANSACTION_TYPE_MAP[normalizedType];
+    }
+
+    return PAYMENT_TRANSACTION_TYPES.includes(fallbackType) ? fallbackType : 'full';
+};
+
 const buildTransactionPayload = ({
     appointmentId = null,
     orderId = null,
@@ -50,7 +82,7 @@ const buildTransactionPayload = ({
     return {
         appointmentId,
         orderId,
-        type,
+        type: normalizePaymentTransactionType(type),
         amount: parseFloat(safeAmount.toFixed(2)),
         currency: 'SAR',
         paymentMethod: resolveLedgerPaymentMethod(paymentMethod, fallbackSource),
@@ -95,6 +127,8 @@ const createOrderTransaction = async (paymentData, options = {}) => {
 };
 
 module.exports = {
+    PAYMENT_TRANSACTION_TYPES,
+    normalizePaymentTransactionType,
     resolveLedgerPaymentMethod,
     createAppointmentTransaction,
     createOrderTransaction

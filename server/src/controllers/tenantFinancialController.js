@@ -20,6 +20,7 @@ const {
     normalizeFinancialPaymentMethodGroup,
     getRefundModeLabel
 } = require('../services/tenantFinancialFormulaService');
+const { PAYMENT_TRANSACTION_TYPES } = require('../services/paymentTransactionLedgerService');
 const tenantPosController = require('./tenantPosController');
 
 function parseDateValue(value, endOfDay = false) {
@@ -911,7 +912,7 @@ exports.getFinancialOverview = async (req, res) => {
                 { '$order.tenantId$': tenantId }
             ],
             status: { [Op.in]: ['completed', 'refunded'] },
-            type: { [Op.in]: ['deposit', 'remainder', 'full', 'refund'] },
+            type: { [Op.in]: PAYMENT_TRANSACTION_TYPES },
             ...buildDateRangeWhere('processedAt', startDate, endDate)
         }, [['processedAt', 'DESC']]);
 
@@ -1780,7 +1781,7 @@ exports.getFinancialLedger = async (req, res) => {
                     { '$order.tenantId$': tenantId }
                 ],
                 status: { [Op.in]: ['completed', 'refunded'] },
-                type: { [Op.in]: ['deposit', 'remainder', 'full', 'refund'] },
+                type: { [Op.in]: PAYMENT_TRANSACTION_TYPES },
                 processedAt: {
                     [Op.gte]: start,
                     [Op.lte]: end

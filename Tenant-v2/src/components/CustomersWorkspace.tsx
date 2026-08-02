@@ -396,8 +396,11 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isErrorHistory, setIsErrorHistory] = useState(false);
 
-  // History detail viewer modal (placeholder for purchases, actual values)
+  // History detail viewer modal (persisted purchase/order data only)
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<any | null>(null);
+  const selectedOrderItems = Array.isArray(selectedOrderDetails?.details?.items)
+    ? selectedOrderDetails.details.items.filter(Boolean)
+    : [];
 
   const loadCustomerHistory = async () => {
     if (!selectedCustomerId) return;
@@ -1717,7 +1720,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                       </div>
                       <div className="bg-neutral-50/50 p-4 rounded-xl border border-neutral-100">
                         <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">{isRtl ? 'إجمالي المشتريات / الطلبات' : 'Total Orders'}</p>
-                        <p className="text-2xl font-black text-neutral-800 mt-1 font-mono">{inspectedCustomer.totalOrders || 3}</p>
+                        <p className="text-2xl font-black text-neutral-800 mt-1 font-mono">{inspectedCustomer.totalOrders ?? 0}</p>
                       </div>
                       <div className="bg-neutral-50/50 p-4 rounded-xl border border-neutral-100">
                         <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">{isRtl ? 'إجمالي المبالغ المدفوعة' : 'Total Spent'}</p>
@@ -2309,19 +2312,35 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-neutral-50 font-medium">
-                                {inspectedCustomer.transactions.map(tx => (
-                                  <tr key={tx.id} className="hover:bg-neutral-50/50">
-                                    <td className="px-4 py-3 font-mono text-neutral-400 text-[11px]">{tx.id}</td>
-                                    <td className="px-4 py-3 font-extrabold">{isRtl ? tx.typeAr : tx.type}</td>
-                                    <td className="px-4 py-3">{isRtl ? tx.methodAr : tx.method}</td>
-                                    <td className="px-4 py-3 text-end font-mono font-bold text-neutral-800">{tx.amount} ر.س</td>
-                                    <td className="px-4 py-3 text-center">
-                                      <span className="bg-emerald-50 text-emerald-700 text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase">
-                                        {tx.status}
-                                      </span>
+                                {inspectedCustomer.transactions.length > 0 ? (
+                                  inspectedCustomer.transactions.map(tx => (
+                                    <tr key={tx.id} className="hover:bg-neutral-50/50">
+                                      <td className="px-4 py-3 font-mono text-neutral-400 text-[11px]">{tx.id}</td>
+                                      <td className="px-4 py-3 font-extrabold">{isRtl ? tx.typeAr : tx.type}</td>
+                                      <td className="px-4 py-3">{isRtl ? tx.methodAr : tx.method}</td>
+                                      <td className="px-4 py-3 text-end font-mono font-bold text-neutral-800">{tx.amount} ر.س</td>
+                                      <td className="px-4 py-3 text-center">
+                                        <span className="bg-emerald-50 text-emerald-700 text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase">
+                                          {tx.status}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td colSpan={5} className="px-4 py-10 text-center text-neutral-400">
+                                      <div className="space-y-2">
+                                        <Package size={20} className="mx-auto text-neutral-300" />
+                                        <p className="text-xs font-bold text-neutral-700">
+                                          {isRtl ? 'لا توجد فواتير أو معاملات محفوظة' : 'No persisted invoices or financial transactions yet.'}
+                                        </p>
+                                        <p className="text-[10px]">
+                                          {isRtl ? 'ستظهر هنا الفواتير الفعلية بمجرد وجود عمليات شراء أو حجوزات مدفوعة.' : 'Real invoice and ledger records will appear here once purchases or paid appointments exist.'}
+                                        </p>
+                                      </div>
                                     </td>
                                   </tr>
-                                ))}
+                                )}
                               </tbody>
                             </table>
                           </div>
@@ -2845,7 +2864,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
         )}
       </AnimatePresence>
 
-      {/* GORGEOUS INVOICE DETAIL PLACEHOLDER MODAL FOR PURCHASES */}
+      {/* Persisted order/invoice detail modal */}
       <AnimatePresence>
         {selectedOrderDetails && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
@@ -2859,9 +2878,11 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
               <div className="bg-neutral-900 text-white p-5 flex items-center justify-between">
                 <div>
                   <span className="text-[9px] bg-emerald-500 text-white font-mono px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
-                    {isRtl ? 'فاتورة بيع منتجات' : 'PRODUCT RECEIPT'}
+                    {isRtl ? 'فاتورة محفوظة' : 'Persisted Invoice'}
                   </span>
-                  <h3 className="text-sm font-black mt-1 font-mono">{selectedOrderDetails.id}</h3>
+                  <h3 className="text-sm font-black mt-1 font-mono">
+                    {selectedOrderDetails.details?.orderNumber || selectedOrderDetails.id}
+                  </h3>
                 </div>
                 <button
                   onClick={() => setSelectedOrderDetails(null)}
@@ -2880,41 +2901,50 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
 
                 <div className="space-y-3">
                   <h4 className="font-black text-neutral-800 dark:text-neutral-200">{isRtl ? 'المنتجات المشتراة:' : 'Purchased Products:'}</h4>
-                  <div className="bg-neutral-50 dark:bg-zinc-950/40 p-3 rounded-xl border border-neutral-100 flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-extrabold text-neutral-800 dark:text-neutral-100 truncate">
-                        {isRtl ? selectedOrderDetails.productsAr : selectedOrderDetails.products}
+                  {selectedOrderItems.length > 0 ? (
+                    selectedOrderItems.map((item: any, index: number) => {
+                      const product = item?.product || {};
+                      const productName = isRtl
+                        ? product?.name_ar || item?.productNameAr || item?.productName || product?.name || 'منتج'
+                        : product?.name_en || item?.productName || item?.productNameAr || product?.name || 'Product';
+                      const quantity = Number(item?.quantity || 0);
+                      const unitPrice = Number(item?.unitPrice || 0);
+                      const totalPrice = Number(item?.totalPrice || (quantity * unitPrice) || 0);
+
+                      return (
+                        <div key={`${selectedOrderDetails.id}-${item?.id || index}`} className="bg-neutral-50 dark:bg-zinc-950/40 p-3 rounded-xl border border-neutral-100 flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-extrabold text-neutral-800 dark:text-neutral-100 truncate">{productName}</p>
+                            <p className="text-[10px] text-neutral-400 mt-0.5">
+                              {isRtl ? `الكمية: ${quantity}` : `Qty: ${quantity}`}
+                              {unitPrice ? ` • ${isRtl ? 'سعر الوحدة' : 'Unit'}: ${unitPrice.toFixed(2)} ر.س` : ''}
+                            </p>
+                          </div>
+                          <span className="font-mono font-black text-neutral-900 dark:text-neutral-100 shrink-0">
+                            {totalPrice.toFixed(2)} ر.س
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-neutral-200 p-5 text-center text-neutral-400">
+                      <Package size={18} className="mx-auto text-neutral-300" />
+                      <p className="mt-2 text-xs font-bold text-neutral-700">
+                        {isRtl ? 'لا توجد منتجات محفوظة لهذه العملية' : 'No persisted product items found for this record.'}
                       </p>
-                      <p className="text-[10px] text-neutral-400 mt-0.5">{isRtl ? 'الكمية: 1 علبة فاخرة' : 'Qty: 1 Luxury Pack'}</p>
                     </div>
-                    <span className="font-mono font-black text-neutral-900 dark:text-neutral-100 ml-4 shrink-0">{selectedOrderDetails.amount} ر.س</span>
-                  </div>
+                  )}
                 </div>
 
-                {/* Subtotal & Taxes breakdown */}
                 <div className="border-t border-neutral-100 pt-3 space-y-1.5 font-mono text-[11px] text-neutral-500">
                   <div className="flex justify-between">
-                    <span>{isRtl ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
-                    <span>{Math.round(selectedOrderDetails.amount * 0.85)} ر.س</span>
+                    <span>{isRtl ? 'الحالة:' : 'Status:'}</span>
+                    <span>{selectedOrderDetails.status || selectedOrderDetails.paymentStatus || 'completed'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>{isRtl ? 'ضريبة القيمة المضافة (15%):' : 'VAT (15%):'}</span>
-                    <span>{Math.round(selectedOrderDetails.amount * 0.15)} ر.س</span>
+                    <span>{isRtl ? 'المبلغ الإجمالي:' : 'Total Amount:'}</span>
+                    <span>{Number(selectedOrderDetails.amount || 0).toFixed(2)} ر.س</span>
                   </div>
-                  <div className="flex justify-between font-bold text-neutral-800 dark:text-neutral-100 text-xs border-t border-neutral-100 pt-2 font-sans">
-                    <span>{isRtl ? 'الإجمالي الكلي:' : 'Total Amount Paid:'}</span>
-                    <span className="font-mono">{selectedOrderDetails.amount} ر.س</span>
-                  </div>
-                </div>
-
-                {/* Simulated Order Status banner */}
-                <div className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 p-3 rounded-xl flex items-center gap-2.5 border border-emerald-100">
-                  <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
-                  <p className="text-[10px]">
-                    {isRtl 
-                      ? 'تم دفع القيمة بالكامل عبر بطاقة مدى الإلكترونية وجاري تحضير الشحنة.' 
-                      : 'Paid in full via Mada digital gateway. Order fulfilled successfully.'}
-                  </p>
                 </div>
               </div>
 

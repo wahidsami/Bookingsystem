@@ -41,6 +41,7 @@ const {
     buildPaymentMethodSummaryRows,
     buildPaymentMethodBucketRows
 } = require('../services/tenantFinancialFormulaService');
+const { PAYMENT_TRANSACTION_TYPES } = require('../services/paymentTransactionLedgerService');
 
 function getCustomerName(user) {
     const firstName = user?.firstName || '';
@@ -1133,7 +1134,7 @@ async function getPaymentTransactions(req, { startDate, endDate, limit = 200 } =
             { '$order.tenantId$': tenantId }
         ],
         status: { [Op.in]: ['completed', 'refunded'] },
-        type: { [Op.in]: ['deposit', 'remainder', 'full', 'refund'] }
+        type: { [Op.in]: PAYMENT_TRANSACTION_TYPES }
     };
 
     if (startDate || endDate) {

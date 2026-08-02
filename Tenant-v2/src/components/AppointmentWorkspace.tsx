@@ -2360,16 +2360,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
-    if (normalizedNext === 'checked_in' && paymentDueAmount > 0) {
-      setPendingStatusAfterPayment('checked_in');
-      addLocalToast(
-        isRtl ? 'أكمل تحصيل الدفع أولاً ثم سنثبت حالة الوصول.' : 'Collect payment first, then we will mark the appointment as arrived.',
-        isRtl ? 'Collect payment first, then we will mark the appointment as arrived.' : 'أكمل تحصيل الدفع أولاً ثم سنثبت حالة الوصول.',
-        'warning'
-      );
-      return;
-    }
-
     setStatusUpdating(true);
     try {
       const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, normalizedNext, activeAppointment.notes);
@@ -3669,13 +3659,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   onEventResizeStart={(eventItem, mouseEvent) => {
                     if (viewMode === 'day' && isBoardEditable && eventItem.kind !== 'blocked') {
                       handleMouseDown(mouseEvent, eventItem.id, true);
-                    }
-                  }}
-                  onAddSlotHover={(slot) => {
-                    if (slot) {
-                      setHoveredSlot({ staffId: slot.columnId, date: slot.dateKey, timeInMinutes: slot.startMinutes });
-                    } else {
-                      setHoveredSlot(null);
                     }
                   }}
                   emptyHint={t.emptyStateText}
