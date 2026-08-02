@@ -635,7 +635,9 @@ export default function SchedulerGrid({
             const height = durationSlots * slotHeight;
             const columnWidth = 100 / Math.max(columns.length, 1);
             const laneWidth = columnWidth / Math.max(1, event.laneCount);
-            const left = `calc(${columnIndex * columnWidth}% + ${event.laneIndex * laneWidth}%)`;
+            const rtlColumnIndex = isRtl ? (columns.length - columnIndex - 1) : columnIndex;
+            const rtlLaneIndex = isRtl ? (event.laneCount - event.laneIndex - 1) : event.laneIndex;
+            const left = `calc(${rtlColumnIndex * columnWidth}% + ${rtlLaneIndex * laneWidth}%)`;
             const serviceStyles = getServiceCategoryStyles(event.serviceCategory || event.raw?.service?.category);
             const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
             const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
