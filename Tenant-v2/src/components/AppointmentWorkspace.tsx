@@ -3929,28 +3929,28 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
       <AnimatePresence>
         {isSchedulerSettingsOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 overflow-hidden">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs"
-              onClick={() => setIsSchedulerSettingsOpen(false)}
+              onClick={cancelSchedulerBoardSettings}
             />
             <motion.div
-              initial={{ opacity: 0, y: 18, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="relative z-10 w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+              initial={{ opacity: 0, x: isRtl ? -28 : 28 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: isRtl ? -24 : 24 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+              className={`absolute inset-y-0 ${isRtl ? 'left-0 border-r' : 'right-0 border-l'} z-10 flex h-full w-full max-w-4xl flex-col border-slate-200 bg-white shadow-2xl`}
             >
-              <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
                     {isRtl ? 'إعدادات لوحة الجدولة' : 'Scheduler settings'}
                   </p>
                   <h3 className="mt-1 text-lg font-black text-slate-900">
-                    {isRtl ? 'تخصيص عرض الجدول' : 'Customize the scheduler board'}
+                    {isRtl ? 'تخصيص عرض الجدول والفلترة' : 'Customize the scheduler board and filters'}
                   </h3>
                 </div>
                 <button
@@ -3960,6 +3960,143 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 >
                   <X size={16} />
                 </button>
+              </div>
+
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+                  <section className="space-y-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">
+                          {isRtl ? 'المخطط الزمني للتشغيل' : 'Daily Timeline Navigator'}
+                        </p>
+                        <h4 className="mt-1 text-sm font-black text-slate-900">
+                          {isRtl ? 'التاريخ الحالي ومجال العرض' : 'Current date and visible range'}
+                        </h4>
+                      </div>
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-sm">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        {selectedDate.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long' })}
+                      </p>
+                      <p className="text-3xl font-black text-slate-900">{selectedDate.getDate()}</p>
+                      <p className="text-xs font-bold text-slate-600">
+                        {selectedDate.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { month: 'long', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1 text-center">
+                      {[-3, -2, -1, 0, 1, 2, 3].map((offset) => {
+                        const day = new Date(selectedDate);
+                        day.setDate(day.getDate() + offset);
+                        const isSelected = offset === 0;
+                        return (
+                          <button
+                            key={offset}
+                            type="button"
+                            onClick={() => handleDayShift(offset)}
+                            className={`flex flex-col items-center gap-0.5 rounded-xl p-2 text-[11px] font-bold transition-all ${
+                              isSelected ? 'scale-105 bg-zinc-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span className="opacity-70">{day.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'narrow' })}</span>
+                            <span className="text-xs">{day.getDate()}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  <section className="space-y-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">
+                          {isRtl ? 'البحث والتصفية والفرز' : 'FILTER CONTROL DESK'}
+                        </p>
+                        <h4 className="mt-1 text-sm font-black text-slate-900">
+                          {isRtl ? 'عناصر التصفية السريعة' : 'Quick filtering controls'}
+                        </h4>
+                      </div>
+                      <SlidersHorizontal size={14} className="text-slate-400" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">{isRtl ? 'البحث عن حجز' : 'Search'}</label>
+                      <div className="relative">
+                        <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400`} size={13} />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder={isRtl ? 'اسم العميل، الخدمة...' : 'Client, service name...'}
+                          className={`w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-sans outline-none transition-all focus:border-amber-300 focus:ring-1 focus:ring-amber-300 ${isRtl ? 'pr-8 pl-3' : 'pl-8 pr-3'}`}
+                        />
+                        {searchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">{isRtl ? 'مقدم الخدمة / الخبيرة' : 'Staff Stylist'}</label>
+                      <div className="relative">
+                        <select
+                          value={selectedStylistFilter}
+                          onChange={(e) => setSelectedStylistFilter(e.target.value)}
+                          className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-700 outline-none"
+                        >
+                          <option value="all">👑 {t.allStaff}</option>
+                          {liveStylists.map((s) => (
+                            <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className={`pointer-events-none absolute ${isRtl ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-slate-400`} />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">{isRtl ? 'حالة الموعد' : 'Booking Status'}</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: 'all', label: t.allStatus },
+                          { id: 'confirmed', label: t.confirmed },
+                          { id: 'checked_in', label: t.arrived },
+                          { id: 'completed', label: t.completed }
+                        ].map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setStatusFilter(opt.id)}
+                            className={`rounded-xl border px-2.5 py-2 text-[10px] font-bold transition-all ${
+                              statusFilter === opt.id
+                                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {(selectedStylistFilter !== 'all' || serviceCategoryFilter !== 'all' || statusFilter !== 'all' || searchQuery !== '') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedStylistFilter('all');
+                          setServiceCategoryFilter('all');
+                          setStatusFilter('all');
+                          setSearchQuery('');
+                        }}
+                        className="w-full rounded-xl bg-slate-100 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition hover:bg-zinc-900 hover:text-white"
+                      >
+                        {t.clearFilters}
+                      </button>
+                    )}
+                  </section>
+                </div>
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
