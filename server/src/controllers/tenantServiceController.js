@@ -87,13 +87,20 @@ function normalizeServiceVariant(variant) {
         return null;
     }
 
-    const description = `${variant.description ?? ''}`.trim();
+    const nameAr = `${variant.name_ar ?? variant.nameAr ?? variant.name ?? ''}`.trim();
+    const nameEn = `${variant.name_en ?? variant.nameEn ?? variant.name ?? ''}`.trim();
+    const descriptionAr = `${variant.description_ar ?? variant.descriptionAr ?? variant.description ?? ''}`.trim();
+    const descriptionEn = `${variant.description_en ?? variant.descriptionEn ?? variant.description ?? ''}`.trim();
     const duration = parseInt(variant.duration, 10);
     const finalPrice = parseFloat(variant.finalPrice ?? variant.price ?? 0);
+    const rawPrice = parseFloat(variant.rawPrice ?? variant.basePrice ?? variant.price ?? 0);
     const id = `${variant.id ?? ''}`.trim();
     const fallbackPayload = JSON.stringify({
-        description: description.toLowerCase(),
-        duration: Number.isFinite(duration) && duration > 0 ? duration : 30,
+        nameAr: nameAr.toLowerCase(),
+        nameEn: nameEn.toLowerCase(),
+        descriptionAr: descriptionAr.toLowerCase(),
+        descriptionEn: descriptionEn.toLowerCase(),
+        duration: Number.isFinite(duration) && duration > 0 ? Math.max(5, Math.round(duration / 5) * 5) : 30,
         finalPrice: Number.isFinite(finalPrice) && finalPrice >= 0 ? parseFloat(finalPrice.toFixed(2)) : 0,
         isActive: variant.isActive === undefined || variant.isActive === null
             ? true
@@ -107,12 +114,22 @@ function normalizeServiceVariant(variant) {
 
     return {
         id: id || `variant-${Math.abs(fallbackHash).toString(36)}`,
-        description,
-        duration: Number.isFinite(duration) && duration > 0 ? duration : 30,
+        name_ar: nameAr,
+        name_en: nameEn,
+        description_ar: descriptionAr,
+        description_en: descriptionEn,
+        description: descriptionEn || descriptionAr || nameEn || nameAr,
+        duration: Number.isFinite(duration) && duration > 0 ? Math.max(5, Math.round(duration / 5) * 5) : 30,
         finalPrice: Number.isFinite(finalPrice) && finalPrice >= 0 ? parseFloat(finalPrice.toFixed(2)) : 0,
+        rawPrice: Number.isFinite(rawPrice) && rawPrice >= 0 ? parseFloat(rawPrice.toFixed(2)) : 0,
         isActive: variant.isActive === undefined || variant.isActive === null
             ? true
-            : variant.isActive === true || variant.isActive === 'true'
+            : variant.isActive === true || variant.isActive === 'true',
+        nameAr,
+        nameEn,
+        descriptionAr,
+        descriptionEn,
+        price: Number.isFinite(finalPrice) && finalPrice >= 0 ? parseFloat(finalPrice.toFixed(2)) : 0
     };
 }
 

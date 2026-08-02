@@ -6,8 +6,17 @@ import {
   Sparkle, Upload, Edit, Eye, Filter, SlidersHorizontal, Search, CheckSquare, Square,
   Activity, RotateCw, AlertTriangle, Image
 } from 'lucide-react';
-import { Language, Service, Employee, Product, QuickLaunchRequest } from '../types';
+import { Language, Employee, Product, QuickLaunchRequest } from '../types';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import {
+  buildServicePayload,
+  createEmptyServiceDraft,
+  createEmptyServiceVariantDraft,
+  normalizeServicePaymentOptions,
+  normalizeServiceRecord,
+  type ServiceDraft,
+  type ServiceRecord
+} from '../lib/serviceContract';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import {
   buildTenantPlanSummary,
@@ -29,41 +38,8 @@ type ServiceCategoryOption = {
   sortOrder?: number;
 };
 
-// Extend service model for full operational data representation
-export interface EnhancedService extends Service {
-  category?: string;
-  descriptionAr: string;
-  descriptionEn: string;
-  image: string;
-  includes: string[];
-  priceType: 'fixed' | 'starting';
-  targetGender: 'female' | 'male' | 'unisex';
-  variants: Array<{
-    id: string;
-    nameAr: string;
-    nameEn: string;
-    price: number;
-    duration: number;
-  }>;
-  hasOffer: boolean;
-  offerDiscountPct?: number;
-  offerDetailsAr?: string;
-  offerDetailsEn?: string;
-  offerFrom?: string;
-  offerTo?: string;
-  hasGift: boolean;
-  giftType?: 'product' | 'service';
-  giftDetailsAr?: string;
-  giftDetailsEn?: string;
-  giftProductId?: string;
-  paymentOptions: string[]; // 'online' | 'center' | 'deposit'
-  employeeAssignments: string[]; // employee ids
-  employeeCommissions?: Record<string, { enabled: boolean; type: 'percentage' | 'fixed'; value: number }>;
-  isActive: boolean;
-  availableInCenter: boolean;
-  availableHomeVisit: boolean;
-  allowReschedule: boolean;
-}
+// Canonical service contract with backwards-compatible aliases for display only
+export type EnhancedService = ServiceRecord;
 
 const defaultImage = 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?q=80&w=600&auto=format&fit=crop';
 export default function ServicesWorkspace({ lang, quickLaunchRequest }: ServicesWorkspaceProps) {
@@ -84,22 +60,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
         tenantApiAdapter.getProducts(),
         tenantApiAdapter.getServiceCategories()
       ]);
-      const normalizedServices: EnhancedService[] = ((srvRes as any).services || []).map((srv: any) => ({
-        ...srv,
-        descriptionAr: srv.descriptionAr ?? srv.description_ar ?? '',
-        descriptionEn: srv.descriptionEn ?? srv.description_en ?? '',
-        image: srv.image ?? srv.photo ?? defaultImage,
-        includes: Array.isArray(srv.includes) ? srv.includes : [],
-        variants: Array.isArray(srv.variants) ? srv.variants : [],
-        paymentOptions: Array.isArray(srv.paymentOptions) ? srv.paymentOptions : ['online', 'center'],
-        employeeAssignments: Array.isArray(srv.employeeAssignments) ? srv.employeeAssignments : [],
-        hasOffer: Boolean(srv.hasOffer || srv.offerDiscountPct),
-        hasGift: Boolean(srv.hasGift),
-        isActive: typeof srv.isActive === 'boolean' ? srv.isActive : true,
-        availableInCenter: typeof srv.availableInCenter === 'boolean' ? srv.availableInCenter : true,
-        availableHomeVisit: typeof srv.availableHomeVisit === 'boolean' ? srv.availableHomeVisit : false,
-        allowReschedule: typeof srv.allowReschedule === 'boolean' ? srv.allowReschedule : true
-      }));
+      const normalizedServices: EnhancedService[] = ((srvRes as any).services || []).map((srv: any) => normalizeServiceRecord(srv));
       setServices(normalizedServices);
       setEmployees((empRes as any).employees || []);
       setProducts((prdRes as any).products || []);
@@ -156,36 +117,20 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
 
   // 5. Active form section guided editor
   const [activeSection, setActiveSection] = useState<'basic' | 'team' | 'options' | 'settings'>('basic');
+  const serviceSectionOrder: Array<'basic' | 'team' | 'options' | 'settings'> = ['basic', 'team', 'options', 'settings'];
+  const activeSectionIndex = Math.max(0, serviceSectionOrder.indexOf(activeSection));
+  const goToPreviousSection = () => {
+    setActiveSection(serviceSectionOrder[Math.max(0, activeSectionIndex - 1)]);
+  };
+  const goToNextSection = () => {
+    setActiveSection(serviceSectionOrder[Math.min(serviceSectionOrder.length - 1, activeSectionIndex + 1)]);
+  };
 
   // 6. Refreshing and synchronization feedback
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // 7. Form Lifecycle State
-  const [formData, setFormData] = useState<EnhancedService>({
-    id: '',
-    nameAr: '',
-    nameEn: '',
-    categoryAr: '',
-    categoryEn: '',
-    duration: 60,
-    price: 150,
-    descriptionAr: '',
-    descriptionEn: '',
-    image: defaultImage,
-    includes: [],
-    priceType: 'fixed',
-    targetGender: 'female',
-    variants: [],
-    hasOffer: false,
-    paymentOptions: ['online', 'center'],
-    employeeAssignments: [],
-    employeeCommissions: {},
-    isActive: true,
-    availableInCenter: true,
-    availableHomeVisit: false,
-    allowReschedule: true,
-    hasGift: false
-  });
+  const [formData, setFormData] = useState<ServiceDraft>(() => createEmptyServiceDraft());
 
   React.useEffect(() => {
     if (activeView !== 'form' || formMode !== 'add' || serviceCategories.length === 0) {
@@ -222,8 +167,12 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
   const [tempIncludeEn, setTempIncludeEn] = useState('');
   const [tempVariantNameAr, setTempVariantNameAr] = useState('');
   const [tempVariantNameEn, setTempVariantNameEn] = useState('');
+  const [tempVariantDescriptionAr, setTempVariantDescriptionAr] = useState('');
+  const [tempVariantDescriptionEn, setTempVariantDescriptionEn] = useState('');
   const [tempVariantPrice, setTempVariantPrice] = useState<string>('50');
   const [tempVariantDuration, setTempVariantDuration] = useState<string>('15');
+  const [tempVariantIsActive, setTempVariantIsActive] = useState(true);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Custom premium Toast Notifications
   const [toasts, setToasts] = useState<{ id: string; msgAr: string; msgEn: string; type: 'success' | 'info' | 'error' }[]>([]);
@@ -392,35 +341,17 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
   const handleOpenAddForm = () => {
     const defaultCategory = categories[1] || fallbackCategories[0] || categories[0];
     setFormMode('add');
-    setFormData({
-      id: '',
-      nameAr: '',
-      nameEn: '',
-      categoryAr: defaultCategory?.labelAr || 'علاجات ومساج',
-      categoryEn: defaultCategory?.labelEn || 'Massage & Therapy',
-      duration: 60,
-      price: 150,
-      descriptionAr: '',
-      descriptionEn: '',
-      image: defaultImage,
-      includes: [],
-      priceType: 'fixed',
-      targetGender: 'female',
-      variants: [],
-      hasOffer: false,
-      paymentOptions: ['online', 'center'],
-      employeeAssignments: [],
-      employeeCommissions: {},
-      isActive: true,
-      availableInCenter: true,
-      availableHomeVisit: false,
-      allowReschedule: true,
-      hasGift: false
-    });
+    setFormData(createEmptyServiceDraft(defaultCategory));
     setTempIncludeAr('');
     setTempIncludeEn('');
     setTempVariantNameAr('');
     setTempVariantNameEn('');
+    setTempVariantDescriptionAr('');
+    setTempVariantDescriptionEn('');
+    setTempVariantPrice('50');
+    setTempVariantDuration('15');
+    setTempVariantIsActive(true);
+    setFieldErrors({});
     setActiveSection('basic');
     setActiveView('form');
   };
@@ -436,22 +367,30 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
   // Open edit form
   const handleOpenEditForm = (srv: EnhancedService) => {
     const selectedCategoryOption = getServiceCategoryOption(srv);
+    const normalizedService = normalizeServiceRecord(srv);
     setFormMode('edit');
     setFormData({
-      ...srv,
+      ...createEmptyServiceDraft(selectedCategoryOption),
+      ...normalizedService,
       category: selectedCategoryOption.slug,
       categoryEn: selectedCategoryOption.labelEn,
       categoryAr: selectedCategoryOption.labelAr,
-      includes: [...srv.includes],
-      variants: srv.variants ? srv.variants.map(v => ({ ...v })) : [],
-      paymentOptions: [...srv.paymentOptions],
-      employeeAssignments: [...srv.employeeAssignments],
+      includes: [...(srv.includes || [])],
+      variants: Array.isArray(normalizedService.variants) ? normalizedService.variants.map((v) => ({ ...v })) : [],
+      paymentOptions: normalizeServicePaymentOptions(srv.paymentOptions),
+      employeeAssignments: [...(srv.employeeAssignments || [])],
       employeeCommissions: srv.employeeCommissions ? { ...srv.employeeCommissions } : {}
     });
     setTempIncludeAr('');
     setTempIncludeEn('');
     setTempVariantNameAr('');
     setTempVariantNameEn('');
+    setTempVariantDescriptionAr('');
+    setTempVariantDescriptionEn('');
+    setTempVariantPrice(String((normalizeServiceRecord(srv).finalPrice || 50)));
+    setTempVariantDuration(String((normalizeServiceRecord(srv).duration || 15)));
+    setTempVariantIsActive(true);
+    setFieldErrors({});
     setActiveSection('basic');
     setActiveView('form');
   };
@@ -503,26 +442,41 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
   // Save/Deploy Service
   const handleSaveService = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!formData.nameAr && !formData.nameEn) {
-      triggerToast('Service Name is required in at least one language.', 'يرجى كتابة اسم الخدمة بلغة واحدة على الأقل قبل الحفظ.', 'error');
-      return;
-    }
+    setFieldErrors({});
 
     // Auto assign category texts based on selection
-    const matchedCat = resolveCategoryOption(formData.categoryEn);
-
-    const finalFormData: any = {
+    const matchedCat = resolveCategoryOption(formData.category || formData.categoryEn || formData.categoryAr || '');
+    const finalFormData: any = buildServicePayload({
       ...formData,
       category: matchedCat.slug,
       categoryEn: matchedCat.labelEn,
       categoryAr: matchedCat.labelAr
-    };
+    });
+
+    const nextErrors: Record<string, string> = {};
+    if (!finalFormData.name_ar) {
+      nextErrors.name_ar = isRtl ? 'اسم الخدمة بالعربية مطلوب.' : 'Arabic service name is required.';
+    }
+    if (!finalFormData.name_en) {
+      nextErrors.name_en = isRtl ? 'اسم الخدمة بالإنجليزية مطلوب.' : 'English service name is required.';
+    }
+    if (finalFormData.priceType !== 'free' && !Number.isFinite(Number(finalFormData.finalPrice)) && !Number.isFinite(Number(finalFormData.rawPrice))) {
+      nextErrors.finalPrice = isRtl ? 'السعر مطلوب للخدمات غير المجانية.' : 'A valid price is required for non-free services.';
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      triggerToast(
+        'Please fix the validation issues before saving.',
+        'يرجى مراجعة الأخطاء الظاهرة قبل الحفظ.',
+        'error'
+      );
+      return;
+    }
 
     try {
       if (formMode === 'add') {
         const res = await tenantApiAdapter.createService(finalFormData);
-        setServices(prev => [res.service, ...prev]);
+        setServices(prev => [normalizeServiceRecord(res.service), ...prev]);
         triggerToast(
           `Deployed new service successfully!`,
           `تم إضافة وتنشيط الخدمة الجديدة في الكتالوج بنجاح!`,
@@ -530,7 +484,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
         );
       } else {
         const res = await tenantApiAdapter.updateService(finalFormData.id, finalFormData);
-        setServices(prev => prev.map(s => s.id === finalFormData.id ? res.service : s));
+        setServices(prev => prev.map(s => s.id === finalFormData.id ? normalizeServiceRecord(res.service) : s));
         triggerToast(
           `Updated service details!`,
           `تم حفظ تحديثات الخدمة وتثبيتها بنجاح.`,
@@ -539,6 +493,28 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
       }
       setActiveView('list');
     } catch (err: any) {
+      const rawMessage = `${err?.message || ''}`;
+      const lower = rawMessage.toLowerCase();
+      const nextErrors: Record<string, string> = {};
+      if (lower.includes('service name') || lower.includes('name in both english and arabic')) {
+        nextErrors.name_ar = rawMessage;
+        nextErrors.name_en = rawMessage;
+      }
+      if (lower.includes('price')) {
+        nextErrors.finalPrice = rawMessage;
+      }
+      if (lower.includes('payment option')) {
+        nextErrors.paymentOptions = rawMessage;
+      }
+      if (lower.includes('employee')) {
+        nextErrors.employeeAssignments = rawMessage;
+      }
+      if (lower.includes('variant')) {
+        nextErrors.variants = rawMessage;
+      }
+      if (Object.keys(nextErrors).length > 0) {
+        setFieldErrors(nextErrors);
+      }
       triggerToast(err.message || 'Failed to save service', 'فشل حفظ الخدمة', 'error');
     }
   };
@@ -568,11 +544,22 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
     if (!name) return;
 
     const newVar = {
+      ...createEmptyServiceVariantDraft(),
       id: `var-${Date.now()}`,
+      name_ar: tempVariantNameAr.trim() || tempVariantNameEn.trim(),
+      name_en: tempVariantNameEn.trim() || tempVariantNameAr.trim(),
+      description_ar: tempVariantDescriptionAr.trim(),
+      description_en: tempVariantDescriptionEn.trim(),
+      duration: Math.max(5, Math.round((parseInt(tempVariantDuration) || 0) / 5) * 5),
+      rawPrice: parseFloat(tempVariantPrice) || 0,
+      finalPrice: parseFloat(tempVariantPrice) || 0,
+      isActive: tempVariantIsActive,
       nameAr: tempVariantNameAr.trim() || tempVariantNameEn.trim(),
       nameEn: tempVariantNameEn.trim() || tempVariantNameAr.trim(),
-      price: parseFloat(tempVariantPrice) || 0,
-      duration: parseInt(tempVariantDuration) || 0
+      descriptionAr: tempVariantDescriptionAr.trim(),
+      descriptionEn: tempVariantDescriptionEn.trim(),
+      description: tempVariantDescriptionEn.trim() || tempVariantDescriptionAr.trim() || tempVariantNameEn.trim() || tempVariantNameAr.trim(),
+      price: parseFloat(tempVariantPrice) || 0
     };
 
     setFormData(prev => ({
@@ -582,8 +569,11 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
 
     setTempVariantNameAr('');
     setTempVariantNameEn('');
+    setTempVariantDescriptionAr('');
+    setTempVariantDescriptionEn('');
     setTempVariantPrice('50');
     setTempVariantDuration('15');
+    setTempVariantIsActive(true);
   };
 
   const handleRemoveVariant = (id: string) => {
@@ -768,7 +758,6 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                     <option value="all">{isRtl ? 'كل الجماهير' : 'All Genders'}</option>
                     <option value="female">{isRtl ? 'نساء فقط' : 'Females Only'}</option>
                     <option value="male">{isRtl ? 'رجال فقط' : 'Males Only'}</option>
-                    <option value="unisex">{isRtl ? 'للجنسين' : 'Unisex'}</option>
                   </select>
 
                   <select
@@ -1256,6 +1245,12 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                         </button>
                       </div>
 
+                      {fieldErrors.general && (
+                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+                          {fieldErrors.general}
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         
                         {/* Name fields stacked vertically */}
@@ -1268,10 +1263,11 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                             required
                             autoFocus
                             value={formData.nameAr}
-                            onChange={e => setFormData(p => ({ ...p, nameAr: e.target.value }))}
+                            onChange={e => setFormData(p => ({ ...p, nameAr: e.target.value, name_ar: e.target.value }))}
                             placeholder="مثال: جلسة مساج السويدي الملكي بالأروما"
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-indigo-500 text-neutral-800"
                           />
+                          {fieldErrors.name_ar && <p className="text-[10px] font-bold text-rose-600">{fieldErrors.name_ar}</p>}
                         </div>
 
                         <div className="space-y-1">
@@ -1282,10 +1278,11 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                             type="text"
                             required
                             value={formData.nameEn}
-                            onChange={e => setFormData(p => ({ ...p, nameEn: e.target.value }))}
+                            onChange={e => setFormData(p => ({ ...p, nameEn: e.target.value, name_en: e.target.value }))}
                             placeholder="e.g. Royal Swedish Massage with Aromatherapy"
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-indigo-500 text-neutral-800"
                           />
+                          {fieldErrors.name_en && <p className="text-[10px] font-bold text-rose-600">{fieldErrors.name_en}</p>}
                         </div>
 
                         {/* Description fields with localized translations attached */}
@@ -1304,7 +1301,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                           </div>
                           <textarea
                             value={formData.descriptionAr}
-                            onChange={e => setFormData(p => ({ ...p, descriptionAr: e.target.value }))}
+                            onChange={e => setFormData(p => ({ ...p, descriptionAr: e.target.value, description_ar: e.target.value }))}
                             placeholder="اكتب نبذة مهنية عن الخدمة لتظهر للعميل في التطبيق والموقع..."
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-1 focus:ring-indigo-500 h-24 leading-relaxed text-neutral-800"
                           />
@@ -1325,7 +1322,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                           </div>
                           <textarea
                             value={formData.descriptionEn}
-                            onChange={e => setFormData(p => ({ ...p, descriptionEn: e.target.value }))}
+                            onChange={e => setFormData(p => ({ ...p, descriptionEn: e.target.value, description_en: e.target.value }))}
                             placeholder="Write rich description showcasing results, organic products used, and benefits..."
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-1 focus:ring-indigo-500 h-24 leading-relaxed text-neutral-800"
                           />
@@ -1337,7 +1334,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                             {isRtl ? 'فئة الخدمة الرئيسية *' : 'Service Main Category *'}
                           </label>
                           <select
-                            value={resolveCategoryOption(formData.categoryEn)?.id || 'all'}
+                            value={resolveCategoryOption(formData.category || formData.categoryEn || formData.categoryAr || '')?.id || 'all'}
                             onChange={e => {
                               const val = e.target.value;
                               const matched = categories.find(c => c.id === val || c.slug === val || c.labelEn === val || c.labelAr === val);
@@ -1377,9 +1374,9 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                           </label>
                           <div className="grid grid-cols-3 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200/50">
                             {[
+                              { id: 'all', labelAr: 'للجميع', labelEn: 'All Genders' },
                               { id: 'female', labelAr: 'نساء فقط', labelEn: 'Females Only' },
-                              { id: 'male', labelAr: 'رجال فقط', labelEn: 'Males Only' },
-                              { id: 'unisex', labelAr: 'مشترك للجنسين', labelEn: 'Unisex Target' }
+                              { id: 'male', labelAr: 'رجال فقط', labelEn: 'Males Only' }
                             ].map(t => (
                               <button
                                 key={t.id}
@@ -1405,7 +1402,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                           <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200/50">
                             {[
                               { id: 'fixed', labelAr: 'مبلغ محدد وثابت', labelEn: 'Fixed Price' },
-                              { id: 'starting', labelAr: 'يبدأ من (مبلغ متغير)', labelEn: 'Starting From' }
+                              { id: 'free', labelAr: 'مجانية', labelEn: 'Free' }
                             ].map(t => (
                               <button
                                 key={t.id}
@@ -1430,11 +1427,17 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                           <input
                             type="number"
                             required
-                            value={formData.price}
-                            onChange={e => setFormData(p => ({ ...p, price: parseFloat(e.target.value) || 0 }))}
+                            value={formData.finalPrice ?? formData.price}
+                            onChange={e => setFormData(p => ({
+                              ...p,
+                              price: parseFloat(e.target.value) || 0,
+                              finalPrice: parseFloat(e.target.value) || 0,
+                              rawPrice: parseFloat(e.target.value) || 0
+                            }))}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold focus:bg-white focus:ring-1 focus:ring-indigo-500 text-neutral-800 font-mono"
                             placeholder="e.g. 450"
                           />
+                          {fieldErrors.finalPrice && <p className="text-[10px] font-bold text-rose-600">{fieldErrors.finalPrice}</p>}
                         </div>
 
                       </div>
@@ -1462,6 +1465,12 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                             ? 'عيّن الأخصائيات المسموح لهن بتقديم هذه الجلسة، مع إمكانية تمكين وضبط عمولة منفردة مخصصة لكل واحدة منهن.' 
                             : 'Check all employees certified to perform this specific treatment, and optionally override their base salary with custom session commissions.'}
                         </p>
+
+                        {fieldErrors.employeeAssignments && (
+                          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-semibold text-rose-700">
+                            {fieldErrors.employeeAssignments}
+                          </div>
+                        )}
 
                         <div className="space-y-3">
                           {employees.map(emp => {
@@ -1611,7 +1620,17 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                             </span>
                           </div>
 
+                          {fieldErrors.variants && (
+                            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-semibold text-rose-700">
+                              {fieldErrors.variants}
+                            </div>
+                          )}
+
                           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/50 space-y-2">
+                            <div className="grid grid-cols-2 gap-2 text-[9px] font-black uppercase tracking-wider text-neutral-500">
+                              <span>{isRtl ? 'الاسم بالعربية *' : 'Arabic Name *'}</span>
+                              <span>{isRtl ? 'الاسم بالإنجليزية *' : 'English Name *'}</span>
+                            </div>
                             <div className="grid grid-cols-2 gap-2">
                               <input
                                 type="text"
@@ -1629,21 +1648,62 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                               />
                             </div>
                             
-                            <div className="flex gap-2">
-                              <input
-                                type="number"
-                                value={tempVariantPrice}
-                                onChange={e => setTempVariantPrice(e.target.value)}
-                                placeholder="السعر الإضافي"
-                                className="flex-1 bg-white border border-slate-200 rounded-lg p-2 text-[10px] font-bold font-mono text-neutral-800 focus:bg-white focus:outline-none"
+                            <div className="grid grid-cols-2 gap-2 text-[9px] font-black uppercase tracking-wider text-neutral-500 pt-1">
+                              <span>{isRtl ? 'الوصف بالعربية' : 'Arabic Description'}</span>
+                              <span>{isRtl ? 'الوصف بالإنجليزية' : 'English Description'}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <textarea
+                                value={tempVariantDescriptionAr}
+                                onChange={e => setTempVariantDescriptionAr(e.target.value)}
+                                placeholder={isRtl ? 'وصف البديل بالعربية' : 'Arabic variant description'}
+                                className="bg-white border border-slate-200 rounded-lg p-2 text-[10px] font-medium text-neutral-800 focus:bg-white focus:outline-none min-h-[72px] resize-none"
                               />
-                              <input
-                                type="number"
-                                value={tempVariantDuration}
-                                onChange={e => setTempVariantDuration(e.target.value)}
-                                placeholder="دقائق إضافية"
-                                className="flex-1 bg-white border border-slate-200 rounded-lg p-2 text-[10px] font-bold font-mono text-neutral-800 focus:bg-white focus:outline-none"
+                              <textarea
+                                value={tempVariantDescriptionEn}
+                                onChange={e => setTempVariantDescriptionEn(e.target.value)}
+                                placeholder="English variant description"
+                                className="bg-white border border-slate-200 rounded-lg p-2 text-[10px] font-medium text-neutral-800 focus:bg-white focus:outline-none min-h-[72px] resize-none"
                               />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <label className="text-[9px] text-neutral-500 font-black uppercase tracking-wider block">
+                                  {isRtl ? 'السعر الإضافي *' : 'Variant Price *'}
+                                </label>
+                                <input
+                                  type="number"
+                                  value={tempVariantPrice}
+                                  onChange={e => setTempVariantPrice(e.target.value)}
+                                  placeholder="50"
+                                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-[10px] font-bold font-mono text-neutral-800 focus:bg-white focus:outline-none"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] text-neutral-500 font-black uppercase tracking-wider block">
+                                  {isRtl ? 'المدة بالدقائق *' : 'Variant Duration (mins) *'}
+                                </label>
+                                <input
+                                  type="number"
+                                  value={tempVariantDuration}
+                                  onChange={e => setTempVariantDuration(e.target.value)}
+                                  placeholder="15"
+                                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-[10px] font-bold font-mono text-neutral-800 focus:bg-white focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 pt-1">
+                              <label className="flex items-center gap-2 text-[10px] font-bold text-neutral-600 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={tempVariantIsActive}
+                                  onChange={(e) => setTempVariantIsActive(e.target.checked)}
+                                  className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                                />
+                                <span>{isRtl ? 'البديل متاح للحجز الآن' : 'Variant is active and bookable'}</span>
+                              </label>
                               <button
                                 type="button"
                                 onClick={handleAddVariant}
@@ -1665,6 +1725,9 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                                   <div>
                                     <span className="font-extrabold text-neutral-700">{isRtl ? v.nameAr : v.nameEn}</span>
                                     <span className="text-neutral-400 ml-2">({v.duration} {isRtl ? 'دقيقة إضافية' : 'add. mins'})</span>
+                                    <span className={`ml-2 px-2 py-0.5 rounded-full text-[9px] font-black ${v.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                                      {v.isActive ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'متوقف' : 'Inactive')}
+                                    </span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span className="font-black text-indigo-600 font-mono">+{v.price} {isRtl ? 'ر.س' : 'SAR'}</span>
@@ -1937,12 +2000,18 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                           <label className="text-[10px] text-neutral-400 font-black uppercase tracking-wider block">
                             {isRtl ? 'طرق وسياسات السداد المقبولة للحجز' : 'Accepted Booking Payment Channels'}
                           </label>
+
+                          {fieldErrors.paymentOptions && (
+                            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-semibold text-rose-700">
+                              {fieldErrors.paymentOptions}
+                            </div>
+                          )}
                           
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             {[
-                              { id: 'center', titleEn: 'Cash / Card at Center', titleAr: 'الدفع المباشر داخل فرع الصالون' },
-                              { id: 'online', titleEn: 'Full Pre-payment Online', titleAr: 'سداد كامل القيمة عبر البوابة الإلكترونية' },
-                              { id: 'deposit', titleEn: 'Guaranteed Deposit', titleAr: 'دفع عربون تأمين لضمان الحضور' }
+                              { id: 'at-center', titleEn: 'Cash / Card at Center', titleAr: 'الدفع المباشر داخل فرع الصالون' },
+                              { id: 'online-full', titleEn: 'Full Pre-payment Online', titleAr: 'سداد كامل القيمة عبر البوابة الإلكترونية' },
+                              { id: 'booking-fee', titleEn: 'Guaranteed Deposit', titleAr: 'دفع عربون تأمين لضمان الحضور' }
                             ].map(opt => {
                               const active = formData.paymentOptions.includes(opt.id);
                               return (
@@ -2049,6 +2118,40 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                     </div>
                   )}
 
+                </div>
+
+                <div className="lg:col-span-12 flex items-center justify-between gap-3 rounded-2xl border border-neutral-200/60 bg-white px-4 py-3 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={goToPreviousSection}
+                    disabled={activeSectionIndex === 0}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      activeSectionIndex === 0
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-900 text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    {isRtl ? 'السابق' : 'Previous'}
+                  </button>
+
+                  <div className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                    {isRtl
+                      ? `الخطوة ${activeSectionIndex + 1} من ${serviceSectionOrder.length}`
+                      : `Step ${activeSectionIndex + 1} of ${serviceSectionOrder.length}`}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={goToNextSection}
+                    disabled={activeSectionIndex === serviceSectionOrder.length - 1}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      activeSectionIndex === serviceSectionOrder.length - 1
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
+                  >
+                    {isRtl ? 'التالي' : 'Next'}
+                  </button>
                 </div>
 
               </form>

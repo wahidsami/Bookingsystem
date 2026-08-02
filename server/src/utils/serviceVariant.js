@@ -12,6 +12,25 @@ const toStringValue = (value, fallback = '') => {
     return `${value}`;
 };
 
+const toNumberValue = (value, fallback = 0) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const toBooleanValue = (value, fallback = false) => {
+    if (value === undefined || value === null) {
+        return fallback;
+    }
+
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true') return true;
+        if (normalized === 'false') return false;
+    }
+
+    return Boolean(value);
+};
+
 const calculateRawPriceFromFinalPrice = (finalPrice, taxRate, commissionRate) => {
     const final = parseFloat(finalPrice || 0);
     const tax = parseFloat(taxRate || 15) / 100;
@@ -26,13 +45,18 @@ const calculateRawPriceFromFinalPrice = (finalPrice, taxRate, commissionRate) =>
 };
 
 const createStableVariantId = (variant) => {
+    const nameAr = toStringValue(variant?.name_ar ?? variant?.nameAr ?? '', '').trim();
+    const nameEn = toStringValue(variant?.name_en ?? variant?.nameEn ?? '', '').trim();
+    const descriptionAr = toStringValue(variant?.description_ar ?? variant?.descriptionAr ?? variant?.description ?? '', '').trim();
+    const descriptionEn = toStringValue(variant?.description_en ?? variant?.descriptionEn ?? variant?.description ?? '', '').trim();
     const payload = JSON.stringify({
-        description: toStringValue(variant?.description ?? '').trim().toLowerCase(),
-        duration: parseInt(variant?.duration, 10) || SERVICE_VARIANT_DEFAULT_DURATION,
-        finalPrice: parseFloat(variant?.finalPrice ?? variant?.price ?? 0) || 0,
-        isActive: variant?.isActive === undefined || variant?.isActive === null
-            ? true
-            : variant.isActive === true || variant.isActive === 'true'
+        nameAr: nameAr.toLowerCase(),
+        nameEn: nameEn.toLowerCase(),
+        descriptionAr: descriptionAr.toLowerCase(),
+        descriptionEn: descriptionEn.toLowerCase(),
+        duration: Math.max(5, Math.round(toNumberValue(variant?.duration, SERVICE_VARIANT_DEFAULT_DURATION) / 5) * 5),
+        finalPrice: parseFloat(toNumberValue(variant?.finalPrice ?? variant?.price ?? 0, 0).toFixed(2)),
+        isActive: toBooleanValue(variant?.isActive, true)
     });
 
     let hash = 0;
@@ -53,19 +77,35 @@ function normalizeServiceVariant(variant) {
         return null;
     }
 
-    const description = toStringValue(variant.description ?? '').trim();
+    const nameAr = toStringValue(variant.name_ar ?? variant.nameAr ?? variant.name ?? '', '').trim();
+    const nameEn = toStringValue(variant.name_en ?? variant.nameEn ?? variant.name ?? '', '').trim();
+    const descriptionAr = toStringValue(variant.description_ar ?? variant.descriptionAr ?? variant.description ?? '', '').trim();
+    const descriptionEn = toStringValue(variant.description_en ?? variant.descriptionEn ?? variant.description ?? '', '').trim();
     const duration = parseInt(variant.duration, 10);
     const finalPrice = parseFloat(variant.finalPrice ?? variant.price ?? 0);
     const providedId = toStringValue(variant.id ?? '').trim();
+    const normalizedDuration = Number.isFinite(duration) && duration > 0
+        ? Math.max(5, Math.round(duration / 5) * 5)
+        : SERVICE_VARIANT_DEFAULT_DURATION;
+    const normalizedFinalPrice = Number.isFinite(finalPrice) && finalPrice >= 0 ? parseFloat(finalPrice.toFixed(2)) : 0;
+    const isActive = toBooleanValue(variant.isActive, true);
 
     return {
         id: providedId || buildServiceVariantId(variant),
-        description,
-        duration: Number.isFinite(duration) && duration > 0 ? duration : SERVICE_VARIANT_DEFAULT_DURATION,
-        finalPrice: Number.isFinite(finalPrice) && finalPrice >= 0 ? parseFloat(finalPrice.toFixed(2)) : 0,
-        isActive: variant.isActive === undefined || variant.isActive === null
-            ? true
-            : variant.isActive === true || variant.isActive === 'true'
+        name_ar: nameAr,
+        name_en: nameEn,
+        description_ar: descriptionAr,
+        description_en: descriptionEn,
+        description: descriptionEn || descriptionAr || nameEn || nameAr,
+        duration: normalizedDuration,
+        finalPrice: normalizedFinalPrice,
+        rawPrice: toNumberValue(variant.rawPrice ?? variant.basePrice ?? variant.price ?? 0, 0),
+        isActive,
+        nameAr,
+        nameEn,
+        descriptionAr,
+        descriptionEn,
+        price: normalizedFinalPrice
     };
 }
 

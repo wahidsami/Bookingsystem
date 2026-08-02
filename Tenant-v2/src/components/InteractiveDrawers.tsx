@@ -1,10 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Calendar as CalendarIcon, User, Users, PlusCircle, Check, 
   Trash, ChevronLeft, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle
 } from 'lucide-react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import {
+  getServiceDisplayName,
+  getServiceDisplayPrice,
+  groupServicesByCategory,
+  normalizeServiceRecord,
+  type ServiceRecord
+} from '../lib/serviceContract';
 
 const toMoney = (value: any) => {
   const numeric = Number(value);
@@ -98,6 +105,8 @@ export interface GuestProfile {
 interface StagedService {
   id: string;
   serviceId: string;
+  variantId?: string;
+  serviceCategory?: string;
   staffId: string;
   startTime: number;
   duration: number;
@@ -424,11 +433,45 @@ export default function InteractiveDrawers({
 
   // Step 2: Service Queue Staging
   const [currentServiceId, setCurrentServiceId] = useState<string>('');
+  const [currentServiceCategory, setCurrentServiceCategory] = useState<string>('');
+  const [currentVariantId, setCurrentVariantId] = useState<string>('');
   const [currentDuration, setCurrentDuration] = useState<number>(60);
   const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
   const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
   const [currentServiceNotes, setCurrentServiceNotes] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
+  const canonicalServices = useMemo<ServiceRecord[]>(() => services.map((service) => normalizeServiceRecord(service)), [services]);
+  const serviceCategories = useMemo(() => groupServicesByCategory(canonicalServices), [canonicalServices]);
+  const selectedCategoryGroup = useMemo(() => {
+    if (!serviceCategories.length) {
+      return null;
+    }
+
+    return serviceCategories.find((group) => group.key === currentServiceCategory)
+      || serviceCategories[0]
+      || null;
+  }, [serviceCategories, currentServiceCategory]);
+  const categoryServices = selectedCategoryGroup?.services || [];
+  const selectedService = useMemo(() => {
+    if (!canonicalServices.length) {
+      return null;
+    }
+
+    return canonicalServices.find((service) => service.id === currentServiceId)
+      || categoryServices[0]
+      || canonicalServices[0]
+      || null;
+  }, [canonicalServices, currentServiceId, categoryServices]);
+  const selectedVariants = selectedService?.variants || [];
+  const selectedVariant = useMemo(() => {
+    if (!selectedVariants.length) {
+      return null;
+    }
+
+    return selectedVariants.find((variant) => variant.id === currentVariantId) || selectedVariants[0] || null;
+  }, [selectedVariants, currentVariantId]);
+  const selectedBookablePrice = selectedVariant?.finalPrice ?? selectedService?.finalPrice ?? selectedService?.price ?? 0;
+  const selectedBookableDuration = selectedVariant?.duration ?? selectedService?.duration ?? currentDuration;
 
   useEffect(() => {
     if (createStep === 4 && stagedServices.length === 0) {
@@ -437,13 +480,38 @@ export default function InteractiveDrawers({
   }, [createStep, stagedServices.length]);
 
   useEffect(() => {
-    if (services.length > 0) {
-      const selectedServiceExists = services.some((service) => service.id === currentServiceId);
+    if (canonicalServices.length > 0) {
+      const selectedServiceExists = canonicalServices.some((service) => service.id === currentServiceId);
       if (!selectedServiceExists) {
-        setCurrentServiceId(services[0].id);
+        setCurrentServiceId(canonicalServices[0].id);
       }
     }
-  }, [services, currentServiceId]);
+  }, [canonicalServices, currentServiceId]);
+
+  useEffect(() => {
+    if (selectedService?.category || selectedService?.categoryEn || selectedService?.categoryAr) {
+      const nextCategory = selectedService.category || selectedService.categoryEn || selectedService.categoryAr || '';
+      if (nextCategory && nextCategory !== currentServiceCategory) {
+        setCurrentServiceCategory(nextCategory);
+      }
+    }
+  }, [selectedService, currentServiceCategory]);
+
+  useEffect(() => {
+    if (selectedService?.variants?.length) {
+      const selectedVariantExists = selectedService.variants.some((variant) => variant.id === currentVariantId);
+      if (!selectedVariantExists) {
+        setCurrentVariantId(selectedService.variants[0].id);
+      }
+      const nextDuration = selectedVariant?.duration || selectedService.duration || 60;
+      setCurrentDuration((current) => (current === nextDuration ? current : nextDuration));
+      return;
+    }
+
+    setCurrentVariantId('');
+    const nextDuration = selectedService?.duration || 60;
+    setCurrentDuration((current) => (current === nextDuration ? current : nextDuration));
+  }, [selectedService, selectedVariant, currentVariantId]);
 
   useEffect(() => {
     if (customers.length > 0) {
@@ -535,8 +603,9 @@ export default function InteractiveDrawers({
 
   const handleAddStagedService = () => {
     const resolvedServiceId = `${currentServiceId || ''}`.trim();
-    const srv = services.find(s => s.id === resolvedServiceId);
+    const srv = canonicalServices.find(s => s.id === resolvedServiceId);
     if (!srv) return;
+    const resolvedVariant = srv.variants.find((variant) => variant.id === currentVariantId) || srv.variants[0] || null;
 
     let nextStartTime = currentStartTime;
     if (stagedServices.length > 0) {
@@ -547,9 +616,11 @@ export default function InteractiveDrawers({
     const newItem: StagedService = {
       id: `stg-${Date.now()}`,
       serviceId: resolvedServiceId,
+      variantId: resolvedVariant?.id,
+      serviceCategory: srv.category,
       staffId: currentStaffId,
       startTime: nextStartTime,
-      duration: currentDuration,
+      duration: resolvedVariant?.duration || currentDuration,
       discountType: currentDiscountType,
       discountValue: currentDiscountValue,
       notes: currentServiceNotes,
@@ -627,18 +698,19 @@ export default function InteractiveDrawers({
     let totalDuration = 0;
 
     finalStaged.forEach(item => {
-      const srv = services.find(s => s.id === item.serviceId);
+      const srv = canonicalServices.find(s => s.id === item.serviceId);
+      const variant = srv?.variants.find((entry) => entry.id === item.variantId) || srv?.variants[0] || null;
       if (srv) {
-        let priceAfterDisc = srv.price;
+        let priceAfterDisc = variant?.finalPrice ?? srv.finalPrice ?? srv.price;
         if (item.discountType === 'flat') {
-          priceAfterDisc = Math.max(0, srv.price - item.discountValue);
+          priceAfterDisc = Math.max(0, priceAfterDisc - item.discountValue);
         } else if (item.discountType === 'percent') {
-          priceAfterDisc = Math.max(0, srv.price - (srv.price * item.discountValue) / 100);
+          priceAfterDisc = Math.max(0, priceAfterDisc - (priceAfterDisc * item.discountValue) / 100);
         }
         totalRawPrice += priceAfterDisc;
-        serviceNamesEn.push(srv.nameEn);
-        serviceNamesAr.push(srv.nameAr);
-        totalDuration += item.duration;
+        serviceNamesEn.push(variant ? `${srv.nameEn} / ${variant.nameEn}` : srv.nameEn);
+        serviceNamesAr.push(variant ? `${srv.nameAr} / ${variant.nameAr}` : srv.nameAr);
+        totalDuration += variant?.duration || item.duration;
       }
     });
 
@@ -661,20 +733,23 @@ export default function InteractiveDrawers({
 
     const items = finalStaged.map((item) => {
       const resolvedServiceId = `${item.serviceId || ''}`.trim();
-      const service = services.find(s => s.id === resolvedServiceId);
+      const service = canonicalServices.find(s => s.id === resolvedServiceId);
+      const variant = service?.variants.find((entry) => entry.id === item.variantId) || service?.variants[0] || null;
       return {
         serviceId: resolvedServiceId,
         staffId: item.staffId,
         requestedStaffId: item.staffId,
         startTime: buildIsoFromMinutes(selectedDate, item.startTime),
         notes: item.notes || undefined,
-        duration: item.duration,
+        duration: variant?.duration || item.duration,
+        price: variant ? toMoney(variant.finalPrice ?? variant.price) : (service ? toMoney(service.price) : 0),
         discountType: item.discountType,
         discountValue: item.discountValue,
         paymentMethod: 'at-center',
         assignmentMode: 'tenant_reassigned',
-        variantId: undefined,
-        serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined
+        variantId: variant?.id || undefined,
+        serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined,
+        variantName: variant ? (isRtl ? variant.nameAr : variant.nameEn) : undefined
       };
     });
 
@@ -1594,15 +1669,125 @@ export default function InteractiveDrawers({
                     {createStep === 3 && (
                       <div className="space-y-4 animate-fadeIn text-xs">
                         <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-slate-500 block mb-1">{isRtl ? 'الخدمة الفاخرة' : 'Select Service'}</label>
-                              <select value={currentServiceId} onChange={(e) => setCurrentServiceId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold">
-                                {services.map(s => (
-                                  <option key={s.id} value={s.id}>{isRtl ? s.nameAr : s.nameEn} ({toMoney(s.price).toFixed(2)} ر.س)</option>
-                                ))}
-                              </select>
+                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                            <div className="space-y-2">
+                              <label className="text-slate-500 block mb-1">{isRtl ? 'الفئة' : 'Category'}</label>
+                              <div className="space-y-2">
+                                {serviceCategories.map((group) => {
+                                  const active = group.key === selectedCategoryGroup?.key;
+                                  return (
+                                    <button
+                                      key={group.key}
+                                      type="button"
+                                      onClick={() => {
+                                        setCurrentServiceCategory(group.key);
+                                        const firstService = group.services[0];
+                                        if (firstService) {
+                                          setCurrentServiceId(firstService.id);
+                                          setCurrentVariantId(firstService.variants?.[0]?.id || '');
+                                          setCurrentDuration(firstService.variants?.[0]?.duration || firstService.duration || 60);
+                                        }
+                                      }}
+                                      className={`w-full text-left rounded-xl border p-3 transition-all ${
+                                        active ? 'bg-indigo-50 border-indigo-200 shadow-2xs' : 'bg-white border-slate-200 hover:border-slate-300'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-black text-slate-800 text-xs truncate">{isRtl ? group.labelAr : group.labelEn}</span>
+                                        <span className="text-[10px] font-bold text-slate-400">{group.services.length}</span>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
+
+                            <div className="space-y-2">
+                              <label className="text-slate-500 block mb-1">{isRtl ? 'الخدمة' : 'Service'}</label>
+                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                {categoryServices.map((service) => {
+                                  const active = service.id === currentServiceId;
+                                  const displayPrice = getServiceDisplayPrice(service);
+                                  return (
+                                    <button
+                                      key={service.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setCurrentServiceId(service.id);
+                                        setCurrentVariantId(service.variants?.[0]?.id || '');
+                                        setCurrentDuration(service.variants?.[0]?.duration || service.duration || 60);
+                                      }}
+                                      className={`w-full text-left rounded-xl border p-3 transition-all ${
+                                        active ? 'bg-amber-50 border-amber-200 shadow-2xs' : 'bg-white border-slate-200 hover:border-slate-300'
+                                      }`}
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <p className="font-black text-slate-800 text-xs truncate">{getServiceDisplayName(service, isRtl ? 'ar' : 'en')}</p>
+                                          <p className="text-[10px] text-slate-500 truncate">
+                                            {service.duration} {isRtl ? 'دقيقة' : 'min'} • {service.variants?.length || 0} {isRtl ? 'بديل' : 'variants'}
+                                          </p>
+                                        </div>
+                                        <span className="font-mono font-black text-slate-700 whitespace-nowrap">
+                                          {displayPrice.toFixed(2)} SAR
+                                        </span>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-slate-500 block mb-1">{isRtl ? 'البدائل' : 'Variants'}</label>
+                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                {(selectedVariants.length > 0 ? selectedVariants : selectedService ? [selectedService as any] : []).map((variant: any) => {
+                                  const active = `${variant.id}` === currentVariantId || (!currentVariantId && selectedVariants.length === 0);
+                                  const variantNameAr = variant.nameAr || variant.name_ar || selectedService?.nameAr || '';
+                                  const variantNameEn = variant.nameEn || variant.name_en || selectedService?.nameEn || '';
+                                  const variantPrice = Number(variant.finalPrice ?? variant.price ?? selectedBookablePrice ?? 0);
+                                  const variantDuration = Number(variant.duration ?? selectedBookableDuration ?? 60);
+                                  const variantStaffNames = availableStylists
+                                    .filter((staff) => !selectedService || !Array.isArray(selectedService.employeeAssignments) || selectedService.employeeAssignments.includes(staff.id))
+                                    .map((staff) => (isRtl ? staff.nameAr : staff.nameEn))
+                                    .slice(0, 3)
+                                    .join(' • ');
+                                  return (
+                                    <button
+                                      key={variant.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setCurrentVariantId(variant.id);
+                                        setCurrentDuration(variantDuration);
+                                      }}
+                                      className={`w-full text-left rounded-xl border p-3 transition-all ${
+                                        active ? 'bg-emerald-50 border-emerald-200 shadow-2xs' : 'bg-white border-slate-200 hover:border-slate-300'
+                                      }`}
+                                    >
+                                      <div className="space-y-1">
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div className="min-w-0">
+                                            <p className="font-black text-slate-800 text-xs truncate">{isRtl ? variantNameAr : variantNameEn}</p>
+                                            <p className="text-[10px] text-slate-500 truncate">
+                                              {variantDuration} {isRtl ? 'دقيقة' : 'min'} • {variantStaffNames || (isRtl ? 'لم يتم التعيين بعد' : 'No staff assigned yet')}
+                                            </p>
+                                          </div>
+                                          <span className="font-mono font-black text-slate-700 whitespace-nowrap">
+                                            {variantPrice.toFixed(2)} SAR
+                                          </span>
+                                        </div>
+                                        <div className="text-[10px] text-slate-500">
+                                          {isRtl ? 'ينتهي عند' : 'Estimated finish'}: {formatMinutesToTime(currentStartTime + variantDuration)}
+                                        </div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-slate-500 block mb-1">{isRtl ? 'أخصائية التجميل' : 'Assign Stylist'}</label>
                               <select value={currentStaffId} onChange={(e) => setCurrentStaffId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold">
@@ -1611,9 +1796,6 @@ export default function InteractiveDrawers({
                                 ))}
                               </select>
                             </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-slate-500 block mb-1">{isRtl ? 'وقت البدء' : 'Start Time'}</label>
                               <div className="flex items-center gap-1">
@@ -1621,14 +1803,34 @@ export default function InteractiveDrawers({
                                 <span className="text-[10px] font-mono text-zinc-500">{formatMinutesToTime(currentStartTime)}</span>
                               </div>
                             </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="text-slate-500 block mb-1">{isRtl ? 'المدة بالدقائق' : 'Duration (mins)'}</label>
-                              <input type="number" step={15} value={currentDuration} onChange={(e) => setCurrentDuration(parseInt(e.target.value) || 60)} className="w-full bg-slate-50 border rounded p-1 font-mono text-center font-bold" />
+                              <label className="text-slate-500 block mb-1">{isRtl ? 'المدة المختارة بالدقائق' : 'Selected Duration (mins)'}</label>
+                              <input
+                                type="number"
+                                step={15}
+                                value={currentDuration}
+                                readOnly={Boolean(selectedVariant)}
+                                onChange={(e) => setCurrentDuration(parseInt(e.target.value) || 60)}
+                                className={`w-full bg-slate-50 border rounded p-1 font-mono text-center font-bold ${selectedVariant ? 'cursor-not-allowed text-slate-500' : ''}`}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-slate-500 block mb-1">{isRtl ? 'السعر الحالي' : 'Selected Price'}</label>
+                              <div className="w-full bg-slate-50 border rounded p-2 font-mono font-black text-center text-slate-800">
+                                {Number(selectedBookablePrice || 0).toFixed(2)} SAR
+                              </div>
                             </div>
                           </div>
 
                           <div className="flex justify-end pt-2">
-                            <button type="button" onClick={handleAddStagedService} className="py-1.5 px-3 bg-zinc-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer">
+                            <button
+                              type="button"
+                              onClick={handleAddStagedService}
+                              className="py-1.5 px-3 bg-zinc-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                            >
                               <span>+ {isRtl ? 'إدراج لسلسة الخدمات للجلسة' : 'Add to Session Queue'}</span>
                             </button>
                           </div>
@@ -1639,12 +1841,13 @@ export default function InteractiveDrawers({
                           <div className="p-3 bg-slate-100 border rounded-xl space-y-2">
                             <span className="font-bold text-slate-700 block">{isRtl ? 'الخدمات المضافة للجلسة الكلية' : 'Staged Services'}</span>
                             {stagedServices.map((item, index) => {
-                              const s = services.find(srv => srv.id === item.serviceId);
+                              const s = canonicalServices.find(srv => srv.id === item.serviceId);
+                              const variant = s?.variants.find((entry) => entry.id === item.variantId) || s?.variants[0] || null;
                               const staff = availableStylists.find(st => st.id === item.staffId);
                               return (
                                 <div key={item.id} className="p-2 bg-white rounded-lg border flex items-center justify-between text-xs">
                                   <div>
-                                    <p className="font-bold">#{index+1} {isRtl ? s?.nameAr : s?.nameEn}</p>
+                                    <p className="font-bold">#{index+1} {isRtl ? s?.nameAr : s?.nameEn}{variant ? ` / ${isRtl ? variant.nameAr : variant.nameEn}` : ''}</p>
                                     <p className="text-[10px] text-slate-400">⏱️ {formatMinutesToTime(item.startTime)} | {isRtl ? staff?.nameAr : staff?.nameEn}</p>
                                   </div>
                                   <button type="button" onClick={() => setStagedServices(prev => prev.filter(p => p.id !== item.id))} className="text-rose-500 p-1">
@@ -1662,16 +1865,17 @@ export default function InteractiveDrawers({
                       <div className="space-y-4 animate-fadeIn text-xs">
                         {(() => {
                           const queuedLineItems = stagedServices.map((item, index) => {
-                            const srv = services.find((service) => service.id === item.serviceId);
+                            const srv = canonicalServices.find((service) => service.id === item.serviceId);
+                            const variant = srv?.variants.find((entry) => entry.id === item.variantId) || srv?.variants[0] || null;
                             const staff = availableStylists.find((stylist) => stylist.id === item.staffId);
                             return {
                               id: item.id,
                               index,
-                              serviceName: srv ? (isRtl ? srv.nameAr : srv.nameEn) : item.serviceId,
+                              serviceName: srv ? `${isRtl ? srv.nameAr : srv.nameEn}${variant ? ` / ${isRtl ? variant.nameAr : variant.nameEn}` : ''}` : item.serviceId,
                               staffName: isRtl ? staff?.nameAr : staff?.nameEn,
-                              duration: item.duration,
+                              duration: variant?.duration || item.duration,
                               startTime: item.startTime,
-                              price: srv ? toMoney(srv.price) : 0
+                              price: variant ? toMoney(variant.finalPrice ?? variant.price) : (srv ? toMoney(srv.price) : 0)
                             };
                           });
                           const primarySubtotal = queuedLineItems.reduce((sum, item) => sum + item.price, 0);

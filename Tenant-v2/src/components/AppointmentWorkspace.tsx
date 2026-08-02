@@ -16,6 +16,7 @@ import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
 import SchedulerGrid, { SchedulerColumn, SchedulerEvent, SchedulerSlot } from './SchedulerGrid';
 import { resolveEmployeeImageUrl } from '../lib/employeeImage';
+import { normalizeServiceRecord } from '../lib/serviceContract';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import { getTenantSchedulerConfig } from '../lib/tenantWorkingHours';
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
@@ -304,14 +305,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
         const services = srvRes?.services || [];
         setLiveServices(services.map((s: any) => ({
-          id: s.id,
-          serviceId: s.id,
-          nameEn: s.name_en || s.name || '',
-          nameAr: s.name_ar || s.name || '',
-          duration: s.duration || 60,
-          price: toMoney(s.finalPrice ?? s.price ?? 0),
-          categoryAr: s.category || 'علاجات ومساج',
-          categoryEn: s.category || 'Massage & Therapy'
+          ...normalizeServiceRecord(s),
+          serviceId: s.id
         })));
 
         const customers = custRes?.customers || (custRes as any)?.data?.customers || [];
