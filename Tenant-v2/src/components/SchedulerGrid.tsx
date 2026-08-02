@@ -16,12 +16,15 @@ export interface SchedulerColumn {
 
 export interface SchedulerEvent {
   id: string;
+  appointmentId?: string;
   columnId: string;
   dateKey: string;
   startMinutes: number;
   durationMinutes: number;
   title: string;
   subtitle?: string;
+  variantLabel?: string;
+  variantDescription?: string;
   notes?: string;
   price?: number;
   paymentStatus?: 'paid' | 'partial' | 'unpaid';
@@ -32,6 +35,10 @@ export interface SchedulerEvent {
   guestCount?: number;
   hasNotes?: boolean;
   avatar?: string;
+  staffAvatar?: string;
+  assignedStaffName?: string;
+  assignedStaffRole?: string;
+  serviceCategory?: string;
   role?: string;
   raw?: any;
 }
@@ -94,6 +101,92 @@ const toneClasses: Record<NonNullable<SchedulerColumn['statusTone']>, string> = 
   off: 'bg-rose-500',
   today: 'bg-amber-500',
   neutral: 'bg-slate-300',
+};
+
+const serviceCategoryStyles: Record<string, {
+  accent: string;
+  card: string;
+  badge: string;
+  avatar: string;
+}> = {
+  hair: {
+    accent: 'bg-fuchsia-500',
+    card: 'border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 to-white',
+    badge: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+    avatar: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
+  },
+  spa: {
+    accent: 'bg-emerald-500',
+    card: 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white',
+    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    avatar: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  },
+  nails: {
+    accent: 'bg-rose-500',
+    card: 'border-rose-200 bg-gradient-to-br from-rose-50 to-white',
+    badge: 'bg-rose-50 text-rose-700 border-rose-200',
+    avatar: 'border-rose-200 bg-rose-50 text-rose-700',
+  },
+  beauty: {
+    accent: 'bg-amber-500',
+    card: 'border-amber-200 bg-gradient-to-br from-amber-50 to-white',
+    badge: 'bg-amber-50 text-amber-700 border-amber-200',
+    avatar: 'border-amber-200 bg-amber-50 text-amber-700',
+  },
+  barber: {
+    accent: 'bg-sky-500',
+    card: 'border-sky-200 bg-gradient-to-br from-sky-50 to-white',
+    badge: 'bg-sky-50 text-sky-700 border-sky-200',
+    avatar: 'border-sky-200 bg-sky-50 text-sky-700',
+  },
+  skin: {
+    accent: 'bg-violet-500',
+    card: 'border-violet-200 bg-gradient-to-br from-violet-50 to-white',
+    badge: 'bg-violet-50 text-violet-700 border-violet-200',
+    avatar: 'border-violet-200 bg-violet-50 text-violet-700',
+  },
+  default: {
+    accent: 'bg-slate-500',
+    card: 'border-slate-200 bg-white',
+    badge: 'bg-slate-50 text-slate-700 border-slate-200',
+    avatar: 'border-slate-200 bg-slate-50 text-slate-700',
+  },
+};
+
+const getInitials = (value?: string | null) => {
+  const words = `${value || ''}`.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '•';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0] || ''}${words[1][0] || ''}`.toUpperCase();
+};
+
+const getServiceCategoryStyles = (value?: string | null) => {
+  const key = `${value || ''}`.trim().toLowerCase();
+  if (serviceCategoryStyles[key]) {
+    return serviceCategoryStyles[key];
+  }
+  if (key.includes('spa')) return serviceCategoryStyles.spa;
+  if (key.includes('nail')) return serviceCategoryStyles.nails;
+  if (key.includes('hair')) return serviceCategoryStyles.hair;
+  if (key.includes('beauty')) return serviceCategoryStyles.beauty;
+  if (key.includes('barber')) return serviceCategoryStyles.barber;
+  if (key.includes('skin')) return serviceCategoryStyles.skin;
+  return serviceCategoryStyles.default;
+};
+
+const formatAppointmentStatusLabel = (status?: string | null, kind?: SchedulerEvent['kind']) => {
+  if (kind === 'blocked') {
+    return 'Blocked';
+  }
+  const normalized = `${status || ''}`.trim().toLowerCase();
+  if (!normalized) return 'Pending';
+  if (normalized === 'completed') return 'Completed';
+  if (['checked_in', 'checked-in', 'arrived'].includes(normalized)) return 'Arrived';
+  if (['in_service', 'in-service'].includes(normalized)) return 'In Service';
+  if (['confirmed', 'scheduled'].includes(normalized)) return 'Confirmed';
+  if (['cancelled', 'canceled'].includes(normalized)) return 'Cancelled';
+  if (['no_show', 'no-show'].includes(normalized)) return 'No Show';
+  return normalized.replace(/[_-]+/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
 };
 
 const formatSlotTime = (totalMinutesFromStart: number, startHour: number, isRtl: boolean) => {
@@ -543,6 +636,15 @@ export default function SchedulerGrid({
             const columnWidth = 100 / Math.max(columns.length, 1);
             const laneWidth = columnWidth / Math.max(1, event.laneCount);
             const left = `calc(${columnIndex * columnWidth}% + ${event.laneIndex * laneWidth}%)`;
+            const serviceStyles = getServiceCategoryStyles(event.serviceCategory || event.raw?.service?.category);
+            const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
+            const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
+            const assignedStaffName = event.assignedStaffName || event.raw?.staff?.name || event.role || '';
+            const assignedStaffRole = event.assignedStaffRole || event.role || '';
+            const variantLabel = event.variantLabel || event.raw?.serviceVariantName || event.raw?.serviceVariantDescription || '';
+            const variantDescription = event.variantDescription || event.raw?.serviceVariantDescription || '';
+            const isCompact = height < 38;
+            const isMedium = height >= 38 && height < 58;
 
             const styleVariant = event.kind === 'blocked'
               ? 'bg-slate-50 text-slate-500 border-slate-200'
@@ -588,43 +690,126 @@ export default function SchedulerGrid({
                     contextEvent.stopPropagation();
                     onEventContextMenu?.(contextEvent, event);
                   }}
-                  className={`pointer-events-auto relative flex h-full flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${styleVariant} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'}`}
+                  className={`pointer-events-auto relative flex h-full flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${styleVariant} ${event.kind !== 'blocked' ? serviceStyles.card : ''} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'}`}
                 >
-                  <div className="flex items-center justify-between gap-1.5 min-w-0">
-                    <span className="rounded bg-zinc-900/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tight">
-                      {formatSlotTime(event.startMinutes, startHour, isRtl)}
-                    </span>
-                    <div className="flex items-center gap-1 text-slate-500">
-                      {event.isGroupBooking && (
-                        <span className="flex items-center gap-0.5 rounded bg-zinc-900/10 px-1 py-0.5 text-[8px] font-bold">
-                          <Users size={9} />
-                          <span>{event.guestCount || 2}</span>
+                  {event.kind !== 'blocked' && (
+                    <div className={`absolute inset-x-0 top-0 h-1 ${serviceStyles.accent}`} />
+                  )}
+
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <div className="flex min-w-0 flex-1 items-start gap-2">
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border text-[10px] font-black ${serviceStyles.avatar}`}>
+                        {customerAvatar ? (
+                          <img src={customerAvatar} alt={event.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <span>{getInitials(event.title)}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[11px] font-black leading-tight text-slate-900">
+                          {event.title}
+                        </p>
+                        {!isCompact && (
+                          <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
+                            <span className={`max-w-full truncate rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide ${serviceStyles.badge}`}>
+                              {event.subtitle || 'Service'}
+                            </span>
+                            {variantLabel && (
+                              <span className="truncate text-[9px] font-semibold text-slate-500">
+                                {variantLabel}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="rounded bg-zinc-900/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tight text-slate-700">
+                        {formatSlotTime(event.startMinutes, startHour, isRtl)}
+                      </span>
+                      {!isCompact && (
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${
+                          event.kind === 'blocked'
+                            ? 'border-slate-200 bg-slate-50 text-slate-600'
+                            : event.status === 'completed'
+                              ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
+                              : event.status === 'cancelled'
+                                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                : 'border-amber-200 bg-amber-50 text-amber-700'
+                        }`}>
+                          {formatAppointmentStatusLabel(event.status, event.kind)}
                         </span>
                       )}
-                      {event.hasNotes && <span className="text-[9px] font-black uppercase tracking-wider">⋯</span>}
+                      {!isCompact && event.kind !== 'blocked' && (
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${event.paymentStatus === 'paid'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : event.paymentStatus === 'partial'
+                            ? 'border-amber-200 bg-amber-50 text-amber-700'
+                            : 'border-rose-200 bg-rose-50 text-rose-700'
+                        }`}>
+                          {event.paymentStatus === 'paid' ? 'Paid' : event.paymentStatus === 'partial' ? 'Partial' : 'Unpaid'}
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-bold leading-tight text-slate-900">{event.title}</p>
-                    {event.subtitle && (
-                      <p className="mt-0.5 truncate text-[10px] font-medium leading-tight text-slate-600">{event.subtitle}</p>
-                    )}
-                    {event.notes && (
-                      <p className="mt-1 truncate text-[9px] italic text-slate-500">"{event.notes}"</p>
-                    )}
-                  </div>
+                  {!isCompact && (
+                    <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[9px]">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        {staffAvatar ? (
+                          <div className="h-4 w-4 shrink-0 overflow-hidden rounded-full border border-white shadow-sm">
+                            <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                          </div>
+                        ) : assignedStaffName ? (
+                          <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[7px] font-black text-slate-600">
+                            {getInitials(assignedStaffName)}
+                          </div>
+                        ) : null}
+                        <span className="truncate font-bold text-slate-600">
+                          {assignedStaffName || (event.kind === 'blocked' ? (event.blockedType || 'Blocked') : 'Unassigned')}
+                        </span>
+                        {assignedStaffRole && (
+                          <span className="truncate text-slate-400">
+                            · {assignedStaffRole}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {event.isGroupBooking && (
+                          <span className="flex items-center gap-0.5 rounded bg-zinc-900/10 px-1 py-0.5 text-[8px] font-bold text-slate-600">
+                            <Users size={9} />
+                            <span>{event.guestCount || 2}</span>
+                          </span>
+                        )}
+                        {typeof event.price === 'number' && (
+                          <span className="font-black font-mono text-slate-700">
+                            {event.price}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="mt-1 flex items-center justify-between gap-2 border-t border-black/5 pt-1 text-[9px]">
-                    <span className="font-black uppercase tracking-wide text-slate-500">
-                      {event.kind === 'blocked' ? event.blockedType || 'Blocked' : `${Math.max(1, Math.ceil(event.durationMinutes / slotMinutes)) * slotMinutes} mins`}
-                    </span>
-                    {typeof event.price === 'number' && (
-                      <span className="font-black font-mono text-slate-700">
-                        {event.price}
+                  {isMedium && variantDescription && (
+                    <p className="mt-1 truncate text-[8px] italic text-slate-500">
+                      {variantDescription}
+                    </p>
+                  )}
+
+                  {!isCompact && event.notes && (
+                    <p className={`mt-1 truncate text-[9px] italic ${event.kind === 'blocked' ? 'text-slate-500' : 'text-slate-500'}`}>
+                      "{event.notes}"
+                    </p>
+                  )}
+
+                  {isCompact && (
+                    <div className="mt-1 flex items-center justify-between gap-1 text-[8px] font-bold text-slate-500">
+                      <span className="truncate">
+                        {event.subtitle || variantLabel || formatAppointmentStatusLabel(event.status, event.kind)}
                       </span>
-                    )}
-                  </div>
+                      {typeof event.price === 'number' && <span className="font-mono text-slate-700">{event.price}</span>}
+                    </div>
+                  )}
 
                   {isEditable && event.kind !== 'blocked' && (
                     <button

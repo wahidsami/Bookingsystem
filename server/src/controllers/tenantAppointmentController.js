@@ -1737,6 +1737,9 @@ exports.searchDashboard = async (req, res) => {
                 paymentStatus: appointment.paymentStatus,
                 notes: appointment.notes || null,
                 price: appointment.price,
+                serviceVariantId: appointment.serviceVariantId || null,
+                serviceVariantName: appointment.serviceVariantName || null,
+                serviceVariantDescription: appointment.serviceVariantDescription || null,
                 service: appointment.service ? {
                     id: appointment.service.id,
                     name_en: appointment.service.name_en,

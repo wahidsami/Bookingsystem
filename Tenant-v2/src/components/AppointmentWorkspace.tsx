@@ -51,6 +51,12 @@ interface Appointment {
   serviceNameEn: string;
   serviceNameAr: string;
   staffId: string;
+  appointmentId?: string;
+  avatar?: string;
+  staffAvatar?: string;
+  serviceVariantId?: string;
+  serviceVariantName?: string;
+  serviceVariantDescription?: string;
   startTime: number; // minutes from 9:00 AM (0 to 720 for 12 hours)
   duration: number; // minutes
   status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'completed' | 'cancelled' | 'no_show';
@@ -431,6 +437,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       serviceNameEn,
       serviceNameAr,
       staffId: a.staffId,
+      appointmentId: a.id,
+      avatar: a.user?.photo || a.user?.profileImage || null,
+      staffAvatar: a.staff?.photo || null,
+      serviceVariantId: a.serviceVariantId || a.serviceVariant?.id || null,
+      serviceVariantName: a.serviceVariantName || a.serviceVariant?.name_en || a.serviceVariant?.nameEn || a.serviceVariant?.description || null,
+      serviceVariantDescription: a.serviceVariantDescription || a.serviceVariant?.name_ar || a.serviceVariant?.nameAr || a.serviceVariant?.description || null,
       startTime: startMins,
       duration,
       status: normalizeWorkspaceAppointmentStatus(a.status),
@@ -484,132 +496,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     };
   };
 
-  const groupBoardAppointments = (items: Appointment[]) => {
-    const grouped = new Map<string, Appointment[]>();
-    const standalone: Appointment[] = [];
-
-    items.forEach((item) => {
-      if (item.type === 'blocked') {
-        standalone.push(item);
-        return;
-      }
-
-      const groupingKey = item.bookingSessionId || item.bookingReference;
-      if (!groupingKey) {
-        standalone.push(item);
-        return;
-      }
-
-      const bucket = grouped.get(groupingKey) || [];
-      bucket.push(item);
-      grouped.set(groupingKey, bucket);
-    });
-
-    const aggregateGroup = (group: Appointment[]): Appointment => {
-      if (group.length === 1) {
-        return group[0];
-      }
-
-      const primary = group[0];
-      const serviceEntries = group.flatMap((item) => {
-        if (Array.isArray(item.serviceItems) && item.serviceItems.length > 0) {
-          return item.serviceItems;
-        }
-        if (Array.isArray(item.services) && item.services.length > 0) {
-          return item.services;
-        }
-        if (item.serviceId || item.serviceNameEn || item.serviceNameAr) {
-          return [{
-            id: item.serviceId || `svc-${item.id}`,
-            service: item.service || null,
-            nameEn: item.serviceNameEn,
-            nameAr: item.serviceNameAr,
-            serviceNameEn: item.serviceNameEn || item.service?.name_en || item.service?.nameEn || item.service?.name || item.nameEn || item.name || '',
-            serviceNameAr: item.serviceNameAr || item.service?.name_ar || item.service?.nameAr || item.service?.name || item.nameAr || item.name || '',
-            duration: item.duration,
-            price: item.price
-          }];
-        }
-        return [];
-      });
-      const uniqueServiceEntries = serviceEntries.filter((entry, index, arr) => {
-        const entryKey = `${entry?.id || entry?.serviceId || entry?.nameEn || entry?.nameAr || index}`;
-        return arr.findIndex((candidate) => `${candidate?.id || candidate?.serviceId || candidate?.nameEn || candidate?.nameAr || ''}` === entryKey) === index;
-      });
-      const namesEn = uniqueServiceEntries
-        .map((entry: any) => entry?.service?.name_en || entry?.name_en || entry?.serviceNameEn || entry?.nameEn || entry?.name || '')
-        .filter(Boolean);
-      const namesAr = uniqueServiceEntries
-        .map((entry: any) => entry?.service?.name_ar || entry?.name_ar || entry?.serviceNameAr || entry?.nameAr || entry?.name || '')
-        .filter(Boolean);
-      const staffNames = Array.from(new Set(group.map((entry) => entry.assignedStaffName).filter(Boolean)));
-      const sumDuration = group.reduce((sum, entry) => sum + Number(entry.duration || 0), 0);
-      const sumPrice = group.reduce((sum, entry) => sum + Number(entry.price || 0), 0);
-      const sumPaid = group.reduce((sum, entry) => sum + Number(entry.totalPaid || 0), 0);
-      const sumDepositAmount = group.reduce((sum, entry) => sum + Number(entry.depositAmount || 0), 0);
-      const sumDepositPaid = group.reduce((sum, entry) => sum + Number(entry.depositPaid || 0), 0);
-      const sumRemainder = group.reduce((sum, entry) => sum + Number(entry.remainderAmount || 0), 0);
-      const sumRemainderPaid = group.reduce((sum, entry) => sum + Number(entry.remainderPaid || 0), 0);
-      const sumRemainingBalance = group.reduce((sum, entry) => sum + Number((entry.remainingBalance ?? entry.outstandingAmount ?? entry.remainderAmount) || 0), 0);
-      const sumOutstandingAmount = group.reduce((sum, entry) => sum + Number((entry.outstandingAmount ?? entry.remainingBalance ?? entry.remainderAmount) || 0), 0);
-      const combinedLineItems = group.flatMap((entry) => Array.isArray(entry.lineItems) ? entry.lineItems : Array.isArray(entry.invoiceItems) ? entry.invoiceItems : []);
-      const combinedProducts = group.flatMap((entry) => Array.isArray(entry.products) ? entry.products : Array.isArray(entry.productItems) ? entry.productItems : Array.isArray(entry.retailItems) ? entry.retailItems : []);
-      const combinedTags = Array.from(new Set(group.flatMap((entry) => Array.isArray(entry.tags) ? entry.tags : [])));
-      const normalizedPaymentStatus = group.some((entry) => `${entry.normalizedPaymentStatus || ''}`.toLowerCase() === 'deposit_paid')
-        ? 'deposit_paid'
-        : group.every((entry) => ['paid', 'fully_paid'].includes(`${entry.normalizedPaymentStatus || entry.paymentStatus || ''}`.toLowerCase()))
-          ? 'fully_paid'
-          : primary.normalizedPaymentStatus || primary.paymentStatus || undefined;
-
-      return {
-        ...primary,
-        id: primary.id,
-        serviceId: primary.serviceId || group.find((entry) => entry.serviceId)?.serviceId,
-        bookingSessionId: primary.bookingSessionId || undefined,
-        bookingReference: primary.bookingReference || undefined,
-        normalizedPaymentStatus,
-        serviceNameEn: namesEn.length > 0 ? namesEn.join(' + ') : primary.serviceNameEn,
-        serviceNameAr: namesAr.length > 0 ? namesAr.join(' + ') : primary.serviceNameAr,
-        staffId: primary.staffId,
-        assignedStaffName: staffNames.length > 0 ? staffNames.join(' + ') : primary.assignedStaffName,
-        duration: sumDuration || primary.duration,
-        price: sumPrice || primary.price,
-        totalPaid: sumPaid || primary.totalPaid,
-        depositAmount: sumDepositAmount || primary.depositAmount,
-        depositPaid: sumDepositPaid || primary.depositPaid,
-        remainderAmount: sumRemainder || primary.remainderAmount,
-        remainderPaid: sumRemainderPaid || primary.remainderPaid,
-        remainingBalance: sumRemainingBalance || primary.remainingBalance,
-        outstandingAmount: sumOutstandingAmount || primary.outstandingAmount,
-        hasNotes: group.some((entry) => entry.hasNotes),
-        notes: group.map((entry) => entry.notes).filter(Boolean).join(' | ') || primary.notes,
-        tags: combinedTags,
-        services: uniqueServiceEntries,
-        serviceItems: uniqueServiceEntries,
-        lineItems: combinedLineItems,
-        invoiceItems: combinedLineItems,
-        products: combinedProducts,
-        productItems: combinedProducts,
-        retailItems: combinedProducts,
-        paymentStatus: group.every((entry) => `${entry.paymentStatus || ''}` === 'paid')
-          ? 'paid'
-          : group.some((entry) => `${entry.paymentStatus || ''}` === 'partial')
-            ? 'partial'
-            : primary.paymentStatus,
-        invoiceStatus: group.every((entry) => `${entry.invoiceStatus || ''}` === 'paid' || `${entry.paymentStatus || ''}` === 'paid')
-          ? 'paid'
-          : group.some((entry) => `${entry.paymentStatus || ''}` === 'partial')
-            ? 'partial'
-            : primary.invoiceStatus,
-      };
-    };
-
-    return [
-      ...standalone,
-      ...Array.from(grouped.values()).map((group) => aggregateGroup(group))
-    ].sort((left, right) => left.startTime - right.startTime);
-  };
-
   const mapBoardBreak = (b: any): Appointment => {
     const [h, m] = (b.startTime || '12:00').split(':');
     const startMins = parseInt(h) * 60 + parseInt(m) - 9 * 60;
@@ -638,18 +524,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const loadBoardData = async () => {
     setIsLoading(true);
     try {
-      const dateStr = getSelectedDateKey();
-      const res = await tenantApiAdapter.getAppointmentsBoard(dateStr, {
-        staffId: selectedStylistFilter === 'all' ? undefined : selectedStylistFilter,
-        status: statusFilter === 'all' ? undefined : statusFilter,
-        search: searchQuery.trim() || undefined
-      });
-      if (res && res.success) {
-        const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => mapBoardAppointment(a, dateStr));
-        const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => mapBoardBreak(b));
-        setAppointments([...groupBoardAppointments(mappedApts), ...mappedBreaks]);
+        const dateStr = getSelectedDateKey();
+        const res = await tenantApiAdapter.getAppointmentsBoard(dateStr, {
+          staffId: selectedStylistFilter === 'all' ? undefined : selectedStylistFilter,
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          search: searchQuery.trim() || undefined
+        });
+        if (res && res.success) {
+          const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => mapBoardAppointment(a, dateStr));
+          const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => mapBoardBreak(b));
+          setAppointments([...mappedApts, ...mappedBreaks].sort((left, right) => left.startTime - right.startTime));
 
-        const newStatuses: Record<string, 'active'|'break'|'off'> = {};
+          const newStatuses: Record<string, 'active'|'break'|'off'> = {};
         (res.breaks || []).forEach((b: any) => {
           newStatuses[b.staffId] = 'break';
         });
@@ -3099,12 +2985,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     return {
       id: apt.id,
+      appointmentId: apt.appointmentId || apt.id,
       columnId,
       dateKey: apt.date || getSelectedDateKey(),
       startMinutes: Math.max(0, apt.startTime),
       durationMinutes: Math.max(5, apt.duration),
       title,
       subtitle,
+      variantLabel: isRtl ? (apt.serviceVariantDescription || apt.serviceVariantName || '') : (apt.serviceVariantName || apt.serviceVariantDescription || ''),
+      variantDescription: apt.serviceVariantDescription || apt.serviceVariantName || '',
       notes: apt.notes,
       price: apt.price,
       paymentStatus: apt.paymentStatus,
@@ -3114,7 +3003,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       isGroupBooking: apt.isGroupBooking,
       guestCount: apt.guestCount,
       hasNotes: apt.hasNotes,
-      avatar: staff?.avatar,
+      avatar: apt.avatar || undefined,
+      staffAvatar: apt.staffAvatar || staff?.avatar,
+      assignedStaffName: apt.assignedStaffName || staff?.nameEn || staff?.name || '',
+      assignedStaffRole: staff ? (isRtl ? staff.roleAr : staff.roleEn) : '',
       role: isRtl ? staff?.roleAr : staff?.roleEn,
       raw: apt,
     };
