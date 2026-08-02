@@ -131,6 +131,33 @@ type AccountForm = {
   isActive: boolean;
 };
 
+type SettingsTabKey =
+  | 'overview'
+  | 'business'
+  | 'working-hours'
+  | 'booking'
+  | 'notifications'
+  | 'payment'
+  | 'localization'
+  | 'accounts'
+  | 'security';
+
+const SETTINGS_TABS: Array<{
+  key: SettingsTabKey;
+  labelEn: string;
+  labelAr: string;
+}> = [
+  { key: 'overview', labelEn: 'Overview', labelAr: 'نظرة عامة' },
+  { key: 'business', labelEn: 'Business', labelAr: 'الأعمال' },
+  { key: 'working-hours', labelEn: 'Working Hours', labelAr: 'ساعات العمل' },
+  { key: 'booking', labelEn: 'Booking', labelAr: 'الحجز' },
+  { key: 'notifications', labelEn: 'Notifications', labelAr: 'الإشعارات' },
+  { key: 'payment', labelEn: 'Payment', labelAr: 'السداد' },
+  { key: 'localization', labelEn: 'Localization', labelAr: 'اللغة والمنطقة' },
+  { key: 'accounts', labelEn: 'Team Access', labelAr: 'حسابات الفريق' },
+  { key: 'security', labelEn: 'Security', labelAr: 'الأمان' }
+];
+
 const BUSINESS_HOUR_KEYS: Array<{ key: WorkingHoursDayKey; labelEn: string; labelAr: string }> = [
   { key: 'sunday', labelEn: 'Sunday', labelAr: 'الأحد' },
   { key: 'monday', labelEn: 'Monday', labelAr: 'الاثنين' },
@@ -326,6 +353,7 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [savingSection, setSavingSection] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<SettingsTabKey>('overview');
 
   const [businessForm, setBusinessForm] = useState<BusinessForm>(() => createBusinessForm(tenant));
   const [workingHoursForm, setWorkingHoursForm] = useState<Record<WorkingHoursDayKey, WorkingHoursDayState>>(() => createWorkingHoursForm(tenantSettings, tenant));
@@ -732,8 +760,33 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
         </div>
       )}
 
-      <DashboardPreferencesSection lang={lang} darkMode={darkMode} />
+      <div className="rounded-2xl border border-neutral-200 bg-white/80 p-2 shadow-sm backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/60">
+        <div className="flex flex-wrap gap-2">
+          {SETTINGS_TABS.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                  active
+                    ? 'bg-brand-500 text-white shadow-sm'
+                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800'
+                }`}
+              >
+                {isRtl ? tab.labelAr : tab.labelEn}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
+      {activeTab === 'overview' && (
+        <DashboardPreferencesSection lang={lang} darkMode={darkMode} />
+      )}
+
+      {activeTab === 'business' && (
       <SectionCard
         title={isRtl ? 'معلومات الأعمال' : 'Business information'}
         description={isRtl
@@ -809,7 +862,9 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
           </label>
         </div>
       </SectionCard>
+      )}
 
+      {activeTab === 'working-hours' && (
       <SectionCard
         title={isRtl ? 'ساعات العمل الكانونية' : 'Canonical working hours'}
         description={isRtl
@@ -885,7 +940,9 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
           })}
         </div>
       </SectionCard>
+      )}
 
+      {activeTab === 'booking' && (
       <SectionCard
         title={isRtl ? 'إعدادات الحجز' : 'Booking settings'}
         description={isRtl
@@ -1003,7 +1060,9 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
           </label>
         </div>
       </SectionCard>
+      )}
 
+      {activeTab === 'notifications' && (
       <SectionCard
         title={isRtl ? 'الإشعارات والتشغيل' : 'Notifications & operations'}
         description={isRtl
@@ -1065,7 +1124,9 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
           </label>
         </div>
       </SectionCard>
+      )}
 
+      {activeTab === 'payment' && (
       <SectionCard
         title={isRtl ? 'السداد والفوترة' : 'Payment settings'}
         description={isRtl
@@ -1160,7 +1221,9 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
           </label>
         </div>
       </SectionCard>
+      )}
 
+      {activeTab === 'localization' && (
       <SectionCard
         title={isRtl ? 'اللغة والمنطقة' : 'Localization'}
         description={isRtl
@@ -1235,7 +1298,9 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
           </div>
         </div>
       </SectionCard>
+      )}
 
+      {activeTab === 'accounts' && (
       <SectionCard
         title={isRtl ? 'حسابات الإدارة والفريق' : 'Team access accounts'}
         description={isRtl
@@ -1427,7 +1492,9 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
           </div>
         )}
       </SectionCard>
+      )}
 
+      {activeTab === 'security' && (
       <SectionCard
         title={isRtl ? 'أمان الحساب' : 'Account security'}
         description={isRtl
@@ -1438,7 +1505,9 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
       >
         <PasswordSecuritySection onSubmit={handleChangePassword} lang={lang} darkMode={darkMode} />
       </SectionCard>
+      )}
 
+      {activeTab === 'working-hours' && (
       <SectionCard
         title={isRtl ? 'ملخص ساعات العمل' : 'Working hours snapshot'}
         description={isRtl
@@ -1468,6 +1537,7 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
             : `Scheduler will now render from ${schedulerConfig.startHour.toString().padStart(2, '0')}:00 to ${schedulerConfig.endHour.toString().padStart(2, '0')}:00 using ${schedulerConfig.slotMinutes}-minute slots.`}
         </div>
       </SectionCard>
+      )}
     </div>
   );
 }
@@ -1563,4 +1633,3 @@ function PasswordSecuritySection({
     </div>
   );
 }
-
