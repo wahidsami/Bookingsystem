@@ -1295,6 +1295,19 @@ class TenantApiAdapter {
     return this.get('/tenant/dashboard/todays-appointments');
   }
 
+  async getTenantHeaderNotifications(params: Record<string, string | number | undefined> = {}): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/tenant/header/notifications${query ? `?${query}` : ''}`);
+  }
+
+  async markTenantHeaderNotificationRead(id: string): Promise<any> {
+    return this.patch(`/tenant/header/notifications/${encodeURIComponent(id)}/read`, {});
+  }
+
+  async markAllTenantHeaderNotificationsRead(): Promise<any> {
+    return this.patch('/tenant/header/notifications/read-all', {});
+  }
+
   // --- Reports ---
   async getReportsSummary(params: Record<string, string | number | undefined> = {}): Promise<any> {
     const query = this.buildQueryString(params);

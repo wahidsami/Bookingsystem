@@ -22,6 +22,7 @@ const tenantRegistrationController = require('../controllers/tenantRegistrationC
 const tenantBillsController = require('../controllers/tenantBillsController');
 const tenantPosController = require('../controllers/tenantPosController');
 const tenantMessagesController = require('../controllers/tenantMessagesController');
+const tenantHeaderNotificationController = require('../controllers/tenantHeaderNotificationController');
 const tenantPayrollController = require('../controllers/tenantPayrollController');
 const tenantNotificationController = require('../controllers/tenantNotificationController');
 const tenantGiftCardController = require('../controllers/tenantGiftCardController');
@@ -88,6 +89,11 @@ router.get('/dashboard/stats', tenantDashboardController.getDashboardStats);
 router.get('/dashboard/todays-appointments', tenantDashboardController.getTodaysAppointments);
 router.get('/dashboard/revenue-chart', tenantDashboardController.getRevenueChartData);
 router.get('/dashboard/search', tenantAppointmentController.searchDashboard);
+
+// Header notifications
+router.get('/header/notifications', tenantHeaderNotificationController.listNotifications);
+router.patch('/header/notifications/:id/read', tenantHeaderNotificationController.markNotificationRead);
+router.patch('/header/notifications/read-all', tenantHeaderNotificationController.markAllNotificationsRead);
 
 // Employee management
 router.get('/employees', tenantEmployeeController.getEmployees);
