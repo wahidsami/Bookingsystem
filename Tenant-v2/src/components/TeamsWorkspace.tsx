@@ -129,6 +129,14 @@ const buildScheduleFromWorkingData = (employee: any, shifts: any[]): TeamMemberD
   return [];
 };
 
+const cloneScheduleDays = (schedule: TeamMemberData['schedule']) => {
+  return schedule.map((day) => ({
+    ...day,
+    slots: day.slots ? day.slots.map((slot) => ({ ...slot })) : [],
+    subShifts: day.subShifts ? day.subShifts.map((sub) => ({ ...sub })) : []
+  }));
+};
+
 const DEFAULT_WORKING_HOURS = {
   startTime: '10:00 AM',
   endTime: '08:00 PM'
@@ -548,14 +556,21 @@ export default function TeamsWorkspace({
         reviewsList: []
       }));
       const uniqueMembers = Array.from(new Map(mapped.map((member) => [member.id, member])).values());
-      setTeamMembers(uniqueMembers);
+      const membersWithSchedules = await Promise.all(
+        uniqueMembers.map(async (member) => {
+          const { schedule } = await loadEmployeeSchedule(member.id, member);
+          return {
+            ...member,
+            schedule: Array.isArray(schedule) ? cloneScheduleDays(schedule) : []
+          };
+        })
+      );
+
+      setTeamMembers(membersWithSchedules);
       const nextSelected = selectedMemberId && uniqueMembers.some((member) => member.id === selectedMemberId)
         ? selectedMemberId
         : '';
       setSelectedMemberId(nextSelected);
-      if (nextSelected) {
-        void syncSelectedMemberSchedule(nextSelected);
-      }
     } catch (err) {
       console.error(err);
       triggerToast('Failed to load team directory', 'فشل في تحميل قائمة الموظفين', 'error');
@@ -924,11 +939,11 @@ export default function TeamsWorkspace({
     if (member.position === 'service_provider') {
       void fetchStaffAppPermissions(member.id);
     }
-    void loadEmployeeSchedule(member.id, member).then(({ schedule }) => {
-      setTeamMembers((prev) => prev.map((existing) => (
-        existing.id === member.id ? { ...existing, schedule } : existing
-      )));
-      setFormData((prev) => (
+      void loadEmployeeSchedule(member.id, member).then(({ schedule }) => {
+        setTeamMembers((prev) => prev.map((existing) => (
+          existing.id === member.id ? { ...existing, schedule } : existing
+        )));
+        setFormData((prev) => (
         prev.id === member.id
           ? {
               ...prev,
