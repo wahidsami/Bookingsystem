@@ -317,6 +317,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       ...(localOverride || {})
     });
   });
+  const schedulerBoardSnapshotRef = useRef<SchedulerBoardSettings>(schedulerBoardSettings);
   const [schedulerBoardDraft, setSchedulerBoardDraft] = useState<SchedulerBoardSettings>(schedulerBoardSettings);
   const [isSchedulerSettingsOpen, setIsSchedulerSettingsOpen] = useState(false);
   const [isSchedulerSettingsSaving, setIsSchedulerSettingsSaving] = useState(false);
@@ -367,6 +368,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     });
     setSchedulerBoardSettings(merged);
     setSchedulerBoardDraft(merged);
+    schedulerBoardSnapshotRef.current = merged;
   }, [canonicalSchedulerBoardSettings, schedulerStorageKey]);
 
   // Master Data Fetch
@@ -1770,6 +1772,19 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }, 600);
   };
 
+  const openSchedulerSettings = useCallback(() => {
+    schedulerBoardSnapshotRef.current = schedulerBoardSettings;
+    setSchedulerBoardDraft(schedulerBoardSettings);
+    setIsSchedulerSettingsOpen(true);
+  }, [schedulerBoardSettings]);
+
+  const cancelSchedulerBoardSettings = useCallback(() => {
+    const snapshot = normalizeSchedulerBoardSettings(schedulerBoardSnapshotRef.current || schedulerBoardSettings);
+    setSchedulerBoardSettings(snapshot);
+    setSchedulerBoardDraft(snapshot);
+    setIsSchedulerSettingsOpen(false);
+  }, [schedulerBoardSettings]);
+
   const saveSchedulerBoardSettings = useCallback(async (nextSettings: SchedulerBoardSettings) => {
     const normalized = normalizeSchedulerBoardSettings(nextSettings);
     setIsSchedulerSettingsSaving(true);
@@ -1779,6 +1794,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       });
       setSchedulerBoardSettings(normalized);
       setSchedulerBoardDraft(normalized);
+      schedulerBoardSnapshotRef.current = normalized;
       writeSchedulerBoardOverride(schedulerStorageKey, normalized);
       setIsSchedulerSettingsOpen(false);
       addLocalToast(
@@ -1801,8 +1817,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const resetSchedulerBoardSettings = useCallback(() => {
     const normalized = normalizeSchedulerBoardSettings(DEFAULT_SCHEDULER_BOARD_SETTINGS);
     setSchedulerBoardDraft(normalized);
-    void saveSchedulerBoardSettings(normalized);
-  }, [saveSchedulerBoardSettings]);
+    setSchedulerBoardSettings(normalized);
+    schedulerBoardSnapshotRef.current = normalized;
+  }, []);
+
+  const updateSchedulerBoardDraft = useCallback((patch: Partial<SchedulerBoardSettings>) => {
+    setSchedulerBoardDraft((current) => {
+      const next = normalizeSchedulerBoardSettings({
+        ...current,
+        ...patch
+      });
+      setSchedulerBoardSettings(next);
+      return next;
+    });
+  }, []);
 
   const getServiceAssignment = useCallback((serviceId?: string | null) => {
     if (!serviceId) {
@@ -3458,7 +3486,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
             <button
               type="button"
-              onClick={() => setIsSchedulerSettingsOpen(true)}
+              onClick={openSchedulerSettings}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               title={isRtl ? 'إعدادات لوحة الجدولة' : 'Scheduler settings'}
             >
@@ -3927,7 +3955,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsSchedulerSettingsOpen(false)}
+                  onClick={cancelSchedulerBoardSettings}
                   className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
                 >
                   <X size={16} />
@@ -3950,16 +3978,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         {schedulerBoardDraft[field.key as keyof SchedulerBoardSettings] as number}{field.suffix}
                       </span>
                     </div>
-                    <input
+                      <input
                       type="range"
                       min={field.min}
                       max={field.max}
                       step={field.step}
                       value={schedulerBoardDraft[field.key as keyof SchedulerBoardSettings] as number}
-                      onChange={(event) => setSchedulerBoardDraft((current) => ({
-                        ...current,
+                      onChange={(event) => updateSchedulerBoardDraft({
                         [field.key]: Number(event.target.value)
-                      }))}
+                      } as Partial<SchedulerBoardSettings>)}
                       className="w-full accent-amber-500"
                     />
                   </label>
@@ -3980,10 +4007,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <input
                       type="checkbox"
                       checked={Boolean(schedulerBoardDraft[field.key as keyof SchedulerBoardSettings])}
-                      onChange={(event) => setSchedulerBoardDraft((current) => ({
-                        ...current,
+                      onChange={(event) => updateSchedulerBoardDraft({
                         [field.key]: event.target.checked
-                      }))}
+                      } as Partial<SchedulerBoardSettings>)}
                       className="h-4 w-4 accent-amber-500"
                     />
                   </label>
@@ -4002,7 +4028,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsSchedulerSettingsOpen(false)}
+                    onClick={cancelSchedulerBoardSettings}
                     className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
                   >
                     {isRtl ? 'إلغاء' : 'Cancel'}

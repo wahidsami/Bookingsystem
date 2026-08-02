@@ -269,6 +269,7 @@ export default function SchedulerGrid({
   onSlotRangeSelect,
 }: SchedulerGridProps) {
   const [hoveredSlot, setHoveredSlot] = useState<SchedulerSlot | null>(null);
+  const [hoverTooltip, setHoverTooltip] = useState<{ x: number; y: number; label: string } | null>(null);
   const [selectionAnchor, setSelectionAnchor] = useState<SchedulerSlot | null>(null);
   const [selectionFocus, setSelectionFocus] = useState<SchedulerSlot | null>(null);
   const suppressNextClickRef = useRef(false);
@@ -583,12 +584,24 @@ export default function SchedulerGrid({
                         setSelectionFocus(slot);
                         onAddSlotHover?.(slot);
                       }}
-                      onMouseEnter={() => {
+                      onMouseEnter={(event) => {
                         if (selectionAnchor && isSameAxis(selectionAnchor, slot)) {
                           setSelectionFocus(slot);
                         }
                         setHoveredSlot(slot);
+                        setHoverTooltip({
+                          x: event.clientX,
+                          y: event.clientY,
+                          label: formatSlotTime(slot.startMinutes, startHour, isRtl),
+                        });
                         onAddSlotHover?.(slot);
+                      }}
+                      onMouseMove={(event) => {
+                        setHoverTooltip({
+                          x: event.clientX,
+                          y: event.clientY,
+                          label: formatSlotTime(slot.startMinutes, startHour, isRtl),
+                        });
                       }}
                       onMouseUp={() => {
                         if (!isEditable) return;
@@ -596,6 +609,7 @@ export default function SchedulerGrid({
                       }}
                       onMouseLeave={() => {
                         setHoveredSlot((current) => (current?.columnId === slot.columnId && current.slotIndex === slot.slotIndex ? null : current));
+                        setHoverTooltip(null);
                         onAddSlotHover?.(null);
                       }}
                       onClick={(event) => {
@@ -847,6 +861,19 @@ export default function SchedulerGrid({
             );
           })}
         </div>
+
+        {hoverTooltip && (
+          <div
+            className="pointer-events-none fixed z-[60] rounded-full border border-slate-200 bg-zinc-950 px-2.5 py-1 text-[10px] font-black text-white shadow-xl"
+            style={{
+              left: `${hoverTooltip.x + 14}px`,
+              top: `${hoverTooltip.y + 14}px`,
+              transform: 'translate3d(0, 0, 0)'
+            }}
+          >
+            {hoverTooltip.label}
+          </div>
+        )}
 
       </div>
     </div>
