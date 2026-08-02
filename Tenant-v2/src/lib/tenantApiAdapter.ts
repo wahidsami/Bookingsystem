@@ -1,5 +1,6 @@
 import { API_BASE_URL, API_ORIGIN } from './apiConfig';
 import { normalizeEmployeeAvatarCollection } from './employeeImage';
+import { normalizeProductCollection, normalizeProductRecord } from './productContract';
 
 export { API_BASE_URL, API_ORIGIN } from './apiConfig';
 
@@ -1082,7 +1083,11 @@ class TenantApiAdapter {
 
   // --- Products ---
   async getProducts(): Promise<any> {
-    return this.get('/tenant/products');
+    const response = await this.get('/tenant/products');
+    return {
+      ...response,
+      products: normalizeProductCollection(response?.products || [])
+    };
   }
 
   async createProduct(data: any): Promise<any> {
@@ -1097,7 +1102,11 @@ class TenantApiAdapter {
       });
       return this.handleResponse(response);
     }
-    return this.post('/tenant/products', data);
+    const response = await this.post('/tenant/products', data);
+    return {
+      ...response,
+      product: response?.product ? normalizeProductRecord(response.product) : response?.product
+    };
   }
 
   async updateProduct(id: string, data: any): Promise<any> {
@@ -1111,7 +1120,11 @@ class TenantApiAdapter {
       });
       return this.handleResponse(response);
     }
-    return this.put(`/tenant/products/${id}`, data);
+    const response = await this.put(`/tenant/products/${id}`, data);
+    return {
+      ...response,
+      product: response?.product ? normalizeProductRecord(response.product) : response?.product
+    };
   }
 
   async deleteProduct(id: string): Promise<any> {

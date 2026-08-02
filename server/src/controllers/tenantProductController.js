@@ -44,6 +44,19 @@ function calculateProductPrice(rawPrice, taxRate, commissionRate) {
     return parseFloat((raw + tax + commission).toFixed(2));
 }
 
+function calculateProductRawPrice(finalPrice, taxRate, commissionRate) {
+    const final = parseFloat(finalPrice || 0);
+    const tax = parseFloat(taxRate || 15) / 100;
+    const commission = parseFloat(commissionRate || 10) / 100;
+    const multiplier = 1 + tax + commission;
+
+    if (!Number.isFinite(final) || !Number.isFinite(multiplier) || multiplier <= 0) {
+        return 0;
+    }
+
+    return parseFloat((final / multiplier).toFixed(2));
+}
+
 function parseArrayField(value) {
     if (Array.isArray(value)) {
         return value.filter(Boolean).map((item) => `${item}`.trim()).filter(Boolean);
@@ -62,6 +75,13 @@ function parseArrayField(value) {
         return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
     }
     return [];
+}
+
+function isFilesystemManagedImage(value) {
+    const normalized = `${value ?? ''}`.trim();
+    if (!normalized) return false;
+    if (/^(https?:|data:|blob:)/i.test(normalized)) return false;
+    return !normalized.startsWith('server/') && !normalized.startsWith('uploads/');
 }
 
 // Configure multer for product image uploads
@@ -207,6 +227,8 @@ exports.createProduct = async (req, res) => {
             description_en,
             description_ar,
             rawPrice, // Changed from price to rawPrice
+            finalPrice,
+            price,
             category,
             stock,
             sku,
@@ -233,11 +255,21 @@ exports.createProduct = async (req, res) => {
             });
         }
 
-        if (!rawPrice || rawPrice < 0) {
+        const rawPriceInput = rawPrice !== undefined && `${rawPrice}`.trim() !== ''
+            ? parseFloat(rawPrice)
+            : null;
+        const finalPriceInput = finalPrice !== undefined && `${finalPrice}`.trim() !== ''
+            ? parseFloat(finalPrice)
+            : (price !== undefined && `${price}`.trim() !== '' ? parseFloat(price) : null);
+        const hasValidRawPrice = rawPriceInput !== null && !Number.isNaN(rawPriceInput) && rawPriceInput >= 0;
+        const hasValidFinalPrice = finalPriceInput !== null && !Number.isNaN(finalPriceInput) && finalPriceInput >= 0;
+        const stockValue = Number.parseInt(stock, 10);
+
+        if (!hasValidRawPrice && !hasValidFinalPrice) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
-                message: 'Valid raw price is required'
+                message: 'Valid final selling price is required'
             });
         }
 
@@ -246,10 +278,14 @@ exports.createProduct = async (req, res) => {
         const taxRate = globalSettings.taxRate;
         const commissionRate = globalSettings.productCommissionRate;
 
-        // Calculate final price
-        const finalPrice = calculateProductPrice(rawPrice, taxRate, commissionRate);
+        const derivedRawPrice = hasValidFinalPrice
+            ? calculateProductRawPrice(finalPriceInput, taxRate, commissionRate)
+            : parseFloat(rawPriceInput.toFixed(2));
+        const derivedFinalPrice = hasValidFinalPrice
+            ? parseFloat(finalPriceInput.toFixed(2))
+            : calculateProductPrice(rawPriceInput, taxRate, commissionRate);
 
-        if (stock === undefined || stock < 0) {
+        if (!Number.isFinite(stockValue) || stockValue < 0) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
@@ -274,12 +310,24 @@ exports.createProduct = async (req, res) => {
 
         // Handle multiple images (up to 5, minimum 1)
         let imagePaths = [];
+        const bodyImages = parseArrayField(req.body.images || req.body.image || req.body.imageUrl || req.body.imageUrls);
+        if (bodyImages.length > 0) {
+            imagePaths = bodyImages;
+        }
         if (req.files && req.files.length > 0) {
-            imagePaths = req.files.map(file => file.path.replace(/\\/g, '/').split('uploads/')[1]);
+            imagePaths = [
+                ...imagePaths,
+                ...req.files.map(file => file.path.replace(/\\/g, '/').split('uploads/')[1])
+            ];
         } else if (req.file) {
             // Legacy single image support
-            imagePaths = [req.file.path.replace(/\\/g, '/').split('uploads/')[1]];
+            imagePaths = [
+                ...imagePaths,
+                req.file.path.replace(/\\/g, '/').split('uploads/')[1]
+            ];
         }
+
+        imagePaths = Array.from(new Set(imagePaths.filter(Boolean)));
 
         // Validation: At least 1 image is required
         if (imagePaths.length === 0) {
@@ -317,12 +365,12 @@ exports.createProduct = async (req, res) => {
             description_ar: description_ar || null,
             image: imagePath, // Legacy field (first image)
             images: imagePaths, // New field (array of all images)
-            rawPrice: parseFloat(rawPrice),
+            rawPrice: derivedRawPrice,
             taxRate: taxRate,
             commissionRate: commissionRate,
-            price: finalPrice,
+            price: derivedFinalPrice,
             category: category || 'general',
-            stock: parseInt(stock),
+            stock: stockValue,
             sku: sku || null,
             brand: brand || null,
             size: size || null,
@@ -383,6 +431,8 @@ exports.updateProduct = async (req, res) => {
             description_en,
             description_ar,
             rawPrice, // Changed from price to rawPrice
+            finalPrice,
+            price,
             category,
             stock,
             sku,
@@ -422,11 +472,23 @@ exports.updateProduct = async (req, res) => {
         const taxRate = globalSettings.taxRate;
         const commissionRate = globalSettings.productCommissionRate;
 
-        // Calculate final price if rawPrice is provided
-        let finalPrice = product.price;
-        if (rawPrice !== undefined) {
-            finalPrice = calculateProductPrice(rawPrice, taxRate, commissionRate);
-        }
+        const rawPriceInput = rawPrice !== undefined && `${rawPrice}`.trim() !== ''
+            ? parseFloat(rawPrice)
+            : null;
+        const finalPriceInput = finalPrice !== undefined && `${finalPrice}`.trim() !== ''
+            ? parseFloat(finalPrice)
+            : (price !== undefined && `${price}`.trim() !== '' ? parseFloat(price) : null);
+        const hasValidRawPrice = rawPriceInput !== null && !Number.isNaN(rawPriceInput) && rawPriceInput >= 0;
+        const hasValidFinalPrice = finalPriceInput !== null && !Number.isNaN(finalPriceInput) && finalPriceInput >= 0;
+        const stockValue = stock !== undefined && `${stock}`.trim() !== ''
+            ? Number.parseInt(stock, 10)
+            : null;
+        const updatedRawPrice = hasValidFinalPrice
+            ? calculateProductRawPrice(finalPriceInput, taxRate, commissionRate)
+            : (hasValidRawPrice ? parseFloat(rawPriceInput.toFixed(2)) : product.rawPrice);
+        const updatedFinalPrice = hasValidFinalPrice
+            ? parseFloat(finalPriceInput.toFixed(2))
+            : (hasValidRawPrice ? calculateProductPrice(rawPriceInput, taxRate, commissionRate) : product.price);
 
         // Check SKU uniqueness if changed
         if (sku && sku !== product.sku) {
@@ -449,14 +511,20 @@ exports.updateProduct = async (req, res) => {
             : (product.image ? [product.image] : []);
         const retainedImagesRaw = req.body.retainedImages ?? req.body.imagesExisting ?? req.body.existingImages;
         const retainedImages = parseArrayField(retainedImagesRaw);
+        const submittedBodyImages = parseArrayField(req.body.images || req.body.image || req.body.imageUrl || req.body.imageUrls);
 
-        let imagePaths = retainedImagesRaw !== undefined
-            ? retainedImages.filter((img) => currentImages.includes(img))
-            : [...currentImages];
+        let imagePaths = submittedBodyImages.length > 0
+            ? submittedBodyImages
+            : (retainedImagesRaw !== undefined
+                ? retainedImages.filter((img) => currentImages.includes(img))
+                : [...currentImages]);
 
         // Clean up files removed by tenant from product gallery
         const removedImages = currentImages.filter((img) => !imagePaths.includes(img));
         for (const relativePath of removedImages) {
+            if (!isFilesystemManagedImage(relativePath)) {
+                continue;
+            }
             const absolutePath = path.join(__dirname, '../../uploads', relativePath);
             if (fs.existsSync(absolutePath)) {
                 try {
@@ -497,6 +565,8 @@ exports.updateProduct = async (req, res) => {
             }
         }
 
+        imagePaths = Array.from(new Set(imagePaths.filter(Boolean)));
+
         // Validation: At least 1 image is required
         if (imagePaths.length === 0) {
             await transaction.rollback();
@@ -511,14 +581,23 @@ exports.updateProduct = async (req, res) => {
         if (name_ar !== undefined) product.name_ar = name_ar;
         if (description_en !== undefined) product.description_en = description_en || null;
         if (description_ar !== undefined) product.description_ar = description_ar || null;
-        if (rawPrice !== undefined) {
-            product.rawPrice = parseFloat(rawPrice);
+        if (rawPrice !== undefined || finalPrice !== undefined || price !== undefined) {
+            product.rawPrice = updatedRawPrice;
             product.taxRate = taxRate;
             product.commissionRate = commissionRate;
-            product.price = finalPrice;
+            product.price = updatedFinalPrice;
         }
         if (category !== undefined) product.category = category;
-        if (stock !== undefined) product.stock = parseInt(stock);
+        if (stock !== undefined) {
+            if (!Number.isFinite(stockValue) || stockValue === null || stockValue < 0) {
+                await transaction.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'Valid stock quantity is required'
+                });
+            }
+            product.stock = stockValue;
+        }
         if (sku !== undefined) product.sku = sku || null;
         if (brand !== undefined) product.brand = brand || null;
         if (size !== undefined) product.size = size || null;
@@ -600,7 +679,7 @@ exports.deleteProduct = async (req, res) => {
         // For now, we'll allow deletion but can add this check later
 
         // Delete image if exists
-        if (product.image) {
+        if (isFilesystemManagedImage(product.image)) {
             const imagePath = path.join(__dirname, '../../uploads', product.image);
             if (fs.existsSync(imagePath)) {
                 fs.unlinkSync(imagePath);

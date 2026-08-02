@@ -6,9 +6,16 @@ import {
   RotateCw, AlertTriangle, Image as ImageIcon, ShoppingBag, Package, 
   Layers, Tag, Percent, Truck, Store, FileText
 } from 'lucide-react';
-import { Language, Product, QuickLaunchRequest } from '../types';
+import { Language, QuickLaunchRequest } from '../types';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
+import {
+  PRODUCT_CATEGORY_OPTIONS,
+  buildProductSubmissionPayload,
+  normalizeProductRecord,
+  resolveProductImageUrl,
+  type ProductRecord
+} from '../lib/productContract';
 import {
   buildTenantPlanSummary,
   formatTenantPlanLimit,
@@ -20,42 +27,10 @@ interface ProductsWorkspaceProps {
   quickLaunchRequest?: QuickLaunchRequest | null;
 }
 
-// Extend Product model for high-fidelity inventory and fulfillment specifications
-export interface EnhancedProduct extends Product {
-  descriptionAr: string;
-  descriptionEn: string;
-  images: string[]; // Support gallery up to 5 images
-  brand: string;
-  rawPrice: number;
-  taxRate: number; // e.g. 15% VAT
-  commissionRate: number; // e.g. 10% platform fee
-  size: string;
-  color: string;
-  ingredientsAr: string;
-  ingredientsEn: string;
-  howToUseAr: string;
-  howToUseEn: string;
-  featuresAr: string;
-  featuresEn: string;
-  isAvailable: boolean;
-  isFeatured: boolean;
-  allowsDelivery: boolean;
-  allowsPickup: boolean;
-  soldCount: number;
-  usedAsGiftCount: number;
-}
+type EnhancedProduct = ProductRecord;
 
 // Default luxury cosmetics placeholder
 const defaultImagePlaceholder = 'https://images.unsplash.com/photo-1556228720-195a672e8a03?q=80&w=600&auto=format&fit=crop';
-
-const categoryOptions = [
-  { id: 'all', labelAr: 'كل فئات المنتجات', labelEn: 'All Product Categories' },
-  { id: 'Hair Products', labelAr: 'منتجات الشعر', labelEn: 'Hair Products' },
-  { id: 'Skincare Products', labelAr: 'منتجات البشرة', labelEn: 'Skincare Products' },
-  { id: 'Body Products', labelAr: 'منتجات الجسم', labelEn: 'Body Products' },
-  { id: 'Nail Products', labelAr: 'منتجات الأظافر', labelEn: 'Nail Products' },
-  { id: 'Luxury Perfumes', labelAr: 'عطور فاخرة', labelEn: 'Luxury Perfumes' }
-];
 
 const presetCosmeticsImages = [
   { url: 'https://images.unsplash.com/photo-1608248597481-496100c80836?q=80&w=600&auto=format&fit=crop', labelAr: 'زيت شعر ذهبي فاخر', labelEn: 'Luxury Golden Hair Oil' },
@@ -64,6 +39,17 @@ const presetCosmeticsImages = [
   { url: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?q=80&w=600&auto=format&fit=crop', labelAr: 'مستخلص لافندر وشامبو طبيعي', labelEn: 'Natural Shampoo & Lavender' },
   { url: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?q=80&w=600&auto=format&fit=crop', labelAr: 'زيت جوز الهند العضوي المعالج', labelEn: 'Organic Coconut Treatment' },
   { url: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?q=80&w=600&auto=format&fit=crop', labelAr: 'مجموعة التجميل والعناية', labelEn: 'Premium Cosmetic Set' }
+];
+
+const categoryOptions = [
+  { id: 'all', labelAr: 'كل فئات المنتجات', labelEn: 'All Product Categories' },
+  ...PRODUCT_CATEGORY_OPTIONS
+    .filter((option) => option.id !== 'general')
+    .map((option) => ({
+      id: option.id,
+      labelAr: option.labelAr,
+      labelEn: option.labelEn
+    }))
 ];
 
 export default function ProductsWorkspace({ lang, quickLaunchRequest }: ProductsWorkspaceProps) {
@@ -120,7 +106,8 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
     categoryEn: 'Hair Products',
     images: [defaultImagePlaceholder],
     rawPrice: 100,
-    price: 126.5, // (100 * 1.10) * 1.15
+    price: 126.5, // canonical final selling price alias
+    finalPrice: 126.5,
     taxRate: 15,
     commissionRate: 10,
     stock: 25,
@@ -243,6 +230,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
       images: [defaultImagePlaceholder],
       rawPrice: 100,
       price: 126.5,
+      finalPrice: 126.5,
       taxRate: 15,
       commissionRate: 10,
       stock: 30,
@@ -276,7 +264,35 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
   // Action: Open Edit form
   const handleOpenEdit = (prd: EnhancedProduct) => {
     setFormMode('edit');
-    setFormData({ ...prd });
+    const normalized = normalizeProductRecord(prd);
+    setFormData({
+      ...normalized,
+      nameAr: normalized.nameAr || normalized.name_ar || '',
+      nameEn: normalized.nameEn || normalized.name_en || '',
+      descriptionAr: normalized.descriptionAr || normalized.description_ar || '',
+      descriptionEn: normalized.descriptionEn || normalized.description_en || '',
+      categoryAr: normalized.categoryAr || '',
+      categoryEn: normalized.categoryEn || normalized.category || '',
+      images: normalized.images && normalized.images.length > 0 ? normalized.images : (normalized.image ? [normalized.image] : [defaultImagePlaceholder]),
+      rawPrice: normalized.rawPrice ?? 0,
+      price: normalized.finalPrice ?? normalized.price ?? 0,
+      finalPrice: normalized.finalPrice ?? normalized.price ?? 0,
+      size: normalized.size || '',
+      color: normalized.color || '',
+      brand: normalized.brand || '',
+      ingredientsAr: normalized.ingredientsAr || normalized.ingredients_ar || '',
+      ingredientsEn: normalized.ingredientsEn || normalized.ingredients_en || '',
+      howToUseAr: normalized.howToUseAr || normalized.howToUse_ar || '',
+      howToUseEn: normalized.howToUseEn || normalized.howToUse_en || '',
+      featuresAr: normalized.featuresAr || normalized.features_ar || '',
+      featuresEn: normalized.featuresEn || normalized.features_en || '',
+      stock: normalized.stock ?? 0,
+      sku: normalized.sku || '',
+      isAvailable: normalized.isAvailable,
+      isFeatured: normalized.isFeatured,
+      allowsDelivery: normalized.allowsDelivery ?? true,
+      allowsPickup: normalized.allowsPickup ?? true
+    } as EnhancedProduct);
     setActiveSection('basic');
     setActiveView('form');
   };
@@ -382,18 +398,30 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
     reader.readAsDataURL(file);
   };
 
-  // Raw Price input and tax recalculation
-  const handleRawPriceChange = (val: number) => {
-    const rawVal = Math.max(0, val);
-    const comm = Math.round(rawVal * (formData.commissionRate / 100) * 100) / 100;
-    const finalBeforeTax = rawVal + comm;
-    const tax = Math.round(finalBeforeTax * (formData.taxRate / 100) * 100) / 100;
-    const finalPrice = Math.round((finalBeforeTax + tax) * 100) / 100;
+  const calculateDerivedProductPricing = (sellingPrice: number) => {
+    const finalPrice = Math.max(0, sellingPrice);
+    const divisor = 1 + (formData.taxRate / 100) + (formData.commissionRate / 100);
+    const rawPrice = divisor > 0 ? Math.round((finalPrice / divisor) * 100) / 100 : 0;
+    const commission = Math.round(rawPrice * (formData.commissionRate / 100) * 100) / 100;
+    const vat = Math.round(rawPrice * (formData.taxRate / 100) * 100) / 100;
+
+    return {
+      rawPrice,
+      commission,
+      vat,
+      finalPrice: Math.round(finalPrice * 100) / 100
+    };
+  };
+
+  // Selling Price input and tax recalculation
+  const handleFinalPriceChange = (val: number) => {
+    const derived = calculateDerivedProductPricing(val);
 
     setFormData(prev => ({
       ...prev,
-      rawPrice: rawVal,
-      price: finalPrice
+      rawPrice: derived.rawPrice,
+      price: derived.finalPrice,
+      finalPrice: derived.finalPrice
     }));
   };
 
@@ -411,35 +439,40 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
       return;
     }
 
-    // Validation: At least one delivery option
-    if (!formData.allowsDelivery && !formData.allowsPickup) {
-      triggerToast('At least one fulfillment channel (Delivery or Pickup) must be enabled.', 'يجب تمكين قناة تلبية واحدة على الأقل (التوصيل أو الاستلام من الفرع).', 'error');
-      return;
-    }
-
     // Validation: Unique SKU
-    const isSkuDuplicate = products.some(p => p.sku.toLowerCase() === formData.sku.toLowerCase() && p.id !== formData.id);
+    const isSkuDuplicate = products.some(p => `${p.sku ?? ''}`.toLowerCase() === formData.sku.toLowerCase() && p.id !== formData.id);
     if (isSkuDuplicate) {
       triggerToast('SKU already exists. Please input a unique identifier.', 'رمز الـ SKU مسجل مسبقاً لمنتج آخر. يرجى إدخال رمز فريد.', 'error');
       return;
     }
 
-    // Resolve Category objects
+    const submittedImages = formData.images
+      .filter((img) => img && img !== defaultImagePlaceholder)
+      .map((img) => `${img}`.trim())
+      .filter(Boolean);
+
+    if (submittedImages.length === 0) {
+      triggerToast('At least one product image is required.', 'يجب إضافة صورة واحدة على الأقل للمنتج.', 'error');
+      return;
+    }
+
     const selectedCat = categoryOptions.find(c => c.id === formData.categoryEn || c.labelEn === formData.categoryEn) || categoryOptions[1];
 
-    const finalProductData: any = {
+    const finalProductData: any = buildProductSubmissionPayload({
       ...formData,
       categoryEn: selectedCat.id,
       categoryAr: selectedCat.labelAr,
+      category: selectedCat.id,
       isAvailable: formData.stock > 0 && formData.isAvailable,
-      images: formData.images.length > 0 ? formData.images : [defaultImagePlaceholder]
-    };
+      images: submittedImages,
+      retainedImages: submittedImages
+    });
 
     try {
       if (formMode === 'add') {
         // Send to backend
         const res = await tenantApiAdapter.createProduct(finalProductData);
-        setProducts(prev => [res.product, ...prev]);
+        setProducts(prev => [normalizeProductRecord(res.product), ...prev]);
         triggerToast(
           `Deployed new product successfully!`,
           `تم إضافة وتنشيط المنتج الجديد وتأكيد مخزونه بنجاح!`,
@@ -447,7 +480,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
         );
       } else {
         const res = await tenantApiAdapter.updateProduct(finalProductData.id, finalProductData);
-        setProducts(prev => prev.map(p => p.id === finalProductData.id ? res.product : p));
+        setProducts(prev => prev.map(p => p.id === finalProductData.id ? normalizeProductRecord(res.product) : p));
         triggerToast(
           `Updated product details!`,
           `تم حفظ تفاصيل وتعديلات المنتج بنجاح.`,
@@ -711,7 +744,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
                       {/* Image Preview & Hover features */}
                       <div className="aspect-video relative overflow-hidden bg-neutral-100 border-b border-neutral-100">
                         <img 
-                          src={prd.images[0] || defaultImagePlaceholder} 
+                          src={resolveProductImageUrl(prd.images?.[0] || prd.image || defaultImagePlaceholder) || defaultImagePlaceholder}
                           alt={prd.nameEn} 
                           className="w-full h-full object-cover" 
                         />
@@ -1488,14 +1521,14 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
                         {/* Raw Price */}
                         <div className="space-y-1.5">
                           <label className="text-[10px] text-neutral-500 font-extrabold block uppercase">
-                            {isRtl ? 'سعر التكلفة المبدئي ر.س *' : 'Raw Cost Price (SAR) *'}
+                            {isRtl ? 'سعر البيع النهائي شامل الضريبة ر.س *' : 'Final Selling Price (VAT Included) *'}
                           </label>
                           <input
                             type="number"
                             required
                             min={0}
-                            value={formData.rawPrice}
-                            onChange={e => handleRawPriceChange(parseFloat(e.target.value) || 0)}
+                            value={formData.finalPrice ?? formData.price}
+                            onChange={e => handleFinalPriceChange(parseFloat(e.target.value) || 0)}
                             className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-indigo-500 rounded-xl p-2.5 text-xs font-black text-neutral-800 font-mono text-center"
                           />
                         </div>
@@ -1596,37 +1629,37 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
 
                       <div className="space-y-2.5 text-xs font-bold text-slate-300">
                         <div className="flex justify-between">
-                          <span>{isRtl ? 'سعر التكلفة المبدئي:' : 'Raw Cost Price:'}</span>
-                          <span className="font-mono text-white">{formData.rawPrice} {isRtl ? 'ر.س' : 'SAR'}</span>
+                          <span>{isRtl ? 'سعر البيع المدخل:' : 'Selling Price (Entered):'}</span>
+                          <span className="font-mono text-white">{formData.finalPrice ?? formData.price} {isRtl ? 'ر.س' : 'SAR'}</span>
                         </div>
                         <div className="flex justify-between text-indigo-300">
                           <span className="flex items-center gap-1">
                             <Percent size={11} />
-                            <span>{isRtl ? 'عمولة منصة رفاه (١٠٪):' : 'Refah Commission (10%):'}</span>
+                            <span>{isRtl ? 'الضريبة المستخرجة (١٥٪):' : 'VAT extracted (15%):'}</span>
                           </span>
                           <span className="font-mono text-indigo-200">
-                            + {Math.round(formData.rawPrice * 0.10 * 100) / 100} {isRtl ? 'ر.س' : 'SAR'}
+                            + {Math.round((formData.rawPrice ?? 0) * (formData.taxRate / 100) * 100) / 100} {isRtl ? 'ر.س' : 'SAR'}
                           </span>
                         </div>
                         <div className="flex justify-between text-slate-400">
-                          <span>{isRtl ? 'قيمة المجموع الخاضع للضريبة:' : 'Taxable Subtotal:'}</span>
+                          <span>{isRtl ? 'سعر الصافي قبل الضريبة والعمولة:' : 'Net price before VAT & fee:'}</span>
                           <span className="font-mono">
-                            {formData.rawPrice + Math.round(formData.rawPrice * 0.10 * 100) / 100} {isRtl ? 'ر.س' : 'SAR'}
+                            {formData.rawPrice ?? 0} {isRtl ? 'ر.س' : 'SAR'}
                           </span>
                         </div>
                         <div className="flex justify-between text-violet-300 border-b border-white/10 pb-2.5">
                           <span className="flex items-center gap-1">
                             <Percent size={11} />
-                            <span>{isRtl ? 'ضريبة القيمة المضافة لصالونات التجميل (١٥٪):' : 'Beauty Center VAT (15%):'}</span>
+                            <span>{isRtl ? 'الرسوم الداخلية المضمّنة (١٠٪):' : 'Internal fee extracted (10%):'}</span>
                           </span>
                           <span className="font-mono text-violet-200">
-                            + {Math.round((formData.rawPrice * 1.10) * 0.15 * 100) / 100} {isRtl ? 'ر.س' : 'SAR'}
+                            + {Math.round((formData.rawPrice ?? 0) * (formData.commissionRate / 100) * 100) / 100} {isRtl ? 'ر.س' : 'SAR'}
                           </span>
                         </div>
                         <div className="flex justify-between text-base font-black text-white pt-1.5">
-                          <span className="text-emerald-400">{isRtl ? 'سعر البيع النهائي للجمهور:' : 'Final Display Retail Price:'}</span>
+                          <span className="text-emerald-400">{isRtl ? 'المبلغ المخزن نهائياً:' : 'Stored final selling price:'}</span>
                           <span className="font-mono text-emerald-400 text-lg">
-                            {formData.price} {isRtl ? 'ر.س' : 'SAR'}
+                            {formData.finalPrice ?? formData.price} {isRtl ? 'ر.س' : 'SAR'}
                           </span>
                         </div>
                       </div>

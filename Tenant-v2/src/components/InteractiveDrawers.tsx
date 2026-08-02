@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Calendar as CalendarIcon, User, Users, PlusCircle, Check, 
-  Trash, ChevronLeft, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle
+  Trash, ChevronLeft, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search
 } from 'lucide-react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import {
@@ -12,6 +12,11 @@ import {
   normalizeServiceRecord,
   type ServiceRecord
 } from '../lib/serviceContract';
+import {
+  PRODUCT_CATEGORY_OPTIONS,
+  resolveProductImageUrl,
+  type ProductRecord
+} from '../lib/productContract';
 
 const toMoney = (value: any) => {
   const numeric = Number(value);
@@ -564,6 +569,8 @@ export default function InteractiveDrawers({
 
   // POS CART & GIFT CARDS
   const [cartTab, setCartTab] = useState<'products' | 'giftcards'>('products');
+  const [productSearch, setProductSearch] = useState('');
+  const [productCategoryFilter, setProductCategoryFilter] = useState('all');
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [gcSender, setGcSender] = useState('');
   const [gcRecipient, setGcRecipient] = useState('');
@@ -573,6 +580,53 @@ export default function InteractiveDrawers({
   const [posSelectedCustId, setPosSelectedCustId] = useState('');
   const [posSplitActive, setPosSplitActive] = useState(false);
   const [posSplitAmounts, setPosSplitAmounts] = useState({ card: 0, cash: 0, wallet: 0 });
+
+  const canonicalProducts = useMemo<ProductRecord[]>(() => {
+    return products.map((product: any) => ({
+      ...product,
+      imageUrl: resolveProductImageUrl(product.imageUrl || product.primaryImage || product.image || product.images?.[0]),
+      primaryImage: resolveProductImageUrl(product.primaryImage || product.image || product.images?.[0]),
+      images: Array.isArray(product.images) ? product.images.map((img: any) => resolveProductImageUrl(img)).filter(Boolean) : []
+    }));
+  }, [products]);
+
+  const productCategoryOptions = useMemo(() => {
+    const categories = new Map<string, { id: string; labelAr: string; labelEn: string }>();
+    canonicalProducts.forEach((product) => {
+      const category = `${product.category || product.categoryEn || product.categoryAr || ''}`.trim();
+      if (!category || categories.has(category.toLowerCase())) {
+        return;
+      }
+
+      const match = PRODUCT_CATEGORY_OPTIONS.find((option) => {
+        return [option.id, option.slug, option.labelEn, option.labelAr]
+          .some((candidate) => `${candidate}`.toLowerCase() === category.toLowerCase());
+      });
+
+      const entry = match
+        ? { id: match.id, labelAr: match.labelAr, labelEn: match.labelEn }
+        : { id: category, labelAr: product.categoryAr || category, labelEn: product.categoryEn || category };
+
+      categories.set(category.toLowerCase(), entry);
+    });
+
+    return [
+      { id: 'all', labelAr: 'جميع المنتجات', labelEn: 'All Products' },
+      ...Array.from(categories.values())
+    ];
+  }, [canonicalProducts]);
+
+  const filteredProductCards = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+    return canonicalProducts.filter((product) => {
+      const category = `${product.category || product.categoryEn || product.categoryAr || ''}`.trim();
+      const matchesCategory = productCategoryFilter === 'all' || category.toLowerCase() === productCategoryFilter.toLowerCase();
+      const matchesSearch = query.length === 0
+        || [product.nameAr, product.nameEn, product.sku, product.brand, category]
+          .some((value) => `${value ?? ''}`.toLowerCase().includes(query));
+      return matchesCategory && matchesSearch;
+    });
+  }, [canonicalProducts, productCategoryFilter, productSearch]);
 
   // Receipt printed preview modal
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
@@ -2217,24 +2271,88 @@ export default function InteractiveDrawers({
 
                       <div className="flex-1 overflow-y-auto p-3">
                     {cartTab === 'products' ? (
-                      <div className="grid grid-cols-2 gap-2 animate-fadeIn">
-                        {products.map(prod => (
-                          <div key={prod.id} className="p-2.5 border rounded-lg flex flex-col justify-between h-36 bg-white hover:border-amber-400">
-                            <div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-[8px] font-mono text-slate-400">{prod.sku}</span>
-                                <span className={`text-[8px] font-bold px-1 rounded ${prod.stock === 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>{prod.stock} left</span>
-                              </div>
-                              <h4 className="text-[10px] font-bold text-slate-800 mt-1 line-clamp-2 leading-snug">{isRtl ? prod.nameAr : prod.nameEn}</h4>
-                            </div>
-                            <div className="flex justify-between items-center pt-2 border-t mt-1">
-                              <span className="font-mono font-black text-slate-800 text-xs">{prod.price} SAR</span>
-                              <button type="button" disabled={prod.stock === 0} onClick={() => handleAddProductToCart(prod)} className="bg-zinc-950 text-white text-[9px] py-1 px-2 rounded-md hover:bg-zinc-850">
-                                Add +
-                              </button>
-                            </div>
+                      <div className="space-y-3 animate-fadeIn">
+                        <div className="space-y-2 border-b border-slate-200 pb-3">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-3 text-slate-400" size={14} />
+                            <input
+                              type="text"
+                              value={productSearch}
+                              onChange={(e) => setProductSearch(e.target.value)}
+                              placeholder={isRtl ? 'ابحث باسم المنتج أو SKU...' : 'Search products by name or SKU...'}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-9 py-2 text-xs font-semibold text-slate-700 focus:ring-1 focus:ring-amber-500"
+                            />
                           </div>
-                        ))}
+                          <div className="flex flex-wrap gap-1.5">
+                            {productCategoryOptions.map((category) => (
+                              <button
+                                key={category.id}
+                                type="button"
+                                onClick={() => setProductCategoryFilter(category.id)}
+                                className={`px-2.5 py-1.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
+                                  productCategoryFilter === category.id
+                                    ? 'bg-zinc-950 text-white border-zinc-950'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-amber-400'
+                                }`}
+                              >
+                                {isRtl ? category.labelAr : category.labelEn}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {filteredProductCards.length > 0 ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            {filteredProductCards.map((prod) => {
+                              const imageSrc = resolveProductImageUrl(prod.imageUrl || prod.primaryImage || prod.image || prod.images?.[0]);
+                              return (
+                                <button
+                                  key={prod.id}
+                                  type="button"
+                                  disabled={prod.stock === 0}
+                                  onClick={() => handleAddProductToCart(prod)}
+                                  className={`group text-left rounded-xl border bg-white overflow-hidden flex flex-col transition-all h-full ${
+                                    prod.stock === 0 ? 'opacity-60 cursor-not-allowed' : 'hover:border-amber-400 hover:shadow-xs cursor-pointer'
+                                  }`}
+                                >
+                                  <div className="aspect-square bg-slate-50 overflow-hidden relative">
+                                    <img src={imageSrc || ''} alt={isRtl ? prod.nameAr : prod.nameEn} className="w-full h-full object-cover" />
+                                    <span className="absolute top-2 left-2 text-[8px] font-black px-1.5 py-0.5 rounded bg-black/70 text-white">
+                                      {prod.stock > 0 ? `${prod.stock}` : (isRtl ? 'نفد' : '0')}
+                                    </span>
+                                  </div>
+                                  <div className="p-2.5 flex-1 flex flex-col justify-between gap-2">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[8px] font-bold text-amber-600 uppercase truncate">
+                                          {isRtl ? prod.categoryAr : prod.categoryEn}
+                                        </span>
+                                        <span className="text-[8px] font-mono text-slate-400 truncate">{prod.sku || '—'}</span>
+                                      </div>
+                                      <h4 className="text-[11px] font-bold text-slate-800 line-clamp-2 leading-snug">
+                                        {isRtl ? prod.nameAr : prod.nameEn}
+                                      </h4>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                                      <span className="font-mono font-black text-slate-800 text-xs">
+                                        {Number(prod.price || 0).toFixed(2)} SAR
+                                      </span>
+                                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                                        prod.stock === 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+                                      }`}>
+                                        {prod.stock === 0 ? (isRtl ? 'غير متاح' : 'Out') : (isRtl ? 'متاح' : 'Live')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-10 text-center text-[10px] text-slate-500">
+                            {isRtl ? 'لا توجد منتجات مطابقة الآن.' : 'No products match your current filters.'}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-3 animate-fadeIn text-xs">

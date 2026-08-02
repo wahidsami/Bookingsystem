@@ -9,7 +9,7 @@ import { Language, ViewType, QuickLaunchRequest } from '../types';
 import { translations, navigationItems } from '../data/translations';
 import { 
   mockCustomers, mockEmployees, 
-  mockServices, mockProducts, mockTransactions, mockCampaigns, 
+  mockServices, mockTransactions, mockCampaigns,
   mockGiftCards, mockLoyalty, mockReviews
 } from '../data/mockData';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
@@ -92,6 +92,7 @@ export default function Workspace({
   // Real Data State
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [todaysAppointments, setTodaysAppointments] = useState<any[]>([]);
+  const [liveProducts, setLiveProducts] = useState<any[]>([]);
   const [tenantBills, setTenantBills] = useState<any[]>([]);
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
@@ -115,6 +116,16 @@ export default function Workspace({
           }
         } catch (err) {
           console.error(err);
+        }
+      } else if (view === 'pos' || view === 'inventory') {
+        try {
+          const prodRes = await tenantApiAdapter.getProducts();
+          if (isMounted) {
+            setLiveProducts(Array.isArray(prodRes?.products) ? prodRes.products : []);
+          }
+        } catch (err) {
+          console.error(err);
+          if (isMounted) setLiveProducts([]);
         }
       } else {
         await new Promise(resolve => setTimeout(resolve, 400));
@@ -694,7 +705,7 @@ export default function Workspace({
                 </div>
               ))}
 
-              {mockProducts.map(prd => (
+              {liveProducts.length > 0 ? liveProducts.map(prd => (
                 <div 
                   key={prd.id} 
                   onClick={() => prd.stock > 0 && handleAddToPosCart({ id: prd.id, nameAr: prd.nameAr, nameEn: prd.nameEn, price: prd.price, type: 'product' })}
@@ -710,7 +721,11 @@ export default function Workspace({
                   </div>
                   <span className="text-xs font-black text-brand-600 dark:text-brand-400 font-mono shrink-0">{prd.price} {t.riyal}</span>
                 </div>
-              ))}
+              )) : (
+                <div className={`col-span-2 p-5 rounded-xl border text-center text-xs ${darkMode ? 'border-zinc-800 bg-zinc-900/60 text-zinc-400' : 'border-neutral-100 bg-neutral-50 text-neutral-500'}`}>
+                  {isRtl ? 'لا توجد منتجات مضافة بعد.' : 'No live products are available yet.'}
+                </div>
+              )}
             </div>
           </div>
 
@@ -989,7 +1004,7 @@ export default function Workspace({
           </div>
 
           <div className="space-y-3">
-            {mockProducts.map((prd) => (
+            {liveProducts.length > 0 ? liveProducts.map((prd) => (
               <div key={prd.id} className={`p-3.5 border rounded-xl flex justify-between items-center text-xs ${
                 darkMode ? 'border-zinc-800 bg-zinc-950/10' : 'border-neutral-100'
               }`}>
@@ -1004,7 +1019,11 @@ export default function Workspace({
                   }`}>{prd.stock} units</span>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className={`p-4 rounded-xl border text-center text-xs ${darkMode ? 'border-zinc-800 bg-zinc-900/60 text-zinc-400' : 'border-neutral-100 bg-neutral-50 text-neutral-500'}`}>
+                {isRtl ? 'لا توجد منتجات مخزنة حتى الآن.' : 'No products have been added to inventory yet.'}
+              </div>
+            )}
           </div>
         </div>
       )}
