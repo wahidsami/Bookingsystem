@@ -738,6 +738,30 @@ export default function InteractiveDrawers({
       loyalty = 'Guest Account';
     }
 
+    const splitCustomerName = (value: string) => {
+      const normalized = `${value || ''}`.trim().replace(/\s+/g, ' ');
+      if (!normalized) {
+        return { firstName: 'Customer', lastName: 'Guest' };
+      }
+
+      const parts = normalized.split(' ').filter(Boolean);
+      if (parts.length === 1) {
+        return { firstName: parts[0], lastName: 'Guest' };
+      }
+
+      if (parts.length === 2) {
+        return { firstName: parts[0], lastName: parts[1] };
+      }
+
+      return {
+        firstName: parts[0],
+        lastName: parts.slice(1).join(' ')
+      };
+    };
+
+    const derivedCustomerName = `${custNameEn || custNameAr || ''}`.trim();
+    const derivedCustomerNameParts = splitCustomerName(derivedCustomerName);
+
     const finalStaged = [...stagedServices];
     if (finalStaged.length === 0) {
       addLocalToast('يرجى إدراج خدمة واحدة على الأقل لتأكيد الحجز', 'Please add at least one service to confirm booking', 'warning');
@@ -828,8 +852,8 @@ export default function InteractiveDrawers({
       platformUserId: custMode === 'existing' ? selectedCustId : undefined,
       customer: custMode === 'new' || custMode === 'walkin'
         ? {
-            firstName: custNameEn.trim(),
-            lastName: '',
+            firstName: derivedCustomerNameParts.firstName,
+            lastName: derivedCustomerNameParts.lastName,
             email: custEmail.trim(),
             phone: custPhone.trim()
           }
