@@ -3574,7 +3574,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         
         {/* LEFT COLUMN: CONTROLS & DATE NAVIGATOR (col-span-3) */}
-        <div className={`${isSidebarCollapsed ? 'lg:col-span-1' : 'lg:col-span-3'} space-y-4`}>
+        <div className="hidden lg:col-span-3 space-y-4">
           
           {/* Quick Date Indicator Widget */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
@@ -3729,13 +3729,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         </div>
 
         {/* CENTER COLUMN: INTERACTIVE SCHEDULER BOARD (col-span-9) */}
-        <div className={`${isSidebarCollapsed ? 'lg:col-span-11' : 'lg:col-span-9'}`}>
+        <div className="lg:col-span-12">
           
           <div
             className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative"
             style={{
-              width: `${schedulerBoardSettings.gridWidth}%`,
-              minWidth: `${schedulerBoardSettings.gridWidth}%`
+              width: '100%',
+              minWidth: '100%'
             }}
           >
             
