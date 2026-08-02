@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { DEFAULT_EMPLOYEE_AVATAR, resolveEmployeeImageUrl } from '../lib/employeeImage';
+import { useTenantAuth } from '../contexts/TenantAuthContext';
+import { getTenantBusinessHours, normalizeTimeInput, type WorkingHoursDayKey } from '../lib/tenantWorkingHours';
 import { 
   UserCheck, Calendar, TrendingUp, DollarSign, Clock, Star, 
   Settings, Award, Sparkles, Check, X, Download, ShieldCheck, Mail, Phone,
@@ -62,6 +64,16 @@ const WEEKDAY_ROWS = [
   { dayOfWeek: 5, dayEn: 'Friday', dayAr: 'الجمعة' },
   { dayOfWeek: 6, dayEn: 'Saturday', dayAr: 'السبت' }
 ] as const;
+
+const WEEKDAY_KEYS: WorkingHoursDayKey[] = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday'
+];
 
 const formatScheduleTime = (value: string) => {
   const raw = `${value ?? ''}`.trim();
@@ -137,11 +149,6 @@ const cloneScheduleDays = (schedule: TeamMemberData['schedule']) => {
   }));
 };
 
-const DEFAULT_WORKING_HOURS = {
-  startTime: '10:00 AM',
-  endTime: '08:00 PM'
-};
-
 function to12HourTime(value: string) {
   const raw = `${value || ''}`.trim();
   if (!raw) return '';
@@ -176,22 +183,6 @@ function to24HourTime(value: string) {
   return raw.length >= 5 ? raw.slice(0, 5) : raw;
 }
 
-function createDefaultWeeklySchedule(): TeamMemberData['schedule'] {
-  return WEEKDAY_ROWS.map((day) => {
-    const isWorking = ![0, 5].includes(day.dayOfWeek);
-    return {
-      dayEn: day.dayEn,
-      dayAr: day.dayAr,
-      hours: isWorking
-        ? `${DEFAULT_WORKING_HOURS.startTime} - ${DEFAULT_WORKING_HOURS.endTime}`
-        : 'Day Off',
-      status: isWorking ? 'working' : 'off',
-      slots: [],
-      subShifts: []
-    };
-  });
-}
-
 function parseScheduleRange(hours: string) {
   const raw = `${hours || ''}`.trim();
   if (!raw || /^day off$/i.test(raw)) {
@@ -219,6 +210,29 @@ function formatScheduleRange(startTime: string, endTime: string) {
 
 function parseTimeForInput(value: string) {
   return to24HourTime(value);
+}
+
+function createDefaultWeeklySchedule(
+  settings?: Record<string, any> | null,
+  tenant?: Record<string, any> | null
+): TeamMemberData['schedule'] {
+  const businessHours = getTenantBusinessHours(settings, tenant);
+  return WEEKDAY_ROWS.map((day, index) => {
+    const canonical = businessHours[WEEKDAY_KEYS[index]];
+    const isWorking = canonical?.isOpen ?? ![0, 5].includes(day.dayOfWeek);
+    const hours = isWorking
+      ? formatScheduleRange(canonical?.open || '09:00', canonical?.close || '21:00')
+      : 'Day Off';
+
+    return {
+      dayEn: day.dayEn,
+      dayAr: day.dayAr,
+      hours,
+      status: isWorking ? 'working' : 'off',
+      slots: [],
+      subShifts: []
+    };
+  });
 }
 
 const canonicalEmployeePosition = (value: string) => {
@@ -364,6 +378,11 @@ export default function TeamsWorkspace({
   quickLaunchRequest
 }: TeamsWorkspaceProps) {
   const isRtl = lang === 'ar';
+  const { tenant, tenantSettings } = useTenantAuth();
+  const defaultWeeklySchedule = useMemo(
+    () => createDefaultWeeklySchedule(tenantSettings, tenant),
+    [tenantSettings, tenant]
+  );
 
   // State Management
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
@@ -842,7 +861,7 @@ export default function TeamsWorkspace({
       scheduleEndDate: '',
       scheduleContinues: true,
       draftShifts: [],
-      schedule: createDefaultWeeklySchedule(),
+      schedule: cloneScheduleDays(defaultWeeklySchedule),
       staffAppPassword: 'Password123!',
       isActive: true,
       dashboardPermissions: {
@@ -906,7 +925,7 @@ export default function TeamsWorkspace({
             slots: [...s.slots],
             subShifts: s.subShifts ? s.subShifts.map(sub => ({ ...sub })) : []
           }))
-        : createDefaultWeeklySchedule(),
+        : cloneScheduleDays(defaultWeeklySchedule),
       isActive: member.isActive ?? true,
       dashboardPermissions: { 
         view_dashboard: member.dashboardPermissions.view_dashboard ?? true,
@@ -1204,12 +1223,13 @@ export default function TeamsWorkspace({
       const updated = [...prev.schedule];
       const target = updated[dayIndex];
       const nextStatus = target.status === 'working' ? 'off' : 'working';
+      const canonicalDay = defaultWeeklySchedule[dayIndex];
       updated[dayIndex] = {
         ...target,
         status: nextStatus,
         hours: nextStatus === 'off'
           ? 'Day Off'
-          : `${DEFAULT_WORKING_HOURS.startTime} - ${DEFAULT_WORKING_HOURS.endTime}`
+          : canonicalDay?.hours || '09:00 AM - 09:00 PM'
       };
       return { ...prev, schedule: updated };
     });

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Calendar, Clock, Plus, Trash2, Check, AlertCircle, Save, Info, Sparkles
 } from 'lucide-react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { useTenantAuth } from '../contexts/TenantAuthContext';
+import { getTenantBusinessHours } from '../lib/tenantWorkingHours';
 
 interface SubShift {
   id: string;
@@ -34,14 +36,16 @@ interface EmployeeWeeklyScheduleEditorProps {
 }
 
 const DEFAULT_WEEKLY_DAYS: Omit<DailySchedule, 'subShifts'>[] = [
-  { dayOfWeek: 0, dayEn: 'Sunday', dayAr: 'الأحد', status: 'off', startTime: '09:00 AM', endTime: '06:00 PM' },
-  { dayOfWeek: 1, dayEn: 'Monday', dayAr: 'الاثنين', status: 'working', startTime: '09:00 AM', endTime: '06:00 PM' },
-  { dayOfWeek: 2, dayEn: 'Tuesday', dayAr: 'الثلاثاء', status: 'working', startTime: '09:00 AM', endTime: '06:00 PM' },
-  { dayOfWeek: 3, dayEn: 'Wednesday', dayAr: 'الأربعاء', status: 'working', startTime: '09:00 AM', endTime: '06:00 PM' },
-  { dayOfWeek: 4, dayEn: 'Thursday', dayAr: 'Thursday', status: 'working', startTime: '09:00 AM', endTime: '09:00 PM' },
-  { dayOfWeek: 5, dayEn: 'Friday', dayAr: 'الجمعة', status: 'off', startTime: '01:00 PM', endTime: '09:00 PM' },
-  { dayOfWeek: 6, dayEn: 'Saturday', dayAr: 'السبت', status: 'working', startTime: '10:00 AM', endTime: '06:00 PM' },
+  { dayOfWeek: 0, dayEn: 'Sunday', dayAr: 'الأحد', status: 'off', startTime: '09:00', endTime: '18:00' },
+  { dayOfWeek: 1, dayEn: 'Monday', dayAr: 'الاثنين', status: 'working', startTime: '09:00', endTime: '18:00' },
+  { dayOfWeek: 2, dayEn: 'Tuesday', dayAr: 'الثلاثاء', status: 'working', startTime: '09:00', endTime: '18:00' },
+  { dayOfWeek: 3, dayEn: 'Wednesday', dayAr: 'الأربعاء', status: 'working', startTime: '09:00', endTime: '18:00' },
+  { dayOfWeek: 4, dayEn: 'Thursday', dayAr: 'Thursday', status: 'working', startTime: '09:00', endTime: '21:00' },
+  { dayOfWeek: 5, dayEn: 'Friday', dayAr: 'الجمعة', status: 'off', startTime: '13:00', endTime: '21:00' },
+  { dayOfWeek: 6, dayEn: 'Saturday', dayAr: 'السبت', status: 'working', startTime: '10:00', endTime: '18:00' },
 ];
+
+const WEEKDAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
 function to24HourTime(value: string) {
   const match = `${value || ''}`.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -58,15 +62,18 @@ function to24HourTime(value: string) {
   return `${String(hours).padStart(2, '0')}:${minutes}`;
 }
 
-function to12HourTime(value: string) {
-  const raw = `${value || ''}`.trim();
-  const match = raw.match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return raw;
-  let hours = Number(match[1]);
-  const minutes = match[2];
-  const suffix = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12 || 12;
-  return `${hours}:${minutes} ${suffix}`;
+function createDefaultWeeklyDays(settings?: Record<string, any> | null, tenant?: Record<string, any> | null): Omit<DailySchedule, 'subShifts'>[] {
+  const businessHours = getTenantBusinessHours(settings, tenant);
+  return DEFAULT_WEEKLY_DAYS.map((day, index) => {
+    const canonical = businessHours[WEEKDAY_KEYS[index]];
+    const isWorking = canonical?.isOpen ?? day.status === 'working';
+    return {
+      ...day,
+      status: isWorking ? 'working' : 'off',
+      startTime: canonical?.open || day.startTime,
+      endTime: canonical?.close || day.endTime
+    };
+  });
 }
 
 export default function EmployeeWeeklyScheduleEditor({
@@ -79,6 +86,8 @@ export default function EmployeeWeeklyScheduleEditor({
   onSave,
   onBoardChanged
 }: EmployeeWeeklyScheduleEditorProps) {
+  const { tenant, tenantSettings } = useTenantAuth();
+  const defaultWeeklyDays = useMemo(() => createDefaultWeeklyDays(tenantSettings, tenant), [tenantSettings, tenant]);
   const [scheduleType, setScheduleType] = useState<'recurring' | 'onetime'>('recurring');
   const [schedule, setSchedule] = useState<DailySchedule[]>([]);
   const [startDate, setStartDate] = useState<string>('2026-07-01');
@@ -100,11 +109,11 @@ export default function EmployeeWeeklyScheduleEditor({
             : [];
 
         if (shifts.length === 0) {
-          setSchedule(DEFAULT_WEEKLY_DAYS.map((day) => ({ ...day, subShifts: [] })));
+          setSchedule(defaultWeeklyDays.map((day) => ({ ...day, subShifts: [] })));
           return;
         }
 
-        const initialSchedule: DailySchedule[] = DEFAULT_WEEKLY_DAYS.map((day) => {
+        const initialSchedule: DailySchedule[] = defaultWeeklyDays.map((day) => {
           const dayShifts = shifts
             .filter((shift: any) => shift.dayOfWeek === day.dayOfWeek && shift.isActive !== false)
             .sort((a: any, b: any) => `${a.startTime || ''}`.localeCompare(`${b.startTime || ''}`));
@@ -121,13 +130,13 @@ export default function EmployeeWeeklyScheduleEditor({
           return {
             ...day,
             status: 'working',
-            startTime: to12HourTime(primary.startTime || day.startTime),
-            endTime: to12HourTime(primary.endTime || day.endTime),
+            startTime: to24HourTime(primary.startTime || day.startTime),
+            endTime: to24HourTime(primary.endTime || day.endTime),
             subShifts: rest.map((shift: any, index: number) => ({
               id: shift.id || `sub-${day.dayOfWeek}-${index}`,
               label: (shift.label as SubShift['label']) || 'Morning Shift',
-              startTime: to12HourTime(shift.startTime || day.startTime),
-              endTime: to12HourTime(shift.endTime || day.endTime)
+              startTime: to24HourTime(shift.startTime || day.startTime),
+              endTime: to24HourTime(shift.endTime || day.endTime)
             }))
           };
         });
@@ -135,12 +144,12 @@ export default function EmployeeWeeklyScheduleEditor({
         setSchedule(initialSchedule);
       } catch (err) {
         console.warn('Failed to load live weekly schedule, using defaults:', err);
-        setSchedule(DEFAULT_WEEKLY_DAYS.map((day) => ({ ...day, subShifts: [] })));
+        setSchedule(defaultWeeklyDays.map((day) => ({ ...day, subShifts: [] })));
       }
     };
 
     void loadLiveSchedule();
-  }, [isOpen, staffId]);
+  }, [isOpen, staffId, defaultWeeklyDays]);
 
   const handleToggleDay = (idx: number) => {
     setSchedule(prev => prev.map((day, dIdx) => {
@@ -172,8 +181,8 @@ export default function EmployeeWeeklyScheduleEditor({
         const newSub: SubShift = {
           id: `sub-${Date.now()}-${Math.random()}`,
           label: 'Morning Shift',
-          startTime: '09:00 AM',
-          endTime: '01:00 PM'
+          startTime: '09:00',
+          endTime: '13:00'
         };
         return {
           ...day,
@@ -502,21 +511,21 @@ export default function EmployeeWeeklyScheduleEditor({
                           <div className="flex items-center gap-1.5 bg-white border border-slate-200 p-1 rounded-xl flex-1">
                             <Clock size={12} className="text-neutral-400 shrink-0 ml-1" />
                             <input
-                              type="text"
+                              type="time"
+                              step={900}
                               disabled={!isWorking}
                               value={day.startTime}
                               onChange={(e) => handleTimeChange(idx, 'startTime', e.target.value)}
                               className="w-full text-center font-mono text-xs font-black bg-transparent border-none outline-none disabled:text-neutral-300"
-                              placeholder="09:00 AM"
                             />
                             <span className="text-neutral-300 font-bold">→</span>
                             <input
-                              type="text"
+                              type="time"
+                              step={900}
                               disabled={!isWorking}
                               value={day.endTime}
                               onChange={(e) => handleTimeChange(idx, 'endTime', e.target.value)}
                               className="w-full text-center font-mono text-xs font-black bg-transparent border-none outline-none disabled:text-neutral-300"
-                              placeholder="06:00 PM"
                             />
                           </div>
 
@@ -557,19 +566,19 @@ export default function EmployeeWeeklyScheduleEditor({
                                   
                                   <div className="flex items-center gap-1 min-w-0 shrink-0">
                                     <input
-                                      type="text"
+                                      type="time"
+                                      step={900}
                                       value={sub.startTime}
                                       onChange={(e) => handleUpdateSubShift(idx, sub.id, 'startTime', e.target.value)}
                                       className="w-16 text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
-                                      placeholder="09:00 AM"
                                     />
                                     <span className="text-neutral-300 font-mono text-[9px]">→</span>
                                     <input
-                                      type="text"
+                                      type="time"
+                                      step={900}
                                       value={sub.endTime}
                                       onChange={(e) => handleUpdateSubShift(idx, sub.id, 'endTime', e.target.value)}
                                       className="w-16 text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
-                                      placeholder="01:00 PM"
                                     />
                                   </div>
                                 </div>

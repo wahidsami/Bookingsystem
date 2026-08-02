@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar as CalendarIcon, Clock, Plus, Search, User, Users, Check, X, 
@@ -16,6 +16,8 @@ import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
 import SchedulerGrid, { SchedulerColumn, SchedulerEvent, SchedulerSlot } from './SchedulerGrid';
 import { resolveEmployeeImageUrl } from '../lib/employeeImage';
+import { useTenantAuth } from '../contexts/TenantAuthContext';
+import { getTenantSchedulerConfig } from '../lib/tenantWorkingHours';
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
 
 interface AppointmentWorkspaceProps {
@@ -255,6 +257,8 @@ const getRiyadhCalendarDate = (value = new Date()) => parseLocalDateKey(getRiyad
 
 export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
+  const { tenant, tenantSettings } = useTenantAuth();
+  const schedulerConfig = useMemo(() => getTenantSchedulerConfig(tenantSettings, tenant), [tenantSettings, tenant]);
   
   // New API States replacing mock data
   const [liveStylists, setLiveStylists] = useState<Stylist[]>([]);
@@ -1805,9 +1809,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // Conversions for layout
   const SLOT_HEIGHT = 100; // 100px per hour
-  const START_HOUR = 9; // 9:00 AM
-  const END_HOUR = 21; // 9:00 PM (12 hours duration)
-  const TOTAL_HOURS = END_HOUR - START_HOUR;
+  const START_HOUR = schedulerConfig.startHour;
+  const END_HOUR = schedulerConfig.endHour;
+  const SLOT_MINUTES = schedulerConfig.slotMinutes;
+  const TOTAL_HOURS = Math.max(1, END_HOUR - START_HOUR);
 
   const minutesToTop = (mins: number) => {
     return (mins / 60) * SLOT_HEIGHT;
@@ -1888,7 +1893,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     
     const deltaY = e.clientY - dragState.startMouseY;
     // Each 1 hour is SLOT_HEIGHT (100px). So deltaMinutes = (deltaY / 100) * 60
-    const deltaMinutes = Math.round(((deltaY / SLOT_HEIGHT) * 60) / 5) * 5; // 5 minute precision step
+    const deltaMinutes = Math.round(((deltaY / SLOT_HEIGHT) * 60) / SLOT_MINUTES) * SLOT_MINUTES;
 
     if (dragState.isResizing) {
       // Handle resizing duration
@@ -3745,6 +3750,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   boardCurrentTime={boardCurrentTime}
                   columns={schedulerColumns}
                   events={schedulerEvents}
+                  slotMinutes={SLOT_MINUTES}
+                  startHour={START_HOUR}
+                  endHour={END_HOUR}
                   timeColumnWidth={84}
                   onSlotClick={handleSchedulerSlotClick}
                   onSlotContextMenu={handleSchedulerSlotContextMenu}
@@ -4366,8 +4374,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             }}
                             className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                           >
-                              {Array.from({ length: TOTAL_HOURS * 4 }).map((_, idx) => {
-                                const totalMins = idx * 15;
+                              {Array.from({ length: TOTAL_HOURS * (60 / SLOT_MINUTES) }).map((_, idx) => {
+                                const totalMins = idx * SLOT_MINUTES;
                                 return (
                                   <option key={idx} value={totalMins}>
                                     {formatMinutesToTime(totalMins)}
