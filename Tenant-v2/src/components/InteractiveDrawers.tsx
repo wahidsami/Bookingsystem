@@ -1723,7 +1723,7 @@ export default function InteractiveDrawers({
                     {createStep === 3 && (
                       <div className="space-y-4 animate-fadeIn text-xs">
                         <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
-                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
                             <div className="space-y-2">
                               <label className="text-slate-500 block mb-1">{isRtl ? 'الفئة' : 'Category'}</label>
                               <div className="space-y-2">
@@ -1756,85 +1756,95 @@ export default function InteractiveDrawers({
                               </div>
                             </div>
 
-                            <div className="space-y-2">
-                              <label className="text-slate-500 block mb-1">{isRtl ? 'الخدمة' : 'Service'}</label>
-                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                                {categoryServices.map((service) => {
-                                  const active = service.id === currentServiceId;
-                                  const displayPrice = getServiceDisplayPrice(service);
-                                  return (
-                                    <button
-                                      key={service.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setCurrentServiceId(service.id);
-                                        setCurrentVariantId(service.variants?.[0]?.id || '');
-                                        setCurrentDuration(service.variants?.[0]?.duration || service.duration || 60);
-                                      }}
-                                      className={`w-full text-left rounded-xl border p-3 transition-all ${
-                                        active ? 'bg-amber-50 border-amber-200 shadow-2xs' : 'bg-white border-slate-200 hover:border-slate-300'
-                                      }`}
-                                    >
-                                      <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                          <p className="font-black text-slate-800 text-xs truncate">{getServiceDisplayName(service, isRtl ? 'ar' : 'en')}</p>
-                                          <p className="text-[10px] text-slate-500 truncate">
-                                            {service.duration} {isRtl ? 'دقيقة' : 'min'} • {service.variants?.length || 0} {isRtl ? 'بديل' : 'variants'}
-                                          </p>
-                                        </div>
-                                        <span className="font-mono font-black text-slate-700 whitespace-nowrap">
-                                          {displayPrice.toFixed(2)} SAR
-                                        </span>
-                                      </div>
-                                    </button>
-                                  );
-                                })}
+                            <div className="space-y-2 lg:col-span-8">
+                              <div className="flex items-center justify-between gap-2">
+                                <label className="text-slate-500 block mb-1">{isRtl ? 'الخدمات والبدائل' : 'Services & Variants'}</label>
+                                <span className="text-[10px] font-bold text-slate-400">
+                                  {categoryServices.length} {isRtl ? 'خدمة' : 'services'}
+                                </span>
                               </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <label className="text-slate-500 block mb-1">{isRtl ? 'البدائل' : 'Variants'}</label>
-                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                                {(selectedVariants.length > 0 ? selectedVariants : selectedService ? [selectedService as any] : []).map((variant: any) => {
-                                  const active = `${variant.id}` === currentVariantId || (!currentVariantId && selectedVariants.length === 0);
-                                  const variantNameAr = variant.nameAr || variant.name_ar || selectedService?.nameAr || '';
-                                  const variantNameEn = variant.nameEn || variant.name_en || selectedService?.nameEn || '';
-                                  const variantPrice = Number(variant.finalPrice ?? variant.price ?? selectedBookablePrice ?? 0);
-                                  const variantDuration = Number(variant.duration ?? selectedBookableDuration ?? 60);
-                                  const variantStaffNames = availableStylists
-                                    .filter((staff) => !selectedService || !Array.isArray(selectedService.employeeAssignments) || selectedService.employeeAssignments.includes(staff.id))
-                                    .map((staff) => (isRtl ? staff.nameAr : staff.nameEn))
-                                    .slice(0, 3)
-                                    .join(' • ');
+                              <div className="space-y-2 max-h-[28rem] overflow-y-auto pr-1">
+                                {categoryServices.map((service) => {
+                                  const activeService = service.id === currentServiceId;
+                                  const displayPrice = getServiceDisplayPrice(service);
+                                  const serviceVariants = Array.isArray(service.variants) ? service.variants : [];
                                   return (
-                                    <button
-                                      key={variant.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setCurrentVariantId(variant.id);
-                                        setCurrentDuration(variantDuration);
-                                      }}
-                                      className={`w-full text-left rounded-xl border p-3 transition-all ${
-                                        active ? 'bg-emerald-50 border-emerald-200 shadow-2xs' : 'bg-white border-slate-200 hover:border-slate-300'
+                                    <div
+                                      key={service.id}
+                                      className={`rounded-2xl border p-3 transition-all ${
+                                        activeService ? 'bg-amber-50 border-amber-200 shadow-2xs' : 'bg-white border-slate-200 hover:border-slate-300'
                                       }`}
                                     >
-                                      <div className="space-y-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setCurrentServiceId(service.id);
+                                          const initialVariant = serviceVariants[0] || null;
+                                          setCurrentVariantId(initialVariant?.id || '');
+                                          setCurrentDuration(initialVariant?.duration || service.duration || 60);
+                                        }}
+                                        className="w-full text-left"
+                                      >
                                         <div className="flex items-start justify-between gap-2">
                                           <div className="min-w-0">
-                                            <p className="font-black text-slate-800 text-xs truncate">{isRtl ? variantNameAr : variantNameEn}</p>
+                                            <p className="font-black text-slate-800 text-xs truncate">{getServiceDisplayName(service, isRtl ? 'ar' : 'en')}</p>
                                             <p className="text-[10px] text-slate-500 truncate">
-                                              {variantDuration} {isRtl ? 'دقيقة' : 'min'} • {variantStaffNames || (isRtl ? 'لم يتم التعيين بعد' : 'No staff assigned yet')}
+                                              {service.duration} {isRtl ? 'دقيقة' : 'min'} • {serviceVariants.length || 0} {isRtl ? 'بديل' : 'variants'}
                                             </p>
                                           </div>
                                           <span className="font-mono font-black text-slate-700 whitespace-nowrap">
-                                            {variantPrice.toFixed(2)} SAR
+                                            {displayPrice.toFixed(2)} SAR
                                           </span>
                                         </div>
-                                        <div className="text-[10px] text-slate-500">
-                                          {isRtl ? 'ينتهي عند' : 'Estimated finish'}: {formatMinutesToTime(currentStartTime + variantDuration)}
+                                      </button>
+
+                                      {serviceVariants.length > 0 && (
+                                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                          {serviceVariants.map((variant: any) => {
+                                            const active = `${variant.id}` === currentVariantId && service.id === currentServiceId;
+                                            const variantNameAr = variant.nameAr || variant.name_ar || service.nameAr || '';
+                                            const variantNameEn = variant.nameEn || variant.name_en || service.nameEn || '';
+                                            const variantPrice = Number(variant.finalPrice ?? variant.price ?? displayPrice ?? 0);
+                                            const variantDuration = Number(variant.duration ?? service.duration ?? 60);
+                                            const variantStaffNames = availableStylists
+                                              .filter((staff) => !service || !Array.isArray(service.employeeAssignments) || service.employeeAssignments.includes(staff.id))
+                                              .map((staff) => (isRtl ? staff.nameAr : staff.nameEn))
+                                              .slice(0, 3)
+                                              .join(' • ');
+
+                                            return (
+                                              <button
+                                                key={variant.id}
+                                                type="button"
+                                                onClick={() => {
+                                                  setCurrentServiceId(service.id);
+                                                  setCurrentVariantId(variant.id);
+                                                  setCurrentDuration(variantDuration);
+                                                }}
+                                                className={`rounded-xl border p-2.5 text-left transition-all ${
+                                                  active ? 'bg-emerald-50 border-emerald-200 shadow-2xs' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                                                }`}
+                                              >
+                                                <div className="flex items-start justify-between gap-2">
+                                                  <div className="min-w-0">
+                                                    <p className="font-black text-slate-800 text-[11px] truncate">{isRtl ? variantNameAr : variantNameEn}</p>
+                                                    <p className="text-[10px] text-slate-500 truncate">
+                                                      {variantDuration} {isRtl ? 'دقيقة' : 'min'} • {variantStaffNames || (isRtl ? 'لم يتم التعيين بعد' : 'No staff assigned yet')}
+                                                    </p>
+                                                  </div>
+                                                  <span className="font-mono font-black text-slate-700 whitespace-nowrap text-[11px]">
+                                                    {variantPrice.toFixed(2)} SAR
+                                                  </span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-500 mt-1">
+                                                  {isRtl ? 'ينتهي عند' : 'Estimated finish'}: {formatMinutesToTime(currentStartTime + variantDuration)}
+                                                </div>
+                                              </button>
+                                            );
+                                          })}
                                         </div>
-                                      </div>
-                                    </button>
+                                      )}
+                                    </div>
                                   );
                                 })}
                               </div>

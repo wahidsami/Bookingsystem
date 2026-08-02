@@ -14,6 +14,7 @@ import {
   createEmptyServiceVariantDraft,
   normalizeServicePaymentOptions,
   normalizeServiceRecord,
+  resolveServiceImageUrl,
   type ServiceDraft,
   type ServiceRecord
 } from '../lib/serviceContract';
@@ -189,6 +190,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
 
   const handleFileChange = (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -209,6 +211,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result) {
+        setSelectedImageFile(file);
         setFormData(prev => ({
           ...prev,
           image: e.target!.result as string
@@ -294,11 +297,6 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
         ...prev,
         descriptionEn: prev.descriptionEn || `Immersive premium therapeutic ${name} customized session. Uses award-winning premium materials, temperature-controlled luxury suites, and clinical experts to deliver profound revitalization and ultimate cell relief.`,
         descriptionAr: prev.descriptionAr || `جلسة ${name} الاحترافية الفاخرة مصممة خصيصاً لتلبية أعلى المعايير الفندقية. نستخدم منتجات طبيعية حاصلة على جوائز مع عطور مسترخية في أجنحة معقمة تحت إشراف نخبة من الكوادر المعتمدة لضمان النضارة التامة وعمق الارتياح.`,
-        includes: prev.includes.length > 0 ? prev.includes : [
-          isRtl ? 'جلسة تشخيصية تمهيدية متخصصة ومجانية' : 'Complimentary diagnostic pre-session skin/hair test',
-          isRtl ? 'مستخلصات عطرية وزيوت أساسية مستوردة' : 'Signature organic oils & mineral serums',
-          isRtl ? 'مشروب دافئ مهدئ للأعصاب وضيافة ميكرو فاخرة' : 'Refah specialized wellness herbal tea & micro-delicacies'
-        ],
         categoryAr: prev.categoryAr || 'علاجات ومساج',
         categoryEn: prev.categoryEn || 'Massage & Therapy'
       }));
@@ -342,6 +340,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
     const defaultCategory = categories[1] || fallbackCategories[0] || categories[0];
     setFormMode('add');
     setFormData(createEmptyServiceDraft(defaultCategory));
+    setSelectedImageFile(null);
     setTempIncludeAr('');
     setTempIncludeEn('');
     setTempVariantNameAr('');
@@ -369,6 +368,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
     const selectedCategoryOption = getServiceCategoryOption(srv);
     const normalizedService = normalizeServiceRecord(srv);
     setFormMode('edit');
+    setSelectedImageFile(null);
     setFormData({
       ...createEmptyServiceDraft(selectedCategoryOption),
       ...normalizedService,
@@ -452,6 +452,8 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
       categoryEn: matchedCat.labelEn,
       categoryAr: matchedCat.labelAr
     });
+    const imageValue = `${formData.image || ''}`.trim();
+    const shouldPersistBodyImage = !selectedImageFile && imageValue.length > 0 && imageValue !== defaultImage;
 
     const nextErrors: Record<string, string> = {};
     if (!finalFormData.name_ar) {
@@ -474,8 +476,40 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
     }
 
     try {
+      const buildFormData = () => {
+        const fd = new FormData();
+        const appendValue = (key: string, value: any) => {
+          if (value === undefined || value === null) {
+            return;
+          }
+
+          if (Array.isArray(value) || (typeof value === 'object' && !(value instanceof File) && !(value instanceof Blob))) {
+            fd.append(key, JSON.stringify(value));
+            return;
+          }
+
+          fd.append(key, `${value}`);
+        };
+
+        Object.entries(finalFormData).forEach(([key, value]) => {
+          if (key === 'image') {
+            return;
+          }
+          appendValue(key, value);
+        });
+
+        if (selectedImageFile) {
+          fd.append('image', selectedImageFile);
+        } else if (shouldPersistBodyImage) {
+          fd.append('image', imageValue);
+        }
+
+        return fd;
+      };
+
+      const payload = selectedImageFile || shouldPersistBodyImage ? buildFormData() : finalFormData;
       if (formMode === 'add') {
-        const res = await tenantApiAdapter.createService(finalFormData);
+        const res = await tenantApiAdapter.createService(payload);
         setServices(prev => [normalizeServiceRecord(res.service), ...prev]);
         triggerToast(
           `Deployed new service successfully!`,
@@ -483,7 +517,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
           'success'
         );
       } else {
-        const res = await tenantApiAdapter.updateService(finalFormData.id, finalFormData);
+        const res = await tenantApiAdapter.updateService(finalFormData.id, payload);
         setServices(prev => prev.map(s => s.id === finalFormData.id ? normalizeServiceRecord(res.service) : s));
         triggerToast(
           `Updated service details!`,
@@ -491,6 +525,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
           'success'
         );
       }
+      setSelectedImageFile(null);
       setActiveView('list');
     } catch (err: any) {
       const rawMessage = `${err?.message || ''}`;
@@ -978,7 +1013,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-1 min-w-0">
                               <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 border shrink-0 relative">
                                 <img 
-                                  src={srv.image || defaultImage} 
+                                  src={resolveServiceImageUrl(srv.image || defaultImage)}
                                   alt={srv.nameEn} 
                                   className="w-full h-full object-cover" 
                                 />
@@ -1334,7 +1369,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                             {isRtl ? 'فئة الخدمة الرئيسية *' : 'Service Main Category *'}
                           </label>
                           <select
-                            value={resolveCategoryOption(formData.category || formData.categoryEn || formData.categoryAr || '')?.id || 'all'}
+                            value={formData.category || categories[1]?.slug || categories[0]?.slug || 'general'}
                             onChange={e => {
                               const val = e.target.value;
                               const matched = categories.find(c => c.id === val || c.slug === val || c.labelEn === val || c.labelAr === val);
@@ -1814,6 +1849,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                                 type="button"
                                 onClick={() => {
                                   setFormData(p => ({ ...p, image: defaultImage }));
+                                  setSelectedImageFile(null);
                                   setUploadError(null);
                                   triggerToast('Reverted to default image placeholder', 'تمت إعادة تعيين الصورة إلى الافتراضية', 'info');
                                 }}
@@ -1875,7 +1911,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                               </div>
                             ) : formData.image && formData.image !== defaultImage ? (
                               <div className="absolute inset-0 group">
-                                <img src={formData.image} alt="Service cover" className="w-full h-full object-cover" />
+                                <img src={resolveServiceImageUrl(formData.image)} alt="Service cover" className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2">
                                   <Upload size={20} className="drop-shadow-xs" />
                                   <span className="text-[10px] font-black">{isRtl ? 'اضغط أو اسحب لتغيير الصورة' : 'Click or Drag to replace'}</span>

@@ -1,3 +1,5 @@
+import { API_ORIGIN } from './apiConfig';
+
 export type ServicePriceType = 'free' | 'fixed';
 export type ServiceTargetGender = 'all' | 'female' | 'male';
 export type ServicePaymentOption = 'at-center' | 'online-full' | 'booking-fee';
@@ -123,6 +125,43 @@ export type ServiceCategoryOption = {
 };
 
 const DEFAULT_SERVICE_IMAGE = 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?q=80&w=600&auto=format&fit=crop';
+
+const isAbsoluteServiceUrl = (value: string) => /^(https?:|data:|blob:)/i.test(value);
+
+export const resolveServiceImageUrl = (value: unknown): string => {
+  const raw = `${value ?? ''}`.trim();
+  if (!raw) {
+    return DEFAULT_SERVICE_IMAGE;
+  }
+
+  if (isAbsoluteServiceUrl(raw)) {
+    return raw;
+  }
+
+  const normalized = raw
+    .replace(/^\.?\//, '')
+    .replace(/^server\//, '')
+    .replace(/^\/+/, '');
+
+  if (!normalized) {
+    return DEFAULT_SERVICE_IMAGE;
+  }
+
+  if (normalized.startsWith('uploads/')) {
+    return `${API_ORIGIN}/${normalized}`;
+  }
+
+  if (
+    normalized.startsWith('tenants/')
+    || normalized.startsWith('services/')
+    || normalized.startsWith('catalog/')
+    || normalized.startsWith('appointments/')
+  ) {
+    return `${API_ORIGIN}/uploads/${normalized}`;
+  }
+
+  return `${API_ORIGIN}/uploads/${normalized}`;
+};
 
 const SERVICE_PRICE_TYPES: ServicePriceType[] = ['free', 'fixed'];
 const SERVICE_TARGET_GENDERS: ServiceTargetGender[] = ['all', 'female', 'male'];
@@ -281,7 +320,7 @@ export const normalizeServiceRecord = (service: any): ServiceRecord => {
     description_en: descriptionEn,
     descriptionAr,
     descriptionEn,
-    image: toStringValue(service?.image ?? service?.photo ?? DEFAULT_SERVICE_IMAGE, DEFAULT_SERVICE_IMAGE),
+    image: resolveServiceImageUrl(service?.image ?? service?.photo ?? DEFAULT_SERVICE_IMAGE),
     includes: Array.isArray(service?.includes) ? service.includes : parseJsonArray(service?.includes),
     priceType,
     targetGender,
@@ -319,6 +358,10 @@ export const normalizeServiceRecord = (service: any): ServiceRecord => {
     allowReschedule: toBoolean(service?.allowReschedule, true),
     price: Number.isFinite(finalPrice) && finalPrice >= 0 ? parseFloat(finalPrice.toFixed(2)) : 0
   };
+};
+
+export const normalizeServiceCollection = (services: any[]): ServiceRecord[] => {
+  return Array.isArray(services) ? services.map((service) => normalizeServiceRecord(service)) : [];
 };
 
 export const createEmptyServiceDraft = (defaultCategory?: ServiceCategoryOption | null): ServiceDraft => ({

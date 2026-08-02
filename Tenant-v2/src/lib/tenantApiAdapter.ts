@@ -1,5 +1,6 @@
 import { API_BASE_URL, API_ORIGIN } from './apiConfig';
 import { normalizeEmployeeAvatarCollection } from './employeeImage';
+import { normalizeServiceCollection, normalizeServiceRecord } from './serviceContract';
 import { normalizeProductCollection, normalizeProductRecord } from './productContract';
 
 export { API_BASE_URL, API_ORIGIN } from './apiConfig';
@@ -1144,7 +1145,11 @@ class TenantApiAdapter {
   }
 
   async getServices(): Promise<any> {
-    return this.get('/tenant/services');
+    const response = await this.get('/tenant/services');
+    return {
+      ...response,
+      services: normalizeServiceCollection(response?.services || [])
+    };
   }
 
   async getServiceCategories(): Promise<any> {
@@ -1162,7 +1167,11 @@ class TenantApiAdapter {
       });
       return this.handleResponse(response);
     }
-    return this.post('/tenant/services', data);
+    const response = await this.post('/tenant/services', data);
+    return {
+      ...response,
+      service: response?.service ? normalizeServiceRecord(response.service) : response?.service
+    };
   }
 
   async updateService(id: string, data: any): Promise<any> {
@@ -1176,7 +1185,11 @@ class TenantApiAdapter {
       });
       return this.handleResponse(response);
     }
-    return this.put(`/tenant/services/${id}`, data);
+    const response = await this.put(`/tenant/services/${id}`, data);
+    return {
+      ...response,
+      service: response?.service ? normalizeServiceRecord(response.service) : response?.service
+    };
   }
 
   async deleteService(id: string): Promise<any> {

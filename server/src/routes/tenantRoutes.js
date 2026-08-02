@@ -102,7 +102,7 @@ router.get('/employees/:id/permissions', tenantEmployeeController.getEmployeePer
 router.post(
     '/employees',
     requireActiveSubscription,
-    checkResourceLimit('staff'),
+    checkResourceLimit('maxStaff'),
     tenantEmployeeController.uploadPhoto,
     tenantEmployeeController.createEmployee
 );
@@ -120,7 +120,7 @@ router.post(
     '/products',
     checkTenantFeature('hasProductsAndOrders'),
     requireActiveSubscription,
-    checkResourceLimit('product'),
+    checkResourceLimit('maxProducts'),
     tenantProductController.uploadImages,
     tenantProductController.createProduct
 );
@@ -134,7 +134,7 @@ router.get('/services/:id', tenantServiceController.getService);
 router.post(
     '/services',
     requireActiveSubscription,
-    checkResourceLimit('service'),
+    checkResourceLimit('maxServices'),
     tenantServiceController.uploadImage,
     tenantServiceController.createService
 );

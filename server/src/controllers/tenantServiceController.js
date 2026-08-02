@@ -64,6 +64,19 @@ const SERVICE_TARGET_GENDERS = new Set(['all', 'female', 'male']);
 const SERVICE_PRICE_TYPES = new Set(['free', 'fixed']);
 const SERVICE_EMPLOYEE_COMMISSION_TYPES = new Set(['fixed', 'percentage']);
 
+function isFilesystemManagedImage(value) {
+    const normalized = `${value ?? ''}`.trim();
+    if (!normalized) {
+        return false;
+    }
+
+    if (/^(https?:|data:|blob:)/i.test(normalized)) {
+        return false;
+    }
+
+    return !normalized.startsWith('server/') && !normalized.startsWith('uploads/');
+}
+
 function normalizeServiceTargetGender(value) {
     const normalized = `${value ?? 'all'}`.trim().toLowerCase();
     if (!normalized) {
@@ -428,6 +441,9 @@ exports.createService = async (req, res) => {
             name_ar,
             description_en,
             description_ar,
+            image,
+            imageUrl,
+            imagePath,
             finalPrice,
             rawPrice,
             taxRate,
@@ -533,10 +549,15 @@ exports.createService = async (req, res) => {
             }
         }
 
-        // Get image path if uploaded
-        let imagePath = null;
+        // Get image path if uploaded or supplied as canonical URL/data string
+        let resolvedImage = null;
         if (req.file) {
-            imagePath = req.file.path.replace(/\\/g, '/').split('uploads/')[1];
+            resolvedImage = req.file.path.replace(/\\/g, '/').split('uploads/')[1];
+        } else {
+            const bodyImage = `${image ?? imageUrl ?? imagePath ?? ''}`.trim();
+            if (bodyImage) {
+                resolvedImage = bodyImage;
+            }
         }
 
         // Create service
@@ -546,7 +567,7 @@ exports.createService = async (req, res) => {
             name_ar,
             description_en: description_en || null,
             description_ar: description_ar || null,
-            image: imagePath,
+            image: resolvedImage,
             rawPrice: derivedRawPrice,
             taxRate: finalTaxRate,
             commissionRate: finalCommissionRate,
@@ -626,6 +647,9 @@ exports.updateService = async (req, res) => {
             name_ar,
             description_en,
             description_ar,
+            image,
+            imageUrl,
+            imagePath,
             finalPrice,
             rawPrice,
             // taxRate and commissionRate are ignored - always use global settings
@@ -773,18 +797,21 @@ exports.updateService = async (req, res) => {
         if (availableHomeVisit !== undefined) service.availableHomeVisit = availableHomeVisit === true || availableHomeVisit === 'true';
         if (allowReschedule !== undefined) service.allowReschedule = allowReschedule === true || allowReschedule === 'true';
 
-        // Handle image upload
-        if (req.file) {
-            // Delete old image if exists
-            if (service.image) {
+        // Handle image upload or canonical image URL/body value
+        const nextBodyImage = `${image ?? imageUrl ?? imagePath ?? ''}`.trim();
+        if (req.file || nextBodyImage) {
+            if (req.file && isFilesystemManagedImage(service.image)) {
                 const oldImagePath = path.join(__dirname, '../../uploads', service.image);
                 if (fs.existsSync(oldImagePath)) {
                     fs.unlinkSync(oldImagePath);
                 }
             }
-            
-            // Set new image path
-            service.image = req.file.path.replace(/\\/g, '/').split('uploads/')[1];
+
+            if (req.file) {
+                service.image = req.file.path.replace(/\\/g, '/').split('uploads/')[1];
+            } else {
+                service.image = nextBodyImage;
+            }
         }
 
         await service.save({ transaction });
@@ -871,7 +898,7 @@ exports.deleteService = async (req, res) => {
         // For now, we'll allow deletion
 
         // Delete image if exists
-        if (service.image) {
+        if (isFilesystemManagedImage(service.image)) {
             const imagePath = path.join(__dirname, '../../uploads', service.image);
             if (fs.existsSync(imagePath)) {
                 fs.unlinkSync(imagePath);
