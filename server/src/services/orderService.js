@@ -35,8 +35,9 @@ class OrderService {
      * @param {Object} options - Sequelize options (transaction, etc.)
      */
     async createOrder(orderData, options = {}) {
+        const logSQL = (msg) => console.log('[PURCHASE-SQL]', msg);
         console.log('[DIAGNOSTIC] Beginning SQL transaction');
-        const transaction = options.transaction || await db.sequelize.transaction();
+        const transaction = options.transaction || await db.sequelize.transaction({ logging: logSQL });
         const shouldCommit = !options.transaction;
         const skipNotification = options.skipNotification === true;
         const skipInvoiceEmail = options.skipInvoiceEmail === true;
@@ -85,7 +86,8 @@ class OrderService {
                         isAvailable: true
                     },
                     lock: transaction.LOCK.UPDATE, // Lock row for update
-                    transaction
+                    transaction,
+                    logging: logSQL
                 });
 
                 if (!product) {
@@ -123,17 +125,17 @@ class OrderService {
                 // Reserve or deduct inventory based on payment method
                 if (paymentMethod === 'online') {
                     // Deduct immediately for online payment
-                    await product.decrement('stock', { by: quantity, transaction });
+                    await product.decrement('stock', { by: quantity, transaction, logging: logSQL });
                     console.log('[DIAGNOSTIC] Updating Product stock... SUCCESS');
-                    await product.increment('soldCount', { by: quantity, transaction });
+                    await product.increment('soldCount', { by: quantity, transaction, logging: logSQL });
                     console.log('[DIAGNOSTIC] Updating soldCount... SUCCESS');
                 } else {
                     // For POD/POV, we'll reserve inventory (deduct when payment confirmed)
                     // For now, we'll still deduct but mark payment as pending
                     // In production, you might want a separate "reserved" field
-                    await product.decrement('stock', { by: quantity, transaction });
+                    await product.decrement('stock', { by: quantity, transaction, logging: logSQL });
                     console.log('[DIAGNOSTIC] Updating Product stock... SUCCESS');
-                    await product.increment('soldCount', { by: quantity, transaction });
+                    await product.increment('soldCount', { by: quantity, transaction, logging: logSQL });
                     console.log('[DIAGNOSTIC] Updating soldCount... SUCCESS');
                 }
             }
@@ -172,7 +174,7 @@ class OrderService {
                 shippingFee: finalShippingFee,
                 platformFee,
                 totalAmount
-            }, { transaction });
+            }, { transaction, logging: logSQL });
             console.log('[DIAGNOSTIC] Creating Order... SUCCESS id=' + order.id);
 
             // Create order items
@@ -181,7 +183,7 @@ class OrderService {
                 const oi = await db.OrderItem.create({
                     orderId: order.id,
                     ...itemData
-                }, { transaction });
+                }, { transaction, logging: logSQL });
                 console.log('[DIAGNOSTIC] Creating OrderItem... SUCCESS id=' + oi.id);
             }
 

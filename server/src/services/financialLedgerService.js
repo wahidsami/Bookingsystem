@@ -56,7 +56,7 @@ class FinancialLedgerService {
                 paymentMethod,
                 status,
                 description,
-            }, { transaction });
+            }, { transaction, logging: (msg) => console.log('[PURCHASE-SQL]', msg) });
         } catch (error) {
             console.log('[DIAGNOSTIC] FULL ERROR in recordRevenue:', {
                 message: error.message,

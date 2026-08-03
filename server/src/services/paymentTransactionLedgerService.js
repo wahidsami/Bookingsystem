@@ -123,7 +123,8 @@ const createOrderTransaction = async (paymentData, options = {}) => {
 
     console.log('[DIAGNOSTIC] Creating PaymentTransaction...');
     const pt = await db.PaymentTransaction.create(payload, {
-        transaction: options.transaction
+        transaction: options.transaction,
+        logging: (msg) => console.log('[PURCHASE-SQL]', msg)
     });
     console.log('[DIAGNOSTIC] Creating PaymentTransaction... SUCCESS id=' + pt.id);
     return pt;
