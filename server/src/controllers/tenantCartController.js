@@ -10,6 +10,7 @@ const tenantGiftSettlementService = require('../services/tenantGiftSettlementSer
 const notificationOrchestrator = require('../services/notificationOrchestratorService');
 const { sendEmail } = require('../utils/emailService');
 const { getServerPublicUrl } = require('../utils/url');
+const { createForensicTrace } = require('../utils/forensicTrace');
 
 const CLAIM_EXPIRY_HOURS = 24 * 30;
 const VALID_PAYMENT_METHODS = ['cash', 'card_pos', 'wallet', 'bank_transfer', 'gift_card_code'];
@@ -118,7 +119,9 @@ const getActiveGiftPackage = async (tenantId, packageId) => {
   });
 };
 
-const resolveCustomer = async (payload = {}, transaction = null) => {
+const resolveCustomer = async (payload = {}, options = {}) => {
+  const transaction = options.transaction || null;
+  const forensicTrace = options.forensicTrace || null;
   const customerId = normalizeText(payload.customerId);
   const email = normalizeEmail(payload.customerEmail);
   const phone = normalizePhone(payload.customerPhone);
@@ -127,7 +130,10 @@ const resolveCustomer = async (payload = {}, transaction = null) => {
   const birthDate = normalizeText(payload.customerBirthDate || payload.dateOfBirth);
 
   if (customerId) {
-    const customer = await db.PlatformUser.findByPk(customerId, { transaction });
+    const customer = await db.PlatformUser.findByPk(customerId, {
+      transaction,
+      ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
+    });
     if (!customer) {
       throw new Error('Customer not found');
     }
@@ -140,7 +146,10 @@ const resolveCustomer = async (payload = {}, transaction = null) => {
     if (birthDate && !customer.dateOfBirth) updates.dateOfBirth = birthDate;
 
     if (Object.keys(updates).length > 0) {
-      await customer.update(updates, { transaction });
+      await customer.update(updates, {
+        transaction,
+        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
+      });
     }
 
     return { customer, created: false };
@@ -155,11 +164,14 @@ const resolveCustomer = async (payload = {}, transaction = null) => {
       phone: await userService.generateGuestPhonePlaceholder(),
       firstName,
       lastName
-    }, transaction ? { transaction } : {});
+    }, transaction ? {
+      transaction,
+      ...(forensicTrace ? { forensicTrace } : {})
+    } : { forensicTrace });
     return { customer: guest, created: true };
   }
 
-  const existing = await userService.findUserByEmailOrPhone(email, phone);
+  const existing = await userService.findUserByEmailOrPhone(email, phone, { forensicTrace });
   if (existing) {
     const updates = {};
     if (firstName && !existing.firstName) updates.firstName = firstName;
@@ -169,7 +181,10 @@ const resolveCustomer = async (payload = {}, transaction = null) => {
     if (birthDate && !existing.dateOfBirth) updates.dateOfBirth = birthDate;
 
     if (Object.keys(updates).length > 0) {
-      await existing.update(updates, { transaction });
+      await existing.update(updates, {
+        transaction,
+        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
+      });
     }
 
     return { customer: existing, created: false };
@@ -184,17 +199,25 @@ const resolveCustomer = async (payload = {}, transaction = null) => {
     phone,
     firstName,
     lastName
-  }, transaction ? { transaction } : {});
+  }, transaction ? {
+    transaction,
+    ...(forensicTrace ? { forensicTrace } : {})
+  } : { forensicTrace });
 
   if (birthDate && !guest.dateOfBirth) {
-    await guest.update({ dateOfBirth: birthDate }, { transaction });
+    await guest.update({ dateOfBirth: birthDate }, {
+      transaction,
+      ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
+    });
   }
 
   return { customer: guest, created: true };
 };
 
 exports.purchaseGiftCard = async (req, res) => {
-  const tx = await db.sequelize.transaction();
+  const forensicTrace = createForensicTrace({ label: 'POST /api/v1/tenant/cart/gift-cards/purchase', req, res });
+  forensicTrace.log('BEGIN transaction', { scope: 'purchaseGiftCard' });
+  const tx = await db.sequelize.transaction({ logging: forensicTrace.sqlLogger });
   try {
     const tenantId = req.tenantId;
     const senderId = req.userId || null;
@@ -220,6 +243,7 @@ exports.purchaseGiftCard = async (req, res) => {
     const giftPackage = await getActiveGiftPackage(tenantId, packageId);
     if (!giftPackage) {
       await tx.rollback();
+      forensicTrace.log('ROLLBACK', { scope: 'purchaseGiftCard', reason: 'gift package not found or inactive' });
       return res.status(404).json({ success: false, message: 'Gift package not found or inactive' });
     }
 
@@ -235,7 +259,10 @@ exports.purchaseGiftCard = async (req, res) => {
       customerBirthDate
     };
 
-    const { customer: recipient, created: createdGuest } = await resolveCustomer(recipientPayload, tx);
+    const { customer: recipient, created: createdGuest } = await resolveCustomer(recipientPayload, {
+      transaction: tx,
+      forensicTrace
+    });
     if (!recipient && !normalizeEmail(customerEmail) && !normalizePhone(customerPhone)) {
       throw new Error('Customer email or phone is required for gift card delivery');
     }
@@ -255,7 +282,11 @@ exports.purchaseGiftCard = async (req, res) => {
     if (externalCodeNeeded) {
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const candidate = generateGiftCode('TN');
-        const exists = await db.GiftCardCode.findOne({ where: { code: candidate }, transaction: tx });
+        const exists = await db.GiftCardCode.findOne({
+          where: { code: candidate },
+          transaction: tx,
+          logging: forensicTrace.sqlLogger
+        });
         if (!exists) {
           giftCardCode = await db.GiftCardCode.create({
             code: candidate,
@@ -276,7 +307,7 @@ exports.purchaseGiftCard = async (req, res) => {
               createdByTenantAccountId: req.tenantAccountId || null,
               createdByStaffId: req.staffId || null
             }
-          }, { transaction: tx });
+          }, { transaction: tx, logging: forensicTrace.sqlLogger });
           break;
         }
       }
@@ -313,11 +344,11 @@ exports.purchaseGiftCard = async (req, res) => {
         paymentCollectedByStaffId: req.staffId || null,
         externalRedeemCode: giftCardCode?.code || null
       }
-    }, { transaction: tx });
+    }, { transaction: tx, logging: forensicTrace.sqlLogger });
 
     if (giftCardCode?.id) {
       giftCardCode.sourceTenantGiftCardTransactionId = giftTx.id;
-      await giftCardCode.save({ transaction: tx });
+      await giftCardCode.save({ transaction: tx, logging: forensicTrace.sqlLogger });
     }
 
     if (recipient?.id && isRefahRecipient) {
@@ -333,7 +364,8 @@ exports.purchaseGiftCard = async (req, res) => {
           senderName: `${req.tenant?.name || req.tenant?.name_en || 'Refah'}`.trim(),
           packageTitle
         },
-        transaction: tx
+        transaction: tx,
+        forensicTrace
       });
     }
 
@@ -349,10 +381,11 @@ exports.purchaseGiftCard = async (req, res) => {
         createdByTenantAccountId: req.tenantAccountId || null,
         createdByStaffId: req.staffId || null
       },
-      transaction: tx
+      transaction: tx,
+      forensicTrace
     });
 
-    await db.PaymentTransaction.create({
+    const paymentTransaction = await db.PaymentTransaction.create({
       type: 'full',
       amount: purchaseAmount,
       paymentMethod: paymentMethod || 'cash',
@@ -364,12 +397,12 @@ exports.purchaseGiftCard = async (req, res) => {
         source: 'gift_card_purchase',
         giftCardTransactionId: giftTx.id
       }
-    }, { transaction: tx });
+    }, { transaction: tx, logging: forensicTrace.sqlLogger, forensicTrace });
 
     const platformFee = parseFloat((purchaseAmount * 0.025).toFixed(2));
     const tenantRevenue = parseFloat((purchaseAmount - platformFee).toFixed(2));
 
-    await db.Transaction.create({
+    const saleTransaction = await db.Transaction.create({
       platformUserId: senderId || recipient?.id,
       tenantId: tenantId,
       amount: purchaseAmount,
@@ -384,9 +417,42 @@ exports.purchaseGiftCard = async (req, res) => {
         giftCardTransactionId: giftTx.id,
         paymentMethod: paymentMethod || 'cash'
       }
-    }, { transaction: tx });
+      }, { transaction: tx, logging: forensicTrace.sqlLogger, forensicTrace });
 
     await tx.commit();
+    forensicTrace.log('COMMIT', {
+      scope: 'purchaseGiftCard',
+      giftCardTransactionId: giftTx.id,
+      paymentTransactionId: paymentTransaction.id,
+      transactionId: saleTransaction.id
+    });
+
+    try {
+      const verification = {
+        giftCardTransactionExists: await db.TenantGiftCardTransaction.count({
+          where: { id: giftTx.id },
+          logging: forensicTrace.sqlLogger
+        }),
+        paymentTransactionExists: await db.PaymentTransaction.count({
+          where: { id: paymentTransaction.id },
+          logging: forensicTrace.sqlLogger
+        }),
+        transactionExists: await db.Transaction.count({
+          where: { id: saleTransaction.id },
+          logging: forensicTrace.sqlLogger
+        }),
+        tenantGiftSettlementExists: await db.TenantGiftCardSettlement.count({
+          where: { transactionId: giftTx.id },
+          logging: forensicTrace.sqlLogger
+        })
+      };
+      forensicTrace.log('Post-commit verification', verification);
+    } catch (verificationError) {
+      forensicTrace.log('Verification exception', {
+        message: verificationError?.message || String(verificationError),
+        stack: verificationError?.stack || null
+      });
+    }
 
     const senderName = req.tenant?.name_ar || req.tenant?.name_en || req.tenant?.name || 'Refah';
     if (recipient?.id && isRefahRecipient) {
@@ -404,7 +470,11 @@ exports.purchaseGiftCard = async (req, res) => {
           }
         });
       } catch (notificationError) {
-        console.warn('Tenant gift push notification failed:', notificationError.message);
+        forensicTrace.log('Exception', {
+          scope: 'purchaseGiftCard.notification',
+          message: notificationError?.message || String(notificationError),
+          stack: notificationError?.stack || null
+        });
       }
     }
 
@@ -418,7 +488,11 @@ exports.purchaseGiftCard = async (req, res) => {
           claimLink: buildClaimLink(claimToken)
         });
       } catch (emailError) {
-        console.warn('Tenant gift email warning:', emailError.message);
+        forensicTrace.log('Exception', {
+          scope: 'purchaseGiftCard.email',
+          message: emailError?.message || String(emailError),
+          stack: emailError?.stack || null
+        });
       }
     }
 
@@ -439,14 +513,15 @@ exports.purchaseGiftCard = async (req, res) => {
     });
   } catch (error) {
     await tx.rollback();
-    console.error('Tenant cart gift card purchase error:', error);
+    forensicTrace.log('ROLLBACK', { scope: 'purchaseGiftCard', message: error?.message || String(error) });
+    forensicTrace.log('Exception', { message: error?.message || String(error), stack: error?.stack || null });
     return res.status(400).json({ success: false, message: error.message || 'Failed to complete gift card purchase' });
   }
 };
 
 exports.purchaseProducts = async (req, res) => {
-  console.log('[DIAGNOSTIC] HTTP request received');
-  console.log('[DIAGNOSTIC] Entering purchaseProducts()');
+  const forensicTrace = createForensicTrace({ label: 'POST /api/v1/tenant/cart/products/purchase', req, res });
+  forensicTrace.log('BEGIN request flow', { scope: 'purchaseProducts' });
   try {
     const tenantId = req.tenantId;
     const senderId = req.userId || null;
@@ -482,7 +557,7 @@ exports.purchaseProducts = async (req, res) => {
       customerEmail,
       customerPhone,
       customerBirthDate
-    });
+    }, { forensicTrace });
     if (!recipient) {
       throw new Error('Customer details are required');
     }
@@ -504,7 +579,8 @@ exports.purchaseProducts = async (req, res) => {
       notes: orderNotes
     }, {
       skipNotification: true,
-      skipInvoiceEmail: true
+      skipInvoiceEmail: true,
+      forensicTrace
     });
 
     const orderTotal = parseMoney(order?.totalAmount || 0);
@@ -529,10 +605,37 @@ exports.purchaseProducts = async (req, res) => {
         senderId,
         recipientCreatedAsGuest: createdGuest,
         recipientId: recipient.id
-      }
+      },
+      forensicTrace
     });
 
     const updatedOrder = await orderService.getOrderById(order.id);
+
+    try {
+      const invoice = await db.CustomerInvoice.findOne({
+        where: { entityType: 'order', entityId: order.id },
+        include: [{
+          model: db.CustomerInvoiceItem,
+          as: 'items',
+          required: false
+        }],
+        logging: forensicTrace.sqlLogger
+      });
+      const verification = {
+        orderExists: await db.Order.count({ where: { id: order.id }, logging: forensicTrace.sqlLogger }),
+        orderItemsExist: await db.OrderItem.count({ where: { orderId: order.id }, logging: forensicTrace.sqlLogger }),
+        paymentTransactionExists: await db.PaymentTransaction.count({ where: { orderId: order.id }, logging: forensicTrace.sqlLogger }),
+        transactionExists: await db.Transaction.count({ where: { orderId: order.id }, logging: forensicTrace.sqlLogger }),
+        customerInvoiceExists: await db.CustomerInvoice.count({ where: { entityType: 'order', entityId: order.id }, logging: forensicTrace.sqlLogger }),
+        customerInvoiceItemsExist: Array.isArray(invoice?.items) ? invoice.items.length : 0
+      };
+      forensicTrace.log('Post-commit verification', verification);
+    } catch (verificationError) {
+      forensicTrace.log('Verification exception', {
+        message: verificationError?.message || String(verificationError),
+        stack: verificationError?.stack || null
+      });
+    }
 
     return res.json({
       success: true,
@@ -540,7 +643,7 @@ exports.purchaseProducts = async (req, res) => {
       order: updatedOrder || order
     });
   } catch (error) {
-    console.error('Tenant cart product purchase error:', error);
+    forensicTrace.log('Exception', { message: error?.message || String(error), stack: error?.stack || null });
     return res.status(400).json({ success: false, message: error.message || 'Failed to complete product purchase' });
   }
 };

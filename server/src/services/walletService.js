@@ -51,7 +51,8 @@ class WalletService {
         referenceType = null,
         referenceId = null,
         metadata = {},
-        transaction: externalTransaction = null
+        transaction: externalTransaction = null,
+        forensicTrace = null
     }) {
         return this.#applyWalletDelta({
             platformUserId,
@@ -61,7 +62,8 @@ class WalletService {
             referenceType,
             referenceId,
             metadata,
-            externalTransaction
+            externalTransaction,
+            forensicTrace
         });
     }
 
@@ -72,7 +74,8 @@ class WalletService {
         referenceType = null,
         referenceId = null,
         metadata = {},
-        transaction: externalTransaction = null
+        transaction: externalTransaction = null,
+        forensicTrace = null
     }) {
         return this.#applyWalletDelta({
             platformUserId,
@@ -82,7 +85,8 @@ class WalletService {
             referenceType,
             referenceId,
             metadata,
-            externalTransaction
+            externalTransaction,
+            forensicTrace
         });
     }
 
@@ -94,7 +98,8 @@ class WalletService {
         referenceType,
         referenceId,
         metadata,
-        externalTransaction
+        externalTransaction,
+        forensicTrace
     }) {
         if (!platformUserId) {
             throw new Error('platformUserId is required');
@@ -114,7 +119,8 @@ class WalletService {
         try {
             const user = await db.PlatformUser.findByPk(platformUserId, {
                 transaction,
-                lock: transaction.LOCK.UPDATE
+                lock: transaction.LOCK.UPDATE,
+                ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
             });
 
             if (!user) {
@@ -130,7 +136,7 @@ class WalletService {
             }
 
             user.walletBalance = balanceAfter;
-            await user.save({ transaction });
+            await user.save({ transaction, ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {}) });
 
             const ledgerEntry = await db.WalletLedgerEntry.create({
                 platformUserId,
@@ -143,7 +149,10 @@ class WalletService {
                 referenceType,
                 referenceId,
                 metadata: metadata || {}
-            }, { transaction });
+            }, {
+                transaction,
+                ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
+            });
 
             if (shouldCommit) {
                 await transaction.commit();
@@ -164,4 +173,3 @@ class WalletService {
 }
 
 module.exports = new WalletService();
-

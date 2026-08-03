@@ -156,8 +156,26 @@ module.exports = (sequelize, DataTypes) => {
 
     
     Transaction.addHook('afterSave', async (transaction, options) => {
+        const forensicTrace = options?.forensicTrace || null;
+        if (forensicTrace) {
+            forensicTrace.log('Model hook entered', {
+                model: 'Transaction.afterSave',
+                id: transaction.id,
+                type: transaction.type,
+                status: transaction.status
+            });
+        }
         try {
-            if (transaction.status !== 'completed' && transaction.status !== 'refunded') return;
+            if (transaction.status !== 'completed' && transaction.status !== 'refunded') {
+                if (forensicTrace) {
+                    forensicTrace.log('Model hook exited', {
+                        model: 'Transaction.afterSave',
+                        id: transaction.id,
+                        reason: 'non-revenue status'
+                    });
+                }
+                return;
+            }
             // Avoid duplicate logging if handled elsewhere, but since Transaction is used for Wallet Topups:
             if (transaction.type === 'wallet_topup' || transaction.type === 'loyalty_redemption') {
                 const FinancialLedgerService = require('../services/financialLedgerService');
@@ -174,8 +192,23 @@ module.exports = (sequelize, DataTypes) => {
                     description: `${transaction.type} ${transaction.status}`
                 }, options.transaction);
             }
+            if (forensicTrace) {
+                forensicTrace.log('Model hook exited', {
+                    model: 'Transaction.afterSave',
+                    id: transaction.id
+                });
+            }
         } catch (error) {
-            console.error('Failed to record revenue for Transaction', error);
+            if (forensicTrace) {
+                forensicTrace.log('Model hook exception', {
+                    model: 'Transaction.afterSave',
+                    id: transaction.id,
+                    message: error?.message || String(error),
+                    stack: error?.stack || null
+                });
+            } else {
+                console.error('Failed to record revenue for Transaction', error);
+            }
         }
     });
 

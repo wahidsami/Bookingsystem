@@ -97,6 +97,7 @@ const buildTransactionPayload = ({
 };
 
 const createAppointmentTransaction = async (paymentData, options = {}) => {
+    const forensicTrace = options.forensicTrace || null;
     const payload = buildTransactionPayload({
         ...paymentData,
         orderId: null
@@ -106,12 +107,32 @@ const createAppointmentTransaction = async (paymentData, options = {}) => {
         return null;
     }
 
-    return db.PaymentTransaction.create(payload, {
-        transaction: options.transaction
+    if (forensicTrace) {
+        forensicTrace.log('PaymentTransaction INSERT begin', {
+            source: 'appointment',
+            payload
+        });
+    }
+
+    const created = await db.PaymentTransaction.create(payload, {
+        transaction: options.transaction,
+        forensicTrace,
+        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
     });
+
+    if (forensicTrace) {
+        forensicTrace.log('PaymentTransaction INSERT success', {
+            id: created.id,
+            appointmentId: created.appointmentId || null,
+            orderId: created.orderId || null
+        });
+    }
+
+    return created;
 };
 
 const createOrderTransaction = async (paymentData, options = {}) => {
+    const forensicTrace = options.forensicTrace || null;
     const payload = buildTransactionPayload({
         ...paymentData,
         appointmentId: null
@@ -121,12 +142,29 @@ const createOrderTransaction = async (paymentData, options = {}) => {
         return null;
     }
 
-    console.log('[DIAGNOSTIC] Creating PaymentTransaction...');
+    if (forensicTrace) {
+        forensicTrace.log('PaymentTransaction INSERT begin', {
+            source: 'order',
+            payload
+        });
+    } else {
+        console.log('[DIAGNOSTIC] Creating PaymentTransaction...');
+    }
+
     const pt = await db.PaymentTransaction.create(payload, {
         transaction: options.transaction,
-        logging: (msg) => console.log('[PURCHASE-SQL]', msg)
+        forensicTrace,
+        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : { logging: (msg) => console.log('[PURCHASE-SQL]', msg) })
     });
-    console.log('[DIAGNOSTIC] Creating PaymentTransaction... SUCCESS id=' + pt.id);
+    if (forensicTrace) {
+        forensicTrace.log('PaymentTransaction INSERT success', {
+            id: pt.id,
+            appointmentId: pt.appointmentId || null,
+            orderId: pt.orderId || null
+        });
+    } else {
+        console.log('[DIAGNOSTIC] Creating PaymentTransaction... SUCCESS id=' + pt.id);
+    }
     return pt;
 };
 

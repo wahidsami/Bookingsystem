@@ -12,7 +12,8 @@ class TenantGiftSettlementService {
         grossAmount,
         platformFeeAmount = 0,
         metadata = {},
-        transaction: externalTransaction = null
+        transaction: externalTransaction = null,
+        forensicTrace = null
     }) {
         if (!tenantId || !transactionId || !packageId) {
             throw new Error('tenantId, transactionId, and packageId are required');
@@ -29,6 +30,11 @@ class TenantGiftSettlementService {
             throw new Error('netTenantPayableAmount cannot be negative');
         }
 
+        const createOptions = {
+            ...(externalTransaction ? { transaction: externalTransaction } : undefined),
+            ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
+        };
+
         return db.TenantGiftCardSettlement.create({
             tenantId,
             transactionId,
@@ -39,7 +45,7 @@ class TenantGiftSettlementService {
             settledAmount: 0,
             status: 'pending',
             metadata: metadata || {}
-        }, externalTransaction ? { transaction: externalTransaction } : undefined);
+        }, createOptions);
     }
 }
 

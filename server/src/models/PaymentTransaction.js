@@ -162,7 +162,15 @@ module.exports = (sequelize, DataTypes) => {
 
     
     PaymentTransaction.addHook('afterCreate', async (transaction, options) => {
-        console.log('[DIAGNOSTIC] PaymentTransaction afterCreate hook entered');
+        const forensicTrace = options?.forensicTrace || null;
+        if (forensicTrace) {
+            forensicTrace.log('Model hook entered', {
+                model: 'PaymentTransaction.afterCreate',
+                id: transaction.id
+            });
+        } else {
+            console.log('[DIAGNOSTIC] PaymentTransaction afterCreate hook entered');
+        }
         try {
             const FinancialLedgerService = require('../services/financialLedgerService');
             let tenantId = null;
@@ -203,8 +211,24 @@ module.exports = (sequelize, DataTypes) => {
                     description: transaction.notes || `Payment ${transaction.type}`
                 }, options.transaction);
             }
+            if (forensicTrace) {
+                forensicTrace.log('Model hook exited', {
+                    model: 'PaymentTransaction.afterCreate',
+                    id: transaction.id,
+                    recordedRevenue: Boolean(tenantId && entityType && entityId)
+                });
+            }
         } catch (error) {
-            console.error('Failed to create FinancialLedgerEntry in PaymentTransaction hook', error);
+            if (forensicTrace) {
+                forensicTrace.log('Model hook exception', {
+                    model: 'PaymentTransaction.afterCreate',
+                    id: transaction.id,
+                    message: error?.message || String(error),
+                    stack: error?.stack || null
+                });
+            } else {
+                console.error('Failed to create FinancialLedgerEntry in PaymentTransaction hook', error);
+            }
         }
     });
 

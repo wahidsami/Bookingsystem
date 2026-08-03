@@ -48,6 +48,8 @@ class UserService {
      */
     async findOrCreatePlatformUser({ email, phone, firstName, lastName }, options = {}) {
         const transaction = options.transaction || null;
+        const forensicTrace = options.forensicTrace || null;
+        const sqlLogger = forensicTrace?.sqlLogger || null;
         const trimmedFirstName = `${firstName || ''}`.trim();
         const trimmedLastName = `${lastName || ''}`.trim();
 
@@ -67,7 +69,8 @@ class UserService {
         let user = await db.PlatformUser.findOne({
             where: {
                 [Op.or]: Object.keys(where).map(key => ({ [key]: where[key] }))
-            }
+            },
+            ...(sqlLogger ? { logging: sqlLogger } : {})
         });
 
         if (!user) {
@@ -87,7 +90,10 @@ class UserService {
                 // Password can be reset or claimed later by support flows.
             };
 
-            user = await db.PlatformUser.create(userData, transaction ? { transaction } : undefined);
+            user = await db.PlatformUser.create(userData, {
+                ...(transaction ? { transaction } : {}),
+                ...(sqlLogger ? { logging: sqlLogger } : {})
+            });
 
             // Link any pending gifts that were sent to this email/phone before the account existed.
             await linkPendingGiftRecipients({
@@ -95,10 +101,19 @@ class UserService {
                 email: userData.email,
                 phone: userData.phone
             }).catch((error) => {
-                console.error('[UserService] Failed to reconcile gift recipients after platform user creation', {
-                    userId: user.id,
-                    error: error?.message || error
-                });
+                if (forensicTrace) {
+                    forensicTrace.log('Exception', {
+                        scope: 'userService.linkPendingGiftRecipients',
+                        userId: user.id,
+                        message: error?.message || String(error),
+                        stack: error?.stack || null
+                    });
+                } else {
+                    console.error('[UserService] Failed to reconcile gift recipients after platform user creation', {
+                        userId: user.id,
+                        error: error?.message || error
+                    });
+                }
             });
         } else {
             // Update info if provided and missing
@@ -109,7 +124,10 @@ class UserService {
             if (phone && !user.phone) updates.phone = phone.trim();
 
             if (Object.keys(updates).length > 0) {
-                await user.update(updates, transaction ? { transaction } : undefined);
+                await user.update(updates, {
+                    ...(transaction ? { transaction } : {}),
+                    ...(sqlLogger ? { logging: sqlLogger } : {})
+                });
             }
         }
 
@@ -122,8 +140,10 @@ class UserService {
      * @param {string} phone 
      * @returns {Promise<PlatformUser|null>}
      */
-    async findUserByEmailOrPhone(email, phone) {
+    async findUserByEmailOrPhone(email, phone, options = {}) {
         const where = {};
+        const forensicTrace = options.forensicTrace || null;
+        const sqlLogger = forensicTrace?.sqlLogger || null;
         if (email) {
             where.email = email.toLowerCase().trim();
         }
@@ -138,7 +158,8 @@ class UserService {
         return await db.PlatformUser.findOne({
             where: {
                 [Op.or]: Object.keys(where).map(key => ({ [key]: where[key] }))
-            }
+            },
+            ...(sqlLogger ? { logging: sqlLogger } : {})
         });
     }
 }

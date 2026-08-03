@@ -50,7 +50,8 @@ class TenantWalletService {
         referenceType = null,
         referenceId = null,
         metadata = {},
-        transaction: externalTransaction = null
+        transaction: externalTransaction = null,
+        forensicTrace = null
     }) {
         return this.#applyDelta({
             platformUserId,
@@ -61,7 +62,8 @@ class TenantWalletService {
             referenceType,
             referenceId,
             metadata,
-            externalTransaction
+            externalTransaction,
+            forensicTrace
         });
     }
 
@@ -73,7 +75,8 @@ class TenantWalletService {
         referenceType = null,
         referenceId = null,
         metadata = {},
-        transaction: externalTransaction = null
+        transaction: externalTransaction = null,
+        forensicTrace = null
     }) {
         return this.#applyDelta({
             platformUserId,
@@ -84,7 +87,8 @@ class TenantWalletService {
             referenceType,
             referenceId,
             metadata,
-            externalTransaction
+            externalTransaction,
+            forensicTrace
         });
     }
 
@@ -109,7 +113,8 @@ class TenantWalletService {
         referenceType,
         referenceId,
         metadata,
-        externalTransaction
+        externalTransaction,
+        forensicTrace
     }) {
         if (!platformUserId || !tenantId) {
             throw new Error('platformUserId and tenantId are required');
@@ -135,10 +140,11 @@ class TenantWalletService {
                     balance: 0,
                     currency: 'SAR'
                 },
-                transaction
+                transaction,
+                ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
             });
 
-            await balanceRow.reload({ transaction, lock: transaction.LOCK.UPDATE });
+            await balanceRow.reload({ transaction, lock: transaction.LOCK.UPDATE, ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {}) });
 
             const balanceBefore = Number.parseFloat(balanceRow.balance || 0);
             const delta = direction === 'debit' ? -normalizedAmount : normalizedAmount;
@@ -149,7 +155,7 @@ class TenantWalletService {
             }
 
             balanceRow.balance = balanceAfter;
-            await balanceRow.save({ transaction });
+            await balanceRow.save({ transaction, ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {}) });
 
             const ledgerEntry = await db.TenantWalletLedgerEntry.create({
                 platformUserId,
@@ -163,7 +169,10 @@ class TenantWalletService {
                 referenceType,
                 referenceId,
                 metadata: metadata || {}
-            }, { transaction });
+            }, {
+                transaction,
+                ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
+            });
 
             if (shouldCommit) {
                 await transaction.commit();

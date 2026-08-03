@@ -35,12 +35,22 @@ class OrderService {
      * @param {Object} options - Sequelize options (transaction, etc.)
      */
     async createOrder(orderData, options = {}) {
-        const logSQL = (msg) => console.log('[PURCHASE-SQL]', msg);
-        console.log('[DIAGNOSTIC] Beginning SQL transaction');
+        const forensicTrace = options.forensicTrace || null;
+        const logSQL = forensicTrace?.sqlLogger || ((msg) => console.log('[PURCHASE-SQL]', msg));
+        if (forensicTrace) {
+            forensicTrace.log('BEGIN transaction', { scope: 'orderService.createOrder' });
+        } else {
+            console.log('[DIAGNOSTIC] Beginning SQL transaction');
+        }
         const transaction = options.transaction || await db.sequelize.transaction({ logging: logSQL });
         const shouldCommit = !options.transaction;
         const skipNotification = options.skipNotification === true;
         const skipInvoiceEmail = options.skipInvoiceEmail === true;
+        const q = (extra = {}) => ({
+            transaction,
+            ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {}),
+            ...extra
+        });
 
         try {
             const {
@@ -86,8 +96,7 @@ class OrderService {
                         isAvailable: true
                     },
                     lock: transaction.LOCK.UPDATE, // Lock row for update
-                    transaction,
-                    logging: logSQL
+                    ...q()
                 });
 
                 if (!product) {
@@ -125,18 +134,18 @@ class OrderService {
                 // Reserve or deduct inventory based on payment method
                 if (paymentMethod === 'online') {
                     // Deduct immediately for online payment
-                    await product.decrement('stock', { by: quantity, transaction, logging: logSQL });
-                    console.log('[DIAGNOSTIC] Updating Product stock... SUCCESS');
-                    await product.increment('soldCount', { by: quantity, transaction, logging: logSQL });
-                    console.log('[DIAGNOSTIC] Updating soldCount... SUCCESS');
+                    await product.decrement('stock', { by: quantity, ...q() });
+                    forensicTrace ? forensicTrace.log('Inventory UPDATE success', { productId: product.id, field: 'stock', by: quantity }) : console.log('[DIAGNOSTIC] Updating Product stock... SUCCESS');
+                    await product.increment('soldCount', { by: quantity, ...q() });
+                    forensicTrace ? forensicTrace.log('Inventory UPDATE success', { productId: product.id, field: 'soldCount', by: quantity }) : console.log('[DIAGNOSTIC] Updating soldCount... SUCCESS');
                 } else {
                     // For POD/POV, we'll reserve inventory (deduct when payment confirmed)
                     // For now, we'll still deduct but mark payment as pending
                     // In production, you might want a separate "reserved" field
-                    await product.decrement('stock', { by: quantity, transaction, logging: logSQL });
-                    console.log('[DIAGNOSTIC] Updating Product stock... SUCCESS');
-                    await product.increment('soldCount', { by: quantity, transaction, logging: logSQL });
-                    console.log('[DIAGNOSTIC] Updating soldCount... SUCCESS');
+                    await product.decrement('stock', { by: quantity, ...q() });
+                    forensicTrace ? forensicTrace.log('Inventory UPDATE success', { productId: product.id, field: 'stock', by: quantity }) : console.log('[DIAGNOSTIC] Updating Product stock... SUCCESS');
+                    await product.increment('soldCount', { by: quantity, ...q() });
+                    forensicTrace ? forensicTrace.log('Inventory UPDATE success', { productId: product.id, field: 'soldCount', by: quantity }) : console.log('[DIAGNOSTIC] Updating soldCount... SUCCESS');
                 }
             }
 
@@ -157,7 +166,7 @@ class OrderService {
             const orderNumber = await db.Order.generateOrderNumber();
 
             // Create order
-            console.log('[DIAGNOSTIC] Creating Order...');
+            forensicTrace ? forensicTrace.log('Order INSERT begin', { orderNumber }) : console.log('[DIAGNOSTIC] Creating Order...');
             const order = await db.Order.create({
                 orderNumber,
                 platformUserId,
@@ -174,27 +183,35 @@ class OrderService {
                 shippingFee: finalShippingFee,
                 platformFee,
                 totalAmount
-            }, { transaction, logging: logSQL });
-            console.log('[DIAGNOSTIC] Creating Order... SUCCESS id=' + order.id);
+            }, q());
+            forensicTrace ? forensicTrace.log('Order INSERT success', { id: order.id, orderNumber }) : console.log('[DIAGNOSTIC] Creating Order... SUCCESS id=' + order.id);
 
             // Create order items
-            console.log('[DIAGNOSTIC] Creating OrderItem...');
+            forensicTrace ? forensicTrace.log('OrderItem INSERT begin', { orderId: order.id, itemCount: orderItems.length }) : console.log('[DIAGNOSTIC] Creating OrderItem...');
             for (const itemData of orderItems) {
                 const oi = await db.OrderItem.create({
                     orderId: order.id,
                     ...itemData
-                }, { transaction, logging: logSQL });
-                console.log('[DIAGNOSTIC] Creating OrderItem... SUCCESS id=' + oi.id);
+                }, q());
+                forensicTrace ? forensicTrace.log('OrderItem INSERT success', { id: oi.id, orderId: order.id }) : console.log('[DIAGNOSTIC] Creating OrderItem... SUCCESS id=' + oi.id);
             }
 
-            await ensureOrderInvoice(order.id, {
+            const invoice = await ensureOrderInvoice(order.id, {
                 transaction,
-                triggerSource: 'order_created'
+                triggerSource: 'order_created',
+                forensicTrace
             });
+            if (invoice?.id && forensicTrace) {
+                forensicTrace.log('CustomerInvoice INSERT/UPDATE success', { id: invoice.id, orderId: order.id });
+            }
 
             if (shouldCommit) {
                 await transaction.commit();
-                console.log('[DIAGNOSTIC] Transaction committed');
+                if (forensicTrace) {
+                    forensicTrace.log('COMMIT', { scope: 'orderService.createOrder', orderId: order.id });
+                } else {
+                    console.log('[DIAGNOSTIC] Transaction committed');
+                }
             }
 
             // Reload order with associations
@@ -214,7 +231,8 @@ class OrderService {
                     { model: db.Tenant, as: 'tenant' },
                     { model: db.PlatformUser, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'phone'] }
                 ],
-                transaction: shouldCommit ? null : transaction
+                transaction: shouldCommit ? null : transaction,
+                ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
             });
 
             if (!skipNotification) {
@@ -233,20 +251,37 @@ class OrderService {
                         }
                     });
                 } catch (notificationError) {
-                    console.warn('Order creation notification warning:', notificationError.message);
+                    if (forensicTrace) {
+                        forensicTrace.log('Exception', {
+                            scope: 'orderService.createOrder.notification',
+                            message: notificationError?.message || String(notificationError),
+                            stack: notificationError?.stack || null
+                        });
+                    } else {
+                        console.warn('Order creation notification warning:', notificationError.message);
+                    }
                 }
             }
 
             if (!skipInvoiceEmail) {
                 try {
                     const invoice = await db.CustomerInvoice.findOne({
-                        where: { entityType: 'order', entityId: order.id }
+                        where: { entityType: 'order', entityId: order.id },
+                        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
                     });
                     if (invoice) {
                         await sendCustomerInvoiceLifecycleEmail(invoice.id);
                     }
                 } catch (invoiceMailError) {
-                    console.warn('Order invoice email warning:', invoiceMailError.message);
+                    if (forensicTrace) {
+                        forensicTrace.log('Exception', {
+                            scope: 'orderService.createOrder.invoiceEmail',
+                            message: invoiceMailError?.message || String(invoiceMailError),
+                            stack: invoiceMailError?.stack || null
+                        });
+                    } else {
+                        console.warn('Order invoice email warning:', invoiceMailError.message);
+                    }
                 }
             }
 
@@ -254,7 +289,14 @@ class OrderService {
 
         } catch (error) {
             if (shouldCommit && !transaction.finished) {
-                console.log('[DIAGNOSTIC] Rolling back transaction');
+                if (forensicTrace) {
+                    forensicTrace.log('ROLLBACK', {
+                        scope: 'orderService.createOrder',
+                        message: error?.message || String(error)
+                    });
+                } else {
+                    console.log('[DIAGNOSTIC] Rolling back transaction');
+                }
                 await transaction.rollback();
             }
             throw error;
@@ -268,7 +310,10 @@ class OrderService {
      * @param {Object} options - Sequelize options
      */
     async updatePaymentStatus(orderId, paymentStatus, options = {}) {
-        const transaction = options.transaction || await db.sequelize.transaction();
+        const forensicTrace = options.forensicTrace || null;
+        const transaction = options.transaction || await db.sequelize.transaction({
+            logging: forensicTrace?.sqlLogger || ((msg) => console.log('[PURCHASE-SQL]', msg))
+        });
         const shouldCommit = !options.transaction;
         const {
             paymentMethod,
@@ -279,9 +324,18 @@ class OrderService {
             metadata = {},
             skipNotification = false
         } = options;
+        const q = (extra = {}) => ({
+            transaction,
+            ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {}),
+            ...extra
+        });
 
         try {
-            const order = await db.Order.findByPk(orderId, { transaction });
+            if (forensicTrace) {
+                forensicTrace.log('BEGIN transaction', { scope: 'orderService.updatePaymentStatus', orderId, paymentStatus });
+            }
+
+            const order = await db.Order.findByPk(orderId, q());
 
             if (!order) {
                 throw new Error('Order not found');
@@ -289,15 +343,13 @@ class OrderService {
 
             const previousPaymentStatus = order.paymentStatus;
 
-            // Update payment status
             await order.update({
                 paymentStatus,
                 paidAt: paymentStatus === 'paid' ? new Date() : null
-            }, { transaction });
+            }, q());
 
-            // If payment confirmed and order was pending, update status
             if (paymentStatus === 'paid' && order.status === 'pending') {
-                await order.update({ status: 'confirmed' }, { transaction });
+                await order.update({ status: 'confirmed' }, q());
             }
 
             if (previousPaymentStatus !== 'paid' && paymentStatus === 'paid') {
@@ -318,18 +370,18 @@ class OrderService {
                         customerPaymentMethod: order.paymentMethod,
                         ...metadata
                     }
-                }, { transaction });
+                }, { transaction, forensicTrace });
 
                 await db.PlatformUser.increment('totalSpent', {
                     by: parseFloat(order.totalAmount || 0),
                     where: { id: order.platformUserId },
-                    transaction
+                    ...q()
                 });
 
                 const platformFee = parseFloat(((order.totalAmount || 0) * 0.025).toFixed(2));
                 const tenantRevenue = parseFloat(((order.totalAmount || 0) - platformFee).toFixed(2));
 
-                await db.Transaction.create({
+                const saleTransaction = await db.Transaction.create({
                     platformUserId: order.platformUserId,
                     tenantId: order.tenantId,
                     orderId: order.id,
@@ -346,7 +398,11 @@ class OrderService {
                         customerPaymentMethod: order.paymentMethod,
                         ...metadata
                     }
-                }, { transaction });
+                }, { ...q(), forensicTrace });
+
+                if (forensicTrace) {
+                    forensicTrace.log('Transaction INSERT success', { id: saleTransaction.id, orderId: order.id });
+                }
             } else if (paymentStatus === 'failed' && previousPaymentStatus !== 'failed') {
                 await createOrderTransaction({
                     orderId: order.id,
@@ -365,7 +421,7 @@ class OrderService {
                         customerPaymentMethod: order.paymentMethod,
                         ...metadata
                     }
-                }, { transaction });
+                }, { transaction, forensicTrace });
             } else if (paymentStatus === 'refunded' && previousPaymentStatus !== 'refunded') {
                 await createOrderTransaction({
                     orderId: order.id,
@@ -384,12 +440,12 @@ class OrderService {
                         customerPaymentMethod: order.paymentMethod,
                         ...metadata
                     }
-                }, { transaction });
+                }, { transaction, forensicTrace });
 
                 const platformFee = parseFloat(((order.totalAmount || 0) * 0.025).toFixed(2));
                 const tenantRevenue = parseFloat(((order.totalAmount || 0) - platformFee).toFixed(2));
 
-                await db.Transaction.create({
+                const refundTransaction = await db.Transaction.create({
                     platformUserId: order.platformUserId,
                     tenantId: order.tenantId,
                     orderId: order.id,
@@ -406,16 +462,24 @@ class OrderService {
                         customerPaymentMethod: order.paymentMethod,
                         ...metadata
                     }
-                }, { transaction });
+                }, { ...q(), forensicTrace });
+
+                if (forensicTrace) {
+                    forensicTrace.log('Transaction INSERT success', { id: refundTransaction.id, orderId: order.id });
+                }
             }
 
             await syncOrderInvoiceStatus(order.id, {
                 transaction,
-                triggerSource: 'order_payment_status_update'
+                triggerSource: 'order_payment_status_update',
+                forensicTrace
             });
 
             if (shouldCommit) {
                 await transaction.commit();
+                if (forensicTrace) {
+                    forensicTrace.log('COMMIT', { scope: 'orderService.updatePaymentStatus', orderId, paymentStatus });
+                }
             }
 
             if (!skipNotification) {
@@ -435,20 +499,37 @@ class OrderService {
                         }
                     });
                 } catch (notificationError) {
-                    console.warn('Order payment notification warning:', notificationError.message);
+                    if (forensicTrace) {
+                        forensicTrace.log('Exception', {
+                            scope: 'orderService.updatePaymentStatus.notification',
+                            message: notificationError?.message || String(notificationError),
+                            stack: notificationError?.stack || null
+                        });
+                    } else {
+                        console.warn('Order payment notification warning:', notificationError.message);
+                    }
                 }
             }
 
             if (previousPaymentStatus !== paymentStatus) {
                 try {
                     const invoice = await db.CustomerInvoice.findOne({
-                        where: { entityType: 'order', entityId: order.id }
+                        where: { entityType: 'order', entityId: order.id },
+                        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
                     });
-                    if (invoice) {
+                if (invoice) {
                         await sendCustomerInvoiceLifecycleEmail(invoice.id);
                     }
                 } catch (invoiceMailError) {
-                    console.warn('Order invoice lifecycle email warning:', invoiceMailError.message);
+                    if (forensicTrace) {
+                        forensicTrace.log('Exception', {
+                            scope: 'orderService.updatePaymentStatus.invoiceEmail',
+                            message: invoiceMailError?.message || String(invoiceMailError),
+                            stack: invoiceMailError?.stack || null
+                        });
+                    } else {
+                        console.warn('Order invoice lifecycle email warning:', invoiceMailError.message);
+                    }
                 }
             }
 
@@ -456,6 +537,14 @@ class OrderService {
 
         } catch (error) {
             if (shouldCommit && !transaction.finished) {
+                if (forensicTrace) {
+                    forensicTrace.log('ROLLBACK', {
+                        scope: 'orderService.updatePaymentStatus',
+                        orderId,
+                        paymentStatus,
+                        message: error?.message || String(error)
+                    });
+                }
                 await transaction.rollback();
             }
             throw error;

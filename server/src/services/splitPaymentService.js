@@ -301,7 +301,7 @@ const buildPaymentSummaryFromAppointments = (appointments = [], fallbackAppointm
     };
 };
 
-const decrementCustomerWalletBalance = async (appointment, amount, transaction) => {
+const decrementCustomerWalletBalance = async (appointment, amount, transaction, forensicTrace = null) => {
     if (!appointment?.platformUserId) {
         throw new Error('Customer wallet account not found');
     }
@@ -320,7 +320,8 @@ const decrementCustomerWalletBalance = async (appointment, amount, transaction) 
             source: 'tenant_dashboard_payment_collection',
             appointmentId: appointment.id
         },
-        transaction
+        transaction,
+        forensicTrace
     });
 };
 
@@ -334,7 +335,8 @@ const createAppointmentPaymentTransactions = async ({
     transactionRef = null,
     notes = null,
     source = 'tenant_dashboard_payment_collection',
-    transaction = null
+    transaction = null,
+    forensicTrace = null
 }) => {
     const allocations = normalizePaymentAllocations({
         amount,
@@ -344,13 +346,14 @@ const createAppointmentPaymentTransactions = async ({
     });
 
     const baseReference = `${transactionRef || `APT-PAY-${appointment?.bookingNumber || appointment?.id?.slice(0, 8)?.toUpperCase() || 'TX'}`}`.trim();
+    const createdPaymentTransactions = [];
 
     for (let index = 0; index < allocations.length; index += 1) {
         const allocation = allocations[index];
         if (allocation.paymentMethod === 'wallet') {
-            await decrementCustomerWalletBalance(appointment, allocation.amount, transaction);
+            await decrementCustomerWalletBalance(appointment, allocation.amount, transaction, forensicTrace);
         }
-        await createAppointmentTransaction({
+        const created = await createAppointmentTransaction({
             appointmentId: appointment.id,
             type,
             amount: allocation.amount,
@@ -366,13 +369,17 @@ const createAppointmentPaymentTransactions = async ({
                 paymentAllocations: allocations,
                 paymentSummaryMethod: allocations.length > 1 ? 'split' : allocation.paymentMethod
             }
-        }, { transaction });
+        }, { transaction, forensicTrace });
+        if (created?.id) {
+            createdPaymentTransactions.push(created);
+        }
     }
 
     return {
         allocations,
         paymentMethod: allocations.length > 1 ? 'split' : allocations[0]?.paymentMethod || paymentMethod || 'cash',
-        totalAmount: allocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0)
+        totalAmount: allocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0),
+        paymentTransactions: createdPaymentTransactions
     };
 };
 

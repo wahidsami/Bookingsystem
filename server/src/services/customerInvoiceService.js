@@ -138,7 +138,7 @@ async function generateInvoiceNumber(transaction) {
     return `${prefix}${String(sequence).padStart(6, '0')}`;
 }
 
-async function appendEvent(invoiceId, event, transaction) {
+async function appendEvent(invoiceId, event, transaction, forensicTrace = null) {
     await db.CustomerInvoiceEvent.create({
         invoiceId,
         eventType: event.eventType,
@@ -148,16 +148,25 @@ async function appendEvent(invoiceId, event, transaction) {
         actorType: event.actorType || null,
         actorId: event.actorId || null,
         payload: event.payload || {}
-    }, { transaction });
+    }, {
+        transaction,
+        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {})
+    });
 }
 
 async function ensureOrderInvoice(orderId, options = {}) {
     const transaction = options.transaction || null;
     const triggerSource = options.triggerSource || 'system';
+    const forensicTrace = options.forensicTrace || null;
+    const q = (extra = {}) => ({
+        transaction,
+        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {}),
+        ...extra
+    });
 
     const order = await db.Order.findByPk(orderId, {
         include: [{ model: db.OrderItem, as: 'items' }],
-        transaction
+        ...q()
     });
     if (!order) {
         throw new Error('Order not found while ensuring invoice');
@@ -172,7 +181,7 @@ async function ensureOrderInvoice(orderId, options = {}) {
 
     let invoice = await db.CustomerInvoice.findOne({
         where: { entityType: 'order', entityId: order.id },
-        transaction
+        ...q()
     });
 
     if (!invoice) {
@@ -195,7 +204,7 @@ async function ensureOrderInvoice(orderId, options = {}) {
             issuedAt: order.createdAt || new Date(),
             paidAt: order.paymentStatus === 'paid' ? (order.paidAt || new Date()) : null,
             metadata: { source: 'order', invoiceRenderVersion: INVOICE_RENDER_VERSION }
-        }, { transaction });
+        }, q());
 
         if (Array.isArray(order.items) && order.items.length > 0) {
             await db.CustomerInvoiceItem.bulkCreate(order.items.map((item) => ({
@@ -209,7 +218,7 @@ async function ensureOrderInvoice(orderId, options = {}) {
                 lineTotal: formatAmount(item.totalPrice),
                 taxAmount: 0,
                 metadata: {}
-            })), { transaction });
+            })), q());
         }
 
         await appendEvent(invoice.id, {
@@ -218,7 +227,7 @@ async function ensureOrderInvoice(orderId, options = {}) {
             toStatus: invoice.status,
             triggerSource,
             payload: { entityType: 'order', entityId: order.id }
-        }, transaction);
+        }, transaction, forensicTrace);
     }
 
     return invoice;
@@ -227,17 +236,23 @@ async function ensureOrderInvoice(orderId, options = {}) {
 async function syncOrderInvoiceStatus(orderId, options = {}) {
     const transaction = options.transaction || null;
     const triggerSource = options.triggerSource || 'system';
+    const forensicTrace = options.forensicTrace || null;
+    const q = (extra = {}) => ({
+        transaction,
+        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {}),
+        ...extra
+    });
 
-    const order = await db.Order.findByPk(orderId, { transaction });
+    const order = await db.Order.findByPk(orderId, q());
     if (!order) return null;
 
     let invoice = await db.CustomerInvoice.findOne({
         where: { entityType: 'order', entityId: order.id },
-        transaction
+        ...q()
     });
 
     if (!invoice) {
-        invoice = await ensureOrderInvoice(orderId, { transaction, triggerSource });
+        invoice = await ensureOrderInvoice(orderId, { transaction, triggerSource, forensicTrace });
     }
 
     const { totalAmount } = normalizeInvoiceAmounts(order.totalAmount, order.taxAmount);
@@ -270,7 +285,7 @@ async function syncOrderInvoiceStatus(orderId, options = {}) {
             source: 'order',
             invoiceRenderVersion: INVOICE_RENDER_VERSION
         }
-    }, { transaction });
+    }, q());
 
     if (prevStatus !== nextStatus) {
         await appendEvent(invoice.id, {
@@ -282,7 +297,7 @@ async function syncOrderInvoiceStatus(orderId, options = {}) {
                 orderId: order.id,
                 orderPaymentStatus: order.paymentStatus
             }
-        }, transaction);
+        }, transaction, forensicTrace);
     }
 
     return invoice;
@@ -291,6 +306,12 @@ async function syncOrderInvoiceStatus(orderId, options = {}) {
 async function ensureAppointmentInvoice(appointmentId, options = {}) {
     const transaction = options.transaction || null;
     const triggerSource = options.triggerSource || 'system';
+    const forensicTrace = options.forensicTrace || null;
+    const q = (extra = {}) => ({
+        transaction,
+        ...(forensicTrace?.sqlLogger ? { logging: forensicTrace.sqlLogger } : {}),
+        ...extra
+    });
 
     const appointment = await db.Appointment.findByPk(appointmentId, {
         include: [
@@ -321,7 +342,7 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
                 ]
             }
         ],
-        transaction
+        ...q()
     });
     if (!appointment) {
         throw new Error('Appointment not found while ensuring invoice');
@@ -406,7 +427,7 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
 
     let invoice = await db.CustomerInvoice.findOne({
         where: { entityType: 'appointment', entityId: appointment.id },
-        transaction
+        ...q()
     });
 
     if (!invoice) {
@@ -444,12 +465,12 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
                 ...invoiceMetadata,
                 invoiceRenderVersion: INVOICE_RENDER_VERSION
             }
-        }, { transaction });
+        }, q());
 
         await db.CustomerInvoiceItem.bulkCreate(invoiceItems.map((item) => ({
             invoiceId: invoice.id,
             ...item
-        })), { transaction });
+        })), q());
 
         await appendEvent(invoice.id, {
             eventType: 'invoice_created',
@@ -461,7 +482,7 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
                 entityId: appointment.id,
                 bookingSessionId: appointment.bookingSession?.id || null
             }
-        }, transaction);
+        }, transaction, forensicTrace);
     } else {
         const prevStatus = invoice.status;
         await invoice.update({
@@ -492,18 +513,18 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
                 ...invoiceMetadata,
                 invoiceRenderVersion: INVOICE_RENDER_VERSION
             }
-        }, { transaction });
+        }, q());
 
         if (isSessionInvoice) {
             await db.CustomerInvoiceItem.destroy({
                 where: { invoiceId: invoice.id },
-                transaction
+                ...q()
             });
 
             await db.CustomerInvoiceItem.bulkCreate(invoiceItems.map((item) => ({
                 invoiceId: invoice.id,
                 ...item
-            })), { transaction });
+            })), q());
         }
 
         if (prevStatus !== status) {
@@ -519,7 +540,7 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
                         : appointment.paymentStatus,
                     bookingSessionId: appointment.bookingSession?.id || null
                 }
-            }, transaction);
+            }, transaction, forensicTrace);
         }
     }
 
