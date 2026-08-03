@@ -1,11 +1,12 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { api } from '../api/client';
 import { registerCustomerPushNotifications, unregisterCustomerPushNotifications } from '../lib/notifications';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 interface SettingsScreenProps {
     navigation: any;
@@ -13,12 +14,17 @@ interface SettingsScreenProps {
 
 export function SettingsScreen({ navigation }: SettingsScreenProps) {
     const { t, language, setLanguage } = useLanguage();
+    const { logout } = useAppSession();
     const { topInset } = useScreenSafeArea();
     const [profile, setProfile] = React.useState<any>(null);
     const [pushEnabled, setPushEnabled] = React.useState(true);
     const [pushLoading, setPushLoading] = React.useState(false);
+    const [deleteModalVisible, setDeleteModalVisible] = React.useState(false);
+    const [deletePassword, setDeletePassword] = React.useState('');
+    const [deleteLoading, setDeleteLoading] = React.useState(false);
 
     const nextLanguage = language === 'ar' ? 'en' : 'ar';
+    const requiresPassword = profile?.authProvider === 'local';
 
     React.useEffect(() => {
         let active = true;
@@ -74,6 +80,45 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
         }
     };
 
+    const confirmDeleteAccount = () => {
+        Alert.alert(
+            t('deleteAccountConfirmTitle'),
+            t('deleteAccountConfirmBody'),
+            [
+                { text: t('cancel'), style: 'cancel' },
+                {
+                    text: t('deleteAccount'),
+                    style: 'destructive',
+                    onPress: () => {
+                        setDeletePassword('');
+                        setDeleteModalVisible(true);
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleDeleteAccount = async () => {
+        if (deleteLoading) return;
+        if (requiresPassword && !deletePassword.trim()) {
+            Alert.alert(t('error'), t('deleteAccountPasswordHint'));
+            return;
+        }
+
+        setDeleteLoading(true);
+        try {
+            await api.deleteAccount(requiresPassword ? deletePassword.trim() : undefined);
+            setDeleteModalVisible(false);
+            setDeletePassword('');
+            Alert.alert(t('success'), t('deleteAccountSuccess'));
+            await logout();
+        } catch (error: any) {
+            Alert.alert(t('error'), error?.message || t('deleteAccountFailed'));
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
     return (
         <View style={styles.container}>
             <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
@@ -117,6 +162,59 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
                     )}
                 </View>
             </View>
+
+            <View style={styles.card}>
+                <Text style={styles.cardTitle}>{t('deleteAccount')}</Text>
+                <Text style={styles.cardDescription}>{t('deleteAccountSubtitle')}</Text>
+                <TouchableOpacity style={[styles.deleteButton, deleteLoading && styles.actionButtonDisabled]} onPress={confirmDeleteAccount} disabled={deleteLoading}>
+                    <Text style={styles.deleteButtonText}>{t('deleteAccount')}</Text>
+                </TouchableOpacity>
+            </View>
+
+            <Modal visible={deleteModalVisible} animationType="slide" transparent onRequestClose={() => setDeleteModalVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>{t('deleteAccountConfirmTitle')}</Text>
+                        <Text style={styles.modalBody}>{t('deleteAccountConfirmBody')}</Text>
+                        {requiresPassword ? (
+                            <>
+                                <Text style={styles.modalLabel}>{t('deleteAccountPasswordLabel')}</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={deletePassword}
+                                    onChangeText={setDeletePassword}
+                                    secureTextEntry
+                                    autoCapitalize="none"
+                                    placeholder={t('deleteAccountPasswordHint')}
+                                    placeholderTextColor={colors.textSecondary}
+                                />
+                            </>
+                        ) : (
+                            <Text style={styles.modalHint}>{t('deleteAccountGoogleHint')}</Text>
+                        )}
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalCancelButton]}
+                                onPress={() => setDeleteModalVisible(false)}
+                                disabled={deleteLoading}
+                            >
+                                <Text style={styles.modalCancelButtonText}>{t('cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalDeleteButton, deleteLoading && styles.actionButtonDisabled]}
+                                onPress={handleDeleteAccount}
+                                disabled={deleteLoading}
+                            >
+                                {deleteLoading ? (
+                                    <ActivityIndicator color={colors.textInverse} />
+                                ) : (
+                                    <Text style={styles.modalDeleteButtonText}>{t('deleteAccount')}</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -192,6 +290,98 @@ const styles = StyleSheet.create({
         marginTop: 0,
     },
     actionButtonText: {
+        color: colors.textInverse,
+        fontSize: fontSize.md,
+        fontWeight: '700',
+    },
+    actionButtonDisabled: {
+        opacity: 0.6,
+    },
+    deleteButton: {
+        backgroundColor: '#FEF2F2',
+        borderRadius: 14,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+        alignItems: 'center',
+        marginTop: spacing.xs,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
+    deleteButtonText: {
+        color: '#DC2626',
+        fontSize: fontSize.md,
+        fontWeight: '700',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(17, 24, 39, 0.55)',
+        justifyContent: 'center',
+        padding: spacing.lg,
+    },
+    modalCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: spacing.lg,
+        gap: spacing.sm,
+        borderWidth: 1,
+        borderColor: '#E9DDFD',
+    },
+    modalTitle: {
+        fontSize: fontSize.xl,
+        color: colors.text,
+        fontWeight: '700',
+    },
+    modalBody: {
+        fontSize: fontSize.md,
+        color: colors.textSecondary,
+        lineHeight: 22,
+    },
+    modalLabel: {
+        fontSize: fontSize.sm,
+        color: colors.text,
+        fontWeight: '600',
+        marginTop: spacing.xs,
+    },
+    modalInput: {
+        borderWidth: 1,
+        borderColor: '#E9DDFD',
+        borderRadius: 14,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        fontSize: fontSize.md,
+        backgroundColor: '#FAFAFF',
+        color: colors.text,
+    },
+    modalHint: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        fontStyle: 'italic',
+    },
+    modalActions: {
+        marginTop: spacing.md,
+        flexDirection: 'row',
+        gap: spacing.sm,
+        justifyContent: 'flex-end',
+    },
+    modalButton: {
+        borderRadius: 14,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+        minWidth: 110,
+        alignItems: 'center',
+    },
+    modalCancelButton: {
+        backgroundColor: '#F3F4F6',
+    },
+    modalCancelButtonText: {
+        color: colors.text,
+        fontSize: fontSize.md,
+        fontWeight: '700',
+    },
+    modalDeleteButton: {
+        backgroundColor: '#DC2626',
+    },
+    modalDeleteButtonText: {
         color: colors.textInverse,
         fontSize: fontSize.md,
         fontWeight: '700',

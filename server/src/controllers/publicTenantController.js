@@ -806,7 +806,7 @@ exports.getPublicService = async (req, res) => {
 exports.getPublicProducts = async (req, res) => {
     try {
         const { tenantId } = req.params;
-        const { category, minPrice, maxPrice, search } = req.query;
+        const { category, minPrice, maxPrice, search, brand } = req.query;
 
         const where = {
             tenantId,
@@ -832,8 +832,14 @@ exports.getPublicProducts = async (req, res) => {
                 { name_en: { [Op.iLike]: `%${search}%` } },
                 { name_ar: { [Op.iLike]: `%${search}%` } },
                 { description_en: { [Op.iLike]: `%${search}%` } },
-                { description_ar: { [Op.iLike]: `%${search}%` } }
+                { description_ar: { [Op.iLike]: `%${search}%` } },
+                { category: { [Op.iLike]: `%${search}%` } },
+                { brand: { [Op.iLike]: `%${search}%` } }
             ];
+        }
+
+        if (brand && brand !== 'all') {
+            where.brand = { [Op.iLike]: `%${brand}%` };
         }
 
         const products = await db.Product.findAll({
@@ -849,7 +855,8 @@ exports.getPublicProducts = async (req, res) => {
                 'rawPrice',
                 'images',
                 'stock',
-                'isAvailable'
+                'isAvailable',
+                'brand'
             ],
             order: [['createdAt', 'DESC']]
         });

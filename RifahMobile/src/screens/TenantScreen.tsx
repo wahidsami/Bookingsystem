@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions, Alert, Share, Linking, Modal, Animated, Easing } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator, ImageBackground, Dimensions, Alert, Share, Linking, Modal, Animated, Easing, TextInput } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -109,6 +109,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [activeTab, setActiveTab] = useState<'services' | 'products' | 'gifts' | 'reviews' | 'about'>('services');
     const [services, setServices] = useState<Service[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [allTenantProducts, setAllTenantProducts] = useState<Product[]>([]);
     const [staff, setStaff] = useState<Staff[]>([]);
     const [showServicesTab, setShowServicesTab] = useState(true);
     const [showProductsTab, setShowProductsTab] = useState(false);
@@ -118,6 +119,9 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [giftPackages, setGiftPackages] = useState<TenantGiftPackage[]>([]);
     const [giftImageErrors, setGiftImageErrors] = useState<Record<string, boolean>>({});
     const [serviceImageErrors, setServiceImageErrors] = useState<Record<string, boolean>>({});
+    const [productSearchQuery, setProductSearchQuery] = useState('');
+    const [productCategoryFilter, setProductCategoryFilter] = useState('all');
+    const [productSearchLoading, setProductSearchLoading] = useState(false);
     const [reviews, setReviews] = useState<TenantReview[]>([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [reviewsSummary, setReviewsSummary] = useState<{ total: number; avgRating: number | null }>({ total: 0, avgRating: null });
@@ -158,6 +162,48 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             openServiceDetails(matchedService);
         }
     }, [selectedServiceId, services]);
+
+    useEffect(() => {
+        if (!tenant?.id || !showProductsTab) {
+            return;
+        }
+
+        const search = productSearchQuery.trim();
+        const hasRemoteFilters = search.length > 0 || productCategoryFilter !== 'all';
+
+        if (!hasRemoteFilters) {
+            setProducts(allTenantProducts);
+            setProductSearchLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        const timer = setTimeout(async () => {
+            try {
+                setProductSearchLoading(true);
+                const responseProducts = await api.getPublicTenantProducts(tenant.id, {
+                    search,
+                    category: productCategoryFilter,
+                });
+                if (!cancelled) {
+                    setProducts(responseProducts);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setProducts([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setProductSearchLoading(false);
+                }
+            }
+        }, 280);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [allTenantProducts, productCategoryFilter, productSearchQuery, showProductsTab, tenant?.id]);
 
     useEffect(() => {
         const availableTabs: Array<'services' | 'products' | 'gifts' | 'reviews' | 'about'> = [];
@@ -264,12 +310,15 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 try {
                     const productsRes = await api.get<{ success: boolean; products: Product[] }>(`/public/tenant/${idToFetch}/products`);
                     if (productsRes.success) {
-                        setProducts((productsRes.products || []).map((product) => normalizeProduct({
+                        const normalizedProducts = (productsRes.products || []).map((product) => normalizeProduct({
                             ...product,
                             tenantId: idToFetch,
-                        })));
+                        }));
+                        setAllTenantProducts(normalizedProducts);
+                        setProducts(normalizedProducts);
                     }
                 } catch {
+                    setAllTenantProducts([]);
                     setProducts([]);
                 }
             }
@@ -1197,6 +1246,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     };
 
     const renderProducts = () => {
+        const productCategories = Array.from(new Set((allTenantProducts.length > 0 ? allTenantProducts : products).map((product) => product.category || 'General')));
+        const hasProductFilters = productSearchQuery.trim().length > 0 || productCategoryFilter !== 'all';
         return (
             <View style={styles.contentSection}>
                 <View style={styles.productsHeaderBlock}>
@@ -1205,9 +1256,54 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         {isRTL ? 'منتجات مختارة للعناية اليومية والجمال.' : 'Curated beauty and wellness products for your routine.'}
                     </Text>
                 </View>
+
+                <View style={styles.productSearchCard}>
+                    <Text style={styles.productSearchTitle}>{t('searchProducts')}</Text>
+                    <Text style={styles.productSearchSubtitle}>{t('searchProductsHint')}</Text>
+                    <TextInput
+                        style={styles.productSearchInput}
+                        value={productSearchQuery}
+                        onChangeText={setProductSearchQuery}
+                        placeholder={isRTL ? 'ابحثي باسم المنتج أو الفئة أو العلامة التجارية...' : 'Search by product name, category, or brand...'}
+                        placeholderTextColor="#7F86A6"
+                        autoCapitalize="none"
+                        returnKeyType="search"
+                    />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productCategoryRow}>
+                        <TouchableOpacity
+                            style={[styles.productCategoryChip, productCategoryFilter === 'all' ? styles.productCategoryChipActive : null]}
+                            onPress={() => setProductCategoryFilter('all')}
+                        >
+                            <Text style={[styles.productCategoryChipText, productCategoryFilter === 'all' ? styles.productCategoryChipTextActive : null]}>
+                                {isRTL ? 'الكل' : 'All'}
+                            </Text>
+                        </TouchableOpacity>
+                        {productCategories.map((category) => {
+                            const active = productCategoryFilter === category;
+                            return (
+                                <TouchableOpacity
+                                    key={category}
+                                    style={[styles.productCategoryChip, active ? styles.productCategoryChipActive : null]}
+                                    onPress={() => setProductCategoryFilter(category)}
+                                >
+                                    <Text style={[styles.productCategoryChipText, active ? styles.productCategoryChipTextActive : null]} numberOfLines={1}>
+                                        {category}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+
                 {products.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>{isRTL ? 'لا توجد منتجات متاحة حالياً.' : 'No products available yet.'}</Text>
+                        <Text style={styles.emptyText}>
+                            {productSearchLoading
+                                ? (isRTL ? 'جارٍ البحث في المنتجات...' : 'Searching products...')
+                                : hasProductFilters
+                                    ? (isRTL ? 'لا توجد نتائج مطابقة.' : 'No matching products found.')
+                                    : (isRTL ? 'لا توجد منتجات متاحة حالياً.' : 'No products available yet.')}
+                        </Text>
                     </View>
                 ) : (
                     <View style={styles.productGrid}>
@@ -1217,6 +1313,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                 : 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?q=80&w=600&auto=format&fit=crop';
                             const productName = isRTL ? product.name_ar : product.name_en;
                             const productDescription = (isRTL ? product.description_ar : product.description_en) || (isRTL ? product.description_en : product.description_ar) || '';
+                            const brandLabel = product.brand || null;
 
                             return (
                                 <TouchableOpacity
@@ -1233,6 +1330,13 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                         <Text style={styles.productName} numberOfLines={1}>{productName}</Text>
                                         {productDescription ? (
                                             <Text style={styles.productDescription} numberOfLines={2}>{productDescription}</Text>
+                                        ) : null}
+                                        {brandLabel ? (
+                                            <View style={styles.productBrandPill}>
+                                                <Text style={styles.productBrandPillText} numberOfLines={1}>
+                                                    {brandLabel}
+                                                </Text>
+                                            </View>
                                         ) : null}
                                         <View style={styles.productMetaRow}>
                                             <Text style={styles.productPrice}>{formatRiyal(product.price, isRTL ? 'ar' : 'en')}</Text>
@@ -3304,6 +3408,59 @@ const styles = StyleSheet.create({
         color: '#626A89',
         lineHeight: 25,
     },
+    productSearchCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: '#EDE9FA',
+        padding: spacing.md,
+        marginBottom: spacing.md,
+        gap: spacing.sm,
+    },
+    productSearchTitle: {
+        fontSize: fontSize.lg,
+        color: '#171843',
+        fontWeight: '800',
+    },
+    productSearchSubtitle: {
+        fontSize: fontSize.sm,
+        color: '#626A89',
+        lineHeight: 20,
+    },
+    productSearchInput: {
+        borderWidth: 1,
+        borderColor: '#D8DDF1',
+        borderRadius: 16,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        fontSize: fontSize.md,
+        color: colors.text,
+        backgroundColor: '#FAFBFF',
+    },
+    productCategoryRow: {
+        gap: spacing.sm,
+        paddingTop: spacing.xs,
+    },
+    productCategoryChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: '#F3F6FF',
+        borderWidth: 1,
+        borderColor: '#DDE5FF',
+    },
+    productCategoryChipActive: {
+        backgroundColor: '#111827',
+        borderColor: '#111827',
+    },
+    productCategoryChipText: {
+        fontSize: fontSize.sm,
+        color: '#34416A',
+        fontWeight: '600',
+    },
+    productCategoryChipTextActive: {
+        color: '#FFFFFF',
+    },
     productGrid: {
         gap: spacing.md,
     },
@@ -3336,6 +3493,19 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#5D6585',
         lineHeight: 22,
+    },
+    productBrandPill: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#EEF2FF',
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        marginTop: spacing.sm,
+    },
+    productBrandPillText: {
+        fontSize: 11,
+        color: '#4338CA',
+        fontWeight: '700',
     },
     productMetaRow: {
         marginTop: spacing.sm,

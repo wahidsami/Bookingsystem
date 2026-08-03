@@ -557,6 +557,64 @@ const unregisterPushToken = async (req, res) => {
     }
 };
 
+/**
+ * Delete/deactivate the current customer account
+ * DELETE /api/v1/users/account
+ */
+const deleteAccount = async (req, res) => {
+    try {
+        const user = await db.PlatformUser.findByPk(req.userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        const providedPassword = `${req.body?.password || req.body?.currentPassword || ''}`.trim();
+        if (user.authProvider === 'local') {
+            if (!providedPassword) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Password confirmation is required for local accounts'
+                });
+            }
+
+            const passwordValid = await user.validatePassword(providedPassword);
+            if (!passwordValid) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Password confirmation failed'
+                });
+            }
+        }
+
+        await db.MobilePushToken.destroy({
+            where: { platformUserId: user.id }
+        });
+
+        await user.update({
+            isActive: false,
+            refreshToken: null,
+            emailVerificationToken: null,
+            phoneVerificationCode: null,
+            passwordResetToken: null,
+            passwordResetTokenExpiresAt: null
+        });
+
+        res.json({
+            success: true,
+            message: 'Account deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete account error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to delete account'
+        });
+    }
+};
+
 module.exports = {
     getProfile,
     updateProfile,
@@ -570,6 +628,7 @@ module.exports = {
     markNotificationRead,
     registerPushToken,
     unregisterPushToken,
+    deleteAccount,
     uploadMiddleware: upload.single('photo')
 };
 

@@ -57,7 +57,7 @@ export function AuthNavigator({
             onBackToWelcome={() => navigation.navigate('Welcome')}
             onGoToRegister={() => navigation.navigate('Register')}
             onForgotPassword={() => navigation.navigate('ForgotPassword')}
-            onGoogleSignIn={() => navigation.navigate('GoogleOnboarding')}
+            onGoogleSignIn={() => navigation.replace('GoogleOnboarding')}
           />
         )}
       </Stack.Screen>
@@ -67,7 +67,7 @@ export function AuthNavigator({
             onRegisterSuccess={onAuthSuccess}
             onBackToWelcome={() => navigation.navigate('Welcome')}
             onGoToLogin={() => navigation.navigate('Login')}
-            onGoogleSignIn={() => navigation.navigate('GoogleOnboarding')}
+            onGoogleSignIn={() => navigation.replace('GoogleOnboarding')}
           />
         )}
       </Stack.Screen>

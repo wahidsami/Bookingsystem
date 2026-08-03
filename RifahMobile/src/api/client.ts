@@ -272,6 +272,7 @@ export interface Product {
     description_en: string;
     description_ar: string;
     category: string;
+    brand?: string;
     price: number;
     rawPrice: number;
     images?: string[];
@@ -282,6 +283,8 @@ export interface Product {
 export interface Staff {
     id: string;
     name: string;
+    name_en?: string;
+    name_ar?: string;
     role?: string;
     specialty?: string;
     avatar?: string;
@@ -312,6 +315,16 @@ export interface Booking {
     endTime: string;
     status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'cancelled' | 'completed' | 'no_show';
     price: number;
+    customerName?: string | null;
+    customer?: {
+        id?: string;
+        name?: string | null;
+        fullName?: string | null;
+        firstName?: string | null;
+        lastName?: string | null;
+        email?: string | null;
+    } | null;
+    tenantName?: string | null;
     paymentStatus?: string;
     paymentMethod?: string;
     paidAt?: string;
@@ -741,6 +754,7 @@ export const normalizeProduct = (product: Partial<Product> | null | undefined): 
     description_en: toStringValue(product?.description_en),
     description_ar: toStringValue(product?.description_ar),
     category: toStringValue(product?.category, 'General'),
+    brand: toOptionalString(product?.brand),
     price: toNumber(product?.price),
     rawPrice: toNumber(product?.rawPrice ?? product?.price),
     images: Array.isArray(product?.images)
@@ -1718,12 +1732,51 @@ class ApiClient {
         return (response.deals || []).map((deal) => normalizeHotDeal(deal));
     }
 
+    async getPublicTenantProducts(
+        tenantId: string,
+        filters: {
+            search?: string;
+            category?: string;
+            brand?: string;
+            minPrice?: number;
+            maxPrice?: number;
+        } = {}
+    ): Promise<Product[]> {
+        const query = new URLSearchParams();
+        if (filters.search) query.set('search', filters.search);
+        if (filters.category && filters.category !== 'all') query.set('category', filters.category);
+        if (filters.brand && filters.brand !== 'all') query.set('brand', filters.brand);
+        if (Number.isFinite(Number(filters.minPrice))) query.set('minPrice', String(Number(filters.minPrice)));
+        if (Number.isFinite(Number(filters.maxPrice))) query.set('maxPrice', String(Number(filters.maxPrice)));
+
+        const endpoint = `/public/tenant/${encodeURIComponent(tenantId)}/products${query.toString() ? `?${query.toString()}` : ''}`;
+        const response = await this.get<{ success: boolean; products: Product[] }>(endpoint);
+        return (response.products || []).map((product) => normalizeProduct({
+            ...product,
+            tenantId,
+        }));
+    }
+
     /**
      * Get service categories
      */
     async getCategories(): Promise<ServiceCategory[]> {
         const response = await this.get<{ success: boolean; categories: ServiceCategory[] }>('/categories');
         return (response.categories || []).map((category) => normalizeCategory(category));
+    }
+
+    async deleteAccount(password?: string): Promise<{ success: boolean; message: string }> {
+        const response = await this.request('/users/account', {
+            method: 'DELETE',
+            body: password ? JSON.stringify({ password }) : undefined,
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: 'Request failed' }));
+            throw new Error(error.message || `HTTP ${response.status}`);
+        }
+
+        return response.json();
     }
 
     /**

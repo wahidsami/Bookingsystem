@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -105,8 +105,9 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
     const [otp, setOtp] = useState('');
     const [otpHint, setOtpHint] = useState('');
     const [googlePromptInFlight, setGooglePromptInFlight] = useState(false);
+    const autoStartedGoogleFlowRef = useRef(false);
 
-    const persistOnboardingState = async (patch: Partial<PersistedGoogleOnboardingState> = {}) => {
+    const persistOnboardingState = useCallback(async (patch: Partial<PersistedGoogleOnboardingState> = {}) => {
         const nextState: PersistedGoogleOnboardingState = {
             onboardingToken: patch.onboardingToken ?? onboardingToken,
             phone: patch.phone ?? phone,
@@ -121,11 +122,11 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
         }
 
         await AsyncStorage.setItem(GOOGLE_ONBOARDING_STATE_KEY, JSON.stringify(nextState));
-    };
+    }, [email, firstName, lastName, onboardingToken, phone, step]);
 
-    const clearPersistedOnboardingState = async () => {
+    const clearPersistedOnboardingState = useCallback(async () => {
         await AsyncStorage.removeItem(GOOGLE_ONBOARDING_STATE_KEY);
-    };
+    }, []);
 
     const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
         webClientId: googleClientId || undefined,
@@ -148,7 +149,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
         return Boolean(googleClientId);
     }, [googleAndroidClientId, googleClientId, googleIosClientId]);
 
-    const beginGoogleFlow = async () => {
+    const beginGoogleFlow = useCallback(async () => {
         setError('');
         if (!canStartGoogle) {
             setError(t('googleMissingClientId'));
@@ -168,7 +169,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
             setError(err?.message || t('googleSignInFailed'));
             setLoading(false);
         }
-    };
+    }, [canStartGoogle, promptAsync, t]);
 
     useEffect(() => {
         const startFreshGoogleFlow = async () => {
@@ -180,62 +181,73 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
             setOtp('');
             setOtpHint('');
             setError('');
+            setGooglePromptInFlight(false);
+            autoStartedGoogleFlowRef.current = false;
         };
 
         startFreshGoogleFlow().catch(() => undefined);
     }, []);
 
-    useEffect(() => {
-        const completeGoogleStart = async () => {
-            if (!googlePromptInFlight) {
-                return;
-            }
+    const completeGoogleStart = useCallback(async () => {
+        if (!googlePromptInFlight) {
+            return;
+        }
 
-            const idToken = extractIdToken(response as any, response as any);
-            if (!idToken) {
-                return;
-            }
+        const idToken = extractIdToken(response as any, response as any);
+        if (!idToken) {
+            return;
+        }
 
-            try {
-                const startResult = await api.googleStart(idToken);
-                if (startResult.requiresOnboarding === false && startResult.accessToken && startResult.user) {
-                    await api.setTokens(startResult.accessToken, startResult.refreshToken ?? null);
-                    await api.setUser(startResult.user);
-                    setError('');
-                    onSuccess();
-                    return;
-                }
-
-                if (!startResult.onboardingToken) {
-                    throw new Error(t('googleSignInFailed'));
-                }
-                setOnboardingToken(startResult.onboardingToken);
-                setEmail(startResult.profile?.email || '');
-                setFirstName(startResult.profile?.firstName || '');
-                setLastName(startResult.profile?.lastName || '');
-                setStep('phone');
-                await persistOnboardingState({
-                    onboardingToken: startResult.onboardingToken,
-                    email: startResult.profile?.email || '',
-                    firstName: startResult.profile?.firstName || '',
-                    lastName: startResult.profile?.lastName || '',
-                    step: 'phone',
-                });
+        try {
+            const startResult = await api.googleStart(idToken);
+            if (startResult.requiresOnboarding === false && startResult.accessToken && startResult.user) {
+                await api.setTokens(startResult.accessToken, startResult.refreshToken ?? null);
+                await api.setUser(startResult.user);
                 setError('');
-            } catch (err: any) {
-                setError(err?.message || t('googleSignInFailed'));
-            } finally {
-                setGooglePromptInFlight(false);
-                setLoading(false);
+                onSuccess();
+                return;
             }
-        };
 
+            if (!startResult.onboardingToken) {
+                throw new Error(t('googleSignInFailed'));
+            }
+            setOnboardingToken(startResult.onboardingToken);
+            setEmail(startResult.profile?.email || '');
+            setFirstName(startResult.profile?.firstName || '');
+            setLastName(startResult.profile?.lastName || '');
+            setStep('phone');
+            await persistOnboardingState({
+                onboardingToken: startResult.onboardingToken,
+                email: startResult.profile?.email || '',
+                firstName: startResult.profile?.firstName || '',
+                lastName: startResult.profile?.lastName || '',
+                step: 'phone',
+            });
+            setError('');
+        } catch (err: any) {
+            setError(err?.message || t('googleSignInFailed'));
+        } finally {
+            setGooglePromptInFlight(false);
+            setLoading(false);
+        }
+    }, [googlePromptInFlight, onSuccess, persistOnboardingState, response, t]);
+
+    useEffect(() => {
         completeGoogleStart().catch(() => {
             setGooglePromptInFlight(false);
             setLoading(false);
             setError(t('googleSignInFailed'));
         });
-    }, [googlePromptInFlight, response, t]);
+    }, [completeGoogleStart, t]);
+
+    useEffect(() => {
+        if (step !== 'google' || autoStartedGoogleFlowRef.current || !request || !canStartGoogle) {
+            return;
+        }
+
+        autoStartedGoogleFlowRef.current = true;
+        beginGoogleFlow().catch(() => undefined);
+    }, [beginGoogleFlow, canStartGoogle, request, step]);
 
     const sendOtp = async () => {
         setError('');
