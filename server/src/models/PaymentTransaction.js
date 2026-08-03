@@ -184,7 +184,7 @@ module.exports = (sequelize, DataTypes) => {
                 });
                 if (appointment) {
                     tenantId = appointment.tenantId;
-                    customerId = appointment.customerId || appointment.bookingSession?.customerId;
+                    customerId = appointment.platformUserId || appointment.customerId || appointment.bookingSession?.customerId || null;
                     entityType = 'Booking';
                     entityId = appointment.id;
                 }
@@ -192,9 +192,17 @@ module.exports = (sequelize, DataTypes) => {
                 const order = await sequelize.models.Order.findByPk(transaction.orderId);
                 if (order) {
                     tenantId = order.tenantId;
-                    customerId = order.customerId;
+                    customerId = order.platformUserId || order.customerId || null;
                     entityType = order.orderType === 'pos' ? 'PosReceipt' : 'Order';
                     entityId = order.id;
+                }
+            } else {
+                const meta = typeof transaction.metadata === 'string' ? (JSON.parse(transaction.metadata || '{}')) : (transaction.metadata || {});
+                if (meta.isGiftCard || meta.giftCardTransactionId) {
+                    tenantId = meta.tenantId || null;
+                    customerId = meta.recipientId || meta.senderId || null;
+                    entityType = 'GiftCard';
+                    entityId = meta.giftCardTransactionId || transaction.id;
                 }
             }
 

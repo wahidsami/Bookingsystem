@@ -395,7 +395,10 @@ exports.purchaseGiftCard = async (req, res) => {
       metadata: {
         isGiftCard: true,
         source: 'gift_card_purchase',
-        giftCardTransactionId: giftTx.id
+        giftCardTransactionId: giftTx.id,
+        tenantId,
+        recipientId: recipient?.id || null,
+        senderId
       }
     }, { transaction: tx, logging: forensicTrace.sqlLogger, forensicTrace });
 
@@ -567,46 +570,51 @@ exports.purchaseProducts = async (req, res) => {
       recipientType === 'gift' ? 'gift_purchase' : 'self_purchase'
     ].filter(Boolean).join(' | ');
 
-    const order = await orderService.createOrder({
-      platformUserId: recipient.id,
-      tenantId,
-      items: items.map((item) => ({
-        productId: item.productId,
-        quantity: Number(item.quantity || 0)
-      })),
-      paymentMethod: 'pay_on_visit',
-      deliveryType: 'pickup',
-      notes: orderNotes
-    }, {
-      skipNotification: true,
-      skipInvoiceEmail: true,
-      forensicTrace
-    });
+    let order;
+    await db.sequelize.transaction(async (tx) => {
+      order = await orderService.createOrder({
+        platformUserId: recipient.id,
+        tenantId,
+        items: items.map((item) => ({
+          productId: item.productId,
+          quantity: Number(item.quantity || 0)
+        })),
+        paymentMethod: 'pay_on_visit',
+        deliveryType: 'pickup',
+        notes: orderNotes
+      }, {
+        transaction: tx,
+        skipNotification: true,
+        skipInvoiceEmail: true,
+        forensicTrace
+      });
 
-    const orderTotal = parseMoney(order?.totalAmount || 0);
-    const normalizedAllocations = normalizeAllocations(
-      orderTotal,
-      paymentMethod || 'cash',
-      paymentAllocations
-    );
+      const orderTotal = parseMoney(order?.totalAmount || 0);
+      const normalizedAllocations = normalizeAllocations(
+        orderTotal,
+        paymentMethod || 'cash',
+        paymentAllocations
+      );
 
-    await orderService.updatePaymentStatus(order.id, 'paid', {
-      paymentMethod: paymentMethod || 'cash',
-      processedBy: req.staffId || req.tenantAccountId || null,
-      transactionRef: transactionRef || `CART-ORDER-${order.orderNumber}`,
-      notes: orderNotes,
-      skipNotification: recipientType === 'self',
-      metadata: {
-        source: 'tenant_cart_products',
-        recipientType: recipientType || 'self',
-        paymentAllocations: normalizedAllocations,
-        createdByTenantAccountId: req.tenantAccountId || null,
-        createdByStaffId: req.staffId || null,
-        senderId,
-        recipientCreatedAsGuest: createdGuest,
-        recipientId: recipient.id
-      },
-      forensicTrace
+      await orderService.updatePaymentStatus(order.id, 'paid', {
+        transaction: tx,
+        paymentMethod: paymentMethod || 'cash',
+        processedBy: req.staffId || req.tenantAccountId || null,
+        transactionRef: transactionRef || `CART-ORDER-${order.orderNumber}`,
+        notes: orderNotes,
+        skipNotification: recipientType === 'self',
+        metadata: {
+          source: 'tenant_cart_products',
+          recipientType: recipientType || 'self',
+          paymentAllocations: normalizedAllocations,
+          createdByTenantAccountId: req.tenantAccountId || null,
+          createdByStaffId: req.staffId || null,
+          senderId,
+          recipientCreatedAsGuest: createdGuest,
+          recipientId: recipient.id
+        },
+        forensicTrace
+      });
     });
 
     const updatedOrder = await orderService.getOrderById(order.id);

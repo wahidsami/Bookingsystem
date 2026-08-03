@@ -19,6 +19,7 @@ const {
     parseServiceVariants
 } = require('../utils/serviceVariant');
 const { createAppointmentTransaction } = require('../services/paymentTransactionLedgerService');
+const { ensureAppointmentInvoice } = require('../services/customerInvoiceService');
 
 const BUSINESS_TYPE_META = {
     beauty_salon: { name_en: 'Beauty Salon', name_ar: 'صالون تجميل', icon: '💄' },
@@ -1297,6 +1298,12 @@ exports.createPublicBooking = async (req, res) => {
                     where: { platformUserId: platformUser.id, tenantId }
                 });
             }
+        }
+
+        try {
+            await ensureAppointmentInvoice(appointment.id);
+        } catch (invoiceErr) {
+            console.warn('Could not generate CustomerInvoice for public booking:', invoiceErr.message);
         }
 
         await appointment.reload();

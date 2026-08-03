@@ -288,7 +288,7 @@ async function loadTransactions(tenantId, start, end, limit = 600) {
                 { '$order.tenantId$': tenantId }
             ],
             status: { [Op.in]: ['completed', 'refunded'] },
-            type: { [Op.in]: ['booking', 'product_purchase', 'refund'] },
+            type: { [Op.in]: ['deposit', 'remainder', 'full', 'refund'] },
             processedAt: {
                 [Op.gte]: start,
                 [Op.lte]: end
