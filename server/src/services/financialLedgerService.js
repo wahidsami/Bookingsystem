@@ -32,17 +32,18 @@ class FinancialLedgerService {
             throw new Error('Missing required fields for FinancialLedgerEntry');
         }
 
-        return db.FinancialLedgerEntry.create({
-            tenantId,
-            customerId,
-            entityType,
-            entityId,
-            amount,
-            currency,
-            paymentMethod,
-            status,
-            description,
-        }, { transaction });
+        // return db.FinancialLedgerEntry.create({
+        //     tenantId,
+        //     customerId,
+        //     entityType,
+        //     entityId,
+        //     amount,
+        //     currency,
+        //     paymentMethod,
+        //     status,
+        //     description,
+        // }, { transaction });
+        return null;
     }
 }
 
