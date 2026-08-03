@@ -83,6 +83,23 @@ function normalizeEntityType(value) {
     return normalizeText(value).toLowerCase();
 }
 
+function isUuidLike(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(`${value || ''}`.trim());
+}
+
+function ensureUuidLike(value, fieldName) {
+    const normalized = normalizeText(value);
+    if (!normalized) {
+        return normalized;
+    }
+
+    if (!isUuidLike(normalized)) {
+        throw createSupportError(`${fieldName} must be a valid UUID`, 400);
+    }
+
+    return normalized;
+}
+
 function parsePage(query = {}) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 20));
@@ -1299,14 +1316,16 @@ async function createTicket({
     metadata = {}
 }) {
     const actorContext = getActorContext(actor);
-    const normalizedTenantId = normalizeText(tenantId);
+    const normalizedTenantId = ensureUuidLike(tenantId, 'tenantId');
     if (!normalizedTenantId) {
         throw createSupportError('tenantId is required', 400);
     }
 
     const normalizedCustomerId = actorContext.isCustomer
-        ? actorContext.actorId
-        : normalizeText(customerPlatformUserId) || null;
+        ? ensureUuidLike(actorContext.actorId, 'customerPlatformUserId')
+        : ensureUuidLike(customerPlatformUserId, 'customerPlatformUserId') || null;
+
+    const normalizedSupportCategoryId = ensureUuidLike(supportCategoryId, 'supportCategoryId') || null;
 
     if (actorContext.isCustomer && !normalizedCustomerId) {
         throw createSupportError('customerPlatformUserId is required', 400);
@@ -1330,7 +1349,7 @@ async function createTicket({
         if (normalizedCustomerId) {
             await resolveCustomer(normalizedTenantId, normalizedCustomerId, transaction);
         }
-        const category = await resolveCategoryOrNull(supportCategoryId, normalizedTenantId, transaction);
+        const category = await resolveCategoryOrNull(normalizedSupportCategoryId, normalizedTenantId, transaction);
 
         const ticket = await db.SupportTicket.create({
             tenantId: normalizedTenantId,

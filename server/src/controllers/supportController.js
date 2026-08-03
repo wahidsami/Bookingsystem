@@ -57,9 +57,11 @@ const createTicket = async (req, res) => {
         const actor = getActor(req);
         const links = parseJsonMaybe(pickFirst(req.body.links, req.body.linkedEntities), []);
         const metadata = parseJsonMaybe(req.body.metadata, {});
+        // For authenticated tenant/admin actors, tenant identity must come from server context.
+        const resolvedTenantId = pickFirst(actor.tenantId, req.body.tenantId, req.query.tenantId, req.params.tenantId);
         const ticket = await supportService.createTicket({
             actor,
-            tenantId: pickFirst(req.body.tenantId, req.query.tenantId, req.params.tenantId),
+            tenantId: resolvedTenantId,
             customerPlatformUserId: pickFirst(req.body.customerPlatformUserId, req.body.customerId),
             supportCategoryId: pickFirst(req.body.supportCategoryId, req.body.categoryId),
             subject: req.body.subject,
