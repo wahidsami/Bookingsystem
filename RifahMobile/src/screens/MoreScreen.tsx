@@ -9,6 +9,7 @@ import { api, PublicAppContent, User } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
+import * as Notifications from 'expo-notifications';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface MoreScreenProps {
@@ -44,7 +45,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
 
             if (isAuthenticated) {
                 api.getNotifications(1, 1)
-                    .then((response) => setNotificationUnreadCount(response.unreadCount || 0))
+                    .then((response) => { setNotificationUnreadCount(response.unreadCount || 0); Notifications.setBadgeCountAsync(response.unreadCount || 0); })
                     .catch(() => setNotificationUnreadCount(0));
             } else {
                 setNotificationUnreadCount(0);
@@ -406,3 +407,4 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
     },
 });
+

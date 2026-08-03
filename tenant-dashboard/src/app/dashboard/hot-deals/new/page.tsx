@@ -11,10 +11,8 @@ export default function NewHotDealPage() {
     const [services, setServices] = useState<any[]>([]);
     const [formData, setFormData] = useState({
         serviceId: '',
-        title_en: '',
-        title_ar: '',
-        description_en: '',
-        description_ar: '',
+        title: '',
+        subtitle: '',
         discountType: 'percentage',
         discountValue: '',
         validFrom: new Date().toISOString().split('T')[0],
@@ -99,54 +97,27 @@ export default function NewHotDealPage() {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-dark-300 mb-1">
-                                    Title (English) *
+                                    Title *
                                 </label>
                                 <input
                                     type="text"
                                     required
-                                    value={formData.title_en}
-                                    onChange={(e) => setFormData({ ...formData, title_en: e.target.value })}
+                                    value={formData.title}
+                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
                                     placeholder="e.g., Summer Haircut Special"
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-dark-300 mb-1">
-                                    Title (Arabic) *
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.title_ar}
-                                    onChange={(e) => setFormData({ ...formData, title_ar: e.target.value })}
-                                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
-                                    dir="rtl"
-                                    placeholder="مثال: عرض قصة صيفية خاصة"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-dark-300 mb-1">
-                                    Description (English)
+                                    Subtitle
                                 </label>
                                 <textarea
-                                    value={formData.description_en}
-                                    onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
+                                    value={formData.subtitle}
+                                    onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
                                     rows={2}
                                     className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
                                     placeholder="Brief description of your offer"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-dark-300 mb-1">
-                                    Description (Arabic)
-                                </label>
-                                <textarea
-                                    value={formData.description_ar}
-                                    onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                                    rows={2}
-                                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
-                                    dir="rtl"
-                                    placeholder="وصف موجز لعرضك"
                                 />
                             </div>
                         </div>

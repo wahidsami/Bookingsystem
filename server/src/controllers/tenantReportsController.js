@@ -1214,7 +1214,29 @@ async function buildFullReportData(req, sections, startDate, endDate) {
     if (sections.includes('overview') || sections.includes('discounts')) {
         await collectSection('overview', async () => {
             const response = await runHandler(tenantFinancialController.getFinancialOverview, req);
-            const overview = response?.overview || response?.data?.overview || response?.data || null;
+            
+            const overview = response?.overview || response?.data?.overview || response?.data || {};
+            // Override with FinancialLedgerEntry
+            const ledgerEntries = await db.FinancialLedgerEntry.findAll({
+                where: { tenantId: req.tenantId, ...buildDateRangeWhere('createdAt', startDate, endDate) },
+                attributes: ['amount', 'status', 'paymentMethod']
+            });
+            let totalRevenue = 0;
+            let totalRefunds = 0;
+            const paymentMethods = {};
+            for (const entry of ledgerEntries) {
+                if (entry.status === 'completed') {
+                    totalRevenue += Number(entry.amount);
+                    paymentMethods[entry.paymentMethod] = (paymentMethods[entry.paymentMethod] || 0) + Number(entry.amount);
+                } else if (entry.status === 'refunded') {
+                    totalRefunds += Math.abs(Number(entry.amount));
+                }
+            }
+            overview.totalRevenue = totalRevenue;
+            overview.totalRefunds = totalRefunds;
+            overview.netRevenue = totalRevenue - totalRefunds;
+            overview.paymentMethodBreakdown = paymentMethods;
+
             if (overview) {
                 if (sections.includes('overview')) {
                     result.overview = overview;
@@ -2250,5 +2272,6 @@ exports.downloadReportPdf = async (req, res) => {
         }
     }
 };
+
 
 

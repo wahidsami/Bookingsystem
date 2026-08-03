@@ -158,5 +158,54 @@ module.exports = (sequelize, DataTypes) => {
         }
     });
 
+    
+    PaymentTransaction.addHook('afterCreate', async (transaction, options) => {
+        try {
+            const FinancialLedgerService = require('../services/financialLedgerService');
+            let tenantId = null;
+            let customerId = null;
+            let entityType = null;
+            let entityId = null;
+
+            if (transaction.appointmentId) {
+                const appointment = await sequelize.models.Appointment.findByPk(transaction.appointmentId, {
+                    include: [{ model: sequelize.models.BookingSession, as: 'bookingSession' }]
+                });
+                if (appointment) {
+                    tenantId = appointment.tenantId;
+                    customerId = appointment.customerId || appointment.bookingSession?.customerId;
+                    entityType = 'Booking';
+                    entityId = appointment.id;
+                }
+            } else if (transaction.orderId) {
+                const order = await sequelize.models.Order.findByPk(transaction.orderId);
+                if (order) {
+                    tenantId = order.tenantId;
+                    customerId = order.customerId;
+                    entityType = order.orderType === 'pos' ? 'PosReceipt' : 'Order';
+                    entityId = order.id;
+                }
+            }
+
+            if (tenantId && entityType && entityId) {
+                await FinancialLedgerService.recordRevenue({
+                    tenantId,
+                    customerId,
+                    entityType,
+                    entityId,
+                    amount: transaction.type === 'refund' ? -Math.abs(transaction.amount) : Math.abs(transaction.amount),
+                    currency: transaction.currency,
+                    paymentMethod: transaction.paymentMethod,
+                    status: transaction.status,
+                    description: transaction.notes || \Payment \\
+                }, options.transaction);
+            }
+        } catch (error) {
+            console.error('Failed to create FinancialLedgerEntry in PaymentTransaction hook', error);
+        }
+    });
+
     return PaymentTransaction;
+
 };
+

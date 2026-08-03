@@ -213,10 +213,8 @@ const createHotDeal = async (req, res) => {
         const tenantId = req.tenantId;
         const {
             serviceId,
-            title_en,
-            title_ar,
-            description_en,
-            description_ar,
+            title,
+            subtitle,
             discountType, // 'percentage' or 'fixed_amount'
             discountValue,
             validFrom,
@@ -296,10 +294,8 @@ const createHotDeal = async (req, res) => {
         const deal = await db.HotDeal.create({
             tenantId,
             serviceId,
-            title_en,
-            title_ar,
-            description_en,
-            description_ar,
+            title,
+            subtitle,
             discountType,
             discountValue,
             originalPrice,
@@ -893,3 +889,4 @@ module.exports = {
     // Public endpoints
     getActiveHotDeals
 };
+

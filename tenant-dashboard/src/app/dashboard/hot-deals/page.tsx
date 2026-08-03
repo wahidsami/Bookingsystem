@@ -142,7 +142,7 @@ export default function HotDealsPage() {
                                 </div>
 
                                 {/* Deal Info */}
-                                <h3 className="text-lg font-semibold text-white mb-2">{deal.title_en}</h3>
+                                <h3 className="text-lg font-semibold text-white mb-2">{deal.title}</h3>
                                 <p className="text-sm text-dark-300 mb-4">{deal.service?.name}</p>
 
                                 {/* Pricing */}

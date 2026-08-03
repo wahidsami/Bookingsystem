@@ -152,5 +152,32 @@ module.exports = (sequelize, DataTypes) => {
         }
     });
 
+    
+    Transaction.addHook('afterSave', async (transaction, options) => {
+        try {
+            if (transaction.status !== 'completed' && transaction.status !== 'refunded') return;
+            // Avoid duplicate logging if handled elsewhere, but since Transaction is used for Wallet Topups:
+            if (transaction.type === 'wallet_topup' || transaction.type === 'loyalty_redemption') {
+                const FinancialLedgerService = require('../services/financialLedgerService');
+                
+                await FinancialLedgerService.recordRevenue({
+                    tenantId: transaction.tenantId,
+                    customerId: transaction.platformUserId,
+                    entityType: transaction.type === 'wallet_topup' ? 'WalletTopup' : 'LoyaltyRedemption',
+                    entityId: transaction.id,
+                    amount: transaction.status === 'refunded' ? -Math.abs(transaction.amount) : Math.abs(transaction.amount),
+                    currency: transaction.currency,
+                    paymentMethod: transaction.paymentMethodId || 'online',
+                    status: transaction.status,
+                    description: \\ \\
+                }, options.transaction);
+            }
+        } catch (error) {
+            console.error('Failed to record revenue for Transaction', error);
+        }
+    });
+
     return Transaction;
+
 };
+

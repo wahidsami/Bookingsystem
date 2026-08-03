@@ -694,7 +694,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
                 ) : imageUrl ? (
                   <div className="relative inline-block group">
                     <img 
-                      src={imageUrl} 
+                      src={imageUrl.startsWith('http') ? imageUrl : 'http://localhost:5000/' + imageUrl} 
                       alt="Uploaded payload preview" 
                       className="h-28 object-cover rounded-lg border border-zinc-800 max-w-xs" 
                     />
@@ -1329,3 +1329,4 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
     </div>
   );
 }
+

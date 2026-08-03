@@ -33,6 +33,21 @@ interface BusinessSettings {
   snapchat: string;
 }
 
+type PageSetupTabKey = 'cover' | 'visibility' | 'about' | 'gallery' | 'contact';
+
+const PAGE_SETUP_TABS: Array<{
+  key: PageSetupTabKey;
+  labelEn: string;
+  labelAr: string;
+  icon: React.ReactNode;
+}> = [
+  { key: 'cover', labelEn: 'Cover', labelAr: 'الغلاف', icon: <Image size={14} /> },
+  { key: 'visibility', labelEn: 'Visibility', labelAr: 'الظهور', icon: <Eye size={14} /> },
+  { key: 'about', labelEn: 'About', labelAr: 'القصة', icon: <FileText size={14} /> },
+  { key: 'gallery', labelEn: 'Gallery', labelAr: 'المعرض', icon: <Sparkles size={14} /> },
+  { key: 'contact', labelEn: 'Contact', labelAr: 'التواصل', icon: <Phone size={14} /> }
+];
+
 const normalizeSectionsVisibility = (value: any): SectionsVisibility => {
   const sections = value?.sections || value || {};
   return {
@@ -87,6 +102,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
   const [aboutTextAr, setAboutTextAr] = useState<string>('');
   const [aboutTextEn, setAboutTextEn] = useState<string>('');
   const [gallery, setGallery] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<PageSetupTabKey>('cover');
 
   // Form states matching business settings schema
   const [contact, setContact] = useState<BusinessSettings>({
@@ -490,8 +506,34 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* LEFT: CONTENT MANAGEMENT CONTROLS (7 cols) */}
-          <div className="lg:col-span-7 space-y-8">
+          <div className="lg:col-span-7 space-y-6">
+            <div className={`rounded-2xl border p-2 ${darkMode ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white border-neutral-200 shadow-xs'}`}>
+              <div className="flex flex-wrap gap-2">
+                {PAGE_SETUP_TABS.map((tab) => {
+                  const active = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
+                        active
+                          ? 'bg-brand-500 text-white shadow-sm'
+                          : darkMode
+                            ? 'bg-zinc-950 text-zinc-300 hover:bg-zinc-800'
+                            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      }`}
+                    >
+                      {tab.icon}
+                      <span>{isRtl ? tab.labelAr : tab.labelEn}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             
+            {activeTab === 'cover' && (
+            <>
             {/* 1. COVER IMAGE PANEL */}
             <div className={`p-6 rounded-2xl border text-start space-y-5 ${
               darkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-neutral-150 shadow-xs'
@@ -596,7 +638,11 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                 </div>
               </div>
             </div>
+            </>
+            )}
 
+            {activeTab === 'visibility' && (
+            <>
             {/* 2. SECTION VISIBILITY PANEL */}
             <div className={`p-6 rounded-2xl border text-start space-y-5 ${
               darkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-neutral-150 shadow-xs'
@@ -691,7 +737,11 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
 
               </div>
             </div>
+            </>
+            )}
 
+            {activeTab === 'about' && (
+            <>
             {/* 3. ABOUT CONTENT PANEL */}
             <div className={`p-6 rounded-2xl border text-start space-y-4 ${
               darkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-neutral-150 shadow-xs'
@@ -767,7 +817,11 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                 </div>
               </div>
             </div>
+            </>
+            )}
 
+            {activeTab === 'gallery' && (
+            <>
             {/* 4. GALLERY IMAGES PANEL */}
             <div className={`p-6 rounded-2xl border text-start space-y-4 ${
               darkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-neutral-150 shadow-xs'
@@ -876,7 +930,11 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                 </div>
               </div>
             </div>
+            </>
+            )}
 
+            {activeTab === 'contact' && (
+            <>
             {/* 5. CONTACT INFORMATION PANEL */}
             <div className={`p-6 rounded-2xl border text-start space-y-4 ${
               darkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-neutral-150 shadow-xs'
@@ -1082,6 +1140,8 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
 
               </div>
             </div>
+            </>
+            )}
 
             {/* 6. SAVE BUTTON BAR */}
             <div className={`p-4 rounded-xl border flex justify-end gap-3 items-center ${

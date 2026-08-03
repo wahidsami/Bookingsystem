@@ -5,10 +5,10 @@ import path from "path";
 interface HotDeal {
   id: string;
   serviceId: string;
-  title_en: string;
-  title_ar: string;
-  description_en: string;
-  description_ar: string;
+  title: string;
+  titleAr: string;
+  subtitle: string;
+  subtitleAr: string;
   discountType: 'percentage' | 'fixed_amount';
   discountValue: number;
   validFrom: string; // YYYY-MM-DD
@@ -26,10 +26,10 @@ let hotDeals: HotDeal[] = [
   {
     id: "deal-royal-massage",
     serviceId: "SRV-001",
-    title_en: "Royal Relaxation Escape",
-    title_ar: "هروب الاسترخاء الملكي",
-    description_en: "Experience our signature Swedish massage with custom luxury aromatherapy oils at an exclusive price.",
-    description_ar: "استمتعي بجلسة مساج سويدي ملكي فاخر بالزيوت العطرية المخصصة بسعر استثنائي ومحدود.",
+    title: "Royal Relaxation Escape",
+    titleAr: "هروب الاسترخاء الملكي",
+    subtitle: "Experience our signature Swedish massage with custom luxury aromatherapy oils at an exclusive price.",
+    subtitleAr: "استمتعي بجلسة مساج سويدي ملكي فاخر بالزيوت العطرية المخصصة بسعر استثنائي ومحدود.",
     discountType: "percentage",
     discountValue: 25,
     validFrom: "2026-06-01",
@@ -44,10 +44,10 @@ let hotDeals: HotDeal[] = [
   {
     id: "deal-hydrafacial",
     serviceId: "SRV-002",
-    title_en: "Platinum Hydrafacial Special",
-    title_ar: "عرض الهيدرافيشال البلاتيني المميز",
-    description_en: "Renew your skin radiance with a complete multi-step deep hydration facial treatment.",
-    description_ar: "جددي نضارة وإشراقة بشرتك مع جلسة تنظيف وترطيب خلايا البشرة العميقة المتكاملة.",
+    title: "Platinum Hydrafacial Special",
+    titleAr: "عرض الهيدرافيشال البلاتيني المميز",
+    subtitle: "Renew your skin radiance with a complete multi-step deep hydration facial treatment.",
+    subtitleAr: "جددي نضارة وإشراقة بشرتك مع جلسة تنظيف وترطيب خلايا البشرة العميقة المتكاملة.",
     discountType: "fixed_amount",
     discountValue: 80,
     validFrom: "2026-06-15",
@@ -62,10 +62,10 @@ let hotDeals: HotDeal[] = [
   {
     id: "deal-nails-hair",
     serviceId: "SRV-004",
-    title_en: "Weekend Collagen Spa Special",
-    title_ar: "خصم نهاية الأسبوع للباديكير والمانيكير الكولاجين",
-    description_en: "Treat yourself to a luxurious spa pedicure and manicure session with absolute comfort.",
-    description_ar: "دللي نفسك مع جلسة العناية العميقة بالأظافر مع الكولاجين والترطيب الفاخر بنهاية الأسبوع.",
+    title: "Weekend Collagen Spa Special",
+    titleAr: "خصم نهاية الأسبوع للباديكير والمانيكير الكولاجين",
+    subtitle: "Treat yourself to a luxurious spa pedicure and manicure session with absolute comfort.",
+    subtitleAr: "دللي نفسك مع جلسة العناية العميقة بالأظافر مع الكولاجين والترطيب الفاخر بنهاية الأسبوع.",
     discountType: "percentage",
     discountValue: 20,
     validFrom: "2026-07-01",
@@ -80,10 +80,10 @@ let hotDeals: HotDeal[] = [
   {
     id: "deal-hair-treatment",
     serviceId: "SRV-005",
-    title_en: "Vegan Keratin Hair Therapy",
-    title_ar: "علاج الكيراتين النباتي للشعر",
-    description_en: "Revitalize hair health with our premium plant-based botanical keratin therapy.",
-    description_ar: "استعيدي حيوية وصحة شعرك مع علاج الكيراتين النباتي العضوي الفاخر والمغذي.",
+    title: "Vegan Keratin Hair Therapy",
+    titleAr: "علاج الكيراتين النباتي للشعر",
+    subtitle: "Revitalize hair health with our premium plant-based botanical keratin therapy.",
+    subtitleAr: "استعيدي حيوية وصحة شعرك مع علاج الكيراتين النباتي العضوي الفاخر والمغذي.",
     discountType: "fixed_amount",
     discountValue: 150,
     validFrom: "2026-06-01",
@@ -98,10 +98,10 @@ let hotDeals: HotDeal[] = [
   {
     id: "deal-hair-styling",
     serviceId: "SRV-003",
-    title_en: "Premium Style & Blowdry Deal",
-    title_ar: "عرض تصفيف الشعر والسيشوار المائي",
-    description_en: "Look your absolute best for any special event with our master hair stylists.",
-    description_ar: "تألقي بمظهر باهر وجذاب في جميع مناسباتك الخاصة مع خبيرات تصفيف الشعر لدينا.",
+    title: "Premium Style & Blowdry Deal",
+    titleAr: "عرض تصفيف الشعر والسيشوار المائي",
+    subtitle: "Look your absolute best for any special event with our master hair stylists.",
+    subtitleAr: "تألقي بمظهر باهر وجذاب في جميع مناسباتك الخاصة مع خبيرات تصفيف الشعر لدينا.",
     discountType: "percentage",
     discountValue: 40,
     validFrom: "2026-06-10",
@@ -190,10 +190,10 @@ async function startServer() {
     try {
       const {
         serviceId,
-        title_en,
-        title_ar,
-        description_en,
-        description_ar,
+        title,
+        titleAr,
+        subtitle,
+        subtitleAr,
         discountType,
         discountValue,
         validFrom,
@@ -209,7 +209,7 @@ async function startServer() {
       if (!serviceId) {
         return res.status(400).json({ error: "Service selection is required." });
       }
-      if (!title_en || !title_ar) {
+      if (!title || !titleAr) {
         return res.status(400).json({ error: "Titles in both languages are required." });
       }
       if (!discountType || discountValue === undefined) {
@@ -237,10 +237,10 @@ async function startServer() {
       const newDeal: HotDeal = {
         id: `deal-${Date.now()}`,
         serviceId,
-        title_en,
-        title_ar,
-        description_en: description_en || "",
-        description_ar: description_ar || "",
+        title,
+        titleAr,
+        subtitle: subtitle || "",
+        subtitleAr: subtitleAr || "",
         discountType,
         discountValue: Number(discountValue),
         validFrom,
@@ -271,10 +271,10 @@ async function startServer() {
 
       const {
         serviceId,
-        title_en,
-        title_ar,
-        description_en,
-        description_ar,
+        title,
+        titleAr,
+        subtitle,
+        subtitleAr,
         discountType,
         discountValue,
         validFrom,
@@ -287,7 +287,7 @@ async function startServer() {
       if (!serviceId) {
         return res.status(400).json({ error: "Service selection is required." });
       }
-      if (!title_en || !title_ar) {
+      if (!title || !titleAr) {
         return res.status(400).json({ error: "Titles in both languages are required." });
       }
       if (!discountType || discountValue === undefined) {
@@ -315,10 +315,10 @@ async function startServer() {
       const updatedDeal: HotDeal = {
         ...existingDeal,
         serviceId,
-        title_en,
-        title_ar,
-        description_en: description_en || "",
-        description_ar: description_ar || "",
+        title,
+        titleAr,
+        subtitle: subtitle || "",
+        subtitleAr: subtitleAr || "",
         discountType,
         discountValue: Number(discountValue),
         validFrom,
@@ -3240,3 +3240,4 @@ async function startServer() {
 }
 
 startServer();
+

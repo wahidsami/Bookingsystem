@@ -15,10 +15,10 @@ interface HotDealsWorkspaceProps {
 interface HotDeal {
   id: string;
   serviceId: string;
-  title_en: string;
-  title_ar: string;
-  description_en: string;
-  description_ar: string;
+  title: string;
+  titleAr: string;
+  subtitle: string;
+  subtitleAr: string;
   discountType: 'percentage' | 'fixed_amount';
   discountValue: number;
   validFrom: string;
@@ -80,10 +80,10 @@ const normalizeHotDealLimits = (input: any): PackageLimits => {
 const normalizeHotDeal = (deal: any): HotDeal => ({
   id: String(deal?.id || ''),
   serviceId: String(deal?.serviceId || ''),
-  title_en: deal?.title_en || deal?.titleEn || '',
-  title_ar: deal?.title_ar || deal?.titleAr || '',
-  description_en: deal?.description_en || deal?.descriptionEn || '',
-  description_ar: deal?.description_ar || deal?.descriptionAr || '',
+  title: deal?.title || deal?.titleEn || '',
+  titleAr: deal?.titleAr || deal?.titleAr || '',
+  subtitle: deal?.subtitle || deal?.descriptionEn || '',
+  subtitleAr: deal?.subtitleAr || deal?.descriptionAr || '',
   discountType: deal?.discountType || 'percentage',
   discountValue: Number(deal?.discountValue ?? 0),
   validFrom: deal?.validFrom || deal?.valid_from || '',
@@ -252,10 +252,10 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
           
           setImage(deal.image);
           setServiceId(deal.serviceId);
-          setTitleEn(deal.title_en);
-          setTitleAr(deal.title_ar);
-          setDescEn(deal.description_en || '');
-          setDescAr(deal.description_ar || '');
+          setTitleEn(deal.title);
+          setTitleAr(deal.titleAr);
+          setDescEn(deal.subtitle || '');
+          setDescAr(deal.subtitleAr || '');
           setDiscountType(deal.discountType);
           setDiscountValue(deal.discountValue);
           setValidFrom(deal.validFrom);
@@ -466,10 +466,10 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
       setSaving(true);
       const payload = {
         serviceId,
-        title_en: titleEn,
-        title_ar: titleAr,
-        description_en: descEn,
-        description_ar: descAr,
+        title: titleEn,
+        titleAr: titleAr,
+        subtitle: descEn,
+        subtitleAr: descAr,
         discountType,
         discountValue: Number(discountValue),
         validFrom,
@@ -547,10 +547,10 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
 
       const matchesSearch = 
         !q ||
-        deal.title_ar.toLowerCase().includes(q) ||
-        deal.title_en.toLowerCase().includes(q) ||
-        (deal.description_ar && deal.description_ar.toLowerCase().includes(q)) ||
-        (deal.description_en && deal.description_en.toLowerCase().includes(q)) ||
+        deal.titleAr.toLowerCase().includes(q) ||
+        deal.title.toLowerCase().includes(q) ||
+        (deal.subtitleAr && deal.subtitleAr.toLowerCase().includes(q)) ||
+        (deal.subtitle && deal.subtitle.toLowerCase().includes(q)) ||
         srvNameAr.toLowerCase().includes(q) ||
         srvNameEn.toLowerCase().includes(q);
 
@@ -798,7 +798,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                     <div className="relative h-44 w-full bg-zinc-800 overflow-hidden">
                       <img 
                         src={deal.image || "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=800&auto=format&fit=crop"} 
-                        alt={isRtl ? deal.title_ar : deal.title_en}
+                        alt={isRtl ? deal.titleAr : deal.title}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         referrerPolicy="no-referrer"
                       />
@@ -845,10 +845,10 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                           {srvName}
                         </span>
                         <h3 className="font-extrabold text-sm md:text-base leading-snug group-hover:text-brand-400 transition-colors">
-                          {isRtl ? deal.title_ar : deal.title_en}
+                          {isRtl ? deal.titleAr : deal.title}
                         </h3>
                         <p className="text-xs text-neutral-400 line-clamp-2 leading-relaxed">
-                          {isRtl ? deal.description_ar : deal.description_en}
+                          {isRtl ? deal.subtitleAr : deal.subtitle}
                         </p>
                       </div>
 
@@ -1503,3 +1503,4 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
     </div>
   );
 }
+

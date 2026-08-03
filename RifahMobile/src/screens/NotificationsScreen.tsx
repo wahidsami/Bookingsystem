@@ -15,6 +15,7 @@ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
 
 interface NotificationsScreenProps {
     navigation: any;
@@ -330,3 +331,4 @@ const styles = StyleSheet.create({
         lineHeight: 22,
     },
 });
+

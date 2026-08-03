@@ -77,26 +77,15 @@ module.exports = (sequelize, DataTypes) => {
             onDelete: 'CASCADE'
         },
 
-        // Deal Content (Bilingual)
-        title_en: {
+        // Deal Content
+        title: {
             type: DataTypes.STRING,
             allowNull: false,
             validate: {
                 notEmpty: true
             }
         },
-        title_ar: {
-            type: DataTypes.STRING,
-            allowNull: false,
-            validate: {
-                notEmpty: true
-            }
-        },
-        description_en: {
-            type: DataTypes.TEXT,
-            allowNull: true
-        },
-        description_ar: {
+        subtitle: {
             type: DataTypes.TEXT,
             allowNull: true
         },
