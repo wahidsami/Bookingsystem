@@ -312,6 +312,28 @@ class OrderService {
                     where: { id: order.platformUserId },
                     transaction
                 });
+
+                const platformFee = parseFloat(((order.totalAmount || 0) * 0.025).toFixed(2));
+                const tenantRevenue = parseFloat(((order.totalAmount || 0) - platformFee).toFixed(2));
+
+                await db.Transaction.create({
+                    platformUserId: order.platformUserId,
+                    tenantId: order.tenantId,
+                    orderId: order.id,
+                    amount: parseFloat(order.totalAmount || 0),
+                    currency: 'SAR',
+                    type: 'product_purchase',
+                    status: 'completed',
+                    platformFee,
+                    tenantRevenue,
+                    metadata: {
+                        source: 'order_payment_status_update',
+                        previousPaymentStatus,
+                        nextPaymentStatus: paymentStatus,
+                        customerPaymentMethod: order.paymentMethod,
+                        ...metadata
+                    }
+                }, { transaction });
             } else if (paymentStatus === 'failed' && previousPaymentStatus !== 'failed') {
                 await createOrderTransaction({
                     orderId: order.id,
@@ -342,6 +364,28 @@ class OrderService {
                     processedAt: new Date(),
                     transactionRef: transactionRef || `ORDER-REFUND-${order.orderNumber}`,
                     notes: notes || 'Order payment refunded',
+                    metadata: {
+                        source: 'order_payment_status_update',
+                        previousPaymentStatus,
+                        nextPaymentStatus: paymentStatus,
+                        customerPaymentMethod: order.paymentMethod,
+                        ...metadata
+                    }
+                }, { transaction });
+
+                const platformFee = parseFloat(((order.totalAmount || 0) * 0.025).toFixed(2));
+                const tenantRevenue = parseFloat(((order.totalAmount || 0) - platformFee).toFixed(2));
+
+                await db.Transaction.create({
+                    platformUserId: order.platformUserId,
+                    tenantId: order.tenantId,
+                    orderId: order.id,
+                    amount: parseFloat(order.totalAmount || 0),
+                    currency: 'SAR',
+                    type: 'refund',
+                    status: 'refunded',
+                    platformFee,
+                    tenantRevenue,
                     metadata: {
                         source: 'order_payment_status_update',
                         previousPaymentStatus,

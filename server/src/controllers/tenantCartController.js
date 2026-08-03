@@ -352,6 +352,40 @@ exports.purchaseGiftCard = async (req, res) => {
       transaction: tx
     });
 
+    await db.PaymentTransaction.create({
+      type: 'full',
+      amount: purchaseAmount,
+      paymentMethod: paymentMethod || 'cash',
+      status: 'completed',
+      processedBy: req.staffId || null,
+      processedAt: new Date(),
+      metadata: {
+        isGiftCard: true,
+        source: 'gift_card_purchase',
+        giftCardTransactionId: giftTx.id
+      }
+    }, { transaction: tx });
+
+    const platformFee = parseFloat((purchaseAmount * 0.025).toFixed(2));
+    const tenantRevenue = parseFloat((purchaseAmount - platformFee).toFixed(2));
+
+    await db.Transaction.create({
+      platformUserId: senderId || recipient?.id,
+      tenantId: tenantId,
+      amount: purchaseAmount,
+      currency: 'SAR',
+      type: 'wallet_topup',
+      status: 'completed',
+      platformFee,
+      tenantRevenue,
+      metadata: {
+        isGiftCard: true,
+        source: 'gift_card_purchase',
+        giftCardTransactionId: giftTx.id,
+        paymentMethod: paymentMethod || 'cash'
+      }
+    }, { transaction: tx });
+
     await tx.commit();
 
     const senderName = req.tenant?.name_ar || req.tenant?.name_en || req.tenant?.name || 'Refah';

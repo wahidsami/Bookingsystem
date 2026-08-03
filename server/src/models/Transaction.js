@@ -140,6 +140,8 @@ module.exports = (sequelize, DataTypes) => {
         underscored: false,
         validate: {
             hasReference() {
+                if (this.type === 'wallet_topup' || this.type === 'loyalty_redemption') return;
+
                 const references = [this.appointmentId, this.bookingSessionId, this.orderId].filter(Boolean);
                 if (references.length === 0) {
                     throw new Error('Must have either appointmentId, bookingSessionId, or orderId');

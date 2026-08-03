@@ -146,8 +146,10 @@ module.exports = (sequelize, DataTypes) => {
             { fields: ['transaction_ref'], where: { transaction_ref: { [sequelize.Sequelize.Op.ne]: null } } }
         ],
         validate: {
-            // Must have either appointmentId or orderId, but not both
+            // Must have either appointmentId or orderId, unless it's a gift card
             hasReference() {
+                if (this.metadata?.isGiftCard) return;
+                
                 if (!this.appointmentId && !this.orderId) {
                     throw new Error('Must have either appointmentId or orderId');
                 }
