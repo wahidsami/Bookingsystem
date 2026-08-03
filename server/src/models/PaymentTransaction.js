@@ -197,7 +197,7 @@ module.exports = (sequelize, DataTypes) => {
                     currency: transaction.currency,
                     paymentMethod: transaction.paymentMethod,
                     status: transaction.status,
-                    description: transaction.notes || \Payment \\
+                    description: transaction.notes || `Payment ${transaction.type}`
                 }, options.transaction);
             }
         } catch (error) {

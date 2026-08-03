@@ -169,7 +169,7 @@ module.exports = (sequelize, DataTypes) => {
                     currency: transaction.currency,
                     paymentMethod: transaction.paymentMethodId || 'online',
                     status: transaction.status,
-                    description: \\ \\
+                    description: `${transaction.type} ${transaction.status}`
                 }, options.transaction);
             }
         } catch (error) {
