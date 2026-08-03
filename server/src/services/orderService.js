@@ -115,77 +115,27 @@ class OrderService {
                     productPrice: product.price,
                     productImage: product.images && product.images.length > 0 ? product.images[0] : product.image,
                     productSku: product.sku,
-
-            // Validate required fields
-            if (!platformUserId || !tenantId || !items || !Array.isArray(items) || items.length === 0) {
-                throw new Error('Missing required fields: platformUserId, tenantId, and items are required');
-            }
-
-            if (!paymentMethod || !['online', 'cash_on_delivery', 'pay_on_visit'].includes(paymentMethod)) {
-                throw new Error('Invalid payment method');
-            }
-
-            // Validate and calculate order totals
-            let subtotal = 0;
-            let totalTax = 0;
-            const orderItems = [];
-
-            // Process each item
-            for (const item of items) {
-                const { productId, quantity } = item;
-
-                if (!productId || !quantity || quantity <= 0) {
-                    throw new Error('Invalid item: productId and quantity (positive) are required');
-                }
-
-                // Get product with lock (to prevent race conditions)
-                const product = await db.Product.findOne({
-                    where: {
-                        id: productId,
-                        tenantId,
-                        isAvailable: true
-                    },
-                    lock: transaction.LOCK.UPDATE, // Lock row for update
-                    transaction
-                });
-
-                if (!product) {
-                    throw new Error(`Product not found or not available: ${productId}`);
-                }
-
-                // Check stock availability
-                if (product.stock < quantity) {
-                    throw new Error(`Insufficient stock for product: ${product.name_en}. Available: ${product.stock}, Requested: ${quantity}`);
-                }
-
-                // Calculate item pricing
-                const unitPrice = parseFloat(product.price);
-                const itemTotal = unitPrice * quantity;
-                subtotal += itemTotal;
-
-                // Calculate tax for this item (if product has taxRate)
-                const taxRate = parseFloat(product.taxRate || 15); // Default 15% VAT
-                const itemTax = itemTotal * (taxRate / 100);
-                totalTax += itemTax;
-
-                // Store product snapshot
-                orderItems.push({
-                    productId: product.id,
-                    productName: product.name_en,
-                    productNameAr: product.name_ar,
-                    productPrice: product.price,
-                    productImage: product.images && product.images.length > 0 ? product.images[0] : product.image,
-                    productSku: product.sku,
                     quantity,
                     unitPrice,
                     totalPrice: itemTotal
                 });
 
                 // Reserve or deduct inventory based on payment method
-                await product.decrement('stock', { by: quantity, transaction });
-                console.log('[DIAGNOSTIC] Updating Product stock... SUCCESS');
-                await product.increment('soldCount', { by: quantity, transaction });
-                console.log('[DIAGNOSTIC] Updating soldCount... SUCCESS');
+                if (paymentMethod === 'online') {
+                    // Deduct immediately for online payment
+                    await product.decrement('stock', { by: quantity, transaction });
+                    console.log('[DIAGNOSTIC] Updating Product stock... SUCCESS');
+                    await product.increment('soldCount', { by: quantity, transaction });
+                    console.log('[DIAGNOSTIC] Updating soldCount... SUCCESS');
+                } else {
+                    // For POD/POV, we'll reserve inventory (deduct when payment confirmed)
+                    // For now, we'll still deduct but mark payment as pending
+                    // In production, you might want a separate "reserved" field
+                    await product.decrement('stock', { by: quantity, transaction });
+                    console.log('[DIAGNOSTIC] Updating Product stock... SUCCESS');
+                    await product.increment('soldCount', { by: quantity, transaction });
+                    console.log('[DIAGNOSTIC] Updating soldCount... SUCCESS');
+                }
             }
 
             // Calculate platform fee (2.5% of subtotal)
@@ -302,6 +252,7 @@ class OrderService {
 
         } catch (error) {
             if (shouldCommit && !transaction.finished) {
+                console.log('[DIAGNOSTIC] Rolling back transaction');
                 await transaction.rollback();
             }
             throw error;
