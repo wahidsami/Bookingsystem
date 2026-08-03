@@ -445,6 +445,8 @@ exports.purchaseGiftCard = async (req, res) => {
 };
 
 exports.purchaseProducts = async (req, res) => {
+  console.log('[DIAGNOSTIC] HTTP request received');
+  console.log('[DIAGNOSTIC] Entering purchaseProducts()');
   try {
     const tenantId = req.tenantId;
     const senderId = req.userId || null;

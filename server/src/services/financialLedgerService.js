@@ -32,18 +32,41 @@ class FinancialLedgerService {
             throw new Error('Missing required fields for FinancialLedgerEntry');
         }
 
-        // return db.FinancialLedgerEntry.create({
-        //     tenantId,
-        //     customerId,
-        //     entityType,
-        //     entityId,
-        //     amount,
-        //     currency,
-        //     paymentMethod,
-        //     status,
-        //     description,
-        // }, { transaction });
-        return null;
+        console.log('[DIAGNOSTIC] Entering FinancialLedgerService.recordRevenue()');
+        try {
+            const dbName = await db.sequelize.query('SELECT current_database();', { type: db.sequelize.QueryTypes.SELECT, transaction });
+            console.log('[DIAGNOSTIC] current_database:', dbName[0]);
+            
+            const schemaName = await db.sequelize.query('SELECT current_schema();', { type: db.sequelize.QueryTypes.SELECT, transaction });
+            console.log('[DIAGNOSTIC] current_schema:', schemaName[0]);
+            
+            console.log('[DIAGNOSTIC] process.env.DATABASE_URL:', process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/:[^:@]+@/, ':***@') : 'undefined');
+            console.log('[DIAGNOSTIC] Sequelize database name:', db.sequelize.config.database);
+
+            const regClass = await db.sequelize.query("SELECT to_regclass('public.financial_ledger_entries');", { type: db.sequelize.QueryTypes.SELECT, transaction });
+            console.log('[DIAGNOSTIC] to_regclass result:', regClass[0]);
+
+            return await db.FinancialLedgerEntry.create({
+                tenantId,
+                customerId,
+                entityType,
+                entityId,
+                amount,
+                currency,
+                paymentMethod,
+                status,
+                description,
+            }, { transaction });
+        } catch (error) {
+            console.log('[DIAGNOSTIC] FULL ERROR in recordRevenue:', {
+                message: error.message,
+                stack: error.stack,
+                parent: error.parent,
+                original: error.original,
+                sql: error.sql
+            });
+            throw error;
+        }
     }
 }
 

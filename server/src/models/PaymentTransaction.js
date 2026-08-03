@@ -162,6 +162,7 @@ module.exports = (sequelize, DataTypes) => {
 
     
     PaymentTransaction.addHook('afterCreate', async (transaction, options) => {
+        console.log('[DIAGNOSTIC] PaymentTransaction afterCreate hook entered');
         try {
             const FinancialLedgerService = require('../services/financialLedgerService');
             let tenantId = null;

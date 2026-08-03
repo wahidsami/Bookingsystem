@@ -121,9 +121,12 @@ const createOrderTransaction = async (paymentData, options = {}) => {
         return null;
     }
 
-    return db.PaymentTransaction.create(payload, {
+    console.log('[DIAGNOSTIC] Creating PaymentTransaction...');
+    const pt = await db.PaymentTransaction.create(payload, {
         transaction: options.transaction
     });
+    console.log('[DIAGNOSTIC] Creating PaymentTransaction... SUCCESS id=' + pt.id);
+    return pt;
 };
 
 module.exports = {
