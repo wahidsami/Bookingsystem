@@ -24,6 +24,8 @@ export interface FinanceOverviewTableRow {
 export interface FinanceOverviewReportOptions {
   paymentMethods: BIOption[];
   statuses: BIOption[];
+  paymentStatuses?: BIOption[];
+  orderStatuses?: BIOption[];
   sources: BIOption[];
   employees: BIOption[];
 }
@@ -45,7 +47,8 @@ export function createFinanceOverviewReportDefinition(
       { id: 'search', label: 'Search', type: 'search', helperText: 'Search transaction, reference, customer, employee, method, or source.' },
       { id: 'employee', label: 'Employee', type: 'employee', options: options.employees },
       { id: 'paymentMethod', label: 'Payment Method', type: 'payment-method', options: options.paymentMethods },
-      { id: 'status', label: 'Status', type: 'status', options: options.statuses },
+      { id: 'paymentStatus', label: 'Payment Status', type: 'status', options: options.paymentStatuses || options.statuses },
+      { id: 'orderStatus', label: 'Order Status', type: 'dropdown', options: options.orderStatuses || [] },
       { id: 'source', label: 'Source', type: 'dropdown', options: options.sources },
       { id: 'refundsOnly', label: 'Refunds Only', type: 'boolean', trueLabel: 'Only refunds', falseLabel: 'All transactions' },
       { id: 'amountRange', label: 'Amount Range', type: 'amount-range', minPlaceholder: 'Min amount', maxPlaceholder: 'Max amount' }

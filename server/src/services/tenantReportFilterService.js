@@ -135,6 +135,9 @@ function buildReportFilterContext(query = {}) {
     channel: parseList(query.channel),
     paymentMethod: parseList(query.paymentMethod),
     status: parseList(query.status),
+    paymentStatus: parseList(query.paymentStatus),
+    orderStatus: parseList(query.orderStatus),
+    appointmentStatus: parseList(query.appointmentStatus),
     source: parseList(query.source),
     customerType: parseList(query.customerType),
     discountCategory: parseList(query.discountCategory),
@@ -223,7 +226,10 @@ function matchesAppointmentFilters(appointment, filters) {
   if (!matchesSelection(values.customer, filters.customer)) return false;
   if (!matchesSelection(values.location, filters.location)) return false;
   if (!matchesSelection(values.paymentMethod, filters.paymentMethod)) return false;
-  if (!matchesSelection(values.status, filters.status)) return false;
+  
+  const statusFilter = (filters.appointmentStatus && filters.appointmentStatus.length) ? filters.appointmentStatus : filters.status;
+  if (!matchesSelection(values.status, statusFilter)) return false;
+
   if (!matchesSelection(values.service, filters.service)) return false;
   if (!matchesSelection(values.category, filters.category)) return false;
   if (!matchesRange(values.amount, filters.amountRange)) return false;
@@ -237,15 +243,16 @@ function matchesAppointmentFilters(appointment, filters) {
 function getOrderFilterValues(order = {}) {
   const user = order.user || {};
   const tenant = order.tenant || {};
-  const items = Array.isArray(order.items) ? order.items : [];
-  const itemNames = items.map((item) => item?.product?.name_en || item?.product?.name_ar || item?.product?.name || item?.productId);
-  const itemCategories = items.map((item) => item?.product?.category);
+  const orderItems = Array.isArray(order.items) ? order.items : [];
+  const itemNames = orderItems.map((item) => item?.product?.name_en || item?.product?.name_ar || item?.product?.name || item?.productId);
+  const itemCategories = orderItems.map((item) => item?.product?.category);
 
   return {
     searchValues: [
       order.orderNumber,
       order.id,
       order.status,
+      order.paymentStatus,
       order.paymentMethod,
       order.subtotal,
       order.taxAmount,
@@ -286,7 +293,10 @@ function matchesOrderFilters(order, filters) {
   if (!matchesSelection(values.channel, filters.channel)) return false;
   if (!matchesSelection(values.channel, filters.discountCategory)) return false;
   if (!matchesSelection(values.paymentMethod, filters.paymentMethod)) return false;
-  if (!matchesSelection(values.status, filters.status)) return false;
+  
+  const statusFilter = (filters.orderStatus && filters.orderStatus.length) ? filters.orderStatus : filters.status;
+  if (!matchesSelection(values.status, statusFilter)) return false;
+
   if (!matchesSelection(values.source, filters.source)) return false;
   if (!matchesAnySelection(values.product, filters.product)) return false;
   if (!matchesAnySelection(values.category, filters.category)) return false;
@@ -349,7 +359,9 @@ function getTransactionFilterValues(transaction = {}) {
     location: tenant.city || tenant.name_en || tenant.name_ar || tenant.name || tenant.address,
     channel: appointment ? 'Appointment' : (order ? 'Order' : 'Transaction'),
     paymentMethod: transaction.paymentMethod,
-    status: transaction.status,
+    paymentStatus: transaction.status,
+    orderStatus: order?.status || null,
+    appointmentStatus: appointment?.status || null,
     source: appointment ? 'appointment' : (order ? 'order' : 'transaction'),
     transactionType: transaction.type,
     service: service.name_en || service.name_ar || service.id,
@@ -358,6 +370,10 @@ function getTransactionFilterValues(transaction = {}) {
     amount: transaction.amount
   };
 }
+
+const PAYMENT_LIFECYCLE_STATUSES = ['completed', 'refunded', 'failed', 'pending', 'cancelled'];
+const ORDER_FULFILLMENT_STATUSES = ['confirmed', 'processing', 'ready_for_pickup', 'shipped', 'delivered'];
+const APPOINTMENT_LIFECYCLE_STATUSES = ['in_service', 'no_show'];
 
 function matchesTransactionFilters(transaction, filters) {
   const values = getTransactionFilterValues(transaction);
@@ -369,7 +385,37 @@ function matchesTransactionFilters(transaction, filters) {
   if (!matchesSelection(values.channel, filters.channel)) return false;
   if (!matchesSelection(values.channel, filters.discountCategory)) return false;
   if (!matchesSelection(values.paymentMethod, filters.paymentMethod)) return false;
-  if (!matchesSelection(values.status, filters.status)) return false;
+
+  // Domain 1: Payment Status
+  const paymentStatusFilter = (filters.paymentStatus && filters.paymentStatus.length)
+    ? filters.paymentStatus
+    : (filters.status && filters.status.some((s) => PAYMENT_LIFECYCLE_STATUSES.includes(s))
+        ? filters.status.filter((s) => PAYMENT_LIFECYCLE_STATUSES.includes(s))
+        : []);
+  if (paymentStatusFilter.length > 0 && !matchesSelection(values.paymentStatus, paymentStatusFilter)) {
+    return false;
+  }
+
+  // Domain 2: Order Fulfillment Status
+  const orderStatusFilter = (filters.orderStatus && filters.orderStatus.length)
+    ? filters.orderStatus
+    : (filters.status && filters.status.some((s) => ORDER_FULFILLMENT_STATUSES.includes(s))
+        ? filters.status.filter((s) => ORDER_FULFILLMENT_STATUSES.includes(s))
+        : []);
+  if (orderStatusFilter.length > 0 && transaction.order && !matchesSelection(values.orderStatus, orderStatusFilter)) {
+    return false;
+  }
+
+  // Domain 3: Appointment Booking Status
+  const appointmentStatusFilter = (filters.appointmentStatus && filters.appointmentStatus.length)
+    ? filters.appointmentStatus
+    : (filters.status && filters.status.some((s) => APPOINTMENT_LIFECYCLE_STATUSES.includes(s))
+        ? filters.status.filter((s) => APPOINTMENT_LIFECYCLE_STATUSES.includes(s))
+        : []);
+  if (appointmentStatusFilter.length > 0 && transaction.appointment && !matchesSelection(values.appointmentStatus, appointmentStatusFilter)) {
+    return false;
+  }
+
   if (!matchesSelection(values.source, filters.source)) return false;
   if (!matchesSelection(values.transactionType, filters.transactionType)) return false;
   if (!matchesSelection(values.service, filters.service)) return false;
