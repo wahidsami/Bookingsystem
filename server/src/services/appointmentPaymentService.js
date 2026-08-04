@@ -4,7 +4,7 @@ const {
     createAppointmentPaymentTransactions,
     normalizePaymentAllocations
 } = require('./splitPaymentService');
-const { syncBookingSessionTotals } = require('./bookingSessionService'); // I will verify if this exists, or if it's bookingService.syncBookingSessionTotals
+
 
 const roundMoney = (value) => Number.parseFloat(Number(value || 0).toFixed(2));
 
