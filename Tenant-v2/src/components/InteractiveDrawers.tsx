@@ -1213,21 +1213,32 @@ export default function InteractiveDrawers({
     const vat = subtotal * 0.15;
     const total = subtotal + vat;
 
+    let canonicalPaymentMethod = 'card_pos';
     let paymentMethodSummary = isRtl ? 'طرق الدفع' : 'Payment methods';
-    let allocations: any = undefined;
+    let allocationsArray: any[] | undefined = undefined;
+
     if (posSplitActive) {
-      allocations = {
-        card: posSplitAmounts.card,
-        cash: posSplitAmounts.cash,
-        wallet: posSplitAmounts.wallet
-      };
+      allocationsArray = [];
       const parts = [];
-      if (posSplitAmounts.card > 0) parts.push(`Card: ${posSplitAmounts.card} ر.س`);
-      if (posSplitAmounts.cash > 0) parts.push(`نقداً: ${posSplitAmounts.cash} ر.س`);
-      if (posSplitAmounts.wallet > 0) parts.push(`المحفظة: ${posSplitAmounts.wallet} ر.س`);
+      if (posSplitAmounts.card > 0) {
+        allocationsArray.push({ paymentMethod: 'card_pos', amount: posSplitAmounts.card });
+        parts.push(`Card: ${posSplitAmounts.card} ر.س`);
+      }
+      if (posSplitAmounts.cash > 0) {
+        allocationsArray.push({ paymentMethod: 'cash', amount: posSplitAmounts.cash });
+        parts.push(`نقداً: ${posSplitAmounts.cash} ر.س`);
+      }
+      if (posSplitAmounts.wallet > 0) {
+        allocationsArray.push({ paymentMethod: 'wallet', amount: posSplitAmounts.wallet });
+        parts.push(`المحفظة: ${posSplitAmounts.wallet} ر.س`);
+      }
       paymentMethodSummary = parts.join(' | ');
+      if (allocationsArray.length > 0) {
+        canonicalPaymentMethod = allocationsArray[0].paymentMethod;
+      }
     } else {
       paymentMethodSummary = isRtl ? 'مدفوع بالكامل بالبطاقة الرقمية' : 'Paid in full via credit card terminal';
+      canonicalPaymentMethod = 'card_pos';
     }
 
     try {
@@ -1240,8 +1251,9 @@ export default function InteractiveDrawers({
           items: productItems.map(p => ({ productId: p.id, quantity: p.quantity, price: p.price })),
           customerId,
           customerName: buyerName,
-          paymentMethod: paymentMethodSummary,
-          paymentAllocations: allocations
+          paymentMethod: canonicalPaymentMethod,
+          paymentAllocations: allocationsArray,
+          notes: paymentMethodSummary
         });
         if (prodRes.orderId || prodRes.transactionRef) orderId = prodRes.orderId || prodRes.transactionRef;
       }
@@ -1254,8 +1266,9 @@ export default function InteractiveDrawers({
               amount: gc.price,
               customerId,
               customerName: buyerName,
-              paymentMethod: paymentMethodSummary,
-              paymentAllocations: allocations
+              paymentMethod: canonicalPaymentMethod,
+              paymentAllocations: allocationsArray,
+              notes: paymentMethodSummary
             });
             if (gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id) {
               orderId = gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id;
