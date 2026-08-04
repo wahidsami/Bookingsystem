@@ -194,6 +194,7 @@ export default function InteractiveDrawers({
   // Create Modal Step
   const [createMode, setCreateMode] = useState<'appointment' | 'blocked'>('appointment');
   const [createStep, setCreateStep] = useState<number>(1);
+  const [showAssignWarning, setShowAssignWarning] = useState(false);
 
   // Sync initial parameters when drawer opens
   useEffect(() => {
@@ -655,10 +656,25 @@ export default function InteractiveDrawers({
     }
   }, [currentServiceId, services]);
 
+  // Validate immediate employee service assignment selection in Step 3
+  useEffect(() => {
+    if (!isCreateDrawerOpen || createStep !== 3 || !currentServiceId || !currentStaffId) return;
+    const srv = canonicalServices.find(s => s.id === currentServiceId);
+    if (srv && srv.employeeAssignments && !srv.employeeAssignments.includes(currentStaffId)) {
+      setShowAssignWarning(true);
+    }
+  }, [currentServiceId, currentStaffId, createStep, isCreateDrawerOpen, canonicalServices]);
+
   const handleAddStagedService = () => {
     const resolvedServiceId = `${currentServiceId || ''}`.trim();
     const srv = canonicalServices.find(s => s.id === resolvedServiceId);
     if (!srv) return;
+
+    if (srv.employeeAssignments && !srv.employeeAssignments.includes(currentStaffId)) {
+      setShowAssignWarning(true);
+      return;
+    }
+
     const resolvedVariant = srv.variants.find((variant) => variant.id === currentVariantId) || srv.variants[0] || null;
 
     let nextStartTime = currentStartTime;
@@ -766,6 +782,27 @@ export default function InteractiveDrawers({
     if (finalStaged.length === 0) {
       addLocalToast('يرجى إدراج خدمة واحدة على الأقل لتأكيد الحجز', 'Please add at least one service to confirm booking', 'warning');
       return;
+    }
+
+    // Pre-validate staged services and guest services staff assignment
+    for (const item of finalStaged) {
+      const srv = canonicalServices.find(s => s.id === item.serviceId);
+      if (srv && srv.employeeAssignments && !srv.employeeAssignments.includes(item.staffId)) {
+        setShowAssignWarning(true);
+        return;
+      }
+    }
+
+    if (includeGroupGuests) {
+      for (const guest of guestsList) {
+        for (const gs of guest.services) {
+          const srv = canonicalServices.find(s => s.id === gs.serviceId);
+          if (srv && srv.employeeAssignments && !srv.employeeAssignments.includes(gs.staffId)) {
+            setShowAssignWarning(true);
+            return;
+          }
+        }
+      }
     }
 
     let totalRawPrice = 0;
@@ -2630,6 +2667,60 @@ export default function InteractiveDrawers({
           </div>
         )}
       </AnimatePresence>
+
+      {showAssignWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-sm" onClick={() => setShowAssignWarning(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 z-10">
+            <div className="flex items-center gap-3 text-amber-600">
+              <span className="p-2 bg-amber-500/10 rounded-xl">
+                <AlertTriangle size={24} />
+              </span>
+              <h3 className="text-lg font-black text-slate-800">
+                {isRtl ? 'الخدمة غير معينة' : 'Service Not Assigned'}
+              </h3>
+            </div>
+            
+            <div className="text-xs text-slate-600 space-y-2 leading-relaxed">
+              <p>
+                {isRtl 
+                  ? 'الخدمة المحددة غير معينة للموظف المحدد.' 
+                  : 'The selected service is not assigned to the selected employee.'}
+              </p>
+              <p className="font-bold">{isRtl ? 'يرجى إما:' : 'Please either:'}</p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li>
+                  {isRtl 
+                    ? '• اختيار موظف آخر يقوم بتقديم هذه الخدمة.' 
+                    : '• Select another employee who performs this service.'}
+                </li>
+                <li>
+                  {isRtl 
+                    ? '• تعيين هذه الخدمة للموظف المحدد أولاً من إدارة الموظفين.' 
+                    : '• Assign this service to the selected employee first from Employee Management.'}
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowAssignWarning(false)}
+                className="px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-all cursor-pointer"
+              >
+                {isRtl ? 'تغيير الموظف' : 'Change Employee'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAssignWarning(false)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                {isRtl ? 'إغلاق' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
