@@ -1289,6 +1289,20 @@ exports.createAppointment = async (req, res) => {
 exports.getAppointments = async (req, res) => {
     try {
         const tenantId = req.tenantId;
+
+        // Auto mark past appointments as no-show
+        const now = new Date();
+        await db.Appointment.update(
+            { status: 'no_show', noShowMarkedAt: now },
+            {
+                where: {
+                    tenantId,
+                    endTime: { [db.Sequelize.Op.lt]: now },
+                    status: { [db.Sequelize.Op.notIn]: ['completed', 'cancelled', 'no_show'] }
+                }
+            }
+        );
+
         const { 
             startDate, 
             endDate, 
@@ -1460,6 +1474,20 @@ exports.getCalendarAppointments = async (req, res) => {
 exports.getAppointmentsBoard = async (req, res) => {
     try {
         const tenantId = req.tenantId;
+
+        // Auto mark past appointments as no-show
+        const now = new Date();
+        await db.Appointment.update(
+            { status: 'no_show', noShowMarkedAt: now },
+            {
+                where: {
+                    tenantId,
+                    endTime: { [db.Sequelize.Op.lt]: now },
+                    status: { [db.Sequelize.Op.notIn]: ['completed', 'cancelled', 'no_show'] }
+                }
+            }
+        );
+
         const {
             date,
             staffId,
@@ -1806,6 +1834,20 @@ exports.getAppointment = async (req, res) => {
         createRuntimeTraceLogger(req, res, 'GET /api/v1/tenant/appointments/:id');
         const tenantId = req.tenantId;
         const { id } = req.params;
+
+        // Auto mark past appointments as no-show
+        const now = new Date();
+        await db.Appointment.update(
+            { status: 'no_show', noShowMarkedAt: now },
+            {
+                where: {
+                    id,
+                    tenantId,
+                    endTime: { [db.Sequelize.Op.lt]: now },
+                    status: { [db.Sequelize.Op.notIn]: ['completed', 'cancelled', 'no_show'] }
+                }
+            }
+        );
 
         const appointment = await db.Appointment.findOne({
             where: { id },

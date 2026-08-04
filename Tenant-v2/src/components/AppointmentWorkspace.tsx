@@ -1469,6 +1469,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [refundDialogError, setRefundDialogError] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('cash');
   const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<string | null>(null);
+  const [showPaymentRequiredDialog, setShowPaymentRequiredDialog] = useState(false);
+  const [showCancelReasonDialog, setShowCancelReasonDialog] = useState(false);
+  const [cancelReasonText, setCancelReasonText] = useState('');
 
   const activeInvoiceServiceItems = activeAppointment ? (
     activeAppointmentServiceSources.length > 0
@@ -2519,14 +2522,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     push('no_show', isRtl ? 'عدم حضور' : 'No-show');
     push('cancelled', isRtl ? 'ملغي' : 'Cancelled');
 
-    if (['completed', 'cancelled', 'no_show'].includes(currentStatus)) {
+    if (currentStatus === 'completed') {
       return options.filter((option) => option.value === currentStatus);
     }
 
     return options;
   };
 
-  const handleAppointmentStatusUpdate = async (nextStatus: Appointment['status']) => {
+  const handleAppointmentStatusUpdate = async (nextStatus: Appointment['status'], cancellationReason?: string) => {
     if (!activeAppointment || appointmentDetailsReadOnly || statusUpdating) {
       return;
     }
@@ -2550,9 +2553,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
+    const finalNotes = cancellationReason 
+      ? `${activeAppointment.notes || ''}\n[Cancellation Reason]: ${cancellationReason}` 
+      : activeAppointment.notes;
+
     setStatusUpdating(true);
     try {
-      const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, normalizedNext, activeAppointment.notes);
+      const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, normalizedNext, finalNotes);
       if (!response?.success) {
         throw new Error(response?.message || 'Failed to update appointment status');
       }
@@ -4557,10 +4564,23 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       </label>
                       <select
                         value={normalizeWorkspaceAppointmentStatus(activeAppointment.status) || ''}
-                        disabled={statusUpdating || appointmentDetailsReadOnly || ['completed', 'cancelled', 'no_show'].includes(normalizeWorkspaceAppointmentStatus(activeAppointment.status))}
+                        disabled={statusUpdating || appointmentDetailsReadOnly || normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'completed'}
                         onChange={(event) => {
                           const nextStatus = event.target.value as Appointment['status'];
                           if (nextStatus === normalizeWorkspaceAppointmentStatus(activeAppointment.status)) return;
+                          
+                          if (nextStatus === 'completed') {
+                            if (activeAppointment.paymentStatus !== 'paid') {
+                              setShowPaymentRequiredDialog(true);
+                              return;
+                            }
+                          }
+                          
+                          if (nextStatus === 'cancelled') {
+                            setShowCancelReasonDialog(true);
+                            return;
+                          }
+
                           void handleAppointmentStatusUpdate(nextStatus);
                         }}
                         className={`min-w-[170px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60 ${isRtl ? 'text-right' : 'text-left'}`}
@@ -4655,6 +4675,21 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       <div className="bg-amber-50/50 border border-amber-200/40 p-3 rounded-lg text-xs text-amber-900 font-medium leading-relaxed">
                         {activeAppointment.notes || '—'}
                       </div>
+                      {normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'cancelled' && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-800 text-xs mt-2 space-y-1">
+                          <p className="font-black flex items-center gap-1.5">
+                            <span>⚠️</span>
+                            <span>{isRtl ? 'سبب إلغاء الحجز:' : 'Cancellation Reason:'}</span>
+                          </p>
+                          <p className="font-semibold whitespace-pre-wrap pl-5">
+                            {(() => {
+                              const notes = activeAppointment.notes || '';
+                              const match = notes.match(/\[Cancellation Reason\]:\s*(.*)/s);
+                              return match ? match[1].trim() : (isRtl ? 'غير محدد' : 'Not specified');
+                            })()}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Wallet Quick Balance card */}
@@ -5337,175 +5372,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       </div>
                     </div>
 
-                    {/* Add Products to Ticket Section */}
-                    {activeAppointment.paymentStatus !== 'paid' && (
-                      <div className="border-b border-slate-100 pb-3 space-y-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                          {isRtl ? 'إضافة منتجات التجميل للفاتورة 🧴' : 'ADD RETAIL PRODUCTS TO TICKET 🧴'}
-                        </span>
-                        
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                            {isRtl ? 'اختر المنتجات من القائمة' : 'Pick products from the list'}
-                          </span>
-                          <div className="flex items-center gap-2 text-[10px]">
-                            <span className="rounded-full bg-slate-100 px-2 py-1 font-bold text-slate-600">
-                              {selectedProductIds.length} {isRtl ? 'مختار' : 'selected'}
-                            </span>
-                            {selectedProductIds.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedProductIds([])}
-                                className="rounded-full border border-slate-200 bg-white px-2 py-1 font-bold text-slate-600 hover:bg-slate-50"
-                              >
-                                {isRtl ? 'إلغاء التحديد' : 'Clear'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
 
-                        <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white">
-                          {liveProducts.length > 0 ? (
-                            <div className="divide-y divide-slate-100">
-                              {liveProducts.map((prod) => {
-                                const isSelected = selectedProductIds.includes(prod.id);
-                                const imageSrc = resolveProductImageUrl(prod.imageUrl || prod.primaryImage || prod.image || prod.images?.[0] || '');
-                                return (
-                                  <button
-                                    key={prod.id}
-                                    type="button"
-                                    onClick={() => toggleProductSelection(prod.id)}
-                                    className={`w-full text-start p-3 flex items-center gap-3 transition-all cursor-pointer ${
-                                      isSelected ? 'bg-amber-50/80' : 'hover:bg-slate-50'
-                                    }`}
-                                  >
-                                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                                      {imageSrc ? (
-                                        <img src={imageSrc} alt={isRtl ? prod.nameAr : prod.nameEn} className="h-full w-full object-cover" />
-                                      ) : (
-                                        <div className="flex h-full w-full items-center justify-center text-[9px] font-black text-slate-400">
-                                          {isRtl ? 'صورة' : 'IMG'}
-                                        </div>
-                                      )}
-                                      {isSelected && (
-                                        <div className="absolute inset-0 bg-amber-500/10 ring-2 ring-amber-400" />
-                                      )}
-                                    </div>
-
-                                    <div className="min-w-0 flex-1 space-y-1">
-                                      <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                          <p className="truncate text-sm font-black text-slate-800">
-                                            {isRtl ? prod.nameAr : prod.nameEn}
-                                          </p>
-                                          <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                            {prod.sku || '—'}
-                                          </p>
-                                        </div>
-                                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-slate-500">
-                                          {isRtl ? (prod.stock > 0 ? 'متوفر' : 'نفد') : (prod.stock > 0 ? 'In Stock' : 'Out')}
-                                        </span>
-                                      </div>
-
-                                      <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold">
-                                        <span className="rounded-full bg-slate-50 px-2 py-1 text-slate-500">
-                                          {isRtl ? prod.categoryAr || 'فئة' : prod.categoryEn || 'Category'}
-                                        </span>
-                                        <span className="rounded-full bg-amber-50 px-2 py-1 font-mono text-amber-700">
-                                          {Number(prod.price || 0).toFixed(2)} {t.riyal}
-                                        </span>
-                                        <span className="rounded-full bg-slate-50 px-2 py-1 text-slate-500">
-                                          {isRtl ? `${prod.stock} في المخزون` : `${prod.stock} in stock`}
-                                        </span>
-                                      </div>
-                                    </div>
-
-                                    <div className="shrink-0">
-                                      <div className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-black ${
-                                        isSelected
-                                          ? 'border-amber-500 bg-amber-500 text-white'
-                                          : 'border-slate-300 bg-white text-transparent'
-                                      }`}>
-                                        ✓
-                                      </div>
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="px-4 py-10 text-center text-[10px] text-slate-500">
-                              {isRtl ? 'لا توجد منتجات متاحة حالياً.' : 'No products available right now.'}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between gap-3 pt-1">
-                          <p className="text-[10px] text-slate-400">
-                            {isRtl ? 'يمكنك اختيار عدة منتجات ثم إضافتها دفعة واحدة إلى الفاتورة' : 'Select multiple products and add them to the appointment basket together'}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={handleAddSelectedProductsToCart}
-                            className="rounded-xl bg-zinc-950 px-3 py-2 text-[10px] font-black text-white transition-all hover:bg-zinc-800 cursor-pointer"
-                          >
-                            {selectedProductIds.length > 0
-                              ? (isRtl ? `إضافة ${selectedProductIds.length} للفاتورة` : `Add ${selectedProductIds.length} to basket`)
-                              : (isRtl ? 'إضافة للفاتورة' : 'Add to basket')}
-                          </button>
-                        </div>
-
-                        {/* List of currently added products */}
-                        {checkoutProducts.length > 0 && (
-                          <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/60 space-y-1 text-[11px]">
-                            {checkoutProducts.map(prod => (
-                              <div key={prod.id} className="flex justify-between items-center bg-white p-1.5 rounded-lg border border-slate-150">
-                                <div className="min-w-0 flex-1 pr-1">
-                                  <p className="font-bold text-slate-800 truncate">{isRtl ? prod.nameAr : prod.nameEn}</p>
-                                  <p className="text-[9px] text-slate-400 font-mono">{prod.price} SAR</p>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setCheckoutProducts(prev => {
-                                        const found = prev.find(p => p.id === prod.id);
-                                        if (found && found.quantity === 1) {
-                                          return prev.filter(p => p.id !== prod.id);
-                                        }
-                                        return prev.map(p => p.id === prod.id ? { ...p, quantity: p.quantity - 1 } : p);
-                                      });
-                                    }}
-                                    className="px-1 bg-slate-100 hover:bg-slate-200 rounded font-black text-slate-600"
-                                  >
-                                    -
-                                  </button>
-                                  <span className="font-mono font-bold text-slate-700">{prod.quantity}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setCheckoutProducts(prev => prev.map(p => p.id === prod.id ? { ...p, quantity: p.quantity + 1 } : p));
-                                    }}
-                                    className="px-1 bg-slate-100 hover:bg-slate-200 rounded font-black text-slate-600"
-                                  >
-                                    +
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setCheckoutProducts(prev => prev.filter(p => p.id !== prod.id));
-                                    }}
-                                    className="text-slate-300 hover:text-rose-600 ml-1"
-                                  >
-                                    <Trash size={12} />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
 
                     {/* Apply Gift Card Section */}
                     {activeAppointment.paymentStatus !== 'paid' && (
@@ -5567,10 +5434,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <span className="font-mono font-bold">{activeServiceSummary.price.toFixed(2)} {t.riyal}</span>
                       </div>
 
-                      <div className="flex justify-between text-slate-500">
-                        <span>{isRtl ? 'إجمالي منتجات التجزئة' : 'Retail Products Total'}</span>
-                        <span className="font-mono font-bold">{checkoutProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2)} {t.riyal}</span>
-                      </div>
+
 
                       {appliedGiftCardAmount > 0 && (
                         <div className="flex justify-between text-emerald-600 font-semibold">
@@ -6878,6 +6742,111 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     </button>
                   </div>
                 </aside>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showPaymentRequiredDialog && (
+          <div className="fixed inset-0 z-[157] flex items-center justify-center px-4">
+            <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs" onClick={() => setShowPaymentRequiredDialog(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-100 flex flex-col gap-4 z-10"
+            >
+              <div className="flex items-center gap-2.5 text-amber-600">
+                <span className="p-2 bg-amber-500/10 rounded-xl">
+                  <AlertTriangle size={20} />
+                </span>
+                <h3 className="font-black text-slate-800 text-sm">
+                  {isRtl ? 'مطلوب سداد المبلغ الكلي' : 'Payment Required'}
+                </h3>
+              </div>
+              <div className="text-[11px] text-slate-500 leading-relaxed font-semibold">
+                {isRtl 
+                  ? 'لا يمكن تغيير حالة هذا الموعد إلى مكتمل لعدم سداد القيمة الإجمالية بالكامل.' 
+                  : 'This appointment cannot be marked as Completed because payment has not been fully collected.'}
+                <br />
+                {isRtl ? 'يرجى سداد الفاتورة أولاً.' : 'Please complete the payment first.'}
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1.5 border-t border-slate-55">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDrawerTab('financials');
+                    setShowPaymentRequiredDialog(false);
+                  }}
+                  className="rounded-xl bg-zinc-950 px-3.5 py-2 text-[10px] font-black text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                >
+                  {isRtl ? 'تحصيل المبلغ' : 'Collect Payment'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentRequiredDialog(false)}
+                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-black text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showCancelReasonDialog && (
+          <div className="fixed inset-0 z-[157] flex items-center justify-center px-4">
+            <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs" onClick={() => { setShowCancelReasonDialog(false); setCancelReasonText(''); }} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-100 flex flex-col gap-4 z-10"
+            >
+              <div className="flex items-center gap-2.5 text-rose-600">
+                <span className="p-2 bg-rose-500/10 rounded-xl">
+                  <Trash size={20} />
+                </span>
+                <h3 className="font-black text-slate-800 text-sm">
+                  {isRtl ? 'سبب إلغاء الموعد' : 'Reason for Cancellation'}
+                </h3>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'السبب المبرر للإلغاء' : 'Cancellation Reason Detail'}</label>
+                <textarea
+                  rows={3}
+                  value={cancelReasonText}
+                  onChange={(e) => setCancelReasonText(e.target.value)}
+                  placeholder={isRtl ? 'اكتب سبب الإلغاء هنا...' : 'Explain the reason for cancellation...'}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold focus:border-rose-500 outline-none"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1.5 border-t border-slate-55">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowCancelReasonDialog(false);
+                    await handleAppointmentStatusUpdate('cancelled', cancelReasonText);
+                    setCancelReasonText('');
+                  }}
+                  className="rounded-xl bg-rose-600 px-3.5 py-2 text-[10px] font-black text-white hover:bg-rose-700 transition-all cursor-pointer"
+                >
+                  {isRtl ? 'إلغاء الموعد' : 'Cancel Appointment'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCancelReasonDialog(false);
+                    setCancelReasonText('');
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-black text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  {isRtl ? 'الرجوع' : 'Back'}
+                </button>
               </div>
             </motion.div>
           </div>
