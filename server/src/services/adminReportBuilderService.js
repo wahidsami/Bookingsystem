@@ -1,5 +1,6 @@
 const { Op, Sequelize } = require('sequelize');
 const db = require('../models');
+const { buildCanonicalFinancialData } = require('../utils/financialMapper');
 
 const DIMENSIONS = [
   { key: 'employee', label: 'Employee' },
@@ -364,16 +365,20 @@ async function fetchTransactionFacts(config, opts = {}) {
     const order = transaction.order || {};
     const user = appointment.user || order.user || {};
     const paymentMethod = transaction.paymentMethod?.name || transaction.paymentMethod?.type || appointment.paymentMethod || order.paymentMethod || '-';
-    const signedAmount = transaction.type === 'refund' || transaction.status === 'refunded'
-      ? -Math.abs(toNumber(transaction.amount))
-      : Math.abs(toNumber(transaction.amount));
-    const refunds = transaction.type === 'refund' || transaction.status === 'refunded' ? Math.abs(toNumber(transaction.amount)) : 0;
-    const commissions = transaction.type === 'refund' || transaction.status === 'refunded'
+
+    const canonical = buildCanonicalFinancialData(transaction);
+    
+    // Refunds should be positive for the 'refunds' metric, and negative for 'revenue' metric
+    const isRefund = transaction.type === 'refund' || transaction.status === 'refunded';
+    const signedAmount = isRefund ? -Math.abs(canonical.amountPaid) : Math.abs(canonical.amountPaid);
+    
+    const refunds = isRefund ? Math.abs(canonical.amountPaid) : 0;
+    const commissions = isRefund
       ? -Math.abs(toNumber(transaction.platformFee))
       : Math.abs(toNumber(transaction.platformFee));
-    const discounts = appointment.rawPrice && appointment.price
-      ? Math.max(toNumber(appointment.rawPrice) - toNumber(appointment.price), 0)
-      : Math.max((toNumber(order.subtotal) + toNumber(order.taxAmount) + toNumber(order.shippingFee)) - toNumber(order.totalAmount), 0);
+      
+    // Discount is provided by the canonical mapper
+    const discounts = canonical.discount;
 
     if (opts.productMode && Array.isArray(order.items) && order.items.length > 0) {
       const baseRevenue = order.items.reduce((sum, item) => sum + toNumber(item.totalPrice), 0) || 1;

@@ -21,6 +21,7 @@ const {
     getRefundModeLabel
 } = require('../services/tenantFinancialFormulaService');
 const { PAYMENT_TRANSACTION_TYPES } = require('../services/paymentTransactionLedgerService');
+const { buildCanonicalFinancialData } = require('../utils/financialMapper');
 const tenantPosController = require('./tenantPosController');
 
 function parseDateValue(value, endOfDay = false) {
@@ -628,6 +629,8 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map(), refundLook
                 : amount
     );
 
+    const canonical = buildCanonicalFinancialData(transaction, invoice);
+
     return {
         id: transaction.id,
         saleNumber,
@@ -644,11 +647,12 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map(), refundLook
         category: category || 'Unavailable',
         channel: appointment ? 'Appointment' : order ? 'Order' : 'Transaction',
         location: getTransactionLocationLabel(transaction),
-        grossSales: Number(signedAmount.toFixed(2)),
-        tax: Number((Number(appointment?.taxAmount || order?.taxAmount || 0)).toFixed(2)),
-        discount: Number(getTransactionDiscountAmount(transaction, invoice).toFixed(2)),
+        grossSales: canonical.grossSales,
+        tax: canonical.vat, // Kept for backwards compatibility
+        vat: canonical.vat, // Added for frontend canonical naming
+        discount: canonical.discount,
         refundAmount: Number(refundAmount.toFixed(2)),
-        netSales: Number(netSales.toFixed(2)),
+        netSales: canonical.netSales,
         paymentMethod: transaction.paymentMethod,
         paymentMethodLabel: formatLedgerPaymentMethodLabel(transaction.paymentMethod),
         status: appointment?.status || order?.status || transaction.status,

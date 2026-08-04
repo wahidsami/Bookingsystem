@@ -1,0 +1,2189 @@
+# DATABASE CONNECTION SUCCESS
+
+# POSTGRES TABLES
+
+## Table: SequelizeMeta
+- name: character varying (Nullable: NO, Default: null)
+
+## Table: staff
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- tenantId: uuid (Nullable: NO, Default: null)
+- name: character varying (Nullable: NO, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: now())
+- updatedAt: timestamp with time zone (Nullable: NO, Default: now())
+- position: character varying (Nullable: YES, Default: null)
+- dashboardPermissions: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- gender: character varying (Nullable: YES, Default: null)
+- spokenLanguages: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- serviceCommissionEnabled: boolean (Nullable: NO, Default: false)
+- productCommissionEnabled: boolean (Nullable: NO, Default: false)
+- email: character varying (Nullable: YES, Default: null)
+- isActive: boolean (Nullable: NO, Default: true)
+- bio: text (Nullable: YES, Default: null)
+- commission: numeric (Nullable: NO, Default: 0)
+- commissionRate: numeric (Nullable: NO, Default: 0)
+- experience: character varying (Nullable: YES, Default: null)
+- nationality: character varying (Nullable: YES, Default: null)
+- phone: character varying (Nullable: YES, Default: null)
+- photo: character varying (Nullable: YES, Default: null)
+- rating: numeric (Nullable: NO, Default: 5)
+- salary: numeric (Nullable: NO, Default: 0)
+- scheduleVisibilityWeeks: integer (Nullable: NO, Default: 1)
+- skills: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- totalBookings: integer (Nullable: NO, Default: 0)
+- workingHours: jsonb (Nullable: YES, Default: '{}'::jsonb)
+  Foreign Keys:
+    - tenantId -> tenants.id
+
+## Table: activity_logs
+- id: uuid (Nullable: NO, Default: null)
+- entityType: USER-DEFINED (Nullable: NO, Default: null)
+- entityId: uuid (Nullable: YES, Default: null)
+- action: USER-DEFINED (Nullable: NO, Default: null)
+- performedByType: USER-DEFINED (Nullable: NO, Default: null)
+- performedById: uuid (Nullable: YES, Default: null)
+- performedByName: character varying (Nullable: YES, Default: null)
+- details: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- previousValue: jsonb (Nullable: YES, Default: null)
+- newValue: jsonb (Nullable: YES, Default: null)
+- ipAddress: character varying (Nullable: YES, Default: null)
+- userAgent: character varying (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: admin_notifications
+- id: uuid (Nullable: NO, Default: null)
+- type: character varying (Nullable: NO, Default: null)
+- severity: USER-DEFINED (Nullable: NO, Default: 'info'::enum_admin_notifications_severity)
+- titleAr: character varying (Nullable: NO, Default: null)
+- titleEn: character varying (Nullable: NO, Default: null)
+- messageAr: text (Nullable: NO, Default: null)
+- messageEn: text (Nullable: NO, Default: null)
+- entityType: character varying (Nullable: YES, Default: null)
+- entityId: uuid (Nullable: YES, Default: null)
+- actionUrl: character varying (Nullable: YES, Default: null)
+- isRead: boolean (Nullable: NO, Default: false)
+- readAt: timestamp with time zone (Nullable: YES, Default: null)
+- dedupeKey: character varying (Nullable: NO, Default: null)
+- metadata: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: admin_saved_reports
+- id: uuid (Nullable: NO, Default: null)
+- createdByAdminId: uuid (Nullable: YES, Default: null)
+- reportType: character varying (Nullable: NO, Default: 'custom'::character varying)
+- title: character varying (Nullable: NO, Default: null)
+- description: text (Nullable: YES, Default: null)
+- dimensions: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- metrics: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- grouping: character varying (Nullable: YES, Default: null)
+- filters: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- outputType: character varying (Nullable: NO, Default: 'table'::character varying)
+- chartType: character varying (Nullable: YES, Default: null)
+- reportConfig: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- scheduleConfig: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- isFavorite: boolean (Nullable: NO, Default: false)
+- lastRunAt: timestamp with time zone (Nullable: YES, Default: null)
+- nextRunAt: timestamp with time zone (Nullable: YES, Default: null)
+- lastRunResult: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- runHistory: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- duplicatedFromId: uuid (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: appointment_events
+- id: uuid (Nullable: NO, Default: null)
+- appointmentId: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: YES, Default: null)
+- actorType: character varying (Nullable: NO, Default: 'customer'::character varying)
+- actorId: uuid (Nullable: YES, Default: null)
+- eventType: character varying (Nullable: NO, Default: null)
+- payload: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- occurredAt: timestamp with time zone (Nullable: NO, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: auth_users
+- id: uuid (Nullable: NO, Default: null)
+- email: character varying (Nullable: NO, Default: null)
+- password: character varying (Nullable: NO, Default: null)
+- role: USER-DEFINED (Nullable: YES, Default: 'owner'::enum_auth_users_role)
+- tenantId: uuid (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: orders
+- id: uuid (Nullable: NO, Default: null)
+- orderNumber: character varying (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: YES, Default: 'pending'::enum_orders_status)
+- paymentMethod: USER-DEFINED (Nullable: NO, Default: null)
+- paymentStatus: USER-DEFINED (Nullable: YES, Default: 'pending'::"enum_orders_paymentStatus")
+- subtotal: numeric (Nullable: NO, Default: 0)
+- taxAmount: numeric (Nullable: NO, Default: 0)
+- shippingFee: numeric (Nullable: NO, Default: 0)
+- platformFee: numeric (Nullable: NO, Default: 0)
+- totalAmount: numeric (Nullable: NO, Default: 0)
+- deliveryType: USER-DEFINED (Nullable: NO, Default: 'pickup'::"enum_orders_deliveryType")
+- shippingAddress: jsonb (Nullable: YES, Default: null)
+- pickupDate: timestamp with time zone (Nullable: YES, Default: null)
+- trackingNumber: character varying (Nullable: YES, Default: null)
+- estimatedDeliveryDate: timestamp with time zone (Nullable: YES, Default: null)
+- deliveredAt: timestamp with time zone (Nullable: YES, Default: null)
+- notes: text (Nullable: YES, Default: null)
+- tenantNotes: text (Nullable: YES, Default: null)
+- cancelledAt: timestamp with time zone (Nullable: YES, Default: null)
+- cancellationReason: text (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: appointments
+- id: uuid (Nullable: NO, Default: null)
+- bookingNumber: character varying (Nullable: YES, Default: null)
+- serviceId: uuid (Nullable: NO, Default: null)
+- staffId: uuid (Nullable: NO, Default: null)
+- requestedStaffId: uuid (Nullable: YES, Default: null)
+- platformUserId: uuid (Nullable: YES, Default: null)
+- customerId: uuid (Nullable: YES, Default: null)
+- tenantId: uuid (Nullable: YES, Default: null)
+- startTime: timestamp with time zone (Nullable: NO, Default: null)
+- endTime: timestamp with time zone (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: YES, Default: 'pending'::enum_appointments_status)
+- assignmentMode: character varying (Nullable: NO, Default: 'unknown'::character varying)
+- price: numeric (Nullable: NO, Default: null)
+- rawPrice: numeric (Nullable: YES, Default: null)
+- taxAmount: numeric (Nullable: YES, Default: null)
+- platformFee: numeric (Nullable: YES, Default: null)
+- tenantRevenue: numeric (Nullable: YES, Default: null)
+- employeeRevenue: numeric (Nullable: YES, Default: null)
+- employeeCommissionRate: numeric (Nullable: YES, Default: null)
+- employeeCommission: numeric (Nullable: YES, Default: null)
+- paymentStatus: USER-DEFINED (Nullable: YES, Default: 'pending'::"enum_appointments_paymentStatus")
+- paymentMethod: character varying (Nullable: YES, Default: null)
+- paidAt: timestamp with time zone (Nullable: YES, Default: null)
+- customerReminderSentAt: timestamp with time zone (Nullable: YES, Default: null)
+- noShowMarkedAt: timestamp with time zone (Nullable: YES, Default: null)
+- customerConfirmationRequired: boolean (Nullable: NO, Default: false)
+- customerConfirmationStatus: character varying (Nullable: NO, Default: 'not_required'::character varying)
+- customerConfirmedAt: timestamp with time zone (Nullable: YES, Default: null)
+- inviteToken: character varying (Nullable: YES, Default: null)
+- inviteExpiresAt: timestamp with time zone (Nullable: YES, Default: null)
+- notes: text (Nullable: YES, Default: null)
+- aiScore: numeric (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+- depositAmount: numeric (Nullable: NO, Default: 0)
+- depositPaid: boolean (Nullable: NO, Default: false)
+- remainderAmount: numeric (Nullable: NO, Default: 0)
+- remainderPaid: boolean (Nullable: NO, Default: false)
+- totalPaid: numeric (Nullable: NO, Default: 0)
+- serviceVariantId: character varying (Nullable: YES, Default: null)
+- serviceVariantName: character varying (Nullable: YES, Default: null)
+- serviceVariantDescription: text (Nullable: YES, Default: null)
+- serviceVariantDuration: integer (Nullable: YES, Default: null)
+- bookingSessionId: uuid (Nullable: YES, Default: null)
+- bookingReference: character varying (Nullable: YES, Default: null)
+- bookingItemIndex: integer (Nullable: NO, Default: 0)
+- serviceStartedAt: timestamp with time zone (Nullable: YES, Default: null)
+- serviceCompletedAt: timestamp with time zone (Nullable: YES, Default: null)
+  Foreign Keys:
+    - bookingSessionId -> booking_sessions.id
+
+## Table: tenants
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- name: character varying (Nullable: NO, Default: null)
+- slug: character varying (Nullable: NO, Default: null)
+- dbSchema: character varying (Nullable: NO, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: now())
+- updatedAt: timestamp with time zone (Nullable: NO, Default: now())
+- status: USER-DEFINED (Nullable: YES, Default: 'pending_approval'::enum_tenants_status)
+- city: character varying (Nullable: YES, Default: null)
+- plan: USER-DEFINED (Nullable: YES, Default: 'free_trial'::enum_tenants_plan)
+- email: character varying (Nullable: YES, Default: null)
+- paymentDueAt: timestamp with time zone (Nullable: YES, Default: null)
+- moreInfoMessage: text (Nullable: YES, Default: null)
+- password: character varying (Nullable: YES, Default: null)
+- lastLogin: timestamp with time zone (Nullable: YES, Default: null)
+- address: text (Nullable: YES, Default: null)
+- buildingNumber: character varying (Nullable: YES, Default: null)
+- businessType: jsonb (Nullable: NO, Default: '["salon"]'::jsonb)
+- contactPersonEmail: character varying (Nullable: YES, Default: null)
+- coordinates: jsonb (Nullable: YES, Default: null)
+- country: character varying (Nullable: NO, Default: 'Saudi Arabia'::character varying)
+- coverImage: character varying (Nullable: YES, Default: null)
+- crDocument: character varying (Nullable: YES, Default: null)
+- crNumber: character varying (Nullable: YES, Default: null)
+- description: text (Nullable: YES, Default: null)
+- descriptionAr: text (Nullable: YES, Default: null)
+- district: character varying (Nullable: YES, Default: null)
+- facebookUrl: character varying (Nullable: YES, Default: null)
+- googleMapLink: text (Nullable: YES, Default: null)
+- instagramUrl: character varying (Nullable: YES, Default: null)
+- layoutTemplate: USER-DEFINED (Nullable: NO, Default: 'default'::"enum_tenants_layoutTemplate")
+- licenseDocument: character varying (Nullable: YES, Default: null)
+- licenseNumber: character varying (Nullable: YES, Default: null)
+- linkedinUrl: character varying (Nullable: YES, Default: null)
+- logo: character varying (Nullable: YES, Default: null)
+- mobile: character varying (Nullable: YES, Default: null)
+- nameAr: character varying (Nullable: YES, Default: null)
+- name_ar: character varying (Nullable: YES, Default: null)
+- name_en: character varying (Nullable: YES, Default: null)
+- phone: character varying (Nullable: YES, Default: null)
+- pinterestUrl: character varying (Nullable: YES, Default: null)
+- postalCode: character varying (Nullable: YES, Default: null)
+- settings: jsonb (Nullable: NO, Default: '{"currency": "SAR", "language": "ar", "timezone": "Asia/Riyadh", "bookingBuffer": 15, "requireDeposit": false, "depositPercentage": 0, "maxAdvanceBooking": 30, "cancellationPolicy": 24, "autoConfirmBookings": false}'::jsonb)
+- snapchatUrl: character varying (Nullable: YES, Default: null)
+- stats: jsonb (Nullable: NO, Default: '{"totalRevenue": 0, "totalReviews": 0, "averageRating": 0, "totalBookings": 0, "totalCustomers": 0}'::jsonb)
+- street: character varying (Nullable: YES, Default: null)
+- taxDocument: character varying (Nullable: YES, Default: null)
+- taxNumber: character varying (Nullable: YES, Default: null)
+- themeColors: jsonb (Nullable: NO, Default: '{"primary": "#7C3AED", "secondary": "#EC4899"}'::jsonb)
+- tiktokUrl: character varying (Nullable: YES, Default: null)
+- twitterUrl: character varying (Nullable: YES, Default: null)
+- website: character varying (Nullable: YES, Default: null)
+- whatsapp: character varying (Nullable: YES, Default: null)
+- workingHours: jsonb (Nullable: NO, Default: '{"friday": {"open": "14:00", "close": "21:00", "isOpen": true}, "monday": {"open": "09:00", "close": "21:00", "isOpen": true}, "sunday": {"open": "09:00", "close": "21:00", "isOpen": true}, "tuesday": {"open": "09:00", "close": "21:00", "isOpen": true}, "saturday": {"open": "09:00", "close": "21:00", "isOpen": true}, "thursday": {"open": "09:00", "close": "21:00", "isOpen": true}, "wednesday": {"open": "09:00", "close": "21:00", "isOpen": true}}'::jsonb)
+- youtubeUrl: character varying (Nullable: YES, Default: null)
+- images: jsonb (Nullable: YES, Default: '[]'::jsonb)
+- documents: jsonb (Nullable: YES, Default: '{"license": null, "ownerIdCard": null, "vatCertificate": null, "commercialRegister": null}'::jsonb)
+- contactPersonNameAr: character varying (Nullable: YES, Default: null)
+- contactPersonNameEn: character varying (Nullable: YES, Default: null)
+- contactPersonMobile: character varying (Nullable: YES, Default: null)
+- contactPersonPosition: character varying (Nullable: YES, Default: null)
+- providesHomeServices: boolean (Nullable: YES, Default: false)
+- staffCount: integer (Nullable: YES, Default: null)
+- mainService: text (Nullable: YES, Default: null)
+- sellsProducts: boolean (Nullable: YES, Default: false)
+- hasOwnPaymentGateway: boolean (Nullable: YES, Default: false)
+- serviceRanking: integer (Nullable: YES, Default: null)
+- advertiseOnSocialMedia: boolean (Nullable: YES, Default: false)
+- wantsRifahPromotion: boolean (Nullable: YES, Default: false)
+- planStartDate: timestamp with time zone (Nullable: YES, Default: null)
+- planEndDate: timestamp with time zone (Nullable: YES, Default: null)
+- approvedAt: timestamp with time zone (Nullable: YES, Default: null)
+- approvedBy: uuid (Nullable: YES, Default: null)
+- rejectionReason: text (Nullable: YES, Default: null)
+- suspensionReason: text (Nullable: YES, Default: null)
+- ownerName: character varying (Nullable: YES, Default: null)
+- ownerNameAr: character varying (Nullable: YES, Default: null)
+- ownerNameEn: character varying (Nullable: YES, Default: null)
+- ownerPhone: character varying (Nullable: YES, Default: null)
+- ownerEmail: character varying (Nullable: YES, Default: null)
+- ownerNationalId: character varying (Nullable: YES, Default: null)
+
+## Table: bill_payment_attempts
+- id: uuid (Nullable: NO, Default: null)
+- billId: uuid (Nullable: NO, Default: null)
+- source: USER-DEFINED (Nullable: NO, Default: 'public_payment_link'::enum_bill_payment_attempts_source)
+- status: USER-DEFINED (Nullable: NO, Default: 'pending'::enum_bill_payment_attempts_status)
+- paymentProvider: character varying (Nullable: YES, Default: null)
+- paymentMethod: character varying (Nullable: YES, Default: null)
+- paymentReference: character varying (Nullable: YES, Default: null)
+- checkoutSessionId: character varying (Nullable: YES, Default: null)
+- gatewayStatus: character varying (Nullable: YES, Default: null)
+- requestedAmount: numeric (Nullable: YES, Default: null)
+- capturedAmount: numeric (Nullable: YES, Default: null)
+- failureReason: text (Nullable: YES, Default: null)
+- idempotencyKey: character varying (Nullable: NO, Default: null)
+- processedAt: timestamp with time zone (Nullable: NO, Default: null)
+- performedByType: USER-DEFINED (Nullable: NO, Default: 'system'::"enum_bill_payment_attempts_performedByType")
+- performedById: uuid (Nullable: YES, Default: null)
+- performedByName: character varying (Nullable: YES, Default: null)
+- notes: text (Nullable: YES, Default: null)
+- gatewaySummary: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: consultant_conversations
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- createdByUserId: uuid (Nullable: YES, Default: null)
+- snapshotId: uuid (Nullable: YES, Default: null)
+- reportId: uuid (Nullable: YES, Default: null)
+- title: character varying (Nullable: NO, Default: null)
+- topic: character varying (Nullable: YES, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'open'::enum_consultant_conversations_status)
+- messages: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- searchText: text (Nullable: YES, Default: null)
+- summary: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- lastMessageAt: timestamp with time zone (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: consultant_reports
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- snapshotId: uuid (Nullable: YES, Default: null)
+- createdByUserId: uuid (Nullable: YES, Default: null)
+- reportType: character varying (Nullable: NO, Default: 'business_snapshot'::character varying)
+- analysisVersion: character varying (Nullable: NO, Default: 'v1'::character varying)
+- snapshotHash: character varying (Nullable: NO, Default: ''::character varying)
+- title: character varying (Nullable: NO, Default: null)
+- description: text (Nullable: YES, Default: null)
+- periodType: USER-DEFINED (Nullable: NO, Default: 'daily'::"enum_consultant_reports_periodType")
+- periodStart: timestamp with time zone (Nullable: NO, Default: null)
+- periodEnd: timestamp with time zone (Nullable: NO, Default: null)
+- outputFormat: character varying (Nullable: NO, Default: 'json'::character varying)
+- sections: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- reportData: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- generatedAt: timestamp with time zone (Nullable: NO, Default: null)
+- status: character varying (Nullable: NO, Default: 'ready'::character varying)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: consultant_snapshots
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- createdByUserId: uuid (Nullable: YES, Default: null)
+- periodType: USER-DEFINED (Nullable: NO, Default: 'daily'::"enum_consultant_snapshots_periodType")
+- periodStart: timestamp with time zone (Nullable: NO, Default: null)
+- periodEnd: timestamp with time zone (Nullable: NO, Default: null)
+- generatedAt: timestamp with time zone (Nullable: NO, Default: null)
+- datasetVersion: character varying (Nullable: NO, Default: 'v1'::character varying)
+- snapshotHash: character varying (Nullable: NO, Default: ''::character varying)
+- currency: character varying (Nullable: NO, Default: 'SAR'::character varying)
+- summary: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- financial: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- customers: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- operations: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- employees: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- products: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- sourceCounts: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: customer_insights
+- id: uuid (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- totalBookings: integer (Nullable: YES, Default: 0)
+- totalSpent: numeric (Nullable: YES, Default: 0)
+- averageRating: numeric (Nullable: YES, Default: null)
+- lastVisit: timestamp with time zone (Nullable: YES, Default: null)
+- firstVisit: timestamp with time zone (Nullable: YES, Default: null)
+- favoriteServices: ARRAY (Nullable: YES, Default: ARRAY[]::uuid[])
+- favoriteStaff: ARRAY (Nullable: YES, Default: ARRAY[]::uuid[])
+- preferredTimes: ARRAY (Nullable: YES, Default: (ARRAY[]::character varying[])::character varying(255)[])
+- loyaltyTier: USER-DEFINED (Nullable: YES, Default: 'bronze'::"enum_customer_insights_loyaltyTier")
+- tenantLoyaltyPoints: integer (Nullable: YES, Default: 0)
+- notes: text (Nullable: YES, Default: null)
+- tags: ARRAY (Nullable: YES, Default: (ARRAY[]::character varying[])::character varying(255)[])
+- noShowCount: integer (Nullable: YES, Default: 0)
+- cancellationCount: integer (Nullable: YES, Default: 0)
+- averageBookingValue: numeric (Nullable: YES, Default: 0)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: customer_invoice_events
+- id: uuid (Nullable: NO, Default: null)
+- invoiceId: uuid (Nullable: NO, Default: null)
+- eventType: character varying (Nullable: NO, Default: null)
+- fromStatus: USER-DEFINED (Nullable: YES, Default: null)
+- toStatus: USER-DEFINED (Nullable: YES, Default: null)
+- triggerSource: character varying (Nullable: NO, Default: null)
+- actorType: character varying (Nullable: YES, Default: null)
+- actorId: uuid (Nullable: YES, Default: null)
+- payload: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: customer_invoice_items
+- id: uuid (Nullable: NO, Default: null)
+- invoiceId: uuid (Nullable: NO, Default: null)
+- itemType: USER-DEFINED (Nullable: NO, Default: null)
+- itemRefId: uuid (Nullable: YES, Default: null)
+- nameEn: character varying (Nullable: NO, Default: null)
+- nameAr: character varying (Nullable: NO, Default: null)
+- quantity: integer (Nullable: NO, Default: 1)
+- unitPrice: numeric (Nullable: NO, Default: 0)
+- lineTotal: numeric (Nullable: NO, Default: 0)
+- taxAmount: numeric (Nullable: NO, Default: 0)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: gift_card_codes
+- id: uuid (Nullable: NO, Default: null)
+- code: character varying (Nullable: NO, Default: null)
+- scopeType: USER-DEFINED (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: YES, Default: null)
+- sourceGiftCardTransactionId: uuid (Nullable: YES, Default: null)
+- sourceTenantGiftCardTransactionId: uuid (Nullable: YES, Default: null)
+- initialAmount: numeric (Nullable: NO, Default: null)
+- remainingAmount: numeric (Nullable: NO, Default: null)
+- currency: character varying (Nullable: NO, Default: 'SAR'::character varying)
+- recipientEmail: character varying (Nullable: YES, Default: null)
+- recipientPhone: character varying (Nullable: YES, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'issued'::enum_gift_card_codes_status)
+- expiresAt: timestamp with time zone (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: gift_card_packages
+- id: uuid (Nullable: NO, Default: null)
+- title_en: character varying (Nullable: NO, Default: null)
+- title_ar: character varying (Nullable: NO, Default: null)
+- description_en: text (Nullable: YES, Default: null)
+- description_ar: text (Nullable: YES, Default: null)
+- displayOrder: integer (Nullable: NO, Default: 0)
+- priceAmount: numeric (Nullable: NO, Default: null)
+- walletCreditAmount: numeric (Nullable: NO, Default: null)
+- bonusAmount: numeric (Nullable: NO, Default: 0)
+- imageUrl: character varying (Nullable: YES, Default: null)
+- startsAt: timestamp with time zone (Nullable: YES, Default: null)
+- endsAt: timestamp with time zone (Nullable: YES, Default: null)
+- isActive: boolean (Nullable: NO, Default: true)
+- createdByAdminId: uuid (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: notification_delivery_logs
+- id: uuid (Nullable: NO, Default: null)
+- eventType: character varying (Nullable: NO, Default: null)
+- recipientType: USER-DEFINED (Nullable: NO, Default: null)
+- recipientId: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: YES, Default: null)
+- channel: USER-DEFINED (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'queued'::enum_notification_delivery_logs_status)
+- reason: character varying (Nullable: YES, Default: null)
+- payload: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- response: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: order_items
+- id: uuid (Nullable: NO, Default: null)
+- orderId: uuid (Nullable: NO, Default: null)
+- productId: uuid (Nullable: NO, Default: null)
+- productName: character varying (Nullable: NO, Default: null)
+- productNameAr: character varying (Nullable: YES, Default: null)
+- productPrice: numeric (Nullable: NO, Default: null)
+- productImage: character varying (Nullable: YES, Default: null)
+- productSku: character varying (Nullable: YES, Default: null)
+- quantity: integer (Nullable: NO, Default: 1)
+- unitPrice: numeric (Nullable: NO, Default: null)
+- totalPrice: numeric (Nullable: NO, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: payment_methods
+- id: uuid (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: NO, Default: null)
+- type: USER-DEFINED (Nullable: NO, Default: null)
+- cardLast4: character varying (Nullable: YES, Default: null)
+- cardBrand: character varying (Nullable: YES, Default: null)
+- cardExpiry: character varying (Nullable: YES, Default: null)
+- cardHolderName: character varying (Nullable: YES, Default: null)
+- stripePaymentMethodId: character varying (Nullable: YES, Default: null)
+- isDefault: boolean (Nullable: YES, Default: false)
+- isActive: boolean (Nullable: YES, Default: true)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: reviews
+- id: uuid (Nullable: NO, Default: null)
+- tenant_id: uuid (Nullable: NO, Default: null)
+- staff_id: uuid (Nullable: YES, Default: null)
+- appointment_id: uuid (Nullable: YES, Default: null)
+- platform_user_id: uuid (Nullable: YES, Default: null)
+- customer_name: character varying (Nullable: YES, Default: null)
+- rating: smallint (Nullable: NO, Default: null)
+- comment: text (Nullable: YES, Default: null)
+- staff_reply: text (Nullable: YES, Default: null)
+- staff_replied_at: timestamp with time zone (Nullable: YES, Default: null)
+- is_visible: boolean (Nullable: NO, Default: true)
+- created_at: timestamp with time zone (Nullable: NO, Default: null)
+- updated_at: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: customers
+- id: uuid (Nullable: NO, Default: null)
+- phone: character varying (Nullable: NO, Default: null)
+- name: character varying (Nullable: NO, Default: null)
+- email: character varying (Nullable: YES, Default: null)
+- preferences: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- totalSpent: numeric (Nullable: YES, Default: 0)
+- loyaltyPoints: integer (Nullable: YES, Default: 0)
+- totalBookings: integer (Nullable: YES, Default: 0)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: FeaturePricings
+- id: uuid (Nullable: NO, Default: null)
+- featureKey: character varying (Nullable: NO, Default: null)
+- label: character varying (Nullable: NO, Default: null)
+- unitLabel: character varying (Nullable: NO, Default: null)
+- unitPrice: numeric (Nullable: NO, Default: 0)
+- isActive: boolean (Nullable: NO, Default: true)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: gift_card_code_redemptions
+- id: uuid (Nullable: NO, Default: null)
+- giftCardCodeId: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- appointmentId: uuid (Nullable: YES, Default: null)
+- orderId: uuid (Nullable: YES, Default: null)
+- posInvoiceId: uuid (Nullable: YES, Default: null)
+- redeemedAmount: numeric (Nullable: NO, Default: null)
+- remainingAfter: numeric (Nullable: NO, Default: null)
+- redeemedByStaffId: uuid (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: mobile_push_tokens
+- id: uuid (Nullable: NO, Default: null)
+- token: character varying (Nullable: NO, Default: null)
+- appType: USER-DEFINED (Nullable: NO, Default: null)
+- platform: USER-DEFINED (Nullable: NO, Default: 'unknown'::enum_mobile_push_tokens_platform)
+- appVersion: character varying (Nullable: YES, Default: null)
+- deviceName: character varying (Nullable: YES, Default: null)
+- platformUserId: uuid (Nullable: YES, Default: null)
+- staffUserId: uuid (Nullable: YES, Default: null)
+- staffId: uuid (Nullable: YES, Default: null)
+- tenantId: uuid (Nullable: YES, Default: null)
+- isActive: boolean (Nullable: NO, Default: true)
+- lastRegisteredAt: timestamp with time zone (Nullable: NO, Default: null)
+- lastSeenAt: timestamp with time zone (Nullable: NO, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: products
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- name_en: character varying (Nullable: NO, Default: null)
+- name_ar: character varying (Nullable: NO, Default: null)
+- description_en: text (Nullable: YES, Default: null)
+- description_ar: text (Nullable: YES, Default: null)
+- image: character varying (Nullable: YES, Default: null)
+- images: jsonb (Nullable: YES, Default: '[]'::jsonb)
+- rawPrice: numeric (Nullable: NO, Default: null)
+- taxRate: numeric (Nullable: YES, Default: null)
+- commissionRate: numeric (Nullable: YES, Default: null)
+- price: numeric (Nullable: NO, Default: null)
+- category: character varying (Nullable: NO, Default: 'general'::character varying)
+- stock: integer (Nullable: NO, Default: 0)
+- sku: character varying (Nullable: YES, Default: null)
+- brand: character varying (Nullable: YES, Default: null)
+- size: character varying (Nullable: YES, Default: null)
+- color: character varying (Nullable: YES, Default: null)
+- ingredients: text (Nullable: YES, Default: null)
+- ingredients_en: text (Nullable: YES, Default: null)
+- ingredients_ar: text (Nullable: YES, Default: null)
+- howToUse_en: text (Nullable: YES, Default: null)
+- howToUse_ar: text (Nullable: YES, Default: null)
+- features_en: text (Nullable: YES, Default: null)
+- features_ar: text (Nullable: YES, Default: null)
+- isAvailable: boolean (Nullable: YES, Default: true)
+- isFeatured: boolean (Nullable: YES, Default: false)
+- soldCount: integer (Nullable: YES, Default: 0)
+- usedAsGiftCount: integer (Nullable: YES, Default: 0)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: public_page_data
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- aboutUs_heroImage: character varying (Nullable: YES, Default: null)
+- aboutUs_storyTitle: character varying (Nullable: YES, Default: 'ourStory'::character varying)
+- aboutUs_storyEn: text (Nullable: YES, Default: null)
+- aboutUs_storyAr: text (Nullable: YES, Default: null)
+- aboutUs_missions: jsonb (Nullable: YES, Default: '[]'::jsonb)
+- aboutUs_visions: jsonb (Nullable: YES, Default: '[]'::jsonb)
+- aboutUs_values: jsonb (Nullable: YES, Default: '[]'::jsonb)
+- aboutUs_facilitiesDescriptionEn: text (Nullable: YES, Default: null)
+- aboutUs_facilitiesDescriptionAr: text (Nullable: YES, Default: null)
+- aboutUs_facilitiesImages: jsonb (Nullable: YES, Default: '[]'::jsonb)
+- aboutUs_finalWordTitleEn: character varying (Nullable: YES, Default: null)
+- aboutUs_finalWordTitleAr: character varying (Nullable: YES, Default: null)
+- aboutUs_finalWordTextEn: text (Nullable: YES, Default: null)
+- aboutUs_finalWordTextAr: text (Nullable: YES, Default: null)
+- aboutUs_finalWordType: character varying (Nullable: YES, Default: 'image'::character varying)
+- aboutUs_finalWordImageUrl: character varying (Nullable: YES, Default: null)
+- aboutUs_finalWordIconName: character varying (Nullable: YES, Default: null)
+- heroSliders: jsonb (Nullable: YES, Default: '[]'::jsonb)
+- homePage_data: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- contactUs_data: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- pageBanner_services: character varying (Nullable: YES, Default: null)
+- pageBanner_products: character varying (Nullable: YES, Default: null)
+- pageBanner_about: character varying (Nullable: YES, Default: null)
+- pageBanner_contact: character varying (Nullable: YES, Default: null)
+- generalSettings: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: customer_invoices
+- id: uuid (Nullable: NO, Default: null)
+- invoiceNumber: character varying (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: NO, Default: null)
+- entityType: USER-DEFINED (Nullable: NO, Default: null)
+- entityId: uuid (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'UNPAID'::enum_customer_invoices_status)
+- currency: character varying (Nullable: NO, Default: 'SAR'::character varying)
+- subtotalAmount: numeric (Nullable: NO, Default: 0)
+- vatAmount: numeric (Nullable: NO, Default: 0)
+- totalAmount: numeric (Nullable: NO, Default: 0)
+- paidAmount: numeric (Nullable: NO, Default: 0)
+- dueAmount: numeric (Nullable: NO, Default: 0)
+- paymentMethodSnapshot: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- paymentStatusSnapshot: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- invoicePdfPath: character varying (Nullable: YES, Default: null)
+- receiptPdfPath: character varying (Nullable: YES, Default: null)
+- issuedAt: timestamp with time zone (Nullable: NO, Default: null)
+- paidAt: timestamp with time zone (Nullable: YES, Default: null)
+- lastEmailedAt: timestamp with time zone (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+- discountAmount: numeric (Nullable: NO, Default: 0)
+
+## Table: gift_card_transactions
+- id: uuid (Nullable: NO, Default: null)
+- senderPlatformUserId: uuid (Nullable: YES, Default: null)
+- recipientPlatformUserId: uuid (Nullable: YES, Default: null)
+- recipientEmail: character varying (Nullable: YES, Default: null)
+- recipientPhone: character varying (Nullable: YES, Default: null)
+- packageId: uuid (Nullable: NO, Default: null)
+- purchaseAmount: numeric (Nullable: NO, Default: null)
+- creditAmount: numeric (Nullable: NO, Default: null)
+- bonusAmount: numeric (Nullable: NO, Default: 0)
+- totalCreditAmount: numeric (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'purchased'::enum_gift_card_transactions_status)
+- deliveryChannel: USER-DEFINED (Nullable: NO, Default: 'in_app'::"enum_gift_card_transactions_deliveryChannel")
+- claimToken: character varying (Nullable: YES, Default: null)
+- claimedAt: timestamp with time zone (Nullable: YES, Default: null)
+- expiresAt: timestamp with time zone (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- deliveryMode: USER-DEFINED (Nullable: YES, Default: null)
+- giftCardCodeId: uuid (Nullable: YES, Default: null)
+- recipientResolvedPlatformUserId: uuid (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: global_settings
+- id: uuid (Nullable: NO, Default: null)
+- serviceCommissionRate: numeric (Nullable: NO, Default: 10)
+- productCommissionRate: numeric (Nullable: NO, Default: 10)
+- taxRate: numeric (Nullable: NO, Default: 15)
+- invoiceSellerNameAr: character varying (Nullable: YES, Default: null)
+- invoiceSellerNameEn: character varying (Nullable: YES, Default: null)
+- invoiceVatNumber: character varying (Nullable: YES, Default: null)
+- invoiceCrNumber: character varying (Nullable: YES, Default: null)
+- invoiceAddressAr: text (Nullable: YES, Default: null)
+- invoiceAddressEn: text (Nullable: YES, Default: null)
+- invoiceCity: character varying (Nullable: YES, Default: null)
+- invoiceCountry: character varying (Nullable: NO, Default: 'Saudi Arabia'::character varying)
+- invoiceEmail: character varying (Nullable: YES, Default: null)
+- invoicePhone: character varying (Nullable: YES, Default: null)
+- invoicePrefix: character varying (Nullable: NO, Default: 'INV'::character varying)
+- invoiceFooterNoteAr: text (Nullable: YES, Default: null)
+- invoiceFooterNoteEn: text (Nullable: YES, Default: null)
+- invoiceLogoPath: character varying (Nullable: YES, Default: null)
+- updatedBy: uuid (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: platform_users
+- id: uuid (Nullable: NO, Default: null)
+- email: character varying (Nullable: NO, Default: null)
+- phone: character varying (Nullable: NO, Default: null)
+- password: character varying (Nullable: YES, Default: null)
+- firstName: character varying (Nullable: NO, Default: null)
+- lastName: character varying (Nullable: NO, Default: null)
+- dateOfBirth: date (Nullable: YES, Default: null)
+- gender: USER-DEFINED (Nullable: YES, Default: null)
+- profileImage: character varying (Nullable: YES, Default: null)
+- address_street: character varying (Nullable: YES, Default: null)
+- address_city: character varying (Nullable: YES, Default: null)
+- address_building: character varying (Nullable: YES, Default: null)
+- address_floor: character varying (Nullable: YES, Default: null)
+- address_apartment: character varying (Nullable: YES, Default: null)
+- address_phone: character varying (Nullable: YES, Default: null)
+- address_notes: text (Nullable: YES, Default: null)
+- preferredLanguage: USER-DEFINED (Nullable: YES, Default: 'en'::"enum_platform_users_preferredLanguage")
+- notificationPreferences: jsonb (Nullable: YES, Default: '{"sms": true, "push": true, "email": true, "whatsapp": true}'::jsonb)
+- walletBalance: numeric (Nullable: YES, Default: 0)
+- loyaltyPoints: integer (Nullable: YES, Default: 0)
+- totalSpent: numeric (Nullable: YES, Default: 0)
+- totalBookings: integer (Nullable: YES, Default: 0)
+- emailVerified: boolean (Nullable: YES, Default: false)
+- phoneVerified: boolean (Nullable: YES, Default: false)
+- emailVerificationToken: character varying (Nullable: YES, Default: null)
+- password_reset_token: character varying (Nullable: YES, Default: null)
+- password_reset_token_expires_at: timestamp with time zone (Nullable: YES, Default: null)
+- phoneVerificationCode: character varying (Nullable: YES, Default: null)
+- lastLogin: timestamp with time zone (Nullable: YES, Default: null)
+- refreshToken: text (Nullable: YES, Default: null)
+- isActive: boolean (Nullable: YES, Default: true)
+- isBanned: boolean (Nullable: YES, Default: false)
+- banReason: text (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+- auth_provider: USER-DEFINED (Nullable: NO, Default: 'local'::enum_platform_users_auth_provider)
+- google_sub: character varying (Nullable: YES, Default: null)
+- google_email: character varying (Nullable: YES, Default: null)
+
+## Table: service_categories
+- id: uuid (Nullable: NO, Default: null)
+- name_en: character varying (Nullable: NO, Default: null)
+- name_ar: character varying (Nullable: NO, Default: null)
+- slug: character varying (Nullable: NO, Default: null)
+- icon: character varying (Nullable: YES, Default: null)
+- sortOrder: integer (Nullable: NO, Default: 0)
+- isActive: boolean (Nullable: NO, Default: true)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: service_employees
+- id: uuid (Nullable: NO, Default: null)
+- serviceId: uuid (Nullable: NO, Default: null)
+- staffId: uuid (Nullable: NO, Default: null)
+- commissionRate: numeric (Nullable: YES, Default: null)
+- commissionType: character varying (Nullable: YES, Default: null)
+- commissionValue: numeric (Nullable: YES, Default: null)
+- isPrimary: boolean (Nullable: YES, Default: false)
+- notes: text (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: services
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: YES, Default: null)
+- name_en: character varying (Nullable: NO, Default: null)
+- name_ar: character varying (Nullable: NO, Default: null)
+- description_en: text (Nullable: YES, Default: null)
+- description_ar: text (Nullable: YES, Default: null)
+- image: character varying (Nullable: YES, Default: null)
+- includes: json (Nullable: YES, Default: '[]'::json)
+- category: character varying (Nullable: NO, Default: 'general'::character varying)
+- duration: integer (Nullable: NO, Default: 30)
+- rawPrice: numeric (Nullable: YES, Default: 0)
+- taxRate: numeric (Nullable: YES, Default: 15)
+- commissionRate: numeric (Nullable: YES, Default: 10)
+- finalPrice: numeric (Nullable: YES, Default: 0)
+- basePrice: numeric (Nullable: YES, Default: null)
+- minPrice: numeric (Nullable: YES, Default: null)
+- maxPrice: numeric (Nullable: YES, Default: null)
+- hasOffer: boolean (Nullable: YES, Default: false)
+- offerDetails: text (Nullable: YES, Default: null)
+- hasGift: boolean (Nullable: YES, Default: false)
+- giftType: USER-DEFINED (Nullable: YES, Default: null)
+- giftDetails: text (Nullable: YES, Default: null)
+- isActive: boolean (Nullable: YES, Default: true)
+- availableInCenter: boolean (Nullable: YES, Default: true)
+- availableHomeVisit: boolean (Nullable: YES, Default: false)
+- allowReschedule: boolean (Nullable: NO, Default: false)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+- targetGender: character varying (Nullable: NO, Default: 'all'::character varying)
+- priceType: character varying (Nullable: NO, Default: 'fixed'::character varying)
+- variants: jsonb (Nullable: YES, Default: '[]'::jsonb)
+- paymentOptions: jsonb (Nullable: YES, Default: '[]'::jsonb)
+
+## Table: staff_messages
+- id: uuid (Nullable: NO, Default: null)
+- tenant_id: uuid (Nullable: NO, Default: null)
+- sender_type: character varying (Nullable: NO, Default: null)
+- sender_id: uuid (Nullable: NO, Default: null)
+- recipient_type: character varying (Nullable: YES, Default: null)
+- recipient_id: uuid (Nullable: YES, Default: null)
+- subject: character varying (Nullable: YES, Default: null)
+- body: text (Nullable: NO, Default: null)
+- is_pinned: boolean (Nullable: NO, Default: false)
+- read_by: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- created_at: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: staff_payrolls
+- id: uuid (Nullable: NO, Default: null)
+- staff_id: uuid (Nullable: NO, Default: null)
+- tenant_id: uuid (Nullable: NO, Default: null)
+- period_start: date (Nullable: NO, Default: null)
+- period_end: date (Nullable: NO, Default: null)
+- base_salary: numeric (Nullable: NO, Default: 0)
+- commission: numeric (Nullable: NO, Default: 0)
+- tips_total: numeric (Nullable: NO, Default: 0)
+- bonuses: numeric (Nullable: NO, Default: 0)
+- deductions: numeric (Nullable: NO, Default: 0)
+- status: character varying (Nullable: NO, Default: 'draft'::character varying)
+- notes: text (Nullable: YES, Default: null)
+- paid_at: timestamp with time zone (Nullable: YES, Default: null)
+- created_at: timestamp with time zone (Nullable: NO, Default: null)
+- updated_at: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: staff_permissions
+- id: uuid (Nullable: NO, Default: null)
+- staffId: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- permissions: jsonb (Nullable: NO, Default: '{"view_clients": false, "view_reviews": true, "reply_reviews": false, "view_earnings": false, "can_mark_no_show": true, "can_start_service": true, "view_booking_notes": false}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: staff_schedules
+- id: uuid (Nullable: NO, Default: null)
+- staffId: uuid (Nullable: NO, Default: null)
+- dayOfWeek: integer (Nullable: NO, Default: null)
+- startTime: time without time zone (Nullable: NO, Default: null)
+- endTime: time without time zone (Nullable: NO, Default: null)
+- isAvailable: boolean (Nullable: YES, Default: true)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: subscription_packages
+- id: uuid (Nullable: NO, Default: null)
+- name: character varying (Nullable: NO, Default: null)
+- name_ar: character varying (Nullable: NO, Default: null)
+- slug: character varying (Nullable: NO, Default: null)
+- description: text (Nullable: YES, Default: null)
+- description_ar: text (Nullable: YES, Default: null)
+- monthlyPrice: numeric (Nullable: NO, Default: 0)
+- sixMonthPrice: numeric (Nullable: NO, Default: 0)
+- annualPrice: numeric (Nullable: NO, Default: 0)
+- limits: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- platformCommission: numeric (Nullable: NO, Default: 5)
+- displayOrder: integer (Nullable: NO, Default: 0)
+- isActive: boolean (Nullable: NO, Default: true)
+- isFeatured: boolean (Nullable: NO, Default: false)
+- isCustom: boolean (Nullable: NO, Default: false)
+- customTenantId: uuid (Nullable: YES, Default: null)
+- createdBy: uuid (Nullable: YES, Default: null)
+- updatedBy: uuid (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: tenant_feature_usage
+- id: uuid (Nullable: NO, Default: null)
+- tenant_id: uuid (Nullable: NO, Default: null)
+- feature_key: character varying (Nullable: NO, Default: null)
+- month: character varying (Nullable: NO, Default: null)
+- count: integer (Nullable: NO, Default: 0)
+- created_at: timestamp with time zone (Nullable: NO, Default: null)
+- updated_at: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: super_admins
+- id: uuid (Nullable: NO, Default: null)
+- email: character varying (Nullable: NO, Default: null)
+- password: character varying (Nullable: NO, Default: null)
+- firstName: character varying (Nullable: NO, Default: null)
+- lastName: character varying (Nullable: NO, Default: null)
+- role: USER-DEFINED (Nullable: YES, Default: 'admin'::enum_super_admins_role)
+- permissions: jsonb (Nullable: YES, Default: '{"users": {"edit": true, "view": true, "create": false, "delete": false}, "tenants": {"edit": true, "view": true, "create": true, "delete": false, "approve": true}, "settings": {"edit": false, "view": true}, "financial": {"view": true, "export": true, "refund": false}}'::jsonb)
+- isActive: boolean (Nullable: YES, Default: true)
+- lastLoginAt: timestamp with time zone (Nullable: YES, Default: null)
+- lastLoginIP: character varying (Nullable: YES, Default: null)
+- profileImage: character varying (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: tenant_gift_card_packages
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- title_en: character varying (Nullable: NO, Default: null)
+- title_ar: character varying (Nullable: NO, Default: null)
+- description_en: text (Nullable: YES, Default: null)
+- description_ar: text (Nullable: YES, Default: null)
+- displayOrder: integer (Nullable: NO, Default: 0)
+- priceAmount: numeric (Nullable: NO, Default: null)
+- walletCreditAmount: numeric (Nullable: NO, Default: null)
+- bonusAmount: numeric (Nullable: NO, Default: 0)
+- imageUrl: character varying (Nullable: YES, Default: null)
+- thumbnailUrl: character varying (Nullable: YES, Default: null)
+- startsAt: timestamp with time zone (Nullable: YES, Default: null)
+- endsAt: timestamp with time zone (Nullable: YES, Default: null)
+- isActive: boolean (Nullable: NO, Default: true)
+- createdByTenantUserId: uuid (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+- title: character varying (Nullable: YES, Default: null)
+- description: text (Nullable: YES, Default: null)
+- discountPreset: character varying (Nullable: YES, Default: null)
+- discountPercent: numeric (Nullable: YES, Default: 0)
+- expirationPreset: character varying (Nullable: YES, Default: null)
+
+## Table: tenant_gift_card_settlements
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- transactionId: uuid (Nullable: NO, Default: null)
+- packageId: uuid (Nullable: NO, Default: null)
+- grossAmount: numeric (Nullable: NO, Default: null)
+- platformFeeAmount: numeric (Nullable: NO, Default: 0)
+- netTenantPayableAmount: numeric (Nullable: NO, Default: null)
+- settledAmount: numeric (Nullable: NO, Default: 0)
+- status: USER-DEFINED (Nullable: NO, Default: 'pending'::enum_tenant_gift_card_settlements_status)
+- settledAt: timestamp with time zone (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: tenant_usage
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- currentPeriod: character varying (Nullable: NO, Default: null)
+- bookingsThisMonth: integer (Nullable: NO, Default: 0)
+- bookingsTotal: integer (Nullable: NO, Default: 0)
+- activeStaff: integer (Nullable: NO, Default: 0)
+- activeServices: integer (Nullable: NO, Default: 0)
+- activeProducts: integer (Nullable: NO, Default: 0)
+- storageUsedMB: numeric (Nullable: NO, Default: 0)
+- emailCampaignsThisMonth: integer (Nullable: NO, Default: 0)
+- smsCampaignsThisMonth: integer (Nullable: NO, Default: 0)
+- apiCallsThisMonth: integer (Nullable: NO, Default: 0)
+- lastResetDate: timestamp with time zone (Nullable: YES, Default: null)
+- historicalUsage: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: tenant_wallet_balances
+- platformUserId: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- balance: numeric (Nullable: NO, Default: 0)
+- currency: character varying (Nullable: NO, Default: 'SAR'::character varying)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: transactions
+- id: uuid (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: YES, Default: null)
+- appointmentId: uuid (Nullable: YES, Default: null)
+- bookingSessionId: uuid (Nullable: YES, Default: null)
+- order_id: uuid (Nullable: YES, Default: null)
+- paymentMethodId: uuid (Nullable: YES, Default: null)
+- amount: numeric (Nullable: NO, Default: null)
+- currency: character varying (Nullable: YES, Default: 'SAR'::character varying)
+- type: USER-DEFINED (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: YES, Default: 'pending'::enum_transactions_status)
+- stripePaymentIntentId: character varying (Nullable: YES, Default: null)
+- stripeChargeId: character varying (Nullable: YES, Default: null)
+- platformFee: numeric (Nullable: YES, Default: 0)
+- tenantRevenue: numeric (Nullable: YES, Default: 0)
+- metadata: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- failureReason: text (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: payment_transactions
+- id: uuid (Nullable: NO, Default: null)
+- appointment_id: uuid (Nullable: YES, Default: null)
+- order_id: uuid (Nullable: YES, Default: null)
+- type: USER-DEFINED (Nullable: NO, Default: null)
+- amount: numeric (Nullable: NO, Default: null)
+- currency: character varying (Nullable: NO, Default: 'SAR'::character varying)
+- payment_method: USER-DEFINED (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'completed'::enum_payment_transactions_status)
+- transaction_ref: character varying (Nullable: YES, Default: null)
+- gateway_response: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- processed_by: uuid (Nullable: YES, Default: null)
+- processed_at: timestamp with time zone (Nullable: NO, Default: null)
+- metadata: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- notes: text (Nullable: YES, Default: null)
+- created_at: timestamp with time zone (Nullable: NO, Default: null)
+- updated_at: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: tenant_dashboard_accounts
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- tenantId: uuid (Nullable: NO, Default: null)
+- email: character varying (Nullable: NO, Default: null)
+- password: character varying (Nullable: NO, Default: null)
+- displayName: character varying (Nullable: NO, Default: null)
+- roleKey: character varying (Nullable: NO, Default: 'custom'::character varying)
+- permissions: jsonb (Nullable: NO, Default: '{"view_dashboard": true}'::jsonb)
+- isActive: boolean (Nullable: NO, Default: true)
+- passwordResetRequired: boolean (Nullable: NO, Default: false)
+- lastLoginAt: timestamp with time zone (Nullable: YES, Default: null)
+- lastLoginIP: character varying (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: now())
+- updatedAt: timestamp with time zone (Nullable: NO, Default: now())
+  Foreign Keys:
+    - tenantId -> tenants.id
+
+## Table: tenant_gift_card_transactions
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- packageId: uuid (Nullable: NO, Default: null)
+- senderPlatformUserId: uuid (Nullable: YES, Default: null)
+- recipientPlatformUserId: uuid (Nullable: YES, Default: null)
+- recipientEmail: character varying (Nullable: YES, Default: null)
+- recipientPhone: character varying (Nullable: YES, Default: null)
+- purchaseAmount: numeric (Nullable: NO, Default: null)
+- creditAmount: numeric (Nullable: NO, Default: null)
+- bonusAmount: numeric (Nullable: NO, Default: 0)
+- totalCreditAmount: numeric (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'purchased'::enum_tenant_gift_card_transactions_status)
+- deliveryChannel: USER-DEFINED (Nullable: NO, Default: 'in_app'::"enum_tenant_gift_card_transactions_deliveryChannel")
+- claimToken: character varying (Nullable: YES, Default: null)
+- claimedAt: timestamp with time zone (Nullable: YES, Default: null)
+- expiresAt: timestamp with time zone (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- deliveryMode: USER-DEFINED (Nullable: YES, Default: null)
+- giftCardCodeId: uuid (Nullable: YES, Default: null)
+- recipientResolvedPlatformUserId: uuid (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: tenant_operational_alert_reads
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- readerId: uuid (Nullable: NO, Default: null)
+- alertKey: character varying (Nullable: NO, Default: null)
+- readAt: timestamp with time zone (Nullable: NO, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: tenant_push_campaign_recipients
+- id: uuid (Nullable: NO, Default: null)
+- campaign_id: uuid (Nullable: NO, Default: null)
+- platform_user_id: uuid (Nullable: NO, Default: null)
+- read_at: timestamp with time zone (Nullable: YES, Default: null)
+- created_at: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: tenant_push_campaigns
+- id: uuid (Nullable: NO, Default: null)
+- tenant_id: uuid (Nullable: NO, Default: null)
+- title: character varying (Nullable: NO, Default: null)
+- body: text (Nullable: YES, Default: null)
+- data: jsonb (Nullable: YES, Default: null)
+- audience_type: character varying (Nullable: NO, Default: 'selected'::character varying)
+- recipient_count: integer (Nullable: NO, Default: 0)
+- sent_at: timestamp with time zone (Nullable: NO, Default: null)
+- created_at: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: tenant_push_usage
+- id: uuid (Nullable: NO, Default: null)
+- tenant_id: uuid (Nullable: NO, Default: null)
+- month: character varying (Nullable: NO, Default: null)
+- count: integer (Nullable: NO, Default: 0)
+- created_at: timestamp with time zone (Nullable: NO, Default: null)
+- updated_at: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: wallet_ledger_entries
+- id: uuid (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: NO, Default: null)
+- type: USER-DEFINED (Nullable: NO, Default: null)
+- direction: USER-DEFINED (Nullable: NO, Default: null)
+- amount: numeric (Nullable: NO, Default: null)
+- currency: character varying (Nullable: NO, Default: 'SAR'::character varying)
+- balanceBefore: numeric (Nullable: NO, Default: null)
+- balanceAfter: numeric (Nullable: NO, Default: null)
+- referenceType: character varying (Nullable: YES, Default: null)
+- referenceId: character varying (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: staff_shifts
+- id: uuid (Nullable: NO, Default: null)
+- staff_id: uuid (Nullable: NO, Default: null)
+- day_of_week: integer (Nullable: YES, Default: null)
+- specific_date: date (Nullable: YES, Default: null)
+- start_time: time without time zone (Nullable: NO, Default: null)
+- end_time: time without time zone (Nullable: NO, Default: null)
+- is_recurring: boolean (Nullable: YES, Default: true)
+- start_date: date (Nullable: YES, Default: null)
+- end_date: date (Nullable: YES, Default: null)
+- is_active: boolean (Nullable: YES, Default: true)
+- label: character varying (Nullable: YES, Default: null)
+- created_at: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updated_at: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - staff_id -> staff.id
+
+## Table: staff_breaks
+- id: uuid (Nullable: NO, Default: null)
+- staff_id: uuid (Nullable: NO, Default: null)
+- day_of_week: integer (Nullable: YES, Default: null)
+- specific_date: date (Nullable: YES, Default: null)
+- start_time: time without time zone (Nullable: NO, Default: null)
+- end_time: time without time zone (Nullable: NO, Default: null)
+- type: USER-DEFINED (Nullable: YES, Default: 'lunch'::enum_staff_breaks_type)
+- label: character varying (Nullable: YES, Default: null)
+- is_recurring: boolean (Nullable: YES, Default: true)
+- start_date: date (Nullable: YES, Default: null)
+- end_date: date (Nullable: YES, Default: null)
+- is_active: boolean (Nullable: YES, Default: true)
+- created_at: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updated_at: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - staff_id -> staff.id
+
+## Table: staff_time_off
+- id: uuid (Nullable: NO, Default: null)
+- staff_id: uuid (Nullable: NO, Default: null)
+- start_date: date (Nullable: NO, Default: null)
+- end_date: date (Nullable: NO, Default: null)
+- type: USER-DEFINED (Nullable: YES, Default: 'vacation'::enum_staff_time_off_type)
+- reason: text (Nullable: YES, Default: null)
+- is_approved: boolean (Nullable: YES, Default: true)
+- approved_by: uuid (Nullable: YES, Default: null)
+- approved_at: timestamp with time zone (Nullable: YES, Default: null)
+- created_at: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updated_at: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - staff_id -> staff.id
+
+## Table: staff_schedule_overrides
+- id: uuid (Nullable: NO, Default: null)
+- staff_id: uuid (Nullable: NO, Default: null)
+- date: date (Nullable: NO, Default: null)
+- type: USER-DEFINED (Nullable: YES, Default: 'override'::enum_staff_schedule_overrides_type)
+- start_time: time without time zone (Nullable: YES, Default: null)
+- end_time: time without time zone (Nullable: YES, Default: null)
+- is_available: boolean (Nullable: YES, Default: true)
+- reason: text (Nullable: YES, Default: null)
+- created_at: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updated_at: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - staff_id -> staff.id
+
+## Table: tenant_wallet_ledger_entries
+- id: uuid (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- type: USER-DEFINED (Nullable: NO, Default: null)
+- direction: USER-DEFINED (Nullable: NO, Default: null)
+- amount: numeric (Nullable: NO, Default: null)
+- currency: character varying (Nullable: NO, Default: 'SAR'::character varying)
+- balanceBefore: numeric (Nullable: NO, Default: null)
+- balanceAfter: numeric (Nullable: NO, Default: null)
+- referenceType: character varying (Nullable: YES, Default: null)
+- referenceId: character varying (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: support_tickets
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- ticketNumber: character varying (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- customerPlatformUserId: uuid (Nullable: YES, Default: null)
+- supportCategoryId: uuid (Nullable: YES, Default: null)
+- assignedSupportAgentId: uuid (Nullable: YES, Default: null)
+- sourceChannel: USER-DEFINED (Nullable: NO, Default: 'customer_app'::"enum_support_tickets_sourceChannel")
+- status: USER-DEFINED (Nullable: NO, Default: 'draft'::enum_support_tickets_status)
+- priority: USER-DEFINED (Nullable: NO, Default: 'medium'::enum_support_tickets_priority)
+- language: USER-DEFINED (Nullable: NO, Default: 'ar'::enum_support_tickets_language)
+- subject: character varying (Nullable: NO, Default: null)
+- subjectAr: character varying (Nullable: YES, Default: null)
+- description: text (Nullable: YES, Default: null)
+- descriptionAr: text (Nullable: YES, Default: null)
+- lastMessageAt: timestamp with time zone (Nullable: YES, Default: null)
+- firstResponseAt: timestamp with time zone (Nullable: YES, Default: null)
+- resolvedAt: timestamp with time zone (Nullable: YES, Default: null)
+- closedAt: timestamp with time zone (Nullable: YES, Default: null)
+- reopenedAt: timestamp with time zone (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- deletedAt: timestamp with time zone (Nullable: YES, Default: null)
+- source: USER-DEFINED (Nullable: NO, Default: 'dashboard'::enum_support_tickets_source)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - customerPlatformUserId -> platform_users.id
+    - supportCategoryId -> support_categories.id
+    - assignedSupportAgentId -> support_agents.id
+
+## Table: usage_alerts
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- alertType: USER-DEFINED (Nullable: NO, Default: null)
+- resourceType: USER-DEFINED (Nullable: NO, Default: null)
+- title: character varying (Nullable: NO, Default: null)
+- message: text (Nullable: NO, Default: null)
+- title_ar: character varying (Nullable: YES, Default: null)
+- message_ar: text (Nullable: YES, Default: null)
+- currentValue: integer (Nullable: YES, Default: null)
+- limitValue: integer (Nullable: YES, Default: null)
+- percentage: numeric (Nullable: YES, Default: null)
+- sentAt: timestamp with time zone (Nullable: NO, Default: null)
+- sentVia: jsonb (Nullable: YES, Default: '[]'::jsonb)
+- acknowledged: boolean (Nullable: NO, Default: false)
+- acknowledgedAt: timestamp with time zone (Nullable: YES, Default: null)
+- actionTaken: USER-DEFINED (Nullable: NO, Default: 'none'::"enum_usage_alerts_actionTaken")
+- actionTakenAt: timestamp with time zone (Nullable: YES, Default: null)
+- priority: USER-DEFINED (Nullable: NO, Default: 'medium'::enum_usage_alerts_priority)
+- metadata: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: support_attachments
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- tenantId: uuid (Nullable: NO, Default: null)
+- supportTicketId: uuid (Nullable: NO, Default: null)
+- supportMessageId: uuid (Nullable: YES, Default: null)
+- uploadedByType: USER-DEFINED (Nullable: NO, Default: 'customer'::"enum_support_attachments_uploadedByType")
+- customerPlatformUserId: uuid (Nullable: YES, Default: null)
+- supportAgentId: uuid (Nullable: YES, Default: null)
+- fileName: character varying (Nullable: NO, Default: null)
+- originalName: character varying (Nullable: NO, Default: null)
+- mimeType: character varying (Nullable: NO, Default: null)
+- fileCategory: USER-DEFINED (Nullable: NO, Default: null)
+- storageProvider: character varying (Nullable: NO, Default: 'local'::character varying)
+- storagePath: character varying (Nullable: NO, Default: null)
+- storageUrl: character varying (Nullable: YES, Default: null)
+- fileSize: bigint (Nullable: NO, Default: 0)
+- checksum: character varying (Nullable: YES, Default: null)
+- caption: text (Nullable: YES, Default: null)
+- isInline: boolean (Nullable: NO, Default: false)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- deletedAt: timestamp with time zone (Nullable: YES, Default: null)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - supportTicketId -> support_tickets.id
+    - supportMessageId -> support_messages.id
+    - customerPlatformUserId -> platform_users.id
+    - supportAgentId -> support_agents.id
+
+## Table: hot_deals
+- id: uuid (Nullable: NO, Default: null)
+- tenant_id: uuid (Nullable: NO, Default: null)
+- service_id: uuid (Nullable: NO, Default: null)
+- discount_type: USER-DEFINED (Nullable: NO, Default: null)
+- discount_value: numeric (Nullable: NO, Default: null)
+- original_price: numeric (Nullable: NO, Default: null)
+- discounted_price: numeric (Nullable: NO, Default: null)
+- valid_from: timestamp with time zone (Nullable: NO, Default: null)
+- valid_until: timestamp with time zone (Nullable: NO, Default: null)
+- max_redemptions: integer (Nullable: NO, Default: '-1'::integer)
+- current_redemptions: integer (Nullable: NO, Default: 0)
+- status: USER-DEFINED (Nullable: NO, Default: 'pending'::enum_hot_deals_status)
+- rejection_reason: text (Nullable: YES, Default: null)
+- approved_by: uuid (Nullable: YES, Default: null)
+- approved_at: timestamp with time zone (Nullable: YES, Default: null)
+- is_active: boolean (Nullable: NO, Default: true)
+- created_at: timestamp with time zone (Nullable: NO, Default: null)
+- updated_at: timestamp with time zone (Nullable: NO, Default: null)
+- image: character varying (Nullable: YES, Default: null)
+- title: character varying (Nullable: NO, Default: null)
+- subtitle: text (Nullable: YES, Default: null)
+
+## Table: support_agents
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- superAdminId: uuid (Nullable: YES, Default: null)
+- displayName: character varying (Nullable: NO, Default: null)
+- displayNameAr: character varying (Nullable: YES, Default: null)
+- title: character varying (Nullable: YES, Default: null)
+- avatarUrl: character varying (Nullable: YES, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'active'::enum_support_agents_status)
+- presenceStatus: USER-DEFINED (Nullable: NO, Default: 'offline'::"enum_support_agents_presenceStatus")
+- supportedLanguages: jsonb (Nullable: NO, Default: '["ar", "en"]'::jsonb)
+- skills: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- lastSeenAt: timestamp with time zone (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- deletedAt: timestamp with time zone (Nullable: YES, Default: null)
+  Foreign Keys:
+    - superAdminId -> super_admins.id
+
+## Table: support_messages
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- tenantId: uuid (Nullable: NO, Default: null)
+- supportTicketId: uuid (Nullable: NO, Default: null)
+- replyToMessageId: uuid (Nullable: YES, Default: null)
+- senderType: USER-DEFINED (Nullable: NO, Default: null)
+- customerPlatformUserId: uuid (Nullable: YES, Default: null)
+- supportAgentId: uuid (Nullable: YES, Default: null)
+- content: text (Nullable: NO, Default: null)
+- language: USER-DEFINED (Nullable: NO, Default: 'ar'::enum_support_messages_language)
+- contentFormat: USER-DEFINED (Nullable: NO, Default: 'plain'::"enum_support_messages_contentFormat")
+- visibility: USER-DEFINED (Nullable: NO, Default: 'public'::enum_support_messages_visibility)
+- isEdited: boolean (Nullable: NO, Default: false)
+- editedAt: timestamp with time zone (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- deletedAt: timestamp with time zone (Nullable: YES, Default: null)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - supportTicketId -> support_tickets.id
+    - replyToMessageId -> support_messages.id
+    - customerPlatformUserId -> platform_users.id
+    - supportAgentId -> support_agents.id
+
+## Table: support_categories
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- tenantId: uuid (Nullable: YES, Default: null)
+- slug: character varying (Nullable: NO, Default: null)
+- scope: USER-DEFINED (Nullable: NO, Default: 'global'::enum_support_categories_scope)
+- name: character varying (Nullable: NO, Default: null)
+- nameAr: character varying (Nullable: YES, Default: null)
+- description: text (Nullable: YES, Default: null)
+- descriptionAr: text (Nullable: YES, Default: null)
+- icon: character varying (Nullable: YES, Default: null)
+- color: character varying (Nullable: YES, Default: null)
+- sortOrder: integer (Nullable: NO, Default: 0)
+- isActive: boolean (Nullable: NO, Default: true)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- deletedAt: timestamp with time zone (Nullable: YES, Default: null)
+- parentId: uuid (Nullable: YES, Default: null)
+- featureKey: character varying (Nullable: YES, Default: null)
+- featureRoute: character varying (Nullable: YES, Default: null)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - parentId -> support_categories.id
+
+## Table: tenant_settings
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- commissionRate: numeric (Nullable: YES, Default: null)
+- taxRate: numeric (Nullable: YES, Default: 15)
+- currency: character varying (Nullable: YES, Default: 'SAR'::character varying)
+- businessHours: json (Nullable: YES, Default: '{}'::json)
+- timezone: character varying (Nullable: YES, Default: 'Asia/Riyadh'::character varying)
+- bookingSettings: jsonb (Nullable: YES, Default: '{"noShowPolicy": "warn", "slotInterval": 15, "allowAnyStaff": true, "allowWalkInBooking": true, "cancellationWindow": 24, "defaultBufferAfter": 5, "defaultBufferBefore": 5, "requirePhoneVerification": false, "maxBookingsPerCustomerPerDay": null}'::jsonb)
+- autoApproveBookings: boolean (Nullable: YES, Default: true)
+- bufferTime: integer (Nullable: YES, Default: 15)
+- maxAdvanceBookingDays: integer (Nullable: YES, Default: 30)
+- cancellationPolicy: text (Nullable: YES, Default: null)
+- cancellationHours: integer (Nullable: YES, Default: 24)
+- paymentSettings: json (Nullable: YES, Default: '{"acceptCash":true,"acceptCard":true,"acceptWallet":true,"allowServicePayAtCenter":true,"allowServiceFullOnline":true,"allowServiceDeposit":true,"serviceDepositMode":"fixed","serviceDepositFixedAmount":50,"serviceDepositPercentage":50,"allowProductOnline":true,"allowProductPayOnPickup":true,"allowProductCashOnDelivery":true,"defaultDeliveryFee":25}'::json)
+- acceptCash: boolean (Nullable: YES, Default: true)
+- acceptCard: boolean (Nullable: YES, Default: true)
+- acceptWallet: boolean (Nullable: YES, Default: true)
+- payoutBankAccount: json (Nullable: YES, Default: null)
+- notificationSettings: json (Nullable: YES, Default: '{}'::json)
+- enableEmailNotifications: boolean (Nullable: YES, Default: true)
+- enableSmsNotifications: boolean (Nullable: YES, Default: false)
+- enableWhatsAppNotifications: boolean (Nullable: YES, Default: false)
+- enableVoiceAlerts: boolean (Nullable: YES, Default: true)
+- features: json (Nullable: YES, Default: '{}'::json)
+- subscriptionTier: USER-DEFINED (Nullable: YES, Default: 'basic'::"enum_tenant_settings_subscriptionTier")
+- subscriptionExpiresAt: timestamp with time zone (Nullable: YES, Default: null)
+- defaultLanguage: character varying (Nullable: YES, Default: 'ar'::character varying)
+- supportedLanguages: json (Nullable: YES, Default: '["ar","en"]'::json)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+- dashboardSettings: jsonb (Nullable: NO, Default: '{"defaultLandingPage": "home"}'::jsonb)
+
+## Table: payment_idempotency_keys
+- id: uuid (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: NO, Default: null)
+- idempotencyKey: character varying (Nullable: NO, Default: null)
+- requestHash: character varying (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'processing'::enum_payment_idempotency_keys_status)
+- responsePayload: jsonb (Nullable: YES, Default: null)
+- errorMessage: character varying (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - platformUserId -> platform_users.id
+
+## Table: support_ticket_events
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- tenantId: uuid (Nullable: NO, Default: null)
+- supportTicketId: uuid (Nullable: NO, Default: null)
+- supportMessageId: uuid (Nullable: YES, Default: null)
+- supportAttachmentId: uuid (Nullable: YES, Default: null)
+- actorType: USER-DEFINED (Nullable: NO, Default: 'system'::"enum_support_ticket_events_actorType")
+- customerPlatformUserId: uuid (Nullable: YES, Default: null)
+- supportAgentId: uuid (Nullable: YES, Default: null)
+- eventType: USER-DEFINED (Nullable: NO, Default: null)
+- fromStatus: USER-DEFINED (Nullable: YES, Default: null)
+- toStatus: USER-DEFINED (Nullable: YES, Default: null)
+- fromPriority: USER-DEFINED (Nullable: YES, Default: null)
+- toPriority: USER-DEFINED (Nullable: YES, Default: null)
+- payload: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- occurredAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - supportTicketId -> support_tickets.id
+    - supportMessageId -> support_messages.id
+    - supportAttachmentId -> support_attachments.id
+    - customerPlatformUserId -> platform_users.id
+    - supportAgentId -> support_agents.id
+
+## Table: tenant_saved_reports
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- createdByUserId: uuid (Nullable: YES, Default: null)
+- reportType: character varying (Nullable: NO, Default: null)
+- title: character varying (Nullable: NO, Default: null)
+- description: text (Nullable: YES, Default: null)
+- sections: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- filters: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- selectedMetrics: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- grouping: character varying (Nullable: YES, Default: null)
+- sorting: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- reportConfig: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- isFavorite: boolean (Nullable: NO, Default: false)
+- duplicatedFromId: uuid (Nullable: YES, Default: null)
+- lastOpenedAt: timestamp with time zone (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- columns: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- scheduleConfig: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- lastRunAt: timestamp with time zone (Nullable: YES, Default: null)
+- nextRunAt: timestamp with time zone (Nullable: YES, Default: null)
+- lastRunResult: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- runHistory: jsonb (Nullable: NO, Default: '[]'::jsonb)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - createdByUserId -> platform_users.id
+    - duplicatedFromId -> tenant_saved_reports.id
+
+## Table: support_ticket_links
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- ticketId: uuid (Nullable: NO, Default: null)
+- entityType: character varying (Nullable: NO, Default: null)
+- entityId: uuid (Nullable: NO, Default: null)
+- createdBy: uuid (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - ticketId -> support_tickets.id
+
+## Table: support_ticket_notification_events
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- tenantId: uuid (Nullable: NO, Default: null)
+- supportTicketId: uuid (Nullable: NO, Default: null)
+- supportMessageId: uuid (Nullable: YES, Default: null)
+- eventType: character varying (Nullable: NO, Default: null)
+- recipientType: character varying (Nullable: NO, Default: null)
+- recipientId: uuid (Nullable: YES, Default: null)
+- payload: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- deliveryState: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- processedAt: timestamp with time zone (Nullable: YES, Default: null)
+- failedAt: timestamp with time zone (Nullable: YES, Default: null)
+- failureReason: character varying (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - supportTicketId -> support_tickets.id
+    - supportMessageId -> support_messages.id
+
+## Table: support_ticket_read_states
+- id: uuid (Nullable: NO, Default: gen_random_uuid())
+- tenantId: uuid (Nullable: NO, Default: null)
+- supportTicketId: uuid (Nullable: NO, Default: null)
+- participantType: character varying (Nullable: NO, Default: null)
+- participantId: uuid (Nullable: YES, Default: null)
+- lastReadMessageId: uuid (Nullable: YES, Default: null)
+- lastReadAt: timestamp with time zone (Nullable: YES, Default: null)
+- unreadCount: integer (Nullable: NO, Default: 0)
+- metadata: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - supportTicketId -> support_tickets.id
+    - lastReadMessageId -> support_messages.id
+
+## Table: booking_sessions
+- id: uuid (Nullable: NO, Default: null)
+- bookingReference: character varying (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- platformUserId: uuid (Nullable: YES, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'draft'::enum_booking_sessions_status)
+- itemCount: integer (Nullable: NO, Default: 0)
+- subtotal: numeric (Nullable: NO, Default: 0)
+- taxAmount: numeric (Nullable: NO, Default: 0)
+- platformFee: numeric (Nullable: NO, Default: 0)
+- totalAmount: numeric (Nullable: NO, Default: 0)
+- paymentMethod: character varying (Nullable: YES, Default: null)
+- notes: text (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- metadata: jsonb (Nullable: YES, Default: '{}'::jsonb)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - platformUserId -> platform_users.id
+
+## Table: tenant_subscriptions
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- packageId: uuid (Nullable: NO, Default: null)
+- billingCycle: USER-DEFINED (Nullable: NO, Default: 'monthly'::"enum_tenant_subscriptions_billingCycle")
+- amount: numeric (Nullable: NO, Default: null)
+- currency: character varying (Nullable: NO, Default: 'SAR'::character varying)
+- status: USER-DEFINED (Nullable: NO, Default: 'trial'::enum_tenant_subscriptions_status)
+- trialEndsAt: timestamp with time zone (Nullable: YES, Default: null)
+- currentPeriodStart: timestamp with time zone (Nullable: NO, Default: null)
+- currentPeriodEnd: timestamp with time zone (Nullable: NO, Default: null)
+- autoRenew: boolean (Nullable: NO, Default: true)
+- nextBillingDate: timestamp with time zone (Nullable: YES, Default: null)
+- gracePeriodEnds: timestamp with time zone (Nullable: YES, Default: null)
+- cancelledAt: timestamp with time zone (Nullable: YES, Default: null)
+- cancelledBy: uuid (Nullable: YES, Default: null)
+- cancellationReason: text (Nullable: YES, Default: null)
+- cancelAtPeriodEnd: boolean (Nullable: NO, Default: false)
+- stripeSubscriptionId: character varying (Nullable: YES, Default: null)
+- stripeCustomerId: character varying (Nullable: YES, Default: null)
+- lastPaymentStatus: USER-DEFINED (Nullable: YES, Default: null)
+- lastPaymentDate: timestamp with time zone (Nullable: YES, Default: null)
+- lastPaymentAmount: numeric (Nullable: YES, Default: null)
+- metadata: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- notes: text (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+
+## Table: bills
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- tenantSubscriptionId: uuid (Nullable: NO, Default: null)
+- billNumber: character varying (Nullable: NO, Default: null)
+- amount: numeric (Nullable: NO, Default: null)
+- subtotalAmount: numeric (Nullable: YES, Default: null)
+- platformMarkupRate: numeric (Nullable: YES, Default: null)
+- platformMarkupAmount: numeric (Nullable: YES, Default: null)
+- vatRate: numeric (Nullable: YES, Default: null)
+- vatAmount: numeric (Nullable: YES, Default: null)
+- discountAmount: numeric (Nullable: NO, Default: 0)
+- totalAmount: numeric (Nullable: YES, Default: null)
+- currency: character varying (Nullable: NO, Default: 'SAR'::character varying)
+- dueDate: date (Nullable: NO, Default: null)
+- status: USER-DEFINED (Nullable: NO, Default: 'UNPAID'::enum_bills_status)
+- paymentToken: character varying (Nullable: NO, Default: null)
+- paymentTokenExpiresAt: timestamp with time zone (Nullable: YES, Default: null)
+- paidAt: timestamp with time zone (Nullable: YES, Default: null)
+- invoiceIssuedAt: timestamp with time zone (Nullable: YES, Default: null)
+- invoiceTitle: character varying (Nullable: YES, Default: null)
+- invoiceTemplateMode: character varying (Nullable: NO, Default: 'bilingual_ar_en'::character varying)
+- sellerSnapshot: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- buyerSnapshot: jsonb (Nullable: NO, Default: '{}'::jsonb)
+- lineItemsSnapshot: jsonb (Nullable: NO, Default: '[]'::jsonb)
+- planSnapshot: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- invoicePdfPath: character varying (Nullable: YES, Default: null)
+- receiptPdfPath: character varying (Nullable: YES, Default: null)
+- paymentProvider: character varying (Nullable: YES, Default: null)
+- paymentReference: character varying (Nullable: YES, Default: null)
+- paymentMethod: character varying (Nullable: YES, Default: null)
+- paymentCapturedAmount: numeric (Nullable: YES, Default: null)
+- paymentFailureReason: text (Nullable: YES, Default: null)
+- type: USER-DEFINED (Nullable: NO, Default: 'initial'::enum_bills_type)
+- metadata: jsonb (Nullable: YES, Default: '{}'::jsonb)
+- createdAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: CURRENT_TIMESTAMP)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - tenantSubscriptionId -> tenant_subscriptions.id
+
+## Table: financial_ledger_entries
+- id: uuid (Nullable: NO, Default: null)
+- tenantId: uuid (Nullable: NO, Default: null)
+- customerId: uuid (Nullable: YES, Default: null)
+- entityType: character varying (Nullable: NO, Default: null)
+- entityId: uuid (Nullable: NO, Default: null)
+- amount: numeric (Nullable: NO, Default: null)
+- currency: character varying (Nullable: YES, Default: 'SAR'::character varying)
+- status: character varying (Nullable: YES, Default: 'completed'::character varying)
+- paymentMethod: character varying (Nullable: YES, Default: null)
+- description: character varying (Nullable: YES, Default: null)
+- createdAt: timestamp with time zone (Nullable: NO, Default: null)
+- updatedAt: timestamp with time zone (Nullable: NO, Default: null)
+  Foreign Keys:
+    - tenantId -> tenants.id
+    - customerId -> platform_users.id
+
+# SEQUELIZE MODELS
+
+## Model: ActivityLog
+- tableName: activity_logs
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: AdminNotification
+- tableName: admin_notifications
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: AdminSavedReport
+- tableName: admin_saved_reports
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo creator -> SuperAdmin (FK: createdByAdminId)
+    - BelongsTo duplicatedFrom -> AdminSavedReport (FK: duplicatedFromId)
+
+## Model: Appointment
+- tableName: appointments
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo service -> Service (FK: serviceId)
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo bookingSession -> BookingSession (FK: bookingSessionId)
+    - BelongsTo legacyCustomer -> Customer (FK: customerId)
+    - HasMany paymentTransactions -> PaymentTransaction (FK: appointmentId)
+    - HasMany events -> AppointmentEvent (FK: appointmentId)
+
+## Model: AppointmentEvent
+- tableName: appointment_events
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo appointment -> Appointment (FK: appointmentId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+
+## Model: Bill
+- tableName: bills
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo subscription -> TenantSubscription (FK: tenantSubscriptionId)
+    - HasMany paymentAttempts -> BillPaymentAttempt (FK: billId)
+
+## Model: BillPaymentAttempt
+- tableName: bill_payment_attempts
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo bill -> Bill (FK: billId)
+
+## Model: BookingSession
+- tableName: booking_sessions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - HasMany appointments -> Appointment (FK: bookingSessionId)
+
+## Model: ConsultantConversation
+- tableName: consultant_conversations
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo creator -> PlatformUser (FK: createdByUserId)
+    - BelongsTo snapshot -> ConsultantSnapshot (FK: snapshotId)
+    - BelongsTo report -> ConsultantReport (FK: reportId)
+
+## Model: ConsultantReport
+- tableName: consultant_reports
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo snapshot -> ConsultantSnapshot (FK: snapshotId)
+    - BelongsTo creator -> PlatformUser (FK: createdByUserId)
+
+## Model: ConsultantSnapshot
+- tableName: consultant_snapshots
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo creator -> PlatformUser (FK: createdByUserId)
+    - HasMany reports -> ConsultantReport (FK: snapshotId)
+    - HasMany conversations -> ConsultantConversation (FK: snapshotId)
+
+## Model: Customer
+- tableName: customers
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany Appointments -> Appointment (FK: customerId)
+
+## Model: CustomerInsight
+- tableName: customer_insights
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: CustomerInvoice
+- tableName: customer_invoices
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo platformUser -> PlatformUser (FK: platformUserId)
+    - HasMany items -> CustomerInvoiceItem (FK: invoiceId)
+    - HasMany events -> CustomerInvoiceEvent (FK: invoiceId)
+
+## Model: CustomerInvoiceEvent
+- tableName: customer_invoice_events
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo invoice -> CustomerInvoice (FK: invoiceId)
+
+## Model: CustomerInvoiceItem
+- tableName: customer_invoice_items
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo invoice -> CustomerInvoice (FK: invoiceId)
+
+## Model: FeaturePricing
+- tableName: FeaturePricings
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: FinancialLedgerEntry
+- tableName: financial_ledger_entries
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> Customer (FK: customerId)
+
+## Model: GiftCardCode
+- tableName: gift_card_codes
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo sourceGiftTransaction -> GiftCardTransaction (FK: sourceGiftCardTransactionId)
+    - BelongsTo sourceTenantGiftTransaction -> TenantGiftCardTransaction (FK: sourceTenantGiftCardTransactionId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - HasMany redemptions -> GiftCardCodeRedemption (FK: giftCardCodeId)
+
+## Model: GiftCardCodeRedemption
+- tableName: gift_card_code_redemptions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo giftCardCode -> GiftCardCode (FK: giftCardCodeId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo redeemedByStaff -> Staff (FK: redeemedByStaffId)
+
+## Model: GiftCardPackage
+- tableName: gift_card_packages
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany transactions -> GiftCardTransaction (FK: packageId)
+
+## Model: GiftCardTransaction
+- tableName: gift_card_transactions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo package -> GiftCardPackage (FK: packageId)
+    - BelongsTo sender -> PlatformUser (FK: senderPlatformUserId)
+    - BelongsTo recipient -> PlatformUser (FK: recipientPlatformUserId)
+    - HasOne giftCode -> GiftCardCode (FK: sourceGiftCardTransactionId)
+
+## Model: GlobalSettings
+- tableName: global_settings
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: HotDeal
+- tableName: hot_deals
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo service -> Service (FK: serviceId)
+    - BelongsTo approver -> SuperAdmin (FK: approvedBy)
+
+## Model: MobilePushToken
+- tableName: mobile_push_tokens
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo platformUser -> PlatformUser (FK: platformUserId)
+    - BelongsTo staffUser -> User (FK: staffUserId)
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: NotificationDeliveryLog
+- tableName: notification_delivery_logs
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: Order
+- tableName: orders
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - HasMany items -> OrderItem (FK: orderId)
+    - HasOne transaction -> Transaction (FK: orderId)
+    - HasMany paymentTransactions -> PaymentTransaction (FK: orderId)
+
+## Model: OrderItem
+- tableName: order_items
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo order -> Order (FK: orderId)
+    - BelongsTo product -> Product (FK: productId)
+
+## Model: PaymentIdempotencyKey
+- tableName: payment_idempotency_keys
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+
+## Model: PaymentMethod
+- tableName: payment_methods
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+
+## Model: PaymentTransaction
+- tableName: payment_transactions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo appointment -> Appointment (FK: appointmentId)
+    - BelongsTo order -> Order (FK: orderId)
+    - BelongsTo processor -> Staff (FK: processedBy)
+
+## Model: PlatformUser
+- tableName: platform_users
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany appointments -> Appointment (FK: platformUserId)
+    - HasMany paymentMethods -> PaymentMethod (FK: platformUserId)
+    - HasMany transactions -> Transaction (FK: platformUserId)
+    - HasMany orders -> Order (FK: platformUserId)
+    - HasMany pushTokens -> MobilePushToken (FK: platformUserId)
+    - HasMany walletLedgerEntries -> WalletLedgerEntry (FK: platformUserId)
+    - HasMany sentGiftCards -> GiftCardTransaction (FK: senderPlatformUserId)
+    - HasMany receivedGiftCards -> GiftCardTransaction (FK: recipientPlatformUserId)
+    - HasMany supportTickets -> SupportTicket (FK: customerPlatformUserId)
+    - HasMany supportMessages -> SupportMessage (FK: customerPlatformUserId)
+    - HasMany supportAttachments -> SupportAttachment (FK: customerPlatformUserId)
+    - HasMany supportTicketEvents -> SupportTicketEvent (FK: customerPlatformUserId)
+
+## Model: Product
+- tableName: products
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: PublicPageData
+- tableName: public_page_data
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: Review
+- tableName: reviews
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo appointment -> Appointment (FK: appointmentId)
+    - BelongsTo platformUser -> PlatformUser (FK: platformUserId)
+
+## Model: Service
+- tableName: services
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsToMany employees -> Staff (FK: serviceId)
+    - BelongsToMany legacyStaff -> Staff (FK: serviceId)
+    - HasMany appointments -> Appointment (FK: serviceId)
+
+## Model: ServiceCategory
+- tableName: service_categories
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: ServiceEmployee
+- tableName: service_employees
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: Staff
+- tableName: staff
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsToMany services -> Service (FK: staffId)
+    - BelongsToMany legacyServices -> Service (FK: staffId)
+    - HasMany schedules -> StaffSchedule (FK: staffId)
+    - HasMany shifts -> StaffShift (FK: staffId)
+    - HasMany breaks -> StaffBreak (FK: staffId)
+    - HasMany timeOff -> StaffTimeOff (FK: staffId)
+    - HasMany scheduleOverrides -> StaffScheduleOverride (FK: staffId)
+    - HasMany appointments -> Appointment (FK: staffId)
+    - HasMany pushTokens -> MobilePushToken (FK: staffId)
+    - HasOne permissionProfile -> StaffPermission (FK: staffId)
+
+## Model: StaffBreak
+- tableName: staff_breaks
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+
+## Model: StaffMessage
+- tableName: staff_messages
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: StaffPayroll
+- tableName: staff_payrolls
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: StaffPermission
+- tableName: staff_permissions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: StaffSchedule
+- tableName: staff_schedules
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo Staff -> Staff (FK: staffId)
+
+## Model: StaffScheduleOverride
+- tableName: staff_schedule_overrides
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+
+## Model: StaffShift
+- tableName: staff_shifts
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+
+## Model: StaffTimeOff
+- tableName: staff_time_off
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+
+## Model: SubscriptionPackage
+- tableName: subscription_packages
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany subscriptions -> TenantSubscription (FK: packageId)
+
+## Model: SuperAdmin
+- tableName: super_admins
+- primaryKeyAttributes: id
+  Associations:
+    - HasOne supportAgentProfile -> SupportAgent (FK: superAdminId)
+
+## Model: SupportAgent
+- tableName: support_agents
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo superAdmin -> SuperAdmin (FK: superAdminId)
+    - HasMany assignedTickets -> SupportTicket (FK: assignedSupportAgentId)
+    - HasMany sentMessages -> SupportMessage (FK: supportAgentId)
+    - HasMany events -> SupportTicketEvent (FK: supportAgentId)
+
+## Model: SupportAttachment
+- tableName: support_attachments
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo message -> SupportMessage (FK: supportMessageId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> PlatformUser (FK: customerPlatformUserId)
+    - BelongsTo supportAgent -> SupportAgent (FK: supportAgentId)
+
+## Model: SupportCategory
+- tableName: support_categories
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo parent -> SupportCategory (FK: parentId)
+    - HasMany children -> SupportCategory (FK: parentId)
+    - HasMany tickets -> SupportTicket (FK: supportCategoryId)
+
+## Model: SupportMessage
+- tableName: support_messages
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> PlatformUser (FK: customerPlatformUserId)
+    - BelongsTo supportAgent -> SupportAgent (FK: supportAgentId)
+    - BelongsTo replyToMessage -> SupportMessage (FK: replyToMessageId)
+    - HasMany attachments -> SupportAttachment (FK: supportMessageId)
+    - HasMany notificationEvents -> SupportTicketNotificationEvent (FK: supportMessageId)
+    - HasMany replies -> SupportMessage (FK: replyToMessageId)
+
+## Model: SupportTicket
+- tableName: support_tickets
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> PlatformUser (FK: customerPlatformUserId)
+    - BelongsTo category -> SupportCategory (FK: supportCategoryId)
+    - BelongsTo assignedAgent -> SupportAgent (FK: assignedSupportAgentId)
+    - HasMany messages -> SupportMessage (FK: supportTicketId)
+    - HasMany attachments -> SupportAttachment (FK: supportTicketId)
+    - HasMany events -> SupportTicketEvent (FK: supportTicketId)
+    - HasMany notificationEvents -> SupportTicketNotificationEvent (FK: supportTicketId)
+    - HasMany readStates -> SupportTicketReadState (FK: supportTicketId)
+    - HasMany links -> SupportTicketLink (FK: ticketId)
+
+## Model: SupportTicketEvent
+- tableName: support_ticket_events
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo message -> SupportMessage (FK: supportMessageId)
+    - BelongsTo attachment -> SupportAttachment (FK: supportAttachmentId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> PlatformUser (FK: customerPlatformUserId)
+    - BelongsTo supportAgent -> SupportAgent (FK: supportAgentId)
+
+## Model: SupportTicketLink
+- tableName: support_ticket_links
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo ticket -> SupportTicket (FK: ticketId)
+
+## Model: SupportTicketNotificationEvent
+- tableName: support_ticket_notification_events
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo message -> SupportMessage (FK: supportMessageId)
+
+## Model: SupportTicketReadState
+- tableName: support_ticket_read_states
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo lastReadMessage -> SupportMessage (FK: lastReadMessageId)
+
+## Model: Tenant
+- tableName: tenants
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany Users -> User (FK: tenantId)
+    - HasOne subscription -> TenantSubscription (FK: tenantId)
+    - HasMany bills -> Bill (FK: tenantId)
+    - HasMany hotDeals -> HotDeal (FK: tenantId)
+    - HasMany supportTickets -> SupportTicket (FK: tenantId)
+    - HasMany supportCategories -> SupportCategory (FK: tenantId)
+
+## Model: TenantDashboardAccount
+- tableName: tenant_dashboard_accounts
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantFeatureUsage
+- tableName: tenant_feature_usage
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantGiftCardPackage
+- tableName: tenant_gift_card_packages
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - HasMany transactions -> TenantGiftCardTransaction (FK: packageId)
+
+## Model: TenantGiftCardSettlement
+- tableName: tenant_gift_card_settlements
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo transaction -> TenantGiftCardTransaction (FK: transactionId)
+    - BelongsTo package -> TenantGiftCardPackage (FK: packageId)
+
+## Model: TenantGiftCardTransaction
+- tableName: tenant_gift_card_transactions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo package -> TenantGiftCardPackage (FK: packageId)
+    - BelongsTo sender -> PlatformUser (FK: senderPlatformUserId)
+    - BelongsTo recipient -> PlatformUser (FK: recipientPlatformUserId)
+    - HasOne settlement -> TenantGiftCardSettlement (FK: transactionId)
+    - HasOne giftCode -> GiftCardCode (FK: sourceTenantGiftCardTransactionId)
+
+## Model: TenantOperationalAlertRead
+- tableName: tenant_operational_alert_reads
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantPushCampaign
+- tableName: tenant_push_campaigns
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - HasMany recipients -> TenantPushCampaignRecipient (FK: campaignId)
+
+## Model: TenantPushCampaignRecipient
+- tableName: tenant_push_campaign_recipients
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo campaign -> TenantPushCampaign (FK: campaignId)
+    - BelongsTo platformUser -> PlatformUser (FK: platformUserId)
+
+## Model: TenantPushUsage
+- tableName: tenant_push_usage
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantSavedReport
+- tableName: tenant_saved_reports
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo creator -> PlatformUser (FK: createdByUserId)
+    - BelongsTo duplicatedFrom -> TenantSavedReport (FK: duplicatedFromId)
+
+## Model: TenantSettings
+- tableName: tenant_settings
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantSubscription
+- tableName: tenant_subscriptions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo package -> SubscriptionPackage (FK: packageId)
+    - HasMany bills -> Bill (FK: tenantSubscriptionId)
+
+## Model: TenantUsage
+- tableName: tenant_usage
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantWalletBalance
+- tableName: tenant_wallet_balances
+- primaryKeyAttributes: platformUserId, tenantId
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantWalletLedgerEntry
+- tableName: tenant_wallet_ledger_entries
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: Transaction
+- tableName: transactions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo appointment -> Appointment (FK: appointmentId)
+    - BelongsTo bookingSession -> BookingSession (FK: bookingSessionId)
+    - BelongsTo order -> Order (FK: orderId)
+    - BelongsTo paymentMethod -> PaymentMethod (FK: paymentMethodId)
+
+## Model: UsageAlert
+- tableName: usage_alerts
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: User
+- tableName: auth_users
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo Tenant -> Tenant (FK: tenantId)
+    - HasMany pushTokens -> MobilePushToken (FK: staffUserId)
+
+## Model: WalletLedgerEntry
+- tableName: wallet_ledger_entries
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)

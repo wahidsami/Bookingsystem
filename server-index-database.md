@@ -1,0 +1,939 @@
+# `server/src/index.js`
+```js
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const path = require('path');
+require('dotenv').config();
+
+// Validate environment variables FIRST
+const validateEnvironment = require('./middleware/validateEnvironment');
+validateEnvironment();
+
+const db = require('./models');
+const redisService = require('./services/redisService');
+const { getTenantDashboardBaseUrl } = require('./utils/url');
+
+const app = express();
+const isProduction = process.env.NODE_ENV === 'production';
+const parsedTrustProxy = Number.parseInt(process.env.TRUST_PROXY || '1', 10);
+const trustProxyValue = Number.isNaN(parsedTrustProxy) ? process.env.TRUST_PROXY : parsedTrustProxy;
+let server = null;
+let expiryInterval = null;
+let appointmentAutomationInterval = null;
+let reportScheduleInterval = null;
+let consultantWorkflowInterval = null;
+
+app.disable('x-powered-by');
+app.set('trust proxy', trustProxyValue);
+
+// ========================================
+// CORS Configuration - Environment-based
+// ========================================
+const normalizeOrigin = (value) => `${value || ''}`.trim().replace(/\/+$/, '');
+
+const allowedOriginPatterns = [
+    /^https:\/\/([a-z0-9-]+\.)?rifah\.sa$/i,
+    /^https:\/\/([a-z0-9-]+\.)?unifinitylab\.com$/i,
+    /^http:\/\/localhost(:\d+)?$/i,
+    /^http:\/\/127\.0\.0\.1(:\d+)?$/i,
+];
+
+const isAllowedOrigin = (origin) => {
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) {
+        return false;
+    }
+
+    const envOrigins = (process.env.CORS_ORIGINS || '')
+        .split(',')
+        .map((item) => normalizeOrigin(item))
+        .filter(Boolean);
+
+    if (envOrigins.includes(normalizedOrigin)) {
+        return true;
+    }
+
+    return allowedOriginPatterns.some((pattern) => pattern.test(normalizedOrigin));
+};
+
+const getCorsOrigins = () => {
+    const env = process.env.NODE_ENV || 'development';
+
+    // Parse environment variable if it exists
+    if (process.env.CORS_ORIGINS) {
+        const parsed = process.env.CORS_ORIGINS.split(',').map(o => normalizeOrigin(o)).filter(Boolean);
+        if (parsed.length > 0) return parsed;
+    }
+
+    const defaultProdOrigins = [
+        'https://rifah.sa',
+        'https://www.rifah.sa',
+        'https://admin.rifah.sa',
+        'https://tenant.rifah.sa',
+        'https://public.rifah.sa',
+        'https://radmin.unifinitylab.com',
+        'https://rtenant.unifinitylab.com'
+    ];
+
+    if (env === 'production') {
+        return defaultProdOrigins;
+    }
+
+    // Development fallback (includes prod domains just in case NODE_ENV isn't set right)
+    return [
+        ...defaultProdOrigins,
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3002',
+        'http://localhost:3003',
+        'http://localhost:3004',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3002',
+        'http://127.0.0.1:3003',
+        'http://127.0.0.1:3004'
+    ];
+};
+
+// Initialize Redis
+redisService.initRedis();
+
+const PORT = process.env.PORT || 5000;
+
+// Middleware - CORS with environment-based origins
+app.use((req, res, next) => {
+    const requestOrigin = req.headers.origin;
+
+    if (requestOrigin && isAllowedOrigin(requestOrigin)) {
+        res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
+        res.setHeader(
+            'Access-Control-Allow-Headers',
+            req.headers['access-control-request-headers'] || 'Content-Type,Authorization,X-Requested-With,Accept,Origin'
+        );
+    }
+
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+    }
+
+    next();
+});
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin) {
+            return callback(null, true);
+        }
+
+        if (isAllowedOrigin(origin)) {
+            return callback(null, true);
+        }
+
+        return callback(null, false);
+    },
+    credentials: true,
+    exposedHeaders: ['Content-Disposition', 'Content-Type', 'Content-Length'],
+    optionsSuccessStatus: 204
+}));
+
+// Serve uploaded files FIRST (before helmet) with proper CORS headers
+app.use('/uploads', (req, res, next) => {
+    // Set CORS headers explicitly
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.removeHeader('Cross-Origin-Resource-Policy'); // Remove if exists
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+
+    next();
+}, express.static(path.join(__dirname, '../uploads'), {
+    setHeaders: (res, filePath) => {
+        // Ensure images are served with correct content type
+        if (filePath.endsWith('.png')) {
+            res.setHeader('Content-Type', 'image/png');
+        } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+            res.setHeader('Content-Type', 'image/jpeg');
+        } else if (filePath.endsWith('.gif')) {
+            res.setHeader('Content-Type', 'image/gif');
+        } else if (filePath.endsWith('.webp')) {
+            res.setHeader('Content-Type', 'image/webp');
+        }
+        // Explicitly set CORP to cross-origin and remove any blocking headers
+        res.removeHeader('Cross-Origin-Resource-Policy');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    }
+}));
+
+// Configure helmet AFTER static files - DISABLE CORP completely
+// Only enable helmet in production, or configure it to not block images
+if (isProduction) {
+    app.use(helmet({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+                scriptSrc: ["'self'"],
+            },
+        },
+        crossOriginResourcePolicy: false
+    }));
+} else {
+    // Development: Use minimal helmet without CORP
+    app.use(helmet({
+        contentSecurityPolicy: false, // Disable CSP in dev
+        crossOriginResourcePolicy: false
+    }));
+}
+
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+
+// Rate limiting middleware
+const {
+    generalLimiter,
+    authLimiter,
+    passwordResetLimiter,
+    paymentLimiter,
+    uploadLimiter
+} = require('./middleware/rateLimiter');
+
+// Apply general rate limiting to all API requests
+app.use('/api/v1/', generalLimiter);
+
+// Routes
+const userAuthRoutes = require('./routes/userAuthRoutes');
+const tenantAuthRoutes = require('./routes/tenantAuthRoutes'); // New: Tenant auth
+const bookingRoutes = require('./routes/bookingRoutes');
+const staffRoutes = require('./routes/staffRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
+const tenantRoutes = require('./routes/tenantRoutes'); // Tenant dashboard APIs (protected)
+const userRoutes = require('./routes/userRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+const superAdminAuthRoutes = require('./routes/superAdminAuthRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const adminSettingsController = require('./controllers/adminSettingsController');
+
+// Apply strict auth limiting to user authentication
+app.use('/api/v1/auth/user', authLimiter, userAuthRoutes); // End user auth
+// Apply strict auth limiting to tenant authentication
+app.use('/api/v1/auth/tenant', authLimiter, tenantAuthRoutes); // New: Tenant auth
+// Apply strict auth limiting to admin authentication
+app.use('/api/v1/auth/admin', authLimiter, superAdminAuthRoutes); // Super Admin auth
+app.use('/api/v1/admin', adminRoutes); // Admin APIs
+// Tenant subscription payment (link token or Bearer; must be before /api/v1/tenant)
+app.use('/api/v1/tenant/subscription', require('./routes/tenantSubscriptionPaymentRoutes'));
+app.use('/api/v1/tenant', tenantRoutes); // Tenant dashboard APIs (protected)
+app.use('/api/v1', require('./routes/tenantPaymentRoutes'));
+app.get('/api/v1/settings/global', adminSettingsController.getGlobalSettings); // Public global settings endpoint
+app.use('/api/v1/bookings', bookingRoutes);
+app.use('/api/v1/staff', staffRoutes);
+app.use('/api/v1/services', serviceRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/orders', require('./routes/orderRoutes')); // Order management
+app.use('/api/v1/subscription', subscriptionRoutes); // Subscription management (singular for authenticated routes)
+app.use('/api/v1/subscriptions', subscriptionRoutes); // Subscription management (plural for public routes)
+
+// Public routes (no authentication required)
+const publicRoutes = require('./routes/publicRoutes');
+app.use('/api/v1/public', publicRoutes);
+
+// Hot Deals routes (public + tenant + admin)
+const hotDealsRoutes = require('./routes/hotDealsRoutes');
+app.use('/api/v1', hotDealsRoutes);
+
+// Featured tenants routes
+const featuredRoutes = require('./routes/featuredRoutes');
+app.use('/api/v1', featuredRoutes);
+
+// Public tenant listing (for client app discovery)
+const publicTenantController = require('./controllers/publicTenantController');
+app.get('/api/v1/tenants', publicTenantController.getAllTenants);
+app.get('/api/v1/categories', publicTenantController.getPublicCategories);
+
+// Cleanup routes (temporary - for one-time operations)
+// Cleanup routes removed - one-time operations completed
+// Health Check
+app.get('/', (req, res) => {
+    res.json({ message: 'Rifah API is running' });
+});
+
+if (!isProduction && process.env.ENABLE_DIAGNOSTIC_ROUTES === 'true') {
+    app.get('/test-uploads', (req, res) => {
+        const uploadsPath = path.join(__dirname, '../uploads');
+        const fs = require('fs');
+
+        try {
+            const exists = fs.existsSync(uploadsPath);
+            const files = exists ? fs.readdirSync(path.join(uploadsPath, 'profiles')) : [];
+            res.json({
+                uploadsPath,
+                exists,
+                files: files.slice(0, 5)
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to inspect uploads directory',
+                uploadsPath
+            });
+        }
+    });
+}
+
+// Create default super admin
+const createDefaultSuperAdmin = async () => {
+    try {
+        const existingAdmin = await db.SuperAdmin.findOne({ where: { role: 'super_admin' } });
+        if (existingAdmin) {
+            return;
+        }
+
+        const shouldSeedDefaultSuperAdmin = process.env.ENABLE_DEFAULT_SUPER_ADMIN === 'true';
+
+        if (!shouldSeedDefaultSuperAdmin) {
+            console.warn('⚠️  No super admin exists. Set ENABLE_DEFAULT_SUPER_ADMIN=true with seed credentials to create one intentionally.');
+            return;
+        }
+
+        const defaultAdminEmail = process.env.DEFAULT_SUPER_ADMIN_EMAIL;
+        const defaultAdminPassword = process.env.DEFAULT_SUPER_ADMIN_PASSWORD;
+
+        if (!defaultAdminEmail || !defaultAdminPassword) {
+            throw new Error('DEFAULT_SUPER_ADMIN_EMAIL and DEFAULT_SUPER_ADMIN_PASSWORD are required when ENABLE_DEFAULT_SUPER_ADMIN=true');
+        }
+
+        if (defaultAdminPassword.length < 12) {
+            throw new Error('DEFAULT_SUPER_ADMIN_PASSWORD must be at least 12 characters long');
+        }
+
+        await db.SuperAdmin.create({
+            email: defaultAdminEmail.toLowerCase(),
+            password: defaultAdminPassword,
+            firstName: 'Super',
+            lastName: 'Admin',
+            role: 'super_admin',
+            permissions: {
+                tenants: { view: true, create: true, edit: true, delete: true, approve: true },
+                users: { view: true, create: true, edit: true, delete: true },
+                financial: { view: true, export: true, refund: true },
+                settings: { view: true, edit: true }
+            }
+        });
+        console.log(`✅ Default Super Admin created for ${defaultAdminEmail}`);
+    } catch (error) {
+        console.log('Super admin setup:', error.message);
+    }
+};
+
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Route not found'
+    });
+});
+
+app.use((err, req, res, next) => {
+    console.error('Unhandled server error:', err);
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal server error'
+    });
+});
+
+const ensureBillStatusSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            DECLARE
+                bills_table_exists BOOLEAN;
+                status_udt_name TEXT;
+            BEGIN
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'bills'
+                ) INTO bills_table_exists;
+
+                IF NOT bills_table_exists THEN
+                    RETURN;
+                END IF;
+
+                SELECT c.udt_name
+                INTO status_udt_name
+                FROM information_schema.columns c
+                WHERE c.table_schema = 'public'
+                  AND c.table_name = 'bills'
+                  AND c.column_name = 'status';
+
+                IF status_udt_name IS NOT NULL
+                   AND status_udt_name NOT IN ('varchar', 'text', 'bpchar') THEN
+                    BEGIN
+                        EXECUTE 'ALTER TYPE "' || status_udt_name || '" ADD VALUE IF NOT EXISTS ''VOID''';
+                    EXCEPTION
+                        WHEN duplicate_object THEN NULL;
+                    END;
+                END IF;
+
+                ALTER TABLE public.bills DROP CONSTRAINT IF EXISTS bills_status_check;
+                ALTER TABLE public.bills
+                    ADD CONSTRAINT bills_status_check
+                    CHECK (status::text = ANY (ARRAY['DRAFT', 'UNPAID', 'FAILED', 'PAID', 'EXPIRED', 'VOID']));
+            END $$;
+        `);
+
+        console.log('Bill status schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure bill status schema:', error);
+        throw error;
+    }
+};
+
+const ensureStaffPermissionSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'staff_permissions'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.staff_permissions
+                    ADD COLUMN IF NOT EXISTS id UUID DEFAULT gen_random_uuid();
+
+                ALTER TABLE public.staff_permissions
+                    ADD COLUMN IF NOT EXISTS "staffId" UUID;
+
+                ALTER TABLE public.staff_permissions
+                    ADD COLUMN IF NOT EXISTS "tenantId" UUID;
+
+                ALTER TABLE public.staff_permissions
+                    ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT
+                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false, "can_start_service": true, "can_mark_no_show": true}'::jsonb;
+
+                ALTER TABLE public.staff_permissions
+                    ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
+
+                ALTER TABLE public.staff_permissions
+                    ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'staff_permissions'
+                      AND column_name = 'permissions'
+                      AND data_type IN ('text', 'character varying', 'json')
+                ) THEN
+                    ALTER TABLE public.staff_permissions
+                        ALTER COLUMN permissions TYPE JSONB
+                        USING CASE
+                            WHEN permissions IS NULL OR permissions::text = '' THEN
+                                '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false, "can_start_service": true, "can_mark_no_show": true}'::jsonb
+                            ELSE permissions::jsonb
+                        END;
+                END IF;
+
+                ALTER TABLE public.staff_permissions
+                    ALTER COLUMN permissions SET DEFAULT
+                    '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false, "can_start_service": true, "can_mark_no_show": true}'::jsonb;
+
+                UPDATE public.staff_permissions sp
+                SET "tenantId" = s."tenantId"
+                FROM public.staff s
+                WHERE sp."staffId" = s.id
+                  AND sp."tenantId" IS NULL;
+
+                UPDATE public.staff_permissions
+                SET permissions = '{"view_earnings": false, "view_reviews": true, "reply_reviews": false, "view_clients": false, "view_booking_notes": false, "can_start_service": true, "can_mark_no_show": true}'::jsonb
+                WHERE permissions IS NULL;
+
+                UPDATE public.staff_permissions
+                SET permissions = permissions || '{"view_booking_notes": false}'::jsonb
+                WHERE NOT (permissions ? 'view_booking_notes');
+
+                UPDATE public.staff_permissions
+                SET permissions = permissions || '{"can_start_service": true}'::jsonb
+                WHERE NOT (permissions ? 'can_start_service');
+
+                UPDATE public.staff_permissions
+                SET permissions = permissions || '{"can_mark_no_show": true}'::jsonb
+                WHERE NOT (permissions ? 'can_mark_no_show');
+            END $$;
+        `);
+
+        console.log('Staff permission schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure staff permission schema:', error);
+        throw error;
+    }
+};
+
+const ensureStaffSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'staff'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.staff
+                    ADD COLUMN IF NOT EXISTS "scheduleVisibilityWeeks" INTEGER NOT NULL DEFAULT 1;
+
+                UPDATE public.staff
+                SET "scheduleVisibilityWeeks" = 1
+                WHERE "scheduleVisibilityWeeks" IS NULL
+                   OR "scheduleVisibilityWeeks" NOT IN (1, 2, 3, 4);
+            END $$;
+        `);
+
+        console.log('Staff schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure staff schema:', error);
+        throw error;
+    }
+};
+
+const ensureAppointmentSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'appointments'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "requestedStaffId" UUID;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "assignmentMode" VARCHAR(32) NOT NULL DEFAULT 'unknown';
+
+                UPDATE public.appointments
+                SET "assignmentMode" = 'unknown'
+                WHERE "assignmentMode" IS NULL
+                   OR "assignmentMode" NOT IN ('unknown', 'customer_selected', 'auto_assigned', 'tenant_reassigned');
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "customerReminderSentAt" TIMESTAMP WITH TIME ZONE NULL;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "noShowMarkedAt" TIMESTAMP WITH TIME ZONE NULL;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "customerConfirmationRequired" BOOLEAN NOT NULL DEFAULT FALSE;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "customerConfirmationStatus" VARCHAR(24) NOT NULL DEFAULT 'not_required';
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "customerConfirmedAt" TIMESTAMP WITH TIME ZONE NULL;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "inviteToken" VARCHAR(128) NULL;
+
+                ALTER TABLE public.appointments
+                    ADD COLUMN IF NOT EXISTS "inviteExpiresAt" TIMESTAMP WITH TIME ZONE NULL;
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_appointments_invite_token
+                    ON public.appointments ("inviteToken")
+                    WHERE "inviteToken" IS NOT NULL;
+            END $$;
+        `);
+
+        console.log('Appointment schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure appointment schema:', error);
+        throw error;
+    }
+};
+
+const ensureBookingSessionSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'booking_sessions'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.booking_sessions
+                    ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+            END $$;
+        `);
+
+        console.log('Booking session schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure booking session schema:', error);
+        throw error;
+    }
+};
+
+const ensurePaymentTransactionSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            DECLARE
+                payment_method_udt_name TEXT;
+            BEGIN
+                ALTER TABLE public.transactions
+                    ADD COLUMN IF NOT EXISTS "bookingSessionId" UUID NULL;
+
+                SELECT c.udt_name
+                INTO payment_method_udt_name
+                FROM information_schema.columns c
+                WHERE c.table_schema = 'public'
+                  AND c.table_name = 'payment_transactions'
+                  AND c.column_name = 'payment_method';
+
+                IF payment_method_udt_name IS NOT NULL
+                   AND payment_method_udt_name NOT IN ('varchar', 'text', 'bpchar') THEN
+                    BEGIN
+                        EXECUTE 'ALTER TYPE "' || payment_method_udt_name || '" ADD VALUE IF NOT EXISTS ''gift_card_code''';
+                    EXCEPTION
+                        WHEN duplicate_object THEN NULL;
+                    END;
+                END IF;
+
+                CREATE INDEX IF NOT EXISTS idx_transactions_booking_session
+                    ON public.transactions ("bookingSessionId")
+                    WHERE "bookingSessionId" IS NOT NULL;
+            END $$;
+        `);
+
+        console.log('Payment transaction schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure payment transaction schema:', error);
+        throw error;
+    }
+};
+
+const ensurePlatformUserAuthSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'platform_users'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(24) NOT NULL DEFAULT 'local';
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255) NULL;
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS google_email VARCHAR(255) NULL;
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(255) NULL;
+
+                ALTER TABLE public.platform_users
+                    ADD COLUMN IF NOT EXISTS password_reset_token_expires_at TIMESTAMP WITH TIME ZONE NULL;
+            END $$;
+        `);
+
+        console.log('Platform user auth schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure platform user auth schema:', error);
+        throw error;
+    }
+};
+
+const ensureTenantGiftCardSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'tenant_gift_card_packages'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS title VARCHAR(255) NULL;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS description TEXT NULL;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "discountPreset" VARCHAR(32) NULL;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "discountPercent" NUMERIC(10, 2) NOT NULL DEFAULT 0;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "expirationPreset" VARCHAR(32) NULL;
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
+
+                ALTER TABLE public.tenant_gift_card_packages
+                    ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
+
+                UPDATE public.tenant_gift_card_packages
+                SET title = COALESCE(title, title_en, title_ar),
+                    description = COALESCE(description, description_en, description_ar),
+                    "discountPreset" = COALESCE("discountPreset", 'custom'),
+                    "expirationPreset" = COALESCE("expirationPreset", 'never')
+                WHERE title IS NULL
+                   OR description IS NULL
+                   OR "discountPreset" IS NULL
+                   OR "expirationPreset" IS NULL;
+            END $$;
+        `);
+
+        console.log('Tenant gift card schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure tenant gift card schema:', error);
+        throw error;
+    }
+};
+
+// Database Connection and Server Start
+const startServer = async () => {
+    try {
+        await db.sequelize.authenticate();
+        console.log('Database connection established successfully.');
+
+        // Sync models in dependency order
+        await db.SuperAdmin.sync({ force: false });
+        await db.ActivityLog.sync({ force: false });
+        await db.AdminNotification.sync({ force: false });
+        await db.GlobalSettings.sync({ force: false });
+
+        // Subscription System (must be before Tenant sync for foreign keys)
+        await db.SubscriptionPackage.sync({ force: false }); // Base packages
+        await db.FeaturePricing.sync({ force: false }); // Package builder pricing master list
+        await db.ServiceCategory.sync({ force: false }); // Global service categories
+
+        await db.Tenant.sync({ force: false });
+
+        // Subscription relationships (after Tenant)
+        await db.TenantSubscription.sync({ force: false }); // Tenant subscriptions
+        await db.Bill.sync({ force: false }); // Subscription invoices
+        await ensureBillStatusSchema();
+        await db.BillPaymentAttempt.sync({ force: false }); // Bill payment reconciliation and audit trail
+        await db.TenantUsage.sync({ force: false }); // Usage tracking
+        await db.UsageAlert.sync({ force: false }); // Usage alerts
+        await db.TenantPushUsage.sync({ force: false }); // Marketing push quota usage
+        await db.TenantFeatureUsage.sync({ force: false }); // Monthly feature quota usage such as AI
+        await db.TenantPushCampaign.sync({ force: false }); // Marketing push campaign history
+        await db.StaffMessage.sync({ force: false }); // Internal tenant-to-staff messages
+        await db.NotificationDeliveryLog.sync({ force: false }); // Unified delivery logging (push + inbox/staff)
+
+        await db.PlatformUser.sync({ force: false }); // Must be before PaymentMethod, Transaction, CustomerInsight
+        await ensurePlatformUserAuthSchema();
+        await ensureTenantGiftCardSchema();
+        await db.PaymentMethod.sync({ force: false });
+        await db.User.sync({ force: false });
+        await db.Service.sync({ force: false });
+        await db.Product.sync({ force: false }); // New: Product catalog
+        await db.Customer.sync({ force: false });
+        await db.Staff.sync({ force: false });
+        await ensureStaffSchema();
+        await db.StaffPermission.sync({ force: false });
+        await ensureStaffPermissionSchema();
+        await db.MobilePushToken.sync({ force: false });
+        await db.ServiceEmployee.sync({ force: false }); // New: Service-Employee junction
+        await db.StaffSchedule.sync({ force: false }); // Legacy schedule (kept for backward compatibility)
+        // New scheduling models (Phase 3)
+        try {
+            await db.StaffShift.sync({ force: false });
+        } catch (err) {
+            console.warn('⚠️  StaffShift sync warning:', err.message);
+        }
+        try {
+            await db.StaffBreak.sync({ force: false });
+        } catch (err) {
+            console.warn('⚠️  StaffBreak sync warning:', err.message);
+        }
+        try {
+            await db.StaffTimeOff.sync({ force: false });
+        } catch (err) {
+            console.warn('⚠️  StaffTimeOff sync warning:', err.message);
+        }
+        try {
+            await db.StaffScheduleOverride.sync({ force: false });
+        } catch (err) {
+            console.warn('⚠️  StaffScheduleOverride sync warning:', err.message);
+        }
+        await db.Appointment.sync({ force: false });
+        await db.AppointmentEvent.sync({ force: false }); // Appointment lifecycle events (cancel/reschedule timeline)
+        await db.TenantOperationalAlertRead.sync({ force: false }); // Server-side unread tracking for tenant operational alerts
+        await ensureAppointmentSchema();
+        await ensureBookingSessionSchema();
+        await db.Review.sync({ force: false }); // Customer reviews
+        await db.CustomerInsight.sync({ force: false });
+        await db.Transaction.sync({ force: false });
+        await ensurePaymentTransactionSchema();
+        await db.TenantPushCampaignRecipient.sync({ force: false }); // Marketing push recipients
+        await db.StaffPayroll.sync({ force: false }); // Payroll records
+        await db.Order.sync({ force: false }); // Order system
+        await db.OrderItem.sync({ force: false }); // Order items
+        await db.CustomerInvoice.sync({ force: false }); // Customer commerce invoices
+        await db.CustomerInvoiceItem.sync({ force: false }); // Customer invoice line items
+        await db.CustomerInvoiceEvent.sync({ force: false }); // Customer invoice audit trail
+        await db.TenantSavedReport.sync({ force: false }); // Tenant custom reports
+        await db.ConsultantSnapshot.sync({ force: false }); // AI consultant analytics snapshots
+        await db.ConsultantReport.sync({ force: false }); // AI consultant generated reports
+        await db.ConsultantConversation.sync({ force: false }); // AI consultant conversation history
+        await db.AdminSavedReport.sync({ force: false }); // Admin custom reports
+        await db.PublicPageData.sync({ force: false }); // Public page data
+
+        console.log('✅ Database synced successfully.');
+
+        // Create default super admin if none exists
+        await createDefaultSuperAdmin();
+
+        // Seed default subscription packages
+        const { seedDefaultPackages } = require('./utils/seedPackages');
+        await seedDefaultPackages();
+        const { seedFeaturePricing } = require('./utils/seedFeaturePricing');
+        await seedFeaturePricing();
+        const { seedServiceCategories } = require('./utils/seedServiceCategories');
+        await seedServiceCategories();
+
+        if (isProduction && !getTenantDashboardBaseUrl()) {
+            console.warn('⚠️  Tenant dashboard base URL is not configured. Email-generated links may be incomplete.');
+        }
+
+        server = app.listen(PORT, () => {
+            console.log(`🚀 Server is running on port ${PORT}`);
+            // Expire payment_pending tenants every hour (48h window)
+            const { expirePaymentPendingTenants } = require('./utils/initializeTenantSubscription');
+            expiryInterval = setInterval(() => expirePaymentPendingTenants().catch(() => {}), 60 * 60 * 1000);
+            const { processAppointmentAutomation } = require('./services/appointmentAutomationService');
+            appointmentAutomationInterval = setInterval(
+                () => processAppointmentAutomation().catch((error) => console.error('Appointment automation job failed:', error)),
+                60 * 1000
+            );
+            const { runScheduledReports } = require('./controllers/adminReportBuilderController');
+            reportScheduleInterval = setInterval(
+                () => runScheduledReports().catch((error) => console.error('Scheduled report job failed:', error)),
+                10 * 60 * 1000
+            );
+            const { processConsultantWorkflows } = require('./services/consultantWorkflowService');
+            consultantWorkflowInterval = setInterval(
+                () => processConsultantWorkflows().catch((error) => console.error('Consultant workflow job failed:', error)),
+                15 * 60 * 1000
+            );
+        });
+    } catch (error) {
+        console.error('Unable to connect to the database:', error);
+        process.exit(1);
+    }
+};
+
+const shutdown = async (signal) => {
+    console.log(`\n${signal} received, shutting down gracefully...`);
+
+    if (expiryInterval) {
+        clearInterval(expiryInterval);
+        expiryInterval = null;
+    }
+    if (appointmentAutomationInterval) {
+        clearInterval(appointmentAutomationInterval);
+        appointmentAutomationInterval = null;
+    }
+    if (reportScheduleInterval) {
+        clearInterval(reportScheduleInterval);
+        reportScheduleInterval = null;
+    }
+    if (consultantWorkflowInterval) {
+        clearInterval(consultantWorkflowInterval);
+        consultantWorkflowInterval = null;
+    }
+
+    try {
+        if (server) {
+            await new Promise((resolve, reject) => {
+                server.close((error) => {
+                    if (error) {
+                        return reject(error);
+                    }
+
+                    resolve();
+                });
+            });
+        }
+
+        await redisService.closeRedis();
+        await db.sequelize.close();
+        process.exit(0);
+    } catch (error) {
+        console.error('Graceful shutdown failed:', error);
+        process.exit(1);
+    }
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+startServer();
+```
+
+# `server/src/config/database.js`
+```js
+require('dotenv').config();
+
+module.exports = {
+    development: {
+        username: process.env.POSTGRES_USER || 'postgres',
+        password: process.env.POSTGRES_PASSWORD || 'dev_password',
+        database: process.env.POSTGRES_DB || 'rifah_shared',
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 5434, // Docker exposes on 5434
+        dialect: 'postgres',
+        logging: false
+    },
+    production: {
+        use_env_variable: 'DATABASE_URL',
+        dialect: 'postgres',
+        dialectOptions: {
+            ssl: process.env.DB_SSL === 'true' ? {
+                require: true,
+                rejectUnauthorized: false
+            } : false
+        }
+    }
+};
+```

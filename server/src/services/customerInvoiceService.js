@@ -216,7 +216,7 @@ async function ensureOrderInvoice(orderId, options = {}) {
                 quantity: Number(item.quantity || 1),
                 unitPrice: formatAmount(item.unitPrice),
                 lineTotal: formatAmount(item.totalPrice),
-                taxAmount: 0,
+                taxAmount: formatAmount(order.subtotal > 0 ? (Number(item.totalPrice) / Number(order.subtotal)) * Number(order.taxAmount) : 0),
                 metadata: {}
             })), q());
         }
@@ -384,8 +384,8 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
         nameEn: sourceAppointment.service?.name_en || 'Service',
         nameAr: sourceAppointment.service?.name_ar || sourceAppointment.service?.name_en || 'Service',
         quantity: 1,
-        unitPrice: formatAmount(sourceAppointment.price),
-        lineTotal: formatAmount(sourceAppointment.price),
+        unitPrice: formatAmount(Number(sourceAppointment.price || 0) - Number(sourceAppointment.taxAmount || 0)),
+        lineTotal: formatAmount(Number(sourceAppointment.price || 0) - Number(sourceAppointment.taxAmount || 0)),
         taxAmount: formatAmount(sourceAppointment.taxAmount),
         metadata: {
             bookingNumber: sourceAppointment.bookingNumber || null,

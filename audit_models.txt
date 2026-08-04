@@ -1,0 +1,600 @@
+# SEQUELIZE MODELS
+
+## Model: ActivityLog
+- tableName: activity_logs
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: AdminNotification
+- tableName: admin_notifications
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: AdminSavedReport
+- tableName: admin_saved_reports
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo creator -> SuperAdmin (FK: createdByAdminId)
+    - BelongsTo duplicatedFrom -> AdminSavedReport (FK: duplicatedFromId)
+
+## Model: Appointment
+- tableName: appointments
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo service -> Service (FK: serviceId)
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo bookingSession -> BookingSession (FK: bookingSessionId)
+    - BelongsTo legacyCustomer -> Customer (FK: customerId)
+    - HasMany paymentTransactions -> PaymentTransaction (FK: appointmentId)
+    - HasMany events -> AppointmentEvent (FK: appointmentId)
+
+## Model: AppointmentEvent
+- tableName: appointment_events
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo appointment -> Appointment (FK: appointmentId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+
+## Model: Bill
+- tableName: bills
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo subscription -> TenantSubscription (FK: tenantSubscriptionId)
+    - HasMany paymentAttempts -> BillPaymentAttempt (FK: billId)
+
+## Model: BillPaymentAttempt
+- tableName: bill_payment_attempts
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo bill -> Bill (FK: billId)
+
+## Model: BookingSession
+- tableName: booking_sessions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - HasMany appointments -> Appointment (FK: bookingSessionId)
+
+## Model: ConsultantConversation
+- tableName: consultant_conversations
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo creator -> PlatformUser (FK: createdByUserId)
+    - BelongsTo snapshot -> ConsultantSnapshot (FK: snapshotId)
+    - BelongsTo report -> ConsultantReport (FK: reportId)
+
+## Model: ConsultantReport
+- tableName: consultant_reports
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo snapshot -> ConsultantSnapshot (FK: snapshotId)
+    - BelongsTo creator -> PlatformUser (FK: createdByUserId)
+
+## Model: ConsultantSnapshot
+- tableName: consultant_snapshots
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo creator -> PlatformUser (FK: createdByUserId)
+    - HasMany reports -> ConsultantReport (FK: snapshotId)
+    - HasMany conversations -> ConsultantConversation (FK: snapshotId)
+
+## Model: Customer
+- tableName: customers
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany Appointments -> Appointment (FK: customerId)
+
+## Model: CustomerInsight
+- tableName: customer_insights
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: CustomerInvoice
+- tableName: customer_invoices
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo platformUser -> PlatformUser (FK: platformUserId)
+    - HasMany items -> CustomerInvoiceItem (FK: invoiceId)
+    - HasMany events -> CustomerInvoiceEvent (FK: invoiceId)
+
+## Model: CustomerInvoiceEvent
+- tableName: customer_invoice_events
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo invoice -> CustomerInvoice (FK: invoiceId)
+
+## Model: CustomerInvoiceItem
+- tableName: customer_invoice_items
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo invoice -> CustomerInvoice (FK: invoiceId)
+
+## Model: FeaturePricing
+- tableName: FeaturePricings
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: FinancialLedgerEntry
+- tableName: financial_ledger_entries
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> Customer (FK: customerId)
+
+## Model: GiftCardCode
+- tableName: gift_card_codes
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo sourceGiftTransaction -> GiftCardTransaction (FK: sourceGiftCardTransactionId)
+    - BelongsTo sourceTenantGiftTransaction -> TenantGiftCardTransaction (FK: sourceTenantGiftCardTransactionId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - HasMany redemptions -> GiftCardCodeRedemption (FK: giftCardCodeId)
+
+## Model: GiftCardCodeRedemption
+- tableName: gift_card_code_redemptions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo giftCardCode -> GiftCardCode (FK: giftCardCodeId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo redeemedByStaff -> Staff (FK: redeemedByStaffId)
+
+## Model: GiftCardPackage
+- tableName: gift_card_packages
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany transactions -> GiftCardTransaction (FK: packageId)
+
+## Model: GiftCardTransaction
+- tableName: gift_card_transactions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo package -> GiftCardPackage (FK: packageId)
+    - BelongsTo sender -> PlatformUser (FK: senderPlatformUserId)
+    - BelongsTo recipient -> PlatformUser (FK: recipientPlatformUserId)
+    - HasOne giftCode -> GiftCardCode (FK: sourceGiftCardTransactionId)
+
+## Model: GlobalSettings
+- tableName: global_settings
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: HotDeal
+- tableName: hot_deals
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo service -> Service (FK: serviceId)
+    - BelongsTo approver -> SuperAdmin (FK: approvedBy)
+
+## Model: MobilePushToken
+- tableName: mobile_push_tokens
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo platformUser -> PlatformUser (FK: platformUserId)
+    - BelongsTo staffUser -> User (FK: staffUserId)
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: NotificationDeliveryLog
+- tableName: notification_delivery_logs
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: Order
+- tableName: orders
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - HasMany items -> OrderItem (FK: orderId)
+    - HasOne transaction -> Transaction (FK: orderId)
+    - HasMany paymentTransactions -> PaymentTransaction (FK: orderId)
+
+## Model: OrderItem
+- tableName: order_items
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo order -> Order (FK: orderId)
+    - BelongsTo product -> Product (FK: productId)
+
+## Model: PaymentIdempotencyKey
+- tableName: payment_idempotency_keys
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+
+## Model: PaymentMethod
+- tableName: payment_methods
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+
+## Model: PaymentTransaction
+- tableName: payment_transactions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo appointment -> Appointment (FK: appointmentId)
+    - BelongsTo order -> Order (FK: orderId)
+    - BelongsTo processor -> Staff (FK: processedBy)
+
+## Model: PlatformUser
+- tableName: platform_users
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany appointments -> Appointment (FK: platformUserId)
+    - HasMany paymentMethods -> PaymentMethod (FK: platformUserId)
+    - HasMany transactions -> Transaction (FK: platformUserId)
+    - HasMany orders -> Order (FK: platformUserId)
+    - HasMany pushTokens -> MobilePushToken (FK: platformUserId)
+    - HasMany walletLedgerEntries -> WalletLedgerEntry (FK: platformUserId)
+    - HasMany sentGiftCards -> GiftCardTransaction (FK: senderPlatformUserId)
+    - HasMany receivedGiftCards -> GiftCardTransaction (FK: recipientPlatformUserId)
+    - HasMany supportTickets -> SupportTicket (FK: customerPlatformUserId)
+    - HasMany supportMessages -> SupportMessage (FK: customerPlatformUserId)
+    - HasMany supportAttachments -> SupportAttachment (FK: customerPlatformUserId)
+    - HasMany supportTicketEvents -> SupportTicketEvent (FK: customerPlatformUserId)
+
+## Model: Product
+- tableName: products
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: PublicPageData
+- tableName: public_page_data
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: Review
+- tableName: reviews
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo appointment -> Appointment (FK: appointmentId)
+    - BelongsTo platformUser -> PlatformUser (FK: platformUserId)
+
+## Model: Service
+- tableName: services
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsToMany employees -> Staff (FK: serviceId)
+    - BelongsToMany legacyStaff -> Staff (FK: serviceId)
+    - HasMany appointments -> Appointment (FK: serviceId)
+
+## Model: ServiceCategory
+- tableName: service_categories
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: ServiceEmployee
+- tableName: service_employees
+- primaryKeyAttributes: id
+  Associations:
+
+## Model: Staff
+- tableName: staff
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsToMany services -> Service (FK: staffId)
+    - BelongsToMany legacyServices -> Service (FK: staffId)
+    - HasMany schedules -> StaffSchedule (FK: staffId)
+    - HasMany shifts -> StaffShift (FK: staffId)
+    - HasMany breaks -> StaffBreak (FK: staffId)
+    - HasMany timeOff -> StaffTimeOff (FK: staffId)
+    - HasMany scheduleOverrides -> StaffScheduleOverride (FK: staffId)
+    - HasMany appointments -> Appointment (FK: staffId)
+    - HasMany pushTokens -> MobilePushToken (FK: staffId)
+    - HasOne permissionProfile -> StaffPermission (FK: staffId)
+
+## Model: StaffBreak
+- tableName: staff_breaks
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+
+## Model: StaffMessage
+- tableName: staff_messages
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: StaffPayroll
+- tableName: staff_payrolls
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: StaffPermission
+- tableName: staff_permissions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: StaffSchedule
+- tableName: staff_schedules
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo Staff -> Staff (FK: staffId)
+
+## Model: StaffScheduleOverride
+- tableName: staff_schedule_overrides
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+
+## Model: StaffShift
+- tableName: staff_shifts
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+
+## Model: StaffTimeOff
+- tableName: staff_time_off
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo staff -> Staff (FK: staffId)
+
+## Model: SubscriptionPackage
+- tableName: subscription_packages
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany subscriptions -> TenantSubscription (FK: packageId)
+
+## Model: SuperAdmin
+- tableName: super_admins
+- primaryKeyAttributes: id
+  Associations:
+    - HasOne supportAgentProfile -> SupportAgent (FK: superAdminId)
+
+## Model: SupportAgent
+- tableName: support_agents
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo superAdmin -> SuperAdmin (FK: superAdminId)
+    - HasMany assignedTickets -> SupportTicket (FK: assignedSupportAgentId)
+    - HasMany sentMessages -> SupportMessage (FK: supportAgentId)
+    - HasMany events -> SupportTicketEvent (FK: supportAgentId)
+
+## Model: SupportAttachment
+- tableName: support_attachments
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo message -> SupportMessage (FK: supportMessageId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> PlatformUser (FK: customerPlatformUserId)
+    - BelongsTo supportAgent -> SupportAgent (FK: supportAgentId)
+
+## Model: SupportCategory
+- tableName: support_categories
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo parent -> SupportCategory (FK: parentId)
+    - HasMany children -> SupportCategory (FK: parentId)
+    - HasMany tickets -> SupportTicket (FK: supportCategoryId)
+
+## Model: SupportMessage
+- tableName: support_messages
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> PlatformUser (FK: customerPlatformUserId)
+    - BelongsTo supportAgent -> SupportAgent (FK: supportAgentId)
+    - BelongsTo replyToMessage -> SupportMessage (FK: replyToMessageId)
+    - HasMany attachments -> SupportAttachment (FK: supportMessageId)
+    - HasMany notificationEvents -> SupportTicketNotificationEvent (FK: supportMessageId)
+    - HasMany replies -> SupportMessage (FK: replyToMessageId)
+
+## Model: SupportTicket
+- tableName: support_tickets
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> PlatformUser (FK: customerPlatformUserId)
+    - BelongsTo category -> SupportCategory (FK: supportCategoryId)
+    - BelongsTo assignedAgent -> SupportAgent (FK: assignedSupportAgentId)
+    - HasMany messages -> SupportMessage (FK: supportTicketId)
+    - HasMany attachments -> SupportAttachment (FK: supportTicketId)
+    - HasMany events -> SupportTicketEvent (FK: supportTicketId)
+    - HasMany notificationEvents -> SupportTicketNotificationEvent (FK: supportTicketId)
+    - HasMany readStates -> SupportTicketReadState (FK: supportTicketId)
+    - HasMany links -> SupportTicketLink (FK: ticketId)
+
+## Model: SupportTicketEvent
+- tableName: support_ticket_events
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo message -> SupportMessage (FK: supportMessageId)
+    - BelongsTo attachment -> SupportAttachment (FK: supportAttachmentId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo customer -> PlatformUser (FK: customerPlatformUserId)
+    - BelongsTo supportAgent -> SupportAgent (FK: supportAgentId)
+
+## Model: SupportTicketLink
+- tableName: support_ticket_links
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo ticket -> SupportTicket (FK: ticketId)
+
+## Model: SupportTicketNotificationEvent
+- tableName: support_ticket_notification_events
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo message -> SupportMessage (FK: supportMessageId)
+
+## Model: SupportTicketReadState
+- tableName: support_ticket_read_states
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo ticket -> SupportTicket (FK: supportTicketId)
+    - BelongsTo lastReadMessage -> SupportMessage (FK: lastReadMessageId)
+
+## Model: Tenant
+- tableName: tenants
+- primaryKeyAttributes: id
+  Associations:
+    - HasMany Users -> User (FK: tenantId)
+    - HasOne subscription -> TenantSubscription (FK: tenantId)
+    - HasMany bills -> Bill (FK: tenantId)
+    - HasMany hotDeals -> HotDeal (FK: tenantId)
+    - HasMany supportTickets -> SupportTicket (FK: tenantId)
+    - HasMany supportCategories -> SupportCategory (FK: tenantId)
+
+## Model: TenantDashboardAccount
+- tableName: tenant_dashboard_accounts
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantFeatureUsage
+- tableName: tenant_feature_usage
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantGiftCardPackage
+- tableName: tenant_gift_card_packages
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - HasMany transactions -> TenantGiftCardTransaction (FK: packageId)
+
+## Model: TenantGiftCardSettlement
+- tableName: tenant_gift_card_settlements
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo transaction -> TenantGiftCardTransaction (FK: transactionId)
+    - BelongsTo package -> TenantGiftCardPackage (FK: packageId)
+
+## Model: TenantGiftCardTransaction
+- tableName: tenant_gift_card_transactions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo package -> TenantGiftCardPackage (FK: packageId)
+    - BelongsTo sender -> PlatformUser (FK: senderPlatformUserId)
+    - BelongsTo recipient -> PlatformUser (FK: recipientPlatformUserId)
+    - HasOne settlement -> TenantGiftCardSettlement (FK: transactionId)
+    - HasOne giftCode -> GiftCardCode (FK: sourceTenantGiftCardTransactionId)
+
+## Model: TenantOperationalAlertRead
+- tableName: tenant_operational_alert_reads
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantPushCampaign
+- tableName: tenant_push_campaigns
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - HasMany recipients -> TenantPushCampaignRecipient (FK: campaignId)
+
+## Model: TenantPushCampaignRecipient
+- tableName: tenant_push_campaign_recipients
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo campaign -> TenantPushCampaign (FK: campaignId)
+    - BelongsTo platformUser -> PlatformUser (FK: platformUserId)
+
+## Model: TenantPushUsage
+- tableName: tenant_push_usage
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantSavedReport
+- tableName: tenant_saved_reports
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo creator -> PlatformUser (FK: createdByUserId)
+    - BelongsTo duplicatedFrom -> TenantSavedReport (FK: duplicatedFromId)
+
+## Model: TenantSettings
+- tableName: tenant_settings
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantSubscription
+- tableName: tenant_subscriptions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo package -> SubscriptionPackage (FK: packageId)
+    - HasMany bills -> Bill (FK: tenantSubscriptionId)
+
+## Model: TenantUsage
+- tableName: tenant_usage
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantWalletBalance
+- tableName: tenant_wallet_balances
+- primaryKeyAttributes: platformUserId, tenantId
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: TenantWalletLedgerEntry
+- tableName: tenant_wallet_ledger_entries
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: Transaction
+- tableName: transactions
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+    - BelongsTo appointment -> Appointment (FK: appointmentId)
+    - BelongsTo bookingSession -> BookingSession (FK: bookingSessionId)
+    - BelongsTo order -> Order (FK: orderId)
+    - BelongsTo paymentMethod -> PaymentMethod (FK: paymentMethodId)
+
+## Model: UsageAlert
+- tableName: usage_alerts
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo tenant -> Tenant (FK: tenantId)
+
+## Model: User
+- tableName: auth_users
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo Tenant -> Tenant (FK: tenantId)
+    - HasMany pushTokens -> MobilePushToken (FK: staffUserId)
+
+## Model: WalletLedgerEntry
+- tableName: wallet_ledger_entries
+- primaryKeyAttributes: id
+  Associations:
+    - BelongsTo user -> PlatformUser (FK: platformUserId)
