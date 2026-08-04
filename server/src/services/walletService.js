@@ -22,14 +22,12 @@ const toAmount = (value) => {
 };
 
 class WalletService {
-    async getBalance(platformUserId) {
-        const user = await db.PlatformUser.findByPk(platformUserId, {
-            attributes: ['id', 'walletBalance']
-        });
-        if (!user) {
-            throw new Error('User not found');
+    async getBalance(platformUserId, tenantId) {
+        if (!platformUserId || !tenantId) {
+            throw new Error('platformUserId and tenantId are required to fetch wallet balance');
         }
-        return Number.parseFloat(user.walletBalance || 0);
+        const tenantWalletService = require('./tenantWalletService');
+        return tenantWalletService.getTenantBalance(platformUserId, tenantId);
     }
 
     async getLedger(platformUserId, { limit = 50, offset = 0 } = {}) {

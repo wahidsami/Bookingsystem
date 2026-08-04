@@ -555,12 +555,26 @@ exports.purchaseProducts = async (req, res) => {
 
       const splitPaymentService = require('../services/splitPaymentService');
       const orderTotal = parseMoney(order?.totalAmount || 0);
-      const normalizedAllocations = splitPaymentService.normalizePaymentAllocations({
+      
+      console.log('--- tenantCartController BEFORE normalizePaymentAllocations ---');
+      console.log(`order.id: ${order.id}`);
+      console.log(`order.subtotal: ${order.subtotal}`);
+      console.log(`order.taxAmount: ${order.taxAmount}`);
+      console.log(`order.shippingFee: ${order.shippingFee}`);
+      console.log(`order.totalAmount: ${order.totalAmount}`);
+      console.log(`paymentMethod (raw): ${paymentMethod}`);
+      console.log(`paymentAllocations (raw):`, paymentAllocations);
+      console.log(`JSON.stringify(paymentAllocations):`, JSON.stringify(paymentAllocations));
+      
+      const payload = {
         amount: orderTotal,
         paymentMethod: paymentMethod || 'cash',
         paymentAllocations,
         fallbackSource: paymentMethod || 'cash'
-      });
+      };
+      console.log(`EXACT OBJECT BEING PASSED:`, JSON.stringify(payload, null, 2));
+
+      const normalizedAllocations = splitPaymentService.normalizePaymentAllocations(payload);
 
       await orderService.updatePaymentStatus(order.id, 'paid', {
         transaction: tx,

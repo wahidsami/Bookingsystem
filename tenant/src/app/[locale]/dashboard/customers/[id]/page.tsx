@@ -182,7 +182,7 @@ export default function CustomerDetailPage() {
 
         const nextWalletBalance = Number.isFinite(Number(customEvent.detail.walletBalance))
           ? Number(customEvent.detail.walletBalance)
-          : Number(current.walletBalance ?? current.walletSummary?.currentBalance ?? 0);
+          : Number(current.walletBalance || 0);
         const nextTotalSpent = Number.isFinite(Number(customEvent.detail.totalSpent))
           ? Number(customEvent.detail.totalSpent)
           : Number(current.totalSpent || 0);
@@ -599,7 +599,7 @@ export default function CustomerDetailPage() {
               <div className="grid grid-cols-2 gap-3">
                 <Link href={`/${locale}/dashboard/customers/${customer.id}/wallet`} className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 transition hover:-translate-y-0.5 hover:shadow-md">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">{t('currentBalance') || 'Current balance'}</p>
-                  <p className="mt-2 text-2xl font-black text-emerald-700">{formatMoney(customer.walletBalance ?? customer.walletSummary?.currentBalance ?? 0)}</p>
+                  <p className="mt-2 text-2xl font-black text-emerald-700">{formatMoney(customer.walletBalance || 0)}</p>
                 </Link>
                 <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700">{t('walletLedger') || 'Wallet entries'}</p>

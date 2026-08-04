@@ -397,7 +397,7 @@ function normalizeCustomerProfileResponse(payload: any): CanonicalCustomerProfil
       ? [customer.notes]
       : [];
   const walletSummary = customer?.walletSummary || {};
-  const walletBalance = toNumber(customer?.walletBalance ?? walletSummary?.currentBalance ?? 0);
+  const walletBalance = toNumber(customer?.walletBalance || 0);
   const totalBookings = toNumber(customer?.totalBookings ?? recentAppointments.length ?? 0);
   const totalOrders = toNumber(customer?.totalOrders ?? recentOrders.length ?? 0);
   const totalProductsPurchased = toNumber(customer?.totalProductsPurchased ?? customer?.productsPurchased ?? 0);

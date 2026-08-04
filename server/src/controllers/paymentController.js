@@ -23,7 +23,7 @@ const buildPaymentRequestHash = (payload) => crypto
     .digest('hex');
 
 const buildEligibleSourcesForContext = async ({ platformUserId, tenantId = null, requestedAmount = 0 }) => {
-    const walletBalance = await walletService.getBalance(platformUserId);
+    const walletBalance = tenantId ? await walletService.getBalance(platformUserId, tenantId).catch(() => 0) : 0;
     const tenantGiftBalance = tenantId
         ? await tenantWalletService.getTenantBalance(platformUserId, tenantId).catch(() => 0)
         : 0;

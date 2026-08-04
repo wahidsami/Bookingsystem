@@ -59,7 +59,14 @@ const normalizePaymentMethod = (method, fallbackSource = 'cash') => {
 };
 
 const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations, fallbackSource = 'cash' }) => {
+    console.log('--- splitPaymentService INSIDE normalizePaymentAllocations (Start) ---');
+    console.log(`amount: ${amount}`);
+    console.log(`paymentMethod: ${paymentMethod}`);
+    console.log(`paymentAllocations:`, JSON.stringify(paymentAllocations));
+    console.log(`supported payment methods:`, Array.from(SUPPORTED_PAYMENT_METHODS).join(', '));
+    console.log(`fallbackSource: ${fallbackSource}`);
     const safeAmount = Number(amount);
+    console.log(`safeAmount: ${safeAmount}`);
     if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
         throw new Error('Payment amount must be greater than zero');
     }
@@ -95,15 +102,23 @@ const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations
     const totalAllocations = normalizedAllocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
     const allocationDifference = roundMoney(safeAmount - totalAllocations);
 
+    console.log(`normalizedAllocations:`, JSON.stringify(normalizedAllocations));
+    console.log(`allocationSum: ${totalAllocations}`);
+    console.log(`allocationDifference: ${allocationDifference}`);
+
     if (Math.abs(allocationDifference) > 0.5) {
-        throw new Error('Payment allocations must add up to the payment amount');
+        console.log(`FAILED HERE:\nif (Math.abs(allocationDifference) > 0.5)`);
+        console.log(`Reason:\nvalue = ${Math.abs(allocationDifference)}\nexpected <= 0.5`);
+        throw new Error(`Payment allocations failed.\namount=${safeAmount}\nallocationSum=${totalAllocations}\ndifference=${allocationDifference}\nnormalizedAllocations=${JSON.stringify(normalizedAllocations)}\npaymentMethod=${paymentMethod}`);
     }
 
     if (Math.abs(allocationDifference) > 0.0001 && normalizedAllocations.length > 0) {
         const lastIndex = normalizedAllocations.length - 1;
         const adjustedLastAmount = roundMoney(Number(normalizedAllocations[lastIndex].amount || 0) + allocationDifference);
         if (adjustedLastAmount <= 0) {
-            throw new Error('Payment allocations must add up to the payment amount');
+            console.log(`FAILED HERE:\nif (adjustedLastAmount <= 0)`);
+            console.log(`Reason:\nvalue = ${adjustedLastAmount}\nexpected > 0`);
+            throw new Error(`Payment allocations failed.\namount=${safeAmount}\nallocationSum=${totalAllocations}\ndifference=${allocationDifference}\nnormalizedAllocations=${JSON.stringify(normalizedAllocations)}\npaymentMethod=${paymentMethod}`);
         }
 
         normalizedAllocations[lastIndex] = {

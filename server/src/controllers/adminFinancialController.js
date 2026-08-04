@@ -427,7 +427,7 @@ function normalizeCustomerRow(customer) {
     phone: customer.phone || '-',
     totalBookings: customer.totalBookings ?? 0,
     totalSpent: toNumber(customer.totalSpent),
-    walletBalance: toNumber(customer.walletBalance),
+    walletBalance: 0,
     loyaltyPoints: customer.loyaltyPoints ?? 0,
     lastLogin: customer.lastLogin || customer.updatedAt || customer.createdAt,
     joinedAt: customer.createdAt
@@ -667,7 +667,6 @@ async function getAnalyticsCustomers(query) {
       'lastName',
       'email',
       'phone',
-      'walletBalance',
       'loyaltyPoints',
       'totalBookings',
       'totalSpent',

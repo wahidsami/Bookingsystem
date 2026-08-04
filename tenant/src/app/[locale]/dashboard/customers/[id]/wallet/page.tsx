@@ -141,7 +141,7 @@ export default function CustomerWalletPage() {
     );
   }
 
-  const walletBalance = Number(customer.walletBalance ?? customer.walletSummary?.currentBalance ?? 0);
+  const walletBalance = Number(customer.walletBalance || 0);
   const ledgerEntries = customer.walletLedgerEntries || [];
   const giftCardTransactions = customer.giftCardTransactions || [];
 

@@ -189,7 +189,7 @@ const getUserDetails = async (req, res) => {
                 completedBookings,
                 totalSpent,
                 loyaltyPoints: user.loyaltyPoints || 0,
-                walletBalance: parseFloat(user.walletBalance || 0)
+                walletBalance: 0
             }
         });
 

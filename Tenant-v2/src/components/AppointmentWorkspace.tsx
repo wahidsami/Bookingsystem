@@ -812,7 +812,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const activeCustomerPhone = customerProfile?.phone || activeAppointment?.customerPhone || '';
   const activeCustomerEmail = customerProfile?.email || activeAppointment?.customerEmail || '';
   const activeCustomerTier = customerProfile?.loyaltyTier || activeAppointment?.loyaltyTier || '';
-  const activeCustomerWallet = Number(customerProfile?.walletBalance ?? activeAppointment?.walletBalance ?? 0);
+  const activeCustomerWallet = Number(customerProfile?.walletBalance || activeAppointment?.walletBalance || 0);
   const activeCustomerBranch = activeAppointment?.branchName || activeAppointment?.branch?.name || '';
   const activeAppointmentTime = activeAppointment ? buildClockTime(activeAppointment.startTime) : '';
   const activeCustomerMembership = customerProfile?.membershipTier

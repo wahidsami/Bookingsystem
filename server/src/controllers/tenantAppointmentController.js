@@ -1750,12 +1750,22 @@ exports.searchDashboard = async (req, res) => {
                         attributes: []
                     }
                 ],
-                attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage', 'walletBalance', 'loyaltyPoints', 'totalSpent', 'totalBookings'],
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage', 'loyaltyPoints', 'totalSpent', 'totalBookings'],
                 distinct: true,
                 order: [['createdAt', 'DESC']],
                 limit: safeLimit
             })
         ]);
+        const customerIds = customers.map(c => c.id);
+        let walletBalances = [];
+        if (customerIds.length > 0) {
+            walletBalances = await db.TenantWalletBalance.findAll({
+                where: { platformUserId: { [Op.in]: customerIds }, tenantId },
+                attributes: ['platformUserId', 'balance']
+            });
+        }
+        const walletMap = new Map();
+        walletBalances.forEach(w => walletMap.set(w.platformUserId, Number.parseFloat(w.balance || 0)));
 
         return res.json({
             success: true,
@@ -1809,7 +1819,7 @@ exports.searchDashboard = async (req, res) => {
                 email: customer.email,
                 phone: customer.phone,
                 profileImage: customer.profileImage || null,
-                walletBalance: customer.walletBalance || 0,
+                walletBalance: walletMap.get(customer.id) || 0,
                 loyaltyPoints: customer.loyaltyPoints || 0,
                 totalSpent: customer.totalSpent || 0,
                 totalBookings: customer.totalBookings || 0

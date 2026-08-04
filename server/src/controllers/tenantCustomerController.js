@@ -1090,7 +1090,7 @@ exports.getCustomer = async (req, res) => {
         const customer = await db.PlatformUser.findByPk(id, {
             attributes: [
                 'id', 'firstName', 'lastName', 'email', 'phone',
-                'profileImage', 'gender', 'dateOfBirth', 'preferredLanguage', 'walletBalance',
+                'profileImage', 'gender', 'dateOfBirth', 'preferredLanguage',
                 'createdAt'
             ]
         });
@@ -1998,7 +1998,7 @@ exports.topUpCustomerWallet = async (req, res) => {
         }
 
         const customer = await db.PlatformUser.findByPk(id, {
-            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'walletBalance']
+            attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
         });
 
         if (!customer) {
@@ -2043,7 +2043,7 @@ exports.topUpCustomerWallet = async (req, res) => {
                 }
             }, { transaction }),
             db.PlatformUser.findByPk(id, {
-                attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'walletBalance'],
+                attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
                 transaction
             })
         ]);
@@ -2063,7 +2063,7 @@ exports.topUpCustomerWallet = async (req, res) => {
             message: 'Customer wallet topped up',
             transaction: walletTransaction,
             walletLedgerEntry: walletResult.ledgerEntry,
-            walletBalance: Number(refreshedCustomer?.walletBalance ?? walletResult.balanceAfter ?? 0),
+            walletBalance: Number(walletResult.balanceAfter ?? 0),
             customer: refreshedCustomer
         });
     } catch (error) {

@@ -20,8 +20,7 @@ exports.getWalletSummary = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
 
-        const [walletBalance, tenantRows, globalGiftRows] = await Promise.all([
-            walletService.getBalance(platformUserId),
+        const [tenantRows, globalGiftRows] = await Promise.all([
             db.TenantWalletBalance.findAll({
                 where: { platformUserId },
                 include: [{ model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'name_en', 'name_ar'], required: false }],
@@ -80,7 +79,7 @@ exports.getWalletSummary = async (req, res) => {
                 paymentSourcePriority: PAYMENT_SOURCE_PRIORITY,
                 wallet: {
                     sourceType: GIFT_SOURCES.WALLET,
-                    balance: toNumber(walletBalance, 0),
+                    balance: 0,
                     currency: 'SAR'
                 },
                 platformGift: platformGiftStats,

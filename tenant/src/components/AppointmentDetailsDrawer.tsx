@@ -1148,7 +1148,7 @@ export function AppointmentDetailsDrawer({
     setCustomerProfile((current) => {
       if (!current) return current;
 
-      const previousWalletBalance = Number(current.walletBalance ?? current.walletSummary?.currentBalance ?? 0);
+      const previousWalletBalance = Number(current.walletBalance || 0);
       const nextWalletBalance = safeWalletAmount > 0
         ? Math.max(0, roundMoney(previousWalletBalance - safeWalletAmount))
         : previousWalletBalance;
@@ -1174,8 +1174,8 @@ export function AppointmentDetailsDrawer({
         detail: {
           customerId: appointment.user.id,
           walletBalance: safeWalletAmount > 0
-            ? Math.max(0, roundMoney(Number(customerProfile?.walletBalance ?? customerProfile?.walletSummary?.currentBalance ?? 0) - safeWalletAmount))
-            : Number(customerProfile?.walletBalance ?? customerProfile?.walletSummary?.currentBalance ?? 0),
+            ? Math.max(0, roundMoney(Number(customerProfile?.walletBalance || 0) - safeWalletAmount))
+            : Number(customerProfile?.walletBalance || 0),
           totalSpent: safePaymentAmount > 0
             ? roundMoney(Number(customerProfile?.totalSpent || 0) + safePaymentAmount)
             : Number(customerProfile?.totalSpent || 0)
