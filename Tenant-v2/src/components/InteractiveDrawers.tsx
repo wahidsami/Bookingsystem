@@ -1188,9 +1188,16 @@ export default function InteractiveDrawers({
     }
 
     let buyerName = isRtl ? 'زائر مجهول / Walk-in' : 'Walk-in Guest / زائر مجهول';
+    let customerId: string | undefined = undefined;
+
     if (posCustMode === 'existing') {
       const cust = customers.find(c => c.id === posSelectedCustId);
-      if (cust) buyerName = cust.name;
+      if (!cust) {
+        addLocalToast('يجب اختيار عميل مسجل', 'You must select a registered customer', 'warning');
+        return;
+      }
+      buyerName = cust.name;
+      customerId = cust.id;
     }
 
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -1198,7 +1205,13 @@ export default function InteractiveDrawers({
     const total = subtotal + vat;
 
     let paymentMethodSummary = isRtl ? 'طرق الدفع' : 'Payment methods';
+    let allocations: any = undefined;
     if (posSplitActive) {
+      allocations = {
+        card: posSplitAmounts.card,
+        cash: posSplitAmounts.cash,
+        wallet: posSplitAmounts.wallet
+      };
       const parts = [];
       if (posSplitAmounts.card > 0) parts.push(`Card: ${posSplitAmounts.card} ر.س`);
       if (posSplitAmounts.cash > 0) parts.push(`نقداً: ${posSplitAmounts.cash} ر.س`);
@@ -1208,31 +1221,69 @@ export default function InteractiveDrawers({
       paymentMethodSummary = isRtl ? 'مدفوع بالكامل بالبطاقة الرقمية' : 'Paid in full via credit card terminal';
     }
 
-    setCompletedOrder({
-      orderId: `REF-POS-${Math.floor(100000 + Math.random() * 900000)}`,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      customerName: buyerName,
-      items: [...cartItems],
-      subtotal,
-      vat,
-      total,
-      paymentSummary: paymentMethodSummary
-    });
+    try {
+      const productItems = cartItems.filter(i => i.type === 'product');
+      const giftCardItems = cartItems.filter(i => i.type === 'giftcard');
+      let orderId = `REF-POS-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      if (productItems.length > 0) {
+        const prodRes = await tenantApiAdapter.checkoutProducts({
+          items: productItems.map(p => ({ productId: p.id, quantity: p.quantity, price: p.price })),
+          customerId,
+          customerName: buyerName,
+          paymentMethod: paymentMethodSummary,
+          paymentAllocations: allocations
+        });
+        if (prodRes.orderId || prodRes.transactionRef) orderId = prodRes.orderId || prodRes.transactionRef;
+      }
+
+      if (giftCardItems.length > 0) {
+        for (const gc of giftCardItems) {
+          for (let q = 0; q < (gc.quantity || 1); q++) {
+            const gcRes = await tenantApiAdapter.checkoutGiftCards({
+              packageId: gc.packageId || gc.id,
+              amount: gc.price,
+              customerId,
+              customerName: buyerName,
+              paymentMethod: paymentMethodSummary,
+              paymentAllocations: allocations
+            });
+            if (gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id) {
+              orderId = gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id;
+            }
+          }
+        }
+      }
+
+      setCompletedOrder({
+        orderId: orderId,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        customerName: buyerName,
+        items: [...cartItems],
+        subtotal,
+        vat,
+        total,
+        paymentSummary: paymentMethodSummary
+      });
 
       setCartItems([]);
       setPosSplitActive(false);
       setPosSplitAmounts({ card: 0, cash: 0, wallet: 0 });
       setPosCheckoutComplete(true);
 
-    if (onBoardChanged) {
-      await onBoardChanged();
-    }
+      if (onBoardChanged) {
+        await onBoardChanged();
+      }
 
-    addLocalToast(
-      'تمت فوترة المبيعات وتأكيد السداد بنجاح! 🧾',
-      'POS Sale billed and settled successfully! 🧾',
-      'success'
-    );
+      addLocalToast(
+        'تمت فوترة المبيعات وتأكيد السداد بنجاح! 🧾',
+        'POS Sale billed and settled successfully! 🧾',
+        'success'
+      );
+    } catch (err: any) {
+      console.error('POS Checkout failed', err);
+      addLocalToast('خطأ في إتمام الطلب: ' + (err.message || ''), 'POS Checkout error', 'warning');
+    }
   };
 
   return (
@@ -2600,6 +2651,14 @@ export default function InteractiveDrawers({
                         {isRtl ? 'تم إتمام التحصيل بنجاح' : 'Checkout completed successfully'}
                       </div>
                     ) : null}
+
+                    {posCustMode === 'walkin' && cartItems.some(i => i.type === 'giftcard') && !posCheckoutComplete && (
+                      <div className="w-full py-2 px-3 bg-rose-50 border border-rose-200 text-rose-700 font-bold rounded-xl text-[10px] text-center mb-2 animate-fadeIn">
+                        ⚠️ {isRtl 
+                          ? 'لن يتم إيداع هذه البطاقة في أي محفظة. سيتم إنشاء رمز استرداد بدلاً من ذلك.' 
+                          : 'This gift card will not be credited to any customer wallet. A redemption code will be generated instead.'}
+                      </div>
+                    )}
 
                     <button
                       onClick={handleProcessPosCheckout}

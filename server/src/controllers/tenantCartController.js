@@ -328,7 +328,7 @@ exports.purchaseGiftCard = async (req, res) => {
     const giftTx = await db.TenantGiftCardTransaction.create({
       tenantId,
       packageId: giftPackage.id,
-      senderPlatformUserId: null,
+      senderPlatformUserId: senderId,
       recipientPlatformUserId: recipient?.id || null,
       recipientEmail: normalizedEmail || null,
       recipientPhone: normalizedPhone || null,
