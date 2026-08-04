@@ -59,7 +59,7 @@ module.exports = (sequelize, DataTypes) => {
             comment: 'Product price at time of order (snapshot)'
         },
         productImage: {
-            type: DataTypes.STRING,
+            type: DataTypes.TEXT,
             allowNull: true,
             comment: 'Product image at time of order (snapshot)'
         },
