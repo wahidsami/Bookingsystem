@@ -614,16 +614,19 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
         }, { transaction });
 
         const newTotalPaid = roundMoney(Number(appointment.totalPaid || 0) + numericAmount);
+        
+        const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
+        const financialState = calculateAppointmentFinancialState({
+            price: appointment.price || 0,
+            totalPaid: newTotalPaid,
+            depositAmount: appointment.depositAmount || 0
+        });
+
         await appointment.update({
             paymentMethod: resolvedPaymentMethod,
-            remainderPaid: true,
-            remainderAmount: 0,
-            totalPaid: newTotalPaid,
-            paymentStatus: 'fully_paid',
-            paidAt: appointment.paidAt || new Date()
+            ...financialState,
+            paidAt: financialState.paymentStatus === 'fully_paid' ? (appointment.paidAt || new Date()) : appointment.paidAt
         }, { transaction });
-
-        attachCanonicalFinancialState(appointment);
 
         const invoice = await ensureAppointmentInvoice(appointment.id, {
             transaction,
@@ -802,14 +805,19 @@ const refundPayment = async (appointmentId, refundData) => {
                 }
             }, { transaction });
 
-            const newTotalPaid = roundMoney(Number(targetAppointment.totalPaid || 0) - targetRefund);
-            const isFullRefund = newTotalPaid <= 0;
+            const previousTotalPaid = roundMoney(targetAppointment.totalPaid || 0);
+            const newTotalPaid = roundMoney(previousTotalPaid - targetRefund);
+
+            const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
+            const financialState = calculateAppointmentFinancialState({
+                price: targetAppointment.price || 0,
+                totalPaid: newTotalPaid,
+                depositAmount: targetAppointment.depositAmount || 0,
+                previousTotalPaid
+            });
 
             await targetAppointment.update({
-                totalPaid: newTotalPaid,
-                paymentStatus: isFullRefund ? 'refunded' : 'partially_refunded',
-                depositPaid: newTotalPaid >= Number(targetAppointment.depositAmount || 0),
-                remainderPaid: newTotalPaid >= Number(targetAppointment.price || 0)
+                ...financialState
             }, { transaction });
 
             remainingRefund = roundMoney(remainingRefund - targetRefund);
@@ -920,14 +928,17 @@ const collectAppointmentStatusCharge = async ({
             }
         }, { transaction: dbTransaction });
 
+        const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
+        const financialState = calculateAppointmentFinancialState({
+            price: appointment.price || 0,
+            totalPaid: nextTotalPaid,
+            depositAmount: appointment.depositAmount || 0
+        });
+
         await appointment.update({
             paymentMethod: resolvedPaymentMethod,
-            totalPaid: nextTotalPaid,
-            paymentStatus: nextTotalPaid >= totalPrice ? 'fully_paid' : 'deposit_paid',
-            depositPaid: nextTotalPaid > 0,
-            remainderAmount: roundMoney(Math.max(totalPrice - nextTotalPaid, 0)),
-            remainderPaid: nextTotalPaid >= totalPrice,
-            paidAt: nextTotalPaid >= totalPrice ? (appointment.paidAt || new Date()) : appointment.paidAt
+            ...financialState,
+            paidAt: financialState.paymentStatus === 'fully_paid' ? (appointment.paidAt || new Date()) : appointment.paidAt
         }, { transaction: dbTransaction });
 
         if (appointment.platformUserId) {

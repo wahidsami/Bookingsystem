@@ -796,6 +796,8 @@ exports.createAppointment = async (req, res) => {
             notes,
             paymentMethod,
             paymentAllocations,
+            amount,
+            paymentStatus,
             platformUserId,
             customer,
             assignmentMode,
@@ -905,6 +907,59 @@ exports.createAppointment = async (req, res) => {
                 transaction
             });
 
+            let finalAppointments = fullAppointments;
+            const requestedAmount = Number(amount) || session.totalAmount;
+            if (paymentStatus === 'paid' || requestedAmount > 0 || (Array.isArray(paymentAllocations) && paymentAllocations.length > 0)) {
+                const { processAppointmentPayment } = require('../services/appointmentPaymentService');
+                await processAppointmentPayment({
+                    tenantId,
+                    appointment: fullAppointments[0], // entry point for session
+                    amount: requestedAmount,
+                    paymentMethod,
+                    paymentAllocations,
+                    notes: notes || 'Payment collected during booking session',
+                    forensicTrace: null,
+                    transaction
+                });
+
+                finalAppointments = await db.Appointment.findAll({
+                    where: { bookingSessionId: session.id },
+                    include: [
+                        {
+                            model: db.Service,
+                            as: 'service',
+                            attributes: ['id', 'name_en', 'name_ar', 'duration', 'category', 'image', 'paymentOptions'],
+                            required: true
+                        },
+                        {
+                            model: db.Staff,
+                            as: 'staff',
+                            attributes: ['id', 'name', 'photo', 'phone', 'email'],
+                            required: true
+                        },
+                        {
+                            model: db.PlatformUser,
+                            as: 'user',
+                            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'gender', ['profileImage', 'photo']],
+                            required: false
+                        },
+                        {
+                            model: db.Tenant,
+                            as: 'tenant',
+                            attributes: ['id', 'name', 'name_ar', 'name_en'],
+                            required: false
+                        },
+                        {
+                            model: db.BookingSession,
+                            as: 'bookingSession',
+                            required: false
+                        }
+                    ],
+                    order: [['bookingItemIndex', 'ASC']],
+                    transaction
+                });
+            }
+
             await transaction.commit();
             return res.status(201).json({
                 success: true,
@@ -920,8 +975,8 @@ exports.createAppointment = async (req, res) => {
                     totalAmount: session.totalAmount,
                     paymentSummary
                 },
-                appointments: fullAppointments,
-                appointment: fullAppointments[0] || null
+                appointments: finalAppointments,
+                appointment: finalAppointments[0] || null
             });
         }
 
@@ -1161,6 +1216,57 @@ exports.createAppointment = async (req, res) => {
             transaction
         });
 
+        let finalAppointment = fullAppointment;
+        const requestedAmount = Number(amount) || bookingSession.totalAmount;
+        if (paymentStatus === 'paid' || requestedAmount > 0 || (Array.isArray(paymentAllocations) && paymentAllocations.length > 0)) {
+            const { processAppointmentPayment } = require('../services/appointmentPaymentService');
+            await processAppointmentPayment({
+                tenantId,
+                appointment: fullAppointment,
+                amount: requestedAmount,
+                paymentMethod,
+                paymentAllocations,
+                notes: notes || 'Payment collected during booking',
+                forensicTrace: null,
+                transaction
+            });
+
+            finalAppointment = await db.Appointment.findByPk(appointment.id, {
+                include: [
+                    {
+                        model: db.Service,
+                        as: 'service',
+                        attributes: ['id', 'name_en', 'name_ar', 'duration', 'category', 'image', 'paymentOptions'],
+                        required: true
+                    },
+                    {
+                        model: db.Staff,
+                        as: 'staff',
+                        attributes: ['id', 'name', 'photo', 'phone', 'email'],
+                        required: true
+                    },
+                    {
+                        model: db.PlatformUser,
+                        as: 'user',
+                        attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'gender', ['profileImage', 'photo']],
+                        required: false
+                    },
+                    {
+                        model: db.Tenant,
+                        as: 'tenant',
+                        attributes: ['id', 'name', 'name_ar', 'name_en'],
+                        required: false
+                    },
+                    {
+                        model: db.BookingSession,
+                        as: 'bookingSession',
+                        required: false
+                    }
+                ],
+                transaction
+            });
+        }
+
         await transaction.commit();
         const inviteLink = buildAppointmentInviteLink(inviteToken);
 
@@ -1238,7 +1344,7 @@ exports.createAppointment = async (req, res) => {
         res.status(201).json({
             success: true,
             message: 'Appointment created successfully',
-            appointment: fullAppointment,
+            appointment: finalAppointment,
             appointmentInvite: {
                 token: inviteToken,
                 expiresAt: inviteExpiresAt.toISOString(),
@@ -2089,9 +2195,7 @@ exports.updateAppointmentStatus = async (req, res) => {
             });
         }
 
-        const totalPrice = parseFloat(appointment.price || 0);
-        const totalPaid = parseFloat(appointment.totalPaid || 0);
-        const isSettledByAmount = Number.isFinite(totalPrice) && totalPrice > 0 && Number.isFinite(totalPaid) && totalPaid >= totalPrice;
+        const isSettledByAmount = (parseFloat(appointment.remainderAmount || 0) <= 0.009) && (parseFloat(appointment.outstandingAmount || 0) <= 0.009);
         const isSettledByStatus = isAppointmentFullyPaid(appointment.paymentStatus) || `${appointment.paymentStatus || ''}`.trim().toLowerCase() === 'paid';
         const previousStatus = appointment.status;
 
@@ -2100,7 +2204,7 @@ exports.updateAppointmentStatus = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 code: 'APPOINTMENT_PAYMENT_REQUIRED',
-                message: 'You can not change to completed unless the booking amount is paid.'
+                message: 'Appointment cannot be completed until payment is settled.'
             });
         }
 
@@ -2404,7 +2508,8 @@ exports.updatePaymentStatus = async (req, res) => {
                     }]
                 }
             ],
-            transaction
+            transaction,
+            lock: transaction.LOCK.UPDATE
         });
 
         if (!appointment) {
@@ -2427,197 +2532,20 @@ exports.updatePaymentStatus = async (req, res) => {
             outstandingAmountBefore: appointment.outstandingAmount ?? null
         });
 
-        const roundMoney = (value) => Number.parseFloat(Number(value || 0).toFixed(2));
-        const getAppointmentDueAmount = (targetAppointment) => {
-            const paymentStatusValue = `${targetAppointment.paymentStatus || ''}`.trim().toLowerCase();
-            if (paymentStatusValue === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
-                const remainder = roundMoney(targetAppointment.remainderAmount || 0);
-                return remainder > 0 ? remainder : 0;
-            }
-
-            const totalPrice = roundMoney(targetAppointment.price || 0);
-            const totalPaid = roundMoney(targetAppointment.totalPaid || 0);
-            const dueAmount = roundMoney(totalPrice - totalPaid);
-            return dueAmount > 0 ? dueAmount : 0;
-        };
-
-        const bookingSession = appointment.bookingSession || null;
-        const sessionAppointments = Array.isArray(bookingSession?.appointments)
-            ? bookingSession.appointments
-                .filter((sessionAppointment) => sessionAppointment && `${sessionAppointment.status || ''}`.trim().toLowerCase() !== 'cancelled')
-                .slice()
-                .sort((left, right) => {
-                    const leftIndex = Number.isFinite(Number(left.bookingItemIndex)) ? Number(left.bookingItemIndex) : 0;
-                    const rightIndex = Number.isFinite(Number(right.bookingItemIndex)) ? Number(right.bookingItemIndex) : 0;
-                    if (leftIndex !== rightIndex) {
-                        return leftIndex - rightIndex;
-                    }
-                    return new Date(left.startTime).getTime() - new Date(right.startTime).getTime();
-                })
-            : [];
-        const payableSessionAppointments = sessionAppointments
-            .map((sessionAppointment) => ({
-                appointment: sessionAppointment,
-                dueAmount: getAppointmentDueAmount(sessionAppointment)
-            }))
-            .filter((entry) => entry.dueAmount > 0.009);
-        const forensicPaymentTransactionIds = [];
-        const hasSessionCheckout = Boolean(bookingSession?.id && payableSessionAppointments.length > 1);
-
         if (hasSessionCheckout) {
-            const sessionDueAmount = roundMoney(
-                payableSessionAppointments.reduce((sum, entry) => sum + entry.dueAmount, 0)
-            );
-            const numericRequestedAmount = Number(amount);
-            const normalizedRequestedAmount = Number.isFinite(numericRequestedAmount) && numericRequestedAmount > 0
-                ? roundMoney(numericRequestedAmount)
-                : null;
-            const paymentAmount = normalizedRequestedAmount && Math.abs(normalizedRequestedAmount - sessionDueAmount) <= 0.5
-                ? normalizedRequestedAmount
-                : sessionDueAmount;
-            const normalizedSessionPaymentAllocations = normalizePaymentAllocations({
-                amount: paymentAmount,
+            const { processAppointmentPayment } = require('../services/appointmentPaymentService');
+            const { appointment: updatedAppt } = await processAppointmentPayment({
+                tenantId,
+                appointment,
+                amount,
                 paymentMethod,
                 paymentAllocations,
-                fallbackSource: paymentMethod || bookingSession.paymentMethod || appointment.paymentMethod || 'cash'
+                transactionRef,
+                notes,
+                forensicTrace,
+                transaction
             });
-            const allocationBuckets = normalizedSessionPaymentAllocations.map((allocation) => ({
-                ...allocation,
-                remaining: roundMoney(allocation.amount)
-            }));
-
-            const allocateForAppointment = (targetAmount) => {
-                let remainingTargetAmount = roundMoney(targetAmount);
-                const assignedAllocations = [];
-
-                for (const bucket of allocationBuckets) {
-                    if (remainingTargetAmount <= 0.009) break;
-                    if (bucket.remaining <= 0.009) continue;
-
-                    const takeAmount = roundMoney(Math.min(bucket.remaining, remainingTargetAmount));
-                    if (takeAmount <= 0) continue;
-
-                    assignedAllocations.push({
-                        paymentMethod: bucket.paymentMethod,
-                        amount: takeAmount,
-                        giftCardCode: bucket.giftCardCode || undefined,
-                        notes: bucket.notes || undefined
-                    });
-                    bucket.remaining = roundMoney(bucket.remaining - takeAmount);
-                    remainingTargetAmount = roundMoney(remainingTargetAmount - takeAmount);
-                }
-
-                if (remainingTargetAmount > 0.01) {
-                    throw new Error('Payment allocations must add up to the payment amount');
-                }
-
-                return assignedAllocations;
-            };
-
-            const sessionTransactionRefBase = transactionRef || `APT-PAY-${bookingSession.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`;
-
-            for (let index = 0; index < payableSessionAppointments.length; index += 1) {
-                const target = payableSessionAppointments[index];
-                const targetAppointment = target.appointment;
-                const targetAllocations = allocateForAppointment(target.dueAmount);
-                const resolvedPaymentMethod = targetAllocations.length > 1
-                    ? 'split'
-                    : targetAllocations[0]?.paymentMethod || paymentMethod || targetAppointment.paymentMethod || bookingSession.paymentMethod || 'cash';
-                const transactionType = `${targetAppointment.paymentStatus || ''}`.trim().toLowerCase() === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
-                    ? 'remainder'
-                    : 'full';
-
-                if (targetAllocations.some((allocation) => allocation.paymentMethod === 'wallet')) {
-                    const createdPaymentBatch = await createAppointmentPaymentTransactions({
-                        appointment: targetAppointment,
-                        type: transactionType,
-                        amount: target.dueAmount,
-                        paymentMethod: resolvedPaymentMethod,
-                        paymentAllocations: targetAllocations,
-                        processedBy: null,
-                        transactionRef: payableSessionAppointments.length > 1
-                            ? `${sessionTransactionRefBase}-${index + 1}`
-                            : sessionTransactionRefBase,
-                        notes: notes || (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
-                            ? 'Deposit collected from tenant dashboard'
-                            : 'Full payment collected from tenant dashboard'),
-                        source: 'tenant_booking_session_payment_status_update',
-                        transaction,
-                        forensicTrace
-                    });
-                    if (Array.isArray(createdPaymentBatch?.paymentTransactions)) {
-                        forensicPaymentTransactionIds.push(
-                            ...createdPaymentBatch.paymentTransactions.map((entry) => entry.id).filter(Boolean)
-                        );
-                    }
-                } else {
-                    const createdPaymentBatch = await createAppointmentPaymentTransactions({
-                        appointment: targetAppointment,
-                        type: transactionType,
-                        amount: target.dueAmount,
-                        paymentMethod: resolvedPaymentMethod,
-                        paymentAllocations: targetAllocations,
-                        processedBy: null,
-                        transactionRef: payableSessionAppointments.length > 1
-                            ? `${sessionTransactionRefBase}-${index + 1}`
-                            : sessionTransactionRefBase,
-                        notes: notes || (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
-                            ? 'Deposit collected from tenant dashboard'
-                            : 'Full payment collected from tenant dashboard'),
-                        source: 'tenant_booking_session_payment_status_update',
-                        transaction,
-                        forensicTrace
-                    });
-                    if (Array.isArray(createdPaymentBatch?.paymentTransactions)) {
-                        forensicPaymentTransactionIds.push(
-                            ...createdPaymentBatch.paymentTransactions.map((entry) => entry.id).filter(Boolean)
-                        );
-                    }
-                }
-
-                const targetPreviousPaid = roundMoney(targetAppointment.totalPaid || 0);
-                const targetTotalPrice = roundMoney(targetAppointment.price || 0);
-                targetAppointment.paymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
-                targetAppointment.paidAt = targetAppointment.paidAt || new Date();
-                targetAppointment.depositPaid = true;
-                targetAppointment.remainderPaid = true;
-                targetAppointment.remainderAmount = 0;
-                targetAppointment.totalPaid = targetTotalPrice > 0 ? targetTotalPrice : roundMoney(targetPreviousPaid + target.dueAmount);
-                targetAppointment.paymentMethod = resolvedPaymentMethod;
-                if (targetAppointment.status === 'pending') {
-                    targetAppointment.status = 'confirmed';
-                }
-                await targetAppointment.save({ transaction });
-            }
-
-            await syncBookingSessionTotals(bookingSession.id, transaction);
-
-            if (appointment.platformUserId) {
-                const sessionTotalPaidDelta = roundMoney(
-                    payableSessionAppointments.reduce((sum, entry) => sum + entry.dueAmount, 0)
-                );
-                if (sessionTotalPaidDelta > 0) {
-                    await db.PlatformUser.increment('totalSpent', {
-                        by: sessionTotalPaidDelta,
-                        where: { id: appointment.platformUserId },
-                        transaction
-                    });
-
-                    await db.CustomerInsight.increment('totalSpent', {
-                        by: sessionTotalPaidDelta,
-                        where: { platformUserId: appointment.platformUserId, tenantId },
-                        transaction
-                    });
-                }
-            }
-
-            appointment.paymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
-            appointment.paidAt = appointment.paidAt || new Date();
-            appointment.depositPaid = true;
-            appointment.remainderPaid = true;
-            appointment.remainderAmount = 0;
-            appointment.totalPaid = roundMoney(appointment.price || appointment.totalPaid || 0);
-            appointment.paymentMethod = appointment.paymentMethod || resolvedPaymentMethod || paymentMethod || 'cash';
+            Object.assign(appointment, updatedAppt.dataValues || updatedAppt);
             attachCanonicalFinancialState(appointment);
 
             await transaction.commit();

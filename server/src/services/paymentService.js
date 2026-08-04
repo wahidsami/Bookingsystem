@@ -86,11 +86,6 @@ class PaymentService {
 
         let chargeAmount = outstandingAmount;
         let ledgerType = totalPaid > 0 ? 'remainder' : 'full';
-        let nextPaymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
-        let nextDepositPaid = appointment.depositPaid || totalPaid > 0;
-        let nextRemainderAmount = 0;
-        let nextRemainderPaid = true;
-        let nextTotalPaid = totalAmount;
 
         if (normalizedPaymentChoice === 'booking-fee' && appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING) {
             if (depositAmount <= 0) throw new Error('This booking does not have a deposit configured');
@@ -99,18 +94,19 @@ class PaymentService {
             }
             chargeAmount = depositAmount;
             ledgerType = depositAmount >= totalAmount ? 'full' : 'deposit';
-            nextPaymentStatus = depositAmount >= totalAmount
-                ? APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
-                : APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID;
-            nextDepositPaid = true;
-            nextRemainderAmount = parseFloat(Math.max(0, totalAmount - depositAmount).toFixed(2));
-            nextRemainderPaid = nextRemainderAmount <= 0;
-            nextTotalPaid = parseFloat((totalPaid + chargeAmount).toFixed(2));
         } else {
             if (Math.abs(requestedAmount - outstandingAmount) > 0.01) {
                 throw new Error(`Payment amount must match the outstanding balance of ${outstandingAmount.toFixed(2)} SAR`);
             }
         }
+
+        const nextTotalPaid = parseFloat((totalPaid + chargeAmount).toFixed(2));
+        const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
+        const financialState = calculateAppointmentFinancialState({
+            price: totalAmount,
+            totalPaid: nextTotalPaid,
+            depositAmount
+        });
 
         const platformFee = parseFloat((chargeAmount * 0.025).toFixed(2));
         const tenantRevenue = parseFloat((chargeAmount - platformFee).toFixed(2));
@@ -148,13 +144,9 @@ class PaymentService {
             const now = new Date();
             await appointment.update({
                 status: 'confirmed',
-                paymentStatus: nextPaymentStatus,
                 paymentMethod: 'Wallet',
-                paidAt: now,
-                depositPaid: nextDepositPaid,
-                remainderAmount: nextRemainderAmount,
-                remainderPaid: nextRemainderPaid,
-                totalPaid: nextTotalPaid
+                ...financialState,
+                paidAt: financialState.paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID ? now : appointment.paidAt
             }, { transaction });
 
             await createAppointmentTransaction({
@@ -431,11 +423,6 @@ class PaymentService {
 
         let chargeAmount = outstandingAmount;
         let ledgerType = totalPaid > 0 ? 'remainder' : 'full';
-        let nextPaymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
-        let nextDepositPaid = appointment.depositPaid || totalPaid > 0;
-        let nextRemainderAmount = 0;
-        let nextRemainderPaid = true;
-        let nextTotalPaid = totalAmount;
 
         if (normalizedPaymentChoice === 'booking-fee' && appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING) {
             if (depositAmount <= 0) {
@@ -448,26 +435,19 @@ class PaymentService {
 
             chargeAmount = depositAmount;
             ledgerType = depositAmount >= totalAmount ? 'full' : 'deposit';
-            nextPaymentStatus = depositAmount >= totalAmount
-                ? APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
-                : APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID;
-            nextDepositPaid = true;
-            nextRemainderAmount = parseFloat(Math.max(0, totalAmount - depositAmount).toFixed(2));
-            nextRemainderPaid = nextRemainderAmount <= 0;
-            nextTotalPaid = parseFloat((totalPaid + chargeAmount).toFixed(2));
         } else {
             if (Math.abs(requestedAmount - outstandingAmount) > 0.01) {
                 throw new Error(`Payment amount must match the outstanding balance of ${outstandingAmount.toFixed(2)} SAR`);
             }
-
-            chargeAmount = outstandingAmount;
-            ledgerType = appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID ? 'remainder' : 'full';
-            nextPaymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
-            nextDepositPaid = appointment.depositPaid || totalPaid > 0;
-            nextRemainderAmount = 0;
-            nextRemainderPaid = true;
-            nextTotalPaid = parseFloat((totalPaid + chargeAmount).toFixed(2));
         }
+
+        const nextTotalPaid = parseFloat((totalPaid + chargeAmount).toFixed(2));
+        const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
+        const financialState = calculateAppointmentFinancialState({
+            price: totalAmount,
+            totalPaid: nextTotalPaid,
+            depositAmount
+        });
 
         // Calculate platform fee (2.5%)
         const platformFee = parseFloat((chargeAmount * 0.025).toFixed(2));
@@ -521,24 +501,22 @@ class PaymentService {
         });
 
         // Determine payment method name
-        const paymentMethodName = this.getCardBrand(cleanedCard) === 'mada' ? 'Mada Card' 
-            : this.getCardBrand(cleanedCard) === 'visa' ? 'Visa Card'
-            : this.getCardBrand(cleanedCard) === 'mastercard' ? 'Mastercard'
+        const cardBrand = this.getCardBrand(cleanedCard);
+        const paymentMethodName = cardBrand === 'mada' ? 'Mada Card' 
+            : cardBrand === 'visa' ? 'Visa Card'
+            : cardBrand === 'mastercard' ? 'Mastercard'
             : 'Card';
 
-        // Update appointment status and payment information
-        await appointment.update({ 
+        // Update appointment status
+        const now = new Date();
+        await appointment.update({
             status: 'confirmed',
-            paymentStatus: nextPaymentStatus,
             paymentMethod: paymentMethodName,
-            paidAt: new Date(),
-            depositPaid: nextDepositPaid,
-            remainderAmount: nextRemainderAmount,
-            remainderPaid: nextRemainderPaid,
-            totalPaid: nextTotalPaid
+            ...financialState,
+            paidAt: financialState.paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID ? now : appointment.paidAt
         });
 
-        await createAppointmentTransaction({
+        createAppointmentTransaction({
             appointmentId,
             type: ledgerType,
             amount: chargeAmount,
