@@ -864,6 +864,11 @@ class TenantApiAdapter {
 
     const text = await response.clone().text();
     const parsed = safeJsonParse(text);
+
+    if (!response.ok || (parsed && parsed.success === false)) {
+      throw new Error(parsed?.message || parsed?.error || `HTTP Error ${response.status}`);
+    }
+
     if (!parsed) {
       return response;
     }

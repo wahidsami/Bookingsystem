@@ -235,12 +235,21 @@ exports.purchaseGiftCard = async (req, res) => {
       paymentAllocations,
       notes
     } = req.body || {};
+    let resolvedPackageId = packageId;
+    let resolvedAmount = amount;
 
-    if (!tenantId || !packageId) {
+    // TODO: [COMPATIBILITY LAYER] Temporary fallback for legacy POS clients sending a cart array.
+    // This MUST NOT become the canonical API contract. To be removed once legacy POS is deprecated.
+    if (!resolvedPackageId && Array.isArray(req.body.items) && req.body.items.length > 0) {
+      resolvedPackageId = req.body.items[0].giftCardId || req.body.items[0].packageId;
+      resolvedAmount = req.body.items[0].price;
+    }
+
+    if (!tenantId || !resolvedPackageId) {
       throw new Error('tenantId and packageId are required');
     }
 
-    const giftPackage = await getActiveGiftPackage(tenantId, packageId);
+    const giftPackage = await getActiveGiftPackage(tenantId, resolvedPackageId);
     if (!giftPackage) {
       await tx.rollback();
       forensicTrace.log('ROLLBACK', { scope: 'purchaseGiftCard', reason: 'gift package not found or inactive' });
@@ -266,8 +275,8 @@ exports.purchaseGiftCard = async (req, res) => {
     if (!recipient && !normalizeEmail(customerEmail) && !normalizePhone(customerPhone)) {
       throw new Error('Customer email or phone is required for gift card delivery');
     }
-    const purchaseAmount = parseMoney(giftPackage.priceAmount || amount || 0);
-    if (amount !== undefined && amount !== null && Math.abs(parseMoney(amount) - purchaseAmount) > 0.5) {
+    const purchaseAmount = parseMoney(giftPackage.priceAmount || resolvedAmount || 0);
+    if (resolvedAmount !== undefined && resolvedAmount !== null && Math.abs(parseMoney(resolvedAmount) - purchaseAmount) > 0.5) {
       throw new Error('Payment amount does not match the selected gift card price');
     }
     const totalCredit = parseMoney(Number(giftPackage.walletCreditAmount || 0) + Number(giftPackage.bonusAmount || 0));

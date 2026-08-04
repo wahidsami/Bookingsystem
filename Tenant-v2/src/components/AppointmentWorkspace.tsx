@@ -3139,14 +3139,21 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       }
 
       if (giftCardItems.length > 0) {
-        const gcRes = await tenantApiAdapter.checkoutGiftCards({
-          items: giftCardItems.map(g => ({ giftCardId: g.id, quantity: g.quantity, price: g.price })),
-          customerId,
-          customerName: buyerName,
-          paymentMethod: paymentMethodSummary,
-          paymentAllocations: allocations
-        });
-        if (gcRes.orderId || gcRes.transactionRef) orderId = gcRes.orderId || gcRes.transactionRef;
+        for (const gc of giftCardItems) {
+          for (let q = 0; q < (gc.quantity || 1); q++) {
+            const gcRes = await tenantApiAdapter.checkoutGiftCards({
+              packageId: gc.id,
+              amount: gc.price,
+              customerId,
+              customerName: buyerName,
+              paymentMethod: paymentMethodSummary,
+              paymentAllocations: allocations
+            });
+            if (gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id) {
+              orderId = gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id;
+            }
+          }
+        }
       }
 
       setCompletedOrder({
@@ -3223,7 +3230,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return true;
     }
 
-    if (showLunchBreaks) {
+    if (schedulerBoardSettings.showLunchBreaks) {
       return true;
     }
 
@@ -4002,8 +4009,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   onEventDragStart={(eventItem) => setDraggedAptId(eventItem.id)}
                   onEventDragEnd={() => {
                     setDraggedAptId(null);
-                    setDragOverStaffId(null);
-                    setDragOverTime(null);
                   }}
                   onEventResizeStart={(eventItem, mouseEvent) => {
                     if (viewMode === 'day' && isBoardEditable && eventItem.kind !== 'blocked') {
