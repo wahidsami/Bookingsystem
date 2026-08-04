@@ -113,9 +113,9 @@ class OrderService {
                 const itemTotal = unitPrice * quantity;
                 subtotal += itemTotal;
 
-                // Calculate tax for this item (if product has taxRate)
+                // Calculate tax for this item (extracted from VAT-inclusive price)
                 const taxRate = parseFloat(product.taxRate || 15); // Default 15% VAT
-                const itemTax = itemTotal * (taxRate / 100);
+                const itemTax = itemTotal - (itemTotal / (1 + (taxRate / 100)));
                 totalTax += itemTax;
 
                 // Store product snapshot
@@ -152,9 +152,9 @@ class OrderService {
             // Calculate platform fee (2.5% of subtotal)
             const platformFee = parseFloat((subtotal * 0.025).toFixed(2));
 
-            // Calculate total
+            // Calculate total (subtotal already includes VAT)
             const finalShippingFee = this._calculateShippingFee(deliveryType, shippingFee, deliveryMethod);
-            const totalAmount = parseFloat((subtotal + totalTax + finalShippingFee).toFixed(2));
+            const totalAmount = parseFloat((subtotal + finalShippingFee).toFixed(2));
 
             // Determine payment status
             const paymentStatus = paymentMethod === 'online' ? 'pending' : 'pending'; // Will be updated after payment
@@ -348,7 +348,7 @@ class OrderService {
             let finalAllocations = paymentAllocations || metadata.paymentAllocations || null;
 
             if (paymentStatus === 'paid' && Array.isArray(finalAllocations) && finalAllocations.length > 0) {
-                resolvedPaymentMethod = finalAllocations.length > 1 ? 'split' : (finalAllocations[0].paymentMethod || resolvedPaymentMethod);
+                resolvedPaymentMethod = finalAllocations.length > 1 ? 'split' : 'pay_on_visit';
             }
 
             await order.update({

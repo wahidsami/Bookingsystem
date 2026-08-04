@@ -24,52 +24,7 @@ const parseMoney = (value) => {
   return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : 0;
 };
 
-const normalizeAllocations = (amount, paymentMethod, paymentAllocations = []) => {
-  const total = parseMoney(amount);
-  if (total <= 0) {
-    throw new Error('Payment amount must be greater than zero');
-  }
 
-  const sourceAllocations = Array.isArray(paymentAllocations) && paymentAllocations.length > 0
-    ? paymentAllocations
-    : [{ paymentMethod, amount: total }];
-
-  const normalized = sourceAllocations.map((allocation, index) => {
-    const allocationAmount = parseMoney(allocation?.amount);
-    if (allocationAmount <= 0) {
-      throw new Error(`Invalid payment allocation amount at position ${index + 1}`);
-    }
-
-    const method = normalizeText(allocation?.paymentMethod || paymentMethod || 'cash').toLowerCase();
-    if (!VALID_PAYMENT_METHODS.includes(method)) {
-      throw new Error(`Invalid payment method in allocation ${index + 1}`);
-    }
-
-    return {
-      paymentMethod: method,
-      amount: allocationAmount,
-      giftCardCode: normalizeText(allocation?.giftCardCode || allocation?.giftCardCodeNumber || '') || null,
-      notes: normalizeText(allocation?.notes || '') || null
-    };
-  });
-
-  const totalAllocations = normalized.reduce((sum, allocation) => sum + parseMoney(allocation.amount), 0);
-  const difference = parseMoney(total - totalAllocations);
-
-  if (Math.abs(difference) > 0.5) {
-    throw new Error('Payment allocations must add up to the payment amount');
-  }
-
-  if (Math.abs(difference) > 0.0001 && normalized.length > 0) {
-    const lastIndex = normalized.length - 1;
-    normalized[lastIndex] = {
-      ...normalized[lastIndex],
-      amount: parseMoney(normalized[lastIndex].amount + difference)
-    };
-  }
-
-  return normalized;
-};
 
 const splitName = (fullName = '') => {
   const parts = normalizeText(fullName).split(/\s+/).filter(Boolean);
@@ -598,12 +553,14 @@ exports.purchaseProducts = async (req, res) => {
         forensicTrace
       });
 
+      const splitPaymentService = require('../services/splitPaymentService');
       const orderTotal = parseMoney(order?.totalAmount || 0);
-      const normalizedAllocations = normalizeAllocations(
-        orderTotal,
-        paymentMethod || 'cash',
-        paymentAllocations
-      );
+      const normalizedAllocations = splitPaymentService.normalizePaymentAllocations({
+        amount: orderTotal,
+        paymentMethod: paymentMethod || 'cash',
+        paymentAllocations,
+        fallbackSource: paymentMethod || 'cash'
+      });
 
       await orderService.updatePaymentStatus(order.id, 'paid', {
         transaction: tx,
