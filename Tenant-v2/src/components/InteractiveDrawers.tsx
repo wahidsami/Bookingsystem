@@ -579,6 +579,7 @@ export default function InteractiveDrawers({
   const [generatedGcCode, setGeneratedGcCode] = useState(() => `REF-GFT-2026-${Math.floor(1000 + Math.random() * 9000)}`);
   const [posCustMode, setPosCustMode] = useState<'walkin' | 'existing'>('walkin');
   const [posSelectedCustId, setPosSelectedCustId] = useState('');
+  const [posCustomerSearch, setPosCustomerSearch] = useState('');
   const [posSplitActive, setPosSplitActive] = useState(false);
   const [posSplitAmounts, setPosSplitAmounts] = useState({ card: 0, cash: 0, wallet: 0 });
 
@@ -1193,12 +1194,20 @@ export default function InteractiveDrawers({
     if (posCustMode === 'existing') {
       const cust = customers.find(c => c.id === posSelectedCustId);
       if (!cust) {
-        addLocalToast('يجب اختيار عميل مسجل', 'You must select a registered customer', 'warning');
+        addLocalToast('يجب اختيار عميل مسجل من القائمة', 'You must select a registered customer from the list', 'warning');
         return;
       }
       buyerName = cust.name;
       customerId = cust.id;
     }
+
+    const checkoutPayload = {
+      posCustMode,
+      posSelectedCustId,
+      customerId,
+      customerName: buyerName
+    };
+    console.log('[POS Checkout Debug]', checkoutPayload);
 
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const vat = subtotal * 0.15;
@@ -2583,19 +2592,98 @@ export default function InteractiveDrawers({
                       )}
                     </div>
 
-                    {/* Customer Selection */}
+                      {/* Customer Selection */}
                     <div className="p-2.5 bg-white border rounded-xl text-xs mb-2">
-                      <div className="flex justify-between pb-1 border-b mb-1">
-                        <span className="font-bold">{isRtl ? 'العميل المشتري' : 'POS Customer'}</span>
-                        <div className="flex gap-2">
-                          <button onClick={() => setPosCustMode('walkin')} className={`px-1 py-0.25 rounded text-[9px] font-bold ${posCustMode === 'walkin' ? 'bg-zinc-950 text-white' : 'bg-slate-100 text-slate-500'}`}>Walk-in</button>
-                          <button onClick={() => setPosCustMode('existing')} className={`px-1 py-0.25 rounded text-[9px] font-bold ${posCustMode === 'existing' ? 'bg-zinc-950 text-white' : 'bg-slate-100 text-slate-500'}`}>Registered</button>
+                      <div className="flex justify-between pb-1 border-b mb-2">
+                        <span className="font-bold text-slate-700">{isRtl ? 'العميل المشتري' : 'POS Customer'}</span>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => { setPosCustMode('walkin'); setPosSelectedCustId(''); setPosCustomerSearch(''); }}
+                            className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${posCustMode === 'walkin' ? 'bg-zinc-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                          >
+                            Walk-in
+                          </button>
+                          <button
+                            onClick={() => { setPosCustMode('existing'); setPosSelectedCustId(''); setPosCustomerSearch(''); }}
+                            className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${posCustMode === 'existing' ? 'bg-zinc-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                          >
+                            Registered
+                          </button>
                         </div>
                       </div>
-                      {posCustMode === 'existing' && (
-                        <select value={posSelectedCustId} onChange={(e) => setPosSelectedCustId(e.target.value)} className="w-full bg-slate-50 p-1 text-[11px] font-bold rounded">
-                          {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+
+                      {posCustMode === 'existing' ? (
+                        <div className="space-y-1.5">
+                          {/* Search box */}
+                          <div className="relative">
+                            <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              value={posCustomerSearch}
+                              onChange={(e) => {
+                                setPosCustomerSearch(e.target.value);
+                                // If user clears search, also clear selected id so they must re-pick
+                                if (!e.target.value) setPosSelectedCustId('');
+                              }}
+                              placeholder={isRtl ? 'ابحث باسم العميل أو رقم الجوال...' : 'Search by name or phone...'}
+                              className="w-full pl-6 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-medium outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200 transition-all"
+                            />
+                          </div>
+
+                          {/* Customer list */}
+                          <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-100 divide-y divide-slate-50">
+                            {customers
+                              .filter(c => {
+                                const q = posCustomerSearch.toLowerCase();
+                                return !q
+                                  || (c.name || '').toLowerCase().includes(q)
+                                  || (c.phone || '').toLowerCase().includes(q)
+                                  || (c.email || '').toLowerCase().includes(q);
+                              })
+                              .map(c => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => { setPosSelectedCustId(c.id); setPosCustomerSearch(c.name || ''); }}
+                                  className={`w-full text-left px-2.5 py-2 text-[11px] font-medium hover:bg-amber-50 transition-all flex items-center justify-between gap-2 ${
+                                    posSelectedCustId === c.id
+                                      ? 'bg-amber-50 border-l-2 border-amber-400 font-bold text-amber-800'
+                                      : 'text-slate-700'
+                                  }`}
+                                >
+                                  <span className="truncate">{c.name}</span>
+                                  {c.phone && <span className="text-slate-400 text-[9px] font-mono shrink-0">{c.phone}</span>}
+                                  {posSelectedCustId === c.id && <Check size={10} className="text-amber-600 shrink-0" />}
+                                </button>
+                              ))
+                            }
+                            {customers.filter(c => {
+                              const q = posCustomerSearch.toLowerCase();
+                              return !q || (c.name || '').toLowerCase().includes(q) || (c.phone || '').toLowerCase().includes(q);
+                            }).length === 0 && (
+                              <div className="px-3 py-4 text-center text-[10px] text-slate-400">
+                                {isRtl ? 'لا يوجد عميل مطابق' : 'No matching customer found'}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Selected indicator */}
+                          {posSelectedCustId ? (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-[10px] text-emerald-800 font-bold">
+                              <Check size={10} className="text-emerald-600" />
+                              {isRtl ? 'تم الاختيار:' : 'Selected:'} {customers.find(c => c.id === posSelectedCustId)?.name || posSelectedCustId}
+                            </div>
+                          ) : (
+                            <p className="text-[9px] text-amber-600 font-semibold px-1">
+                              {isRtl ? '⚠️ يجب اختيار عميل لإتمام الدفع' : '⚠️ You must select a customer to proceed'}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] text-slate-500">
+                          <span>👤</span>
+                          <span className="font-medium">{isRtl ? 'زائر غير مسجل — Walk-in' : 'Walk-in Guest — Unregistered'}</span>
+                        </div>
                       )}
                     </div>
 
@@ -2708,6 +2796,30 @@ export default function InteractiveDrawers({
                       <div className="h-px border-b border-dashed my-1.5" />
                       <p className="text-[8px] bg-zinc-900 text-white rounded p-0.5 font-bold">PAID IN FULL - CHECKOUT COMPLETED</p>
                       <p className="text-[8px] text-slate-400 italic">Gateways: {completedOrder.paymentSummary}</p>
+
+                      {/* Gift card codes section for walk-in receipts */}
+                      {completedOrder.items.some((it: any) => it.type === 'giftcard') && (
+                        <div className="mt-2 border border-dashed border-amber-400 rounded p-1.5 bg-amber-50">
+                          <p className="text-[8px] font-black text-amber-800 mb-1 text-center tracking-wider uppercase">
+                            🎁 {isRtl ? 'رموز بطاقات الهدايا' : 'Gift Card Redemption Codes'}
+                          </p>
+                          {completedOrder.items
+                            .filter((it: any) => it.type === 'giftcard')
+                            .map((it: any) => (
+                              <div key={it.id} className="flex items-center justify-between py-0.5">
+                                <span className="text-[8px] text-amber-700 truncate flex-1">{it.nameEn}</span>
+                                <span className="text-[9px] font-black font-mono text-zinc-900 ml-1 tracking-widest">{it.skuOrCode}</span>
+                              </div>
+                            ))
+                          }
+                          <p className="text-[7px] text-amber-600 mt-1 text-center">
+                            {isRtl
+                              ? 'احتفظ بهذا الرمز — يمكن استرداده في أي وقت في المركز'
+                              : 'Keep this code — present at the center to redeem'}
+                          </p>
+                        </div>
+                      )}
+
                       <p className="text-[8px] text-slate-400 mt-2">شكراً لزيارتكم صالون رفاه الفاخر 🌸 Thank you</p>
                     </div>
                     <div className="flex gap-2">
