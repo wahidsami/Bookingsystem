@@ -105,8 +105,6 @@ async function processAppointmentPayment({
             remainingTargetAmount = roundMoney(remainingTargetAmount - takeAmount);
         }
 
-        }
-
         return assignedAllocations;
     };
 
