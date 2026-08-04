@@ -109,7 +109,7 @@ module.exports = (sequelize, DataTypes) => {
         },
         // Payment Information
         paymentMethod: {
-            type: DataTypes.ENUM('online', 'cash_on_delivery', 'pay_on_visit'),
+            type: DataTypes.ENUM('online', 'cash_on_delivery', 'pay_on_visit', 'split'),
             allowNull: false,
             comment: 'Payment method selected by customer'
         },

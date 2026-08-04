@@ -953,9 +953,102 @@ const collectAppointmentStatusCharge = async ({
     }
 };
 
+const decrementOrderCustomerWalletBalance = async (order, amount, transaction, forensicTrace = null) => {
+    if (!order?.platformUserId) {
+        throw new Error('Customer wallet account not found');
+    }
+    if (!order?.tenantId) {
+        throw new Error('Tenant context is required for wallet payment');
+    }
+    const numericAmount = parseFloat(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        throw new Error('Invalid wallet amount');
+    }
+
+    const tenantWalletService = require('./tenantWalletService');
+    await tenantWalletService.debitTenantWallet({
+        platformUserId: order.platformUserId,
+        tenantId: order.tenantId,
+        amount: numericAmount,
+        type: 'tenant_gift_redeem_debit',
+        referenceType: 'order',
+        referenceId: order.id,
+        metadata: {
+            source: 'tenant_dashboard_order_payment_collection',
+            orderId: order.id
+        },
+        transaction,
+        forensicTrace
+    });
+};
+
+const createOrderPaymentTransactions = async ({
+    order,
+    type,
+    amount,
+    paymentMethod,
+    paymentAllocations,
+    processedBy = null,
+    transactionRef = null,
+    notes = null,
+    source = 'order_payment_status_update',
+    metadata = {},
+    transaction = null,
+    forensicTrace = null
+}) => {
+    const allocations = normalizePaymentAllocations({
+        amount,
+        paymentMethod,
+        paymentAllocations,
+        fallbackSource: paymentMethod || order?.paymentMethod || 'cash'
+    });
+
+    const baseReference = `${transactionRef || `ORDER-PAY-${order?.orderNumber || order?.id?.slice(0, 8)?.toUpperCase() || 'TX'}`}`.trim();
+    const createdPaymentTransactions = [];
+
+    const { createOrderTransaction } = require('./paymentTransactionLedgerService');
+
+    for (let index = 0; index < allocations.length; index += 1) {
+        const allocation = allocations[index];
+        if (allocation.paymentMethod === 'wallet') {
+            await decrementOrderCustomerWalletBalance(order, allocation.amount, transaction, forensicTrace);
+        }
+        const created = await createOrderTransaction({
+            orderId: order.id,
+            type,
+            amount: allocation.amount,
+            paymentMethod: allocation.paymentMethod,
+            status: 'completed',
+            transactionRef: allocations.length > 1 ? `${baseReference}-${index + 1}` : baseReference,
+            processedBy,
+            processedAt: new Date(),
+            notes: allocation.notes || notes,
+            metadata: {
+                ...metadata,
+                source,
+                paymentAllocation: allocation,
+                paymentAllocations: allocations,
+                paymentSummaryMethod: allocations.length > 1 ? 'split' : allocation.paymentMethod
+            }
+        }, { transaction, forensicTrace });
+        if (created?.id) {
+            createdPaymentTransactions.push(created);
+        }
+    }
+
+    return {
+        allocations,
+        paymentMethod: allocations.length > 1 ? 'split' : allocations[0]?.paymentMethod || paymentMethod || 'cash',
+        totalAmount: allocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0),
+        paymentTransactions: createdPaymentTransactions
+    };
+};
+
+
 module.exports = {
     calculateSplitPayment,
     createAppointmentPaymentTransactions,
+    createOrderPaymentTransactions,
     normalizePaymentAllocations,
     recordRemainderPayment,
     getPaymentSummary,

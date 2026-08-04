@@ -608,6 +608,7 @@ exports.purchaseProducts = async (req, res) => {
       await orderService.updatePaymentStatus(order.id, 'paid', {
         transaction: tx,
         paymentMethod: paymentMethod || 'cash',
+        paymentAllocations: normalizedAllocations,
         processedBy: req.staffId || req.tenantAccountId || null,
         transactionRef: transactionRef || `CART-ORDER-${order.orderNumber}`,
         notes: orderNotes,

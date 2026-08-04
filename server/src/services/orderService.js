@@ -317,6 +317,7 @@ class OrderService {
         const shouldCommit = !options.transaction;
         const {
             paymentMethod,
+            paymentAllocations,
             processedBy = null,
             notes = null,
             transactionRef = null,
@@ -343,8 +344,16 @@ class OrderService {
 
             const previousPaymentStatus = order.paymentStatus;
 
+            let resolvedPaymentMethod = paymentMethod || order.paymentMethod;
+            let finalAllocations = paymentAllocations || metadata.paymentAllocations || null;
+
+            if (paymentStatus === 'paid' && Array.isArray(finalAllocations) && finalAllocations.length > 0) {
+                resolvedPaymentMethod = finalAllocations.length > 1 ? 'split' : (finalAllocations[0].paymentMethod || resolvedPaymentMethod);
+            }
+
             await order.update({
                 paymentStatus,
+                paymentMethod: resolvedPaymentMethod,
                 paidAt: paymentStatus === 'paid' ? new Date() : null
             }, q());
 
@@ -353,24 +362,26 @@ class OrderService {
             }
 
             if (previousPaymentStatus !== 'paid' && paymentStatus === 'paid') {
-                await createOrderTransaction({
-                    orderId: order.id,
+                const splitPaymentService = require('./splitPaymentService');
+                const paymentResult = await splitPaymentService.createOrderPaymentTransactions({
+                    order,
                     type: 'full',
                     amount: parseFloat(order.totalAmount || 0),
-                    paymentMethod: resolveLedgerPaymentMethod(paymentMethod || order.paymentMethod, order.paymentMethod),
-                    status: 'completed',
+                    paymentMethod: resolvedPaymentMethod,
+                    paymentAllocations: finalAllocations,
                     processedBy,
-                    processedAt: order.paidAt || new Date(),
                     transactionRef: transactionRef || `ORDER-PAY-${order.orderNumber}`,
                     notes: notes || 'Order payment collected',
+                    source: metadata.source || 'order_payment_status_update',
                     metadata: {
-                        source: 'order_payment_status_update',
                         previousPaymentStatus,
                         nextPaymentStatus: paymentStatus,
-                        customerPaymentMethod: order.paymentMethod,
+                        customerPaymentMethod: resolvedPaymentMethod,
                         ...metadata
-                    }
-                }, { transaction, forensicTrace });
+                    },
+                    transaction,
+                    forensicTrace
+                });
 
                 await db.PlatformUser.increment('totalSpent', {
                     by: parseFloat(order.totalAmount || 0),
