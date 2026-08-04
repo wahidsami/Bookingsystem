@@ -1209,9 +1209,9 @@ export default function InteractiveDrawers({
     };
     console.log('[POS Checkout Debug]', checkoutPayload);
 
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const vat = subtotal * 0.15;
-    const total = subtotal + vat;
+    const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const vat = total - (total / 1.15);
+    const subtotal = total - vat;
 
     let canonicalPaymentMethod = 'card_pos';
     let paymentMethodSummary = isRtl ? 'طرق الدفع' : 'Payment methods';
@@ -2702,9 +2702,9 @@ export default function InteractiveDrawers({
 
                     {/* Cost Breakdown */}
                     {(() => {
-                      const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                      const vat = subtotal * 0.15;
-                      const total = subtotal + vat;
+                      const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                      const vat = total - (total / 1.15);
+                      const subtotal = total - vat;
                       return (
                         <div className="p-3 bg-white border rounded-xl space-y-1.5 text-xs font-sans">
                           <div className="flex justify-between text-slate-500">

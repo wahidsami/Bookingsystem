@@ -3099,9 +3099,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       }
     }
 
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const vat = subtotal * 0.15;
-    const total = subtotal + vat;
+    const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const vat = total - (total / 1.15);
+    const subtotal = total - vat;
 
     let canonicalPaymentMethod = 'card_pos';
     let paymentMethodSummary = isRtl ? 'أطراف مدى المشتركة' : 'Mada Unified Terminals';
