@@ -305,15 +305,20 @@ const decrementCustomerWalletBalance = async (appointment, amount, transaction, 
     if (!appointment?.platformUserId) {
         throw new Error('Customer wallet account not found');
     }
+    if (!appointment?.tenantId) {
+        throw new Error('Tenant context is required for wallet payment');
+    }
     const numericAmount = parseFloat(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
         throw new Error('Invalid wallet amount');
     }
 
-    await walletService.debitWallet({
+    const tenantWalletService = require('./tenantWalletService');
+    await tenantWalletService.debitTenantWallet({
         platformUserId: appointment.platformUserId,
+        tenantId: appointment.tenantId,
         amount: numericAmount,
-        type: 'service_payment_debit',
+        type: 'tenant_gift_redeem_debit',
         referenceType: 'appointment',
         referenceId: appointment.id,
         metadata: {
