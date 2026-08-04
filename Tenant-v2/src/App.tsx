@@ -667,6 +667,7 @@ export default function App() {
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode(!darkMode)}
           onOpenActivityCenter={() => setIsActivityCenterOpen(true)}
+          onNavigateToSettings={() => handleSelectView('settings')}
         />
 
         {/* Content View area (bright clean layout) */}

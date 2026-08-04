@@ -46,7 +46,9 @@ interface TopbarProps {
   // Personalization & Dark Mode
   darkMode?: boolean;
   onToggleDarkMode?: () => void;
+  // TODO: Re-enable Operations Hub after replacing demo data with real live events.
   onOpenActivityCenter?: () => void;
+  onNavigateToSettings?: () => void;
 }
 
 export default function Topbar({
@@ -64,7 +66,8 @@ export default function Topbar({
   onLogout,
   darkMode = false,
   onToggleDarkMode,
-  onOpenActivityCenter
+  onOpenActivityCenter,
+  onNavigateToSettings
 }: TopbarProps) {
   const t = translations[lang];
   const isRtl = lang === 'ar';
@@ -232,18 +235,8 @@ export default function Topbar({
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          {/* Live Activity Center Trigger (Enterprise Requirement) */}
-          <button
-            onClick={onOpenActivityCenter}
-            className={`p-2 rounded-xl relative transition-all flex items-center justify-center cursor-pointer ${
-              darkMode ? 'text-zinc-300 hover:bg-zinc-800' : 'text-neutral-600 hover:bg-neutral-100'
-            }`}
-            title={lang === 'ar' ? 'سجل العمليات المباشر' : 'Live Operations Activity Feed'}
-          >
-            <Activity size={18} />
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500" />
-          </button>
+          {/* TODO: Re-enable Operations Hub after replacing demo data with real live events. */}
+          {/* Activity Center button hidden for production — contains mock/demo data */}
 
           {/* Language Selector Toggle */}
           <button
@@ -316,6 +309,7 @@ export default function Topbar({
                   onLogout={onLogout}
                   onSwitchTenant={onSwitchTenant}
                   currentTenant={currentTenant}
+                  onNavigateToSettings={onNavigateToSettings}
                 />
               </div>
             )}
