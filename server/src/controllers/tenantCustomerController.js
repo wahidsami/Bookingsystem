@@ -1152,16 +1152,21 @@ exports.getCustomer = async (req, res) => {
             customerIds: [id]
         });
 
-        const [walletLedgerEntries, giftCardTransactions] = await Promise.all([
-            db.WalletLedgerEntry.findAll({
+        const [tenantWalletRow, walletLedgerEntries, giftCardTransactions] = await Promise.all([
+            db.TenantWalletBalance.findOne({
+                where: { platformUserId: id, tenantId }
+            }),
+            db.TenantWalletLedgerEntry.findAll({
                 where: {
                     platformUserId: id,
+                    tenantId
                 },
                 order: [['createdAt', 'DESC']],
                 ...(walletHistoryMode ? {} : { limit: 10 })
             }),
-            db.GiftCardTransaction.findAll({
+            db.TenantGiftCardTransaction.findAll({
                 where: {
+                    tenantId,
                     [Op.or]: [
                         { senderPlatformUserId: id },
                         { recipientPlatformUserId: id }
@@ -1169,7 +1174,7 @@ exports.getCustomer = async (req, res) => {
                 },
                 include: [
                 {
-                    model: db.GiftCardPackage,
+                    model: db.TenantGiftCardPackage,
                     as: 'package',
                     required: false,
                     attributes: ['id', 'title_en', 'title_ar', 'priceAmount', 'walletCreditAmount', 'bonusAmount']
@@ -1306,7 +1311,7 @@ exports.getCustomer = async (req, res) => {
         const customerJson = customer.toJSON();
         // Ensure profileImage is properly formatted
         customerJson.profileImage = buildPublicAssetUrl(customerJson.profileImage);
-        const currentWalletBalance = parseFloat(customerJson.walletBalance || 0);
+        const currentWalletBalance = parseFloat(tenantWalletRow?.balance || 0);
 
         const mappedWalletLedgerEntries = walletLedgerEntries.map((entry) => ({
             id: entry.id,
@@ -2254,9 +2259,10 @@ exports.getCustomerTransactions = async (req, res) => {
             }),
             []
         ]);
-        const walletLedgerTransactions = await db.WalletLedgerEntry.findAll({
+        const walletLedgerTransactions = await db.TenantWalletLedgerEntry.findAll({
             where: {
                 platformUserId: id,
+                tenantId,
                 ...(appointmentStart || appointmentEnd ? {
                     createdAt: {
                         ...(appointmentStart ? { [Op.gte]: appointmentStart } : {}),
