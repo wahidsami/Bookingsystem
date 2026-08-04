@@ -150,7 +150,7 @@ function BookingDetailsContent() {
     const totalAmount = bookingSession?.totalAmount != null
         ? Number(bookingSession.totalAmount || 0)
         : isGroupedBooking
-            ? parseFloat((subtotalAmount + taxAmount + platformFeeAmount).toFixed(2))
+            ? parseFloat((subtotalAmount + platformFeeAmount).toFixed(2))
             : Number((booking as any)?.price ?? subtotalAmount);
     const paidAmount = Number((booking as any)?.totalPaid ?? 0);
     const depositAmount = Number((booking as any)?.depositAmount ?? 0);

@@ -231,12 +231,12 @@ function PurchaseContent() {
     }
 
     const totalPrice = (product.price * quantity).toFixed(2);
-    const taxAmount = (parseFloat(totalPrice) * 0.15).toFixed(2); // 15% VAT
+    const taxAmount = (parseFloat(totalPrice) - (parseFloat(totalPrice) / 1.15)).toFixed(2); // 15% VAT extracted from inclusive price
     const platformFee = (parseFloat(totalPrice) * 0.025).toFixed(2); // 2.5% platform fee
     // Shipping fee applies to both online and POD (both require delivery)
     // Pay on Visit doesn't have shipping fee (customer picks up)
     const shippingFee = (paymentMethod === "online" || paymentMethod === "cash_on_delivery") ? "25.00" : "0.00";
-    const finalTotal = (parseFloat(totalPrice) + parseFloat(taxAmount) + parseFloat(shippingFee)).toFixed(2);
+    const finalTotal = (parseFloat(totalPrice) + parseFloat(shippingFee)).toFixed(2);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">

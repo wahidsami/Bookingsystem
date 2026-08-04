@@ -220,9 +220,9 @@ export function ProductPurchaseFlow({
     }
 
     const totalPrice = (product.price * quantity).toFixed(2);
-    const taxAmount = (parseFloat(totalPrice) * 0.15).toFixed(2); // 15% VAT
+    const taxAmount = (parseFloat(totalPrice) - (parseFloat(totalPrice) / 1.15)).toFixed(2); // 15% VAT extracted from inclusive price
     const shippingFee = (paymentMethod === "online" || paymentMethod === "cash_on_delivery") ? "25.00" : "0.00";
-    const finalTotal = (parseFloat(totalPrice) + parseFloat(taxAmount) + parseFloat(shippingFee)).toFixed(2);
+    const finalTotal = (parseFloat(totalPrice) + parseFloat(shippingFee)).toFixed(2);
 
     const primaryColor = tenant?.customColors?.primaryColor || "#9333EA";
 

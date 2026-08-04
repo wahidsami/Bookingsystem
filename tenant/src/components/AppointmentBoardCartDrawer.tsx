@@ -161,15 +161,15 @@ export function AppointmentBoardCartDrawer({
   const taxAmount = useMemo(() => {
     if (mode === "gift_card") return 0;
     return selectedProducts.reduce((sum, item) => {
-      const itemSubtotal = Number(item.price || 0) * Number(item.quantity || 0);
+      const itemTotal = Number(item.price || 0) * Number(item.quantity || 0);
       const taxRate = Number(item.taxRate ?? 15);
-      return sum + (itemSubtotal * (taxRate / 100));
+      return sum + (itemTotal - (itemTotal / (1 + (taxRate / 100))));
     }, 0);
   }, [mode, selectedProducts]);
 
   const totalDue = useMemo(() => {
-    return Number((subtotal + taxAmount).toFixed(2));
-  }, [subtotal, taxAmount]);
+    return Number(subtotal.toFixed(2));
+  }, [subtotal]);
 
   const splitTotal = useMemo(() => {
     return paymentRows.reduce((sum, row) => sum + normalizeNumber(row.amount), 0);

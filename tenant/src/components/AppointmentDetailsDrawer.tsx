@@ -1583,7 +1583,7 @@ export function AppointmentDetailsDrawer({
       summedSessionTotals?.totalAmount ??
       sessionTotals?.totalAmount ??
       appointment.price ??
-      (subtotalAmount + taxAmount + platformFeeAmount)
+      (subtotalAmount + platformFeeAmount)
     );
     const outstandingAmount = hasSessionAppointments
       ? Math.max(0, totalAmount - paidAmount)
