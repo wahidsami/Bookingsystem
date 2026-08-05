@@ -2425,6 +2425,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     try {
+      const remainingBalanceForLogs = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
+      const allocationSum = paymentAllocationsPayload.reduce((acc, curr) => acc + curr.amount, 0);
+      console.log('TEMPORARY DEBUG - remainingBalance:', remainingBalanceForLogs);
+      console.log('TEMPORARY DEBUG - paymentRows:', splitAmounts);
+      console.log('TEMPORARY DEBUG - paymentAllocations:', paymentAllocationsPayload);
+      console.log('TEMPORARY DEBUG - allocationSum:', allocationSum);
+
       // 1. Mark appointment as paid
       const paymentResponse = paymentCollectionMode === 'remainder' || hasTrueRemainderBalance
         ? await tenantApiAdapter.recordRemainderPayment(activeAppointment.id, {
@@ -5500,7 +5507,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             <input 
                               type="number" 
                               value={splitAmounts.card}
-                              onChange={(e) => setSplitAmounts(prev => ({ ...prev, card: parseFloat(e.target.value) || 0 }))}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                const totalDue = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
+                                setSplitAmounts(prev => {
+                                  const next = { ...prev, card: val };
+                                  next.cash = Math.max(0, totalDue - next.card - next.wallet);
+                                  return next;
+                                });
+                              }}
                               className="flex-1 bg-slate-50 border border-slate-200 rounded p-1 text-right font-mono text-xs font-bold"
                             />
                           </div>
@@ -5509,7 +5524,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             <input 
                               type="number" 
                               value={splitAmounts.cash}
-                              onChange={(e) => setSplitAmounts(prev => ({ ...prev, cash: parseFloat(e.target.value) || 0 }))}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                const totalDue = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
+                                setSplitAmounts(prev => {
+                                  const next = { ...prev, cash: val };
+                                  next.card = Math.max(0, totalDue - next.cash - next.wallet);
+                                  return next;
+                                });
+                              }}
                               className="flex-1 bg-slate-50 border border-slate-200 rounded p-1 text-right font-mono text-xs font-bold"
                             />
                           </div>
@@ -5518,7 +5541,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             <input 
                               type="number" 
                               value={splitAmounts.wallet}
-                              onChange={(e) => setSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                const totalDue = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
+                                setSplitAmounts(prev => {
+                                  const next = { ...prev, wallet: val };
+                                  next.cash = Math.max(0, totalDue - next.card - next.wallet);
+                                  return next;
+                                });
+                              }}
                               className="flex-1 bg-slate-50 border border-slate-200 rounded p-1 text-right font-mono text-xs font-bold"
                             />
                           </div>
