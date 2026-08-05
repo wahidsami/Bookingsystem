@@ -778,45 +778,50 @@ export default function PublicExperience({
   }
 
   return (
-    <div className="px-4 pb-8 pt-4 md:px-8 md:pb-10">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-5 flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl shadow-2xl">
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-amber-200">
-              <Sparkles size={18} />
+    <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen relative overflow-hidden bg-zinc-950 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.2),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(244,114,182,0.16),_transparent_24%),linear-gradient(135deg,_rgba(9,9,11,0.98),_rgba(24,24,27,0.92))]" />
+      <div className="relative z-10 min-h-screen flex flex-col">
+        <div className="px-4 pb-8 pt-4 md:px-8 md:pb-10">
+          <div className="mx-auto max-w-7xl">
+            <div className="mb-5 flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl shadow-2xl">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-amber-200">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-amber-200/80">Refah</p>
+                  <h1 className="text-lg font-black text-white">
+                    {lang === 'ar' ? 'تجربة عامة قابلة للتوسعة' : 'Extensible public experience'}
+                  </h1>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onToggleLang}
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                <Globe size={16} />
+                <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
+              </button>
             </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-amber-200/80">Refah</p>
-              <h1 className="text-lg font-black text-white">
-                {lang === 'ar' ? 'تجربة عامة قابلة للتوسعة' : 'Extensible public experience'}
-              </h1>
+            <PublicLandingFramework lang={lang} onNavigate={onNavigate} />
+            <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 px-6 py-5 text-center backdrop-blur-xl sm:flex-row sm:text-start">
+              <p className="max-w-3xl text-sm leading-7 text-zinc-300">
+                {lang === 'ar'
+                  ? 'هل تريد متابعة رحلة الزيارة؟ يمكنك التسجيل أو تسجيل الدخول ثم الانتقال مباشرة إلى الواجهة الحية.'
+                  : 'Ready to continue the visit journey? Register or sign in to move directly into the live workspace.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => onNavigate('/register')}
+                className="inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300"
+              >
+                {lang === 'ar' ? 'ابدأ التسجيل' : 'Start registration'}
+                <ArrowRight size={16} />
+              </button>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onToggleLang}
-            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
-          >
-            <Globe size={16} />
-            <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
-          </button>
-        </div>
-        <PublicLandingFramework lang={lang} onNavigate={onNavigate} />
-        <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 px-6 py-5 text-center backdrop-blur-xl sm:flex-row sm:text-start">
-          <p className="max-w-3xl text-sm leading-7 text-zinc-300">
-            {lang === 'ar'
-              ? 'هل تريد متابعة رحلة الزيارة؟ يمكنك التسجيل أو تسجيل الدخول ثم الانتقال مباشرة إلى الواجهة الحية.'
-              : 'Ready to continue the visit journey? Register or sign in to move directly into the live workspace.'}
-          </p>
-          <button
-            type="button"
-            onClick={() => onNavigate('/register')}
-            className="inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300"
-          >
-            {lang === 'ar' ? 'ابدأ التسجيل' : 'Start registration'}
-            <ArrowRight size={16} />
-          </button>
         </div>
       </div>
     </div>
