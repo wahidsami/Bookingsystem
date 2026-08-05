@@ -1228,10 +1228,7 @@ class TenantApiAdapter {
   }
 
   async updateAppointmentStatus(id: string, status: string, notes?: string): Promise<any> {
-    return this.request(`/tenant/appointments/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status, notes, notifyCustomer: true })
-    });
+    return this.patch(`/tenant/appointments/${id}/status`, { status, notes, notifyCustomer: true });
   }
 
   async reassignAppointmentStaff(id: string, staffId: string): Promise<any> {
@@ -1264,27 +1261,19 @@ class TenantApiAdapter {
     endDate?: string | null;
     label?: string;
   }): Promise<any> {
-    return this.request(`/tenant/employees/${employeeId}/shifts`, {
-      method: 'POST',
-      body: JSON.stringify(shiftData),
-    });
+    return this.post(`/tenant/employees/${employeeId}/shifts`, shiftData);
   }
 
   async updateEmployeeShift(employeeId: string, shiftId: string, shiftData: any): Promise<any> {
-    return this.request(`/tenant/employees/${employeeId}/shifts/${shiftId}`, {
-      method: 'PUT',
-      body: JSON.stringify(shiftData),
-    });
+    return this.put(`/tenant/employees/${employeeId}/shifts/${shiftId}`, shiftData);
   }
 
   async deleteEmployeeShift(employeeId: string, shiftId: string): Promise<any> {
-    return this.request(`/tenant/employees/${employeeId}/shifts/${shiftId}`, {
-      method: 'DELETE',
-    });
+    return this.delete(`/tenant/employees/${employeeId}/shifts/${shiftId}`);
   }
 
   async getEmployeeBreaks(employeeId: string): Promise<any> {
-    return this.request(`/tenant/employees/${employeeId}/breaks`);
+    return this.get(`/tenant/employees/${employeeId}/breaks`);
   }
 
   async createEmployeeBreak(employeeId: string, breakData: {
@@ -1299,23 +1288,15 @@ class TenantApiAdapter {
     endDate?: string | null;
     referenceDate?: string | null;
   }): Promise<any> {
-    return this.request(`/tenant/employees/${employeeId}/breaks`, {
-      method: 'POST',
-      body: JSON.stringify(breakData),
-    });
+    return this.post(`/tenant/employees/${employeeId}/breaks`, breakData);
   }
 
   async updateEmployeeBreak(employeeId: string, breakId: string, breakData: any): Promise<any> {
-    return this.request(`/tenant/employees/${employeeId}/breaks/${breakId}`, {
-      method: 'PUT',
-      body: JSON.stringify(breakData),
-    });
+    return this.put(`/tenant/employees/${employeeId}/breaks/${breakId}`, breakData);
   }
 
   async deleteEmployeeBreak(employeeId: string, breakId: string): Promise<any> {
-    return this.request(`/tenant/employees/${employeeId}/breaks/${breakId}`, {
-      method: 'DELETE',
-    });
+    return this.delete(`/tenant/employees/${employeeId}/breaks/${breakId}`);
   }
 
   async getDashboardStats(): Promise<any> {
