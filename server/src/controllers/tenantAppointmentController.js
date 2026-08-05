@@ -964,6 +964,8 @@ exports.createAppointment = async (req, res) => {
                 });
             }
 
+            finalAppointments.forEach(attachCanonicalFinancialState);
+
             await transaction.commit();
             return res.status(201).json({
                 success: true,
@@ -1348,6 +1350,8 @@ exports.createAppointment = async (req, res) => {
         } catch (notificationError) {
             console.warn('Tenant appointment notification warning:', notificationError.message);
         }
+
+        attachCanonicalFinancialState(finalAppointment);
 
         res.status(201).json({
             success: true,
@@ -2114,6 +2118,7 @@ exports.getAppointment = async (req, res) => {
  * PATCH /api/v1/tenant/appointments/:id/status
  */
 exports.updateAppointmentStatus = async (req, res) => {
+    let appointment = null;
     const transaction = await db.sequelize.transaction();
     try {
         const tenantId = req.tenantId;
@@ -2129,7 +2134,7 @@ exports.updateAppointmentStatus = async (req, res) => {
             });
         }
 
-        const appointment = await db.Appointment.findOne({
+        appointment = await db.Appointment.findOne({
             where: { id },
             include: [
                 {
@@ -2424,14 +2429,24 @@ exports.updateAppointmentStatus = async (req, res) => {
         });
     } catch (error) {
         try { if (transaction && !transaction.finished) await transaction.rollback(); } catch (_) {}
+        
         console.error('Update appointment status error:', error);
+        
+        const debugInfo = {
+            id: req.params.id,
+            currentStatus: appointment ? appointment.status : null,
+            requestedStatus: req.body?.status,
+            paymentStatus: appointment ? appointment.paymentStatus : null,
+            remainingBalance: appointment ? appointment.remainingBalance : null
+        };
+        console.log('BUG 2 TRACE:', debugInfo);
+
         res.status(500).json({
-            success: false,
-            message: 'Failed to update appointment status',
-            error: error.message,
-            stack: error.stack,
-            appointment_id: req.params.id,
-            requestedStatus: req.body?.status
+            error: {
+                message: error.message,
+                stack: error.stack
+            },
+            appointment: debugInfo
         });
     }
 };
