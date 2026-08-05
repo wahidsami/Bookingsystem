@@ -276,7 +276,7 @@ export default function SchedulerGrid({
   const slotsPerHour = 60 / slotMinutes;
   const slotCount = Math.max(1, Math.round(((endHour - startHour) * 60) / slotMinutes));
   const gridTemplateColumns = useMemo(
-    () => `${timeColumnWidth}px repeat(${Math.max(columns.length, 1)}, minmax(${Math.max(120, staffColumnWidth)}px, 1fr))`,
+    () => `${timeColumnWidth}px repeat(${Math.max(columns.length, 1)}, minmax(${Math.max(50, staffColumnWidth)}px, 1fr))`,
     [columns.length, staffColumnWidth, timeColumnWidth]
   );
   const visibleDateKey = getRiyadhDateKey(boardCurrentTime);
@@ -484,7 +484,7 @@ export default function SchedulerGrid({
           return (
           <div
             key={column.id}
-            className={`min-w-0 border-r last:border-r-0 border-slate-200 px-3 py-2 flex items-center justify-between gap-3 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''}`}
+            className={`min-w-0 overflow-hidden border-r last:border-r-0 border-slate-200 px-1.5 py-2 flex items-center justify-between gap-1 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''}`}
           >
             <div className="min-w-0 flex items-center gap-2">
               {column.avatar ? (

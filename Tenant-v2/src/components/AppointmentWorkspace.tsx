@@ -4215,7 +4215,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   { key: 'gridWidth', labelEn: 'Grid Width', labelAr: 'عرض اللوحة', min: 80, max: 160, step: 1, suffix: '%' },
                   { key: 'gridHeight', labelEn: 'Grid Height', labelAr: 'ارتفاع اللوحة', min: 420, max: 1400, step: 10, suffix: 'px' },
                   { key: 'timeSlotHeight', labelEn: 'Time Slot Height', labelAr: 'ارتفاع الخانة الزمنية', min: 8, max: 24, step: 1, suffix: 'px' },
-                  { key: 'staffColumnWidth', labelEn: 'Staff Column Width', labelAr: 'عرض عمود الموظف', min: 180, max: 360, step: 5, suffix: 'px' }
+                  { key: 'staffColumnWidth', labelEn: 'Staff Column Width', labelAr: 'عرض عمود الموظف', min: 50, max: 360, step: 5, suffix: 'px' }
                 ].map((field) => (
                   <label key={field.key} className="space-y-2 rounded-xl border border-slate-100 bg-slate-50/70 p-4">
                     <div className="flex items-center justify-between gap-2">
