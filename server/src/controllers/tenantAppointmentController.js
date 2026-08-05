@@ -908,8 +908,12 @@ exports.createAppointment = async (req, res) => {
             });
 
             let finalAppointments = fullAppointments;
-            const requestedAmount = Number(amount) || session.totalAmount;
-            if (paymentStatus === 'paid' || requestedAmount > 0 || (Array.isArray(paymentAllocations) && paymentAllocations.length > 0)) {
+            const hasExplicitPayment = paymentStatus === 'paid' || 
+                (amount !== undefined && amount !== null && Number(amount) >= 0) || 
+                (Array.isArray(paymentAllocations) && paymentAllocations.length > 0);
+
+            if (hasExplicitPayment) {
+                const requestedAmount = (amount !== undefined && amount !== null) ? Number(amount) : session.totalAmount;
                 const { processAppointmentPayment } = require('../services/appointmentPaymentService');
                 await processAppointmentPayment({
                     tenantId,
@@ -1217,8 +1221,12 @@ exports.createAppointment = async (req, res) => {
         });
 
         let finalAppointment = fullAppointment;
-        const requestedAmount = Number(amount) || bookingSession.totalAmount;
-        if (paymentStatus === 'paid' || requestedAmount > 0 || (Array.isArray(paymentAllocations) && paymentAllocations.length > 0)) {
+        const hasExplicitPayment = paymentStatus === 'paid' || 
+            (amount !== undefined && amount !== null && Number(amount) >= 0) || 
+            (Array.isArray(paymentAllocations) && paymentAllocations.length > 0);
+
+        if (hasExplicitPayment) {
+            const requestedAmount = (amount !== undefined && amount !== null) ? Number(amount) : bookingSession.totalAmount;
             const { processAppointmentPayment } = require('../services/appointmentPaymentService');
             await processAppointmentPayment({
                 tenantId,
@@ -2204,7 +2212,7 @@ exports.updateAppointmentStatus = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 code: 'APPOINTMENT_PAYMENT_REQUIRED',
-                message: 'Appointment cannot be completed until payment is settled.'
+                message: 'You cannot complete this appointment until payment has been completed.'
             });
         }
 
@@ -2437,25 +2445,7 @@ exports.updatePaymentStatus = async (req, res) => {
         const tenantId = req.tenantId;
         const { id } = req.params;
         const { paymentStatus, paymentMethod, amount, paymentAllocations, transactionRef, notes } = req.body;
-        const requestId = `pay_${Date.now()}_${id}`;
-        const tracePaymentSnapshot = (label, appointment, invoice = null, bookingSession = null) => {
-            forensicTrace.log(label, {
-                appointmentId: appointment?.id || null,
-                bookingSessionId: bookingSession?.id || appointment?.bookingSessionId || appointment?.bookingSession?.id || null,
-                paymentStatus: appointment?.paymentStatus || null,
-                totalPaid: appointment?.totalPaid ?? null,
-                remainingAmount: appointment?.remainderAmount ?? null,
-                outstandingAmount: appointment?.outstandingAmount ?? null,
-                invoiceId: invoice?.id || null,
-                invoiceItemsCount: Array.isArray(invoice?.customerInvoiceItems) ? invoice.customerInvoiceItems.length : 0,
-                bookingSessionAppointmentCount: Array.isArray(bookingSession?.appointments)
-                    ? bookingSession.appointments.length
-                    : Array.isArray(appointment?.bookingSession?.appointments)
-                        ? appointment.bookingSession.appointments.length
-                        : 0
-            });
-        };
-
+        
         const validPaymentStatuses = [
             APPOINTMENT_PAYMENT_STATUS.PENDING,
             APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID,
@@ -2520,259 +2510,23 @@ exports.updatePaymentStatus = async (req, res) => {
             });
         }
 
-        const previousTotalPaid = parseFloat(appointment.totalPaid || 0);
-        const previousPaymentStatus = appointment.paymentStatus;
-        const previousPaymentMethod = appointment.paymentMethod || null;
-        forensicTrace.log('request snapshot', {
-            appointmentId: appointment.id,
-            bookingSessionId: appointment.bookingSessionId || appointment.bookingSession?.id || null,
-            paymentStatusBefore: previousPaymentStatus,
-            totalPaidBefore: previousTotalPaid,
-            remainingAmountBefore: appointment.remainderAmount ?? null,
-            outstandingAmountBefore: appointment.outstandingAmount ?? null
-        });
-
-        if (hasSessionCheckout) {
-            const { processAppointmentPayment } = require('../services/appointmentPaymentService');
-            const { appointment: updatedAppt } = await processAppointmentPayment({
-                tenantId,
-                appointment,
-                amount,
-                paymentMethod,
-                paymentAllocations,
-                transactionRef,
-                notes,
-                forensicTrace,
-                transaction
-            });
-            Object.assign(appointment, updatedAppt.dataValues || updatedAppt);
-            attachCanonicalFinancialState(appointment);
-
-            await transaction.commit();
-
-            try {
-                const primaryInvoice = await ensureAppointmentInvoice(appointment.id, {
-                    triggerSource: 'tenant_dashboard_booking_session_payment_update'
-                });
-                if (primaryInvoice?.id) {
-                    await sendCustomerInvoiceLifecycleEmail(primaryInvoice.id);
-                }
-                tracePaymentSnapshot('committed', appointment, primaryInvoice, bookingSession);
-            } catch (invoiceError) {
-                console.warn('Tenant booking payment invoice email warning:', invoiceError.message);
-            }
-
-            res.json({
-                success: true,
-                message: 'Payment status updated successfully',
-                appointment
-            });
-            return;
-        }
-
-        logTenantAppointmentAudit('payment_update_requested', {
-            requestId,
+        const { processAppointmentPayment } = require('../services/appointmentPaymentService');
+        const { appointment: updatedAppt } = await processAppointmentPayment({
             tenantId,
-            appointmentId: id,
-            previousPaymentStatus,
-            requestedPaymentStatus: paymentStatus,
-            previousTotalPaid,
-            requestedPaymentMethod: paymentMethod || null
-        }, forensicTrace);
-
-        appointment.paymentStatus = paymentStatus;
-        if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) {
-            appointment.paidAt = new Date();
-            appointment.depositAmount = 0;
-            appointment.depositPaid = true;
-            appointment.remainderAmount = 0;
-            appointment.remainderPaid = true;
-            appointment.totalPaid = appointment.price;
-            if (appointment.status === 'pending') {
-                appointment.status = 'confirmed';
-            }
-        } else if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
-            appointment.depositPaid = true;
-            appointment.remainderPaid = false;
-            if (!appointment.depositAmount || parseFloat(appointment.depositAmount) === 0) {
-                const splitPayment = await calculateSplitPayment(tenantId, appointment.price || 0);
-                appointment.depositAmount = splitPayment.depositAmount;
-                appointment.remainderAmount = splitPayment.remainderAmount;
-                appointment.totalPaid = splitPayment.depositAmount;
-            }
-            const appointmentTotalPrice = parseFloat(appointment.price || 0);
-            const totalPaid = parseFloat(appointment.totalPaid || 0);
-            const fullyCovered = Number.isFinite(appointmentTotalPrice) && Number.isFinite(totalPaid) && appointmentTotalPrice > 0 && totalPaid >= appointmentTotalPrice;
-            if (fullyCovered) {
-                appointment.paymentStatus = APPOINTMENT_PAYMENT_STATUS.FULLY_PAID;
-                appointment.remainderAmount = 0;
-                appointment.remainderPaid = true;
-            }
-            appointment.paidAt = appointment.paidAt || new Date();
-            if (appointment.status === 'pending') {
-                appointment.status = 'confirmed';
-            }
-        } else if (paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING) {
-            appointment.paidAt = null;
-            appointment.depositPaid = false;
-            appointment.remainderPaid = false;
-            appointment.totalPaid = 0;
-        }
-
-        const nextTotalPaid = parseFloat(appointment.totalPaid || 0);
-        const paymentDelta = parseFloat((nextTotalPaid - previousTotalPaid).toFixed(2));
-        const normalizedPaymentAllocations = paymentDelta > 0 && Array.isArray(paymentAllocations) && paymentAllocations.length > 0
-            ? normalizePaymentAllocations({
-                amount: paymentDelta,
-                paymentMethod,
-                paymentAllocations,
-                fallbackSource: paymentMethod || appointment.paymentMethod || 'cash'
-            })
-            : null;
-        const resolvedPaymentMethod = normalizedPaymentAllocations
-            ? (normalizedPaymentAllocations.length > 1
-                ? 'split'
-                : normalizedPaymentAllocations[0]?.paymentMethod || paymentMethod || appointment.paymentMethod || null)
-            : (paymentMethod || appointment.paymentMethod || null);
-        if (resolvedPaymentMethod) {
-            appointment.paymentMethod = resolvedPaymentMethod;
-        }
-
-        attachCanonicalFinancialState(appointment);
-        await appointment.save({ transaction });
-
-        await createAppointmentEventSafe({
-            appointmentId: appointment.id,
-            tenantId,
-            platformUserId: appointment.platformUserId,
-            actorType: 'tenant',
-            actorId: req.userId || null,
-            eventType: 'tenant_payment_status_changed',
-            payload: {
-                fromPaymentStatus: previousPaymentStatus,
-                toPaymentStatus: paymentStatus,
-                previousTotalPaid,
-                nextTotalPaid,
-                paymentDelta,
-                fromPaymentMethod: previousPaymentMethod,
-                toPaymentMethod: appointment.paymentMethod || null,
-                transactionRef: transactionRef || null,
-                notes: notes || null
-            },
-            occurredAt: new Date(),
+            appointment,
+            amount,
+            paymentMethod,
+            paymentAllocations,
+            transactionRef,
+            notes,
+            forensicTrace,
             transaction
         });
 
-        if (paymentDelta > 0) {
-            const transactionType = paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
-                ? 'deposit'
-                : previousPaymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
-                    ? 'remainder'
-                    : 'full';
-            if (normalizedPaymentAllocations) {
-                const createdPaymentBatch = await createAppointmentPaymentTransactions({
-                    appointment,
-                    type: transactionType,
-                    amount: paymentDelta,
-                    paymentMethod: resolvedPaymentMethod || paymentMethod || appointment.paymentMethod || 'cash',
-                    paymentAllocations: normalizedPaymentAllocations,
-                    processedBy: null,
-                    transactionRef: transactionRef || `APT-PAY-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
-                    notes: notes || (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
-                        ? 'Deposit collected from tenant dashboard'
-                        : 'Full payment collected from tenant dashboard'),
-                    source: 'tenant_appointment_payment_status_update',
-                    transaction,
-                    forensicTrace
-                });
-                if (Array.isArray(createdPaymentBatch?.paymentTransactions)) {
-                    forensicPaymentTransactionIds.push(
-                        ...createdPaymentBatch.paymentTransactions.map((entry) => entry.id).filter(Boolean)
-                    );
-                }
-            } else {
-                const createdPaymentTransaction = await createAppointmentTransaction({
-                    appointmentId: appointment.id,
-                    type: transactionType,
-                    amount: paymentDelta,
-                    paymentMethod: resolveLedgerPaymentMethod(
-                        paymentMethod || appointment.paymentMethod,
-                        paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID
-                            ? appointment.paymentMethod || 'cash'
-                            : 'cash'
-                    ),
-                    status: 'completed',
-                    transactionRef: transactionRef || `APT-PAY-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
-                    processedBy: null,
-                    processedAt: appointment.paidAt || new Date(),
-                    notes: notes || (paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
-                        ? 'Deposit collected from tenant dashboard'
-                        : 'Full payment collected from tenant dashboard'),
-                    metadata: {
-                        source: 'tenant_appointment_payment_status_update',
-                        previousTotalPaid,
-                        nextTotalPaid,
-                        previousPaymentStatus,
-                        nextPaymentStatus: paymentStatus
-                    }
-                }, { transaction, forensicTrace });
-                if (createdPaymentTransaction?.id) {
-                    forensicPaymentTransactionIds.push(createdPaymentTransaction.id);
-                }
-            }
-        }
-
-        attachCanonicalFinancialState(appointment);
-
-        if (appointment.platformUserId && paymentDelta > 0) {
-            await db.PlatformUser.increment('totalSpent', {
-                by: paymentDelta,
-                where: { id: appointment.platformUserId },
-                transaction
-            });
-
-            await db.CustomerInsight.increment('totalSpent', {
-                by: paymentDelta,
-                where: { platformUserId: appointment.platformUserId, tenantId },
-                transaction
-            });
-        }
-
+        Object.assign(appointment, updatedAppt.dataValues || updatedAppt);
         attachCanonicalFinancialState(appointment);
 
         await transaction.commit();
-        forensicTrace.log('COMMIT', {
-            scope: 'updatePaymentStatus',
-            appointmentId: appointment.id,
-            paymentStatus: appointment.paymentStatus,
-            paymentTransactionIds: forensicPaymentTransactionIds
-        });
-        logTenantAppointmentAudit('payment_update_committed', {
-            requestId,
-            tenantId,
-            appointmentId: appointment.id,
-            previousPaymentStatus,
-            nextPaymentStatus: appointment.paymentStatus,
-            previousTotalPaid,
-            nextTotalPaid: parseFloat(appointment.totalPaid || 0),
-            paymentDelta,
-            paymentMethod: appointment.paymentMethod || null
-        }, forensicTrace);
-
-            try {
-                await appointmentLifecycleService.notifyPaymentCollected(appointment, {
-                    paymentStatus,
-                    paymentDelta,
-                    paymentMethod: appointment.paymentMethod,
-                    transactionRef
-                });
-            } catch (notificationError) {
-                forensicTrace.log('Exception', {
-                    scope: 'updatePaymentStatus.notification',
-                    message: notificationError?.message || String(notificationError),
-                    stack: notificationError?.stack || null
-                });
-            }
 
         try {
             const invoice = await ensureAppointmentInvoice(appointment.id, {
@@ -2782,24 +2536,10 @@ exports.updatePaymentStatus = async (req, res) => {
             if (invoice?.id) {
                 await sendCustomerInvoiceLifecycleEmail(invoice.id);
             }
-            tracePaymentSnapshot('committed', appointment, invoice, appointment.bookingSession || null);
-            const verification = {
-                appointmentExists: await db.Appointment.count({ where: { id: appointment.id }, logging: forensicTrace.sqlLogger }),
-                paymentTransactionsExist: forensicPaymentTransactionIds.length > 0
-                    ? await db.PaymentTransaction.count({
-                        where: { id: forensicPaymentTransactionIds[0] },
-                        logging: forensicTrace.sqlLogger
-                    })
-                    : 0,
-                invoiceExists: invoice?.id ? await db.CustomerInvoice.count({ where: { id: invoice.id }, logging: forensicTrace.sqlLogger }) : 0,
-                invoiceItemsExist: invoice?.id ? await db.CustomerInvoiceItem.count({ where: { invoiceId: invoice.id }, logging: forensicTrace.sqlLogger }) : 0
-            };
-            forensicTrace.log('Post-commit verification', verification);
         } catch (invoiceError) {
             forensicTrace.log('Exception', {
                 scope: 'updatePaymentStatus.invoiceEmail',
-                message: invoiceError?.message || String(invoiceError),
-                stack: invoiceError?.stack || null
+                message: invoiceError?.message || String(invoiceError)
             });
         }
 
@@ -2814,11 +2554,7 @@ exports.updatePaymentStatus = async (req, res) => {
             scope: 'updatePaymentStatus',
             message: error?.message || String(error)
         });
-        forensicTrace.log('Exception', {
-            message: error?.message || String(error),
-            stack: error?.stack || null,
-            statusCode: 500
-        });
+        console.error('Update payment status error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to update payment status',
