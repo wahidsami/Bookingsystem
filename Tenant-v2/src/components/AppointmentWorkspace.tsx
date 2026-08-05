@@ -2566,33 +2566,59 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       : activeAppointment.notes;
 
     setStatusUpdating(true);
+    let patchSuccess = false;
+    let patchResponse: any = null;
+
     try {
-      const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, normalizedNext, finalNotes);
-      if (!response?.success) {
-        throw new Error(response?.message || 'Failed to update appointment status');
+      console.log("[STATUS] Step 1 - Sending PATCH");
+      patchResponse = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, normalizedNext, finalNotes);
+      if (!patchResponse?.success) {
+        throw new Error(patchResponse?.message || 'Failed to update appointment status');
+      }
+      patchSuccess = true;
+      console.log("[STATUS] Step 2 - PATCH completed", patchResponse);
+
+      // Optimistically update local state immediately using the backend's returned payload
+      const serverAppt = patchResponse.appointment || patchResponse.data?.appointment;
+      if (serverAppt) {
+        setActiveAppointment(mapBoardAppointment(serverAppt, getSelectedDateKey()));
+        console.log("[STATUS] Step 2.5 - Optimistic state updated");
       }
 
-      await loadBoardData();
-      const refreshed = await tenantApiAdapter.getAppointment(activeAppointment.id);
-      const refreshedData = refreshed?.appointment || refreshed?.data?.appointment || refreshed?.data || refreshed;
-      if (refreshedData) {
-        setActiveAppointment(mapBoardAppointment(refreshedData, getSelectedDateKey()));
-      }
-      setCustomerProfileRefreshToken(token => token + 1);
       addLocalToast(
         isRtl ? 'تم تحديث حالة الموعد بنجاح.' : 'Appointment status updated successfully.',
         isRtl ? 'Appointment status updated successfully.' : 'تم تحديث حالة الموعد بنجاح.',
         'success'
       );
-    } catch (err) {
-      console.error('Failed to update appointment status', err);
+    } catch (err: any) {
+      console.error("[STATUS FAILED]", err);
+      console.error(err.stack);
       addLocalToast(
-        isRtl ? 'تعذر تحديث حالة الموعد.' : 'Unable to update appointment status.',
-        isRtl ? 'Unable to update appointment status.' : 'تعذر تحديث حالة الموعد.',
+        err.message || 'Unable to update appointment status.',
+        err.message || 'Unable to update appointment status.',
         'warning'
       );
     } finally {
       setStatusUpdating(false);
+    }
+
+    if (patchSuccess) {
+      try {
+        await loadBoardData();
+        console.log("[STATUS] Step 3 - refreshAppointments completed");
+
+        const refreshed = await tenantApiAdapter.getAppointment(activeAppointment.id);
+        console.log("[STATUS] Step 4 - refreshBooking completed");
+
+        const refreshedData = refreshed?.appointment || refreshed?.data?.appointment || refreshed?.data || refreshed;
+        if (refreshedData) {
+          setActiveAppointment(mapBoardAppointment(refreshedData, getSelectedDateKey()));
+        }
+        setCustomerProfileRefreshToken(token => token + 1);
+        console.log("[STATUS] Step 5 - Background refresh state updated");
+      } catch (bgErr) {
+        console.error("[STATUS BACKGROUND REFRESH FAILED]", bgErr);
+      }
     }
   };
 

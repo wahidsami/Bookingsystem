@@ -2126,13 +2126,18 @@ exports.updateAppointmentStatus = async (req, res) => {
         const { status, notes } = req.body;
         const normalizedStatus = normalizeAppointmentStatus(status);
 
+        console.log('[TRACE] Incoming status update request for appointment:', id);
+        console.log('[TRACE] Requested status:', normalizedStatus);
+        console.log('[TRACE] Validation currently executing: isValidAppointmentStatus');
         if (!isValidAppointmentStatus(normalizedStatus)) {
+            console.log('[TRACE] Validation failed: isValidAppointmentStatus (Invalid status)');
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: 'Invalid status'
             });
         }
+        console.log('[TRACE] Validation passed: isValidAppointmentStatus');
 
         appointment = await db.Appointment.findOne({
             where: { id },
@@ -2185,14 +2190,24 @@ exports.updateAppointmentStatus = async (req, res) => {
             transaction
         });
 
+        console.log('[TRACE] Validation currently executing: appointment exists');
         if (!appointment) {
+            console.log('[TRACE] Validation failed: appointment exists (Not found)');
             await transaction.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'Appointment not found'
             });
         }
+        console.log('[TRACE] Validation passed: appointment exists');
+        
+        console.log('[TRACE] Current status:', appointment.status);
+        console.log('[TRACE] paymentStatus:', appointment.paymentStatus);
+        console.log('[TRACE] totalPaid:', appointment.totalPaid);
+        console.log('[TRACE] remainingBalance:', appointment.remainingBalance);
+        console.log('[TRACE] appointmentId:', appointment.id);
 
+        console.log('[TRACE] Validation currently executing: transition validation');
         if (
             appointment.status !== normalizedStatus &&
             !canTransitionAppointmentStatus(
@@ -2201,18 +2216,22 @@ exports.updateAppointmentStatus = async (req, res) => {
                 TENANT_APPOINTMENT_TRANSITIONS
             )
         ) {
+            console.log(`[TRACE] Validation failed: transition validation (Cannot change from ${appointment.status} to ${normalizedStatus})`);
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: `Cannot change appointment from ${appointment.status} to ${normalizedStatus}`
             });
         }
+        console.log('[TRACE] Validation passed: transition validation');
 
+        console.log('[TRACE] Validation currently executing: payment status for completion');
         const isSettledByAmount = (parseFloat(appointment.remainderAmount ?? 0) <= 0.009) && (parseFloat(appointment.outstandingAmount || 0) <= 0.009);
         const isSettledByStatus = isAppointmentFullyPaid(appointment.paymentStatus) || `${appointment.paymentStatus || ''}`.trim().toLowerCase() === 'paid';
         const previousStatus = appointment.status;
 
         if (normalizedStatus === 'completed' && appointment.status !== 'completed' && !isSettledByAmount && !isSettledByStatus) {
+            console.log('[TRACE] Validation failed: payment status for completion (Payment required)');
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
@@ -2220,6 +2239,7 @@ exports.updateAppointmentStatus = async (req, res) => {
                 message: 'You cannot complete this appointment until payment has been completed.'
             });
         }
+        console.log('[TRACE] Validation passed: payment status for completion');
 
         appointment.status = normalizedStatus;
         if (notes !== undefined) {
@@ -2235,7 +2255,10 @@ exports.updateAppointmentStatus = async (req, res) => {
             appointment.noShowMarkedAt = new Date();
         }
 
+        console.log('[TRACE] Validation currently executing: save()');
         await appointment.save({ transaction });
+        console.log('[TRACE] Validation passed: save()');
+
         await createAppointmentEventSafe({
             appointmentId: appointment.id,
             tenantId,
@@ -2422,6 +2445,52 @@ exports.updateAppointmentStatus = async (req, res) => {
             console.warn('Tenant booking status notification warning:', notificationError.message);
         }
 
+        console.log('[TRACE] returning response successfully');
+        
+        // Rebuild the response from a fresh canonical database read
+        await appointment.reload({
+            include: [
+                {
+                    model: db.Service,
+                    as: 'service',
+                    where: { tenantId },
+                    required: true
+                },
+                {
+                    model: db.BookingSession,
+                    as: 'bookingSession',
+                    required: false,
+                    include: [
+                        {
+                            model: db.Appointment,
+                            as: 'appointments',
+                            required: false,
+                            include: [
+                                {
+                                    model: db.Service,
+                                    as: 'service',
+                                    attributes: ['id', 'name_en', 'name_ar', 'duration'],
+                                    required: true
+                                },
+                                {
+                                    model: db.Staff,
+                                    as: 'staff',
+                                    attributes: ['id', 'name', 'photo'],
+                                    required: false
+                                },
+                                {
+                                    model: db.PlatformUser,
+                                    as: 'user',
+                                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', ['profileImage', 'photo']],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
         res.json({
             success: true,
             message: 'Appointment status updated successfully',
@@ -2431,6 +2500,7 @@ exports.updateAppointmentStatus = async (req, res) => {
         try { if (transaction && !transaction.finished) await transaction.rollback(); } catch (_) {}
         
         console.error('Update appointment status error:', error);
+        console.log('[TRACE] Exception caught in updateAppointmentStatus:', error.message);
         
         const debugInfo = {
             id: req.params.id,
