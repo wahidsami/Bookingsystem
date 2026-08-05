@@ -59,6 +59,11 @@ const normalizePaymentMethod = (method, fallbackSource = 'cash') => {
 };
 
 const normalizePaymentAllocations = ({ amount, paymentMethod, paymentAllocations, fallbackSource = 'cash' }) => {
+    console.log('[PAYMENT-ENGINE-TRACE] normalizePaymentAllocations entry:', {
+        amount,
+        paymentMethod,
+        paymentAllocationsLength: paymentAllocations?.length
+    });
     console.log('--- splitPaymentService INSIDE normalizePaymentAllocations (Start) ---');
     console.log(`amount: ${amount}`);
     console.log(`paymentMethod: ${paymentMethod}`);
@@ -358,6 +363,13 @@ const createAppointmentPaymentTransactions = async ({
     transaction = null,
     forensicTrace = null
 }) => {
+    console.log('[PAYMENT-ENGINE-TRACE] createAppointmentPaymentTransactions entry:', {
+        appointmentId: appointment?.id,
+        type,
+        amount,
+        paymentMethod,
+        paymentAllocationsLength: paymentAllocations?.length
+    });
     const allocations = normalizePaymentAllocations({
         amount,
         paymentMethod,

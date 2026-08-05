@@ -36,6 +36,13 @@ async function processAppointmentPayment({
     forensicTrace,
     transaction
 }) {
+    console.log('[PAYMENT-ENGINE-TRACE] processAppointmentPayment entry:', {
+        appointmentId: appointment?.id,
+        amount,
+        paymentMethod,
+        paymentAllocationsLength: paymentAllocations?.length
+    });
+
     if (!transaction) {
         throw new Error('processAppointmentPayment requires a transaction');
     }
