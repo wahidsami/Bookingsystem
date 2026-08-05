@@ -479,29 +479,16 @@ function getTransactionReferenceAmount(transaction) {
 }
 
 function getTransactionDiscountAmount(transaction, invoice = null) {
-    const appointment = transaction?.appointment;
-    const order = transaction?.order;
     const invoiceDiscount = Number(invoice?.discountAmount ?? 0);
-
+    
     if (Number.isFinite(invoiceDiscount) && invoiceDiscount > 0) {
         return invoiceDiscount;
     }
 
-    if (appointment) {
-        const rawPrice = Number(appointment.rawPrice ?? 0);
-        const price = Number(appointment.price ?? 0);
-        return Math.max(Number.isFinite(invoiceDiscount) ? invoiceDiscount : 0, Math.max(rawPrice - price, 0));
-    }
-
-    if (order) {
-        const subtotal = Number(order.subtotal ?? 0);
-        const taxAmount = Number(order.taxAmount ?? 0);
-        const shippingFee = Number(order.shippingFee ?? 0);
-        const totalAmount = Number(order.totalAmount ?? 0);
-        return Math.max(Number.isFinite(invoiceDiscount) ? invoiceDiscount : 0, Math.max((subtotal + taxAmount + shippingFee) - totalAmount, 0));
-    }
-
-    return Number.isFinite(invoiceDiscount) ? invoiceDiscount : 0;
+    // Mathematical derivation was removed here to prevent VAT double-counting.
+    // Accepted sources: invoice discount, coupon, voucher, gift card, manual discount.
+    // If none exists, return 0.
+    return 0;
 }
 
 function getTransactionServiceLabel(transaction) {

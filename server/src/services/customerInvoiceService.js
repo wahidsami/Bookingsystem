@@ -40,11 +40,8 @@ function getOrderInvoiceDiscountAmount(order) {
         return 0;
     }
 
-    const subtotal = formatAmount(order.subtotal ?? 0);
-    const taxAmount = formatAmount(order.taxAmount ?? 0);
-    const shippingFee = formatAmount(order.shippingFee ?? 0);
-    const totalAmount = formatAmount(order.totalAmount ?? 0);
-    return formatAmount(Math.max((subtotal + taxAmount + shippingFee) - totalAmount, 0));
+    // Mathematical derivation removed. Only use explicit discounts.
+    return formatAmount(Number(order.discountAmount ?? 0));
 }
 
 function safeJsonObject(value) {

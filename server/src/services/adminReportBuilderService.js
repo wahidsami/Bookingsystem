@@ -382,7 +382,8 @@ async function fetchTransactionFacts(config, opts = {}) {
 
     if (opts.productMode && Array.isArray(order.items) && order.items.length > 0) {
       const baseRevenue = order.items.reduce((sum, item) => sum + toNumber(item.totalPrice), 0) || 1;
-      const baseDiscount = Math.max((toNumber(order.subtotal) + toNumber(order.taxAmount) + toNumber(order.shippingFee)) - toNumber(order.totalAmount), 0);
+      // Mathematical derivation removed. Only use explicit discounts.
+      const baseDiscount = toNumber(order.discountAmount ?? 0);
       order.items.forEach((item) => {
         const share = toNumber(item.totalPrice) / baseRevenue;
         const productName = item.productName || item.product?.name_en || item.product?.name_ar || 'Product';
