@@ -5490,7 +5490,30 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     </div>
 
                     {/* SPLIT PAYMENTS COMPONENT CONTAINER */}
-                    <div className="pt-3 border-t border-slate-100 space-y-3">
+                    {(() => {
+                      const isAlreadyFullyPaid = 
+                        activeAppointment.paymentStatus === 'paid' || 
+                        activeAppointment.paymentStatus === 'fully_paid' || 
+                        (activeInvoiceTotal > 0 && Math.max(0, activeInvoiceTotal - Number(activeAppointment.totalPaid ?? 0)) <= 0);
+
+                      if (isAlreadyFullyPaid) {
+                        return (
+                          <div className="pt-3 border-t border-slate-100 mt-2">
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 flex flex-col items-center justify-center gap-2 text-emerald-800 text-center shadow-sm">
+                              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-1">
+                                <CheckCircle2 size={26} className="text-emerald-600" />
+                              </div>
+                              <h4 className="font-black text-sm">{isRtl ? 'تم السداد بالكامل' : 'Payment Completed'}</h4>
+                              <p className="text-xs font-bold opacity-90">
+                                {isRtl ? 'المبلغ المسدد:' : 'Amount Paid:'} <span className="font-mono">{Number(activeAppointment.totalPaid ?? 0).toFixed(2)} {t.riyal}</span>
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <>
+                          <div className="pt-3 border-t border-slate-100 space-y-3">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                           {isRtl ? 'طريقة الدفع' : 'Payment method'}
@@ -5590,12 +5613,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                     {/* Checkout and Complete operation */}
                     <div className="pt-3">
-                      {activeAppointment.paymentStatus === 'paid' ? (
-                        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-3 rounded-lg flex items-center gap-2 text-xs font-bold">
-                          <Check size={16} />
-                          <span>{isRtl ? 'تم سداد الفاتورة بنجاح' : 'Payment completed successfully'}</span>
-                        </div>
-                      ) : (
                         <button
                           disabled={!selectedPaymentMethod.trim()}
                           onClick={() => {
@@ -5616,8 +5633,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           <CheckCircle2 size={15} className="text-amber-400" />
                           <span>{t.checkout}</span>
                         </button>
-                      )}
+                    </div>
+                        </>
+                      );
+                    })()}
 
+                    <div className="pt-3">
                       {refundableAmount > 0.009 && (
                         <div className="mt-3 space-y-2">
                           <div className="grid grid-cols-2 gap-2 text-[10px]">
