@@ -909,7 +909,7 @@ exports.createAppointment = async (req, res) => {
 
             let finalAppointments = fullAppointments;
             const hasExplicitPayment = paymentStatus === 'paid' || 
-                (amount !== undefined && amount !== null && Number(amount) >= 0) || 
+                (amount !== undefined && amount !== null && Number(amount) > 0) || 
                 (Array.isArray(paymentAllocations) && paymentAllocations.length > 0);
 
             if (hasExplicitPayment) {
@@ -1222,7 +1222,7 @@ exports.createAppointment = async (req, res) => {
 
         let finalAppointment = fullAppointment;
         const hasExplicitPayment = paymentStatus === 'paid' || 
-            (amount !== undefined && amount !== null && Number(amount) >= 0) || 
+            (amount !== undefined && amount !== null && Number(amount) > 0) || 
             (Array.isArray(paymentAllocations) && paymentAllocations.length > 0);
 
         if (hasExplicitPayment) {
@@ -2423,12 +2423,15 @@ exports.updateAppointmentStatus = async (req, res) => {
             appointment
         });
     } catch (error) {
-        await transaction.rollback();
+        try { if (transaction && !transaction.finished) await transaction.rollback(); } catch (_) {}
         console.error('Update appointment status error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to update appointment status',
-            error: error.message
+            error: error.message,
+            stack: error.stack,
+            appointment_id: req.params.id,
+            requestedStatus: req.body?.status
         });
     }
 };
