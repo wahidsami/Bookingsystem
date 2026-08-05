@@ -1537,9 +1537,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   ] : [];
   const activeInvoiceSubtotal = activeInvoiceLineItems.reduce((sum, item) => sum + item.subtotal, 0);
   const activeInvoiceDiscount = Number(appliedGiftCardAmount || 0);
-  const activeInvoiceTaxable = Math.max(0, activeInvoiceSubtotal - activeInvoiceDiscount);
-  const activeInvoiceVat = Number((activeInvoiceTaxable * 0.15).toFixed(2));
-  const activeInvoiceTotal = Number((activeInvoiceTaxable + activeInvoiceVat).toFixed(2));
+  const activeInvoiceTotal = Math.max(0, activeInvoiceSubtotal - activeInvoiceDiscount);
+  const activeInvoiceTaxable = Number((activeInvoiceTotal / 1.15).toFixed(2));
+  const activeInvoiceVat = Number((activeInvoiceTotal - activeInvoiceTaxable).toFixed(2));
   const activeInvoiceRemaining = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0) - Number(splitAmounts.wallet || 0));
   const currentPaymentStatus = resolveEffectivePaymentStatus(activeAppointment || undefined);
   const hasTrueRemainderBalance = Boolean(
@@ -2383,9 +2383,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const productsSubtotal = checkoutProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
     const subtotal = serviceSubtotal + productsSubtotal;
     const discount = appliedGiftCardAmount;
-    const taxableAmount = Math.max(0, subtotal - discount);
-    const vat = taxableAmount * 0.15;
-    const total = paymentDueAmount > 0 ? paymentDueAmount : taxableAmount + vat;
+    const computedTotal = Math.max(0, subtotal - discount);
+    const taxableAmount = computedTotal / 1.15;
+    const vat = computedTotal - taxableAmount;
+    const total = paymentDueAmount > 0 ? paymentDueAmount : computedTotal;
     const paymentMethodApi = `${selectedPaymentMethod || ''}`.trim();
     if (!paymentMethodApi) {
       addLocalToast(
@@ -2426,7 +2427,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     try {
       const remainingBalanceForLogs = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
-      const allocationSum = paymentAllocationsPayload.reduce((acc, curr) => acc + curr.amount, 0);
+      const allocationSum = paymentAllocationsPayload ? paymentAllocationsPayload.reduce((acc, curr) => acc + curr.amount, 0) : total;
       console.log('TEMPORARY DEBUG - remainingBalance:', remainingBalanceForLogs);
       console.log('TEMPORARY DEBUG - paymentRows:', splitAmounts);
       console.log('TEMPORARY DEBUG - paymentAllocations:', paymentAllocationsPayload);
