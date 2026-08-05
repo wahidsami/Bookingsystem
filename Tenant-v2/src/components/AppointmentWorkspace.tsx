@@ -2809,23 +2809,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 return undefined;
               }
 
-              const totalAllocations = allocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
-              const allocationDifference = Number((createAppointmentTotal - totalAllocations).toFixed(2));
-
-              if (Math.abs(allocationDifference) > 0.5) {
-                return undefined;
-              }
-
-              if (Math.abs(allocationDifference) > 0.0001) {
-                const lastAllocation = allocations[allocations.length - 1];
-                const adjustedAmount = Number((Number(lastAllocation.amount || 0) + allocationDifference).toFixed(2));
-                if (adjustedAmount > 0) {
-                  allocations[allocations.length - 1] = {
-                    ...lastAllocation,
-                    amount: adjustedAmount
-                  };
-                }
-              }
+              // Removed strict frontend math validation because createAppointmentTotal does not include VAT,
+              // which causes valid split payments to be silently dropped as 'undefined' and bypass the backend payment engine.
+              // Also removed the auto-balancing block for the same reason.
 
               return allocations;
             })()
