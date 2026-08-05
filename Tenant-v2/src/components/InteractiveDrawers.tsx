@@ -2198,6 +2198,7 @@ export default function InteractiveDrawers({
                           );
                         })()}
 
+{/* TEMPORARILY DISABLED (Refah – Remove Payment from Wizard) 
                         <div className="p-4 bg-white border rounded-xl space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="font-bold">{isRtl ? 'طريقة الدفع' : 'Payment allocation'}</span>
@@ -2234,6 +2235,7 @@ export default function InteractiveDrawers({
                             </div>
                           )}
                         </div>
+                        */}
 
                         <div className="p-4 bg-white border rounded-xl space-y-2">
                           <label className="text-slate-500 block">{isRtl ? 'ملاحظات الجلسة العامة للموظفة' : 'Staff comments'}</label>

@@ -2789,33 +2789,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         }, 0);
 
         const createAppointmentTotal = Number(calculateStagedServiceTotal().toFixed(2));
-        const createPaymentAllocations = createSplitActive
-          ? (() => {
-              const allocations = Object.entries(createSplitAmounts)
-                .filter(([, amount]) => Number(amount) > 0)
-                .map(([paymentMethod, amount]) => ({
-                  paymentMethod:
-                    paymentMethod === 'card'
-                      ? 'card_pos'
-                      : paymentMethod === 'bank'
-                        ? 'bank_transfer'
-                        : paymentMethod === 'gift'
-                          ? 'gift_card_code'
-                          : paymentMethod,
-                  amount: Number(amount)
-                }));
-
-              if (allocations.length === 0) {
-                return undefined;
-              }
-
-              // Removed strict frontend math validation because createAppointmentTotal does not include VAT,
-              // which causes valid split payments to be silently dropped as 'undefined' and bypass the backend payment engine.
-              // Also removed the auto-balancing block for the same reason.
-
-              return allocations;
-            })()
-          : undefined;
+        
+        // TEMPORARILY DISABLED (Refah - Remove Payment from Wizard)
+        // const createPaymentAllocations = ... 
 
         const response = await tenantApiAdapter.createAppointment({
           items: payloadItems,
@@ -2824,8 +2800,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
           assignmentMode: 'tenant_reassigned',
           notifyCustomer: true,
-          paymentMethod: 'at-center',
-          paymentAllocations: createPaymentAllocations,
+          // paymentMethod: 'at-center',
+          // paymentAllocations: undefined,
           platformUserId: custMode === 'existing' ? selectedCustId : undefined,
           customer: custMode === 'new' || custMode === 'walkin'
             ? {
