@@ -73,6 +73,10 @@ interface CustomerProfileData {
   allergiesAr: string;
   favServices: string[];
   favServicesAr: string[];
+  favoriteProducts?: Array<{name: string, count: number}>;
+  totalOrders?: number;
+  totalProductsPurchased?: number;
+  totalSpent?: number;
   communication: CommunicationLog[];
   appointments: Array<{
     id: string;
@@ -1224,7 +1228,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                             <td className="px-4 py-3.5 text-center font-mono text-neutral-600">{client.totalOrders ?? 0}</td>
 
                             {/* Products purchased */}
-                            <td className="px-4 py-3.5 text-center font-mono text-neutral-600">{client.productsPurchased ?? 0}</td>
+                            <td className="px-4 py-3.5 text-center font-mono text-neutral-600">{client.totalProductsPurchased ?? 0}</td>
 
                             {/* Total spent */}
                             <td className="px-4 py-3.5 text-end font-bold font-mono text-neutral-800">
@@ -1771,11 +1775,15 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                       <div>
                         <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mb-2">{isRtl ? 'المنتجات المفضلة' : 'Favorite Products'}</p>
                         <div className="flex flex-wrap gap-1.5">
-                          {[(isRtl ? 'سيروم لتغذية بصيلات الشعر كيراستاس' : 'Kérastase Specifique Scalp Serum'), (isRtl ? 'معالج بناء روابط الشعر أولابلكس ٣' : 'Olaplex No. 3 Hair Perfector')].map((prd, idx) => (
-                            <span key={idx} className="bg-blue-50 text-blue-800 text-[10px] px-2.5 py-1 rounded-lg font-bold border border-blue-100">
-                              {prd}
-                            </span>
-                          ))}
+                          {inspectedCustomer.favoriteProducts && inspectedCustomer.favoriteProducts.length > 0 ? (
+                            inspectedCustomer.favoriteProducts.map((prd, idx) => (
+                              <span key={idx} className="bg-blue-50 text-blue-800 text-[10px] px-2.5 py-1 rounded-lg font-bold border border-blue-100 flex items-center gap-1">
+                                {prd.name} <span className="bg-blue-200 text-blue-900 px-1 rounded-sm text-[8px]">{prd.count}</span>
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-neutral-400 italic">{isRtl ? 'لم تسجل أي منتجات مفضلة بعد' : 'No favorite products recorded.'}</p>
+                          )}
                         </div>
                       </div>
 
