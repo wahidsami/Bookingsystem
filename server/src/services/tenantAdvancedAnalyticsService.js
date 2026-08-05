@@ -178,9 +178,9 @@ function mapRefundRow(transaction) {
     const user = appointment?.user || order?.user;
     const amount = Number(transaction.amount || 0);
     const referenceAmount = appointment
-        ? Number(appointment.price || 0)
+        ? Number(appointment.price ?? 0)
         : order
-            ? Number(order.totalAmount || 0)
+            ? Number(order.totalAmount ?? 0)
             : amount;
     const refundMode = getRefundModeLabel(amount, referenceAmount);
     const refundReason = `${transaction.notes || transaction.metadata?.reason || transaction.metadata?.refundReason || transaction.gatewayResponse?.reason || ''}`.trim() || null;
@@ -375,7 +375,7 @@ async function summarizeRange(tenantId, start, end) {
         bookings += 1;
         if (appointment.status === 'completed') {
             completedBookings += 1;
-            totalRevenue += Number(appointment.price || 0);
+            totalRevenue += Number(appointment.price ?? 0);
         }
     });
 
@@ -384,7 +384,7 @@ async function summarizeRange(tenantId, start, end) {
             currentCustomers.add(order.platformUserId);
         }
         if (['completed', 'delivered'].includes(order.status)) {
-            totalRevenue += Number(order.totalAmount || 0);
+            totalRevenue += Number(order.totalAmount ?? 0);
         }
     });
 
@@ -678,7 +678,7 @@ async function buildRebookingAnalyticsEnhanced(req, startDate, endDate, groupBy 
         const customerKey = appointment.platformUserId || null;
         if (!customerKey) return;
         const history = customerHistory.get(customerKey) || [];
-        const amount = Number(appointment.price || 0);
+        const amount = Number(appointment.price ?? 0);
         const isRebooked = history.length > 0;
 
         if (isRebooked) {

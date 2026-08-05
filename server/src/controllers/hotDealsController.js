@@ -254,7 +254,7 @@ const createHotDeal = async (req, res) => {
 
         // Calculate discounted price
         const originalPrice = parseFloat(
-            service.finalPrice || service.rawPrice || service.basePrice || 0
+            service.finalPrice ?? service.rawPrice ?? service.basePrice ?? 0
         );
 
         if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
@@ -385,7 +385,7 @@ const updateHotDeal = async (req, res) => {
         }
 
         const originalPrice = parseFloat(
-            service.finalPrice || service.rawPrice || service.basePrice || 0
+            service.finalPrice ?? service.rawPrice ?? service.basePrice ?? 0
         );
 
         if (!Number.isFinite(originalPrice) || originalPrice <= 0) {

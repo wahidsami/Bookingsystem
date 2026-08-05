@@ -554,7 +554,7 @@ exports.purchaseProducts = async (req, res) => {
       });
 
       const splitPaymentService = require('../services/splitPaymentService');
-      const orderTotal = parseMoney(order?.totalAmount || 0);
+      const orderTotal = parseMoney(order?.totalAmount ?? 0);
       
       console.log('--- tenantCartController BEFORE normalizePaymentAllocations ---');
       console.log(`order.id: ${order.id}`);

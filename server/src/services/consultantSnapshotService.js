@@ -163,17 +163,17 @@ const resolveCustomerIdentity = (user, legacyCustomer, fallbackId) => {
 };
 
 const getAppointmentDiscountAmount = (appointment) => {
-    const serviceRawPrice = toNumber(appointment?.service?.rawPrice || 0);
-    const discountedRawPrice = toNumber(appointment?.rawPrice || 0);
+    const serviceRawPrice = toNumber(appointment?.service?.rawPrice ?? 0);
+    const discountedRawPrice = toNumber(appointment?.rawPrice ?? 0);
     const discountAmount = serviceRawPrice - discountedRawPrice;
     return Number.isFinite(discountAmount) && discountAmount > 0 ? discountAmount : 0;
 };
 
 const getOrderDiscountAmount = (order) => {
-    const subtotal = toNumber(order?.subtotal || 0);
-    const taxAmount = toNumber(order?.taxAmount || 0);
-    const shippingFee = toNumber(order?.shippingFee || 0);
-    const totalAmount = toNumber(order?.totalAmount || 0);
+    const subtotal = toNumber(order?.subtotal ?? 0);
+    const taxAmount = toNumber(order?.taxAmount ?? 0);
+    const shippingFee = toNumber(order?.shippingFee ?? 0);
+    const totalAmount = toNumber(order?.totalAmount ?? 0);
     const baseAmount = subtotal + taxAmount + shippingFee;
     const discountAmount = baseAmount - totalAmount;
     return Number.isFinite(discountAmount) && discountAmount > 0 ? discountAmount : 0;
@@ -509,13 +509,13 @@ function buildFinancialAnalytics(appointments = [], orders = [], transactions = 
 
     appointments.forEach((appointment) => {
         if (!isRevenueAppointment(appointment)) return;
-        grossRevenue += toNumber(appointment.price || 0);
+        grossRevenue += toNumber(appointment.price ?? 0);
         appointmentDiscounts += getAppointmentDiscountAmount(appointment);
     });
 
     orders.forEach((order) => {
         if (!isRevenueOrder(order)) return;
-        grossRevenue += toNumber(order.totalAmount || 0);
+        grossRevenue += toNumber(order.totalAmount ?? 0);
         orderDiscounts += getOrderDiscountAmount(order);
     });
 
@@ -601,7 +601,7 @@ function buildEmployeeAnalytics(appointments = [], payrolls = []) {
 
         existing.name = appointment.staff?.name || existing.name;
         existing.bookings += 1;
-        existing.revenue += isRevenueAppointment(appointment) ? toNumber(appointment.price || 0) : 0;
+        existing.revenue += isRevenueAppointment(appointment) ? toNumber(appointment.price ?? 0) : 0;
         existing.completed += `${appointment.status || ''}`.toLowerCase() === 'completed' ? 1 : 0;
         existing.commissionEarned += toNumber(appointment.employeeCommission || 0);
         rows.set(staffId, existing);

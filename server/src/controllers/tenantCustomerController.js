@@ -372,11 +372,11 @@ function mapWalletLedgerRecord(record, locale = 'en') {
 function calculateAppointmentOutstandingAmount(appointment) {
   const paymentStatus = appointment?.paymentStatus;
   if (paymentStatus === 'pending') {
-    return Math.max(Number(appointment?.price || 0), 0);
+    return Math.max(Number(appointment?.price ?? 0), 0);
   }
 
   if (paymentStatus === 'deposit_paid') {
-    return Math.max(Number(appointment?.remainderAmount || 0), 0);
+    return Math.max(Number(appointment?.remainderAmount ?? 0), 0);
   }
 
   return 0;
@@ -384,10 +384,10 @@ function calculateAppointmentOutstandingAmount(appointment) {
 
 function normalizeAppointmentPaymentState(appointment, evidenceSource = 'appointment') {
     const rawStatus = `${appointment?.paymentStatus || ''}`.trim().toLowerCase();
-    const price = Number(appointment?.price || 0);
-    const totalPaid = Number(appointment?.totalPaid || 0);
-    const depositAmount = Number(appointment?.depositAmount || 0);
-    const remainderAmount = Number(appointment?.remainderAmount || 0);
+    const price = Number(appointment?.price ?? 0);
+    const totalPaid = Number(appointment?.totalPaid ?? 0);
+    const depositAmount = Number(appointment?.depositAmount ?? 0);
+    const remainderAmount = Number(appointment?.remainderAmount ?? 0);
     const fallbackOutstanding = calculateAppointmentOutstandingAmount(appointment);
     const paidAmount = Number.isFinite(totalPaid) && totalPaid > 0
         ? totalPaid
@@ -518,7 +518,7 @@ function buildAppointmentServiceLine(appointment, index, bookingSessionId, booki
         startTime: appointment?.startTime || null,
         endTime: appointment?.endTime || null,
         duration: getAppointmentLineDuration(appointment),
-        price: parseFloat(appointment?.price || 0),
+        price: parseFloat(appointment?.price ?? 0),
         status: normalizeBookingSessionStatusValue(appointment?.status),
         paymentStatus: normalizeBookingSessionStatusValue(appointment?.paymentStatus),
         normalizedPaymentStatus: normalizedPayment.normalizedPaymentStatus,
@@ -652,7 +652,7 @@ function aggregateAppointmentsByBookingSession(appointments = []) {
                 .filter(Boolean)
                 .join(' + ');
             const staffNames = [...new Set(serviceLines.map((line) => line.staffName).filter(Boolean))];
-            const totalAmount = orderedGroup.reduce((sum, appointment) => sum + Number(appointment?.price || 0), 0);
+            const totalAmount = orderedGroup.reduce((sum, appointment) => sum + Number(appointment?.price ?? 0), 0);
             const paymentSummaries = plainGroup.map((appointment) => normalizeAppointmentPaymentState(appointment, 'appointment'));
             const totalPaid = paymentSummaries.reduce((sum, summary) => sum + Number(summary.paidAmount || 0), 0);
             const outstandingAmount = paymentSummaries.reduce((sum, summary) => sum + Number(summary.outstandingAmount || 0), 0);
@@ -1847,7 +1847,7 @@ exports.getCustomerHistory = async (req, res) => {
                 paidAmount: session.paidAmount,
                 outstandingAmount: session.outstandingAmount,
                 paymentEvidenceSource: 'appointment',
-                amount: parseFloat(session.price || session.totalAmount || 0),
+                amount: parseFloat(session.price ?? session.totalAmount ?? 0),
                 title: session.serviceNameEn || session.serviceNameAr || session.service?.name_en || session.service?.name_ar || 'Booking session',
                 subtitle: session.assignedStaffName || session.staff?.name || '',
                 serviceNameEn: session.serviceNameEn || session.service?.name_en || '',
@@ -1880,7 +1880,7 @@ exports.getCustomerHistory = async (req, res) => {
                 date: order.createdAt,
                 status: order.status,
                 paymentStatus: order.paymentStatus,
-                amount: parseFloat(order.totalAmount || 0),
+                amount: parseFloat(order.totalAmount ?? 0),
                 details: {
                     orderNumber: order.orderNumber,
                     items: items.map(item => ({
@@ -2574,7 +2574,7 @@ exports.getCustomerTransactions = async (req, res) => {
             const invoiceLines = serviceLines.map((line) => ({
                 ...line,
                 lineType: 'service',
-                subtotal: Number(line.price || 0)
+                subtotal: Number(line.price ?? 0)
             }));
             const paymentLines = relatedRecords.map((record) => ({
                 id: record.id,

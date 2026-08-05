@@ -142,9 +142,9 @@ const attachCanonicalFinancialState = (appointment) => {
         return appointment;
     }
 
-    const price = roundMoney(appointment.price || 0);
-    const totalPaid = roundMoney(appointment.totalPaid || 0);
-    const remainderAmount = roundMoney(appointment.remainderAmount || 0);
+    const price = roundMoney(appointment.price ?? 0);
+    const totalPaid = roundMoney(appointment.totalPaid ?? 0);
+    const remainderAmount = roundMoney(appointment.remainderAmount ?? 0);
     const paymentStatus = `${appointment.paymentStatus || ''}`.trim().toLowerCase();
 
     let outstandingAmount = Math.max(price - totalPaid, 0);
@@ -268,8 +268,8 @@ const loadAppointmentPaymentContext = async (appointmentId, { transaction = null
 };
 
 const getAppointmentDueAmount = (appointment) => {
-    const totalAmount = Number(appointment?.price || 0);
-    const totalPaid = Number(appointment?.totalPaid || 0);
+    const totalAmount = Number(appointment?.price ?? 0);
+    const totalPaid = Number(appointment?.totalPaid ?? 0);
     return roundMoney(Math.max(totalAmount - totalPaid, 0));
 };
 
@@ -295,12 +295,12 @@ const buildPaymentSummaryFromAppointments = (appointments = [], fallbackAppointm
         .slice()
         .sort((left, right) => new Date(left.processedAt || left.createdAt || 0) - new Date(right.processedAt || right.createdAt || 0));
 
-    const totalPrice = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.price || 0), 0));
-    const depositAmount = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.depositAmount || 0), 0));
-    const remainderAmount = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.remainderAmount || 0), 0));
-    const totalPaid = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.totalPaid || 0), 0));
+    const totalPrice = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.price ?? 0), 0));
+    const depositAmount = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.depositAmount ?? 0), 0));
+    const remainderAmount = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.remainderAmount ?? 0), 0));
+    const totalPaid = roundMoney(sourceAppointments.reduce((sum, appointment) => sum + Number(appointment?.totalPaid ?? 0), 0));
     const remainingBalance = roundMoney(Math.max(totalPrice - totalPaid, 0));
-    const allPaid = sourceAppointments.length > 0 && sourceAppointments.every((appointment) => Number(appointment?.totalPaid || 0) + 0.01 >= Number(appointment?.price || 0));
+    const allPaid = sourceAppointments.length > 0 && sourceAppointments.every((appointment) => Number(appointment?.totalPaid ?? 0) + 0.01 >= Number(appointment?.price ?? 0));
     const anyDepositPaid = sourceAppointments.some((appointment) => Boolean(appointment?.depositPaid));
     const allDepositPaid = sourceAppointments.length > 0 && sourceAppointments.every((appointment) => Boolean(appointment?.depositPaid));
     const allRemainderPaid = sourceAppointments.length > 0 && sourceAppointments.every((appointment) => Boolean(appointment?.remainderPaid));
@@ -544,7 +544,7 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
                     }
                 }, { transaction });
 
-                const newTotalPaid = roundMoney(Number(targetAppointment.totalPaid || 0) + numericAmount);
+                const newTotalPaid = roundMoney(Number(targetAppointment.totalPaid ?? 0) + numericAmount);
                 await targetAppointment.update({
                     paymentMethod: resolvedPaymentMethod,
                     remainderPaid: true,
@@ -625,13 +625,13 @@ const recordRemainderPayment = async (appointmentId, paymentData) => {
             }
         }, { transaction });
 
-        const newTotalPaid = roundMoney(Number(appointment.totalPaid || 0) + numericAmount);
+        const newTotalPaid = roundMoney(Number(appointment.totalPaid ?? 0) + numericAmount);
         
         const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
         const financialState = calculateAppointmentFinancialState({
-            price: appointment.price || 0,
+            price: appointment.price ?? 0,
             totalPaid: newTotalPaid,
-            depositAmount: appointment.depositAmount || 0
+            depositAmount: appointment.depositAmount ?? 0
         });
 
         await appointment.update({
@@ -717,7 +717,7 @@ const refundPayment = async (appointmentId, refundData) => {
 
         const resolvedPaymentMethod = resolveLedgerPaymentMethod(normalizedMethod || appointment.paymentMethod, 'online');
         const totalPaidAcrossContext = roundMoney(
-            sessionAppointments.reduce((sum, sessionAppointment) => sum + Number(sessionAppointment.totalPaid || 0), 0)
+            sessionAppointments.reduce((sum, sessionAppointment) => sum + Number(sessionAppointment.totalPaid ?? 0), 0)
         );
         if (numericAmount - totalPaidAcrossContext > 0.01) {
             throw new Error('Refund amount cannot exceed the amount already paid');
@@ -729,12 +729,12 @@ const refundPayment = async (appointmentId, refundData) => {
             ? sessionAppointments
                 .map((sessionAppointment) => ({
                     appointment: sessionAppointment,
-                    refundableAmount: roundMoney(Number(sessionAppointment.totalPaid || 0))
+                    refundableAmount: roundMoney(Number(sessionAppointment.totalPaid ?? 0))
                 }))
                 .filter((entry) => entry.refundableAmount > 0)
             : [{
                 appointment,
-                refundableAmount: roundMoney(Number(appointment.totalPaid || 0))
+                refundableAmount: roundMoney(Number(appointment.totalPaid ?? 0))
             }];
 
         let remainingRefund = roundMoney(numericAmount);
@@ -767,7 +767,7 @@ const refundPayment = async (appointmentId, refundData) => {
                 metadata: {
                     source: 'appointment_refund',
                     paymentStatusBefore: targetAppointment.paymentStatus,
-                    totalPaidBefore: roundMoney(Number(targetAppointment.totalPaid || 0))
+                    totalPaidBefore: roundMoney(Number(targetAppointment.totalPaid ?? 0))
                 }
             }, { transaction });
 
@@ -817,14 +817,14 @@ const refundPayment = async (appointmentId, refundData) => {
                 }
             }, { transaction });
 
-            const previousTotalPaid = roundMoney(targetAppointment.totalPaid || 0);
+            const previousTotalPaid = roundMoney(targetAppointment.totalPaid ?? 0);
             const newTotalPaid = roundMoney(previousTotalPaid - targetRefund);
 
             const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
             const financialState = calculateAppointmentFinancialState({
-                price: targetAppointment.price || 0,
+                price: targetAppointment.price ?? 0,
                 totalPaid: newTotalPaid,
-                depositAmount: targetAppointment.depositAmount || 0,
+                depositAmount: targetAppointment.depositAmount ?? 0,
                 previousTotalPaid
             });
 
@@ -880,8 +880,8 @@ const collectAppointmentStatusCharge = async ({
         }
 
         const { appointment } = context;
-        const totalPaidBefore = roundMoney(Number(appointment.totalPaid || 0));
-        const totalPrice = roundMoney(Number(appointment.price || 0));
+        const totalPaidBefore = roundMoney(Number(appointment.totalPaid ?? 0));
+        const totalPrice = roundMoney(Number(appointment.price ?? 0));
         const nextTotalPaid = roundMoney(Math.min(totalPrice, totalPaidBefore + numericAmount));
         const resolvedPaymentMethod = resolveLedgerPaymentMethod(paymentMethod || appointment.paymentMethod || 'cash', 'cash');
         const feeRef = transactionRef || `APT-FEE-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`;
@@ -942,9 +942,9 @@ const collectAppointmentStatusCharge = async ({
 
         const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
         const financialState = calculateAppointmentFinancialState({
-            price: appointment.price || 0,
+            price: appointment.price ?? 0,
             totalPaid: nextTotalPaid,
-            depositAmount: appointment.depositAmount || 0
+            depositAmount: appointment.depositAmount ?? 0
         });
 
         await appointment.update({

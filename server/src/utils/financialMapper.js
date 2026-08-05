@@ -37,10 +37,10 @@ function buildCanonicalFinancialData(transaction, invoice = null) {
     
     // If we have an invoice, it's the commercial source of truth for totals
     if (invoice) {
-        vat = Number(invoice.vatAmount || 0);
-        totalAmount = Number(invoice.totalAmount || 0);
-        discount = Number(invoice.discountAmount || 0);
-        remainingBalance = Number(invoice.dueAmount || 0);
+        vat = Number(invoice.vatAmount ?? 0);
+        totalAmount = Number(invoice.totalAmount ?? 0);
+        discount = Number(invoice.discountAmount ?? 0);
+        remainingBalance = Number(invoice.dueAmount ?? 0);
         
         // Net sales is pre-tax post-discount
         netSales = Math.max(totalAmount - vat, 0);
@@ -49,9 +49,9 @@ function buildCanonicalFinancialData(transaction, invoice = null) {
         grossSales = netSales + discount;
     } else if (appointment) {
         // Fallback calculation for Appointment when no invoice is present
-        const serviceRawPrice = Number(appointment.service?.rawPrice || 0);
-        const appointmentRawPrice = Number(appointment.rawPrice || 0); // Discounted raw price
-        const platformFee = Number(appointment.platformFee || 0);
+        const serviceRawPrice = Number(appointment.service?.rawPrice ?? 0);
+        const appointmentRawPrice = Number(appointment.rawPrice ?? 0); // Discounted raw price
+        const platformFee = Number(appointment.platformFee ?? 0);
         
         // Appointment discount logic based on platform implied logic
         discount = Math.max(serviceRawPrice - appointmentRawPrice, 0);
@@ -62,15 +62,15 @@ function buildCanonicalFinancialData(transaction, invoice = null) {
         // Gross Sales: Pre-tax, pre-discount, including platform fees
         grossSales = netSales + discount;
         
-        vat = Number(appointment.taxAmount || 0);
-        totalAmount = Number(appointment.price || 0); // Inclusive final price
-        remainingBalance = Number(appointment.remainderAmount || 0);
+        vat = Number(appointment.taxAmount ?? 0);
+        totalAmount = Number(appointment.price ?? 0); // Inclusive final price
+        remainingBalance = Number(appointment.remainderAmount ?? 0);
     } else if (order) {
         // Fallback calculation for Order when no invoice is present
-        const subtotal = Number(order.subtotal || 0);
-        const shippingFee = Number(order.shippingFee || 0);
-        vat = Number(order.taxAmount || 0);
-        totalAmount = Number(order.totalAmount || 0);
+        const subtotal = Number(order.subtotal ?? 0);
+        const shippingFee = Number(order.shippingFee ?? 0);
+        vat = Number(order.taxAmount ?? 0);
+        totalAmount = Number(order.totalAmount ?? 0);
         
         // Net Sales: Pre-tax, post-discount, including shipping fees
         netSales = Math.max(totalAmount - vat, 0);

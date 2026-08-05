@@ -142,8 +142,8 @@ const getDashboardStats = async (req, res) => {
             raw: true
         });
 
-        const purchaseTotal = parseFloat(purchaseRevenueResult?.totalAmount || 0);
-        const purchasePlatformFee = parseFloat(purchaseRevenueResult?.platformFee || 0);
+        const purchaseTotal = parseFloat(purchaseRevenueResult?.totalAmount ?? 0);
+        const purchasePlatformFee = parseFloat(purchaseRevenueResult?.platformFee ?? 0);
         const purchaseRevenue = purchaseTotal - purchasePlatformFee;
 
         const totalRevenue = appointmentRevenue + purchaseRevenue;
@@ -245,9 +245,9 @@ const getTodaysAppointments = async (req, res) => {
             const startTime = new Date(apt.startTime);
             const endTime = new Date(apt.endTime);
             const paymentStatus = apt.paymentStatus || APPOINTMENT_PAYMENT_STATUS.PENDING;
-            const price = parseFloat(apt.price || 0);
-            const totalPaid = parseFloat(apt.totalPaid || 0);
-            const remainderAmount = parseFloat(apt.remainderAmount || 0);
+            const price = parseFloat(apt.price ?? 0);
+            const totalPaid = parseFloat(apt.totalPaid ?? 0);
+            const remainderAmount = parseFloat(apt.remainderAmount ?? 0);
             const outstandingAmount = paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID
                 ? remainderAmount
                 : paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID || paymentStatus === 'paid'
@@ -267,7 +267,7 @@ const getTodaysAppointments = async (req, res) => {
                 price,
                 paymentStatus,
                 paymentMethod: apt.paymentMethod || null,
-                depositAmount: parseFloat(apt.depositAmount || 0),
+                depositAmount: parseFloat(apt.depositAmount ?? 0),
                 remainderAmount,
                 totalPaid,
                 outstandingAmount,
@@ -361,7 +361,7 @@ const getRevenueChartData = async (req, res) => {
             if (!mergedData[item.date]) {
                 mergedData[item.date] = { date: item.date, revenue: 0, bookings: 0 };
             }
-            const purchaseRevenue = parseFloat(item.totalAmount || 0) - parseFloat(item.platformFee || 0);
+            const purchaseRevenue = parseFloat(item.totalAmount ?? 0) - parseFloat(item.platformFee ?? 0);
             mergedData[item.date].revenue += purchaseRevenue;
         });
 

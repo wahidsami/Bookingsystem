@@ -11,12 +11,12 @@ const roundMoney = (value) => Number.parseFloat(Number(value || 0).toFixed(2));
 const getAppointmentDueAmount = (targetAppointment) => {
     const paymentStatusValue = `${targetAppointment.paymentStatus || ''}`.trim().toLowerCase();
     if (paymentStatusValue === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
-        const remainder = roundMoney(targetAppointment.remainderAmount || 0);
+        const remainder = roundMoney(targetAppointment.remainderAmount ?? 0);
         return remainder > 0 ? remainder : 0;
     }
 
-    const totalPrice = roundMoney(targetAppointment.price || 0);
-    const totalPaid = roundMoney(targetAppointment.totalPaid || 0);
+    const totalPrice = roundMoney(targetAppointment.price ?? 0);
+    const totalPaid = roundMoney(targetAppointment.totalPaid ?? 0);
     const dueAmount = roundMoney(totalPrice - totalPaid);
     return dueAmount > 0 ? dueAmount : 0;
 };
@@ -154,15 +154,15 @@ async function processAppointmentPayment({
             );
         }
 
-        const targetPreviousPaid = roundMoney(targetAppointment.totalPaid || 0);
-        const targetTotalPrice = roundMoney(targetAppointment.price || 0);
+        const targetPreviousPaid = roundMoney(targetAppointment.totalPaid ?? 0);
+        const targetTotalPrice = roundMoney(targetAppointment.price ?? 0);
         const nextTotalPaid = roundMoney(targetPreviousPaid + targetPaidAmount);
         
         const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
         const financialState = calculateAppointmentFinancialState({
             price: targetTotalPrice,
             totalPaid: nextTotalPaid,
-            depositAmount: targetAppointment.depositAmount || 0
+            depositAmount: targetAppointment.depositAmount ?? 0
         });
 
         Object.assign(targetAppointment, financialState);
@@ -202,9 +202,9 @@ async function processAppointmentPayment({
 
     const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
     const finalFinancialState = calculateAppointmentFinancialState({
-        price: appointment.price || 0,
-        totalPaid: appointment.totalPaid || 0,
-        depositAmount: appointment.depositAmount || 0
+        price: appointment.price ?? 0,
+        totalPaid: appointment.totalPaid ?? 0,
+        depositAmount: appointment.depositAmount ?? 0
     });
     Object.assign(appointment, finalFinancialState);
     

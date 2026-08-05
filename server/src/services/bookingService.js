@@ -133,10 +133,10 @@ class BookingService {
             if (method) {
                 paymentMethods.add(method);
             }
-            acc.subtotal += parseFloat(appointment.rawPrice || 0);
-            acc.taxAmount += parseFloat(appointment.taxAmount || 0);
-            acc.platformFee += parseFloat(appointment.platformFee || 0);
-            acc.totalAmount += parseFloat(appointment.price || 0);
+            acc.subtotal += parseFloat(appointment.rawPrice ?? 0);
+            acc.taxAmount += parseFloat(appointment.taxAmount ?? 0);
+            acc.platformFee += parseFloat(appointment.platformFee ?? 0);
+            acc.totalAmount += parseFloat(appointment.price ?? 0);
             acc.itemCount += 1;
             return acc;
         }, {
@@ -363,7 +363,7 @@ class BookingService {
                 service.taxRate,
                 service.commissionRate
             )
-            : normalizeNumber(service.rawPrice || service.basePrice, 0);
+            : normalizeNumber(service.rawPrice ?? service.basePrice, 0);
         const discountAmount = resolveDiscountAmount(baseRawPrice, discountType, discountValue);
         const discountedRawPrice = Math.max(0, baseRawPrice - discountAmount);
         const pricingSource = {
@@ -380,8 +380,8 @@ class BookingService {
                 depositAmount: 0,
                 remainderAmount: pricing.price
             };
-        const initialDepositAmount = parseFloat((bookingSplit.depositAmount || 0).toFixed(2));
-        const initialRemainderAmount = parseFloat((bookingSplit.remainderAmount || pricing.price).toFixed(2));
+        const initialDepositAmount = parseFloat((bookingSplit.depositAmount ?? 0).toFixed(2));
+        const initialRemainderAmount = parseFloat((bookingSplit.remainderAmount ?? pricing.price).toFixed(2));
 
         // ========== REDIS LOCK (Phase 6.2) ==========
         // Acquire short-term lock to prevent concurrent bookings of same slot
@@ -701,18 +701,18 @@ class BookingService {
                 }, { transaction: finalTransaction });
 
                 appointments.push(appointment);
-                subtotal += parseFloat(appointment.rawPrice || 0);
-                taxAmount += parseFloat(appointment.taxAmount || 0);
-                platformFee += parseFloat(appointment.platformFee || 0);
-                totalAmount += parseFloat(appointment.price || 0);
+                subtotal += parseFloat(appointment.rawPrice ?? 0);
+                taxAmount += parseFloat(appointment.taxAmount ?? 0);
+                platformFee += parseFloat(appointment.platformFee ?? 0);
+                totalAmount += parseFloat(appointment.price ?? 0);
 
                 const itemPaymentMethod = `${item.paymentMethod || paymentMethod || 'at-center'}`.trim().toLowerCase();
                 if (itemPaymentMethod === 'online-full') {
-                    onlineFullAmount += parseFloat(appointment.price || 0);
+                    onlineFullAmount += parseFloat(appointment.price ?? 0);
                 } else if (itemPaymentMethod === 'booking-fee') {
-                    bookingFeeAmount += parseFloat(appointment.depositAmount || 0);
+                    bookingFeeAmount += parseFloat(appointment.depositAmount ?? 0);
                 } else {
-                    atCenterAmount += parseFloat(appointment.price || 0);
+                    atCenterAmount += parseFloat(appointment.price ?? 0);
                 }
             }
 

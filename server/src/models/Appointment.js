@@ -49,10 +49,10 @@ module.exports = (sequelize, DataTypes) => {
          * @returns {Object} Revenue breakdown
          */
         static calculateRevenueBreakdown(service, staff) {
-            const rawPrice = parseFloat(service.rawPrice || service.basePrice || 0);
-            const taxRate = parseFloat(service.taxRate || 15);
-            const commissionRate = parseFloat(service.commissionRate || 10);
-            const employeeCommissionRate = parseFloat(staff?.commissionRate || 0);
+            const rawPrice = parseFloat(service.rawPrice ?? service.basePrice ?? 0);
+            const taxRate = parseFloat(service.taxRate ?? 15);
+            const commissionRate = parseFloat(service.commissionRate ?? 10);
+            const employeeCommissionRate = parseFloat(staff?.commissionRate ?? 0);
 
             const taxAmount = rawPrice * (taxRate / 100);
             const platformFee = rawPrice * (commissionRate / 100);

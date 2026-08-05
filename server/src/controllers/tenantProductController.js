@@ -38,16 +38,16 @@ async function getGlobalSettings() {
  * Calculate final price for product
  */
 function calculateProductPrice(rawPrice, taxRate, commissionRate) {
-    const raw = parseFloat(rawPrice || 0);
-    const tax = raw * (parseFloat(taxRate || 15) / 100);
-    const commission = raw * (parseFloat(commissionRate || 10) / 100);
+    const raw = parseFloat(rawPrice ?? 0);
+    const tax = raw * (parseFloat(taxRate ?? 15) / 100);
+    const commission = raw * (parseFloat(commissionRate ?? 10) / 100);
     return parseFloat((raw + tax + commission).toFixed(2));
 }
 
 function calculateProductRawPrice(finalPrice, taxRate, commissionRate) {
-    const final = parseFloat(finalPrice || 0);
-    const tax = parseFloat(taxRate || 15) / 100;
-    const commission = parseFloat(commissionRate || 10) / 100;
+    const final = parseFloat(finalPrice ?? 0);
+    const tax = parseFloat(taxRate ?? 15) / 100;
+    const commission = parseFloat(commissionRate ?? 10) / 100;
     const multiplier = 1 + tax + commission;
 
     if (!Number.isFinite(final) || !Number.isFinite(multiplier) || multiplier <= 0) {

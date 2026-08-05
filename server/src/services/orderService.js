@@ -114,7 +114,7 @@ class OrderService {
                 subtotal += itemTotal;
 
                 // Calculate tax for this item (extracted from VAT-inclusive price)
-                const taxRate = parseFloat(product.taxRate || 15); // Default 15% VAT
+                const taxRate = parseFloat(product.taxRate ?? 15); // Default 15% VAT
                 const itemTax = itemTotal - (itemTotal / (1 + (taxRate / 100)));
                 totalTax += itemTax;
 
@@ -366,7 +366,7 @@ class OrderService {
                 const paymentResult = await splitPaymentService.createOrderPaymentTransactions({
                     order,
                     type: 'full',
-                    amount: parseFloat(order.totalAmount || 0),
+                    amount: parseFloat(order.totalAmount ?? 0),
                     paymentMethod: resolvedPaymentMethod,
                     paymentAllocations: finalAllocations,
                     processedBy,
@@ -384,19 +384,19 @@ class OrderService {
                 });
 
                 await db.PlatformUser.increment('totalSpent', {
-                    by: parseFloat(order.totalAmount || 0),
+                    by: parseFloat(order.totalAmount ?? 0),
                     where: { id: order.platformUserId },
                     ...q()
                 });
 
-                const platformFee = parseFloat(((order.totalAmount || 0) * 0.025).toFixed(2));
-                const tenantRevenue = parseFloat(((order.totalAmount || 0) - platformFee).toFixed(2));
+                const platformFee = parseFloat(((order.totalAmount ?? 0) * 0.025).toFixed(2));
+                const tenantRevenue = parseFloat(((order.totalAmount ?? 0) - platformFee).toFixed(2));
 
                 const saleTransaction = await db.Transaction.create({
                     platformUserId: order.platformUserId,
                     tenantId: order.tenantId,
                     orderId: order.id,
-                    amount: parseFloat(order.totalAmount || 0),
+                    amount: parseFloat(order.totalAmount ?? 0),
                     currency: 'SAR',
                     type: 'product_purchase',
                     status: 'completed',
@@ -418,7 +418,7 @@ class OrderService {
                 await createOrderTransaction({
                     orderId: order.id,
                     type: 'full',
-                    amount: parseFloat(order.totalAmount || 0),
+                    amount: parseFloat(order.totalAmount ?? 0),
                     paymentMethod: resolveLedgerPaymentMethod(paymentMethod || order.paymentMethod, order.paymentMethod),
                     status: 'failed',
                     processedBy,
@@ -437,7 +437,7 @@ class OrderService {
                 await createOrderTransaction({
                     orderId: order.id,
                     type: 'refund',
-                    amount: parseFloat(order.totalAmount || 0),
+                    amount: parseFloat(order.totalAmount ?? 0),
                     paymentMethod: resolveLedgerPaymentMethod(paymentMethod || order.paymentMethod, order.paymentMethod),
                     status: 'refunded',
                     processedBy,
@@ -453,14 +453,14 @@ class OrderService {
                     }
                 }, { transaction, forensicTrace });
 
-                const platformFee = parseFloat(((order.totalAmount || 0) * 0.025).toFixed(2));
-                const tenantRevenue = parseFloat(((order.totalAmount || 0) - platformFee).toFixed(2));
+                const platformFee = parseFloat(((order.totalAmount ?? 0) * 0.025).toFixed(2));
+                const tenantRevenue = parseFloat(((order.totalAmount ?? 0) - platformFee).toFixed(2));
 
                 const refundTransaction = await db.Transaction.create({
                     platformUserId: order.platformUserId,
                     tenantId: order.tenantId,
                     orderId: order.id,
-                    amount: parseFloat(order.totalAmount || 0),
+                    amount: parseFloat(order.totalAmount ?? 0),
                     currency: 'SAR',
                     type: 'refund',
                     status: 'refunded',
@@ -672,7 +672,7 @@ class OrderService {
                 await createOrderTransaction({
                     orderId: order.id,
                     type: 'refund',
-                    amount: parseFloat(order.totalAmount || 0),
+                    amount: parseFloat(order.totalAmount ?? 0),
                     paymentMethod: resolveLedgerPaymentMethod(order.paymentMethod, order.paymentMethod),
                     status: 'refunded',
                     processedBy: null,

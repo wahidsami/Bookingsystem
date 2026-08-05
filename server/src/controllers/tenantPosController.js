@@ -131,12 +131,12 @@ const getOperationalAlertsReadState = async (tenantId, readerId, alerts) => {
 
 const getAppointmentDueAmount = (appointment) => {
     if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
-        const remainder = parseFloat(appointment.remainderAmount || 0);
+        const remainder = parseFloat(appointment.remainderAmount ?? 0);
         return Number.isFinite(remainder) && remainder > 0 ? remainder : 0;
     }
 
-    const price = parseFloat(appointment.price || 0);
-    const totalPaid = parseFloat(appointment.totalPaid || 0);
+    const price = parseFloat(appointment.price ?? 0);
+    const totalPaid = parseFloat(appointment.totalPaid ?? 0);
     const dueAmount = price - totalPaid;
 
     return Number.isFinite(dueAmount) && dueAmount > 0
@@ -292,11 +292,11 @@ const buildTenantScopedTransactionWhere = (entityScope, filters = {}) => {
 const getAppointmentQueueGroupKey = (appointment) => appointment.bookingSessionId || appointment.id;
 
 const buildAppointmentQueueTotals = (appointments = []) => appointments.reduce((acc, current) => {
-    const itemTotal = parseFloat(current?.price || 0);
-    const itemPaid = parseFloat(current?.totalPaid || 0);
-    const itemRawPrice = parseFloat(current?.rawPrice || 0);
-    const itemTaxAmount = parseFloat(current?.taxAmount || 0);
-    const itemPlatformFee = parseFloat(current?.platformFee || 0);
+    const itemTotal = parseFloat(current?.price ?? 0);
+    const itemPaid = parseFloat(current?.totalPaid ?? 0);
+    const itemRawPrice = parseFloat(current?.rawPrice ?? 0);
+    const itemTaxAmount = parseFloat(current?.taxAmount ?? 0);
+    const itemPlatformFee = parseFloat(current?.platformFee ?? 0);
 
     acc.totalAmount += Number.isFinite(itemTotal) ? itemTotal : 0;
     acc.paidAmount += Number.isFinite(itemPaid) ? itemPaid : 0;
@@ -386,7 +386,7 @@ const computeEntityDueAmount = (entityType, entity) => {
     if (entityType === 'appointment') {
         return getAppointmentDueAmount(entity);
     }
-    const totalAmount = parseFloat(entity?.totalAmount || 0);
+    const totalAmount = parseFloat(entity?.totalAmount ?? 0);
     return Number.isFinite(totalAmount) && totalAmount > 0 ? parseFloat(totalAmount.toFixed(2)) : 0;
 };
 
@@ -582,8 +582,8 @@ exports.redeemGiftCardForPos = async (req, res) => {
 
         if (entityType === 'appointment') {
             const appointment = entityScope.entity;
-            const totalPrice = parseFloat(appointment.price || 0);
-            const previousPaid = parseFloat(appointment.totalPaid || 0);
+            const totalPrice = parseFloat(appointment.price ?? 0);
+            const previousPaid = parseFloat(appointment.totalPaid ?? 0);
             const nextPaid = parseFloat((previousPaid + redeemAmount).toFixed(2));
             const isFullyPaid = nextPaid >= totalPrice;
 
@@ -718,9 +718,9 @@ const mapOrderQueueItem = (order) => ({
         : 'cash_on_delivery',
     paymentMethod: order.paymentMethod,
     paymentMethodLabel: formatPaymentMethodLabel(order.paymentMethod),
-    totalAmount: parseFloat(order.totalAmount || 0),
+    totalAmount: parseFloat(order.totalAmount ?? 0),
     paidAmount: 0,
-    dueAmount: parseFloat(order.totalAmount || 0),
+    dueAmount: parseFloat(order.totalAmount ?? 0),
     detailPath: `/dashboard/orders/${order.id}`
 });
 

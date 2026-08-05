@@ -458,7 +458,7 @@ function normalizeServiceRow(service) {
     tenantName: tenant.name || tenant.name_en || tenant.name_ar || '-',
     serviceName: service.name_en || service.name_ar || '-',
     category: service.category || '-',
-    price: toNumber(service.finalPrice || service.rawPrice || service.basePrice),
+    price: toNumber(service.finalPrice ?? service.rawPrice ?? service.basePrice),
     appointmentsCount: service.appointmentsCount ?? 0,
     employeesCount: service.employeesCount ?? 0,
     revenue: toNumber(service.revenue),

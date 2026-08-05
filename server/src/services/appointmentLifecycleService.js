@@ -36,12 +36,12 @@ const getServiceName = (appointment) => (
 
 const getDueAmount = (appointment) => {
     if (appointment?.paymentStatus === APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID) {
-        const remainder = Number.parseFloat(appointment?.remainderAmount || 0);
+        const remainder = Number.parseFloat(appointment?.remainderAmount ?? 0);
         return Number.isFinite(remainder) && remainder > 0 ? remainder : 0;
     }
 
-    const price = Number.parseFloat(appointment?.price || 0);
-    const totalPaid = Number.parseFloat(appointment?.totalPaid || 0);
+    const price = Number.parseFloat(appointment?.price ?? 0);
+    const totalPaid = Number.parseFloat(appointment?.totalPaid ?? 0);
     const due = price - totalPaid;
 
     return Number.isFinite(due) && due > 0 ? Number.parseFloat(due.toFixed(2)) : 0;

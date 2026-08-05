@@ -274,7 +274,7 @@ async function buildRebookingAnalytics(req, startDate, endDate, groupBy = 'day')
         }
 
         const history = customerHistory.get(customerKey) || [];
-        const amount = Number(appointment.price || 0);
+        const amount = Number(appointment.price ?? 0);
         const isRebooked = history.length > 0;
 
         if (isRebooked) {
@@ -435,12 +435,12 @@ function buildTransactionReference(transaction) {
 
 function buildTransactionReferenceAmount(transaction) {
     if (transaction?.appointment) {
-        return Number(transaction.appointment.price || 0);
+        return Number(transaction.appointment.price ?? 0);
     }
     if (transaction?.order) {
-        const subtotal = Number(transaction.order.subtotal || 0);
-        const taxAmount = Number(transaction.order.taxAmount || 0);
-        const shippingFee = Number(transaction.order.shippingFee || 0);
+        const subtotal = Number(transaction.order.subtotal ?? 0);
+        const taxAmount = Number(transaction.order.taxAmount ?? 0);
+        const shippingFee = Number(transaction.order.shippingFee ?? 0);
         return subtotal + taxAmount + shippingFee;
     }
     return Number(transaction?.amount || 0);
@@ -708,7 +708,7 @@ exports.getBookingTrends = async (req, res) => {
             trends[key].bookings++;
             if (appointment.status === 'completed') {
                 trends[key].completed++;
-                trends[key].revenue += parseFloat(appointment.price || 0);
+                trends[key].revenue += parseFloat(appointment.price ?? 0);
             }
         });
 
@@ -756,7 +756,7 @@ exports.getServicePerformance = async (req, res) => {
         const serviceStats = services.map(service => {
             const appointments = service.appointments || [];
             const completed = appointments.filter(a => a.status === 'completed');
-            const revenue = completed.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
+            const revenue = completed.reduce((sum, a) => sum + parseFloat(a.price ?? 0), 0);
             const trendBuckets = new Map();
 
             completed.forEach((appointment) => {
@@ -772,7 +772,7 @@ exports.getServicePerformance = async (req, res) => {
                 };
 
                 current.bookings += 1;
-                current.revenue += parseFloat(appointment.price || 0);
+                current.revenue += parseFloat(appointment.price ?? 0);
                 trendBuckets.set(bucketKey, current);
             });
             
@@ -841,7 +841,7 @@ exports.getEmployeePerformance = async (req, res) => {
             const completed = appointments.filter(a => a.status === 'completed');
             const noShows = appointments.filter(a => a.status === 'no_show').length;
             const cancellations = appointments.filter(a => a.status === 'cancelled').length;
-            const revenue = completed.reduce((sum, a) => sum + parseFloat(a.price || 0), 0);
+            const revenue = completed.reduce((sum, a) => sum + parseFloat(a.price ?? 0), 0);
             const commission = completed.reduce((sum, a) => sum + parseFloat(a.employeeCommission || 0), 0);
             
             return {
@@ -1039,7 +1039,7 @@ exports.getCustomerAnalytics = async (req, res) => {
             customerStats[customerId].bookings++;
             if (appointment.status === 'completed') {
                 customerStats[customerId].completed++;
-                customerStats[customerId].revenue += parseFloat(appointment.price || 0);
+                customerStats[customerId].revenue += parseFloat(appointment.price ?? 0);
             }
             
             if (new Date(appointment.startTime) < new Date(customerStats[customerId].firstVisit)) {

@@ -32,9 +32,9 @@ const toBooleanValue = (value, fallback = false) => {
 };
 
 const calculateRawPriceFromFinalPrice = (finalPrice, taxRate, commissionRate) => {
-    const final = parseFloat(finalPrice || 0);
-    const tax = parseFloat(taxRate || 15) / 100;
-    const commission = parseFloat(commissionRate || 10) / 100;
+    const final = parseFloat(finalPrice ?? 0);
+    const tax = parseFloat(taxRate ?? 15) / 100;
+    const commission = parseFloat(commissionRate ?? 10) / 100;
     const multiplier = 1 + tax + commission;
 
     if (!Number.isFinite(final) || !Number.isFinite(multiplier) || multiplier <= 0) {

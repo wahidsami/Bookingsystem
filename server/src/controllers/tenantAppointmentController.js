@@ -78,9 +78,9 @@ function attachCanonicalFinancialState(appointment) {
         return appointment;
     }
 
-    const price = roundMoney(appointment.price || 0);
-    const totalPaid = roundMoney(appointment.totalPaid || 0);
-    const remainderAmount = roundMoney(appointment.remainderAmount || 0);
+    const price = roundMoney(appointment.price ?? 0);
+    const totalPaid = roundMoney(appointment.totalPaid ?? 0);
+    const remainderAmount = roundMoney(appointment.remainderAmount ?? 0);
     const paymentStatus = `${appointment.paymentStatus || ''}`.trim().toLowerCase();
 
     let outstandingAmount = Math.max(price - totalPaid, 0);
@@ -689,7 +689,7 @@ async function calculateGroupGuestPriceAdjustment({ tenantId, appointment, group
             extraPlatformFee: 0,
             extraTenantRevenue: 0,
             extraEmployeeRevenue: 0,
-            extraEmployeeCommissionRate: Number(appointment.employeeCommissionRate || 0),
+            extraEmployeeCommissionRate: Number(appointment.employeeCommissionRate ?? 0),
             extraEmployeeCommission: 0,
             guestService: null
         };
@@ -716,13 +716,13 @@ async function calculateGroupGuestPriceAdjustment({ tenantId, appointment, group
     const breakdown = guestServices.reduce((accumulator, guestService) => {
         const itemBreakdown = db.Appointment.calculateRevenueBreakdown(guestService, staff);
         return {
-            price: Number(accumulator.price || 0) + Number(itemBreakdown.price || 0),
-            rawPrice: Number(accumulator.rawPrice || 0) + Number(itemBreakdown.rawPrice || 0),
-            taxAmount: Number(accumulator.taxAmount || 0) + Number(itemBreakdown.taxAmount || 0),
-            platformFee: Number(accumulator.platformFee || 0) + Number(itemBreakdown.platformFee || 0),
+            price: Number(accumulator.price ?? 0) + Number(itemBreakdown.price ?? 0),
+            rawPrice: Number(accumulator.rawPrice ?? 0) + Number(itemBreakdown.rawPrice ?? 0),
+            taxAmount: Number(accumulator.taxAmount ?? 0) + Number(itemBreakdown.taxAmount ?? 0),
+            platformFee: Number(accumulator.platformFee ?? 0) + Number(itemBreakdown.platformFee ?? 0),
             tenantRevenue: Number(accumulator.tenantRevenue || 0) + Number(itemBreakdown.tenantRevenue || 0),
             employeeRevenue: Number(accumulator.employeeRevenue || 0) + Number(itemBreakdown.employeeRevenue || 0),
-            employeeCommissionRate: Number(itemBreakdown.employeeCommissionRate || accumulator.employeeCommissionRate || 0),
+            employeeCommissionRate: Number(itemBreakdown.employeeCommissionRate ?? accumulator.employeeCommissionRate ?? 0),
             employeeCommission: Number(accumulator.employeeCommission || 0) + Number(itemBreakdown.employeeCommission || 0)
         };
     }, {
@@ -732,17 +732,17 @@ async function calculateGroupGuestPriceAdjustment({ tenantId, appointment, group
         platformFee: 0,
         tenantRevenue: 0,
         employeeRevenue: 0,
-        employeeCommissionRate: Number(appointment.employeeCommissionRate || 0),
+        employeeCommissionRate: Number(appointment.employeeCommissionRate ?? 0),
         employeeCommission: 0
     });
     return {
-        extraPrice: Number(breakdown.price || 0),
-        extraRawPrice: Number(breakdown.rawPrice || 0),
-        extraTaxAmount: Number(breakdown.taxAmount || 0),
-        extraPlatformFee: Number(breakdown.platformFee || 0),
+        extraPrice: Number(breakdown.price ?? 0),
+        extraRawPrice: Number(breakdown.rawPrice ?? 0),
+        extraTaxAmount: Number(breakdown.taxAmount ?? 0),
+        extraPlatformFee: Number(breakdown.platformFee ?? 0),
         extraTenantRevenue: Number(breakdown.tenantRevenue || 0),
         extraEmployeeRevenue: Number(breakdown.employeeRevenue || 0),
-        extraEmployeeCommissionRate: Number(breakdown.employeeCommissionRate || 0),
+        extraEmployeeCommissionRate: Number(breakdown.employeeCommissionRate ?? 0),
         extraEmployeeCommission: Number(breakdown.employeeCommission || 0),
         guestService: guestServices[0] || null,
         guestServices
@@ -759,10 +759,10 @@ async function syncBookingSessionTotals(sessionId, transaction) {
         transaction
     });
 
-    const subtotal = appointments.reduce((sum, appointment) => sum + Number(appointment.rawPrice || 0), 0);
-    const taxAmount = appointments.reduce((sum, appointment) => sum + Number(appointment.taxAmount || 0), 0);
-    const platformFee = appointments.reduce((sum, appointment) => sum + Number(appointment.platformFee || 0), 0);
-    const totalAmount = appointments.reduce((sum, appointment) => sum + Number(appointment.price || 0), 0);
+    const subtotal = appointments.reduce((sum, appointment) => sum + Number(appointment.rawPrice ?? 0), 0);
+    const taxAmount = appointments.reduce((sum, appointment) => sum + Number(appointment.taxAmount ?? 0), 0);
+    const platformFee = appointments.reduce((sum, appointment) => sum + Number(appointment.platformFee ?? 0), 0);
+    const totalAmount = appointments.reduce((sum, appointment) => sum + Number(appointment.price ?? 0), 0);
 
     await db.BookingSession.update({
         itemCount: appointments.length,
@@ -1112,10 +1112,10 @@ exports.createAppointment = async (req, res) => {
             transaction
         });
         if (groupGuestPrice && groupGuestPrice.extraPrice > 0) {
-            const currentPrice = Number(appointment.price || 0);
-            const currentRawPrice = Number(appointment.rawPrice || 0);
-            const currentTaxAmount = Number(appointment.taxAmount || 0);
-            const currentPlatformFee = Number(appointment.platformFee || 0);
+            const currentPrice = Number(appointment.price ?? 0);
+            const currentRawPrice = Number(appointment.rawPrice ?? 0);
+            const currentTaxAmount = Number(appointment.taxAmount ?? 0);
+            const currentPlatformFee = Number(appointment.platformFee ?? 0);
             const currentTenantRevenue = Number(appointment.tenantRevenue || 0);
             const currentEmployeeRevenue = Number(appointment.employeeRevenue || 0);
             const currentEmployeeCommission = Number(appointment.employeeCommission || 0);
@@ -1143,8 +1143,8 @@ exports.createAppointment = async (req, res) => {
             appointment.employeeRevenue = totalEmployeeRevenue;
             appointment.employeeCommissionRate = groupGuestPrice.extraEmployeeCommissionRate || appointment.employeeCommissionRate;
             appointment.employeeCommission = totalEmployeeCommission;
-            appointment.depositAmount = parseFloat(Number(bookingSplit.depositAmount || 0).toFixed(2));
-            appointment.remainderAmount = parseFloat(Number(bookingSplit.remainderAmount || totalPrice).toFixed(2));
+            appointment.depositAmount = parseFloat(Number(bookingSplit.depositAmount ?? 0).toFixed(2));
+            appointment.remainderAmount = parseFloat(Number(bookingSplit.remainderAmount ?? totalPrice).toFixed(2));
             appointment.totalPaid = 0;
             appointment.depositPaid = false;
             appointment.remainderPaid = false;
@@ -1171,10 +1171,10 @@ exports.createAppointment = async (req, res) => {
                 platformUserId: customerUser.id,
                 status: 'confirmed',
                 itemCount: 1,
-                subtotal: Number(appointment.rawPrice || 0),
-                taxAmount: Number(appointment.taxAmount || 0),
-                platformFee: Number(appointment.platformFee || 0),
-                totalAmount: Number(appointment.price || 0),
+                subtotal: Number(appointment.rawPrice ?? 0),
+                taxAmount: Number(appointment.taxAmount ?? 0),
+                platformFee: Number(appointment.platformFee ?? 0),
+                totalAmount: Number(appointment.price ?? 0),
                 paymentMethod: appointment.paymentMethod || paymentMethod || null,
                 notes: normalizedNotes || null
             }, { transaction });
@@ -2208,7 +2208,7 @@ exports.updateAppointmentStatus = async (req, res) => {
             });
         }
 
-        const isSettledByAmount = (parseFloat(appointment.remainderAmount || 0) <= 0.009) && (parseFloat(appointment.outstandingAmount || 0) <= 0.009);
+        const isSettledByAmount = (parseFloat(appointment.remainderAmount ?? 0) <= 0.009) && (parseFloat(appointment.outstandingAmount || 0) <= 0.009);
         const isSettledByStatus = isAppointmentFullyPaid(appointment.paymentStatus) || `${appointment.paymentStatus || ''}`.trim().toLowerCase() === 'paid';
         const previousStatus = appointment.status;
 
@@ -2252,8 +2252,8 @@ exports.updateAppointmentStatus = async (req, res) => {
             transaction
         });
 
-        const appointmentTotalPrice = parseFloat(appointment.price || 0);
-        const currentPaid = parseFloat(appointment.totalPaid || 0);
+        const appointmentTotalPrice = parseFloat(appointment.price ?? 0);
+        const currentPaid = parseFloat(appointment.totalPaid ?? 0);
         const outstandingAmount = Math.max(0, parseFloat((appointmentTotalPrice - currentPaid).toFixed(2)));
         const cancellationWindowHours = Number(tenantSettings?.cancellationHours || 24);
         const appointmentStartTime = appointment.startTime ? new Date(appointment.startTime).getTime() : null;

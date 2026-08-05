@@ -149,8 +149,8 @@ const autoMarkNoShowForAppointment = async (appointment, settings, now = new Dat
         noShowMarkedAt: now
     });
 
-    const totalPrice = Number(appointment.price || 0);
-    const totalPaid = Number(appointment.totalPaid || 0);
+    const totalPrice = Number(appointment.price ?? 0);
+    const totalPaid = Number(appointment.totalPaid ?? 0);
     const outstandingAmount = Math.max(0, Number((totalPrice - totalPaid).toFixed(2)));
     if (outstandingAmount > 0.01) {
         await collectAppointmentStatusCharge({

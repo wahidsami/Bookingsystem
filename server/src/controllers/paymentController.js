@@ -242,7 +242,7 @@ const processPayment = async (req, res, next) => {
                 if (!appointment || appointment.status === 'cancelled') return false;
                 const paymentStatus = `${appointment.paymentStatus || ''}`.trim().toLowerCase();
                 if (paymentStatus === 'fully_paid' || paymentStatus === 'paid') return false;
-                const outstanding = parseFloat((Number(appointment.price || 0) - Number(appointment.totalPaid || 0)).toFixed(2));
+                const outstanding = parseFloat((Number(appointment.price ?? 0) - Number(appointment.totalPaid ?? 0)).toFixed(2));
                 return outstanding > 0.009;
             });
 
@@ -253,9 +253,9 @@ const processPayment = async (req, res, next) => {
             const requestedAmount = Number(parseFloat(amount).toFixed(2));
             const computedPayableNow = Number(payableAppointments.reduce((sum, appointment) => {
                 const paymentMethodRaw = `${appointment.paymentMethod || ''}`.trim().toLowerCase();
-                const totalAmount = Number(appointment.price || 0);
-                const totalPaid = Number(appointment.totalPaid || 0);
-                const depositAmount = Number(appointment.depositAmount || 0);
+                const totalAmount = Number(appointment.price ?? 0);
+                const totalPaid = Number(appointment.totalPaid ?? 0);
+                const depositAmount = Number(appointment.depositAmount ?? 0);
                 const status = `${appointment.paymentStatus || ''}`.trim().toLowerCase();
                 if (paymentMethodRaw === 'booking-fee' && status === 'pending' && depositAmount > 0 && totalPaid <= 0.009) {
                     return sum + depositAmount;
@@ -273,9 +273,9 @@ const processPayment = async (req, res, next) => {
             const transactions = [];
             for (const appointment of payableAppointments) {
                 const paymentMethodRaw = `${appointment.paymentMethod || ''}`.trim().toLowerCase();
-                const totalAmount = Number(appointment.price || 0);
-                const totalPaid = Number(appointment.totalPaid || 0);
-                const depositAmount = Number(appointment.depositAmount || 0);
+                const totalAmount = Number(appointment.price ?? 0);
+                const totalPaid = Number(appointment.totalPaid ?? 0);
+                const depositAmount = Number(appointment.depositAmount ?? 0);
                 const status = `${appointment.paymentStatus || ''}`.trim().toLowerCase();
                 const isInitialDeposit = paymentMethodRaw === 'booking-fee' && status === 'pending' && depositAmount > 0 && totalPaid <= 0.009;
                 const appointmentAmount = Number((isInitialDeposit ? depositAmount : Math.max(0, totalAmount - totalPaid)).toFixed(2));

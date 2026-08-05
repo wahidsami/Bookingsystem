@@ -29,8 +29,8 @@ function normalizeInvoiceAmounts(totalInput, vatInput) {
 
 function getAppointmentInvoiceDiscountAmount(appointments = []) {
     return formatAmount(appointments.reduce((sum, appointment) => {
-        const rawPrice = formatAmount(appointment?.rawPrice || 0);
-        const finalPrice = formatAmount(appointment?.price || 0);
+        const rawPrice = formatAmount(appointment?.rawPrice ?? 0);
+        const finalPrice = formatAmount(appointment?.price ?? 0);
         return sum + Math.max(rawPrice - finalPrice, 0);
     }, 0));
 }
@@ -40,10 +40,10 @@ function getOrderInvoiceDiscountAmount(order) {
         return 0;
     }
 
-    const subtotal = formatAmount(order.subtotal || 0);
-    const taxAmount = formatAmount(order.taxAmount || 0);
-    const shippingFee = formatAmount(order.shippingFee || 0);
-    const totalAmount = formatAmount(order.totalAmount || 0);
+    const subtotal = formatAmount(order.subtotal ?? 0);
+    const taxAmount = formatAmount(order.taxAmount ?? 0);
+    const shippingFee = formatAmount(order.shippingFee ?? 0);
+    const totalAmount = formatAmount(order.totalAmount ?? 0);
     return formatAmount(Math.max((subtotal + taxAmount + shippingFee) - totalAmount, 0));
 }
 
@@ -372,11 +372,11 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
             : undefined
     });
 
-    const subtotalAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.rawPrice || 0), 0));
-    const vatAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.taxAmount || 0), 0));
-    const totalAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.price || 0), 0));
+    const subtotalAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.rawPrice ?? 0), 0));
+    const vatAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.taxAmount ?? 0), 0));
+    const totalAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.price ?? 0), 0));
     const discountAmount = getAppointmentInvoiceDiscountAmount(invoiceAppointments);
-    const paidAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.totalPaid || 0), 0));
+    const paidAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.totalPaid ?? 0), 0));
     const dueAmount = formatAmount(Math.max(0, totalAmount - paidAmount));
     const invoiceItems = invoiceAppointments.map((sourceAppointment, index) => ({
         itemType: 'service',
@@ -384,8 +384,8 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
         nameEn: sourceAppointment.service?.name_en || 'Service',
         nameAr: sourceAppointment.service?.name_ar || sourceAppointment.service?.name_en || 'Service',
         quantity: 1,
-        unitPrice: formatAmount(Number(sourceAppointment.price || 0) - Number(sourceAppointment.taxAmount || 0)),
-        lineTotal: formatAmount(Number(sourceAppointment.price || 0) - Number(sourceAppointment.taxAmount || 0)),
+        unitPrice: formatAmount(Number(sourceAppointment.price ?? 0) - Number(sourceAppointment.taxAmount ?? 0)),
+        lineTotal: formatAmount(Number(sourceAppointment.price ?? 0) - Number(sourceAppointment.taxAmount ?? 0)),
         taxAmount: formatAmount(sourceAppointment.taxAmount),
         metadata: {
             bookingNumber: sourceAppointment.bookingNumber || null,
@@ -409,11 +409,11 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
     };
 
     const allPaid = invoiceAppointments.length > 0
-        && invoiceAppointments.every((current) => Number(current.totalPaid || 0) + 0.01 >= Number(current.price || 0));
+        && invoiceAppointments.every((current) => Number(current.totalPaid ?? 0) + 0.01 >= Number(current.price ?? 0));
     const allRefunded = invoiceAppointments.length > 0
         && invoiceAppointments.every((current) => ['refunded', 'partially_refunded'].includes(`${current.paymentStatus || ''}`.trim().toLowerCase())
-            || Number(current.totalPaid || 0) <= 0.01);
-    const anyPaid = invoiceAppointments.some((current) => Number(current.totalPaid || 0) > 0);
+            || Number(current.totalPaid ?? 0) <= 0.01);
+    const anyPaid = invoiceAppointments.some((current) => Number(current.totalPaid ?? 0) > 0);
     let status = 'UNPAID';
     if (allPaid) {
         status = 'PAID';

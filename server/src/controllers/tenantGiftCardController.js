@@ -639,7 +639,7 @@ exports.getSummaryReport = async (req, res) => {
       const summary = giftCards.reduce((acc, row) => {
       const originalAmount = Number(row.originalAmount || 0);
       const redeemedAmount = Number(row.redeemedAmount || 0);
-      const remainingBalance = row.remainingBalance == null ? 0 : Number(row.remainingBalance || 0);
+      const remainingBalance = row.remainingBalance == null ? 0 : Number(row.remainingBalance ?? 0);
       acc.totalGiftCards += 1;
       acc.totalOriginalAmount += originalAmount;
       acc.totalRedeemedAmount += redeemedAmount;

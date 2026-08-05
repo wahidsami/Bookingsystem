@@ -72,9 +72,9 @@ class PaymentService {
         if (appointment.status === 'cancelled') throw new Error('Cancelled appointments cannot be paid');
         if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) throw new Error('Appointment is already paid');
 
-        const totalAmount = parseFloat(appointment.price || 0);
-        const totalPaid = parseFloat(appointment.totalPaid || 0);
-        const depositAmount = parseFloat(appointment.depositAmount || 0);
+        const totalAmount = parseFloat(appointment.price ?? 0);
+        const totalPaid = parseFloat(appointment.totalPaid ?? 0);
+        const depositAmount = parseFloat(appointment.depositAmount ?? 0);
         const outstandingAmount = parseFloat((totalAmount - totalPaid).toFixed(2));
         if (outstandingAmount <= 0) throw new Error('Appointment has no outstanding balance');
 
@@ -201,7 +201,7 @@ class PaymentService {
         if (order.paymentStatus === 'paid') throw new Error('Order is already paid');
         if (['cancelled', 'refunded'].includes(order.status)) throw new Error('This order can no longer be paid');
 
-        const totalAmount = parseFloat(order.totalAmount || 0);
+        const totalAmount = parseFloat(order.totalAmount ?? 0);
         if (Math.abs(requestedAmount - totalAmount) > 0.01) {
             throw new Error(`Payment amount must match the order total of ${totalAmount.toFixed(2)} SAR`);
         }
@@ -401,9 +401,9 @@ class PaymentService {
             throw new Error('Appointment is already paid');
         }
 
-        const totalAmount = parseFloat(appointment.price || 0);
-        const totalPaid = parseFloat(appointment.totalPaid || 0);
-        const depositAmount = parseFloat(appointment.depositAmount || 0);
+        const totalAmount = parseFloat(appointment.price ?? 0);
+        const totalPaid = parseFloat(appointment.totalPaid ?? 0);
+        const depositAmount = parseFloat(appointment.depositAmount ?? 0);
         const outstandingAmount = parseFloat((totalAmount - totalPaid).toFixed(2));
 
         if (outstandingAmount <= 0) {
@@ -661,7 +661,7 @@ class PaymentService {
             throw new Error('This order can no longer be paid');
         }
 
-        const totalAmount = parseFloat(order.totalAmount || 0);
+        const totalAmount = parseFloat(order.totalAmount ?? 0);
         if (Math.abs(requestedAmount - totalAmount) > 0.01) {
             throw new Error(`Payment amount must match the order total of ${totalAmount.toFixed(2)} SAR`);
         }
@@ -746,7 +746,7 @@ class PaymentService {
 
         if (!wasPaid) {
             await db.PlatformUser.increment('totalSpent', {
-                by: parseFloat(order.totalAmount || amount),
+                by: parseFloat(order.totalAmount ?? amount),
                 where: { id: platformUserId }
             });
         }

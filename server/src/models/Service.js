@@ -36,9 +36,9 @@ module.exports = (sequelize, DataTypes) => {
          * Calculate final price based on raw price, tax, and commission
          */
         calculateFinalPrice() {
-            const raw = parseFloat(this.rawPrice || 0);
-            const taxRate = parseFloat(this.taxRate || 15);
-            const commissionRate = parseFloat(this.commissionRate || 10);
+            const raw = parseFloat(this.rawPrice ?? 0);
+            const taxRate = parseFloat(this.taxRate ?? 15);
+            const commissionRate = parseFloat(this.commissionRate ?? 10);
             
             const tax = raw * (taxRate / 100);
             const commission = raw * (commissionRate / 100);

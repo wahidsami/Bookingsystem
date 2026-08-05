@@ -263,7 +263,7 @@ function drawLineItems(doc, bill) {
     const y = 528;
     drawLabelValue(doc, 394, y, 140, 'الإجمالي قبل الضريبة', 'Subtotal', formatMoney(bill.subtotalAmount, bill.currency));
     drawLabelValue(doc, 250, y, 120, 'قيمة ضريبة VAT', 'VAT Amount', formatMoney(bill.vatAmount, bill.currency));
-    drawLabelValue(doc, 52, y, 176, 'الإجمالي النهائي', 'Grand Total', formatMoney(bill.totalAmount || bill.amount, bill.currency), {
+    drawLabelValue(doc, 52, y, 176, 'الإجمالي النهائي', 'Grand Total', formatMoney(bill.totalAmount ?? bill.amount, bill.currency), {
         valueColor: '#7C3AED',
         valueSize: 12
     });

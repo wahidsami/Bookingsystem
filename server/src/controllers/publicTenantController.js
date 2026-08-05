@@ -1198,11 +1198,11 @@ exports.createPublicBooking = async (req, res) => {
         };
 
         const bookingFee = paymentMethod === 'booking-fee'
-            ? calculateServiceDeposit(appointment.price || 0, tenantPaymentSettings).depositAmount
+            ? calculateServiceDeposit(appointment.price ?? 0, tenantPaymentSettings).depositAmount
             : 0;
 
         if (paymentMethod === 'online-full') {
-            const totalPaid = parseFloat(appointment.price || 0);
+            const totalPaid = parseFloat(appointment.price ?? 0);
 
             await appointment.update({
                 paymentStatus: APPOINTMENT_PAYMENT_STATUS.FULLY_PAID,
@@ -1243,7 +1243,7 @@ exports.createPublicBooking = async (req, res) => {
                 where: { platformUserId: platformUser.id, tenantId }
             });
         } else if (paymentMethod === 'booking-fee') {
-            const totalPrice = parseFloat(appointment.price || 0);
+            const totalPrice = parseFloat(appointment.price ?? 0);
             const splitPayment = calculateServiceDeposit(totalPrice, tenantPaymentSettings);
             const safeBookingFee = splitPayment.depositAmount;
             const normalizedTotalPrice = Number.isFinite(totalPrice) ? totalPrice : 0;
