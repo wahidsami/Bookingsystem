@@ -75,8 +75,9 @@ function buildCanonicalFinancialData(transaction, invoice = null) {
         // Net Sales: Pre-tax, post-discount, including shipping fees
         netSales = Math.max(totalAmount - vat, 0);
         
-        // The gross pre-tax pre-discount is subtotal + shippingFee
-        grossSales = subtotal + shippingFee;
+        // The gross pre-tax pre-discount is subtotal + shippingFee minus VAT
+        // (because order.subtotal is tax-inclusive in this system)
+        grossSales = Math.max((subtotal + shippingFee) - vat, 0);
         
         // Discount is the difference between gross pre-tax and net pre-tax
         discount = Math.max(grossSales - netSales, 0);
