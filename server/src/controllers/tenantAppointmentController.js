@@ -2466,8 +2466,21 @@ exports.updatePaymentStatus = async (req, res) => {
             });
         }
 
-        const appointment = await db.Appointment.findOne({
+        let appointment = await db.Appointment.findOne({
             where: { id },
+            transaction,
+            lock: transaction.LOCK.UPDATE
+        });
+
+        if (!appointment) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Appointment not found'
+            });
+        }
+
+        await appointment.reload({
             include: [
                 {
                     model: db.Service,
@@ -2498,17 +2511,8 @@ exports.updatePaymentStatus = async (req, res) => {
                     }]
                 }
             ],
-            transaction,
-            lock: transaction.LOCK.UPDATE
+            transaction
         });
-
-        if (!appointment) {
-            await transaction.rollback();
-            return res.status(404).json({
-                success: false,
-                message: 'Appointment not found'
-            });
-        }
 
         const { processAppointmentPayment } = require('../services/appointmentPaymentService');
         const { appointment: updatedAppt } = await processAppointmentPayment({
