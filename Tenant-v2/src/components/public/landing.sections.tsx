@@ -59,81 +59,71 @@ function HeroSection({ lang, onNavigate }: PublicLandingSectionProps) {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45 }}
-      className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl"
+      className="relative overflow-hidden rounded-[2rem] shadow-2xl min-h-[500px] flex items-center border border-white/10"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(244,114,182,0.14),_transparent_26%)]" />
-      <div className="relative grid gap-10 xl:grid-cols-[1.2fr_0.8fr] p-8 md:p-10 xl:p-12">
-        <div className="space-y-8">
-          <div className={`inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-200 ${isRtl ? 'flex-row-reverse' : ''}`}>
+      {/* Background Image Slider Base */}
+      <motion.div 
+        initial={{ scale: 1.05 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 8, ease: "easeOut" }}
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url("/wallethero.jpg")' }}
+      />
+      {/* Dark overlay to ensure text legibility over the image */}
+      <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/90 via-zinc-950/60 to-zinc-950/90" />
+      
+      <div className="relative z-10 w-full p-8 md:p-10 xl:p-12 flex flex-col items-center justify-center text-center">
+        <div className="space-y-8 max-w-4xl mx-auto flex flex-col items-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className={`inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-zinc-900/60 backdrop-blur-md px-5 py-2 text-xs font-bold text-amber-300 ${isRtl ? 'flex-row-reverse' : ''}`}
+          >
             <Sparkles size={14} />
             <span>{copy.badge}</span>
-          </div>
+          </motion.div>
 
-          <div className="space-y-5 max-w-3xl">
-            <h1 className="text-4xl md:text-6xl font-black leading-tight tracking-tight text-white">
-              {copy.title}
-            </h1>
-            <p className="text-base md:text-xl leading-8 text-zinc-200 max-w-2xl">
-              {copy.subtitle}
-            </p>
-          </div>
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-4xl md:text-5xl lg:text-6xl font-black leading-[1.1] tracking-tight text-white drop-shadow-2xl"
+          >
+            {copy.title}
+          </motion.h1>
+          
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-base md:text-xl leading-relaxed text-zinc-200 max-w-2xl drop-shadow-md"
+          >
+            {copy.subtitle}
+          </motion.p>
 
-          <div className={`flex flex-col sm:flex-row gap-4 ${isRtl ? 'sm:flex-row-reverse' : ''}`}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className={`flex flex-col sm:flex-row gap-4 pt-6 ${isRtl ? 'sm:flex-row-reverse' : ''}`}
+          >
             <button
               type="button"
               onClick={() => onNavigate('/register')}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-400 px-6 py-4 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-400 px-8 py-4 text-sm font-black text-zinc-950 transition hover:bg-amber-300 shadow-xl hover:shadow-amber-500/20 hover:-translate-y-0.5 duration-200"
             >
               {copy.primary}
-              <ArrowRight size={16} />
+              <ArrowRight size={18} />
             </button>
             <button
               type="button"
               onClick={() => onNavigate('/login')}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-6 py-4 text-sm font-semibold text-white transition hover:bg-white/10"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 bg-zinc-900/60 backdrop-blur-md px-8 py-4 text-sm font-bold text-white transition hover:bg-white/10 shadow-xl hover:-translate-y-0.5 duration-200"
             >
               {copy.secondary}
             </button>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            {copy.stats.map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4 backdrop-blur"
-              >
-                <p className="text-xs uppercase tracking-[0.24em] text-zinc-400">{stat.label}</p>
-                <p className="mt-2 text-sm font-semibold text-white">{stat.value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid gap-4 self-center">
-          <div className="rounded-[1.75rem] border border-white/10 bg-zinc-950/60 p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-amber-200/80">{copy.eyebrow}</p>
-                <h2 className="mt-2 text-2xl font-bold text-white">{isRtl ? 'إطار القسّمات الجاهز' : 'Composable section shell'}</h2>
-              </div>
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-emerald-300">
-                <CheckCircle2 size={18} />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                isRtl ? 'بنية قابلة لإضافة الأقسام مستقبلًا' : 'Section registry for future growth',
-                isRtl ? 'لا تغييرات في منطق الحجز أو المصادقة' : 'No changes to booking or auth contracts',
-                isRtl ? 'تجربة عامة حديثة متوافقة مع V2' : 'Modern public UX aligned with V2 styling'
-              ].map((item) => (
-                <div key={item} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-200">
-                  <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </motion.section>

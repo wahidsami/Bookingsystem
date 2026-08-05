@@ -784,16 +784,8 @@ export default function PublicExperience({
         <div className="px-4 pb-8 pt-4 md:px-8 md:pb-10">
           <div className="mx-auto max-w-7xl">
             <div className="mb-5 flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl shadow-2xl">
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-amber-200">
-                  <Sparkles size={18} />
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-amber-200/80">Refah</p>
-                  <h1 className="text-lg font-black text-white">
-                    {lang === 'ar' ? 'تجربة عامة قابلة للتوسعة' : 'Extensible public experience'}
-                  </h1>
-                </div>
+              <div className="flex items-center">
+                <img src="/RifahNewLogoColor.png" alt="Refah" className="h-10 w-auto object-contain" />
               </div>
 
               <button
