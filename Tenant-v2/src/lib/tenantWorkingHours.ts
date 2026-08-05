@@ -165,7 +165,7 @@ export function normalizeSchedulerBoardSettings(value?: any): SchedulerBoardSett
     gridWidth: Math.max(80, Math.min(160, Number(source.gridWidth ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.gridWidth))),
     gridHeight: Math.max(420, Math.min(1400, Number(source.gridHeight ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.gridHeight))),
     timeSlotHeight: Math.max(8, Math.min(24, Number(source.timeSlotHeight ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.timeSlotHeight))),
-    staffColumnWidth: Math.max(180, Math.min(360, Number(source.staffColumnWidth ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.staffColumnWidth))),
+    staffColumnWidth: Math.max(50, Math.min(360, Number(source.staffColumnWidth ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.staffColumnWidth))),
     showCurrentTimeIndicator: source.showCurrentTimeIndicator !== undefined ? Boolean(source.showCurrentTimeIndicator) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showCurrentTimeIndicator,
     showLunchBreaks: source.showLunchBreaks !== undefined ? Boolean(source.showLunchBreaks) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showLunchBreaks,
     showStaffPhotos: source.showStaffPhotos !== undefined ? Boolean(source.showStaffPhotos) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showStaffPhotos,

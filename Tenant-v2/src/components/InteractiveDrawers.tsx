@@ -565,6 +565,8 @@ export default function InteractiveDrawers({
   const [blockStartTime, setBlockStartTime] = useState<number>(180); // 12:00 PM
   const [blockDuration, setBlockDuration] = useState<number>(45);
   const [blockType, setBlockType] = useState<'Break' | 'Lunch' | 'Meeting'>('Break');
+  const [blockIsRecurring, setBlockIsRecurring] = useState<boolean>(false);
+  const [blockEndDate, setBlockEndDate] = useState<string>('');
   const isEditingBreak = Boolean(existingBreak?.id);
   const loadedBreakIdRef = useRef<string | null>(null);
 
@@ -994,15 +996,23 @@ export default function InteractiveDrawers({
 
   const handleConfirmBlockSubmit = async () => {
     try {
-      const payload = {
+      const payload: any = {
         specificDate: getLocalDateKey(selectedDate),
         startTime: buildClockTime(blockStartTime),
         endTime: buildClockTime(blockStartTime + blockDuration),
         type: (blockType === 'Meeting' ? 'other' : blockType.toLowerCase() as any),
         label: blockTitleEn,
-        isRecurring: false,
+        isRecurring: blockIsRecurring,
         referenceDate: getLocalDateKey(selectedDate)
       };
+
+      if (blockIsRecurring) {
+        payload.dayOfWeek = null;
+        payload.startDate = getLocalDateKey(selectedDate);
+        if (blockEndDate) {
+          payload.endDate = blockEndDate;
+        }
+      }
 
       const response = existingBreak?.id
         ? await tenantApiAdapter.updateEmployeeBreak(blockStaffId || existingBreak.staffId || '', existingBreak.id, payload)
@@ -2338,6 +2348,19 @@ export default function InteractiveDrawers({
                       <input type="number" step={15} value={blockStartTime} onChange={(e) => setBlockStartTime(parseInt(e.target.value) || 0)} className="border p-1.5 rounded font-mono font-bold" />
                       <span className="text-[10px] font-mono text-slate-500 ml-2">{formatMinutesToTime(blockStartTime)}</span>
                     </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input type="checkbox" checked={blockIsRecurring} onChange={(e) => setBlockIsRecurring(e.target.checked)} className="rounded border-slate-300 text-zinc-900 focus:ring-zinc-900" />
+                      <span className="text-xs font-bold text-slate-700">{isRtl ? 'تكرار يومياً' : 'Repeat Everyday'}</span>
+                    </label>
+                    {blockIsRecurring && (
+                      <div className="pl-6 rtl:pr-6 rtl:pl-0">
+                        <label className="text-[10px] text-slate-400 block mb-1">{isRtl ? 'تاريخ الانتهاء (اختياري - للجدولة من-إلى)' : 'End Date (Optional - for from-to ranges)'}</label>
+                        <input type="date" value={blockEndDate} onChange={(e) => setBlockEndDate(e.target.value)} className="border p-1.5 rounded font-mono font-bold w-full" />
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-2 flex justify-end gap-2">
