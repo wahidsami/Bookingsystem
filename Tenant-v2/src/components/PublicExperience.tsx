@@ -18,6 +18,7 @@ import TenantLoginScreen from './TenantLoginScreen';
 import { PublicLandingFramework } from './public/LandingFramework';
 import PublicRegistrationWizard from './public/PublicRegistrationWizard';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import refahLogo from '../assets/RifahNewLogoColor.png';
 
 type PublicRoute = 'landing' | 'login' | 'register' | 'forgot-password' | 'reset-password' | 'register-success' | 'payment';
 
@@ -785,7 +786,7 @@ export default function PublicExperience({
           <div className="mx-auto max-w-7xl">
             <div className="mb-5 flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl shadow-2xl">
               <div className="flex items-center">
-                <img src="/RifahNewLogoColor.png" alt="Refah" className="h-10 w-auto object-contain" />
+                <img src={refahLogo} alt="Refah" className="h-10 w-auto object-contain" />
               </div>
 
               <button

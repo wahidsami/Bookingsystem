@@ -7,14 +7,15 @@ import {
   Star,
   ShieldCheck
 } from 'lucide-react';
+import walletHero from '../../assets/wallethero.jpg';
 import type { PublicLandingSectionComponentMap, PublicLandingSectionProps } from './landing.types';
 
 const text = {
   ar: {
     eyebrow: 'منصة رفاه للعروض والعمليات',
-    title: 'واجهة عامة قابلة للتوسعة تجمع بين الهوية الفاخرة وسير عمل الحجز الحقيقي',
+    title: 'ارتقِ بتجربة عملائك مع منصة رفاه',
     subtitle:
-      'هذا الإطار قابل لإضافة أقسام جديدة لاحقاً دون إعادة بناء الصفحة، بينما يبقى السلوك التشغيلي متوافقاً مع إنتاج Refah V1.',
+      'الحل المتكامل لإدارة الحجوزات، المبيعات، والعمليات اليومية لمراكز التجميل والصالونات الفاخرة بطريقة ذكية وعصرية.',
     primary: 'ابدأ التسجيل',
     secondary: 'تسجيل الدخول',
     badge: 'Framework-ready',
@@ -31,9 +32,9 @@ const text = {
   },
   en: {
     eyebrow: 'Refah public booking framework',
-    title: 'A configurable public experience that feels premium and stays compatible with live booking behavior',
+    title: 'Elevate your customer experience with Refah',
     subtitle:
-      'This framework can grow by adding sections later without rewriting the page, while keeping behavior aligned with Refah V1 production rules.',
+      'The all-in-one platform to seamlessly manage bookings, sales, and daily operations for luxury salons and spas.',
     primary: 'Start registration',
     secondary: 'Sign in',
     badge: 'Framework-ready',
@@ -67,7 +68,7 @@ function HeroSection({ lang, onNavigate }: PublicLandingSectionProps) {
         animate={{ scale: 1 }}
         transition={{ duration: 8, ease: "easeOut" }}
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: 'url("/wallethero.jpg")' }}
+        style={{ backgroundImage: `url(${walletHero})` }}
       />
       {/* Dark overlay to ensure text legibility over the image */}
       <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/90 via-zinc-950/60 to-zinc-950/90" />
