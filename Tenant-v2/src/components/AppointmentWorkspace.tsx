@@ -4155,6 +4155,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   showLunchBreaks={activeSchedulerSettings.showLunchBreaks}
                   showStaffPhotos={activeSchedulerSettings.showStaffPhotos}
                   showAppointmentStatusBadges={activeSchedulerSettings.showAppointmentStatusBadges}
+                  onColumnHeaderClick={(e, colId) => handleColumnHeaderClick(e, colId)}
+                  onColumnHeaderContextMenu={(e, colId) => handleColumnHeaderContextMenu(e, colId)}
                   onSlotContextMenu={handleSchedulerSlotContextMenu}
                   onSlotDrop={handleSchedulerSlotDrop}
                   onSlotRangeSelect={handleSchedulerSlotRangeSelect}

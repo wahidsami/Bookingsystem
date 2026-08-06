@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Users } from 'lucide-react';
+import { Users, ChevronDown } from 'lucide-react';
 
 export type SchedulerViewMode = 'day' | 'week';
 
@@ -516,11 +516,16 @@ export default function SchedulerGrid({
               </div>
             </div>
 
-            {column.isToday && (
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
-                {isRtl ? 'اليوم' : 'Today'}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {column.isToday && (
+                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
+                  {isRtl ? 'اليوم' : 'Today'}
+                </span>
+              )}
+              {(onColumnHeaderClick || onColumnHeaderContextMenu) && (
+                <ChevronDown size={14} className="text-slate-400 opacity-60 shrink-0" />
+              )}
+            </div>
           </div>
         );})}
       </div>
@@ -670,11 +675,11 @@ export default function SchedulerGrid({
             const durationSlots = Math.max(1, Math.ceil(Math.max(event.durationMinutes, slotMinutes) / slotMinutes));
             const top = slotIndex * slotHeight;
             const height = durationSlots * slotHeight;
-            const columnWidth = 100 / Math.max(columns.length, 1);
-            const laneWidth = columnWidth / Math.max(1, event.laneCount);
+            const cellWidth = Math.max(50, staffColumnWidth);
+            const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
             const rtlColumnIndex = isRtl ? (columns.length - columnIndex - 1) : columnIndex;
             const rtlLaneIndex = isRtl ? (event.laneCount - event.laneIndex - 1) : event.laneIndex;
-            const left = `calc(${rtlColumnIndex * columnWidth}% + ${rtlLaneIndex * laneWidth}%)`;
+            const left = `calc(${rtlColumnIndex * cellWidth}px + ${rtlLaneIndex * laneWidthPx}px)`;
             const serviceStyles = getServiceCategoryStyles(event.serviceCategory || event.raw?.service?.category);
             const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
             const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
@@ -702,8 +707,8 @@ export default function SchedulerGrid({
                 className="absolute"
                 style={{
                   left,
-                  width: `calc(${laneWidth}% - 8px)`,
-                  maxWidth: `calc(${laneWidth}% - 8px)`,
+                  width: `calc(${laneWidthPx}px - 8px)`,
+                  maxWidth: `calc(${laneWidthPx}px - 8px)`,
                   top: `${top}px`,
                   height: `${height}px`,
                   maxHeight: '100%',
