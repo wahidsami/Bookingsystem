@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import EmployeeProfileEditor from './employee-profile/EmployeeProfileEditor';
 import { motion, AnimatePresence } from 'motion/react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { DEFAULT_EMPLOYEE_AVATAR, resolveEmployeeImageUrl } from '../lib/employeeImage';
@@ -389,9 +390,6 @@ export default function TeamsWorkspace({
   const [activeSubTab, setActiveSubTab] = useState<TeamSubTab>('profile');
   const [activeView, setActiveView] = useState<'list' | 'form'>('list');
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
-  
-  // Guided form editor active section
-  const [activeFormSection, setActiveFormSection] = useState<'basic' | 'bio' | 'finance' | 'schedule' | 'access'>('basic');
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -473,8 +471,7 @@ export default function TeamsWorkspace({
 
   // Custom Toast Notification State
   const [toasts, setToasts] = useState<Array<{ id: string; msgEn: string; msgAr: string; type: 'success' | 'info' | 'error' }>>([]);
-  const [employeePhotoFile, setEmployeePhotoFile] = useState<File | null>(null);
-  const employeePhotoInputRef = useRef<HTMLInputElement | null>(null);
+
   const [staffAppPermissions, setStaffAppPermissions] = useState<Record<StaffAppPermissionKey, boolean>>({
     ...DEFAULT_STAFF_APP_PERMISSIONS
   });
@@ -1000,14 +997,16 @@ export default function TeamsWorkspace({
   };
 
   // Save Team Member Action
-  const handleSaveMember = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.nameEn && !formData.nameAr) {
+  const handleSaveMember = async (
+    submittedData: TeamMemberData,
+    photo: File | null,
+    submittedPermissions: Record<StaffAppPermissionKey, boolean>
+  ) => {
+    if (!submittedData.nameEn && !submittedData.nameAr) {
       triggerToast('Full Name is required.', 'الاسم بالكامل مطلوب.', 'error');
       return;
     }
-    if (!formData.phone) {
+    if (!submittedData.phone) {
       triggerToast('Phone number is required.', 'رقم الهاتف مطلوب.', 'error');
       return;
     }
@@ -1015,55 +1014,55 @@ export default function TeamsWorkspace({
     try {
       setIsSaving(true);
       const payload = new FormData();
-      const canonicalPosition = canonicalEmployeePosition(formData.position);
-      const primaryBio = isRtl ? formData.bioAr || formData.bioEn : formData.bioEn || formData.bioAr;
-      const primaryExperience = isRtl ? formData.experienceAr || formData.experienceEn : formData.experienceEn || formData.experienceAr;
+      const canonicalPosition = canonicalEmployeePosition(submittedData.position);
+      const primaryBio = isRtl ? submittedData.bioAr || submittedData.bioEn : submittedData.bioEn || submittedData.bioAr;
+      const primaryExperience = isRtl ? submittedData.experienceAr || submittedData.experienceEn : submittedData.experienceEn || submittedData.experienceAr;
       const isServiceProvider = canonicalPosition === 'service_provider';
-      let savedEmployeeId = formData.id;
+      let savedEmployeeId = submittedData.id;
 
-      payload.append('name', formData.nameEn || formData.nameAr);
-      if (formData.email.trim()) {
-        payload.append('email', formData.email.trim());
+      payload.append('name', submittedData.nameEn || submittedData.nameAr);
+      if (submittedData.email.trim()) {
+        payload.append('email', submittedData.email.trim());
       }
-      if (formData.phone.trim()) {
-        payload.append('phone', formData.phone.trim());
+      if (submittedData.phone.trim()) {
+        payload.append('phone', submittedData.phone.trim());
       }
-      if (formData.nationalityEn.trim() || formData.nationalityAr.trim()) {
-        payload.append('nationality', formData.nationalityEn || formData.nationalityAr);
+      if (submittedData.nationalityEn.trim() || submittedData.nationalityAr.trim()) {
+        payload.append('nationality', submittedData.nationalityEn || submittedData.nationalityAr);
       }
-      payload.append('gender', formData.gender);
+      payload.append('gender', submittedData.gender);
       payload.append('position', canonicalPosition);
       payload.append('bio', primaryBio || '');
       payload.append('experience', primaryExperience || '');
-      payload.append('skills', JSON.stringify(formData.specialtiesEn || []));
-      payload.append('spokenLanguages', JSON.stringify(formData.languagesEn || []));
-      payload.append('salary', String(formData.baseSalary || 0));
-      payload.append('commissionRate', String(formData.commissionRatePct || 0));
-      payload.append('serviceCommissionEnabled', String(formData.serviceCommissionEnabled));
-      payload.append('productCommissionEnabled', String(formData.productCommissionEnabled));
-      payload.append('scheduleVisibilityWeeks', String(formData.scheduleVisibilityWeeks || 1));
-      payload.append('staffAppPassword', formData.staffAppPassword || '');
-      payload.append('dashboardPermissions', JSON.stringify(formData.dashboardPermissions || {}));
-      payload.append('isActive', String(formData.status === 'active'));
+      payload.append('skills', JSON.stringify(submittedData.specialtiesEn || []));
+      payload.append('spokenLanguages', JSON.stringify(submittedData.languagesEn || []));
+      payload.append('salary', String(submittedData.baseSalary || 0));
+      payload.append('commissionRate', String(submittedData.commissionRatePct || 0));
+      payload.append('serviceCommissionEnabled', String(submittedData.serviceCommissionEnabled));
+      payload.append('productCommissionEnabled', String(submittedData.productCommissionEnabled));
+      payload.append('scheduleVisibilityWeeks', String(submittedData.scheduleVisibilityWeeks || 1));
+      payload.append('staffAppPassword', submittedData.staffAppPassword || '');
+      payload.append('dashboardPermissions', JSON.stringify(submittedData.dashboardPermissions || {}));
+      payload.append('isActive', String(submittedData.status === 'active'));
 
-      if (employeePhotoFile) {
-        payload.append('photo', employeePhotoFile);
+      if (photo) {
+        payload.append('photo', photo);
       }
 
       if (formMode === 'add') {
         const response = await tenantApiAdapter.createEmployee(payload);
         savedEmployeeId = response?.employee?.id || savedEmployeeId;
         triggerToast(
-          `Team member "${formData.nameEn || formData.nameAr}" added successfully!`,
-          `تم إضافة عضو الفريق الجديد "${formData.nameEn || formData.nameAr}" بنجاح!`,
+          `Team member "${submittedData.nameEn || submittedData.nameAr}" added successfully!`,
+          `تم إضافة عضو الفريق الجديد "${submittedData.nameEn || submittedData.nameAr}" بنجاح!`,
           'success'
         );
       } else {
-        const response = await tenantApiAdapter.updateEmployee(formData.id, payload);
-        savedEmployeeId = response?.employee?.id || savedEmployeeId || formData.id;
+        const response = await tenantApiAdapter.updateEmployee(submittedData.id, payload);
+        savedEmployeeId = response?.employee?.id || savedEmployeeId || submittedData.id;
         triggerToast(
-          `Team member "${formData.nameEn || formData.nameAr}" updated successfully!`,
-          `تم تحديث بيانات عضو الفريق "${formData.nameEn || formData.nameAr}" بنجاح!`,
+          `Team member "${submittedData.nameEn || submittedData.nameAr}" updated successfully!`,
+          `تم تحديث بيانات عضو الفريق "${submittedData.nameEn || submittedData.nameAr}" بنجاح!`,
           'success'
         );
       }
@@ -1072,10 +1071,10 @@ export default function TeamsWorkspace({
         try {
           await persistEmployeeSchedule(
             savedEmployeeId,
-            formData.schedule,
-            formData.scheduleStartDate || formData.joinedDate || new Date().toISOString().split('T')[0],
-            formData.scheduleEndDate || '',
-            Boolean(formData.scheduleContinues)
+            submittedData.schedule,
+            submittedData.scheduleStartDate || submittedData.joinedDate || new Date().toISOString().split('T')[0],
+            submittedData.scheduleEndDate || '',
+            Boolean(submittedData.scheduleContinues)
           );
         } catch (scheduleError) {
           console.error('Failed to persist weekly schedule:', scheduleError);
@@ -1089,7 +1088,7 @@ export default function TeamsWorkspace({
 
       if (isServiceProvider && savedEmployeeId) {
         try {
-          await tenantApiAdapter.updateEmployeePermissions(savedEmployeeId, staffAppPermissions);
+          await tenantApiAdapter.updateEmployeePermissions(savedEmployeeId, submittedPermissions);
         } catch (permissionsError) {
           console.error(permissionsError);
           triggerToast(
@@ -1144,229 +1143,7 @@ export default function TeamsWorkspace({
       setIsSaving(false);
     }
   };
-  // Specialty Helper Adders
-  const [newSpecialty, setNewSpecialty] = useState('');
-  const handleAddSpecialty = () => {
-    if (!newSpecialty.trim()) return;
-    const cleanSpec = newSpecialty.trim();
-    if (!formData.specialtiesEn.includes(cleanSpec)) {
-      setFormData(prev => ({
-        ...prev,
-        specialtiesEn: [...prev.specialtiesEn, cleanSpec],
-        specialtiesAr: [...prev.specialtiesAr, cleanSpec]
-      }));
-    }
-    setNewSpecialty('');
-  };
 
-  const handleRemoveSpecialty = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      specialtiesEn: prev.specialtiesEn.filter((_, i) => i !== index),
-      specialtiesAr: prev.specialtiesAr.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Languages Helper Adders
-  const [newLangInput, setNewLangInput] = useState('');
-  const handleAddLanguage = () => {
-    if (!newLangInput.trim()) return;
-    const cleanLang = newLangInput.trim();
-    if (!formData.languagesEn.includes(cleanLang)) {
-      setFormData(prev => ({
-        ...prev,
-        languagesEn: [...prev.languagesEn, cleanLang],
-        languagesAr: [...prev.languagesAr, cleanLang]
-      }));
-    }
-    setNewLangInput('');
-  };
-
-  const handleRemoveLanguage = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      languagesEn: prev.languagesEn.filter((_, i) => i !== index),
-      languagesAr: prev.languagesAr.filter((_, i) => i !== index)
-    }));
-  };
-
-  // AI Fill / Copy Assistance
-  const handleAIAssistFill = () => {
-    if (!formData.nameEn && !formData.nameAr) {
-      triggerToast(
-        'Please input at least one full name to allow context writing.',
-        'يرجى إدخال اسم بلغة واحدة على الأقل لتمكين توليد الوصف والسير الذاتية.',
-        'error'
-      );
-      return;
-    }
-    const name = formData.nameEn || formData.nameAr;
-    triggerToast('AI generating professional wellness bio, experience metrics and skills...', 'الذكاء الاصطناعي يقوم بصياغة التفاصيل المهنية والمهارات الفنية...', 'info');
-
-    setTimeout(() => {
-      setFormData(prev => ({
-        ...prev,
-        bioEn: `A master practitioner of premier beauty, specializing in luxury treatment routines. Holds advanced certificates with a flawless client retention history.`,
-        bioAr: `أخصائية وخبيرة معتمدة محلياً ودولياً في العناية المتكاملة والحلول التجميلية الفاخرة. تمتلك سجلاً حافلاً بالتميز والعملاء الدائمين.`,
-        experienceEn: '6 Years',
-        experienceAr: '٦ سنوات',
-        specialtiesEn: prev.specialtiesEn.length > 0 ? prev.specialtiesEn : ['Thermal Hydration', 'Elite Balayage', 'Nail Overlay'],
-        specialtiesAr: prev.specialtiesAr.length > 0 ? prev.specialtiesAr : ['الترطيب الحراري الشامل', 'البالياج السويسري', 'بناء الجل للأظافر']
-      }));
-      triggerToast('AI assistance profiles filled!', 'تم صياغة السيرة الذاتية والتخصصات بواسطة الذكاء الاصطناعي بنجاح.', 'success');
-    }, 1100);
-  };
-
-  // Schedule Shift Timings Helper
-  const handleScheduleDayToggle = (dayIndex: number) => {
-    setFormData(prev => {
-      const updated = [...prev.schedule];
-      const target = updated[dayIndex];
-      const nextStatus = target.status === 'working' ? 'off' : 'working';
-      const canonicalDay = defaultWeeklySchedule[dayIndex];
-      updated[dayIndex] = {
-        ...target,
-        status: nextStatus,
-        hours: nextStatus === 'off'
-          ? 'Day Off'
-          : canonicalDay?.hours || '09:00 AM - 09:00 PM'
-      };
-      return { ...prev, schedule: updated };
-    });
-  };
-
-  const handleScheduleTimeChange = (dayIndex: number, field: 'startTime' | 'endTime', val: string) => {
-    setFormData(prev => {
-      const updated = [...prev.schedule];
-      const current = parseScheduleRange(updated[dayIndex].hours);
-      const nextStart = field === 'startTime' ? val : current.startTime;
-      const nextEnd = field === 'endTime' ? val : current.endTime;
-      updated[dayIndex] = {
-        ...updated[dayIndex],
-        status: updated[dayIndex].status === 'working' ? 'working' : (nextStart || nextEnd ? 'working' : updated[dayIndex].status),
-        hours: nextStart && nextEnd
-          ? formatScheduleRange(nextStart, nextEnd)
-          : updated[dayIndex].hours
-      };
-      return { ...prev, schedule: updated };
-    });
-  };
-
-  const handleAddSubShift = (dayIndex: number) => {
-    setFormData(prev => {
-      const updated = [...prev.schedule];
-      const day = updated[dayIndex];
-      const subShifts = day.subShifts ? [...day.subShifts] : [];
-      subShifts.push({
-        id: `sub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        label: isRtl ? 'شيفت مسائي' : 'Evening Shift',
-        startTime: '18:00',
-        endTime: '21:00'
-      });
-      updated[dayIndex] = { ...day, subShifts };
-      return { ...prev, schedule: updated };
-    });
-  };
-
-  const handleRemoveSubShift = (dayIndex: number, subShiftId: string) => {
-    setFormData(prev => {
-      const updated = [...prev.schedule];
-      const day = updated[dayIndex];
-      if (day.subShifts) {
-        updated[dayIndex] = {
-          ...day,
-          subShifts: day.subShifts.filter(s => s.id !== subShiftId)
-        };
-      }
-      return { ...prev, schedule: updated };
-    });
-  };
-
-  const handleSubShiftChange = (dayIndex: number, subShiftId: string, field: 'label' | 'startTime' | 'endTime', value: string) => {
-    setFormData(prev => {
-      const updated = [...prev.schedule];
-      const day = updated[dayIndex];
-      if (day.subShifts) {
-        updated[dayIndex] = {
-          ...day,
-          subShifts: day.subShifts.map(s => s.id === subShiftId ? { ...s, [field]: value } : s)
-        };
-      }
-      return { ...prev, schedule: updated };
-    });
-  };
-
-  const applyRolePreset = (preset: string) => {
-    const emptyPerms = {
-      view_dashboard: false,
-      manage_appointments: false,
-      view_employees: false,
-      manage_financials: false,
-      view_reports: false,
-      manage_settings: false,
-      view_appointments: false,
-      view_schedules: false,
-      view_customers: false,
-      view_services: false,
-      view_products: false,
-      view_orders: false,
-      view_financial: false,
-      view_bills: false,
-      view_pos: false,
-      view_messages: false,
-      view_reviews: false,
-      view_hot_deals: false,
-      view_notifications: false,
-      view_payroll: false,
-      view_subscription: false,
-      view_settings: false,
-      manage_accounts: false
-    };
-    
-    let updated = { ...emptyPerms };
-    
-    if (preset === 'manager') {
-      Object.keys(updated).forEach(k => { updated[k as keyof typeof updated] = true; });
-    } else if (preset === 'accountant') {
-      updated.view_dashboard = true;
-      updated.view_financial = true;
-      updated.view_reports = true;
-      updated.view_payroll = true;
-      updated.view_bills = true;
-      updated.manage_financials = true;
-    } else if (preset === 'receptionist') {
-      updated.view_dashboard = true;
-      updated.view_appointments = true;
-      updated.manage_appointments = true;
-      updated.view_schedules = true;
-      updated.view_customers = true;
-      updated.view_messages = true;
-      updated.view_notifications = true;
-    } else if (preset === 'marketing') {
-      updated.view_dashboard = true;
-      updated.view_reports = true;
-      updated.view_hot_deals = true;
-      updated.view_reviews = true;
-    } else if (preset === 'hr') {
-      updated.view_dashboard = true;
-      updated.view_employees = true;
-      updated.view_payroll = true;
-      updated.view_schedules = true;
-    } else if (preset === 'service_provider') {
-      updated.view_dashboard = true;
-      updated.view_schedules = true;
-      updated.view_appointments = true;
-      updated.view_reviews = true;
-    }
-    
-    setFormData(p => ({
-      ...p,
-      dashboardPermissions: {
-        ...p.dashboardPermissions,
-        ...updated
-      }
-    }));
-  };
 
   // Net Payable salary calculations
   const serviceCommEarned = Math.round(((activeMember?.servicesSales || 0) * (activeMember?.commissionRatePct || 0)) / 100);
@@ -2117,896 +1894,14 @@ export default function TeamsWorkspace({
         </div>
       ) : (
         /* GUIDED MULTI-SECTION ROSTER PROFILE FORM */
-        <div className="bg-white rounded-3xl border border-neutral-200/60 shadow-md overflow-hidden animate-fade-in" id="roster-guided-form-editor">
-          
-          {/* Header Panel */}
-          <div className="bg-zinc-950 text-white p-5 flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setActiveView('list')}
-                className="p-2 bg-neutral-900 hover:bg-neutral-800 rounded-xl text-neutral-400 hover:text-white transition-all cursor-pointer border border-neutral-800"
-              >
-                <ArrowLeft size={16} className={isRtl ? 'transform rotate-180' : ''} />
-              </button>
-              <div>
-                <span className="text-[9px] uppercase tracking-widest text-amber-400 font-black block">
-                  {isRtl ? 'بوابة تعيين وتهيئة الكادر' : 'REFAH TEAM ROSTER CREATOR'}
-                </span>
-                <h2 className="text-base font-black">
-                  {formMode === 'add' 
-                    ? (isRtl ? 'تعيين وتهيئة عضو فريق جديد' : 'Onboard & Setup New Team Member')
-                    : (isRtl ? `تحديث الملف المهني: ${formData.nameAr || formData.nameEn}` : `Configure Profile: ${formData.nameEn || formData.nameAr}`)}
-                </h2>
-              </div>
-            </div>
-
-            {/* AI Assist button */}
-            <button
-              type="button"
-              onClick={handleAIAssistFill}
-              className="px-4 py-2 bg-gradient-to-r from-amber-500 to-indigo-600 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border border-white/10"
-            >
-              <Sparkles size={13} className="text-amber-300" />
-              <span>{isRtl ? 'توليد النبذة بالذكاء الاصطناعي' : 'AI Context Generator'}</span>
-            </button>
-          </div>
-
-          {/* Form Content layout with Guided Section Navigator */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[500px]">
-            
-            {/* Left guided Section Navigator Sidebar */}
-            <div className="lg:col-span-3 bg-slate-50/50 border-r border-slate-150 p-4 space-y-1">
-              <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1.5 pb-2 block">
-                {isRtl ? 'خطوات التهيئة المعيارية' : 'Standard Onboarding Steps'}
-              </span>
-
-              {[
-                { id: 'basic', labelEn: '1. Basic Identity', labelAr: '١. الهوية والاتصال', icon: User },
-                { id: 'bio', labelEn: '2. Bio & Specialties', labelAr: '٢. النبذة والخبرات', icon: Sparkles },
-                { id: 'finance', labelEn: '3. Finance Rules', labelAr: '٣. قواعد المستحقات والرواتب', icon: DollarSign },
-                { id: 'schedule', labelEn: '4. Shift Matrix', labelAr: '٤. جدول العمل والشيفت', icon: Calendar },
-                { id: 'access', labelEn: '5. Access Paths & Security', labelAr: '٥. الأمن والوصول اللحظي', icon: Shield }
-              ].map(sec => {
-                const isActive = activeFormSection === sec.id;
-                return (
-                  <button
-                    key={sec.id}
-                    type="button"
-                    onClick={() => setActiveFormSection(sec.id as any)}
-                    className={`w-full text-start px-3.5 py-3 rounded-xl text-xs font-black flex items-center gap-2.5 transition-all cursor-pointer ${
-                      isActive 
-                        ? 'bg-zinc-950 text-white shadow-sm' 
-                        : 'text-neutral-500 hover:bg-slate-100 hover:text-neutral-800'
-                    }`}
-                  >
-                    <sec.icon size={13} className={isActive ? 'text-amber-400' : 'text-neutral-400'} />
-                    <span>{isRtl ? sec.labelAr : sec.labelEn}</span>
-                  </button>
-                );
-              })}
-
-              <div className="pt-6 px-1 text-[10px] text-neutral-400 space-y-1">
-                <p className="font-extrabold text-amber-600 uppercase">🛡️ {isRtl ? 'مستودع آمن بالكامل' : 'SECURE VAULT WORKSPACE'}</p>
-                <p className="leading-relaxed font-medium">All personal records and dashboard permission tokens are protected with certified 256-bit encryption before saving.</p>
-              </div>
-            </div>
-
-            {/* Right Main form edit body */}
-            <form onSubmit={handleSaveMember} className="lg:col-span-9 p-6 bg-white space-y-6 flex flex-col justify-between">
-              
-              <div className="space-y-6">
-                
-                {/* 1. BASIC IDENTITY SECTION */}
-                {activeFormSection === 'basic' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="border-b border-neutral-100 pb-2">
-                      <h4 className="text-xs font-black text-zinc-950 uppercase tracking-wider">{isRtl ? 'المعلومات والبيانات الشخصية والاتصال' : 'Personal Identity & Contact Info'}</h4>
-                      <p className="text-[11px] text-neutral-400 font-medium">Define basic demographic details, contact routing, and the organizational position.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'الاسم بالكامل (بالعربية) *' : 'Full Name (Arabic) *'}</label>
-                        <input
-                          type="text"
-                          required
-                          autoFocus
-                          value={formData.nameAr}
-                          onChange={e => setFormData(p => ({ ...p, nameAr: e.target.value }))}
-                          placeholder="مثال: نادين الحربي"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'الاسم بالكامل (بالإنجليزي) *' : 'Full Name (English) *'}</label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.nameEn}
-                          onChange={e => setFormData(p => ({ ...p, nameEn: e.target.value }))}
-                          placeholder="e.g. Nadeen Al-Harbi"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'المسمى الوظيفي المعتمد (بالعربية)' : 'Designated Role (Arabic)'}</label>
-                        <input
-                          type="text"
-                          value={formData.roleAr}
-                          onChange={e => setFormData(p => ({ ...p, roleAr: e.target.value }))}
-                          placeholder="كبار خبيرات تلوين وتسريح الشعر"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'المسمى الوظيفي المعتمد (بالإنجليزي)' : 'Designated Role (English)'}</label>
-                        <input
-                          type="text"
-                          value={formData.roleEn}
-                          onChange={e => setFormData(p => ({ ...p, roleEn: e.target.value }))}
-                          placeholder="Senior Master Colorist"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'البريد الإلكتروني للعمل' : 'Work Email Address'}</label>
-                        <input
-                          type="email"
-                          value={formData.email}
-                          onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
-                          placeholder="e.g. employee@refah.sa"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'رقم هاتف الجوال الموثق *' : ' Saudi Verified Phone *'}</label>
-                        <input
-                          type="tel"
-                          required
-                          value={formData.phone}
-                          onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
-                          placeholder="+966 54 888 1234"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'الجنسية والبلد *' : 'Nationality *'}</label>
-                        <input
-                          type="text"
-                          required
-                          value={isRtl ? formData.nationalityAr : formData.nationalityEn}
-                          onChange={e => setFormData(p => isRtl ? ({ ...p, nationalityAr: e.target.value }) : ({ ...p, nationalityEn: e.target.value }))}
-                          placeholder={isRtl ? 'سعودية' : 'Saudi'}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'الجنس *' : 'Gender *'}</label>
-                        <select
-                          value={formData.gender}
-                          onChange={e => setFormData(p => ({ ...p, gender: e.target.value as any }))}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
-                        >
-                          <option value="female">{isRtl ? 'أنثى' : 'Female'}</option>
-                          <option value="male">{isRtl ? 'ذكر' : 'Male'}</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1 md:col-span-2">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'مسار الوصول والوظيفة التنظيمية *' : 'Roster Position & Security Level *'}</label>
-                        <select
-                          value={formData.position}
-                          onChange={e => setFormData(p => ({ ...p, position: canonicalEmployeePosition(e.target.value) }))}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1 focus:ring-zinc-900"
-                          required
-                        >
-                          {EMPLOYEE_POSITION_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {isRtl ? option.ar : option.en}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-[10px] text-neutral-400 font-medium leading-relaxed">
-                          {isRtl
-                            ? 'مقدمو الخدمة يحصلون على تطبيق الموظفين، أما بقية الوظائف فتستخدم حسابات لوحة التحكم مع الصلاحيات المناسبة.'
-                            : 'Service providers use the staff app path. All other positions use dashboard access with the appropriate preset and permissions.'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. BIOGRAPHY & SPECIALTIES */}
-                {activeFormSection === 'bio' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="border-b border-neutral-100 pb-2">
-                      <h4 className="text-xs font-black text-zinc-950 uppercase tracking-wider">{isRtl ? 'النبذة المهنية وسيرة العمل والتخصصات' : 'Biography & Expertises'}</h4>
-                      <p className="text-[11px] text-neutral-400 font-medium">Compose the public stylist biography, specialties catalog, and upload their workspace photo avatar.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'النبذة المهنية باللغة العربية' : 'Arabic Bio'}</label>
-                        <textarea
-                          value={formData.bioAr}
-                          onChange={e => setFormData(p => ({ ...p, bioAr: e.target.value }))}
-                          placeholder="أخصائية تجميل وعناية وتلوين شعر محترفة..."
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white h-20"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'النبذة المهنية باللغة الإنجليزية' : 'English Bio'}</label>
-                        <textarea
-                          value={formData.bioEn}
-                          onChange={e => setFormData(p => ({ ...p, bioEn: e.target.value }))}
-                          placeholder="Professional master aesthetician and color specialist..."
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white h-20"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'مستويات الخبرة بالأعوام' : 'Experience Years'}</label>
-                        <input
-                          type="text"
-                          value={isRtl ? formData.experienceAr : formData.experienceEn}
-                          onChange={e => setFormData(p => isRtl ? ({ ...p, experienceAr: e.target.value }) : ({ ...p, experienceEn: e.target.value }))}
-                          placeholder={isRtl ? '٨ سنوات' : '8 Years'}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white focus:ring-1"
-                        />
-                      </div>
-
-                      {/* Specialties adding tags */}
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'التخصصات والخدمات المتقنة' : 'Specialties Tag Hub'}</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            value={newSpecialty}
-                            onChange={e => setNewSpecialty(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddSpecialty())}
-                            placeholder={isRtl ? 'مثال: بالياج سويسري' : 'e.g. Swiss Balayage'}
-                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-bold"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleAddSpecialty}
-                            className="px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold cursor-pointer"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {formData.specialtiesEn.map((sp, i) => (
-                            <span key={i} className="bg-indigo-50 text-indigo-900 px-2 py-1 rounded text-[9px] font-black flex items-center gap-1.5 border border-indigo-100">
-                              <span>{sp}</span>
-                              <button type="button" onClick={() => handleRemoveSpecialty(i)} className="text-indigo-400 hover:text-rose-500"><X size={10} /></button>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Spoken Languages adding tags */}
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'اللغات المتحدثة' : 'Spoken Languages Tag Hub'}</label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            value={newLangInput}
-                            onChange={e => setNewLangInput(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddLanguage())}
-                            placeholder={isRtl ? 'مثال: الفرنسية' : 'e.g. French'}
-                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs font-bold"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleAddLanguage}
-                            className="px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold cursor-pointer"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {formData.languagesEn.map((lg, i) => (
-                            <span key={i} className="bg-slate-100 text-neutral-800 px-2 py-1 rounded text-[9px] font-bold flex items-center gap-1.5 border border-slate-200">
-                              <span>{lg}</span>
-                              <button type="button" onClick={() => handleRemoveLanguage(i)} className="text-neutral-400 hover:text-rose-500"><X size={10} /></button>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Employee Photo Upload */}
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'صورة الموظفة/الموظف' : 'Employee Photo'}</label>
-                        <div
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={(event) => {
-                            event.preventDefault();
-                            const file = event.dataTransfer.files?.[0];
-                            if (file && file.type.startsWith('image/')) {
-                              applyEmployeePhotoFile(file);
-                            }
-                          }}
-                          className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4"
-                        >
-                          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
-                              <img src={formData.avatar} alt="Employee preview" className="h-full w-full object-cover" />
-                            </div>
-                            <div className="flex-1 space-y-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <input
-                                  ref={employeePhotoInputRef}
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(event) => {
-                                    const file = event.target.files?.[0] || null;
-                                    applyEmployeePhotoFile(file);
-                                    event.currentTarget.value = '';
-                                  }}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => employeePhotoInputRef.current?.click()}
-                                  className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-3 py-2 text-[11px] font-black text-white shadow-sm"
-                                >
-                                  <Upload size={14} />
-                                  <span>{isRtl ? 'رفع صورة' : 'Upload image'}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => applyEmployeePhotoFile(null)}
-                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-black text-neutral-500 hover:bg-white"
-                                >
-                                  <X size={14} />
-                                  <span>{isRtl ? 'إزالة الصورة' : 'Remove'}</span>
-                                </button>
-                              </div>
-                              <p className="text-[10px] font-medium text-neutral-400">
-                                {isRtl
-                                  ? 'اسحب وأفلت صورة JPG أو PNG أو WEBP، أو اختر ملفاً من الجهاز. سيتم حفظها في ملف الموظف.'
-                                  : 'Drag and drop a JPG, PNG, or WEBP image, or choose a file from your device. It will be saved to the employee profile.'}
-                              </p>
-                              {employeePhotoFile ? (
-                                <p className="text-[10px] font-bold text-emerald-600">{employeePhotoFile.name}</p>
-                              ) : (
-                                <p className="text-[10px] font-bold text-neutral-400">{isRtl ? 'لم يتم اختيار ملف بعد' : 'No file selected yet'}</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. FINANCE FIELDS */}
-                {activeFormSection === 'finance' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="border-b border-neutral-100 pb-2">
-                      <h4 className="text-xs font-black text-zinc-950 uppercase tracking-wider">{isRtl ? 'إعدادات المستحقات والرواتب والعمولات' : 'Financial Compensation Rules'}</h4>
-                      <p className="text-[11px] text-neutral-400 font-medium">Reconcile official WPS contracts, define base salary levels, service commission rates, and enable product retail payouts.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'الراتب الأساسي الشهري (SAR) *' : 'Contracted Monthly Base Salary (SAR) *'}</label>
-                        <input
-                          type="number"
-                          required
-                          value={formData.baseSalary}
-                          onChange={e => setFormData(p => ({ ...p, baseSalary: Math.max(0, parseInt(e.target.value) || 0) }))}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'نسبة عمولة حجز الخدمات %' : 'Service Commissions Percentage %'}</label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            value={formData.commissionRatePct}
-                            onChange={e => setFormData(p => ({ ...p, commissionRatePct: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) }))}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800 focus:bg-white pr-8 text-center"
-                          />
-                          <span className="absolute right-3.5 top-3 text-neutral-400 font-mono">%</span>
-                        </div>
-                      </div>
-
-                      {/* Financial Toggles */}
-                      <div className="space-y-2 md:col-span-2">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'قوانين وقنوات احتساب العمولات النشطة' : 'Active Financial Compensation Channels'}</label>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setFormData(p => ({ ...p, serviceCommissionEnabled: !p.serviceCommissionEnabled }))}
-                            className={`p-4 rounded-2xl text-xs font-black text-start transition-all cursor-pointer border flex items-center gap-3 ${
-                              formData.serviceCommissionEnabled 
-                                ? 'bg-indigo-50/50 border-indigo-200 text-indigo-900' 
-                                : 'bg-slate-50 text-neutral-500 border-slate-200'
-                            }`}
-                          >
-                            {formData.serviceCommissionEnabled ? <CheckSquare size={16} /> : <Square size={16} />}
-                            <div>
-                              <p>{isRtl ? 'احتساب عمولة الخدمات الفنية' : 'Enable Service Booking Commission'}</p>
-                              <span className="text-[9px] font-bold text-neutral-400 block mt-0.5">Applies selected {formData.commissionRatePct}% to the stylist gross services total.</span>
-                            </div>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setFormData(p => ({ ...p, productCommissionEnabled: !p.productCommissionEnabled }))}
-                            className={`p-4 rounded-2xl text-xs font-black text-start transition-all cursor-pointer border flex items-center gap-3 ${
-                              formData.productCommissionEnabled 
-                                ? 'bg-indigo-50/50 border-indigo-200 text-indigo-900' 
-                                : 'bg-slate-50 text-neutral-500 border-slate-200'
-                            }`}
-                          >
-                            {formData.productCommissionEnabled ? <CheckSquare size={16} /> : <Square size={16} />}
-                            <div>
-                              <p>{isRtl ? 'تفعيل عمولة بيع مستحضرات التجزئة (٥٪)' : 'Enable Product Retail Commission (5% Flat)'}</p>
-                              <span className="text-[9px] font-bold text-neutral-400 block mt-0.5">Grants a 5% incentive commission on all premium shelf product items sold to checkout clients.</span>
-                            </div>
-                          </button>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. SCHEDULE CONFIGURATION */}
-                {activeFormSection === 'schedule' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="border-b border-neutral-100 pb-2 flex justify-between items-start gap-4">
-                      <div>
-                        <h4 className="text-xs font-black text-zinc-950 uppercase tracking-wider">{isRtl ? 'إعداد وجدولة شيفتات العمل الأسبوعية' : 'Weekly Shifts & Roster Scheduler'}</h4>
-                        <p className="text-[11px] text-neutral-400 font-medium">Assign weekly operational shifts, date ranges, and define visibility parameters for the Staff App schedules.</p>
-                      </div>
-                      
-                      {/* Draft Shift status indicator */}
-                      <button
-                        type="button"
-                        onClick={() => setFormData(p => ({ ...p, scheduleDraft: !p.scheduleDraft }))}
-                        className={`px-3 py-1.5 rounded-full text-[10px] font-black cursor-pointer transition-all border flex items-center gap-1.5 ${
-                          formData.scheduleDraft
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${formData.scheduleDraft ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                        {formData.scheduleDraft 
-                          ? (isRtl ? 'وضع المسودة (مخفي)' : 'Draft Mode (Hidden)') 
-                          : (isRtl ? 'منشور (نشط للعملاء)' : 'Published (Live to Clients)')}
-                      </button>
-                    </div>
-
-                    {/* Date-Range and Visibility Panel */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-                      
-                      {/* Visibility select */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'مدى رؤية جدول العمل (بالأسابيع)' : 'Staff App Visibility Range'}</label>
-                        <select
-                          value={formData.scheduleVisibilityWeeks}
-                          onChange={e => setFormData(p => ({ ...p, scheduleVisibilityWeeks: parseInt(e.target.value) || 2 }))}
-                          className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-neutral-800"
-                        >
-                          <option value="1">{isRtl ? 'أسبوع واحد مقبل' : '1 Week Ahead'}</option>
-                          <option value="2">{isRtl ? 'أسبوعين (موصى به)' : '2 Weeks Ahead (Recommended)'}</option>
-                          <option value="3">{isRtl ? '٣ أسابيع متتالية' : '3 Weeks Ahead'}</option>
-                          <option value="4">{isRtl ? 'شهر كامل (٤ أسابيع)' : '4 Weeks Ahead (Full Month)'}</option>
-                        </select>
-                      </div>
-
-                      {/* Start Date */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'تاريخ بدء تفعيل الجدول' : 'Schedule Start Date'}</label>
-                        <input
-                          type="date"
-                          value={formData.scheduleStartDate || ''}
-                          onChange={e => setFormData(p => ({ ...p, scheduleStartDate: e.target.value }))}
-                          className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold text-neutral-800"
-                        />
-                      </div>
-
-                      {/* End Date */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'تاريخ انتهاء الجدول' : 'Schedule End Date'}</label>
-                          <button
-                            type="button"
-                            onClick={() => setFormData(p => ({ ...p, scheduleContinues: !p.scheduleContinues, scheduleEndDate: !p.scheduleContinues ? '' : p.scheduleEndDate }))}
-                            className={`text-[9px] font-black underline cursor-pointer ${formData.scheduleContinues ? 'text-indigo-600' : 'text-neutral-400'}`}
-                          >
-                            {isRtl ? 'بلا تاريخ نهاية' : 'Set Continuous'}
-                          </button>
-                        </div>
-                        {formData.scheduleContinues ? (
-                          <div className="p-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl text-[10px] text-indigo-700 font-black text-center">
-                            {isRtl ? 'جدول مستمر مفتوح النهاية ♾️' : 'Continuous / Open-Ended ♾️'}
-                          </div>
-                        ) : (
-                          <input
-                            type="date"
-                            value={formData.scheduleEndDate || ''}
-                            onChange={e => setFormData(p => ({ ...p, scheduleEndDate: e.target.value }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold text-neutral-800"
-                          />
-                        )}
-                      </div>
-
-                    </div>
-
-                    {/* Weekly Schedule Planner */}
-                    <div className="space-y-3">
-                      <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'ساعات العمل اليومية وتعيين الإجازات' : 'Configure Weekly Daily Hours'}</label>
-                      <div className="space-y-2">
-                        {formData.schedule.map((day, idx) => (
-                          <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-150 space-y-3">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => handleScheduleDayToggle(idx)}
-                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black cursor-pointer transition-all ${
-                                    day.status === 'working' 
-                                      ? 'bg-zinc-950 text-white' 
-                                      : 'bg-rose-50 text-rose-600 border border-rose-200'
-                                  }`}
-                                >
-                                  {isRtl ? day.dayAr : day.dayEn}
-                                </button>
-                                <span className="text-[10px] text-neutral-400 font-bold">
-                                  {day.status === 'working' ? (isRtl ? 'يوم عمل نشط' : 'Active Working Day') : (isRtl ? 'يوم إجازة رسمي' : 'Weekly Day Off')}
-                                </span>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 flex-1 sm:max-w-md">
-                                <input
-                                  type="time"
-                                  step={900}
-                                  disabled={day.status !== 'working'}
-                                  value={parseScheduleRange(day.hours).startTime}
-                                  onChange={e => handleScheduleTimeChange(idx, 'startTime', e.target.value)}
-                                  className={`flex-1 text-center font-bold text-xs font-mono p-2 rounded-xl border transition-all ${
-                                    day.status === 'working'
-                                      ? 'bg-white border-slate-200 text-neutral-800 focus:ring-1 focus:ring-zinc-900'
-                                      : 'bg-neutral-100 border-neutral-100 text-neutral-400 cursor-not-allowed'
-                                  }`}
-                                />
-                                <span className="text-neutral-300 font-black text-[10px]">→</span>
-                                <input
-                                  type="time"
-                                  step={900}
-                                  disabled={day.status !== 'working'}
-                                  value={parseScheduleRange(day.hours).endTime}
-                                  onChange={e => handleScheduleTimeChange(idx, 'endTime', e.target.value)}
-                                  className={`flex-1 text-center font-bold text-xs font-mono p-2 rounded-xl border transition-all ${
-                                    day.status === 'working'
-                                      ? 'bg-white border-slate-200 text-neutral-800 focus:ring-1 focus:ring-zinc-900'
-                                      : 'bg-neutral-100 border-neutral-100 text-neutral-400 cursor-not-allowed'
-                                  }`}
-                                />
-                                {day.status === 'working' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAddSubShift(idx)}
-                                    className="px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-[10px] font-black rounded-xl cursor-pointer transition-all whitespace-nowrap flex items-center gap-1"
-                                  >
-                                    <Plus size={11} />
-                                    <span>{isRtl ? 'شيفت فرعي' : '+ Sub Shift'}</span>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Sub-Shifts Container */}
-                            {day.status === 'working' && day.subShifts && day.subShifts.length > 0 && (
-                              <div className="pl-6 border-l-2 border-indigo-100 space-y-2 mt-2 animate-fade-in">
-                                <p className="text-[10px] text-indigo-700 font-black tracking-wider uppercase mb-1">{isRtl ? 'الشيفتات والكتل الإضافية المقررة لهذا اليوم:' : 'Scheduled Daily Sub Shifts:'}</p>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                  {day.subShifts.map((sub) => (
-                                    <div key={sub.id} className="bg-white p-2.5 rounded-xl border border-indigo-100/70 flex items-center gap-2">
-                                      <select
-                                        value={sub.label}
-                                        onChange={e => handleSubShiftChange(idx, sub.id, 'label', e.target.value)}
-                                        className="bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-black text-neutral-800"
-                                      >
-                                        <option value="Morning Shift">{isRtl ? 'شيفت صباحي' : 'Morning Shift'}</option>
-                                        <option value="Evening Shift">{isRtl ? 'شيفت مسائي' : 'Evening Shift'}</option>
-                                        <option value="Overtime Shift">{isRtl ? 'شيفت إضافي' : 'Overtime Shift'}</option>
-                                        <option value="Restock & Prep">{isRtl ? 'تجهيز وتحضير' : 'Restock & Prep'}</option>
-                                      </select>
-                                      <input
-                                        type="time"
-                                        step={900}
-                                        value={parseTimeForInput(sub.startTime)}
-                                        onChange={e => handleSubShiftChange(idx, sub.id, 'startTime', e.target.value)}
-                                        className="w-16 text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
-                                      />
-                                      <span className="text-[10px] text-neutral-400 font-black font-mono">→</span>
-                                      <input
-                                        type="time"
-                                        step={900}
-                                        value={parseTimeForInput(sub.endTime)}
-                                        onChange={e => handleSubShiftChange(idx, sub.id, 'endTime', e.target.value)}
-                                        className="w-16 text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveSubShift(idx, sub.id)}
-                                        className="p-1 hover:bg-rose-50 text-rose-500 hover:text-rose-600 rounded-lg transition-all cursor-pointer"
-                                      >
-                                        <Trash2 size={13} />
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                  </div>
-                )}
-
-                {/* 5. ACCESS PATHS & DASHBOARD PERMISSIONS */}
-                {activeFormSection === 'access' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="border-b border-neutral-100 pb-2">
-                      <h4 className="text-xs font-black text-zinc-950 uppercase tracking-wider">{isRtl ? 'أمان النظام ومسارات الوصول والصلاحيات' : 'Security Accounts & Access Authorization'}</h4>
-                      <p className="text-[11px] text-neutral-400 font-medium font-mono">Reconcile login paths based on organization position role. Set staff app passcodes or allocate precise dashboard module permissions.</p>
-                    </div>
-
-                    {/* Account Status Toggle (Active vs Suspended) */}
-                    <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl flex items-center justify-between text-xs gap-3">
-                      <div>
-                        <p className="font-extrabold text-neutral-800">{isRtl ? 'حالة نشاط الحساب وصلاحية الدخول' : 'Account Activation & Credential Status'}</p>
-                        <span className="text-[10px] text-neutral-400 font-bold block mt-0.5">
-                          {formData.isActive 
-                            ? (isRtl ? 'الحساب مفعل ويمكنه تسجيل الدخول فوراً' : 'Account active. Authorized to establish secure connection.')
-                            : (isRtl ? 'الحساب معطل حالياً ومحجوب عن النظام' : 'Account temporarily frozen. Revokes all system privileges.')}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormData(p => ({ ...p, isActive: !p.isActive }))}
-                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                          formData.isActive
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}
-                      >
-                        {formData.isActive ? (isRtl ? '● نشط ومصرح' : '● ACTIVE / ENABLED') : (isRtl ? '○ معطل وموقوف' : '○ DISABLED / SUSPENDED')}
-                      </button>
-                    </div>
-
-                    {formData.position === 'service_provider' ? (
-                      /* Staff App passcode credentials path */
-                      <div className="p-5 bg-indigo-50/40 rounded-2xl border border-indigo-100 space-y-4 text-xs font-bold">
-                        <div className="flex items-center gap-2 text-indigo-900">
-                          <Lock size={15} />
-                          <span>{isRtl ? 'تطبيق الكادر الفني للهواتف (Refah Staff App)' : 'Refah Staff Mobile Application Access'}</span>
-                        </div>
-                        <p className="text-neutral-600 text-[11px] leading-relaxed font-medium">
-                          Because this roster position is flagged as a <strong>Service Provider</strong>, they will log into the Refah mobile app. Set their access passcode below.
-                        </p>
-
-                        <div className="space-y-1.5 max-w-sm">
-                          <label className="text-[10px] text-indigo-900 font-extrabold block">{isRtl ? 'رمز المرور المؤقت للتطبيق (الحد الأدنى ٨ خانات) *' : 'Temporary App Password (Min 8 Characters) *'}</label>
-                          <input
-                            type="text"
-                            required
-                            minLength={8}
-                            value={formData.staffAppPassword}
-                            onChange={e => setFormData(p => ({ ...p, staffAppPassword: e.target.value }))}
-                            className="w-full bg-white border border-indigo-200 rounded-xl p-3 text-xs font-bold font-mono text-neutral-800 focus:ring-1 focus:ring-indigo-500"
-                          />
-                          {formData.staffAppPassword && formData.staffAppPassword.length < 8 && (
-                            <p className="text-rose-600 text-[10px] font-bold mt-1">
-                              {isRtl ? '⚠️ يجب أن يتكون الرمز من ٨ خانات على الأقل!' : '⚠️ Password must be at least 8 characters long!'}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="rounded-2xl border border-indigo-100 bg-white/90 p-4 space-y-3">
-                          <div>
-                            <h5 className="text-[11px] font-black text-neutral-800">
-                              {isRtl ? 'صلاحيات تطبيق الموظف' : 'Staff app permissions'}
-                            </h5>
-                            <p className="text-[10px] text-neutral-500 font-medium">
-                              {isRtl
-                                ? 'هذه الصلاحيات تتحكم بما يظهر في تطبيق الموظف لهذا العضو.'
-                                : 'These permissions control what this employee can access in the staff app.'}
-                            </p>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {STAFF_APP_PERMISSION_KEYS.map((key) => (
-                              <label key={key} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5">
-                                <span className="text-[11px] font-semibold text-neutral-700">
-                                  {key === 'view_earnings' && (isRtl ? 'عرض الأرباح' : 'View earnings')}
-                                  {key === 'view_reviews' && (isRtl ? 'عرض التقييمات' : 'View reviews')}
-                                  {key === 'reply_reviews' && (isRtl ? 'الرد على التقييمات' : 'Reply to reviews')}
-                                  {key === 'view_clients' && (isRtl ? 'عرض العملاء' : 'View clients')}
-                                  {key === 'view_booking_notes' && (isRtl ? 'عرض ملاحظات الحجز' : 'View booking notes')}
-                                  {key === 'can_start_service' && (isRtl ? 'إظهار زر بدء الخدمة' : 'Show Start button')}
-                                  {key === 'can_mark_no_show' && (isRtl ? 'إظهار زر عدم الحضور' : 'Show No-show button')}
-                                </span>
-                                <input
-                                  type="checkbox"
-                                  checked={staffAppPermissions[key]}
-                                  onChange={(event) => setStaffAppPermissions((prev) => ({
-                                    ...prev,
-                                    [key]: event.target.checked
-                                  }))}
-                                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Dashboard Admin permissions matrix with Role Presets */
-                      <div className="space-y-4">
-                        <div className="p-4 bg-amber-50/40 rounded-2xl border border-amber-200/40 text-xs font-bold text-amber-900 space-y-1">
-                          <p className="flex items-center gap-1.5"><Shield size={14} /> {isRtl ? 'بوابة لوحة تحكم الإدارة العليا والموظفين' : 'Tenant Admin Dashboard Access Link'}</p>
-                          <p className="text-[11px] text-neutral-600 leading-normal font-medium">This specialist is designated as a <strong>Dashboard Admin</strong>. Select a predefined role preset or customize module permissions manually.</p>
-                        </div>
-
-                        {/* Role Presets */}
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'تطبيق قالب صلاحيات جاهز' : 'Apply Role Preset Template'}</label>
-                          <div className="flex flex-wrap gap-1.5">
-                            {[
-                              { key: 'manager', labelEn: 'General Manager', labelAr: 'مدير عام الفرع' },
-                              { key: 'accountant', labelEn: 'Accountant', labelAr: 'المحاسب المالي' },
-                              { key: 'receptionist', labelEn: 'Receptionist / Front Desk', labelAr: 'موظف الاستقبال' },
-                              { key: 'marketing', labelEn: 'Marketing Planner', labelAr: 'التسويق والعروض' },
-                              { key: 'hr', labelEn: 'HR / Personnel', labelAr: 'شؤون الموظفين' },
-                              { key: 'service_provider', labelEn: 'Senior Specialist', labelAr: 'الأخصائية الكبرى' }
-                            ].map(preset => (
-                              <button
-                                key={preset.key}
-                                type="button"
-                                onClick={() => applyRolePreset(preset.key)}
-                                className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 hover:text-neutral-900 rounded-lg text-[10px] font-black cursor-pointer transition-all border border-neutral-200"
-                              >
-                                {isRtl ? preset.labelAr : preset.labelEn}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Detailed Permission Grid (All 20 keys) */}
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] text-neutral-500 font-extrabold block">{isRtl ? 'مصفوفة التراخيص والصلاحيات التفصيلية (٢٠ مفتاح)' : 'Granular Dashboard Permission Matrix (20 Keys)'}</label>
-                          
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[350px] overflow-y-auto pr-1">
-                            {[
-                              { key: 'view_dashboard', labelEn: 'Access Main Dashboard', labelAr: 'الوصول للوحة التحكم الرئيسية' },
-                              { key: 'view_appointments', labelEn: 'Manage Customer Appointments', labelAr: 'إدارة وحجز مواعيد العملاء' },
-                              { key: 'view_schedules', labelEn: 'Manage Shifts & Rosters', labelAr: 'إدارة جداول وشيفتات الموظفين' },
-                              { key: 'view_employees', labelEn: 'Manage Team Directory', labelAr: 'عرض وإدارة ملفات الموظفين' },
-                              { key: 'view_customers', labelEn: 'Manage Client Profile Records', labelAr: 'سجلات وملفات العملاء' },
-                              { key: 'view_services', labelEn: 'Configure Service Catalog', labelAr: 'إعداد وتحديث قائمة الخدمات' },
-                              { key: 'view_products', labelEn: 'Manage Premium Products Inventory', labelAr: 'مستودع ومخزن المنتجات' },
-                              { key: 'view_orders', labelEn: 'Track Client Orders & Invoices', labelAr: 'مبيعات وفواتير الخدمات بالتفصيل' },
-                              { key: 'view_financial', labelEn: 'Reconcile Financial Ledgers', labelAr: 'السجلات المالية وحساب العمولات' },
-                              { key: 'view_bills', labelEn: 'Manage Operating Branch Expenses', labelAr: 'المصاريف وفواتير التشغيل اليومية' },
-                              { key: 'view_pos', labelEn: 'Access Cashier Register (POS)', labelAr: 'بوابة المبيعات المباشرة كاشير' },
-                              { key: 'view_messages', labelEn: 'Client Messaging & Chats', labelAr: 'رسائل ومحادثات العملاء' },
-                              { key: 'view_reviews', labelEn: 'Moderate Client Reviews', labelAr: 'تقييمات وملاحظات العملاء' },
-                              { key: 'view_hot_deals', labelEn: 'Campaigns & Dynamic Promos', labelAr: 'الحملات التسويقية والعروض الخاصة' },
-                              { key: 'view_notifications', labelEn: 'Access Workspace Notifications', labelAr: 'تنبيهات وإشعارات الفرع' },
-                              { key: 'view_reports', labelEn: 'Analytical Performance Reports', labelAr: 'التقارير الإحصائية والتحليلات' },
-                              { key: 'view_payroll', labelEn: 'Manage Payroll & Base Salaries', labelAr: 'مسيرات الرواتب والمستحقات والعمولات' },
-                              { key: 'view_subscription', labelEn: 'Configure Plan & Subscription', labelAr: 'باقة الاشتراك والحدود المسموحة' },
-                              { key: 'view_settings', labelEn: 'Configure core portal settings', labelAr: 'إعداد خصائص ومحددات النظام' },
-                              { key: 'manage_accounts', labelEn: 'Security & Staff Access Accounts', labelAr: 'أمن حسابات المشرفين والمدراء' }
-                            ].map(perm => {
-                              const isChecked = !!(formData.dashboardPermissions as any)[perm.key];
-                              return (
-                                <button
-                                  key={perm.key}
-                                  type="button"
-                                  onClick={() => setFormData(prev => ({
-                                    ...prev,
-                                    dashboardPermissions: {
-                                      ...prev.dashboardPermissions,
-                                      [perm.key]: !isChecked,
-                                      // Mirror to existing legacy keys for backward compatibility
-                                      ...(perm.key === 'view_appointments' ? { manage_appointments: !isChecked } : {}),
-                                      ...(perm.key === 'view_financial' ? { manage_financials: !isChecked } : {}),
-                                      ...(perm.key === 'view_settings' ? { manage_settings: !isChecked } : {})
-                                    }
-                                  }))}
-                                  className={`p-3 rounded-xl text-xs font-black text-start transition-all cursor-pointer border flex items-center justify-between gap-3 ${
-                                    isChecked
-                                      ? 'bg-zinc-900 border-zinc-950 text-white shadow-sm'
-                                      : 'bg-white hover:bg-neutral-50 text-neutral-500 border-slate-200'
-                                  }`}
-                                >
-                                  <span className="truncate">{isRtl ? perm.labelAr : perm.labelEn}</span>
-                                  {isChecked ? (
-                                    <CheckSquare size={15} className="text-indigo-400 shrink-0" />
-                                  ) : (
-                                    <Square size={15} className="text-neutral-300 shrink-0" />
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-              </div>
-
-              {/* Step Navigation Actions footer panel */}
-              <div className="pt-6 border-t border-slate-100 flex justify-between items-center mt-6">
-                
-                {/* Back Cancel triggers */}
-                <button
-                  type="button"
-                  onClick={() => setActiveView('list')}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-neutral-600 rounded-xl text-xs font-bold cursor-pointer transition-all"
-                >
-                  {isRtl ? 'تراجع والعودة للقائمة' : 'Back to Directory'}
-                </button>
-
-                {/* Confirm Save triggers */}
-                <div className="flex gap-2">
-                  {activeFormSection !== 'access' ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Progress forward
-                        const steps: Array<'basic' | 'bio' | 'finance' | 'schedule' | 'access'> = ['basic', 'bio', 'finance', 'schedule', 'access'];
-                        const idx = steps.indexOf(activeFormSection);
-                        if (idx !== -1 && idx < steps.length - 1) {
-                          setActiveFormSection(steps[idx + 1]);
-                        }
-                      }}
-                      className="px-4 py-2 bg-zinc-900 hover:bg-zinc-850 text-white rounded-xl text-xs font-black cursor-pointer transition-all"
-                    >
-                      {isRtl ? 'الخطوة التالية' : 'Next Step'}
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black cursor-pointer transition-all shadow-md shadow-indigo-600/10 flex items-center gap-1.5 animate-bounce-short"
-                    >
-                      <Check size={14} />
-                      <span>{formMode === 'add' ? (isRtl ? 'تعيين ونشر الملف المكتمل' : 'Deploy Completed Profile') : (isRtl ? 'حفظ وحقن التعديلات' : 'Commit Changes')}</span>
-                    </button>
-                  )}
-                </div>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        </div>
+        <EmployeeProfileEditor
+          initialData={formData}
+          isRtl={isRtl}
+          formMode={formMode}
+          onSave={handleSaveMember}
+          onCancel={() => setActiveView('list')}
+          initialStaffAppPermissions={staffAppPermissions}
+        />
       )}
 
     </div>

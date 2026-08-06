@@ -91,6 +91,8 @@ export interface SchedulerGridProps {
   onEventDragEnd?: (schedulerEvent: SchedulerEvent) => void;
   onEventResizeStart?: (schedulerEvent: SchedulerEvent, event: React.MouseEvent) => void;
   onAddSlotHover?: (slot: SchedulerSlot | null) => void;
+  onColumnHeaderClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
+  onColumnHeaderContextMenu?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
   emptyHint?: string;
 }
 
@@ -482,7 +484,9 @@ export default function SchedulerGrid({
           return (
           <div
             key={column.id}
-            className={`min-w-0 overflow-hidden border-r last:border-r-0 border-slate-200 px-1.5 py-2 flex items-center justify-between gap-1 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''}`}
+            onClick={(e) => onColumnHeaderClick?.(e, column.id)}
+            onContextMenu={(e) => onColumnHeaderContextMenu?.(e, column.id)}
+            className={`min-w-0 overflow-hidden border-r last:border-r-0 border-slate-200 px-1.5 py-2 flex items-center justify-between gap-1 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''} ${(onColumnHeaderClick || onColumnHeaderContextMenu) ? 'cursor-pointer hover:bg-slate-100' : ''}`}
           >
             <div className="min-w-0 flex items-center gap-2">
               {column.avatar ? (

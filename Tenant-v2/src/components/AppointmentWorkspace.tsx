@@ -7,10 +7,12 @@ import {
   SlidersHorizontal, Star, Split, Share2, Printer, CheckCircle2,
   Lock, Scissors, Sparkles, Smile, ShieldCheck, Mail, Phone,
   TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy, Settings2,
-  PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift, Banknote
+  PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift, Banknote,
+  CalendarDays, Ban
 } from 'lucide-react';
 import { Language, Product, QuickLaunchRequest } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
+import TeamMemberProfileDrawer from './employee-profile/TeamMemberProfileDrawer';
 import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
@@ -1436,6 +1438,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     dateKey?: string;
     appointmentId?: string;
   } | null>(null);
+
+  // Employee Header Context Menu State (Popover Anchor)
+  const [employeeMenuState, setEmployeeMenuState] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    anchorEl: HTMLElement | null;
+    staffId: string;
+  } | null>(null);
+
+  // View Team Member Drawer State
+  const [viewTeamMemberStaffId, setViewTeamMemberStaffId] = useState<string | null>(null);
 
   // Drag State Tracker for Vertical Resizing
   const [dragState, setDragState] = useState<{
@@ -3482,6 +3496,161 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     handleContextMenu(event, sourceAppointment.staffId, sourceAppointment.startTime, sourceAppointment.id, sourceAppointment.date || eventItem.dateKey);
+  };
+
+  // --- EMPLOYEE QUICK ACTIONS CONFIGURATION ---
+  type EmployeeActionCategory = 'view' | 'appointments' | 'availability' | 'management' | 'employee';
+  interface EmployeeActionDefinition {
+    id: string;
+    labelEn: string;
+    labelAr: string;
+    icon: React.ElementType;
+    category: EmployeeActionCategory;
+    onClick: (staffId: string) => void;
+  }
+
+  const EMPLOYEE_ACTIONS_CONFIG: EmployeeActionDefinition[] = [
+    {
+      id: 'day_view',
+      labelEn: 'Day View',
+      labelAr: 'عرض اليوم',
+      icon: CalendarIcon,
+      category: 'view',
+      onClick: (staffId) => {
+        setViewMode('day');
+        setSelectedStylistFilter('all');
+        setEmployeeMenuState(null);
+      }
+    },
+    {
+      id: 'week_view',
+      labelEn: 'Week View',
+      labelAr: 'عرض الأسبوع',
+      icon: CalendarDays,
+      category: 'view',
+      onClick: (staffId) => {
+        setViewMode('week');
+        setSelectedStylistFilter('all');
+        setEmployeeMenuState(null);
+      }
+    },
+    {
+      id: 'isolate_employee',
+      labelEn: 'View Employee Schedule',
+      labelAr: 'عرض جدول الموظف',
+      icon: Filter,
+      category: 'view',
+      onClick: (staffId) => {
+        setSelectedStylistFilter(staffId);
+        setEmployeeMenuState(null);
+      }
+    },
+    {
+      id: 'new_appointment',
+      labelEn: 'New Appointment',
+      labelAr: 'موعد جديد',
+      icon: Plus,
+      category: 'appointments',
+      onClick: (staffId) => {
+        setCurrentStaffId(staffId);
+        setInitialCreateMode('appointment');
+        setIsCreateDrawerOpen(true);
+        setEmployeeMenuState(null);
+      }
+    },
+    {
+      id: 'edit_today_availability',
+      labelEn: "Edit Today's Availability",
+      labelAr: 'تعديل متاحية اليوم',
+      icon: Clock,
+      category: 'availability',
+      onClick: (staffId) => {
+        setCurrentStaffId(staffId);
+        setInitialCreateMode('blocked');
+        setBlockType('Meeting');
+        setIsCreateDrawerOpen(true);
+        setEmployeeMenuState(null);
+      }
+    },
+    {
+      id: 'add_break',
+      labelEn: 'Add Break',
+      labelAr: 'إضافة استراحة',
+      icon: Coffee,
+      category: 'availability',
+      onClick: (staffId) => {
+        setCurrentStaffId(staffId);
+        setInitialCreateMode('blocked');
+        setBlockType('Break');
+        setIsCreateDrawerOpen(true);
+        setEmployeeMenuState(null);
+      }
+    },
+    {
+      id: 'block_time',
+      labelEn: 'Block Time',
+      labelAr: 'حظر وقت',
+      icon: Ban,
+      category: 'availability',
+      onClick: (staffId) => {
+        setCurrentStaffId(staffId);
+        setInitialCreateMode('blocked');
+        setBlockType('Meeting');
+        setIsCreateDrawerOpen(true);
+        setEmployeeMenuState(null);
+      }
+    },
+    {
+      id: 'weekly_schedule',
+      labelEn: 'Weekly Schedule',
+      labelAr: 'جدول الأسبوع (دائم)',
+      icon: Settings2,
+      category: 'management',
+      onClick: (staffId) => {
+        setSelectedShiftStaffId(staffId);
+        setIsShiftModalOpen(true);
+        setEmployeeMenuState(null);
+      }
+    },
+    {
+      id: 'view_team_member',
+      labelEn: 'View Team Member',
+      labelAr: 'عرض ملف الموظف',
+      icon: User,
+      category: 'employee',
+      onClick: (staffId) => {
+        setViewTeamMemberStaffId(staffId);
+        setEmployeeMenuState(null);
+      }
+    }
+  ];
+
+  const handleColumnHeaderClick = (event: React.MouseEvent<HTMLElement>, staffId: string) => {
+    if (!isBoardEditable) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setEmployeeMenuState({
+      visible: true,
+      x: rect.left,
+      y: rect.bottom,
+      anchorEl: event.currentTarget,
+      staffId
+    });
+  };
+
+  const handleColumnHeaderContextMenu = (event: React.MouseEvent<HTMLElement>, staffId: string) => {
+    if (!isBoardEditable) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setEmployeeMenuState({
+      visible: true,
+      x: rect.left,
+      y: rect.bottom,
+      anchorEl: event.currentTarget,
+      staffId
+    });
   };
 
   return (
@@ -6917,6 +7086,81 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           ))}
         </AnimatePresence>
       </div>
+
+      {/* 8. EMPLOYEE OPERATIONS MENU (POPOVER) */}
+      <AnimatePresence>
+        {employeeMenuState && employeeMenuState.visible && (
+          <>
+            <div 
+              className="fixed inset-0 z-[60]"
+              onClick={(e) => { e.stopPropagation(); setEmployeeMenuState(null); }}
+              onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setEmployeeMenuState(null); }}
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -5 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -5 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="fixed bg-white rounded-xl shadow-2xl border border-slate-200 p-2 z-[70] w-64 overflow-hidden"
+              style={{
+                top: `${employeeMenuState.y + 4}px`,
+                left: `${employeeMenuState.x}px`
+              }}
+            >
+              <div className="px-3 py-2 border-b border-slate-100 mb-2">
+                <p className="text-[10px] text-slate-500 font-black tracking-wider uppercase">
+                  {isRtl ? 'إجراءات الموظف' : 'EMPLOYEE ACTIONS'}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                {['view', 'appointments', 'availability', 'management', 'employee'].map((category) => {
+                  const items = EMPLOYEE_ACTIONS_CONFIG.filter(a => a.category === category);
+                  if (items.length === 0) return null;
+                  
+                  return (
+                    <div key={category} className="mb-2 last:mb-0">
+                      {items.map(action => {
+                        const Icon = action.icon;
+                        return (
+                          <button
+                            key={action.id}
+                            onClick={() => action.onClick(employeeMenuState.staffId)}
+                            className="w-full text-start px-3 py-2 rounded-lg hover:bg-slate-50 font-medium transition-all flex items-center gap-3 text-xs text-slate-700"
+                          >
+                            <Icon size={14} className="text-slate-400" />
+                            <span>{isRtl ? action.labelAr : action.labelEn}</span>
+                          </button>
+                        );
+                      })}
+                      {category !== 'employee' && (
+                        <div className="h-px bg-slate-100 my-1 mx-2" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* 9. VIEW TEAM MEMBER DRAWER */}
+      <AnimatePresence>
+        {viewTeamMemberStaffId && (
+          <TeamMemberProfileDrawer
+            staffId={viewTeamMemberStaffId}
+            onClose={() => setViewTeamMemberStaffId(null)}
+            isRtl={isRtl}
+            onRefreshBoard={() => {
+                // To force a refresh, we could trigger a re-fetch of master data.
+                // In AppointmentWorkspace, there isn't a direct exported fetch function,
+                // but the drawer update is complete.
+            }}
+          />
+        )}
+      </AnimatePresence>
 
     </div>
   );
