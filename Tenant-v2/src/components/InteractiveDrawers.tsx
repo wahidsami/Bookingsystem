@@ -1313,6 +1313,13 @@ export default function InteractiveDrawers({
       setCartItems([]);
       setPosSplitActive(false);
       setPosSplitAmounts({ card: 0, cash: 0, wallet: 0 });
+      setPosWalkinName('');
+      setPosWalkinEmail('');
+      setPosWalkinPhone('');
+      setPosSelectedCustId('');
+      setPosCustMode('walkin');
+      setPosCustomerSearch('');
+      setShowWalkinModal(false);
       setPosCheckoutComplete(true);
 
       if (onBoardChanged) {
