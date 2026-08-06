@@ -584,6 +584,10 @@ export default function InteractiveDrawers({
   const [posCustomerSearch, setPosCustomerSearch] = useState('');
   const [posSplitActive, setPosSplitActive] = useState(false);
   const [posSplitAmounts, setPosSplitAmounts] = useState({ card: 0, cash: 0, wallet: 0 });
+  const [posWalkinName, setPosWalkinName] = useState('');
+  const [posWalkinEmail, setPosWalkinEmail] = useState('');
+  const [posWalkinPhone, setPosWalkinPhone] = useState('');
+  const [showWalkinModal, setShowWalkinModal] = useState(false);
 
   const canonicalProducts = useMemo<ProductRecord[]>(() => {
     return products.map((product: any) => ({
@@ -1200,6 +1204,8 @@ export default function InteractiveDrawers({
 
     let buyerName = isRtl ? 'زائر مجهول / Walk-in' : 'Walk-in Guest / زائر مجهول';
     let customerId: string | undefined = undefined;
+    let customerEmail: string | undefined = undefined;
+    let customerPhone: string | undefined = undefined;
 
     if (posCustMode === 'existing') {
       const cust = customers.find(c => c.id === posSelectedCustId);
@@ -1209,6 +1215,10 @@ export default function InteractiveDrawers({
       }
       buyerName = cust.name;
       customerId = cust.id;
+    } else if (posCustMode === 'walkin' && posWalkinName) {
+      buyerName = posWalkinName;
+      customerEmail = posWalkinEmail || undefined;
+      customerPhone = posWalkinPhone || undefined;
     }
 
     const checkoutPayload = {
@@ -1276,6 +1286,8 @@ export default function InteractiveDrawers({
               amount: gc.price,
               customerId,
               customerName: buyerName,
+              customerEmail,
+              customerPhone,
               paymentMethod: canonicalPaymentMethod,
               paymentAllocations: allocationsArray,
               notes: paymentMethodSummary
@@ -2718,9 +2730,37 @@ export default function InteractiveDrawers({
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] text-slate-500">
-                          <span>👤</span>
-                          <span className="font-medium">{isRtl ? 'زائر غير مسجل — Walk-in' : 'Walk-in Guest — Unregistered'}</span>
+                        <div className="flex flex-col gap-2">
+                          {cartItems.some(i => i.type === 'giftcard') ? (
+                            <button
+                              type="button"
+                              onClick={() => setShowWalkinModal(true)}
+                              className="flex flex-col text-left px-3 py-2 bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-lg transition-all w-full"
+                            >
+                              <div className="flex items-center justify-between w-full mb-1">
+                                <span className="text-[10px] font-medium text-slate-500">
+                                  {isRtl ? 'بيانات المستلم (زائر)' : 'Recipient Details (Walk-in)'}
+                                </span>
+                                <span className="text-amber-600 text-[10px] font-bold underline">
+                                  {posWalkinName ? (isRtl ? 'تعديل' : 'Edit') : (isRtl ? 'إدخال البيانات' : 'Enter Details')}
+                                </span>
+                              </div>
+                              {posWalkinName ? (
+                                <div className="text-[11px] font-bold text-slate-800">
+                                  {posWalkinName} {posWalkinEmail ? `(${posWalkinEmail})` : ''}
+                                </div>
+                              ) : (
+                                <div className="text-[11px] font-bold text-slate-400">
+                                  {isRtl ? 'لم يتم إدخال بيانات (بطاقة مجهولة)' : 'No details entered (Anonymous Card)'}
+                                </div>
+                              )}
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] text-slate-500">
+                              <span>👤</span>
+                              <span className="font-medium">{isRtl ? 'زائر غير مسجل — Walk-in' : 'Walk-in Guest — Unregistered'}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2939,6 +2979,94 @@ export default function InteractiveDrawers({
           </div>
         )}
       </AnimatePresence>
+
+      {showWalkinModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-sm" onClick={() => setShowWalkinModal(false)} />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 z-10">
+            <div className="flex items-center gap-3 text-amber-600">
+              <span className="p-2 bg-amber-500/10 rounded-xl">
+                <span>👤</span>
+              </span>
+              <h3 className="text-lg font-black text-slate-800">
+                {isRtl ? 'بيانات المستلم (زائر)' : 'Walk-in Recipient Details'}
+              </h3>
+            </div>
+            
+            <div className="text-xs text-slate-600 space-y-3 leading-relaxed">
+              <p>
+                {isRtl 
+                  ? 'يرجى إدخال بيانات المشتري لضمان إرسال بطاقة الهدية الرقمية بنجاح وعدم فقدانها.' 
+                  : 'Please enter the buyer details to ensure the digital gift card is sent successfully and not lost.'}
+              </p>
+
+              <div className="space-y-3 mt-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    {isRtl ? 'الاسم' : 'Name'} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={posWalkinName}
+                    onChange={(e) => setPosWalkinName(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none"
+                    placeholder={isRtl ? 'أدخل اسم المشتري...' : 'Enter buyer name...'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    {isRtl ? 'البريد الإلكتروني (لإرسال البطاقة)' : 'Email (for digital delivery)'} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={posWalkinEmail}
+                    onChange={(e) => setPosWalkinEmail(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none"
+                    placeholder={isRtl ? 'name@example.com' : 'name@example.com'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    {isRtl ? 'رقم الجوال (اختياري)' : 'Phone Number (Optional)'}
+                  </label>
+                  <input
+                    type="tel"
+                    value={posWalkinPhone}
+                    onChange={(e) => setPosWalkinPhone(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none"
+                    placeholder={isRtl ? '05xxxxxxxx' : '05xxxxxxxx'}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100">
+              <button 
+                onClick={() => setShowWalkinModal(false)}
+                className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+              >
+                {isRtl ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button 
+                onClick={() => {
+                  if (!posWalkinName || !posWalkinEmail) {
+                    addLocalToast(
+                      isRtl ? 'الاسم والبريد الإلكتروني مطلوبان لإرسال البطاقة' : 'Name and Email are required to send the gift card',
+                      isRtl ? 'تحقق من البيانات' : 'Check Details',
+                      'warning'
+                    );
+                    return;
+                  }
+                  setShowWalkinModal(false);
+                }}
+                className="flex-[2] px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white font-bold rounded-xl text-xs transition-colors"
+              >
+                {isRtl ? 'حفظ البيانات ومتابعة' : 'Save Details & Continue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAssignWarning && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
