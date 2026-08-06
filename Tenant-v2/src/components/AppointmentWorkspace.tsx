@@ -3311,12 +3311,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     };
   });
 
-    setCurrentStaffId(currentStaffId);
-    setCreateMode('appointment');
-    setCreateStep(1);
-    setStagedServices([]);
-    setIsCreateDrawerOpen(true);
-  };
+
 
   const handleSchedulerSlotContextMenu = (event: React.MouseEvent, slot: SchedulerSlot) => {
     if (!isBoardEditable) {
