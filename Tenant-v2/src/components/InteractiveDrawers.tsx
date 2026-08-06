@@ -2730,67 +2730,126 @@ export default function InteractiveDrawers({
                       const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                       const vat = total - (total / 1.15);
                       const subtotal = total - vat;
+                      
+                      const posSplitSum = (posSplitAmounts.card || 0) + (posSplitAmounts.cash || 0) + (posSplitAmounts.wallet || 0);
+                      const posRemaining = Math.max(0, total - posSplitSum);
+                      const isPosSplitValid = total > 0 && Math.abs(posSplitSum - total) < 0.01;
+                      const isPosSplitComplete = total > 0 && posRemaining === 0 && isPosSplitValid;
+                      const hasOverpayment = posSplitSum > total + 0.01;
+
                       return (
-                        <div className="p-3 bg-white border rounded-xl space-y-1.5 text-xs font-sans">
-                          <div className="flex justify-between text-slate-500">
-                            <span>{isRtl ? 'المجموع' : 'Subtotal'}</span>
-                            <span className="font-mono font-semibold">{subtotal.toFixed(2)} SAR</span>
+                        <>
+                          <div className="p-3 bg-white border rounded-xl space-y-1.5 text-xs font-sans">
+                            <div className="flex justify-between text-slate-500">
+                              <span>{isRtl ? 'المجموع' : 'Subtotal'}</span>
+                              <span className="font-mono font-semibold">{subtotal.toFixed(2)} SAR</span>
+                            </div>
+                            <div className="flex justify-between text-slate-500">
+                              <span>ZATCA VAT (15%)</span>
+                              <span className="font-mono font-semibold">{vat.toFixed(2)} SAR</span>
+                            </div>
+                            <div className="flex justify-between font-black text-slate-900 border-t pt-1 bg-amber-500/5 px-1 py-0.5 rounded text-xs">
+                              <span>{isRtl ? 'الصافي النهائي المستحق' : 'Checkout Total'}</span>
+                              <span className="font-mono text-amber-600 font-black">{total.toFixed(2)} SAR</span>
+                            </div>
                           </div>
-                          <div className="flex justify-between text-slate-500">
-                            <span>ZATCA VAT (15%)</span>
-                            <span className="font-mono font-semibold">{vat.toFixed(2)} SAR</span>
-                          </div>
-                          <div className="flex justify-between font-black text-slate-900 border-t pt-1 bg-amber-500/5 px-1 py-0.5 rounded text-xs">
-                            <span>{isRtl ? 'الصافي النهائي المستحق' : 'Checkout Total'}</span>
-                            <span className="font-mono text-amber-600 font-black">{total.toFixed(2)} SAR</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
+                        
+                          <div className="p-3 bg-white border-t space-y-2 mt-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[9px] font-black text-slate-400">{isRtl ? 'بوابة التحصيل مدى' : 'Integrated Mada Gate'}</span>
+                              <button onClick={() => setPosSplitActive(!posSplitActive)} className="text-[9px] underline text-slate-500">Split Cash/Card</button>
+                            </div>
 
-                  <div className="p-3 bg-white border-t space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-black text-slate-400">{isRtl ? 'بوابة التحصيل مدى' : 'Integrated Mada Gate'}</span>
-                      <button onClick={() => setPosSplitActive(!posSplitActive)} className="text-[9px] underline text-slate-500">Split Cash/Card</button>
-                    </div>
+                            {posSplitActive && (
+                              <div className="space-y-3 animate-fadeIn mt-2">
+                                {/* Live Summary */}
+                                <div className={`p-2 rounded-lg border ${isPosSplitComplete ? 'bg-emerald-50 border-emerald-200' : (hasOverpayment ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200')}`}>
+                                  <div className="flex justify-between text-[10px] mb-1">
+                                    <span className="text-slate-500">{isRtl ? 'المطلوب:' : 'Invoice Total:'}</span>
+                                    <span className="font-bold font-mono">{total.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-[10px] mb-1">
+                                    <span className="text-slate-500">{isRtl ? 'المدفوع:' : 'Allocated Amount:'}</span>
+                                    <span className={`font-bold font-mono ${hasOverpayment ? 'text-rose-600' : 'text-emerald-600'}`}>{posSplitSum.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-[11px] font-black pt-1 border-t border-slate-200 border-dashed">
+                                    <span className={hasOverpayment ? 'text-rose-600' : 'text-slate-700'}>{isRtl ? 'المتبقي:' : 'Remaining Balance:'}</span>
+                                    <span className={`font-mono ${isPosSplitComplete ? 'text-emerald-600' : (hasOverpayment ? 'text-rose-600' : 'text-amber-600')}`}>
+                                      {isPosSplitComplete ? (isRtl ? 'اكتمل التخصيص' : 'Allocation Complete') : `${posRemaining.toFixed(2)}`}
+                                    </span>
+                                  </div>
+                                </div>
 
-                    {posSplitActive && (
-                      <div className="grid grid-cols-3 gap-1 animate-fadeIn text-[10px]">
-                        <div>
-                          <label className="text-slate-400 block text-center">Mada</label>
-                          <input type="number" placeholder="0" value={posSplitAmounts.card || ''} onChange={(e) => setPosSplitAmounts(prev => ({ ...prev, card: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
-                        </div>
-                        <div>
-                          <label className="text-slate-400 block text-center">Cash</label>
-                          <input type="number" placeholder="0" value={posSplitAmounts.cash || ''} onChange={(e) => setPosSplitAmounts(prev => ({ ...prev, cash: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
-                        </div>
-                        <div>
-                          <label className="text-slate-400 block text-center">Wallet</label>
-                          <input type="number" placeholder="0" value={posSplitAmounts.wallet || ''} onChange={(e) => setPosSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
-                        </div>
-                      </div>
-                    )}
+                                {/* Inputs */}
+                                <div className="grid grid-cols-3 gap-2 text-[10px]">
+                                  <div>
+                                    <label className="text-slate-400 block text-center mb-1">Mada</label>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => {
+                                        if (!posSplitAmounts.card && posRemaining > 0) {
+                                          setPosSplitAmounts(prev => ({ ...prev, card: parseFloat((posRemaining + (prev.card || 0)).toFixed(2)) }));
+                                        }
+                                      }}
+                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                    >
+                                      {isRtl ? '+ إضافة' : '+ Add'}
+                                    </button>
+                                    <input type="number" placeholder="0" value={posSplitAmounts.card || ''} onChange={(e) => setPosSplitAmounts(prev => ({ ...prev, card: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
+                                  </div>
+                                  <div>
+                                    <label className="text-slate-400 block text-center mb-1">Cash</label>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => {
+                                        if (!posSplitAmounts.cash && posRemaining > 0) {
+                                          setPosSplitAmounts(prev => ({ ...prev, cash: parseFloat((posRemaining + (prev.cash || 0)).toFixed(2)) }));
+                                        }
+                                      }}
+                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                    >
+                                      {isRtl ? '+ إضافة' : '+ Add'}
+                                    </button>
+                                    <input type="number" placeholder="0" value={posSplitAmounts.cash || ''} onChange={(e) => setPosSplitAmounts(prev => ({ ...prev, cash: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
+                                  </div>
+                                  <div>
+                                    <label className="text-slate-400 block text-center mb-1">Wallet</label>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => {
+                                        if (!posSplitAmounts.wallet && posRemaining > 0) {
+                                          setPosSplitAmounts(prev => ({ ...prev, wallet: parseFloat((posRemaining + (prev.wallet || 0)).toFixed(2)) }));
+                                        }
+                                      }}
+                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                    >
+                                      {isRtl ? '+ إضافة' : '+ Add'}
+                                    </button>
+                                    <input type="number" placeholder="0" value={posSplitAmounts.wallet || ''} onChange={(e) => setPosSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
-                    {posCheckoutComplete && !completedOrder ? (
-                      <div className="w-full py-2 bg-emerald-500/10 border border-emerald-500 text-emerald-800 font-black rounded-xl text-[10px] text-center">
-                        {isRtl ? 'تم إتمام التحصيل بنجاح' : 'Checkout completed successfully'}
-                      </div>
-                    ) : null}
+                            {posCheckoutComplete && !completedOrder ? (
+                              <div className="w-full py-2 bg-emerald-500/10 border border-emerald-500 text-emerald-800 font-black rounded-xl text-[10px] text-center mt-2">
+                                {isRtl ? 'تم إتمام التحصيل بنجاح' : 'Checkout completed successfully'}
+                              </div>
+                            ) : null}
 
-                    {posCustMode === 'walkin' && cartItems.some(i => i.type === 'giftcard') && !posCheckoutComplete && (
-                      <div className="w-full py-2 px-3 bg-rose-50 border border-rose-200 text-rose-700 font-bold rounded-xl text-[10px] text-center mb-2 animate-fadeIn">
-                        ⚠️ {isRtl 
-                          ? 'لن يتم إيداع هذه البطاقة في أي محفظة. سيتم إنشاء رمز استرداد بدلاً من ذلك.' 
-                          : 'This gift card will not be credited to any customer wallet. A redemption code will be generated instead.'}
-                      </div>
-                    )}
+                            {posCustMode === 'walkin' && cartItems.some(i => i.type === 'giftcard') && !posCheckoutComplete && (
+                              <div className="w-full py-2 px-3 bg-rose-50 border border-rose-200 text-rose-700 font-bold rounded-xl text-[10px] text-center my-2 animate-fadeIn">
+                                ⚠️ {isRtl 
+                                  ? 'لن يتم إيداع هذه البطاقة في أي محفظة. سيتم إنشاء رمز استرداد بدلاً من ذلك.' 
+                                  : 'This gift card will not be credited to any customer wallet. A redemption code will be generated instead.'}
+                              </div>
+                            )}
 
-                    <button
-                      onClick={handleProcessPosCheckout}
-                      disabled={posCheckoutComplete || cartItems.length === 0}
-                      className="w-full py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-zinc-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
-                    >
+                            <button
+                              onClick={handleProcessPosCheckout}
+                              disabled={posCheckoutComplete || cartItems.length === 0 || (posSplitActive && !isPosSplitValid)}
+                              className="w-full mt-2 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-zinc-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
+                            >
                       <Receipt size={13} className="text-zinc-950" />
                       <span>
                         {posCheckoutComplete
@@ -2799,6 +2858,10 @@ export default function InteractiveDrawers({
                       </span>
                     </button>
                   </div>
+                </>
+              );
+            })()}
+          </div>
                 </div>
               </div>
 
