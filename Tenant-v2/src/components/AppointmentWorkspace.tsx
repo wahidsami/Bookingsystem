@@ -2472,13 +2472,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     try {
-      const remainingBalanceForLogs = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
-      const allocationSum = paymentAllocationsPayload ? paymentAllocationsPayload.reduce((acc, curr) => acc + curr.amount, 0) : total;
-      console.log('TEMPORARY DEBUG - remainingBalance:', remainingBalanceForLogs);
-      console.log('TEMPORARY DEBUG - paymentRows:', splitAmounts);
-      console.log('TEMPORARY DEBUG - paymentAllocations:', paymentAllocationsPayload);
-      console.log('TEMPORARY DEBUG - allocationSum:', allocationSum);
-
       // 1. Mark appointment as paid
       const paymentResponse = paymentCollectionMode === 'remainder' || hasTrueRemainderBalance
         ? await tenantApiAdapter.recordRemainderPayment(activeAppointment.id, {
@@ -2616,19 +2609,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     let patchResponse: any = null;
 
     try {
-      console.log("[STATUS] Step 1 - Sending PATCH");
       patchResponse = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, normalizedNext, finalNotes);
       if (!patchResponse?.success) {
         throw new Error(patchResponse?.message || 'Failed to update appointment status');
       }
       patchSuccess = true;
-      console.log("[STATUS] Step 2 - PATCH completed", patchResponse);
 
       // Optimistically update local state immediately using the backend's returned payload
       const serverAppt = patchResponse.appointment || patchResponse.data?.appointment;
       if (serverAppt) {
         setActiveAppointment(mapBoardAppointment(serverAppt, getSelectedDateKey()));
-        console.log("[STATUS] Step 2.5 - Optimistic state updated");
       }
 
       addLocalToast(
@@ -2651,17 +2641,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     if (patchSuccess) {
       try {
         await loadBoardData();
-        console.log("[STATUS] Step 3 - refreshAppointments completed");
 
         const refreshed = await tenantApiAdapter.getAppointment(activeAppointment.id);
-        console.log("[STATUS] Step 4 - refreshBooking completed");
 
         const refreshedData = refreshed?.appointment || refreshed?.data?.appointment || refreshed?.data || refreshed;
         if (refreshedData) {
           setActiveAppointment(mapBoardAppointment(refreshedData, getSelectedDateKey()));
         }
         setCustomerProfileRefreshToken(token => token + 1);
-        console.log("[STATUS] Step 5 - Background refresh state updated");
       } catch (bgErr) {
         console.error("[STATUS BACKGROUND REFRESH FAILED]", bgErr);
       }
