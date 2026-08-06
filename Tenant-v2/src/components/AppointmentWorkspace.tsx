@@ -3311,27 +3311,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     };
   });
 
-  const handleSchedulerSlotClick = (slot: SchedulerSlot) => {
-    if (!isBoardEditable) {
-      return;
-    }
-
-    if (viewMode === 'day') {
-      void openCreateAppointmentAtSlot(slot.employeeId || slot.columnId, slot.startMinutes, slot.dateKey, slot.endMinutes - slot.startMinutes);
-      return;
-    }
-
-    const dateValue = parseLocalDateKey(slot.dateKey);
-    if (!currentStaffId) {
-      addLocalToast(
-        'يرجى تحديد موظف قبل إنشاء موعد في العرض الأسبوعي.',
-        'Please select a staff member before creating an appointment in Week view.',
-        'warning'
-      );
-      return;
-    }
-    setSelectedDate(dateValue);
-    setCurrentStartTime(slot.startMinutes);
     setCurrentStaffId(currentStaffId);
     setCreateMode('appointment');
     setCreateStep(1);
@@ -4011,7 +3990,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   showLunchBreaks={schedulerBoardSettings.showLunchBreaks}
                   showStaffPhotos={schedulerBoardSettings.showStaffPhotos}
                   showAppointmentStatusBadges={schedulerBoardSettings.showAppointmentStatusBadges}
-                  onSlotClick={handleSchedulerSlotClick}
                   onSlotContextMenu={handleSchedulerSlotContextMenu}
                   onSlotDrop={handleSchedulerSlotDrop}
                   onSlotRangeSelect={handleSchedulerSlotRangeSelect}

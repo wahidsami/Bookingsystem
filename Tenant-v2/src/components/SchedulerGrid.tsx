@@ -82,7 +82,6 @@ export interface SchedulerGridProps {
   showLunchBreaks?: boolean;
   showStaffPhotos?: boolean;
   showAppointmentStatusBadges?: boolean;
-  onSlotClick?: (slot: SchedulerSlot) => void;
   onSlotContextMenu?: (event: React.MouseEvent, slot: SchedulerSlot) => void;
   onSlotDrop?: (slot: SchedulerSlot, draggedEventId: string) => void;
   onSlotRangeSelect?: (range: SchedulerSlotRange) => void;
@@ -257,7 +256,6 @@ export default function SchedulerGrid({
   showLunchBreaks = true,
   showStaffPhotos = true,
   showAppointmentStatusBadges = true,
-  onSlotClick,
   onSlotContextMenu,
   onSlotDrop,
   onEventClick,
@@ -620,8 +618,10 @@ export default function SchedulerGrid({
                           event.stopPropagation();
                           return;
                         }
-                        onSlotClick?.(slot);
+                        event.preventDefault();
                         event.stopPropagation();
+                        // Unify click behavior: left click opens the context menu
+                        onSlotContextMenu?.(event, slot);
                       }}
                       onContextMenu={(event) => {
                         if (!isEditable) return;
