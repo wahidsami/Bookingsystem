@@ -21,7 +21,7 @@ import { resolveEmployeeImageUrl } from '../lib/employeeImage';
 import { resolveProductImageUrl } from '../lib/productContract';
 import { normalizeServiceRecord } from '../lib/serviceContract';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
-import { DEFAULT_SCHEDULER_BOARD_SETTINGS, getTenantSchedulerConfig, normalizeSchedulerBoardSettings, type SchedulerBoardSettings } from '../lib/tenantWorkingHours';
+import { DEFAULT_SCHEDULER_BOARD_SETTINGS, getTenantSchedulerConfig, normalizeSchedulerBoardSettings, type SchedulerBoardSettings, MIN_STAFF_COLUMN_WIDTH, MAX_STAFF_COLUMN_WIDTH } from '../lib/tenantWorkingHours';
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
 
 interface AppointmentWorkspaceProps {
@@ -323,6 +323,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const schedulerBoardSnapshotRef = useRef<SchedulerBoardSettings>(schedulerBoardSettings);
   const [schedulerBoardDraft, setSchedulerBoardDraft] = useState<SchedulerBoardSettings>(schedulerBoardSettings);
   const [isSchedulerSettingsOpen, setIsSchedulerSettingsOpen] = useState(false);
+  const activeSchedulerSettings = isSchedulerSettingsOpen ? schedulerBoardDraft : schedulerBoardSettings;
   const [isSchedulerSettingsSaving, setIsSchedulerSettingsSaving] = useState(false);
   const [dragMoveDialog, setDragMoveDialog] = useState<{
     appointmentId: string;
@@ -3255,7 +3256,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return true;
     }
 
-    if (schedulerBoardSettings.showLunchBreaks) {
+    if (activeSchedulerSettings.showLunchBreaks) {
       return true;
     }
 
@@ -4017,7 +4018,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               className="overflow-auto scrollbar-thin relative"
               id="interactive-board-scroll"
               style={{
-                height: viewMode === 'agenda' ? 'auto' : `${schedulerBoardSettings.gridHeight}px`
+                height: viewMode === 'agenda' ? 'auto' : `${activeSchedulerSettings.gridHeight}px`
               }}
             >
               
@@ -4148,12 +4149,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   startHour={START_HOUR}
                   endHour={END_HOUR}
                   timeColumnWidth={84}
-                  slotHeight={schedulerBoardSettings.timeSlotHeight}
-                  staffColumnWidth={schedulerBoardSettings.staffColumnWidth}
-                  showCurrentTimeIndicator={schedulerBoardSettings.showCurrentTimeIndicator}
-                  showLunchBreaks={schedulerBoardSettings.showLunchBreaks}
-                  showStaffPhotos={schedulerBoardSettings.showStaffPhotos}
-                  showAppointmentStatusBadges={schedulerBoardSettings.showAppointmentStatusBadges}
+                  slotHeight={activeSchedulerSettings.timeSlotHeight}
+                  staffColumnWidth={activeSchedulerSettings.staffColumnWidth}
+                  showCurrentTimeIndicator={activeSchedulerSettings.showCurrentTimeIndicator}
+                  showLunchBreaks={activeSchedulerSettings.showLunchBreaks}
+                  showStaffPhotos={activeSchedulerSettings.showStaffPhotos}
+                  showAppointmentStatusBadges={activeSchedulerSettings.showAppointmentStatusBadges}
                   onSlotContextMenu={handleSchedulerSlotContextMenu}
                   onSlotDrop={handleSchedulerSlotDrop}
                   onSlotRangeSelect={handleSchedulerSlotRangeSelect}
@@ -4357,7 +4358,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   { key: 'gridWidth', labelEn: 'Grid Width', labelAr: 'عرض اللوحة', min: 80, max: 160, step: 1, suffix: '%' },
                   { key: 'gridHeight', labelEn: 'Grid Height', labelAr: 'ارتفاع اللوحة', min: 420, max: 1400, step: 10, suffix: 'px' },
                   { key: 'timeSlotHeight', labelEn: 'Time Slot Height', labelAr: 'ارتفاع الخانة الزمنية', min: 8, max: 24, step: 1, suffix: 'px' },
-                  { key: 'staffColumnWidth', labelEn: 'Staff Column Width', labelAr: 'عرض عمود الموظف', min: 50, max: 360, step: 5, suffix: 'px' }
+                  { key: 'staffColumnWidth', labelEn: 'Staff Column Width', labelAr: 'عرض عمود الموظف', min: MIN_STAFF_COLUMN_WIDTH, max: MAX_STAFF_COLUMN_WIDTH, step: 5, suffix: 'px' }
                 ].map((field) => (
                   <label key={field.key} className="space-y-2 rounded-xl border border-slate-100 bg-slate-50/70 p-4">
                     <div className="flex items-center justify-between gap-2">

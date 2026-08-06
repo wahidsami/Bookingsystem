@@ -49,11 +49,15 @@ const DEFAULT_START_HOUR = 9;
 const DEFAULT_END_HOUR = 21;
 const DEFAULT_SLOT_MINUTES = 5;
 
+export const MIN_STAFF_COLUMN_WIDTH = 80;
+export const MAX_STAFF_COLUMN_WIDTH = 200;
+export const DEFAULT_STAFF_COLUMN_WIDTH = 90;
+
 export const DEFAULT_SCHEDULER_BOARD_SETTINGS: SchedulerBoardSettings = {
   gridWidth: 100,
   gridHeight: 760,
   timeSlotHeight: 10,
-  staffColumnWidth: 240,
+  staffColumnWidth: DEFAULT_STAFF_COLUMN_WIDTH,
   showCurrentTimeIndicator: true,
   showLunchBreaks: true,
   showStaffPhotos: true,
@@ -165,7 +169,7 @@ export function normalizeSchedulerBoardSettings(value?: any): SchedulerBoardSett
     gridWidth: Math.max(80, Math.min(160, Number(source.gridWidth ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.gridWidth))),
     gridHeight: Math.max(420, Math.min(1400, Number(source.gridHeight ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.gridHeight))),
     timeSlotHeight: Math.max(8, Math.min(24, Number(source.timeSlotHeight ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.timeSlotHeight))),
-    staffColumnWidth: Math.max(50, Math.min(360, Number(source.staffColumnWidth ?? DEFAULT_SCHEDULER_BOARD_SETTINGS.staffColumnWidth))),
+    staffColumnWidth: Math.max(MIN_STAFF_COLUMN_WIDTH, Math.min(MAX_STAFF_COLUMN_WIDTH, Number(source.staffColumnWidth ?? DEFAULT_STAFF_COLUMN_WIDTH))),
     showCurrentTimeIndicator: source.showCurrentTimeIndicator !== undefined ? Boolean(source.showCurrentTimeIndicator) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showCurrentTimeIndicator,
     showLunchBreaks: source.showLunchBreaks !== undefined ? Boolean(source.showLunchBreaks) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showLunchBreaks,
     showStaffPhotos: source.showStaffPhotos !== undefined ? Boolean(source.showStaffPhotos) : DEFAULT_SCHEDULER_BOARD_SETTINGS.showStaffPhotos,
