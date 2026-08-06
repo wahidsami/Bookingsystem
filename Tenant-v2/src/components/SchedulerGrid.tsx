@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Users, ChevronDown } from 'lucide-react';
 
-export type SchedulerViewMode = 'day' | 'week';
+export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
 
 export interface SchedulerColumn {
   id: string;
+  kind?: 'employee' | 'day';
+  resourceId?: string;
   title: string;
   subtitle?: string;
   avatar?: string;
@@ -47,6 +49,7 @@ export interface SchedulerSlot {
   columnId: string;
   dateKey: string;
   employeeId: string;
+  resourceId?: string;
   columnIndex: number;
   slotIndex: number;
   startTime: string;
@@ -283,7 +286,8 @@ export default function SchedulerGrid({
   );
   const visibleDateKey = getRiyadhDateKey(boardCurrentTime);
   const currentMinutesSinceMidnight = getRiyadhMinutesSinceMidnight(boardCurrentTime);
-  const currentTimeLinePosition = showCurrentTimeIndicator && viewMode === 'day' && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
+  const isDayBoardMode = viewMode === 'day' || viewMode === 'team-day' || viewMode === 'employee-day';
+  const currentTimeLinePosition = showCurrentTimeIndicator && isDayBoardMode && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
     ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
     : null;
   const eventLayerInsetStyle = isRtl
@@ -299,10 +303,12 @@ export default function SchedulerGrid({
   const resolveSlot = (column: SchedulerColumn, columnIndex: number, slotIndex: number): SchedulerSlot => {
     const startMinutes = slotIndex * slotMinutes;
     const endMinutes = (slotIndex + 1) * slotMinutes;
+    const resourceId = `${column.resourceId || column.id}`.replace(/^(employee:|day:)/, '');
     return {
       columnId: column.id,
       dateKey: column.dateKey || selectedDateKey,
-      employeeId: column.id,
+      employeeId: column.kind === 'employee' ? resourceId : '',
+      resourceId,
       columnIndex,
       slotIndex,
       startMinutes,
@@ -483,12 +489,14 @@ export default function SchedulerGrid({
         {columns.map((column, columnIndex) => {
           const isActiveLane = hoveredSlot?.columnId === column.id;
           const laneShade = columnIndex % 2 === 0 ? 'bg-slate-50/80' : 'bg-white';
+          const isEmployeeHeader = column.kind === 'employee';
+          const headerResourceId = column.resourceId || column.id;
           return (
           <div
             key={column.id}
-            onClick={(e) => onColumnHeaderClick?.(e, column.id)}
-            onContextMenu={(e) => onColumnHeaderContextMenu?.(e, column.id)}
-            className={`min-w-0 overflow-hidden border-r last:border-r-0 border-slate-200 px-1.5 py-2 flex items-center justify-between gap-1 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''} ${(onColumnHeaderClick || onColumnHeaderContextMenu) ? 'cursor-pointer hover:bg-slate-100' : ''}`}
+            onClick={isEmployeeHeader ? (e) => onColumnHeaderClick?.(e, headerResourceId) : undefined}
+            onContextMenu={isEmployeeHeader ? (e) => onColumnHeaderContextMenu?.(e, headerResourceId) : undefined}
+            className={`min-w-0 overflow-hidden border-r last:border-r-0 border-slate-200 px-1.5 py-2 flex items-center justify-between gap-1 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''} ${isEmployeeHeader && (onColumnHeaderClick || onColumnHeaderContextMenu) ? 'cursor-pointer hover:bg-slate-100' : ''}`}
           >
             <div className="min-w-0 flex items-center gap-2">
               {column.avatar ? (
@@ -522,7 +530,7 @@ export default function SchedulerGrid({
                   {isRtl ? 'اليوم' : 'Today'}
                 </span>
               )}
-              {(onColumnHeaderClick || onColumnHeaderContextMenu) && (
+              {isEmployeeHeader && (onColumnHeaderClick || onColumnHeaderContextMenu) && (
                 <ChevronDown size={14} className="text-slate-400 opacity-60 shrink-0" />
               )}
             </div>

@@ -132,6 +132,35 @@ interface GiftCardPackage {
   imageUrl?: string | null;
 }
 
+type SchedulerBoardMode = 'team-day' | 'team-week' | 'employee-day' | 'employee-week' | 'agenda';
+
+const isEmployeeBoardMode = (mode: SchedulerBoardMode) => mode === 'employee-day' || mode === 'employee-week';
+const isWeekBoardMode = (mode: SchedulerBoardMode) => mode === 'team-week' || mode === 'employee-week';
+const isDayBoardMode = (mode: SchedulerBoardMode) => mode === 'team-day' || mode === 'employee-day';
+
+const getBoardModeLabel = (mode: SchedulerBoardMode, isRtl: boolean) => {
+  switch (mode) {
+    case 'team-day':
+      return isRtl ? 'فريق - يوم' : 'Team Day';
+    case 'team-week':
+      return isRtl ? 'فريق - أسبوع' : 'Team Week';
+    case 'employee-day':
+      return isRtl ? 'موظف - يوم' : 'Employee Day';
+    case 'employee-week':
+      return isRtl ? 'موظف - أسبوع' : 'Employee Week';
+    case 'agenda':
+      return isRtl ? 'الأجندة' : 'Agenda';
+    default:
+      return mode;
+  }
+};
+
+const getSchedulerColumnId = (mode: SchedulerBoardMode, value: string) => {
+  return isWeekBoardMode(mode) ? `day:${value}` : `employee:${value}`;
+};
+
+const parseSchedulerColumnResourceId = (columnId: string) => `${columnId || ''}`.replace(/^(employee:|day:)/, '');
+
 const API_COLORS = [
   'border-amber-500 bg-amber-500/10 text-amber-900',
   'border-emerald-500 bg-emerald-500/10 text-emerald-900',
@@ -361,7 +390,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [serviceCategoryFilter, setServiceCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'agenda'>('day');
+  const [viewMode, setViewMode] = useState<SchedulerBoardMode>('team-day');
+  const [previousBoardMode, setPreviousBoardMode] = useState<SchedulerBoardMode | null>(null);
+  const [focusedEmployeeId, setFocusedEmployeeId] = useState<string | null>(null);
   const [boardCurrentTime, setBoardCurrentTime] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -1933,7 +1964,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   };
 
   const getCurrentTimeLinePosition = () => {
-    if (viewMode !== 'day') {
+    if (!isDayBoardMode(viewMode)) {
       return null;
     }
 
@@ -3221,7 +3252,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // Filters application
   const filteredAppointments = appointments.filter(apt => {
-    const matchesStaff = selectedStylistFilter === 'all' || apt.staffId === selectedStylistFilter;
+    const boardFocusStaffId = isEmployeeBoardMode(viewMode) ? focusedEmployeeId : null;
+    const matchesStaff = viewMode === 'agenda'
+      ? (selectedStylistFilter === 'all' || apt.staffId === selectedStylistFilter)
+      : (!boardFocusStaffId || apt.staffId === boardFocusStaffId);
     const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
     const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
       const matchesSearch = searchQuery === '' || 
@@ -3235,9 +3269,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const dateStr = apt.date || getSelectedDateKey();
     let matchesDate = false;
     
-    if (viewMode === 'day') {
+    if (isDayBoardMode(viewMode)) {
       matchesDate = dateStr === getSelectedDateKey();
-    } else if (viewMode === 'week') {
+    } else if (isWeekBoardMode(viewMode)) {
       const activeBlock = getDaysOfActiveBlock(selectedDate);
       matchesDate = activeBlock.includes(dateStr);
     } else {
@@ -3263,25 +3297,31 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     return `${appointment.blockedType || ''}`.trim().toLowerCase() !== 'lunch';
   });
 
-  const schedulerColumns: SchedulerColumn[] = viewMode === 'day'
-    ? liveStylists.map((stylist) => ({
-        id: stylist.id,
-        title: isRtl ? stylist.nameAr : stylist.nameEn,
-        subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
-        avatar: stylist.avatar,
-        statusLabel: stylistStatuses[stylist.id]
-          ? (stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active') : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break') : (isRtl ? 'خارج' : 'Off'))
-          : undefined,
-        statusTone: stylistStatuses[stylist.id] || 'neutral',
-        isToday: false,
-      }))
-    : getDaysOfActiveBlock(selectedDate).map((dayStr, idx) => {
+  const schedulerColumns: SchedulerColumn[] = isDayBoardMode(viewMode)
+    ? liveStylists
+        .filter((stylist) => !isEmployeeBoardMode(viewMode) || stylist.id === focusedEmployeeId)
+        .map((stylist) => ({
+          id: getSchedulerColumnId(viewMode, stylist.id),
+          kind: 'employee',
+          resourceId: stylist.id,
+          title: isRtl ? stylist.nameAr : stylist.nameEn,
+          subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
+          avatar: stylist.avatar,
+          statusLabel: stylistStatuses[stylist.id]
+            ? (stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active') : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break') : (isRtl ? 'خارج' : 'Off'))
+            : undefined,
+          statusTone: stylistStatuses[stylist.id] || 'neutral',
+          isToday: false,
+        }))
+    : getDaysOfActiveBlock(selectedDate).map((dayStr) => {
         const dateValue = parseLocalDateKey(dayStr);
         const dayName = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
         const dateLabel = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
         const isTodayDate = getLocalDateKey(new Date()) === dayStr;
         return {
-          id: dayStr,
+          id: getSchedulerColumnId(viewMode, dayStr),
+          kind: 'day',
+          resourceId: dayStr,
           title: `${dayName}`,
           subtitle: dateLabel,
           statusLabel: isTodayDate ? (isRtl ? 'اليوم' : 'Today') : undefined,
@@ -3293,7 +3333,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   const schedulerEvents: SchedulerEvent[] = schedulerAppointments.map((apt) => {
     const staff = liveStylists.find((stylist) => stylist.id === apt.staffId);
-    const columnId = viewMode === 'day' ? apt.staffId : (apt.date || getSelectedDateKey());
+    const columnId = getSchedulerColumnId(viewMode, isDayBoardMode(viewMode) ? apt.staffId : (apt.date || getSelectedDateKey()));
     const title = isRtl ? apt.customerNameAr : apt.customerNameEn;
     const subtitle = isRtl ? apt.serviceNameAr : apt.serviceNameEn;
 
@@ -3326,6 +3366,26 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     };
   });
 
+  const focusedEmployee = isEmployeeBoardMode(viewMode) && focusedEmployeeId
+    ? liveStylists.find((stylist) => stylist.id === focusedEmployeeId) || null
+    : null;
+  const boardModeLabel = getBoardModeLabel(viewMode, isRtl);
+  const restoreTeamBoardMode = useCallback(() => {
+    setViewMode(previousBoardMode || (isWeekBoardMode(viewMode) ? 'team-week' : 'team-day'));
+    setFocusedEmployeeId(null);
+    setPreviousBoardMode(null);
+    setSelectedStylistFilter('all');
+    setEmployeeMenuState(null);
+  }, [previousBoardMode, viewMode]);
+
+  const enterEmployeeSchedule = useCallback((staffId: string) => {
+    setPreviousBoardMode((current) => current || (isWeekBoardMode(viewMode) ? 'team-week' : 'team-day'));
+    setFocusedEmployeeId(staffId);
+    setSelectedStylistFilter(staffId);
+    setViewMode(isWeekBoardMode(viewMode) ? 'employee-week' : 'employee-day');
+    setEmployeeMenuState(null);
+  }, [viewMode]);
+
 
 
   const handleSchedulerSlotContextMenu = (event: React.MouseEvent, slot: SchedulerSlot) => {
@@ -3333,20 +3393,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
-    if (viewMode === 'day') {
-      handleContextMenu(event, slot.employeeId || slot.columnId, slot.startMinutes, undefined, slot.dateKey);
+    if (isDayBoardMode(viewMode)) {
+      const targetStaffId = slot.employeeId || parseSchedulerColumnResourceId(slot.columnId);
+      handleContextMenu(event, targetStaffId, slot.startMinutes, undefined, slot.dateKey);
       return;
     }
 
-    if (!currentStaffId) {
+    const targetStaffId = isEmployeeBoardMode(viewMode) ? (focusedEmployeeId || currentStaffId) : currentStaffId;
+    if (!targetStaffId) {
       addLocalToast(
-        'يرجى تحديد موظف قبل فتح قائمة الإنشاء السريع في العرض الأسبوعي.',
-        'Please select a staff member before opening quick create in Week view.',
+        'يرجى تحديد موظف قبل فتح قائمة الإنشاء السريع في عرض الجدول.',
+        'Please select a staff member before opening quick create in the scheduler view.',
         'warning'
       );
       return;
     }
-    handleContextMenu(event, currentStaffId, slot.startMinutes, undefined, slot.dateKey);
+    handleContextMenu(event, targetStaffId, slot.startMinutes, undefined, slot.dateKey);
   };
 
   const handleSchedulerSlotDrop = (slot: SchedulerSlot, draggedEventId: string) => {
@@ -3360,7 +3422,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     const targetDateKey = slot.dateKey || getSelectedDateKey();
-    const targetStaffId = viewMode === 'day' ? slot.employeeId || slot.columnId : movedAppointment.staffId;
+    const targetStaffId = isDayBoardMode(viewMode)
+      ? (slot.employeeId || parseSchedulerColumnResourceId(slot.columnId))
+      : movedAppointment.staffId;
     const serviceName = isRtl ? movedAppointment.serviceNameAr : movedAppointment.serviceNameEn;
     const targetStaff = liveStylists.find((staff) => staff.id === targetStaffId);
     const sourceStaff = liveStylists.find((staff) => staff.id === movedAppointment.staffId);
@@ -3442,9 +3506,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
-    if (viewMode === 'day') {
+    if (isDayBoardMode(viewMode)) {
       void openCreateAppointmentAtSlot(
-        range.startSlot.employeeId || range.startSlot.columnId,
+        range.startSlot.employeeId || parseSchedulerColumnResourceId(range.startSlot.columnId),
         range.startSlot.startMinutes,
         range.startSlot.dateKey,
         range.durationMinutes
@@ -3452,10 +3516,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
-    if (!currentStaffId) {
+    const targetStaffId = isEmployeeBoardMode(viewMode) ? (focusedEmployeeId || currentStaffId) : currentStaffId;
+    if (!targetStaffId) {
       addLocalToast(
-        'يرجى تحديد موظف قبل إنشاء مدة محددة في العرض الأسبوعي.',
-        'Please select a staff member before creating a time range in Week view.',
+        'يرجى تحديد موظف قبل إنشاء مدة محددة في عرض الجدول.',
+        'Please select a staff member before creating a range in the scheduler view.',
         'warning'
       );
       return;
@@ -3463,7 +3528,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     const dateValue = parseLocalDateKey(range.startSlot.dateKey);
     setSelectedDate(dateValue);
-    setCurrentStaffId(currentStaffId);
+    setCurrentStaffId(targetStaffId);
     setCurrentStartTime(range.startSlot.startMinutes);
     setCurrentDuration(range.durationMinutes);
     setCreateMode('appointment');
@@ -3518,7 +3583,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       icon: CalendarIcon,
       category: 'view',
       onClick: (staffId) => {
-        setViewMode('day');
+        setViewMode('team-day');
+        setPreviousBoardMode(null);
+        setFocusedEmployeeId(null);
         setSelectedStylistFilter('all');
         setEmployeeMenuState(null);
       }
@@ -3530,7 +3597,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       icon: CalendarDays,
       category: 'view',
       onClick: (staffId) => {
-        setViewMode('week');
+        setViewMode('team-week');
+        setPreviousBoardMode(null);
+        setFocusedEmployeeId(null);
         setSelectedStylistFilter('all');
         setEmployeeMenuState(null);
       }
@@ -3542,8 +3611,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       icon: Filter,
       category: 'view',
       onClick: (staffId) => {
-        setSelectedStylistFilter(staffId);
-        setEmployeeMenuState(null);
+        enterEmployeeSchedule(staffId);
       }
     },
     {
@@ -3705,19 +3773,23 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             </div>
 
             {/* Day / Week / Agenda views tab */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-              <button 
-                onClick={() => setViewMode('day')}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                <button 
+                onClick={() => {
+                  setViewMode(isEmployeeBoardMode(viewMode) ? 'employee-day' : 'team-day');
+                }}
                 className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                  viewMode === 'day' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  isDayBoardMode(viewMode) ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 {isRtl ? 'يومي' : 'Day'}
               </button>
               <button 
-                onClick={() => setViewMode('week')}
+                onClick={() => {
+                  setViewMode(isEmployeeBoardMode(viewMode) ? 'employee-week' : 'team-week');
+                }}
                 className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                  viewMode === 'week' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  isWeekBoardMode(viewMode) ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 {isRtl ? 'أسبوعي' : 'Week'}
@@ -4021,6 +4093,30 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 height: viewMode === 'agenda' ? 'auto' : `${activeSchedulerSettings.gridHeight}px`
               }}
             >
+              {isEmployeeBoardMode(viewMode) && focusedEmployee && (
+                <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">
+                      {isRtl ? 'عرض جدول الموظف' : 'Employee Schedule'}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-black text-slate-900">
+                        {isRtl ? focusedEmployee.nameAr : focusedEmployee.nameEn}
+                      </span>
+                      <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        {boardModeLabel}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={restoreTeamBoardMode}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                  >
+                    {isRtl ? 'العودة إلى جدول الفريق' : 'Back to Team Schedule'}
+                  </button>
+                </div>
+              )}
               
               {viewMode === 'agenda' ? (
                 /* 1. COMPREHENSIVE AGENDA SCHEDULE VIEW */
@@ -4167,7 +4263,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     setDraggedAptId(null);
                   }}
                   onEventResizeStart={(eventItem, mouseEvent) => {
-                    if (viewMode === 'day' && isBoardEditable && eventItem.kind !== 'blocked') {
+                    if (isDayBoardMode(viewMode) && isBoardEditable && eventItem.kind !== 'blocked') {
                       handleMouseDown(mouseEvent, eventItem.id, true);
                     }
                   }}
