@@ -267,6 +267,8 @@ export default function SchedulerGrid({
   onEventResizeStart,
   onAddSlotHover,
   onSlotRangeSelect,
+  onColumnHeaderClick,
+  onColumnHeaderContextMenu,
 }: SchedulerGridProps) {
   const [hoveredSlot, setHoveredSlot] = useState<SchedulerSlot | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<{ x: number; y: number; label: string } | null>(null);
@@ -276,7 +278,7 @@ export default function SchedulerGrid({
   const slotsPerHour = 60 / slotMinutes;
   const slotCount = Math.max(1, Math.round(((endHour - startHour) * 60) / slotMinutes));
   const gridTemplateColumns = useMemo(
-    () => `${timeColumnWidth}px repeat(${Math.max(columns.length, 1)}, minmax(${Math.max(50, staffColumnWidth)}px, 1fr))`,
+    () => `${timeColumnWidth}px repeat(${Math.max(columns.length, 1)}, ${Math.max(50, staffColumnWidth)}px)`,
     [columns.length, staffColumnWidth, timeColumnWidth]
   );
   const visibleDateKey = getRiyadhDateKey(boardCurrentTime);
@@ -469,8 +471,8 @@ export default function SchedulerGrid({
   }, [columns, events, slotMinutes]);
 
   return (
-    <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="sticky top-0 z-30 grid border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm" style={{ gridTemplateColumns }}>
+    <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-x-auto">
+      <div className="sticky top-0 z-30 grid border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
         <div
           className="flex items-center justify-center border-r border-slate-200 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 bg-slate-50"
           style={{ width: timeColumnWidth }}
@@ -523,7 +525,7 @@ export default function SchedulerGrid({
         );})}
       </div>
 
-      <div className="relative" style={{ minHeight: `${slotCount * slotHeight}px` }}>
+      <div className="relative" style={{ minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}>
         {currentTimeLinePosition !== null && (
           <div
             className="pointer-events-none absolute inset-x-0 z-20"
@@ -554,7 +556,7 @@ export default function SchedulerGrid({
               <div
                 key={row.slotIndex}
                 className="grid"
-                style={{ gridTemplateColumns, height: `${slotHeight}px` }}
+                style={{ gridTemplateColumns, height: `${slotHeight}px`, minWidth: 'min-content' }}
               >
                 <div
                   className={`relative flex items-start justify-center pr-2 text-[10px] font-black font-mono tracking-tight text-slate-400 bg-slate-50/60 border-r border-slate-200 ${hourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80'}`}
