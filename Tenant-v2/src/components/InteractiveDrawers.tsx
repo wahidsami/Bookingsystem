@@ -120,6 +120,17 @@ interface StagedService {
   notes: string;
 }
 
+interface QueuedServiceEditDraft {
+  serviceId: string;
+  variantId: string;
+  staffId: string;
+  startTime: number;
+  duration: number;
+  discountType: 'none' | 'flat' | 'percent';
+  discountValue: number;
+  notes: string;
+}
+
 interface CartItem {
   id: string;
   type: 'product' | 'giftcard';
@@ -445,19 +456,70 @@ export default function InteractiveDrawers({
   const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
   const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
   const [currentServiceNotes, setCurrentServiceNotes] = useState<string>('');
+  const [serviceSearch, setServiceSearch] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
+  const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
+  const [editingQueueDraft, setEditingQueueDraft] = useState<QueuedServiceEditDraft | null>(null);
   const canonicalServices = useMemo<ServiceRecord[]>(() => services.map((service) => normalizeServiceRecord(service)), [services]);
   const serviceCategories = useMemo(() => groupServicesByCategory(canonicalServices), [canonicalServices]);
+  const serviceCategoryTabs = useMemo(() => {
+    return [
+      { key: 'all', labelAr: 'الكل', labelEn: 'All' },
+      ...serviceCategories.map((group) => ({
+        key: group.key,
+        labelAr: group.labelAr,
+        labelEn: group.labelEn
+      }))
+    ];
+  }, [serviceCategories]);
   const selectedCategoryGroup = useMemo(() => {
     if (!serviceCategories.length) {
       return null;
     }
 
+    if (currentServiceCategory === 'all' || !currentServiceCategory) {
+      return {
+        key: 'all',
+        labelAr: 'الكل',
+        labelEn: 'All',
+        services: canonicalServices
+      };
+    }
+
     return serviceCategories.find((group) => group.key === currentServiceCategory)
       || serviceCategories[0]
       || null;
-  }, [serviceCategories, currentServiceCategory]);
+  }, [canonicalServices, currentServiceCategory, serviceCategories]);
   const categoryServices = selectedCategoryGroup?.services || [];
+  const filteredCategoryServices = useMemo(() => {
+    const query = serviceSearch.trim().toLowerCase();
+    if (!query) {
+      return categoryServices;
+    }
+
+    return categoryServices.filter((service) => {
+      const searchableValues = [
+        getServiceDisplayName(service, isRtl ? 'ar' : 'en'),
+        service.category,
+        service.categoryAr,
+        service.categoryEn,
+        service.parentName,
+        service.parentService,
+        service.descriptionAr,
+        service.descriptionEn,
+        service.description,
+        ...(Array.isArray(service.variants) ? service.variants.flatMap((variant) => [
+          variant.nameAr,
+          variant.nameEn,
+          variant.descriptionAr,
+          variant.descriptionEn,
+          variant.description
+        ]) : [])
+      ];
+
+      return searchableValues.some((value) => `${value ?? ''}`.toLowerCase().includes(query));
+    });
+  }, [categoryServices, isRtl, serviceSearch]);
   const selectedService = useMemo(() => {
     if (!canonicalServices.length) {
       return null;
@@ -495,6 +557,16 @@ export default function InteractiveDrawers({
   }, [canonicalServices, currentServiceId]);
 
   useEffect(() => {
+    if (serviceCategories.length === 0) {
+      return;
+    }
+
+    if (!currentServiceCategory) {
+      setCurrentServiceCategory('all');
+    }
+  }, [currentServiceCategory, serviceCategories.length]);
+
+  useEffect(() => {
     if (selectedService?.category || selectedService?.categoryEn || selectedService?.categoryAr) {
       const nextCategory = selectedService.category || selectedService.categoryEn || selectedService.categoryAr || '';
       if (nextCategory && nextCategory !== currentServiceCategory) {
@@ -518,6 +590,102 @@ export default function InteractiveDrawers({
     const nextDuration = selectedService?.duration || 60;
     setCurrentDuration((current) => (current === nextDuration ? current : nextDuration));
   }, [selectedService, selectedVariant, currentVariantId]);
+
+  const openQueuedServiceEditor = (index: number) => {
+    const service = stagedServices[index];
+    if (!service) {
+      return;
+    }
+
+    const resolvedService = canonicalServices.find((entry) => entry.id === service.serviceId) || null;
+    const resolvedVariant = resolvedService?.variants?.find((variant) => variant.id === service.variantId) || null;
+
+    setEditingQueueIndex(index);
+    setEditingQueueDraft({
+      serviceId: service.serviceId,
+      variantId: service.variantId || '',
+      staffId: service.staffId || currentStaffId || availableStylists[0]?.id || '',
+      startTime: service.startTime,
+      duration: service.duration || resolvedVariant?.duration || resolvedService?.duration || 60,
+      discountType: service.discountType || 'none',
+      discountValue: service.discountValue || 0,
+      notes: service.notes || ''
+    });
+  };
+
+  const closeQueuedServiceEditor = () => {
+    setEditingQueueIndex(null);
+    setEditingQueueDraft(null);
+  };
+
+  const applyQueuedServiceEdit = () => {
+    if (editingQueueIndex === null || !editingQueueDraft) {
+      return;
+    }
+
+    const resolvedService = canonicalServices.find((entry) => entry.id === editingQueueDraft.serviceId) || null;
+    if (!resolvedService) {
+      return;
+    }
+
+    if (resolvedService.employeeAssignments?.length && editingQueueDraft.staffId && !resolvedService.employeeAssignments.includes(editingQueueDraft.staffId)) {
+      setShowAssignWarning(true);
+      return;
+    }
+
+    const resolvedVariant = resolvedService.variants?.find((variant) => variant.id === editingQueueDraft.variantId) || null;
+    const sanitizedDuration = Math.max(
+      5,
+      Math.round(Number(editingQueueDraft.duration || 0)) || resolvedVariant?.duration || resolvedService.duration || 30
+    );
+    const sanitizedStartTime = Math.max(0, Math.round(Number(editingQueueDraft.startTime || 0)));
+    const sanitizedDiscountValue = editingQueueDraft.discountType === 'none'
+      ? 0
+      : Math.max(0, Number(editingQueueDraft.discountValue || 0));
+
+    setStagedServices((current) => {
+      const next = [...current];
+      if (!next[editingQueueIndex]) {
+        return current;
+      }
+
+      next[editingQueueIndex] = {
+        ...next[editingQueueIndex],
+        serviceId: resolvedService.id,
+        variantId: resolvedVariant?.id || undefined,
+        serviceCategory: resolvedService.category,
+        staffId: editingQueueDraft.staffId || currentStaffId,
+        startTime: sanitizedStartTime,
+        duration: sanitizedDuration,
+        discountType: editingQueueDraft.discountType,
+        discountValue: sanitizedDiscountValue,
+        notes: editingQueueDraft.notes
+      };
+
+      for (let index = editingQueueIndex + 1; index < next.length; index += 1) {
+        const previousItem = next[index - 1];
+        next[index] = {
+          ...next[index],
+          startTime: previousItem.startTime + previousItem.duration
+        };
+      }
+
+      return next;
+    });
+
+    if (editingQueueIndex === 0) {
+      setCurrentStartTime(sanitizedStartTime);
+      setCurrentStaffId(editingQueueDraft.staffId || currentStaffId);
+    }
+
+    setCurrentDuration(sanitizedDuration);
+    setCurrentVariantId(resolvedVariant?.id || '');
+    setCurrentDiscountType(editingQueueDraft.discountType);
+    setCurrentDiscountValue(sanitizedDiscountValue);
+    setCurrentServiceNotes(editingQueueDraft.notes);
+    setEditingQueueIndex(null);
+    setEditingQueueDraft(null);
+  };
 
   useEffect(() => {
     if (customers.length > 0) {
@@ -672,9 +840,9 @@ export default function InteractiveDrawers({
     }
   }, [currentServiceId, currentStaffId, createStep, isCreateDrawerOpen, canonicalServices]);
 
-  const handleAddStagedService = () => {
-    const resolvedServiceId = `${currentServiceId || ''}`.trim();
-    const srv = canonicalServices.find(s => s.id === resolvedServiceId);
+  const handleAddStagedService = (serviceOverride?: ServiceRecord) => {
+    const resolvedServiceId = `${serviceOverride?.id || currentServiceId || ''}`.trim();
+    const srv = serviceOverride || canonicalServices.find(s => s.id === resolvedServiceId);
     if (!srv) return;
 
     if (srv.employeeAssignments && !srv.employeeAssignments.includes(currentStaffId)) {
@@ -682,7 +850,9 @@ export default function InteractiveDrawers({
       return;
     }
 
-    const resolvedVariant = srv.variants.find((variant) => variant.id === currentVariantId) || srv.variants[0] || null;
+    const resolvedVariant = serviceOverride
+      ? null
+      : srv.variants.find((variant) => variant.id === currentVariantId) || srv.variants[0] || null;
 
     let nextStartTime = currentStartTime;
     if (stagedServices.length > 0) {
@@ -697,10 +867,10 @@ export default function InteractiveDrawers({
       serviceCategory: srv.category,
       staffId: currentStaffId,
       startTime: nextStartTime,
-      duration: resolvedVariant?.duration || currentDuration,
-      discountType: currentDiscountType,
-      discountValue: currentDiscountValue,
-      notes: currentServiceNotes,
+      duration: resolvedVariant?.duration || serviceOverride?.duration || currentDuration,
+      discountType: serviceOverride ? 'none' : currentDiscountType,
+      discountValue: serviceOverride ? 0 : currentDiscountValue,
+      notes: serviceOverride ? '' : currentServiceNotes,
     };
 
     setStagedServices(prev => [...prev, newItem]);
@@ -710,6 +880,10 @@ export default function InteractiveDrawers({
       `Service "${isRtl ? srv.nameAr : srv.nameEn}" added to session queue.`,
       'success'
     );
+  };
+
+  const handleQuickAddService = (service: ServiceRecord) => {
+    handleAddStagedService(service);
   };
 
   const handleConfirmAppointmentCreation = async () => {
@@ -1884,207 +2058,482 @@ export default function InteractiveDrawers({
                     )}
 
                     {createStep === 3 && (
-                      <div className="space-y-4 animate-fadeIn text-xs">
-                        <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
-                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-                            <div className="space-y-2">
-                              <label className="text-slate-500 block mb-1">{isRtl ? 'الفئة' : 'Category'}</label>
-                              <div className="space-y-2">
-                                {serviceCategories.map((group) => {
-                                  const active = group.key === selectedCategoryGroup?.key;
+                      <div className="space-y-5 animate-fadeIn text-xs">
+                        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                          <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+                            <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/70">
+                                    {isRtl ? 'خدمات الحجز' : 'Appointment service browser'}
+                                  </p>
+                                  <h4 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+                                    {isRtl ? 'أضف الخدمات بنقرة واحدة' : 'Add services with one click'}
+                                  </h4>
+                                  <p className="mt-1 text-sm text-slate-500">
+                                    {isRtl
+                                      ? 'ابحث، اختر الفئة، ثم أضف الخدمة مباشرة إلى جلسة الموعد.'
+                                      : 'Search, filter by category, then add each service directly to the session queue.'}
+                                  </p>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                    {isRtl ? 'الخدمات في الجلسة' : 'Queued services'}
+                                  </p>
+                                  <p className="mt-1 text-lg font-semibold text-slate-900">{stagedServices.length}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-4 p-5 sm:p-6">
+                              <div className="relative">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                  type="text"
+                                  value={serviceSearch}
+                                  onChange={(e) => setServiceSearch(e.target.value)}
+                                  placeholder={isRtl ? 'ابحث عن الخدمة أو الفئة...' : 'Search by service or category...'}
+                                  className="w-full rounded-[20px] border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
+                                />
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                {serviceCategoryTabs.map((tab) => {
+                                  const active = currentServiceCategory === tab.key || (!currentServiceCategory && tab.key === 'all');
                                   return (
                                     <button
-                                      key={group.key}
+                                      key={tab.key}
                                       type="button"
-                                      onClick={() => {
-                                        setCurrentServiceCategory(group.key);
-                                        const firstService = group.services[0];
-                                        if (firstService) {
-                                          setCurrentServiceId(firstService.id);
-                                          setCurrentVariantId(firstService.variants?.[0]?.id || '');
-                                          setCurrentDuration(firstService.variants?.[0]?.duration || firstService.duration || 60);
-                                        }
-                                      }}
-                                      className={`w-full text-left rounded-xl border p-3 transition-all ${
-                                        active ? 'bg-indigo-50 border-indigo-200 shadow-2xs' : 'bg-white border-slate-200 hover:border-slate-300'
+                                      onClick={() => setCurrentServiceCategory(tab.key)}
+                                      className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                                        active
+                                          ? 'border-primary bg-primary/5 text-primary shadow-sm'
+                                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                                       }`}
                                     >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <span className="font-black text-slate-800 text-xs truncate">{isRtl ? group.labelAr : group.labelEn}</span>
-                                        <span className="text-[10px] font-bold text-slate-400">{group.services.length}</span>
-                                      </div>
+                                      {isRtl ? tab.labelAr : tab.labelEn}
                                     </button>
                                   );
                                 })}
                               </div>
+
+                              {filteredCategoryServices.length > 0 ? (
+                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                                  {filteredCategoryServices.map((service) => {
+                                    const displayPrice = getServiceDisplayPrice(service);
+                                    const serviceVariants = Array.isArray(service.variants) ? service.variants : [];
+                                    const serviceName = getServiceDisplayName(service, isRtl ? 'ar' : 'en');
+                                    const serviceCategoryLabel = (service.category || service.parentName || service.parentService || service.categoryAr || service.categoryEn || '').trim();
+                                    const hasAssignments = Array.isArray(service.employeeAssignments) && service.employeeAssignments.length > 0;
+                                    return (
+                                      <article
+                                        key={service.id}
+                                        className="group overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+                                      >
+                                        <div className="flex h-full flex-col gap-4 p-4 sm:p-5">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                              <p className="truncate text-lg font-semibold tracking-tight text-slate-900">{serviceName}</p>
+                                              <div className="mt-2 flex flex-wrap gap-2">
+                                                {serviceCategoryLabel ? (
+                                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                                                    {serviceCategoryLabel}
+                                                  </span>
+                                                ) : null}
+                                                <span className="rounded-full bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                                                  {serviceVariants.length > 0
+                                                    ? (isRtl ? `${serviceVariants.length} بديل` : `${serviceVariants.length} variants`)
+                                                    : (isRtl ? 'خدمة مباشرة' : 'Direct service')}
+                                                </span>
+                                              </div>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleQuickAddService(service)}
+                                              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+                                            >
+                                              <PlusCircle className="h-4 w-4" />
+                                              <span>{isRtl ? 'إضافة' : 'Add'}</span>
+                                            </button>
+                                          </div>
+
+                                          <div className="grid gap-3 sm:grid-cols-2">
+                                            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                                              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">{isRtl ? 'المدة' : 'Duration'}</p>
+                                              <p className="mt-1 text-lg font-semibold text-slate-900">{service.duration} {isRtl ? 'دقيقة' : 'min'}</p>
+                                            </div>
+                                            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                                              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">{isRtl ? 'السعر' : 'Price'}</p>
+                                              <p className="mt-1 text-lg font-semibold text-slate-900">{Number(displayPrice || 0).toFixed(2)} SAR</p>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
+                                            <span className="truncate">
+                                              {hasAssignments
+                                                ? (isRtl ? 'متاح لأخصائيات محددات' : 'Available with assigned staff')
+                                                : (isRtl ? 'يتبع إعدادات التعيين التلقائي' : 'Uses the default assignment rules')}
+                                            </span>
+                                            <span className="font-semibold text-slate-400">
+                                              {isRtl ? 'بطاقة جاهزة للإضافة' : 'Ready to add'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </article>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
+                                  {serviceSearch.trim()
+                                    ? (isRtl ? 'لا توجد خدمات مطابقة للبحث الحالي.' : 'No services match the current search.')
+                                    : (isRtl ? 'لا توجد خدمات ضمن هذه الفئة.' : 'No services available in this category.')}
+                                </div>
+                              )}
+                            </div>
+                          </section>
+
+                          <aside className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+                            <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/70">
+                                    {isRtl ? 'جلسة الموعد' : 'Appointment session'}
+                                  </p>
+                                  <h4 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+                                    {isRtl ? 'قائمة الخدمات المختارة' : 'Selected service queue'}
+                                  </h4>
+                                  <p className="mt-1 text-sm text-slate-500">
+                                    {isRtl
+                                      ? 'أضف الخدمات ثم عدّل ما يلزم فقط.'
+                                      : 'Add services first, then edit only what needs to change.'}
+                                  </p>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-left">
+                                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{isRtl ? 'خدمات' : 'Items'}</p>
+                                    <p className="mt-1 text-base font-semibold text-slate-900">{stagedServices.length}</p>
+                                  </div>
+                                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{isRtl ? 'مدة' : 'Duration'}</p>
+                                    <p className="mt-1 text-base font-semibold text-slate-900">
+                                      {stagedServices.reduce((sum, item) => sum + item.duration, 0)} {isRtl ? 'د' : 'm'}
+                                    </p>
+                                  </div>
+                                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{isRtl ? 'إجمالي' : 'Total'}</p>
+                                    <p className="mt-1 text-base font-semibold text-slate-900">
+                                      {stagedServices.reduce((sum, item) => {
+                                        const service = canonicalServices.find((entry) => entry.id === item.serviceId);
+                                        const variant = service?.variants?.find((entry) => entry.id === item.variantId) || service?.variants?.[0] || null;
+                                        const basePrice = toMoney(variant?.finalPrice ?? service?.finalPrice ?? service?.price ?? 0);
+                                        let finalPrice = basePrice;
+                                        if (item.discountType === 'flat') {
+                                          finalPrice = Math.max(0, basePrice - item.discountValue);
+                                        } else if (item.discountType === 'percent') {
+                                          finalPrice = Math.max(0, basePrice - (basePrice * item.discountValue) / 100);
+                                        }
+                                        return sum + finalPrice;
+                                      }, 0).toFixed(2)} SAR
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="space-y-2 lg:col-span-8">
-                              <div className="flex items-center justify-between gap-2">
-                                <label className="text-slate-500 block mb-1">{isRtl ? 'الخدمات والبدائل' : 'Services & Variants'}</label>
-                                <span className="text-[10px] font-bold text-slate-400">
-                                  {categoryServices.length} {isRtl ? 'خدمة' : 'services'}
-                                </span>
-                              </div>
-                              <div className="space-y-2 max-h-[28rem] overflow-y-auto pr-1">
-                                {categoryServices.map((service) => {
-                                  const activeService = service.id === currentServiceId;
-                                  const displayPrice = getServiceDisplayPrice(service);
-                                  const serviceVariants = Array.isArray(service.variants) ? service.variants : [];
+                            <div className="space-y-4 p-5 sm:p-6">
+                              {stagedServices.length > 0 ? (
+                                stagedServices.map((item, index) => {
+                                  const service = canonicalServices.find((entry) => entry.id === item.serviceId) || null;
+                                  const variant = service?.variants?.find((entry) => entry.id === item.variantId) || null;
+                                  const staff = availableStylists.find((stylist) => stylist.id === item.staffId) || null;
+                                  const isEditing = editingQueueIndex === index && editingQueueDraft !== null;
+                                  const editDraft = editingQueueDraft;
+                                  const basePrice = toMoney(variant?.finalPrice ?? service?.finalPrice ?? service?.price ?? 0);
+                                  const discountedPrice = item.discountType === 'flat'
+                                    ? Math.max(0, basePrice - item.discountValue)
+                                    : item.discountType === 'percent'
+                                      ? Math.max(0, basePrice - (basePrice * item.discountValue) / 100)
+                                      : basePrice;
+                                  const isCompact = item.duration <= 30;
+                                  const variantOptions = service?.variants || [];
                                   return (
                                     <div
-                                      key={service.id}
-                                      className={`rounded-2xl border p-3 transition-all ${
-                                        activeService ? 'bg-amber-50 border-amber-200 shadow-2xs' : 'bg-white border-slate-200 hover:border-slate-300'
+                                      key={item.id}
+                                      className={`overflow-hidden rounded-[24px] border bg-white shadow-sm transition ${
+                                        isEditing ? 'border-primary/30 ring-1 ring-primary/15' : 'border-slate-200 hover:border-primary/30'
                                       }`}
                                     >
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setCurrentServiceId(service.id);
-                                          const initialVariant = serviceVariants[0] || null;
-                                          setCurrentVariantId(initialVariant?.id || '');
-                                          setCurrentDuration(initialVariant?.duration || service.duration || 60);
-                                        }}
-                                        className="w-full text-left"
-                                      >
-                                        <div className="flex items-start justify-between gap-2">
-                                          <div className="min-w-0">
-                                            <p className="font-black text-slate-800 text-xs truncate">{getServiceDisplayName(service, isRtl ? 'ar' : 'en')}</p>
-                                            <p className="text-[10px] text-slate-500 truncate">
-                                              {service.duration} {isRtl ? 'دقيقة' : 'min'} • {serviceVariants.length || 0} {isRtl ? 'بديل' : 'variants'}
-                                            </p>
+                                      <div className={`flex items-start gap-3 p-4 ${isCompact ? 'sm:p-4' : 'sm:p-5'}`}>
+                                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-[11px] font-black text-white">
+                                            #{index + 1}
                                           </div>
-                                          <span className="font-mono font-black text-slate-700 whitespace-nowrap">
-                                            {displayPrice.toFixed(2)} SAR
-                                          </span>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-start justify-between gap-2">
+                                              <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-slate-900">
+                                                  {isRtl ? service?.nameAr || service?.nameEn || item.serviceId : service?.nameEn || service?.nameAr || item.serviceId}
+                                                </p>
+                                                <p className="mt-1 truncate text-[11px] text-slate-500">
+                                                  {service?.category || service?.categoryAr || service?.categoryEn || ''}
+                                                  {variant?.description ? ` • ${variant.description}` : ''}
+                                                </p>
+                                              </div>
+                                              <div className="text-right">
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                  {isRtl ? 'السعر' : 'Price'}
+                                                </p>
+                                                <p className="font-mono text-sm font-semibold text-slate-900">{discountedPrice.toFixed(2)} SAR</p>
+                                              </div>
+                                            </div>
+
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                                {isRtl ? 'الموظف' : 'Stylist'}: {staff ? (isRtl ? staff.nameAr : staff.nameEn) : (isRtl ? 'تعيين تلقائي' : 'Auto assign')}
+                                              </span>
+                                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                                {isRtl ? 'الوقت' : 'Start'}: {formatMinutesToTime(item.startTime)}
+                                              </span>
+                                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                                {isRtl ? 'المدة' : 'Duration'}: {item.duration} {isRtl ? 'دقيقة' : 'min'}
+                                              </span>
+                                              {variant ? (
+                                                <span className="rounded-full bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                                                  {isRtl ? 'بديل' : 'Variant'}: {isRtl ? variant.nameAr || variant.nameEn : variant.nameEn || variant.nameAr}
+                                                </span>
+                                              ) : (
+                                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                                                  {isRtl ? 'بدون بديل' : 'No variant selected'}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
                                         </div>
-                                      </button>
 
-                                      {serviceVariants.length > 0 && (
-                                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                          {serviceVariants.map((variant: any) => {
-                                            const active = `${variant.id}` === currentVariantId && service.id === currentServiceId;
-                                            const variantNameAr = variant.nameAr || variant.name_ar || service.nameAr || '';
-                                            const variantNameEn = variant.nameEn || variant.name_en || service.nameEn || '';
-                                            const variantPrice = Number(variant.finalPrice ?? variant.price ?? displayPrice ?? 0);
-                                            const variantDuration = Number(variant.duration ?? service.duration ?? 60);
-                                            const variantStaffNames = availableStylists
-                                              .filter((staff) => !service || !Array.isArray(service.employeeAssignments) || service.employeeAssignments.includes(staff.id))
-                                              .map((staff) => (isRtl ? staff.nameAr : staff.nameEn))
-                                              .slice(0, 3)
-                                              .join(' • ');
+                                        <div className="flex shrink-0 flex-col gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => (isEditing ? closeQueuedServiceEditor() : openQueuedServiceEditor(index))}
+                                            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50"
+                                          >
+                                            {isEditing ? (isRtl ? 'إغلاق' : 'Close') : (isRtl ? 'تعديل' : 'Edit')}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setStagedServices((current) => current.filter((_, currentIndex) => currentIndex !== index))}
+                                            className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-red-200 hover:text-red-600"
+                                          >
+                                            <Trash className="h-4 w-4" />
+                                          </button>
+                                        </div>
+                                      </div>
 
-                                            return (
-                                              <button
-                                                key={variant.id}
-                                                type="button"
-                                                onClick={() => {
-                                                  setCurrentServiceId(service.id);
-                                                  setCurrentVariantId(variant.id);
-                                                  setCurrentDuration(variantDuration);
-                                                }}
-                                                className={`rounded-xl border p-2.5 text-left transition-all ${
-                                                  active ? 'bg-emerald-50 border-emerald-200 shadow-2xs' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                                                }`}
-                                              >
-                                                <div className="flex items-start justify-between gap-2">
-                                                  <div className="min-w-0">
-                                                    <p className="font-black text-slate-800 text-[11px] truncate">{isRtl ? variantNameAr : variantNameEn}</p>
-                                                    <p className="text-[10px] text-slate-500 truncate">
-                                                      {variantDuration} {isRtl ? 'دقيقة' : 'min'} • {variantStaffNames || (isRtl ? 'لم يتم التعيين بعد' : 'No staff assigned yet')}
-                                                    </p>
-                                                  </div>
-                                                  <span className="font-mono font-black text-slate-700 whitespace-nowrap text-[11px]">
-                                                    {variantPrice.toFixed(2)} SAR
+                                      <AnimatePresence>
+                                        {isEditing && editDraft ? (
+                                          <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.18 }}
+                                            className="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-5"
+                                          >
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                              <label className="block">
+                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                  {isRtl ? 'البديل' : 'Variant'}
+                                                </span>
+                                                <select
+                                                  value={editDraft.variantId}
+                                                  onChange={(event) => {
+                                                    const nextVariantId = event.target.value;
+                                                    const nextVariant = variantOptions.find((variantItem) => variantItem.id === nextVariantId) || null;
+                                                    setEditingQueueDraft((current) => current ? ({
+                                                      ...current,
+                                                      variantId: nextVariantId,
+                                                      duration: nextVariant?.duration || service?.duration || current.duration
+                                                    }) : current);
+                                                  }}
+                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
+                                                >
+                                                  <option value="">{isRtl ? 'الخدمة الأساسية' : 'Base service'}</option>
+                                                  {variantOptions.map((variantItem) => (
+                                                    <option key={variantItem.id} value={variantItem.id}>
+                                                      {(isRtl ? variantItem.nameAr || variantItem.nameEn : variantItem.nameEn || variantItem.nameAr) || variantItem.description || variantItem.id}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </label>
+
+                                              <label className="block">
+                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                  {isRtl ? 'أخصائية التجميل' : 'Stylist'}
+                                                </span>
+                                                <select
+                                                  value={editDraft.staffId}
+                                                  onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, staffId: event.target.value }) : current)}
+                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
+                                                >
+                                                  {availableStylists.map((stylist) => (
+                                                    <option key={stylist.id} value={stylist.id}>
+                                                      {isRtl ? stylist.nameAr : stylist.nameEn}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </label>
+
+                                              <label className="block">
+                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                  {isRtl ? 'وقت البدء' : 'Start time'}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                  <input
+                                                    type="number"
+                                                    step={15}
+                                                    min={0}
+                                                    value={editDraft.startTime}
+                                                    onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, startTime: Number(event.target.value) || 0 }) : current)}
+                                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-mono font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
+                                                  />
+                                                  <span className="min-w-[4.5rem] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold text-slate-500">
+                                                    {formatMinutesToTime(editDraft.startTime)}
                                                   </span>
                                                 </div>
-                                                <div className="text-[10px] text-slate-500 mt-1">
-                                                  {isRtl ? 'ينتهي عند' : 'Estimated finish'}: {formatMinutesToTime(currentStartTime + variantDuration)}
-                                                </div>
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
+                                              </label>
+
+                                              <label className="block">
+                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                  {isRtl ? 'المدة' : 'Duration'}
+                                                </span>
+                                                <input
+                                                  type="number"
+                                                  step={5}
+                                                  min={5}
+                                                  value={editDraft.duration}
+                                                  onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, duration: Math.max(5, Number(event.target.value) || 0) }) : current)}
+                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-mono font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
+                                                />
+                                              </label>
+                                            </div>
+
+                                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                              <label className="block">
+                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                  {isRtl ? 'نوع الخصم' : 'Discount type'}
+                                                </span>
+                                                <select
+                                                  value={editDraft.discountType}
+                                                  onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, discountType: event.target.value as QueuedServiceEditDraft['discountType'], discountValue: event.target.value === 'none' ? 0 : current.discountValue }) : current)}
+                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
+                                                >
+                                                  <option value="none">{isRtl ? 'بدون خصم' : 'No discount'}</option>
+                                                  <option value="flat">{isRtl ? 'قيمة ثابتة' : 'Fixed amount'}</option>
+                                                  <option value="percent">{isRtl ? 'نسبة مئوية' : 'Percent'}</option>
+                                                </select>
+                                              </label>
+
+                                              <label className="block">
+                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                  {isRtl ? 'قيمة الخصم' : 'Discount value'}
+                                                </span>
+                                                <input
+                                                  type="number"
+                                                  min={0}
+                                                  step={0.5}
+                                                  disabled={editDraft.discountType === 'none'}
+                                                  value={editDraft.discountValue}
+                                                  onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, discountValue: Number(event.target.value) || 0 }) : current)}
+                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-mono font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-slate-100"
+                                                />
+                                              </label>
+                                            </div>
+
+                                            <label className="mt-3 block">
+                                              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                {isRtl ? 'ملاحظات' : 'Notes'}
+                                              </span>
+                                              <textarea
+                                                rows={3}
+                                                value={editDraft.notes}
+                                                onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, notes: event.target.value }) : current)}
+                                                placeholder={isRtl ? 'تفضيلات، ملاحظات، أو تعليمات خاصة...' : 'Preferences, notes, or special instructions...'}
+                                                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
+                                              />
+                                            </label>
+
+                                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                              <div className="space-y-1 text-[11px] text-slate-600">
+                                                <p className="font-semibold text-slate-900">
+                                                  {isRtl ? 'السعر الحالي' : 'Current price'}: {Number(discountedPrice || 0).toFixed(2)} SAR
+                                                </p>
+                                                <p>
+                                                  {isRtl ? 'تحديث هذا الكارت لا يغيّر البنية الخلفية أو payload.' : 'Updating this card does not change the backend contract or payload shape.'}
+                                                </p>
+                                              </div>
+                                              <div className="flex flex-wrap gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={closeQueuedServiceEditor}
+                                                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                                                >
+                                                  {isRtl ? 'إلغاء' : 'Cancel'}
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={applyQueuedServiceEdit}
+                                                  className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                                                >
+                                                  {isRtl ? 'حفظ' : 'Save'}
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </motion.div>
+                                        ) : null}
+                                      </AnimatePresence>
                                     </div>
                                   );
-                                })}
-                              </div>
+                                })
+                              ) : (
+                                <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
+                                  {isRtl
+                                    ? 'ابدأ بإضافة خدمة من الجانب الأيسر، وستظهر هنا كعناصر منفصلة في جلسة الموعد.'
+                                    : 'Start by adding a service from the left side. It will appear here as a separate appointment card.'}
+                                </div>
+                              )}
                             </div>
-                          </div>
+                          </aside>
+                        </div>
 
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-slate-500 block mb-1">{isRtl ? 'أخصائية التجميل' : 'Assign Stylist'}</label>
-                              <select value={currentStaffId} onChange={(e) => setCurrentStaffId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold">
-                                {availableStylists.map(st => (
-                                  <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-slate-500 block mb-1">{isRtl ? 'وقت البدء' : 'Start Time'}</label>
-                              <div className="flex items-center gap-1">
-                                <input type="number" step={15} value={currentStartTime} onChange={(e) => setCurrentStartTime(parseInt(e.target.value) || 0)} className="w-16 bg-slate-50 border rounded p-1 text-center font-mono font-bold" />
-                                <span className="text-[10px] font-mono text-zinc-500">{formatMinutesToTime(currentStartTime)}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-slate-500 block mb-1">{isRtl ? 'المدة المختارة بالدقائق' : 'Selected Duration (mins)'}</label>
-                              <input
-                                type="number"
-                                step={15}
-                                value={currentDuration}
-                                readOnly={Boolean(selectedVariant)}
-                                onChange={(e) => setCurrentDuration(parseInt(e.target.value) || 60)}
-                                className={`w-full bg-slate-50 border rounded p-1 font-mono text-center font-bold ${selectedVariant ? 'cursor-not-allowed text-slate-500' : ''}`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-slate-500 block mb-1">{isRtl ? 'السعر الحالي' : 'Selected Price'}</label>
-                              <div className="w-full bg-slate-50 border rounded p-2 font-mono font-black text-center text-slate-800">
-                                {Number(selectedBookablePrice || 0).toFixed(2)} SAR
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-end pt-2">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setCreateStep(2)}
+                            disabled={stagedServices.length === 0}
+                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isRtl ? 'السابق' : 'Previous'}
+                          </button>
+                          <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
                             <button
                               type="button"
-                              onClick={handleAddStagedService}
-                              className="py-1.5 px-3 bg-zinc-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                              onClick={() => {
+                                if (stagedServices.length === 0) {
+                                  addLocalToast(
+                                    isRtl ? 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة' : 'Please add at least one service before opening the invoice step',
+                                    isRtl ? 'Please add at least one service before opening the invoice step' : 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
+                                    'warning'
+                                  );
+                                  return;
+                                }
+                                setCreateStep(4);
+                              }}
+                              disabled={stagedServices.length === 0}
+                              className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              <span>+ {isRtl ? 'إدراج لسلسة الخدمات للجلسة' : 'Add to Session Queue'}</span>
+                              {isRtl ? 'التالي' : 'Next'}
                             </button>
                           </div>
                         </div>
-
-                        {/* Staged list */}
-                        {stagedServices.length > 0 && (
-                          <div className="p-3 bg-slate-100 border rounded-xl space-y-2">
-                            <span className="font-bold text-slate-700 block">{isRtl ? 'الخدمات المضافة للجلسة الكلية' : 'Staged Services'}</span>
-                            {stagedServices.map((item, index) => {
-                              const s = canonicalServices.find(srv => srv.id === item.serviceId);
-                              const variant = s?.variants.find((entry) => entry.id === item.variantId) || s?.variants[0] || null;
-                              const staff = availableStylists.find(st => st.id === item.staffId);
-                              return (
-                                <div key={item.id} className="p-2 bg-white rounded-lg border flex items-center justify-between text-xs">
-                                  <div>
-                                    <p className="font-bold">#{index+1} {isRtl ? s?.nameAr : s?.nameEn}{variant ? ` / ${isRtl ? variant.nameAr : variant.nameEn}` : ''}</p>
-                                    <p className="text-[10px] text-slate-400">⏱️ {formatMinutesToTime(item.startTime)} | {isRtl ? staff?.nameAr : staff?.nameEn}</p>
-                                  </div>
-                                  <button type="button" onClick={() => setStagedServices(prev => prev.filter(p => p.id !== item.id))} className="text-rose-500 p-1">
-                                    <Trash size={12} />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
                     )}
 
