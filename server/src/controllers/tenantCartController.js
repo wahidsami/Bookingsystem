@@ -289,8 +289,8 @@ exports.purchaseGiftCard = async (req, res) => {
     const giftTx = await db.TenantGiftCardTransaction.create({
       tenantId,
       packageId: giftPackage.id,
-      senderPlatformUserId: senderId,
-      recipientPlatformUserId: recipient?.id || null,
+      senderPlatformUserId: null, // Tenant operators are not Platform Users
+      recipientPlatformUserId: recipient.id,
       recipientEmail: normalizedEmail || null,
       recipientPhone: normalizedPhone || null,
       purchaseAmount: giftPackage.priceAmount,
@@ -304,7 +304,7 @@ exports.purchaseGiftCard = async (req, res) => {
       expiresAt,
       deliveryMode: isRefahRecipient ? 'auto_wallet' : 'external_code',
       giftCardCodeId: giftCardCode?.id || null,
-      recipientResolvedPlatformUserId: recipient?.id || null,
+      recipientResolvedPlatformUserId: recipient.id,
       metadata: {
         senderMessage: normalizeText(notes) || null,
         packageTitle,
@@ -330,7 +330,8 @@ exports.purchaseGiftCard = async (req, res) => {
         referenceType: 'tenant_gift_card_transaction',
         referenceId: giftTx.id,
         metadata: {
-          senderId,
+          operatorAccountId: req.tenantAccountId || null,
+          staffId: req.staffId || null,
           senderName: `${req.tenant?.name || req.tenant?.name_en || 'Refah'}`.trim(),
           packageTitle
         },
@@ -367,8 +368,9 @@ exports.purchaseGiftCard = async (req, res) => {
         source: 'gift_card_purchase',
         giftCardTransactionId: giftTx.id,
         tenantId,
-        recipientId: recipient?.id || null,
-        senderId
+        recipientId: recipient.id,
+        operatorAccountId: req.tenantAccountId || null,
+        staffId: req.staffId || null
       }
     }, { transaction: tx, logging: forensicTrace.sqlLogger, forensicTrace });
 
@@ -376,7 +378,7 @@ exports.purchaseGiftCard = async (req, res) => {
     const tenantRevenue = parseFloat((purchaseAmount - platformFee).toFixed(2));
 
     const saleTransaction = await db.Transaction.create({
-      platformUserId: senderId || recipient?.id,
+      platformUserId: recipient.id,
       tenantId: tenantId,
       amount: purchaseAmount,
       currency: 'SAR',

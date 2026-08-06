@@ -209,6 +209,7 @@ module.exports = (sequelize, DataTypes) => {
             } else {
                 console.error('Failed to record revenue for Transaction', error);
             }
+            throw error;
         }
     });
 

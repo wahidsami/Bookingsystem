@@ -200,7 +200,7 @@ module.exports = (sequelize, DataTypes) => {
                 const meta = typeof transaction.metadata === 'string' ? (JSON.parse(transaction.metadata || '{}')) : (transaction.metadata || {});
                 if (meta.isGiftCard || meta.giftCardTransactionId) {
                     tenantId = meta.tenantId || null;
-                    customerId = meta.recipientId || meta.senderId || null;
+                    customerId = meta.recipientId || null;
                     entityType = 'GiftCard';
                     entityId = meta.giftCardTransactionId || transaction.id;
                 }
@@ -237,6 +237,7 @@ module.exports = (sequelize, DataTypes) => {
             } else {
                 console.error('Failed to create FinancialLedgerEntry in PaymentTransaction hook', error);
             }
+            throw error;
         }
     });
 

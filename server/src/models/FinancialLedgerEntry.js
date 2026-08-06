@@ -8,9 +8,9 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'tenantId',
                 as: 'tenant'
             });
-            this.belongsTo(models.Customer, {
+            this.belongsTo(models.PlatformUser, {
                 foreignKey: 'customerId',
-                as: 'customer'
+                as: 'platformUser'
             });
             // polymorphic associations are handled loosely via entityType and entityId
         }
