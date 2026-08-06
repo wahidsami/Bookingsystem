@@ -2,10 +2,10 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    const tableInfo = await queryInterface.describeTable('Tenants');
+    const tableInfo = await queryInterface.describeTable('tenants');
 
     if (!tableInfo.region) {
-      await queryInterface.addColumn('Tenants', 'region', {
+      await queryInterface.addColumn('tenants', 'region', {
         type: Sequelize.STRING,
         allowNull: true,
         comment: 'Administrative Region'
@@ -13,7 +13,7 @@ module.exports = {
     }
 
     if (!tableInfo.nationalAddressDocument) {
-      await queryInterface.addColumn('Tenants', 'nationalAddressDocument', {
+      await queryInterface.addColumn('tenants', 'nationalAddressDocument', {
         type: Sequelize.STRING,
         allowNull: true,
         comment: 'National Address document file path'
@@ -22,14 +22,14 @@ module.exports = {
   },
 
   down: async (queryInterface, Sequelize) => {
-    const tableInfo = await queryInterface.describeTable('Tenants');
+    const tableInfo = await queryInterface.describeTable('tenants');
 
     if (tableInfo.region) {
-      await queryInterface.removeColumn('Tenants', 'region');
+      await queryInterface.removeColumn('tenants', 'region');
     }
 
     if (tableInfo.nationalAddressDocument) {
-      await queryInterface.removeColumn('Tenants', 'nationalAddressDocument');
+      await queryInterface.removeColumn('tenants', 'nationalAddressDocument');
     }
   }
 };
