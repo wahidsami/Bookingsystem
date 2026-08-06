@@ -5317,41 +5317,46 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       </div>
 
                       <div className="space-y-1.5">
-                        {activeInvoiceLineItems.map((item) => (
-                          <div key={item.id} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-[10px] space-y-1">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="font-bold text-slate-800 truncate">
-                                  {isRtl ? item.nameAr : item.nameEn}
-                                </p>
-                                <p className="text-slate-400">
-                                  {isRtl ? 'الموظفة:' : 'Stylist:'} {isRtl ? item.stylistAr || '—' : item.stylistEn || '—'}
-                                </p>
+                        {activeInvoiceLineItems.length > 0 && (() => {
+                          const showQty = activeInvoiceLineItems.some(i => i.type !== 'service');
+                          return activeInvoiceLineItems.map((item) => (
+                            <div key={item.id} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-[10px] space-y-1">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-bold text-slate-800 truncate">
+                                    {isRtl ? item.nameAr : item.nameEn}
+                                  </p>
+                                  <p className="text-slate-400">
+                                    {isRtl ? 'الموظفة:' : 'Stylist:'} {isRtl ? item.stylistAr || '—' : item.stylistEn || '—'}
+                                  </p>
+                                </div>
+                                <span className="font-black text-slate-800 font-mono">
+                                  {item.subtotal.toFixed(2)} {t.riyal}
+                                </span>
                               </div>
-                              <span className="font-black text-slate-800 font-mono">
-                                {item.subtotal.toFixed(2)} {t.riyal}
-                              </span>
+                              <div className={`grid gap-2 text-slate-500 ${showQty ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                                {showQty && (
+                                  <div>
+                                    <p className="uppercase text-[9px] font-bold">{isRtl ? 'الكمية' : 'Qty'}</p>
+                                    <p className="font-mono font-bold text-slate-700">{item.quantity}</p>
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="uppercase text-[9px] font-bold">{isRtl ? 'سعر الوحدة' : 'Unit'}</p>
+                                  <p className="font-mono font-bold text-slate-700">{item.unitPrice.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                  <p className="uppercase text-[9px] font-bold">{isRtl ? 'الإجمالي' : 'Subtotal'}</p>
+                                  <p className="font-mono font-bold text-slate-700">{item.subtotal.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                  <p className="uppercase text-[9px] font-bold">{isRtl ? 'نوع' : 'Type'}</p>
+                                  <p className="font-mono font-bold text-slate-700">{item.type}</p>
+                                </div>
+                              </div>
                             </div>
-                            <div className="grid grid-cols-4 gap-2 text-slate-500">
-                              <div>
-                                <p className="uppercase text-[9px] font-bold">{isRtl ? 'الكمية' : 'Qty'}</p>
-                                <p className="font-mono font-bold text-slate-700">{item.quantity}</p>
-                              </div>
-                              <div>
-                                <p className="uppercase text-[9px] font-bold">{isRtl ? 'سعر الوحدة' : 'Unit'}</p>
-                                <p className="font-mono font-bold text-slate-700">{item.unitPrice.toFixed(2)}</p>
-                              </div>
-                              <div>
-                                <p className="uppercase text-[9px] font-bold">{isRtl ? 'الإجمالي' : 'Subtotal'}</p>
-                                <p className="font-mono font-bold text-slate-700">{item.subtotal.toFixed(2)}</p>
-                              </div>
-                              <div>
-                                <p className="uppercase text-[9px] font-bold">{isRtl ? 'نوع' : 'Type'}</p>
-                                <p className="font-mono font-bold text-slate-700">{item.type}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                          ));
+                        })()}
 
                         {activeInvoiceLineItems.length === 0 && (
                           <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-[10px]">

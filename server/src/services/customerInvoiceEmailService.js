@@ -145,6 +145,8 @@ function buildInvoiceItemsHtml(invoice, locale = 'en') {
         return '';
     }
 
+    const showQty = items.some(item => item.type !== 'service');
+
     const sectionTitle = locale === 'ar' ? formatInvoiceSectionLabelAr(invoice) : formatInvoiceSectionLabel(invoice);
     const tableRows = items.map((item, index) => {
         const name = locale === 'ar'
@@ -156,7 +158,7 @@ function buildInvoiceItemsHtml(invoice, locale = 'en') {
         return `
             <tr>
                 <td style="padding:10px 0;border-bottom:1px solid #eef2f7;">${escapeHtml(name)}</td>
-                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;text-align:center;">${escapeHtml(String(qty))}</td>
+                ${showQty ? `<td style="padding:10px 0;border-bottom:1px solid #eef2f7;text-align:center;">${escapeHtml(String(qty))}</td>` : ''}
                 <td style="padding:10px 0;border-bottom:1px solid #eef2f7;">${escapeHtml(unit)}</td>
                 <td style="padding:10px 0;border-bottom:1px solid #eef2f7;text-align:right;">${escapeHtml(total)}</td>
             </tr>`;
@@ -169,7 +171,7 @@ function buildInvoiceItemsHtml(invoice, locale = 'en') {
                 <thead>
                     <tr>
                         <th style="text-align:left;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'الاسم' : 'Name'}</th>
-                        <th style="text-align:center;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'الكمية' : 'Qty'}</th>
+                        ${showQty ? `<th style="text-align:center;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'الكمية' : 'Qty'}</th>` : ''}
                         <th style="text-align:left;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'السعر' : 'Unit price'}</th>
                         <th style="text-align:right;padding:0 0 8px;font-weight:700;color:#6b7280;">${locale === 'ar' ? 'الإجمالي' : 'Total'}</th>
                     </tr>

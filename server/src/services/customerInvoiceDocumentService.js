@@ -149,6 +149,7 @@ async function renderCustomerInvoicePdf(invoiceRecord, kind = 'invoice') {
             doc.fillColor(muted).font('Helvetica').fontSize(10).text('No line items', margin, cursorY);
             cursorY += 18;
         } else {
+            const showQty = rows.some(item => item.type !== 'service');
             rows.forEach((item, index) => {
                 const name = item.nameEn || item.nameAr || `Item ${index + 1}`;
                 const qty = Number(item.quantity || 1);
@@ -157,8 +158,12 @@ async function renderCustomerInvoicePdf(invoiceRecord, kind = 'invoice') {
                 const rowHeight = 42;
                 doc.roundedRect(margin, cursorY, pageWidth - (margin * 2), rowHeight, 12).fillAndStroke('#ffffff', border);
                 doc.fillColor(text).font('Helvetica-Bold').fontSize(10).text(name, margin + 12, cursorY + 10, { width: 220 });
-                doc.fillColor(muted).font('Helvetica').fontSize(9).text(`Qty ${qty}`, margin + 250, cursorY + 10);
-                doc.text(`Unit ${unit}`, margin + 310, cursorY + 10);
+                if (showQty) {
+                    doc.fillColor(muted).font('Helvetica').fontSize(9).text(`Qty ${qty}`, margin + 250, cursorY + 10);
+                    doc.text(`Unit ${unit}`, margin + 310, cursorY + 10);
+                } else {
+                    doc.fillColor(muted).font('Helvetica').fontSize(9).text(`Unit ${unit}`, margin + 250, cursorY + 10);
+                }
                 doc.fillColor(accent).font('Helvetica-Bold').text(total, pageWidth - margin - 110, cursorY + 10, { width: 100, align: 'right' });
                 cursorY += rowHeight + 8;
             });
