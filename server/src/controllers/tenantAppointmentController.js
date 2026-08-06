@@ -16,7 +16,6 @@ const { createStaffAppointmentMessage } = require('../services/staffNotification
 const {
     calculateSplitPayment,
     createAppointmentPaymentTransactions,
-    normalizePaymentAllocations,
     collectAppointmentStatusCharge
 } = require('../services/splitPaymentService');
 const userService = require('../services/userService');
