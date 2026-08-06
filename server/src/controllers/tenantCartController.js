@@ -235,7 +235,13 @@ exports.purchaseGiftCard = async (req, res) => {
       throw new Error('Payment amount does not match the selected gift card price');
     }
     const totalCredit = parseMoney(Number(giftPackage.walletCreditAmount || 0) + Number(giftPackage.bonusAmount || 0));
-    const normalizedAllocations = normalizeAllocations(purchaseAmount, paymentMethod || 'cash', paymentAllocations);
+    const splitPaymentService = require('../services/splitPaymentService');
+    const normalizedAllocations = splitPaymentService.normalizePaymentAllocations({
+      amount: purchaseAmount,
+      paymentMethod: paymentMethod || 'cash',
+      paymentAllocations,
+      fallbackSource: paymentMethod || 'cash'
+    });
     const claimToken = crypto.randomBytes(24).toString('hex');
     const expiresAt = new Date(Date.now() + (CLAIM_EXPIRY_HOURS * 60 * 60 * 1000));
     const packageTitle = giftPackage.title || giftPackage.title_en || giftPackage.title_ar || 'Tenant gift card';
