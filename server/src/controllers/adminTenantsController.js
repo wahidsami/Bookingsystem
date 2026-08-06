@@ -361,6 +361,8 @@ const approveTenant = async (req, res) => {
                     paymentRequired: false,
                     packageId: subscription.packageId,
                     billingCycle: subscription.billingCycle
+
+
                 },
                 ipAddress: req.ip,
                 userAgent: req.headers['user-agent']
@@ -372,15 +374,16 @@ const approveTenant = async (req, res) => {
                 billingCycle: subscription.billingCycle
             });
 
-            const { sendPaymentSuccessEmail } = require('../utils/emailService');
-            sendPaymentSuccessEmail(tenant, {
+            const { sendApprovalEmail } = require('../utils/emailService');
+            sendApprovalEmail(tenant, {
                 packageName: subscription.package?.name,
                 billingCycle: subscription.billingCycle,
                 amount: 0,
                 periodStart: subscription.currentPeriodStart,
-                periodEnd: subscription.currentPeriodEnd
+                periodEnd: subscription.currentPeriodEnd,
+                isFree: true
             }).catch(err => {
-                console.error('[Approval] Failed to send activation email:', err.message);
+                console.error('[Approval] Failed to send approval email:', err.message);
             });
 
             return res.json({

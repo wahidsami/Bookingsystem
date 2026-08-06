@@ -55,8 +55,8 @@ const storage = multer.diskStorage({
             uploadPath = path.join(__dirname, '../../uploads/tenants/documents/cr');
         } else if (file.fieldname === 'taxDocument') {
             uploadPath = path.join(__dirname, '../../uploads/tenants/documents/tax');
-        } else if (file.fieldname === 'licenseDocument') {
-            uploadPath = path.join(__dirname, '../../uploads/tenants/documents/license');
+        } else if (file.fieldname === 'nationalAddressDocument') {
+            uploadPath = path.join(__dirname, '../../uploads/tenants/documents/national_address');
         } else {
             uploadPath = path.join(__dirname, '../../uploads/tenants/misc');
         }
@@ -98,7 +98,7 @@ exports.uploadMiddleware = upload.fields([
     { name: 'logo', maxCount: 1 },
     { name: 'crDocument', maxCount: 1 },
     { name: 'taxDocument', maxCount: 1 },
-    { name: 'licenseDocument', maxCount: 1 }
+    { name: 'nationalAddressDocument', maxCount: 1 }
 ]);
 
 /**
@@ -121,6 +121,7 @@ exports.register = async (req, res) => {
             buildingNumber,
             district,
             street,
+            region,
             city,
             country,
             googleMapLink,
@@ -128,7 +129,6 @@ exports.register = async (req, res) => {
             // Step 2: Official Documentation
             crNumber,
             taxNumber,
-            licenseNumber,
 
             // Step 3: Contact Person
             contactPersonNameAr,
@@ -210,7 +210,7 @@ exports.register = async (req, res) => {
                 message: 'Invalid owner email format'
             });
         }
-        if (!phone || !PHONE_REGEX.test(String(phone).trim())) {
+        if (phone && !PHONE_REGEX.test(String(phone).trim())) {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid business phone number format'
@@ -285,7 +285,7 @@ exports.register = async (req, res) => {
         const logo = req.files?.logo?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
         const crDocument = req.files?.crDocument?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
         const taxDocument = req.files?.taxDocument?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
-        const licenseDocument = req.files?.licenseDocument?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
+        const nationalAddressDocument = req.files?.nationalAddressDocument?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
 
         // Generate slug from English name
         const slug = name_en
@@ -333,6 +333,7 @@ exports.register = async (req, res) => {
             buildingNumber,
             street,
             district,
+            region,
             city,
             country: country || 'Saudi Arabia',
             googleMapLink,
@@ -343,8 +344,7 @@ exports.register = async (req, res) => {
             crDocument,
             taxNumber,
             taxDocument,
-            licenseNumber,
-            licenseDocument,
+            nationalAddressDocument,
 
             // Contact Person
             contactPersonNameAr,

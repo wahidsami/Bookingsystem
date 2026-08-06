@@ -698,8 +698,8 @@ function RegistrationSuccessScreen({
     <PublicAuthShell
       lang={lang}
       onToggleLang={onToggleLang}
-      title={isRtl ? 'تم إرسال الطلب بنجاح' : 'Registration submitted'}
-      subtitle={isRtl ? 'تم إنشاء طلب الانضمام. يمكن للمنشأة الآن متابعة المراجعة والتفعيل.' : 'The onboarding request has been created and is ready for review.'}
+      title={isRtl ? 'تم إرسال الطلب بنجاح' : 'Registration Submitted'}
+      subtitle={isRtl ? 'تم استلام المستندات الخاصة بك وهي الآن قيد المراجعة.' : 'Documents Received. Waiting for Approval.'}
     >
       <div className="space-y-5 text-center">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300">
@@ -707,8 +707,8 @@ function RegistrationSuccessScreen({
         </div>
         <p className="text-sm leading-7 text-zinc-300">
           {isRtl
-            ? 'ستستقبل المنشأة رسالة تأكيد بعد اكتمال المراجعة أو التفعيل من النظام.'
-            : 'The tenant will receive the next notification once the review or activation step completes.'}
+            ? 'ستتلقى رسالة بريد إلكتروني بمجرد مراجعة حسابك.'
+            : 'You will receive an email once your account has been reviewed.'}
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button

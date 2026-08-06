@@ -128,6 +128,11 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true,
             comment: 'District/neighborhood'
         },
+        region: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Administrative Region'
+        },
         city: {
             type: DataTypes.STRING,
             allowNull: true
@@ -205,6 +210,11 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: true,
             comment: 'License document file path'
+        },
+        nationalAddressDocument: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'National Address document file path'
         },
         documents: {
             type: DataTypes.JSONB,

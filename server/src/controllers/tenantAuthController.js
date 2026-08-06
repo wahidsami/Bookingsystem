@@ -144,7 +144,7 @@ const getBlockedTenantMessage = (status) => {
     : status === 'suspended'
       ? 'Your account has been suspended. Please contact support.'
       : status === 'pending_approval'
-        ? 'Your tenant registration is still under review. Please wait for approval.'
+        ? 'Registration Submitted. Documents Received. Waiting for Approval. You will receive an email once your account has been reviewed.'
         : status === 'payment_pending'
           ? 'Your tenant is approved, but access is not active until payment is completed.'
       : status === 'payment_expired'

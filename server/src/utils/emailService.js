@@ -163,8 +163,8 @@ const sendApprovalEmail = async (tenantData, options = {}) => {
         to: tenantData.email,
         cc: options.cc,
         subject: locale === 'en'
-            ? `Rifah account approved - invoice ${data.invoiceNumber}`
-            : `تم قبول حساب رفاه - فاتورة ${data.invoiceNumber}`,
+            ? (options.isFree ? 'Rifah account approved' : `Rifah account approved - invoice ${data.invoiceNumber}`)
+            : (options.isFree ? 'تم قبول حساب رفاه' : `تم قبول حساب رفاه - فاتورة ${data.invoiceNumber}`),
         template: 'approved',
         data
     });
@@ -347,7 +347,9 @@ const buildBillingEmailData = (tenantData = {}, options = {}) => {
         paidDateText: formatDateTime(bill?.paidAt || options.paidAt, locale),
         periodStartText: formatDateOnly(options.periodStart || bill?.invoiceIssuedAt, locale),
         periodEndText: formatDateOnly(options.periodEnd || bill?.subscription?.currentPeriodEnd, locale),
-        supportEmail: process.env.SUPPORT_EMAIL || 'support@rifah.sa'
+        supportEmail: process.env.SUPPORT_EMAIL || 'support@rifah.sa',
+        paidOnlyDisplay: options.isFree ? 'none' : 'block',
+        freeOnlyDisplay: options.isFree ? 'block' : 'none'
     };
 };
 

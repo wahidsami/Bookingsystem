@@ -7,32 +7,19 @@ import PublicFileUploadField from './PublicFileUploadField';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
-const SAUDI_CITIES = [
-  { en: 'Abha', ar: 'أبها' },
-  { en: 'Al Hofuf', ar: 'الهفوف' },
-  { en: 'Al Jubail', ar: 'الجبيل' },
-  { en: 'Al Kharj', ar: 'الخرج' },
-  { en: 'Al Khobar', ar: 'الخبر' },
-  { en: 'Al Majma\'ah', ar: 'المجمعة' },
-  { en: 'Al Mubarraz', ar: 'المبرز' },
-  { en: 'Al Qatif', ar: 'القطيف' },
-  { en: 'Buraydah', ar: 'بريدة' },
-  { en: 'Dammam', ar: 'الدمام' },
-  { en: 'Dhahran', ar: 'الظهران' },
-  { en: 'Hafr Al Batin', ar: 'حفر الباطن' },
-  { en: 'Hail', ar: 'حائل' },
-  { en: 'Jeddah', ar: 'جدة' },
-  { en: 'Jizan', ar: 'جازان' },
-  { en: 'Khamis Mushait', ar: 'خميس مشيط' },
-  { en: 'Mecca', ar: 'مكة المكرمة' },
-  { en: 'Medina', ar: 'المدينة المنورة' },
-  { en: 'Najran', ar: 'نجران' },
-  { en: 'Qurayyat', ar: 'القريات' },
-  { en: 'Riyadh', ar: 'الرياض' },
-  { en: 'Tabuk', ar: 'تبوك' },
-  { en: 'Taif', ar: 'الطائف' },
-  { en: 'Yanbu', ar: 'ينبع' }
-].sort((a, b) => a.en.localeCompare(b.en));
+const SAUDI_REGIONS_AND_CITIES = [
+  { id: 'riyadh', en: 'Riyadh Region', ar: 'منطقة الرياض', cities: [{ en: 'Riyadh', ar: 'الرياض' }, { en: 'Al Kharj', ar: 'الخرج' }, { en: 'Diriyah', ar: 'الدرعية' }, { en: "Al Majma'ah", ar: 'المجمعة' }] },
+  { id: 'makkah', en: 'Makkah Region', ar: 'منطقة مكة المكرمة', cities: [{ en: 'Mecca', ar: 'مكة المكرمة' }, { en: 'Jeddah', ar: 'جدة' }, { en: 'Taif', ar: 'الطائف' }, { en: 'Yanbu', ar: 'ينبع' }] },
+  { id: 'madinah', en: 'Madinah Region', ar: 'منطقة المدينة المنورة', cities: [{ en: 'Medina', ar: 'المدينة المنورة' }, { en: 'Yanbu', ar: 'ينبع' }] },
+  { id: 'eastern', en: 'Eastern Province', ar: 'المنطقة الشرقية', cities: [{ en: 'Dammam', ar: 'الدمام' }, { en: 'Al Khobar', ar: 'الخبر' }, { en: 'Dhahran', ar: 'الظهران' }, { en: 'Al Jubail', ar: 'الجبيل' }, { en: 'Al Hofuf', ar: 'الهفوف' }, { en: 'Al Mubarraz', ar: 'المبرز' }, { en: 'Al Qatif', ar: 'القطيف' }, { en: 'Hafr Al Batin', ar: 'حفر الباطن' }] },
+  { id: 'asir', en: 'Asir Region', ar: 'منطقة عسير', cities: [{ en: 'Abha', ar: 'أبها' }, { en: 'Khamis Mushait', ar: 'خميس مشيط' }] },
+  { id: 'jazan', en: 'Jazan Region', ar: 'منطقة جازان', cities: [{ en: 'Jizan', ar: 'جازان' }] },
+  { id: 'najran', en: 'Najran Region', ar: 'منطقة نجران', cities: [{ en: 'Najran', ar: 'نجران' }] },
+  { id: 'tabuk', en: 'Tabuk Region', ar: 'منطقة تبوك', cities: [{ en: 'Tabuk', ar: 'تبوك' }] },
+  { id: 'hail', en: 'Hail Region', ar: 'منطقة حائل', cities: [{ en: 'Hail', ar: 'حائل' }] },
+  { id: 'qassim', en: 'Al-Qassim Region', ar: 'منطقة القصيم', cities: [{ en: 'Buraydah', ar: 'بريدة' }] },
+  { id: 'jawf', en: 'Al Jawf Region', ar: 'منطقة الجوف', cities: [{ en: 'Qurayyat', ar: 'القريات' }] }
+];
 
 type PackageRecord = Record<string, any>;
 
@@ -49,12 +36,12 @@ type RegistrationFormData = {
   buildingNumber: string;
   district: string;
   street: string;
+  region: string;
   city: string;
   country: string;
   googleMapLink: string;
   crNumber: string;
   taxNumber: string;
-  licenseNumber: string;
   contactPersonNameAr: string;
   contactPersonNameEn: string;
   contactPersonEmail: string;
@@ -91,12 +78,12 @@ const initialFormData: RegistrationFormData = {
   buildingNumber: '',
   district: '',
   street: '',
+  region: '',
   city: '',
   country: 'Saudi Arabia',
   googleMapLink: '',
   crNumber: '',
   taxNumber: '',
-  licenseNumber: '',
   contactPersonNameAr: '',
   contactPersonNameEn: '',
   contactPersonEmail: '',
@@ -205,7 +192,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
     logo: null,
     crDocument: null,
     taxDocument: null,
-    licenseDocument: null
+    nationalAddressDocument: null
   });
 
   const stepDefinitions = useMemo(() => wizardStepDefinitions(isRtl), [isRtl]);
@@ -292,7 +279,6 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
       if (!formData.name_en.trim()) nextErrors.name_en = isRtl ? 'اسم المنشأة بالإنجليزية مطلوب' : 'English business name is required';
       if (!formData.name_ar.trim()) nextErrors.name_ar = isRtl ? 'اسم المنشأة بالعربية مطلوب' : 'Arabic business name is required';
       if (!formData.businessType.length) nextErrors.businessType = isRtl ? 'اختر نوع النشاط' : 'Please select at least one business type';
-      if (!formData.phone.trim()) nextErrors.phone = isRtl ? 'رقم الهاتف مطلوب' : 'Phone is required';
       if (formData.phone && !isValidPhone(formData.phone)) nextErrors.phone = isRtl ? 'رقم الهاتف غير صحيح' : 'Invalid phone number';
       if (!formData.mobile.trim()) nextErrors.mobile = isRtl ? 'رقم الجوال مطلوب' : 'Mobile is required';
       if (formData.mobile && !isValidPhone(formData.mobile)) nextErrors.mobile = isRtl ? 'رقم الجوال غير صحيح' : 'Invalid mobile number';
@@ -308,10 +294,9 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
     if (step === 2) {
       if (!formData.crNumber.trim()) nextErrors.crNumber = isRtl ? 'رقم السجل التجاري مطلوب' : 'Commercial registration number is required';
       if (!formData.taxNumber.trim()) nextErrors.taxNumber = isRtl ? 'الرقم الضريبي مطلوب' : 'Tax number is required';
-      if (!formData.licenseNumber.trim()) nextErrors.licenseNumber = isRtl ? 'رقم الترخيص مطلوب' : 'License number is required';
       if (!files.crDocument) nextErrors.crDocument = isRtl ? 'أرفق مستند السجل التجاري' : 'Commercial registration file is required';
       if (!files.taxDocument) nextErrors.taxDocument = isRtl ? 'أرفق المستند الضريبي' : 'Tax certificate file is required';
-      if (!files.licenseDocument) nextErrors.licenseDocument = isRtl ? 'أرفق مستند الترخيص' : 'License file is required';
+      if (!files.nationalAddressDocument) nextErrors.nationalAddressDocument = isRtl ? 'أرفق ملف العنوان الوطني' : 'National Address file is required';
     }
 
     if (step === 3) {
@@ -506,10 +491,20 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
           <Field label={isRtl ? 'رقم المبنى' : 'Building number'} error={errors.buildingNumber}>
             <input value={formData.buildingNumber} onChange={handleChange} name="buildingNumber" className={premiumFieldClass} />
           </Field>
+          <Field label={isRtl ? 'المنطقة' : 'Region'} error={errors.region}>
+            <select value={formData.region} onChange={(e) => { handleChange(e); handleFieldChange('city', ''); }} name="region" className={premiumSelectClass}>
+              <option value="">{isRtl ? 'اختر المنطقة' : 'Select region'}</option>
+              {SAUDI_REGIONS_AND_CITIES.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {isRtl ? region.ar : region.en}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label={isRtl ? 'المدينة' : 'City'} error={errors.city}>
-            <select value={formData.city} onChange={handleChange} name="city" className={premiumSelectClass}>
+            <select value={formData.city} onChange={handleChange} name="city" className={premiumSelectClass} disabled={!formData.region}>
               <option value="">{isRtl ? 'اختر المدينة' : 'Select city'}</option>
-              {SAUDI_CITIES.map((city) => (
+              {formData.region && SAUDI_REGIONS_AND_CITIES.find(r => r.id === formData.region)?.cities.sort((a,b) => a.en.localeCompare(b.en)).map((city) => (
                 <option key={city.en} value={city.en}>
                   {isRtl ? city.ar : city.en}
                 </option>
@@ -550,16 +545,13 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             onChange={(file) => handleFileSelected('taxDocument', file)}
             hint={isRtl ? 'PDF أو صورة' : 'PDF or image'}
           />
-          <Field label={isRtl ? 'رقم الترخيص' : 'License number'} required error={errors.licenseNumber}>
-            <input value={formData.licenseNumber} onChange={handleChange} name="licenseNumber" className={premiumFieldClass} />
-          </Field>
           <PublicFileUploadField
-            inputId="license-document-upload"
-            label={isRtl ? 'ملف الترخيص' : 'License file'}
+            inputId="na-document-upload"
+            label={isRtl ? 'العنوان الوطني' : 'National Address'}
             required
-            error={errors.licenseDocument}
-            file={files.licenseDocument}
-            onChange={(file) => handleFileSelected('licenseDocument', file)}
+            error={errors.nationalAddressDocument}
+            file={files.nationalAddressDocument}
+            onChange={(file) => handleFileSelected('nationalAddressDocument', file)}
             hint={isRtl ? 'PDF أو صورة' : 'PDF or image'}
           />
         </div>

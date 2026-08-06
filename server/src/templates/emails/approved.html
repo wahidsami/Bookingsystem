@@ -246,17 +246,23 @@
                 to your dashboard.
             </p>
 
-            <div style="text-align: center;">
+            <div style="text-align: center; display: {{paidOnlyDisplay}};">
                 <a href="{{paymentUrl}}" class="cta-button">
                     💳 ادفع الآن | Complete Payment
                 </a>
+                <p class="message" style="text-align: center; margin-top: 10px;">
+                    <strong class="message-ar">يرجى إكمال الدفع خلال 48 ساعة.</strong><br>
+                    <strong class="message-en">Please complete payment within 48 hours (by {{paymentDueText}}).</strong>
+                </p>
             </div>
-            <p class="message" style="text-align: center; margin-top: 10px;">
-                <strong class="message-ar">يرجى إكمال الدفع خلال 48 ساعة.</strong><br>
-                <strong class="message-en">Please complete payment within 48 hours (by {{paymentDueText}}).</strong>
-            </p>
 
-            <div class="info-box">
+            <div style="text-align: center; display: {{freeOnlyDisplay}};">
+                <a href="{{loginUrl}}" class="cta-button">
+                    تسجيل الدخول | Log In
+                </a>
+            </div>
+
+            <div class="info-box" style="display: {{paidOnlyDisplay}};">
                 <h3 class="ar">🧾 تفاصيل الفاتورة والاشتراك</h3>
                 <h3 class="en">Invoice & Subscription Details</h3>
                 <div class="info-row">
