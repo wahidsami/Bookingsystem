@@ -360,8 +360,14 @@ class AvailabilityService {
 
         // Get slots for each staff member
         const slotsByStaff = [];
+        const staffWorkloads = new Map();
+
         for (const staff of staffMembers) {
             try {
+                // Calculate workload for deterministic tie-breaking
+                const appointments = await this._getExistingAppointments(staff.id, date);
+                staffWorkloads.set(staff.id, appointments.length);
+
                 const result = await this._getSlotsForStaff(
                     tenantId,
                     serviceId,
@@ -389,25 +395,33 @@ class AvailabilityService {
             }
         }
 
-        // Sort by time, then by staff rating (best first)
-        slotsByStaff.sort((a, b) => {
-            const timeDiff = new Date(a.startTime) - new Date(b.startTime);
-            if (timeDiff !== 0) return timeDiff;
-            // If same time, prefer higher rated staff (would need to join staff data)
-            return 0;
-        });
-
-        // Remove duplicates (same time slot from multiple staff)
-        // Keep the first one (could enhance to prefer best staff)
-        const uniqueSlots = [];
-        const seenTimes = new Set();
+        // Group slots by exact start time
+        const slotsByTime = new Map();
         for (const slot of slotsByStaff) {
             const timeKey = new Date(slot.startTime).toISOString();
-            if (!seenTimes.has(timeKey)) {
-                seenTimes.add(timeKey);
-                uniqueSlots.push(slot);
+            if (!slotsByTime.has(timeKey)) {
+                slotsByTime.set(timeKey, []);
+            }
+            slotsByTime.get(timeKey).push(slot);
+        }
+
+        // Deduplicate and resolve conflicts per time block
+        const uniqueSlots = [];
+        for (const [timeKey, candidates] of slotsByTime.entries()) {
+            const availableCandidates = candidates.filter(c => c.available);
+            
+            if (availableCandidates.length > 0) {
+                // Determine winner using isolated scheduling policy
+                const winner = this._applySchedulingPolicy(availableCandidates, staffWorkloads);
+                uniqueSlots.push(winner);
+            } else {
+                // If no staff is available, arbitrarily push the first unavailable slot 
+                uniqueSlots.push(candidates[0]);
             }
         }
+
+        // Ensure chronological order for output
+        uniqueSlots.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 
         return {
             slots: uniqueSlots,
@@ -426,6 +440,28 @@ class AvailabilityService {
                 staffCount: staffMembers.length
             }
         };
+    }
+
+    /**
+     * Determine which staff member gets the booking when multiple are available.
+     * Sprint 1 Policy: Least Workload
+     * @private
+     */
+    _applySchedulingPolicy(candidates, staffWorkloads) {
+        if (candidates.length <= 1) return candidates[0];
+
+        // Sort by least workload first, then use staffId as a stable fallback
+        return candidates.sort((a, b) => {
+            const workloadA = staffWorkloads.get(a.staffId) || 0;
+            const workloadB = staffWorkloads.get(b.staffId) || 0;
+            
+            if (workloadA !== workloadB) {
+                return workloadA - workloadB;
+            }
+            
+            // Deterministic stable tie-breaker if workloads are identical
+            return String(a.staffId).localeCompare(String(b.staffId));
+        })[0];
     }
 
     /**
