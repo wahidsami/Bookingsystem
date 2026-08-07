@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar as CalendarIcon, Clock, Plus, Search, User, Users, Check, X, 
@@ -439,6 +440,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [hasHydratedTeamVisibility, setHasHydratedTeamVisibility] = useState(false);
   const teamMembersButtonRef = useRef<HTMLDivElement | null>(null);
   const teamMembersMenuRef = useRef<HTMLDivElement | null>(null);
+  const [teamMembersMenuStyle, setTeamMembersMenuStyle] = useState<React.CSSProperties | null>(null);
 
   useEffect(() => {
     const localOverride = readSchedulerBoardOverride(schedulerStorageKey);
@@ -484,8 +486,49 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   useEffect(() => {
     if (!isTeamMembersMenuOpen) {
+      setTeamMembersMenuStyle(null);
       return;
     }
+
+    const updateMenuPosition = () => {
+      const button = teamMembersButtonRef.current;
+      if (!button || typeof window === 'undefined') {
+        return;
+      }
+
+      const buttonRect = button.getBoundingClientRect();
+      const menuWidth = 288;
+      const viewportPadding = 12;
+      const gap = 8;
+      const top = Math.max(viewportPadding, Math.round(buttonRect.bottom + gap));
+
+      if (isRtl) {
+        const right = Math.max(viewportPadding, Math.round(window.innerWidth - buttonRect.right));
+        setTeamMembersMenuStyle({
+          position: 'fixed',
+          top,
+          right,
+          width: menuWidth,
+          zIndex: 220
+        });
+        return;
+      }
+
+      const left = Math.min(
+        Math.max(viewportPadding, Math.round(buttonRect.left)),
+        Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding)
+      );
+
+      setTeamMembersMenuStyle({
+        position: 'fixed',
+        top,
+        left,
+        width: menuWidth,
+        zIndex: 220
+      });
+    };
+
+    updateMenuPosition();
 
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target;
@@ -503,6 +546,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       setIsTeamMembersMenuOpen(false);
     };
 
+    const handleReposition = () => {
+      updateMenuPosition();
+    };
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsTeamMembersMenuOpen(false);
@@ -512,13 +559,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('touchstart', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleReposition, true);
 
     return () => {
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('touchstart', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleReposition, true);
     };
-  }, [isTeamMembersMenuOpen]);
+  }, [isRtl, isTeamMembersMenuOpen]);
 
   // Master Data Fetch
   useEffect(() => {
@@ -3927,7 +3978,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     <div className="space-y-4 select-none font-sans" id="appointments-workspace">
       
       {/* 1. COMPREHENSIVE CONTROL BAR & BOARD CONTROLS */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+      <div className="relative z-50 bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           
           {/* Unified Tool controls: Prev, Next, Today, Date Picker, Day / Week, Refresh */}
@@ -4017,10 +4068,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <ChevronDown size={11} className="text-slate-400" />
               </button>
 
-              {isTeamMembersMenuOpen && (
+              {isTeamMembersMenuOpen && teamMembersMenuStyle && typeof document !== 'undefined' && createPortal(
                 <div
                   ref={teamMembersMenuRef}
-                  className={`absolute ${isRtl ? 'left-0' : 'right-0'} top-full z-30 mt-2 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl`}
+                  dir={isRtl ? 'rtl' : 'ltr'}
+                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                  style={teamMembersMenuStyle}
                 >
                   <div className="border-b border-slate-100 px-4 py-3">
                     <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
@@ -4073,7 +4126,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       );
                     })}
                   </div>
-                </div>
+                </div>,
+                document.body
               )}
             </div>
 
@@ -4334,7 +4388,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         <div className="lg:col-span-12">
           
           <div
-            className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative"
+            className="relative z-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col"
             style={{
               width: '100%',
               minWidth: '100%'
