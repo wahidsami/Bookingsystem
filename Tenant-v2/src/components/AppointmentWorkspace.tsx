@@ -333,11 +333,51 @@ const writeSchedulerBoardOverride = (storageKey: string, value: SchedulerBoardSe
   }
 };
 
+const buildSchedulerTeamVisibilityStorageKey = (tenantId?: string | null, userId?: string | null) => {
+  return ['refah-scheduler-team-members', tenantId || 'tenant', userId || 'user'].join(':');
+};
+
+const readSchedulerTeamVisibilityOverride = (storageKey: string): string[] | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map((value) => `${value || ''}`.trim()).filter(Boolean) : null;
+  } catch (error) {
+    console.warn('Failed to read scheduler team members preferences', error);
+    return null;
+  }
+};
+
+const writeSchedulerTeamVisibilityOverride = (storageKey: string, value: string[] | null) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (!value || value.length === 0) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+    window.localStorage.setItem(storageKey, JSON.stringify(value));
+  } catch (error) {
+    console.warn('Failed to persist scheduler team members preferences', error);
+  }
+};
+
 export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
   const { tenant, tenantSettings, user } = useTenantAuth();
   const schedulerConfig = useMemo(() => getTenantSchedulerConfig(tenantSettings, tenant), [tenantSettings, tenant]);
   const schedulerStorageKey = useMemo(() => buildSchedulerBoardStorageKey(tenant?.id, user?.id), [tenant?.id, user?.id]);
+  const teamVisibilityStorageKey = useMemo(() => buildSchedulerTeamVisibilityStorageKey(tenant?.id, user?.id), [tenant?.id, user?.id]);
   const canonicalSchedulerBoardSettings = useMemo(
     () => normalizeSchedulerBoardSettings(tenantSettings?.bookingSettings?.schedulerBoard || DEFAULT_SCHEDULER_BOARD_SETTINGS),
     [tenantSettings?.bookingSettings?.schedulerBoard]
@@ -354,6 +394,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [isSchedulerSettingsOpen, setIsSchedulerSettingsOpen] = useState(false);
   const activeSchedulerSettings = isSchedulerSettingsOpen ? schedulerBoardDraft : schedulerBoardSettings;
   const [isSchedulerSettingsSaving, setIsSchedulerSettingsSaving] = useState(false);
+  const [visibleEmployeeIds, setVisibleEmployeeIds] = useState<string[]>([]);
+  const [teamMembersDraftIds, setTeamMembersDraftIds] = useState<string[]>([]);
+  const [isTeamMembersPopoverOpen, setIsTeamMembersPopoverOpen] = useState(false);
   const [dragMoveDialog, setDragMoveDialog] = useState<{
     appointmentId: string;
     targetStaffId: string;
@@ -394,6 +437,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [previousBoardMode, setPreviousBoardMode] = useState<SchedulerBoardMode | null>(null);
   const [focusedEmployeeId, setFocusedEmployeeId] = useState<string | null>(null);
   const [boardCurrentTime, setBoardCurrentTime] = useState<Date>(new Date());
+  const [hasHydratedTeamVisibility, setHasHydratedTeamVisibility] = useState(false);
 
   useEffect(() => {
     const localOverride = readSchedulerBoardOverride(schedulerStorageKey);
@@ -405,6 +449,38 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setSchedulerBoardDraft(merged);
     schedulerBoardSnapshotRef.current = merged;
   }, [canonicalSchedulerBoardSettings, schedulerStorageKey]);
+
+  useEffect(() => {
+    if (!liveStylists.length) {
+      return;
+    }
+
+    const allEmployeeIds = liveStylists.map((stylist) => stylist.id);
+
+    if (!hasHydratedTeamVisibility) {
+      const persistedVisibility = readSchedulerTeamVisibilityOverride(teamVisibilityStorageKey);
+      const normalizedPersistedVisibility = Array.isArray(persistedVisibility)
+        ? persistedVisibility.filter((employeeId) => allEmployeeIds.includes(employeeId))
+        : [];
+      const initialVisibility = normalizedPersistedVisibility.length > 0 ? normalizedPersistedVisibility : allEmployeeIds;
+
+      setVisibleEmployeeIds(initialVisibility);
+      setTeamMembersDraftIds(initialVisibility);
+      setHasHydratedTeamVisibility(true);
+
+      if (normalizedPersistedVisibility.length === 0) {
+        writeSchedulerTeamVisibilityOverride(teamVisibilityStorageKey, allEmployeeIds);
+      }
+    }
+  }, [hasHydratedTeamVisibility, liveStylists, teamVisibilityStorageKey]);
+
+  useEffect(() => {
+    if (!hasHydratedTeamVisibility) {
+      return;
+    }
+
+    writeSchedulerTeamVisibilityOverride(teamVisibilityStorageKey, visibleEmployeeIds);
+  }, [hasHydratedTeamVisibility, teamVisibilityStorageKey, visibleEmployeeIds]);
 
   // Master Data Fetch
   useEffect(() => {
@@ -3240,9 +3316,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   // Filters application
   const filteredAppointments = appointments.filter(apt => {
     const boardFocusStaffId = isEmployeeBoardMode(viewMode) ? focusedEmployeeId : null;
+    const boardVisibleStaffIds = isEmployeeBoardMode(viewMode)
+      ? (boardFocusStaffId ? [boardFocusStaffId] : [])
+      : visibleEmployeeIds;
     const matchesStaff = viewMode === 'agenda'
       ? (selectedStylistFilter === 'all' || apt.staffId === selectedStylistFilter)
-      : (!boardFocusStaffId || apt.staffId === boardFocusStaffId);
+      : (boardVisibleStaffIds.length === 0 || boardVisibleStaffIds.includes(apt.staffId));
     const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
     const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
       const matchesSearch = searchQuery === '' || 
@@ -3285,8 +3364,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   });
 
   const schedulerColumns: SchedulerColumn[] = isDayBoardMode(viewMode)
-    ? liveStylists
-        .filter((stylist) => !isEmployeeBoardMode(viewMode) || stylist.id === focusedEmployeeId)
+    ? visibleTeamStylists
         .map((stylist) => ({
           id: getSchedulerColumnId(viewMode, stylist.id),
           kind: 'employee',
@@ -3357,19 +3435,81 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     ? liveStylists.find((stylist) => stylist.id === focusedEmployeeId) || null
     : null;
   const boardModeLabel = getBoardModeLabel(viewMode, isRtl);
+  const allEmployeeIds = useMemo(() => liveStylists.map((stylist) => stylist.id), [liveStylists]);
+  const visibleEmployeeIdSet = useMemo(() => new Set(visibleEmployeeIds), [visibleEmployeeIds]);
+  const teamMembersDraftSet = useMemo(() => new Set(teamMembersDraftIds), [teamMembersDraftIds]);
+  const visibleTeamStylists = useMemo(() => {
+    if (focusedEmployeeId) {
+      return liveStylists.filter((stylist) => stylist.id === focusedEmployeeId);
+    }
+
+    const selectedStylists = liveStylists.filter((stylist) => visibleEmployeeIdSet.has(stylist.id));
+    return selectedStylists.length > 0 ? selectedStylists : liveStylists;
+  }, [focusedEmployeeId, liveStylists, visibleEmployeeIdSet]);
+  const isAllTeamMembersDraftSelected = allEmployeeIds.length > 0 && teamMembersDraftIds.length === allEmployeeIds.length;
+  const isTeamMembersPopoverReady = liveStylists.length > 0;
+
+  const openTeamMembersPopover = useCallback(() => {
+    if (!isTeamMembersPopoverReady) {
+      return;
+    }
+    setTeamMembersDraftIds(visibleEmployeeIds.length > 0 ? visibleEmployeeIds : allEmployeeIds);
+    setIsTeamMembersPopoverOpen(true);
+  }, [allEmployeeIds, isTeamMembersPopoverReady, visibleEmployeeIds]);
+
+  const closeTeamMembersPopover = useCallback(() => {
+    setIsTeamMembersPopoverOpen(false);
+    setTeamMembersDraftIds(visibleEmployeeIds.length > 0 ? visibleEmployeeIds : allEmployeeIds);
+  }, [allEmployeeIds, visibleEmployeeIds]);
+
+  const commitTeamMembersSelection = useCallback((nextIds: string[]) => {
+    const normalized = nextIds
+      .map((employeeId) => `${employeeId || ''}`.trim())
+      .filter((employeeId, index, list) => Boolean(employeeId) && list.indexOf(employeeId) === index && allEmployeeIds.includes(employeeId));
+    const finalSelection = normalized.length > 0 ? normalized : allEmployeeIds;
+    setVisibleEmployeeIds(finalSelection);
+    setTeamMembersDraftIds(finalSelection);
+    setIsTeamMembersPopoverOpen(false);
+  }, [allEmployeeIds]);
+
+  const toggleTeamMemberDraft = useCallback((employeeId: string) => {
+    setTeamMembersDraftIds((current) => {
+      const normalizedEmployeeId = `${employeeId || ''}`.trim();
+      if (!normalizedEmployeeId) {
+        return current;
+      }
+
+      const next = current.includes(normalizedEmployeeId)
+        ? current.filter((item) => item !== normalizedEmployeeId)
+        : [...current, normalizedEmployeeId];
+
+      const filtered = next.filter((item, index, list) => allEmployeeIds.includes(item) && list.indexOf(item) === index);
+      return filtered.length > 0 ? filtered : current;
+    });
+  }, [allEmployeeIds]);
+
+  const setAllTeamMembersDraft = useCallback(() => {
+    setTeamMembersDraftIds(allEmployeeIds);
+  }, [allEmployeeIds]);
+
   const restoreTeamBoardMode = useCallback(() => {
     setViewMode(previousBoardMode || (isWeekBoardMode(viewMode) ? 'team-week' : 'team-day'));
     setFocusedEmployeeId(null);
     setPreviousBoardMode(null);
+    setVisibleEmployeeIds(allEmployeeIds);
+    setTeamMembersDraftIds(allEmployeeIds);
+    writeSchedulerTeamVisibilityOverride(teamVisibilityStorageKey, allEmployeeIds);
     setSelectedStylistFilter('all');
+    setIsTeamMembersPopoverOpen(false);
     setEmployeeMenuState(null);
-  }, [previousBoardMode, viewMode]);
+  }, [allEmployeeIds, previousBoardMode, teamVisibilityStorageKey, viewMode]);
 
   const enterEmployeeSchedule = useCallback((staffId: string) => {
     setPreviousBoardMode((current) => current || (isWeekBoardMode(viewMode) ? 'team-week' : 'team-day'));
     setFocusedEmployeeId(staffId);
     setSelectedStylistFilter(staffId);
     setViewMode(isWeekBoardMode(viewMode) ? 'employee-week' : 'employee-day');
+    setIsTeamMembersPopoverOpen(false);
     setEmployeeMenuState(null);
   }, [viewMode]);
 
@@ -3760,7 +3900,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             </div>
 
             {/* Day / Week / Agenda views tab */}
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                 <button 
                 onClick={() => {
                   setViewMode(isEmployeeBoardMode(viewMode) ? 'employee-day' : 'team-day');
@@ -3786,10 +3926,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                   viewMode === 'agenda' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
-              >
-                {isRtl ? 'أجندة' : 'Agenda'}
-              </button>
-            </div>
+                >
+                  {isRtl ? 'أجندة' : 'Agenda'}
+                </button>
+              </div>
+
+            <button
+              type="button"
+              onClick={openTeamMembersPopover}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              title={isRtl ? 'إدارة أعضاء الفريق المرئيين' : 'Manage visible team members'}
+            >
+              <Users size={12} />
+              <span>{isRtl ? 'أعضاء الفريق' : 'Team Members'}</span>
+            </button>
 
             {/* Refresh button with action */}
             <button 
@@ -4084,26 +4234,148 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">
-                      {isRtl ? 'عرض جدول الموظف' : 'Employee Schedule'}
+                      {isRtl ? 'عرض جدول الموظف' : 'Viewing Schedule'}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <span className="truncate text-sm font-black text-slate-900">
                         {isRtl ? focusedEmployee.nameAr : focusedEmployee.nameEn}
                       </span>
-                      <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
                         {boardModeLabel}
                       </span>
                     </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={restoreTeamBoardMode}
+                        className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                      >
+                        {isRtl ? 'الفريق' : 'Team'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openTeamMembersPopover}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                      >
+                        {isRtl ? 'أعضاء الفريق' : 'Team Members'}
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={restoreTeamBoardMode}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
-                  >
-                    {isRtl ? 'العودة إلى جدول الفريق' : 'Back to Team Schedule'}
-                  </button>
                 </div>
               )}
+
+              <AnimatePresence>
+                {isTeamMembersPopoverOpen && (
+                  <div className="fixed inset-0 z-40">
+                    <motion.button
+                      type="button"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 h-full w-full bg-zinc-950/25 backdrop-blur-[1px]"
+                      onClick={closeTeamMembersPopover}
+                      aria-label={isRtl ? 'إغلاق أعضاء الفريق' : 'Close team members'}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                      transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+                      className={`absolute top-20 ${isRtl ? 'left-4' : 'right-4'} z-10 w-[320px] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl`}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">
+                            {isRtl ? 'إظهار أعضاء الفريق' : 'Team Members'}
+                          </p>
+                          <h4 className="mt-1 text-sm font-black text-slate-900">
+                            {isRtl ? 'اختر من يظهر في اللوحة' : 'Choose who appears on the board'}
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={closeTeamMembersPopover}
+                          className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      <div className="mt-3 max-h-72 space-y-1 overflow-auto pr-1">
+                        <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          <span className="text-sm font-bold text-slate-800">
+                            {isRtl ? 'جميع الموظفين' : 'All Staff'}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={isAllTeamMembersDraftSelected}
+                            onChange={(event) => {
+                              if (event.target.checked) {
+                                setAllTeamMembersDraft();
+                              }
+                            }}
+                            className="h-4 w-4 accent-amber-500"
+                          />
+                        </label>
+
+                        <div className="pt-1" />
+
+                        {liveStylists.map((stylist) => {
+                          const checked = teamMembersDraftSet.has(stylist.id);
+                          return (
+                            <label
+                              key={stylist.id}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 transition hover:bg-slate-50"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-slate-800">
+                                  {isRtl ? stylist.nameAr : stylist.nameEn}
+                                </p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                  {isRtl ? stylist.roleAr : stylist.roleEn}
+                                </p>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleTeamMemberDraft(stylist.id)}
+                                className="h-4 w-4 accent-amber-500"
+                              />
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                        <button
+                          type="button"
+                          onClick={setAllTeamMembersDraft}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          {isRtl ? 'جميع الموظفين' : 'All Staff'}
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={closeTeamMembersPopover}
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                          >
+                            {isRtl ? 'إلغاء' : 'Cancel'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => commitTeamMembersSelection(teamMembersDraftIds)}
+                            className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                          >
+                            {isRtl ? 'تطبيق' : 'Apply'}
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
               
               {viewMode === 'agenda' ? (
                 /* 1. COMPREHENSIVE AGENDA SCHEDULE VIEW */
