@@ -1,7 +1,13 @@
 import React, { createContext, useContext } from 'react';
+import type { StaffProfile, User } from '../api/client';
 
 interface AppSessionContextValue {
     isAuthenticated: boolean;
+    sessionReady: boolean;
+    bootstrapping: boolean;
+    user: User | null;
+    staffProfile: StaffProfile | null;
+    appMode: 'customer' | 'staff';
     login: () => void;
     logout: () => Promise<void>;
     showLogin: () => void;
@@ -9,6 +15,7 @@ interface AppSessionContextValue {
     showForgotPassword: () => void;
     continueAsGuest: () => void;
     ensureAuthenticated: (onAuthenticated?: () => void) => boolean;
+    refreshSession: () => Promise<boolean>;
 }
 
 const AppSessionContext = createContext<AppSessionContextValue | undefined>(undefined);

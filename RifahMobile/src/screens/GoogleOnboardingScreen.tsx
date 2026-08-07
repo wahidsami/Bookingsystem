@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
-import { api } from '../api/client';
 import { getGoogleAndroidClientId, getGoogleIosClientId, getGoogleWebClientId } from '../config/env';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -20,6 +19,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { sessionManager } from '../services/SessionManager';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -199,10 +199,8 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
         }
 
         try {
-            const startResult = await api.googleStart(idToken);
+            const startResult = await sessionManager.startGoogleLogin(idToken);
             if (startResult.requiresOnboarding === false && startResult.accessToken && startResult.user) {
-                await api.setTokens(startResult.accessToken, startResult.refreshToken ?? null);
-                await api.setUser(startResult.user);
                 setError('');
                 onSuccess();
                 return;
@@ -265,7 +263,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
         try {
             setLoading(true);
-            const sendResult = await api.googleSendPhoneOtp(token, normalizedPhone);
+            const sendResult = await sessionManager.googleSendPhoneOtp(token, normalizedPhone);
             setPhone(sendResult.phone || normalizedPhone);
             setOtpHint(sendResult.testCodeEnabled ? t('devOtpHint') : t('otpSentToPhone'));
             setStep('otp');
@@ -309,7 +307,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
         try {
             setLoading(true);
-            const completeResult = await api.googleComplete({
+            await sessionManager.completeGoogleOnboarding({
                 onboardingToken: token,
                 phone: normalizedPhone,
                 otp: otp.trim(),
@@ -317,8 +315,6 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                 lastName: lastName.trim(),
             });
 
-            await api.setTokens(completeResult.accessToken, completeResult.refreshToken);
-            await api.setUser(completeResult.user);
             await clearPersistedOnboardingState();
             onSuccess();
         } catch (err: any) {

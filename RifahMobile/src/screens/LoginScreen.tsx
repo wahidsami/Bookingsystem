@@ -13,13 +13,13 @@ import {
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import GoogleIcon from '../../assets/icons/icon_google_brand.svg';
 import AppleIcon from '../../assets/icons/icon_apple_brand.svg';
 import EyeOpenIcon from '../../assets/icons/icon_eye_open.svg';
 import EyeClosedIcon from '../../assets/icons/icon_eye_closed.svg';
 import { LinearGradient } from 'expo-linear-gradient';
+import { sessionManager } from '../services/SessionManager';
 
 interface LoginScreenProps {
     onLoginSuccess: () => void;
@@ -65,26 +65,8 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
         setLoading(true);
 
         try {
-            const loginData = {
-                email: email.trim(),
-                password: password,
-            };
-
-            const response = await api.post<{
-                success: boolean;
-                accessToken: string;
-                refreshToken: string;
-                user: any;
-            }>('/auth/user/login', loginData, { timeoutMs: 30000 });
-
-            if (response.success && response.accessToken) {
-                // Store tokens and user data
-                await api.setTokens(response.accessToken, response.refreshToken);
-                await api.setUser(response.user);
-                onLoginSuccess();
-            } else {
-                setError('Login failed. Please check your credentials.');
-            }
+            await sessionManager.loginWithPassword(email.trim(), password);
+            onLoginSuccess();
         } catch (err: any) {
             console.error('Login error:', err);
             setError(err?.message || 'Login failed. Please try again.');

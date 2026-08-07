@@ -13,12 +13,12 @@ import {
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import GoogleIcon from '../../assets/icons/icon_google_brand.svg';
 import EyeOpenIcon from '../../assets/icons/icon_eye_open.svg';
 import EyeClosedIcon from '../../assets/icons/icon_eye_closed.svg';
 import { LinearGradient } from 'expo-linear-gradient';
+import { sessionManager } from '../services/SessionManager';
 
 interface RegisterScreenProps {
     onRegisterSuccess: () => void;
@@ -112,41 +112,16 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
         setLoading(true);
 
         try {
-            const response = await api.post<{
-                success: boolean;
-                accessToken: string;
-                refreshToken: string;
-                user: any;
-            }>('/auth/user/register', {
+            await sessionManager.registerCustomer({
                 email: formData.email.trim(),
                 phone: formatPhone(formData.phone),
                 password: formData.password,
                 firstName: formData.firstName.trim(),
                 lastName: formData.lastName.trim(),
+                dateOfBirth: formData.dateOfBirth || undefined,
+                gender: formData.gender || undefined,
             });
-
-            if (response.success && response.accessToken) {
-                // Store tokens and user data
-                await api.setTokens(response.accessToken, response.refreshToken);
-
-                let user = response.user;
-
-                if (formData.dateOfBirth || formData.gender) {
-                    try {
-                        user = await api.updateProfile({
-                            dateOfBirth: formData.dateOfBirth || undefined,
-                            gender: formData.gender || undefined,
-                        });
-                    } catch (profileError) {
-                        console.error('Registration profile update error:', profileError);
-                    }
-                }
-
-                await api.setUser(user);
-                onRegisterSuccess();
-            } else {
-                setError(t('registrationFailed'));
-            }
+            onRegisterSuccess();
         } catch (err: any) {
             console.error('Registration error:', err);
             setError(err.message || t('registrationFailed'));

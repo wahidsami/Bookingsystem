@@ -4,8 +4,9 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { getApiUrl, getServerUrl } from '../config/env';
+import { sessionManager } from '../services/SessionManager';
+import { normalizeUser } from '../utils/userNormalization';
 
 export const SERVER_URL = getServerUrl();
 const API_BASE_URL = getApiUrl();
@@ -36,17 +37,9 @@ export const getImageUrl = (path: string | null | undefined): string | undefined
     return `${SERVER_URL}${prefix}${normalizedPath}`;
 };
 
-// Storage keys
 const KEYS = {
-    ACCESS_TOKEN: 'refah_access_token',
-    REFRESH_TOKEN: 'refah_refresh_token',
-    USER: 'refah_user',
     CUSTOMER_APP_CONTENT: 'refah_customer_app_content',
-    SESSION_LAST_ACTIVE: 'refah_session_last_active',
 };
-
-const SESSION_MAX_INACTIVE_DAYS = 90;
-const SESSION_MAX_INACTIVE_MS = SESSION_MAX_INACTIVE_DAYS * 24 * 60 * 60 * 1000;
 
 export interface ApiResponse<T> {
     success: boolean;
@@ -573,52 +566,6 @@ const normalizeServicePaymentOptionsValue = (value: unknown): Array<'at-center' 
     return Array.from(new Set(normalized));
 };
 
-const normalizeNotificationPreferences = (value: unknown): User['notificationPreferences'] => {
-    if (!value || typeof value !== 'object') {
-        return {
-            email: true,
-            sms: true,
-            push: true,
-            whatsapp: false,
-        };
-    }
-
-    const prefs = value as Record<string, unknown>;
-    return {
-        email: toBoolean(prefs.email, true),
-        sms: toBoolean(prefs.sms, true),
-        push: toBoolean(prefs.push, true),
-        whatsapp: toBoolean(prefs.whatsapp, false),
-    };
-};
-
-const normalizeUser = (user: Partial<User> | null | undefined): User => ({
-    id: toStringValue(user?.id),
-    email: toStringValue(user?.email),
-    phone: toStringValue(user?.phone),
-    firstName: toStringValue(user?.firstName, 'Refah'),
-    lastName: toStringValue(user?.lastName),
-    profileImage: toOptionalString(user?.profileImage),
-    createdAt: toOptionalString(user?.createdAt),
-    dateOfBirth: toOptionalString(user?.dateOfBirth),
-    gender: (user?.gender as User['gender']) || '',
-    emailVerified: toBoolean(user?.emailVerified),
-    phoneVerified: toBoolean(user?.phoneVerified),
-    walletBalance: toNumber(user?.walletBalance),
-    loyaltyPoints: toNumber(user?.loyaltyPoints),
-    totalBookings: toNumber(user?.totalBookings),
-    totalSpent: toNumber(user?.totalSpent),
-    preferredLanguage: toOptionalString(user?.preferredLanguage),
-    addressStreet: toOptionalString(user?.addressStreet),
-    addressCity: toOptionalString(user?.addressCity),
-    addressBuilding: toOptionalString(user?.addressBuilding),
-    addressFloor: toOptionalString(user?.addressFloor),
-    addressApartment: toOptionalString(user?.addressApartment),
-    addressPhone: toOptionalString(user?.addressPhone),
-    addressNotes: toOptionalString(user?.addressNotes),
-    notificationPreferences: normalizeNotificationPreferences(user?.notificationPreferences),
-});
-
 export const normalizeTenant = (tenant: Partial<Tenant> | null | undefined): Tenant => ({
     id: toStringValue(tenant?.id),
     name: toStringValue(tenant?.name || tenant?.name_en || tenant?.name_ar, 'Refah'),
@@ -1002,164 +949,24 @@ class ApiClient {
         }
     }
 
-    /**
-     * Get stored access token (using SecureStore for tokens)
-     */
-    private async getToken(): Promise<string | null> {
-        try {
-            return await SecureStore.getItemAsync(KEYS.ACCESS_TOKEN);
-        } catch (error) {
-            console.error('Error getting token:', error);
-            return null;
-        }
-    }
-
-    /**
-     * Get stored refresh token
-     */
-    private async getRefreshToken(): Promise<string | null> {
-        try {
-            return await SecureStore.getItemAsync(KEYS.REFRESH_TOKEN);
-        } catch (error) {
-            console.error('Error getting refresh token:', error);
-            return null;
-        }
-    }
-
-    /**
-     * Store tokens securely (using SecureStore for sensitive data)
-     */
     async setTokens(accessToken: string, refreshToken?: string | null): Promise<void> {
-        try {
-            await SecureStore.setItemAsync(KEYS.ACCESS_TOKEN, accessToken);
-            const normalizedRefresh = `${refreshToken ?? ''}`.trim();
-            if (normalizedRefresh) {
-                await SecureStore.setItemAsync(KEYS.REFRESH_TOKEN, normalizedRefresh);
-            }
-            await this.touchSession();
-        } catch (error) {
-            console.error('Error storing tokens:', error);
-        }
+        await sessionManager.setTokens(accessToken, refreshToken ?? null);
     }
 
-    /**
-     * Clear tokens (logout)
-     */
     async clearTokens(): Promise<void> {
-        try {
-            await SecureStore.deleteItemAsync(KEYS.ACCESS_TOKEN);
-            await SecureStore.deleteItemAsync(KEYS.REFRESH_TOKEN);
-            await AsyncStorage.removeItem(KEYS.USER);
-            await AsyncStorage.removeItem(KEYS.SESSION_LAST_ACTIVE);
-        } catch (error) {
-            console.error('Error clearing tokens:', error);
-        }
+        await sessionManager.logout();
     }
 
     async touchSession(): Promise<void> {
-        try {
-            await AsyncStorage.setItem(KEYS.SESSION_LAST_ACTIVE, new Date().toISOString());
-        } catch (error) {
-            console.error('Error updating session activity:', error);
-        }
-    }
-
-    async getLastSessionActivity(): Promise<Date | null> {
-        try {
-            const rawValue = await AsyncStorage.getItem(KEYS.SESSION_LAST_ACTIVE);
-            if (!rawValue) {
-                return null;
-            }
-
-            const parsed = new Date(rawValue);
-            return Number.isNaN(parsed.getTime()) ? null : parsed;
-        } catch (error) {
-            console.error('Error reading session activity:', error);
-            return null;
-        }
-    }
-
-    async isSessionExpired(): Promise<boolean> {
-        const lastActive = await this.getLastSessionActivity();
-        if (!lastActive) {
-            return false;
-        }
-
-        return Date.now() - lastActive.getTime() > SESSION_MAX_INACTIVE_MS;
+        await sessionManager.touch();
     }
 
     async hasActiveSession(): Promise<boolean> {
-        let token = await this.getToken();
-        const refreshToken = await this.getRefreshToken();
-
-        const expired = await this.isSessionExpired();
-        if (expired) {
-            await this.clearTokens();
-            return false;
-        }
-
-        // If access token is missing but refresh token exists, recover session silently.
-        if (!token) {
-            const refreshedToken = await this.refreshAccessToken();
-            if (!refreshedToken) {
-                // Keep the user signed in when refresh token still exists.
-                // This prevents silent logout during transient network outages.
-                return Boolean(refreshToken);
-            }
-            token = refreshedToken;
-        }
-
-        const lastActive = await this.getLastSessionActivity();
-        if (!lastActive) {
-            await this.touchSession();
-        }
-
-        return Boolean(token);
+        return sessionManager.hasActiveSession();
     }
 
-    /**
-     * Refresh access token using refresh token
-     */
     async refreshAccessToken(): Promise<string | null> {
-        const refreshToken = await this.getRefreshToken();
-        if (!refreshToken) return null;
-
-        try {
-            const response = await this.fetchWithTimeout(`${this.baseURL}/auth/user/refresh-token`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ refreshToken }),
-            });
-
-            if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                    await this.clearTokens();
-                }
-                return null;
-            }
-
-            const data = await response.json();
-            if (data.success && data.accessToken) {
-                const nextRefreshToken = data.refreshToken || refreshToken;
-                await this.setTokens(data.accessToken, nextRefreshToken);
-                await this.touchSession();
-                return data.accessToken;
-            }
-
-            if (data?.message && `${data.message}`.toLowerCase().includes('expired')) {
-                await this.clearTokens();
-            }
-
-            return null;
-        } catch (error) {
-            console.error('Token refresh failed:', error);
-            // Keep session data on transient network/runtime failures.
-            // We'll only clear tokens when backend explicitly rejects token validity.
-            return null;
-        }
+        return sessionManager.refreshAccessToken();
     }
 
     /**
@@ -1169,7 +976,7 @@ class ApiClient {
         endpoint: string,
         options: RequestInit & { timeoutMs?: number } = {}
     ): Promise<Response> {
-        const token = await this.getToken();
+        const token = await sessionManager.getAccessToken();
         const url = `${this.baseURL}${endpoint}`;
         const { timeoutMs, ...requestOptions } = options;
 
@@ -1197,7 +1004,7 @@ class ApiClient {
 
         // If 401, try to refresh token and retry once (even if access token was missing)
         if (response.status === 401) {
-            const newToken = await this.refreshAccessToken();
+            const newToken = await sessionManager.refreshAccessToken();
             if (newToken) {
                 // Retry with new token
                 headers['Authorization'] = `Bearer ${newToken}`;
@@ -1342,31 +1149,21 @@ class ApiClient {
      * Check if user is authenticated
      */
     async isAuthenticated(): Promise<boolean> {
-        return this.hasActiveSession();
+        return sessionManager.isAuthenticated();
     }
 
     /**
      * Get stored user data
      */
     async getUser(): Promise<User | null> {
-        try {
-            const userJson = await AsyncStorage.getItem(KEYS.USER);
-            return userJson ? normalizeUser(JSON.parse(userJson)) : null;
-        } catch (error) {
-            console.error('Error getting user:', error);
-            return null;
-        }
+        return sessionManager.getUser();
     }
 
     /**
      * Store user data
      */
     async setUser(user: User): Promise<void> {
-        try {
-            await AsyncStorage.setItem(KEYS.USER, JSON.stringify(normalizeUser(user)));
-        } catch (error) {
-            console.error('Error storing user:', error);
-        }
+        await sessionManager.setUser(user);
     }
 
     /**

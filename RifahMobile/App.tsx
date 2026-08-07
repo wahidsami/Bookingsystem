@@ -13,17 +13,15 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { NavigationContainer } from '@react-navigation/native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { ThemedAlertProvider } from './src/components/ThemedAlertProvider';
-import { api } from './src/api/client';
 import { AppSessionProvider } from './src/contexts/AppSessionContext';
 import { consumePendingNotificationCampaignId, consumePendingNotificationInviteToken, initializeNotificationHandling, registerCustomerPushNotifications, unregisterCustomerPushNotifications } from './src/lib/notifications';
 import { navigationRef, navigateToAppointmentInvite, navigateToGiftClaim, navigateToNotifications, navigateToProfile, navigateToPurchases, navigateToReview, navigateToWalletBalanceDetails } from './src/navigation/navigationService';
 import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
 import { AuthInitialRoute, AuthNavigator } from './src/navigation/AuthNavigator';
 import { StaffRootNavigator } from './src/navigation/StaffRootNavigator';
-import type { StaffProfile } from './src/api/client';
+import { sessionManager } from './src/services/SessionManager';
 
 type AppPhase = 'splash' | 'onboarding' | 'auth' | 'home';
-type AppMode = 'customer' | 'staff';
 type PendingDeepLink =
   | { kind: 'booking'; token: string }
   | { kind: 'order'; orderId?: string }
@@ -54,16 +52,14 @@ function AppContent() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [hasSavedLanguage, setHasSavedLanguage] = useState(false);
   const [authInitialRoute, setAuthInitialRoute] = useState<AuthInitialRoute>('Welcome');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [appMode, setAppMode] = useState<AppMode>('customer');
-  const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(null);
+  const [sessionSnapshot, setSessionSnapshot] = useState(sessionManager.getSnapshot());
   const { setLanguage } = useLanguage();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const [pendingDeepLink, setPendingDeepLink] = useState<PendingDeepLink | null>(null);
   const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null);
 
   const flushDeferredDeepLinks = () => {
-    if (!isAuthenticated || appPhase !== 'home' || !navigationRef.isReady()) {
+    if (!sessionSnapshot.authenticated || appPhase !== 'home' || !navigationRef.isReady()) {
       return;
     }
 
@@ -192,6 +188,10 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
+    return sessionManager.subscribe(setSessionSnapshot);
+  }, []);
+
+  useEffect(() => {
     const handleUrl = (url?: string | null) => {
       const resetToken = extractPasswordResetToken(url);
       if (resetToken) {
@@ -255,35 +255,34 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!sessionSnapshot.authenticated) {
       return;
     }
 
-    api.touchSession().catch(() => undefined);
+    sessionManager.touch().catch(() => undefined);
     registerCustomerPushNotifications().catch((error) => {
       console.warn('Customer push registration warning:', error?.message || error);
     });
-  }, [isAuthenticated]);
+  }, [sessionSnapshot.authenticated]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       const wasBackgrounded = /inactive|background/.test(appStateRef.current);
       appStateRef.current = nextState;
 
-      if (!isAuthenticated || !wasBackgrounded || nextState !== 'active') {
+      if (!sessionSnapshot.authenticated || !wasBackgrounded || nextState !== 'active') {
         return;
       }
 
       void (async () => {
-        const hasActiveSession = await api.hasActiveSession();
+        const hasActiveSession = await sessionManager.ensureSession();
         if (!hasActiveSession) {
-          setIsAuthenticated(false);
           setAuthInitialRoute('Welcome');
           setAppPhase('auth');
           return;
         }
 
-        await api.touchSession().catch(() => undefined);
+        await sessionManager.touch().catch(() => undefined);
         registerCustomerPushNotifications().catch((error) => {
           console.warn('Customer push refresh warning:', error?.message || error);
         });
@@ -293,24 +292,16 @@ function AppContent() {
     return () => {
       subscription.remove();
     };
-  }, [isAuthenticated]);
+  }, [sessionSnapshot.authenticated]);
 
   useEffect(() => {
     flushDeferredDeepLinks();
-  }, [pendingDeepLink, isAuthenticated, appPhase]);
+  }, [pendingDeepLink, sessionSnapshot.authenticated, appPhase]);
 
   const loadFontsAndLanguage = async () => {
     await loadFonts();
     setFontsLoaded(true);
     await checkAppState();
-  };
-
-  const resolveAppMode = async (): Promise<AppMode> => {
-    const nextStaffProfile = await api.getStaffProfile().catch(() => null);
-    setStaffProfile(nextStaffProfile);
-    const nextMode: AppMode = nextStaffProfile ? 'staff' : 'customer';
-    setAppMode(nextMode);
-    return nextMode;
   };
 
   const checkAppState = async () => {
@@ -331,15 +322,11 @@ function AppContent() {
     } else if (!onboardingCompleted) {
       setAppPhase('onboarding');
     } else {
-      const authenticated = await api.hasActiveSession();
-      setIsAuthenticated(authenticated);
+      const session = await sessionManager.bootstrap();
       setAuthInitialRoute('Welcome');
-      if (authenticated) {
-        await resolveAppMode().catch(() => undefined);
+      if (session.authenticated) {
         setAppPhase('home');
       } else {
-        setAppMode('customer');
-        setStaffProfile(null);
         setAppPhase('auth');
       }
     }
@@ -357,26 +344,19 @@ function AppContent() {
   };
 
   const handleLoginSuccess = () => {
-    api.touchSession().catch(() => undefined);
-    void resolveAppMode().catch(() => undefined);
-    setIsAuthenticated(true);
+    sessionManager.touch().catch(() => undefined);
     setAppPhase('home');
   };
 
   const handleRegisterSuccess = () => {
-    api.touchSession().catch(() => undefined);
-    void resolveAppMode().catch(() => undefined);
-    setIsAuthenticated(true);
+    sessionManager.touch().catch(() => undefined);
     setAppPhase('home');
   };
 
   const handleLogout = async () => {
     await unregisterCustomerPushNotifications();
-    await api.clearTokens();
-    setIsAuthenticated(false);
+    await sessionManager.logout();
     setAuthInitialRoute('Welcome');
-    setAppMode('customer');
-    setStaffProfile(null);
     setAppPhase('auth');
   };
 
@@ -386,9 +366,14 @@ function AppContent() {
   }
 
   return (
-      <AppSessionProvider
+    <AppSessionProvider
       value={{
-        isAuthenticated,
+        isAuthenticated: sessionSnapshot.authenticated,
+        sessionReady: sessionSnapshot.ready,
+        bootstrapping: sessionSnapshot.bootstrapping,
+        user: sessionSnapshot.user,
+        staffProfile: sessionSnapshot.staffProfile,
+        appMode: sessionSnapshot.appMode,
         login: handleLoginSuccess,
         logout: handleLogout,
         showLogin: () => {
@@ -404,8 +389,9 @@ function AppContent() {
           setAppPhase('auth');
         },
         continueAsGuest: () => setAppPhase('home'),
+        refreshSession: async () => sessionManager.ensureSession(),
         ensureAuthenticated: (onAuthenticated?: () => void) => {
-          if (!isAuthenticated) {
+          if (!sessionSnapshot.authenticated) {
             setAuthInitialRoute('Login');
             setAppPhase('auth');
             return false;
@@ -468,7 +454,7 @@ function AppContent() {
                 .catch(() => undefined);
             }}
           >
-            {appMode === 'staff' ? <StaffRootNavigator profile={staffProfile} /> : <RootNavigator />}
+            {sessionSnapshot.appMode === 'staff' ? <StaffRootNavigator profile={sessionSnapshot.staffProfile} /> : <RootNavigator />}
           </NavigationContainer>
           <StatusBar style="dark" />
         </ServiceBookingCartProvider>
