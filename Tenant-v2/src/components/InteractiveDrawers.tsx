@@ -4,13 +4,14 @@ import {
   X, Calendar as CalendarIcon, User, Users, PlusCircle, Check, 
   Trash, ChevronLeft, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search
 } from 'lucide-react';
+import ExpandableServiceRow from './ExpandableServiceRow';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import {
   getServiceDisplayName,
-  getServiceDisplayPrice,
   groupServicesByCategory,
   normalizeServiceRecord,
-  type ServiceRecord
+  type ServiceRecord,
+  type ServiceVariantRecord
 } from '../lib/serviceContract';
 import {
   PRODUCT_CATEGORY_OPTIONS,
@@ -458,6 +459,7 @@ export default function InteractiveDrawers({
   const [currentServiceNotes, setCurrentServiceNotes] = useState<string>('');
   const [serviceSearch, setServiceSearch] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
+  const [expandedServiceIds, setExpandedServiceIds] = useState<Record<string, boolean>>({});
   const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
   const [editingQueueDraft, setEditingQueueDraft] = useState<QueuedServiceEditDraft | null>(null);
   const canonicalServices = useMemo<ServiceRecord[]>(() => services.map((service) => normalizeServiceRecord(service)), [services]);
@@ -507,7 +509,8 @@ export default function InteractiveDrawers({
         service.parentService,
         service.descriptionAr,
         service.descriptionEn,
-        service.description,
+        service.descriptionEn,
+        service.descriptionAr,
         ...(Array.isArray(service.variants) ? service.variants.flatMap((variant) => [
           variant.nameAr,
           variant.nameEn,
@@ -840,7 +843,42 @@ export default function InteractiveDrawers({
     }
   }, [currentServiceId, currentStaffId, createStep, isCreateDrawerOpen, canonicalServices]);
 
-  const handleAddStagedService = (serviceOverride?: ServiceRecord) => {
+  const removeQueuedService = (serviceId: string, variantId?: string | null) => {
+    setStagedServices((current) => current.filter((item) => {
+      if (item.serviceId !== serviceId) {
+        return true;
+      }
+
+      if (variantId) {
+        return item.variantId !== variantId;
+      }
+
+      return Boolean(item.variantId);
+    }));
+  };
+
+  const isQueuedServiceSelected = (serviceId: string, variantId?: string | null) => {
+    return stagedServices.some((item) => {
+      if (item.serviceId !== serviceId) {
+        return false;
+      }
+
+      if (variantId) {
+        return item.variantId === variantId;
+      }
+
+      return !item.variantId;
+    });
+  };
+
+  const toggleServiceExpansion = (serviceId: string) => {
+    setExpandedServiceIds((current) => ({
+      ...current,
+      [serviceId]: !current[serviceId]
+    }));
+  };
+
+  const handleAddStagedService = (serviceOverride?: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
     const resolvedServiceId = `${serviceOverride?.id || currentServiceId || ''}`.trim();
     const srv = serviceOverride || canonicalServices.find(s => s.id === resolvedServiceId);
     if (!srv) return;
@@ -850,9 +888,10 @@ export default function InteractiveDrawers({
       return;
     }
 
-    const resolvedVariant = serviceOverride
-      ? null
-      : srv.variants.find((variant) => variant.id === currentVariantId) || srv.variants[0] || null;
+    const resolvedVariant = variantOverride
+      || (serviceOverride
+        ? null
+        : srv.variants.find((variant) => variant.id === currentVariantId) || srv.variants[0] || null);
 
     let nextStartTime = currentStartTime;
     if (stagedServices.length > 0) {
@@ -882,8 +921,14 @@ export default function InteractiveDrawers({
     );
   };
 
-  const handleQuickAddService = (service: ServiceRecord) => {
-    handleAddStagedService(service);
+  const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
+    const isSelected = isQueuedServiceSelected(service.id, variantOverride?.id || null);
+    if (isSelected) {
+      removeQueuedService(service.id, variantOverride?.id || null);
+      return;
+    }
+
+    handleAddStagedService(service, variantOverride);
   };
 
   const handleConfirmAppointmentCreation = async () => {
@@ -2085,7 +2130,7 @@ export default function InteractiveDrawers({
                               </div>
                             </div>
 
-                            <div className="space-y-4 p-5 sm:p-6">
+                            <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-5 pr-2 sm:p-6">
                               <div className="relative">
                                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                 <input
@@ -2118,68 +2163,50 @@ export default function InteractiveDrawers({
                               </div>
 
                               {filteredCategoryServices.length > 0 ? (
-                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                                <div className="space-y-3">
                                   {filteredCategoryServices.map((service) => {
-                                    const displayPrice = getServiceDisplayPrice(service);
                                     const serviceVariants = Array.isArray(service.variants) ? service.variants : [];
-                                    const serviceName = getServiceDisplayName(service, isRtl ? 'ar' : 'en');
-                                    const serviceCategoryLabel = (service.category || service.parentName || service.parentService || service.categoryAr || service.categoryEn || '').trim();
-                                    const hasAssignments = Array.isArray(service.employeeAssignments) && service.employeeAssignments.length > 0;
+                                    const isExpanded = Boolean(expandedServiceIds[service.id]);
+                                    const parentAdded = isQueuedServiceSelected(service.id, null);
+                                    const assignedStaffNames = (service.employeeAssignments || [])
+                                      .map((staffId) => {
+                                        const stylist = availableStylists.find((item) => item.id === staffId);
+                                        return stylist ? (isRtl ? stylist.nameAr : stylist.nameEn) : '';
+                                      })
+                                      .filter(Boolean);
+
                                     return (
-                                      <article
-                                        key={service.id}
-                                        className="group overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
-                                      >
-                                        <div className="flex h-full flex-col gap-4 p-4 sm:p-5">
-                                          <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                              <p className="truncate text-lg font-semibold tracking-tight text-slate-900">{serviceName}</p>
-                                              <div className="mt-2 flex flex-wrap gap-2">
-                                                {serviceCategoryLabel ? (
-                                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                                                    {serviceCategoryLabel}
-                                                  </span>
-                                                ) : null}
-                                                <span className="rounded-full bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                                                  {serviceVariants.length > 0
-                                                    ? (isRtl ? `${serviceVariants.length} بديل` : `${serviceVariants.length} variants`)
-                                                    : (isRtl ? 'خدمة مباشرة' : 'Direct service')}
-                                                </span>
-                                              </div>
+                                      <div key={service.id} className="space-y-2">
+                                        <ExpandableServiceRow
+                                          service={service}
+                                          isRtl={isRtl}
+                                          isAdded={parentAdded}
+                                          canExpand={serviceVariants.length > 0}
+                                          isExpanded={isExpanded}
+                                          onToggleExpand={() => toggleServiceExpansion(service.id)}
+                                          onToggleAdd={() => handleToggleServiceSelection(service)}
+                                          assignedStaffNames={assignedStaffNames}
+                                          description={service.descriptionEn || service.descriptionAr || ''}
+                                        >
+                                          {isExpanded && serviceVariants.length > 0 ? (
+                                            <div className="space-y-2">
+                                              {serviceVariants.map((variant) => (
+                                                <React.Fragment key={variant.id}>
+                                                  <ExpandableServiceRow
+                                                    service={service}
+                                                    variant={variant}
+                                                    isRtl={isRtl}
+                                                    depth={1}
+                                                    isAdded={isQueuedServiceSelected(service.id, variant.id)}
+                                                    onToggleAdd={() => handleToggleServiceSelection(service, variant)}
+                                                    description={variant.descriptionEn || variant.descriptionAr || variant.description || ''}
+                                                  />
+                                                </React.Fragment>
+                                              ))}
                                             </div>
-                                            <button
-                                              type="button"
-                                              onClick={() => handleQuickAddService(service)}
-                                              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
-                                            >
-                                              <PlusCircle className="h-4 w-4" />
-                                              <span>{isRtl ? 'إضافة' : 'Add'}</span>
-                                            </button>
-                                          </div>
-
-                                          <div className="grid gap-3 sm:grid-cols-2">
-                                            <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                                              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">{isRtl ? 'المدة' : 'Duration'}</p>
-                                              <p className="mt-1 text-lg font-semibold text-slate-900">{service.duration} {isRtl ? 'دقيقة' : 'min'}</p>
-                                            </div>
-                                            <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                                              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">{isRtl ? 'السعر' : 'Price'}</p>
-                                              <p className="mt-1 text-lg font-semibold text-slate-900">{Number(displayPrice || 0).toFixed(2)} SAR</p>
-                                            </div>
-                                          </div>
-
-                                          <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
-                                            <span className="truncate">
-                                              {hasAssignments
-                                                ? (isRtl ? 'متاح لأخصائيات محددات' : 'Available with assigned staff')
-                                                : (isRtl ? 'يتبع إعدادات التعيين التلقائي' : 'Uses the default assignment rules')}
-                                            </span>
-                                            <span className="font-semibold text-slate-400">
-                                              {isRtl ? 'بطاقة جاهزة للإضافة' : 'Ready to add'}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </article>
+                                          ) : null}
+                                        </ExpandableServiceRow>
+                                      </div>
                                     );
                                   })}
                                 </div>
