@@ -88,6 +88,9 @@ export default function ExpandableServiceRow({
               <p className={`truncate font-semibold tracking-tight text-slate-900 ${isVariantRow ? 'text-sm' : 'text-base sm:text-lg'}`}>
                 {title}
               </p>
+              <div className="mt-1 inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                {price.toFixed(2)} SAR
+              </div>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -168,9 +171,6 @@ export default function ExpandableServiceRow({
             </div>
           ) : null}
 
-          {!isExpanded && isVariantRow && resolvedDescription ? (
-            <p className="truncate text-[11px] text-slate-500">{resolvedDescription}</p>
-          ) : null}
         </div>
       </div>
     </article>
