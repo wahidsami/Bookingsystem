@@ -3364,7 +3364,19 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   });
 
   const schedulerColumns: SchedulerColumn[] = isDayBoardMode(viewMode)
-    ? visibleTeamStylists
+    ? liveStylists
+        .filter((stylist) => {
+          if (focusedEmployeeId) {
+            return stylist.id === focusedEmployeeId;
+          }
+
+          const selectedTeamCount = visibleEmployeeIds.length > 0 ? visibleEmployeeIds.length : liveStylists.length;
+          if (selectedTeamCount === liveStylists.length) {
+            return true;
+          }
+
+          return visibleEmployeeIds.includes(stylist.id);
+        })
         .map((stylist) => ({
           id: getSchedulerColumnId(viewMode, stylist.id),
           kind: 'employee',
@@ -3436,16 +3448,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     : null;
   const boardModeLabel = getBoardModeLabel(viewMode, isRtl);
   const allEmployeeIds = useMemo(() => liveStylists.map((stylist) => stylist.id), [liveStylists]);
-  const visibleEmployeeIdSet = useMemo(() => new Set(visibleEmployeeIds), [visibleEmployeeIds]);
   const teamMembersDraftSet = useMemo(() => new Set(teamMembersDraftIds), [teamMembersDraftIds]);
-  const visibleTeamStylists = useMemo(() => {
-    if (focusedEmployeeId) {
-      return liveStylists.filter((stylist) => stylist.id === focusedEmployeeId);
-    }
-
-    const selectedStylists = liveStylists.filter((stylist) => visibleEmployeeIdSet.has(stylist.id));
-    return selectedStylists.length > 0 ? selectedStylists : liveStylists;
-  }, [focusedEmployeeId, liveStylists, visibleEmployeeIdSet]);
   const isAllTeamMembersDraftSelected = allEmployeeIds.length > 0 && teamMembersDraftIds.length === allEmployeeIds.length;
   const isTeamMembersPopoverReady = liveStylists.length > 0;
 
