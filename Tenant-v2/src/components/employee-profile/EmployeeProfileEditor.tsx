@@ -32,9 +32,17 @@ export default function EmployeeProfileEditor({
   
   // Guided form editor active section
   const [activeFormSection, setActiveFormSection] = useState<'basic' | 'bio' | 'finance' | 'schedule' | 'access'>('basic');
+  const steps: Array<'basic' | 'bio' | 'finance' | 'schedule' | 'access'> = ['basic', 'bio', 'finance', 'schedule', 'access'];
+  const activeStepIndex = steps.indexOf(activeFormSection);
+  const canGoBack = activeStepIndex > 0;
+  const canGoNext = activeStepIndex >= 0 && activeStepIndex < steps.length - 1;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    onSave(formData, employeePhotoFile, staffAppPermissions);
+  };
+
+  const handlePersist = () => {
     onSave(formData, employeePhotoFile, staffAppPermissions);
   };
 
@@ -144,43 +152,54 @@ export default function EmployeeProfileEditor({
           </div>
 
           {/* Step Navigation Actions footer panel */}
-          <div className="pt-6 border-t border-slate-100 flex justify-between items-center mt-6">
+          <div className="pt-6 border-t border-slate-100 flex flex-col gap-3 mt-6 lg:flex-row lg:items-center lg:justify-between">
             
-            {/* Back Cancel triggers */}
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-neutral-600 rounded-xl text-xs font-bold cursor-pointer transition-all"
-            >
-              {isRtl ? 'تراجع والعودة للقائمة' : 'Back to Directory'}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-neutral-600 rounded-xl text-xs font-bold cursor-pointer transition-all"
+              >
+                {isRtl ? 'تراجع والعودة للقائمة' : 'Back to Directory'}
+              </button>
 
-            {/* Confirm Save triggers */}
-            <div className="flex gap-2">
-              {activeFormSection !== 'access' ? (
+              {canGoBack && (
                 <button
                   type="button"
-                  onClick={() => {
-                    // Progress forward
-                    const steps: Array<'basic' | 'bio' | 'finance' | 'schedule' | 'access'> = ['basic', 'bio', 'finance', 'schedule', 'access'];
-                    const idx = steps.indexOf(activeFormSection);
-                    if (idx !== -1 && idx < steps.length - 1) {
-                      setActiveFormSection(steps[idx + 1]);
-                    }
-                  }}
+                  onClick={() => setActiveFormSection(steps[activeStepIndex - 1])}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black cursor-pointer transition-all"
+                >
+                  {isRtl ? 'الخطوة السابقة' : 'Previous Step'}
+                </button>
+              )}
+
+              {canGoNext && (
+                <button
+                  type="button"
+                  onClick={() => setActiveFormSection(steps[activeStepIndex + 1])}
                   className="px-4 py-2 bg-zinc-900 hover:bg-zinc-850 text-white rounded-xl text-xs font-black cursor-pointer transition-all"
                 >
                   {isRtl ? 'الخطوة التالية' : 'Next Step'}
                 </button>
-              ) : (
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black cursor-pointer transition-all shadow-md shadow-indigo-600/10 flex items-center gap-1.5 animate-bounce-short"
-                >
-                  <Check size={14} />
-                  <span>{formMode === 'add' ? (isRtl ? 'تعيين ونشر الملف المكتمل' : 'Deploy Completed Profile') : (isRtl ? 'حفظ وحقن التعديلات' : 'Commit Changes')}</span>
-                </button>
               )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePersist}
+                className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black cursor-pointer transition-all"
+              >
+                {isRtl ? 'حفظ مسودة' : 'Save Draft'}
+              </button>
+              <button
+                type="button"
+                onClick={handlePersist}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black cursor-pointer transition-all shadow-md shadow-indigo-600/10 flex items-center gap-1.5"
+              >
+                <Check size={14} />
+                <span>{isRtl ? 'حفظ الموظف' : 'Save Employee'}</span>
+              </button>
             </div>
 
           </div>

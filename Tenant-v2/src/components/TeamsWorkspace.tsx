@@ -515,7 +515,7 @@ export default function TeamsWorkspace({
         roleAr: getRoleLabel(emp.position).roleAr,
         avatar: emp.avatar || resolveEmployeeImageUrl(emp.photo || emp.profileImage),
         rating: parseFloat(emp.rating || 5.0),
-        status: emp.isActive ? 'active' : 'off',
+        status: emp.status || (emp.isActive ? 'active' : 'off'),
         email: emp.email || '',
         phone: emp.phone || '',
         joinedDate: emp.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
@@ -963,17 +963,33 @@ export default function TeamsWorkspace({
     if (!activeMember) {
       return;
     }
-    setTeamMembers(prev => prev.map(m => {
-      if (m.id === activeMember.id) {
-        return { ...m, status: newStatus };
-      }
-      return m;
-    }));
-    triggerToast(
-      `Duty status updated to ${newStatus.toUpperCase()}`,
-      `تم تحديث حالة العضو إلى ${newStatus === 'active' ? 'نشط في العمل' : newStatus === 'break' ? 'في استراحة' : 'خارج الخدمة'}`,
-      'info'
-    );
+    const nextPayload = new FormData();
+    nextPayload.append('status', newStatus);
+    nextPayload.append('isActive', String(newStatus !== 'off'));
+
+    void tenantApiAdapter.updateEmployee(activeMember.id, nextPayload)
+      .then(() => {
+        setTeamMembers(prev => prev.map(m => {
+          if (m.id === activeMember.id) {
+            return { ...m, status: newStatus, isActive: newStatus !== 'off' };
+          }
+          return m;
+        }));
+        setFormData((prev) => (
+          prev.id === activeMember.id
+            ? { ...prev, status: newStatus, isActive: newStatus !== 'off' }
+            : prev
+        ));
+        triggerToast(
+          `Duty status updated to ${newStatus.toUpperCase()}`,
+          `تم تحديث حالة العضو إلى ${newStatus === 'active' ? 'نشط في العمل' : newStatus === 'break' ? 'في استراحة' : 'خارج الخدمة'}`,
+          'info'
+        );
+      })
+      .catch((error) => {
+        console.error(error);
+        triggerToast('Failed to update duty status.', 'تعذر تحديث حالة العضو.', 'error');
+      });
   };
 
   // Save Team Member Action
@@ -1023,6 +1039,7 @@ export default function TeamsWorkspace({
       payload.append('scheduleVisibilityWeeks', String(submittedData.scheduleVisibilityWeeks || 1));
       payload.append('staffAppPassword', submittedData.staffAppPassword || '');
       payload.append('dashboardPermissions', JSON.stringify(submittedData.dashboardPermissions || {}));
+      payload.append('status', submittedData.status);
       payload.append('isActive', String(submittedData.status === 'active'));
 
       if (photo) {

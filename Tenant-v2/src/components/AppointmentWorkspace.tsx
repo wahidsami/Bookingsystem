@@ -133,11 +133,12 @@ interface GiftCardPackage {
   imageUrl?: string | null;
 }
 
-type SchedulerBoardMode = 'team-day' | 'team-week' | 'employee-day' | 'employee-week' | 'agenda';
+type SchedulerBoardMode = 'team-day' | 'team-week' | 'employee-day' | 'employee-week' | 'agenda' | 'month';
 
 const isEmployeeBoardMode = (mode: SchedulerBoardMode) => mode === 'employee-day' || mode === 'employee-week';
 const isWeekBoardMode = (mode: SchedulerBoardMode) => mode === 'team-week' || mode === 'employee-week';
 const isDayBoardMode = (mode: SchedulerBoardMode) => mode === 'team-day' || mode === 'employee-day';
+const isMonthBoardMode = (mode: SchedulerBoardMode) => mode === 'month';
 
 const getBoardModeLabel = (mode: SchedulerBoardMode, isRtl: boolean) => {
   switch (mode) {
@@ -151,6 +152,8 @@ const getBoardModeLabel = (mode: SchedulerBoardMode, isRtl: boolean) => {
       return isRtl ? 'موظف - أسبوع' : 'Employee Week';
     case 'agenda':
       return isRtl ? 'الأجندة' : 'Agenda';
+    case 'month':
+      return isRtl ? 'الشهر' : 'Month';
     default:
       return mode;
   }
@@ -509,7 +512,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           top,
           right,
           width: menuWidth,
-          zIndex: 220
+          zIndex: 9999
         });
         return;
       }
@@ -524,7 +527,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         top,
         left,
         width: menuWidth,
-        zIndex: 220
+        zIndex: 9999
       });
     };
 
@@ -582,7 +585,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           tenantApiAdapter.getProducts()
         ]);
         
-        const employees = empRes?.employees || [];
+        const employees = (empRes?.employees || []).filter((emp: any) => `${emp?.status || ''}`.toLowerCase() !== 'off' && emp?.isActive !== false);
         setLiveStylists(employees.map((emp: any, index: number) => ({
           id: emp.id,
           nameEn: emp.name,
@@ -590,7 +593,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           roleEn: emp.title || 'Staff',
           roleAr: emp.title || 'موظف',
           avatar: resolveEmployeeImageUrl(emp.avatar || emp.photo || emp.profileImage),
-          color: API_COLORS[index % API_COLORS.length]
+          color: API_COLORS[index % API_COLORS.length],
+          status: emp.status || (emp.isActive === false ? 'off' : 'active')
         })));
 
         const services = srvRes?.services || [];
@@ -2150,7 +2154,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   const handleDayShift = (days: number) => {
     const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + days);
+    if (isMonthBoardMode(viewMode)) {
+      newDate.setMonth(newDate.getMonth() + days);
+    } else {
+      newDate.setDate(newDate.getDate() + days);
+    }
     setSelectedDate(newDate);
   };
 
@@ -3406,6 +3414,26 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     return list;
   };
 
+  const getMonthCalendarDays = (baseDate: Date) => {
+    const firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+    const monthDays: Array<{ key: string; date: Date; isCurrentMonth: boolean }> = [];
+    const startOffset = firstDay.getDay();
+    const gridStart = new Date(firstDay);
+    gridStart.setDate(firstDay.getDate() - startOffset);
+
+    for (let index = 0; index < 42; index++) {
+      const current = new Date(gridStart);
+      current.setDate(gridStart.getDate() + index);
+      monthDays.push({
+        key: getLocalDateKey(current),
+        date: current,
+        isCurrentMonth: current.getMonth() === baseDate.getMonth()
+      });
+    }
+
+    return monthDays;
+  };
+
   // Filters application
   const filteredAppointments = appointments.filter(apt => {
     const boardFocusStaffId = isEmployeeBoardMode(viewMode) ? focusedEmployeeId : null;
@@ -3433,6 +3461,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     } else if (isWeekBoardMode(viewMode)) {
       const activeBlock = getDaysOfActiveBlock(selectedDate);
       matchesDate = activeBlock.includes(dateStr);
+    } else if (isMonthBoardMode(viewMode)) {
+      const currentMonth = selectedDate.getMonth();
+      const currentYear = selectedDate.getFullYear();
+      const dateValue = parseLocalDateKey(dateStr);
+      matchesDate = dateValue.getFullYear() === currentYear && dateValue.getMonth() === currentMonth;
     } else {
       // Agenda view shows all appointments starting from selected date
       const targetDateStr = getSelectedDateKey();
@@ -3455,6 +3488,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     return `${appointment.blockedType || ''}`.trim().toLowerCase() !== 'lunch';
   });
+  const monthCalendarDays = useMemo(() => getMonthCalendarDays(selectedDate), [selectedDate]);
+  const appointmentsByDate = useMemo(() => {
+    const grouped = new Map<string, Appointment[]>();
+    filteredAppointments.forEach((appointment) => {
+      const dateKey = appointment.date || getSelectedDateKey();
+      const existing = grouped.get(dateKey) || [];
+      existing.push(appointment);
+      grouped.set(dateKey, existing);
+    });
+    return grouped;
+  }, [filteredAppointments]);
 
   const schedulerColumns: SchedulerColumn[] = isDayBoardMode(viewMode)
     ? liveStylists
@@ -3568,7 +3612,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     if (isAllEmployeesVisible || resolvedVisibleEmployeeIds.length === 0) {
-      return isRtl ? '👥 الفريق' : '👥 Team';
+      return isRtl ? '👥 الموظفون' : '👥 Team Members';
     }
 
     if (visibleEmployeeNames.length === 1) {
@@ -3581,7 +3625,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         : `👥 ${visibleEmployeeNames.length} staff`;
     }
 
-    return isRtl ? '👥 الفريق' : '👥 Team';
+    return isRtl ? '👥 الموظفون' : '👥 Team Members';
   }, [allEmployeeIds.length, focusedEmployeeName, isAllEmployeesVisible, isRtl, resolvedVisibleEmployeeIds.length, viewMode, visibleEmployeeNames]);
   const updateVisibleEmployeeIds = useCallback((nextIds: string[]) => {
     const normalized = nextIds
@@ -3979,7 +4023,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   };
 
   return (
-    <div className="space-y-4 select-none font-sans" id="appointments-workspace">
+    <div className="space-y-4 select-none font-sans" id="appointments-workspace" dir={isRtl ? 'rtl' : 'ltr'}>
       
       {/* 1. COMPREHENSIVE CONTROL BAR & BOARD CONTROLS */}
       <div className="relative z-50 bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
@@ -4028,7 +4072,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               />
             </div>
 
-            {/* Day / Week / Agenda views tab */}
+            {/* Time Scope */}
             <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                 <button 
                 onClick={() => {
@@ -4040,7 +4084,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               >
                 {isRtl ? 'يومي' : 'Day'}
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setViewMode(isEmployeeBoardMode(viewMode) ? 'employee-week' : 'team-week');
                 }}
@@ -4050,7 +4094,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               >
                 {isRtl ? 'أسبوعي' : 'Week'}
               </button>
-              <button 
+              <button
+                onClick={() => setViewMode('month')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                  isMonthBoardMode(viewMode) ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {isRtl ? 'شهري' : 'Month'}
+              </button>
+              <button
                 onClick={() => setViewMode('agenda')}
                 className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                   viewMode === 'agenda' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
@@ -4417,11 +4469,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             </div>
 
             {/* THE INTERACTIVE SCHEDULE BOARD CONTAINER */}
-            <div
+              <div
               className="overflow-auto scrollbar-thin relative"
               id="interactive-board-scroll"
               style={{
-                height: viewMode === 'agenda' ? 'auto' : `${activeSchedulerSettings.gridHeight}px`
+                height: viewMode === 'agenda' || viewMode === 'month' ? 'auto' : `${activeSchedulerSettings.gridHeight}px`
               }}
             >
               {isEmployeeBoardMode(viewMode) && focusedEmployee && (
@@ -4442,7 +4494,96 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 </div>
               )}
 
-              {viewMode === 'agenda' ? (
+              {viewMode === 'month' ? (
+                <div className="p-4 bg-white min-h-[420px] space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                        {isRtl ? 'عرض الشهر' : 'Month View'}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 font-semibold mt-1">
+                        {selectedDate.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { month: 'long', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <span className="bg-zinc-900 text-amber-400 px-3 py-1 rounded-lg text-xs font-mono font-black self-start sm:self-auto shadow-xs">
+                      {filteredAppointments.length} {isRtl ? 'مواعيد' : 'Appointments'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    {isRtl
+                      ? ['ح', 'خ', 'ج', 'س', 'ر', 'ث', 'ن']
+                      : ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+                    .map((day) => (
+                      <div key={day} className="px-2 py-1 text-center">{day}</div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-2">
+                    {monthCalendarDays.map((dayCell) => {
+                      const dayAppointments = appointmentsByDate.get(dayCell.key) || [];
+                      const isTodayCell = dayCell.key === getSelectedDateKey();
+                      return (
+                        <button
+                          key={dayCell.key}
+                          type="button"
+                          onClick={() => setSelectedDate(dayCell.date)}
+                          className={`min-h-[120px] rounded-2xl border p-2 text-start transition-all ${
+                            dayCell.isCurrentMonth
+                              ? 'bg-slate-50/70 border-slate-200 hover:border-slate-300'
+                              : 'bg-slate-100/60 border-slate-200 text-slate-400'
+                          } ${isTodayCell ? 'ring-2 ring-amber-400/40 border-amber-300 bg-amber-50/40' : ''}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-[11px] font-black ${isTodayCell ? 'text-amber-700' : 'text-slate-700'}`}>
+                              {dayCell.date.getDate()}
+                            </span>
+                            {dayAppointments.length > 0 && (
+                              <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[9px] font-black text-white">
+                                {dayAppointments.length}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 space-y-1.5">
+                            {dayAppointments.slice(0, 3).map((appointment) => {
+                              const staff = liveStylists.find((stylist) => stylist.id === appointment.staffId);
+                              return (
+                                <div
+                                  key={appointment.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openAppointmentDetails(appointment);
+                                  }}
+                                  className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 shadow-xs transition hover:border-amber-300 hover:shadow-sm"
+                                >
+                                  <p className="truncate text-[10px] font-black text-slate-800">
+                                    {isRtl ? appointment.customerNameAr : appointment.customerNameEn}
+                                  </p>
+                                  <p className="truncate text-[9px] font-semibold text-slate-500">
+                                    {formatMinutesToTime(appointment.startTime)} · {isRtl ? appointment.serviceNameAr : appointment.serviceNameEn}
+                                  </p>
+                                  {staff && (
+                                    <p className="truncate text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                                      {isRtl ? staff.nameAr : staff.nameEn}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {dayAppointments.length > 3 && (
+                              <p className="text-[9px] font-bold text-slate-400">
+                                {isRtl ? `+${dayAppointments.length - 3} مواعيد أخرى` : `+${dayAppointments.length - 3} more`}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : viewMode === 'agenda' ? (
                 /* 1. COMPREHENSIVE AGENDA SCHEDULE VIEW */
                 <div className="p-6 bg-white min-h-[420px]">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4 mb-6 gap-3">

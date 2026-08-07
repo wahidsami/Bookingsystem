@@ -282,32 +282,44 @@ export default function ShiftMatrixSection({ formData, setFormData, isRtl }: Shi
                   </span>
                 </div>
                 
-                <div className="flex items-center gap-2 flex-1 sm:max-w-md">
-                  <input
-                    type="time"
-                    step={900}
-                    disabled={day.status !== 'working'}
-                    value={parseScheduleRange(day.hours).startTime}
-                    onChange={e => handleScheduleTimeChange(idx, 'startTime', e.target.value)}
-                    className={`flex-1 text-center font-bold text-xs font-mono p-2 rounded-xl border transition-all ${
-                      day.status === 'working'
-                        ? 'bg-white border-slate-200 text-neutral-800 focus:ring-1 focus:ring-zinc-900'
-                        : 'bg-neutral-100 border-neutral-100 text-neutral-400 cursor-not-allowed'
-                    }`}
-                  />
-                  <span className="text-neutral-300 font-black text-[10px]">→</span>
-                  <input
-                    type="time"
-                    step={900}
-                    disabled={day.status !== 'working'}
-                    value={parseScheduleRange(day.hours).endTime}
-                    onChange={e => handleScheduleTimeChange(idx, 'endTime', e.target.value)}
-                    className={`flex-1 text-center font-bold text-xs font-mono p-2 rounded-xl border transition-all ${
-                      day.status === 'working'
-                        ? 'bg-white border-slate-200 text-neutral-800 focus:ring-1 focus:ring-zinc-900'
-                        : 'bg-neutral-100 border-neutral-100 text-neutral-400 cursor-not-allowed'
-                    }`}
-                  />
+                <div className="flex flex-col gap-2 flex-1 sm:max-w-md">
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+                    <label className="space-y-1">
+                      <span className="block text-[9px] font-black uppercase tracking-wider text-neutral-400">
+                        {isRtl ? 'من' : 'Start Time'}
+                      </span>
+                      <input
+                        type="time"
+                        step={900}
+                        disabled={day.status !== 'working'}
+                        value={parseScheduleRange(day.hours).startTime}
+                        onChange={e => handleScheduleTimeChange(idx, 'startTime', e.target.value)}
+                        className={`w-full text-center font-bold text-xs font-mono p-2 rounded-xl border transition-all ${
+                          day.status === 'working'
+                            ? 'bg-white border-slate-200 text-neutral-800 focus:ring-1 focus:ring-zinc-900'
+                            : 'bg-neutral-100 border-neutral-100 text-neutral-400 cursor-not-allowed'
+                        }`}
+                      />
+                    </label>
+                    <span className="pb-3 text-neutral-300 font-black text-[10px]">→</span>
+                    <label className="space-y-1">
+                      <span className="block text-[9px] font-black uppercase tracking-wider text-neutral-400">
+                        {isRtl ? 'إلى' : 'End Time'}
+                      </span>
+                      <input
+                        type="time"
+                        step={900}
+                        disabled={day.status !== 'working'}
+                        value={parseScheduleRange(day.hours).endTime}
+                        onChange={e => handleScheduleTimeChange(idx, 'endTime', e.target.value)}
+                        className={`w-full text-center font-bold text-xs font-mono p-2 rounded-xl border transition-all ${
+                          day.status === 'working'
+                            ? 'bg-white border-slate-200 text-neutral-800 focus:ring-1 focus:ring-zinc-900'
+                            : 'bg-neutral-100 border-neutral-100 text-neutral-400 cursor-not-allowed'
+                        }`}
+                      />
+                    </label>
+                  </div>
                   {day.status === 'working' && (
                     <button
                       type="button"
@@ -327,7 +339,7 @@ export default function ShiftMatrixSection({ formData, setFormData, isRtl }: Shi
                   <p className="text-[10px] text-indigo-700 font-black tracking-wider uppercase mb-1">{isRtl ? 'الشيفتات والكتل الإضافية المقررة لهذا اليوم:' : 'Scheduled Daily Sub Shifts:'}</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     {day.subShifts.map((sub) => (
-                      <div key={sub.id} className="bg-white p-2.5 rounded-xl border border-indigo-100/70 flex items-center gap-2">
+                      <div key={sub.id} className="bg-white p-2.5 rounded-xl border border-indigo-100/70 flex flex-col gap-2">
                         <select
                           value={sub.label}
                           onChange={e => handleSubShiftChange(idx, sub.id, 'label', e.target.value)}
@@ -338,21 +350,33 @@ export default function ShiftMatrixSection({ formData, setFormData, isRtl }: Shi
                           <option value="Overtime Shift">{isRtl ? 'شيفت إضافي' : 'Overtime Shift'}</option>
                           <option value="Restock & Prep">{isRtl ? 'تجهيز وتحضير' : 'Restock & Prep'}</option>
                         </select>
-                        <input
-                          type="time"
-                          step={900}
-                          value={parseTimeForInput(sub.startTime)}
-                          onChange={e => handleSubShiftChange(idx, sub.id, 'startTime', e.target.value)}
-                          className="w-16 text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
-                        />
-                        <span className="text-[10px] text-neutral-400 font-black font-mono">→</span>
-                        <input
-                          type="time"
-                          step={900}
-                          value={parseTimeForInput(sub.endTime)}
-                          onChange={e => handleSubShiftChange(idx, sub.id, 'endTime', e.target.value)}
-                          className="w-16 text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
-                        />
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+                          <label className="space-y-1">
+                            <span className="block text-[8px] font-black uppercase tracking-wider text-neutral-400">
+                              {isRtl ? 'من' : 'Start Time'}
+                            </span>
+                            <input
+                              type="time"
+                              step={900}
+                              value={parseTimeForInput(sub.startTime)}
+                              onChange={e => handleSubShiftChange(idx, sub.id, 'startTime', e.target.value)}
+                              className="w-full text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
+                            />
+                          </label>
+                          <span className="pb-2 text-[10px] text-neutral-400 font-black font-mono">→</span>
+                          <label className="space-y-1">
+                            <span className="block text-[8px] font-black uppercase tracking-wider text-neutral-400">
+                              {isRtl ? 'إلى' : 'End Time'}
+                            </span>
+                            <input
+                              type="time"
+                              step={900}
+                              value={parseTimeForInput(sub.endTime)}
+                              onChange={e => handleSubShiftChange(idx, sub.id, 'endTime', e.target.value)}
+                              className="w-full text-center bg-slate-50 border border-slate-150 rounded-lg p-1 text-[10px] font-bold font-mono"
+                            />
+                          </label>
+                        </div>
                         <button
                           type="button"
                           onClick={() => handleRemoveSubShift(idx, sub.id)}

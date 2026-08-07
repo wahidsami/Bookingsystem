@@ -27,6 +27,21 @@ const normalizeEmployeePositionInput = (value) => {
 
     return normalized;
 };
+const VALID_EMPLOYEE_STATUSES = ['active', 'break', 'off'];
+const normalizeEmployeeStatus = (value, fallback = 'active') => {
+    const normalized = `${value ?? ''}`.trim().toLowerCase();
+    if (!normalized) {
+        return VALID_EMPLOYEE_STATUSES.includes(`${fallback}`.trim().toLowerCase()) ? `${fallback}`.trim().toLowerCase() : 'active';
+    }
+
+    if (normalized === 'inactive') {
+        return 'off';
+    }
+
+    return VALID_EMPLOYEE_STATUSES.includes(normalized)
+        ? normalized
+        : null;
+};
 const DEFAULT_STAFF_PERMISSIONS = {
     view_earnings: false,
     view_reviews: true,
@@ -549,6 +564,7 @@ exports.getEmployees = async (req, res) => {
             'serviceCommissionEnabled',
             'productCommissionEnabled',
             'workingHours',
+            'status',
             'scheduleVisibilityWeeks',
             'isActive',
             'createdAt',
@@ -653,6 +669,7 @@ exports.getEmployee = async (req, res) => {
                 'serviceCommissionEnabled',
                 'productCommissionEnabled',
                 'workingHours',
+                'status',
                 'scheduleVisibilityWeeks',
                 'isActive',
                 'createdAt',
@@ -1087,6 +1104,7 @@ exports.createEmployee = async (req, res) => {
             staffAppPassword,
             dashboardPermissions,
             workingHours, // Deprecated - kept for backward compatibility
+            status,
             isActive = true
         } = req.body;
         
@@ -1119,6 +1137,7 @@ exports.createEmployee = async (req, res) => {
         const normalizedPosition = normalizeEmployeePosition(positionValue);
         const genderValue = `${gender ?? ''}`.trim();
         const normalizedGender = normalizeEmployeeGender(genderValue);
+        const normalizedStatus = normalizeEmployeeStatus(status, isActive === false || isActive === 'false' ? 'off' : 'active');
         let parsedDashboardPermissions = null;
         if (dashboardPermissions !== undefined) {
             if (typeof dashboardPermissions === 'string' && dashboardPermissions.trim()) {
@@ -1155,6 +1174,13 @@ exports.createEmployee = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: `Invalid gender. Allowed values: ${VALID_EMPLOYEE_GENDERS.join(', ')}`
+            });
+        }
+        if (status !== undefined && status !== '' && !normalizedStatus) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Invalid status. Allowed values: ${VALID_EMPLOYEE_STATUSES.join(', ')}`
             });
         }
         if (staffAppPassword && staffAppPassword.length < 8) {
@@ -1427,7 +1453,8 @@ exports.createEmployee = async (req, res) => {
             commissionRate: commissionRate ? parseFloat(commissionRate) : 0.00,
             workingHours: workingHoursForDB, // JavaScript object - JSONB should handle this correctly
             scheduleVisibilityWeeks: parsedScheduleVisibilityWeeks,
-            isActive: isActiveBool
+            status: normalizedStatus || (isActiveBool ? 'active' : 'off'),
+            isActive: (normalizedStatus || (isActiveBool ? 'active' : 'off')) !== 'off'
         }, { transaction });
 
         const isServiceProvider = normalizedPosition === 'service_provider';
@@ -1556,7 +1583,8 @@ exports.updateEmployee = async (req, res) => {
             staffAppPassword,
             dashboardPermissions,
             workingHours,
-            isActive
+            isActive,
+            status
         } = req.body;
 
         // Find employee
@@ -1600,11 +1628,19 @@ exports.updateEmployee = async (req, res) => {
         const previousEmail = employee.email;
         const genderValue = `${gender ?? ''}`.trim();
         const normalizedGender = normalizeEmployeeGender(genderValue);
+        const normalizedStatus = normalizeEmployeeStatus(status, employee.status || (employee.isActive ? 'active' : 'off'));
         if (gender !== undefined && genderValue && !normalizedGender) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: `Invalid gender. Allowed values: ${VALID_EMPLOYEE_GENDERS.join(', ')}`
+            });
+        }
+        if (status !== undefined && status !== '' && !normalizedStatus) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Invalid status. Allowed values: ${VALID_EMPLOYEE_STATUSES.join(', ')}`
             });
         }
         let parsedDashboardPermissions = null;
@@ -1661,7 +1697,11 @@ exports.updateEmployee = async (req, res) => {
         if (serviceCommissionEnabled !== undefined) employee.serviceCommissionEnabled = parseBooleanField(serviceCommissionEnabled, employee.serviceCommissionEnabled);
         if (productCommissionEnabled !== undefined) employee.productCommissionEnabled = parseBooleanField(productCommissionEnabled, employee.productCommissionEnabled);
         if (scheduleVisibilityWeeks !== undefined) employee.scheduleVisibilityWeeks = parsedScheduleVisibilityWeeks;
-        if (isActive !== undefined) employee.isActive = isActive === true || isActive === 'true';
+        if (status !== undefined || isActive !== undefined) {
+            const nextStatus = normalizedStatus || (isActive === true || isActive === 'true' ? 'active' : 'off');
+            employee.status = nextStatus;
+            employee.isActive = nextStatus !== 'off';
+        }
 
         const isServiceProvider = employee.position === 'service_provider';
 

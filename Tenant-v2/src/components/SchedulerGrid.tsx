@@ -290,10 +290,15 @@ export default function SchedulerGrid({
   const currentTimeLinePosition = showCurrentTimeIndicator && isDayBoardMode && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
     ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
     : null;
-  const eventLayerInsetStyle = {
-    insetInlineStart: `${timeColumnWidth}px`,
-    insetInlineEnd: 0,
-  };
+  const eventLayerInsetStyle = isRtl
+    ? {
+        right: `${timeColumnWidth}px`,
+        left: 0,
+      }
+    : {
+        left: `${timeColumnWidth}px`,
+        right: 0,
+      };
 
   const rows = useMemo(() => Array.from({ length: slotCount }, (_, slotIndex) => {
     const startMinutes = slotIndex * slotMinutes;
@@ -478,7 +483,7 @@ export default function SchedulerGrid({
   }, [columns, events, slotMinutes]);
 
   return (
-    <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-x-auto">
+    <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-x-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="sticky top-0 z-30 grid border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
         <div
           className="flex items-center justify-center border-r border-slate-200 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 bg-slate-50"
@@ -546,7 +551,10 @@ export default function SchedulerGrid({
             style={{ top: `${currentTimeLinePosition}px` }}
           >
             <div className="relative h-px bg-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,0.18)]">
-              <div className="absolute -top-2 flex items-center gap-2" style={{ insetInlineStart: '0.75rem' }}>
+              <div
+                className="absolute -top-2 flex items-center gap-2"
+                style={isRtl ? { right: '0.75rem' } : { left: '0.75rem' }}
+              >
                 <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-[0_0_0_4px_rgba(244,63,94,0.18)]" />
                 <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-[10px] font-black text-white shadow-lg">
                   {isRtl ? 'الوقت الحالي' : 'Current Time'}{' '}
@@ -713,7 +721,7 @@ export default function SchedulerGrid({
                 key={event.id}
                 className="absolute"
                 style={{
-                  insetInlineStart: inlineStart,
+                  ...(isRtl ? { right: inlineStart } : { left: inlineStart }),
                   width: `calc(${laneWidthPx}px - 8px)`,
                   maxWidth: `calc(${laneWidthPx}px - 8px)`,
                   top: `${top}px`,

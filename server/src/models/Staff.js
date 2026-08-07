@@ -189,6 +189,15 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: {},
             comment: 'Working schedule: { "sunday": { "start": "09:00", "end": "18:00" }, ... }'
         },
+        status: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: 'active',
+            validate: {
+                isIn: [['active', 'break', 'off']]
+            },
+            comment: 'Operational status for scheduler visibility and booking rules'
+        },
         scheduleVisibilityWeeks: {
             type: DataTypes.INTEGER,
             allowNull: false,
@@ -207,7 +216,28 @@ module.exports = (sequelize, DataTypes) => {
         modelName: 'Staff',
         tableName: 'staff',
         schema: 'public',
-        timestamps: true
+        timestamps: true,
+        hooks: {
+            beforeValidate: (staff) => {
+                const rawStatus = `${staff.status || ''}`.trim().toLowerCase();
+                if (rawStatus && ['active', 'break', 'off'].includes(rawStatus)) {
+                    staff.status = rawStatus;
+                } else if (!rawStatus && staff.isActive === false) {
+                    staff.status = 'off';
+                } else if (!rawStatus) {
+                    staff.status = 'active';
+                }
+
+                if (staff.status === 'off') {
+                    staff.isActive = false;
+                    return;
+                }
+
+                if (staff.status === 'break' || staff.status === 'active') {
+                    staff.isActive = true;
+                }
+            }
+        }
     });
 
     return Staff;
