@@ -276,19 +276,19 @@ export default function InteractiveDrawers({
   }, [isCartDrawerOpen]);
 
   // Step 1: Customer Info
-  const [custMode, setCustMode] = useState<'existing' | 'new' | 'walkin'>('existing');
+  const [custMode, setCustMode] = useState<'existing' | 'walkin'>('existing');
   const [selectedCustId, setSelectedCustId] = useState<string>('');
-  const [newCustName, setNewCustName] = useState('');
-  const [newCustPhone, setNewCustPhone] = useState('');
-  const [newCustEmail, setNewCustEmail] = useState('');
-  const [newCustDob, setNewCustDob] = useState('1998-05-12');
-  const [newCustGender, setNewCustGender] = useState<'F' | 'M'>('F');
-  const [newCustIsVip, setNewCustIsVip] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [walkinFullName, setWalkinFullName] = useState('');
+  const [walkinPhone, setWalkinPhone] = useState('');
+  const [walkinGender, setWalkinGender] = useState<'M' | 'F' | ''>('');
+  const [walkinNotes, setWalkinNotes] = useState('');
+  const [walkinSaveCustomer, setWalkinSaveCustomer] = useState(false);
   const [includeGroupGuests, setIncludeGroupGuests] = useState(false);
   const [guestCount, setGuestCount] = useState<number>(1);
   const [guestNames, setGuestNames] = useState('');
-  const existingCustomerSelectRef = useRef<HTMLSelectElement>(null);
-  const newCustomerNameRef = useRef<HTMLInputElement>(null);
+  const registeredCustomerSearchRef = useRef<HTMLInputElement>(null);
+  const walkinNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (availableStylists.length > 0 && !availableStylists.some((stylist) => stylist.id === currentStaffId)) {
@@ -302,10 +302,10 @@ export default function InteractiveDrawers({
     }
 
     const timer = window.setTimeout(() => {
-      if (custMode === 'new') {
-        newCustomerNameRef.current?.focus();
+      if (custMode === 'walkin') {
+        walkinNameRef.current?.focus();
       } else {
-        existingCustomerSelectRef.current?.focus();
+        registeredCustomerSearchRef.current?.focus();
       }
     }, 50);
 
@@ -691,13 +691,35 @@ export default function InteractiveDrawers({
   };
 
   useEffect(() => {
-    if (customers.length > 0) {
-      const selectedCustomerExists = customers.some((customer) => customer.id === selectedCustId);
-      if (!selectedCustomerExists) {
-        setSelectedCustId(customers[0].id);
-      }
+    if (selectedCustId && !customers.some((customer) => customer.id === selectedCustId)) {
+      setSelectedCustId('');
     }
   }, [customers, selectedCustId]);
+
+  const filteredCustomers = useMemo(() => {
+    const query = customerSearch.trim().toLowerCase();
+    const sortedCustomers = [...customers].sort((left, right) => {
+      const leftName = `${left?.name || ''}`.trim().toLowerCase();
+      const rightName = `${right?.name || ''}`.trim().toLowerCase();
+      return leftName.localeCompare(rightName);
+    });
+
+    if (!query) {
+      return sortedCustomers;
+    }
+
+    return sortedCustomers.filter((customer) => {
+      const name = `${customer?.name || ''}`.toLowerCase();
+      const phone = `${customer?.phone || ''}`.toLowerCase();
+      const email = `${customer?.email || ''}`.toLowerCase();
+      return name.includes(query) || phone.includes(query) || email.includes(query);
+    });
+  }, [customers, customerSearch]);
+
+  const selectedRegisteredCustomer = useMemo(
+    () => customers.find((customer) => customer.id === selectedCustId) || null,
+    [customers, selectedCustId]
+  );
 
   // Step 3: Payments notes & custom checkout
   const [sessionNotes, setSessionNotes] = useState('');
@@ -962,22 +984,17 @@ export default function InteractiveDrawers({
         loyalty = existing.appointmentsCount > 10 ? 'VIP Gold' : 'Loyal Club';
         balance = Number(existing.walletBalance || existing.balance || 0);
       }
-    } else if (custMode === 'new') {
-      if (!newCustName || !newCustPhone) {
-        addLocalToast('يرجى تعبئة الاسم ورقم الجوال للعميل الجديد', 'Please fill name and phone for new customer', 'warning');
+    } else {
+      if (!walkinFullName.trim() || !walkinPhone.trim()) {
+        addLocalToast('يرجى تعبئة الاسم ورقم الجوال للعميل الزائر أولاً', 'Please fill the walk-in name and mobile number first', 'warning');
         return;
       }
-      custNameEn = newCustName;
-      custNameAr = newCustName;
-      custPhone = newCustPhone;
-      custEmail = newCustEmail;
-      loyalty = newCustIsVip ? 'Diamond Elite VIP' : 'Classic Base';
+      custNameEn = walkinFullName.trim();
+      custNameAr = walkinFullName.trim();
+      custPhone = walkinPhone.trim();
+      custEmail = '';
+      loyalty = walkinSaveCustomer ? 'Classic Base' : 'Guest Account';
       balance = 0;
-    } else {
-      custNameEn = includeGroupGuests ? `Group Guest (${guestCount} pax)` : 'Walk-in Guest';
-      custNameAr = includeGroupGuests ? `حجز مجموعة زوار (${guestCount} أشخاص)` : 'زائرة زائرة';
-      custPhone = '';
-      loyalty = 'Guest Account';
     }
 
     const splitCustomerName = (value: string) => {
@@ -1113,12 +1130,15 @@ export default function InteractiveDrawers({
       notifyCustomer: notifyWhatsApp,
       paymentMethod: 'at-center',
       platformUserId: custMode === 'existing' ? selectedCustId : undefined,
-      customer: custMode === 'new' || custMode === 'walkin'
+      customer: custMode === 'walkin'
         ? {
             firstName: derivedCustomerNameParts.firstName,
             lastName: derivedCustomerNameParts.lastName,
             email: custEmail.trim(),
-            phone: custPhone.trim()
+            phone: custPhone.trim(),
+            gender: walkinGender || undefined,
+            notes: walkinNotes.trim() || undefined,
+            isGuest: !walkinSaveCustomer
           }
         : null
     };
@@ -1681,91 +1701,229 @@ export default function InteractiveDrawers({
                   <div className="flex-1 overflow-y-auto p-5 space-y-5">
                     {createStep === 1 && (
                       <div className="space-y-4 animate-fadeIn">
-                        <div>
-                          <label className="text-xs font-black text-slate-600 block mb-2">{isRtl ? 'تصنيف ملف العميل لحجز الموعد' : 'Booking Guest Category'}</label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {['existing', 'new', 'walkin'].map((mode) => (
-                              <button
-                                key={mode}
-                                type="button"
-                                onClick={() => setCustMode(mode as any)}
-                                className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                                  custMode === mode 
-                                    ? 'bg-amber-500/10 border-amber-500 text-amber-700' 
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                }`}
-                              >
-                                {mode === 'existing' ? <User size={14} /> : mode === 'new' ? <PlusCircle size={14} /> : <Users size={14} />}
-                                <span>{mode === 'existing' ? (isRtl ? 'عميل مسجل' : 'Registered') : mode === 'new' ? (isRtl ? 'عميلة جديدة' : 'New Profile') : (isRtl ? 'زائر POS' : 'Walk-in')}</span>
-                              </button>
-                            ))}
+                        <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                            <div>
+                              <label className="block text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">
+                                {isRtl ? 'تصنيف ملف العميل لحجز الموعد' : 'Booking Guest Category'}
+                              </label>
+                              <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+                                {isRtl ? 'بيانات العميل' : 'Identity'}
+                              </h3>
+                            </div>
+                            <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+                              {([
+                                { key: 'existing', icon: User, labelEn: 'Registered', labelAr: 'مسجل' },
+                                { key: 'walkin', icon: Users, labelEn: 'Walk-in', labelAr: 'زائر' }
+                              ] as const).map((mode) => {
+                                const Icon = mode.icon;
+                                const active = custMode === mode.key;
+                                return (
+                                  <button
+                                    key={mode.key}
+                                    type="button"
+                                    onClick={() => setCustMode(mode.key)}
+                                    className={`inline-flex items-center gap-2 rounded-[18px] px-4 py-2 text-sm font-semibold transition ${
+                                      active
+                                        ? 'bg-zinc-950 text-white shadow-sm'
+                                        : 'text-slate-500 hover:bg-white hover:text-slate-900'
+                                    }`}
+                                  >
+                                    <Icon className="h-4 w-4" />
+                                    <span>{isRtl ? mode.labelAr : mode.labelEn}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+                            {custMode === 'existing' ? (
+                              <div className="space-y-4">
+                                <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
+                                  <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                    {isRtl ? 'البحث واختيار عميلة مسجلة' : 'Search & Select Customer'}
+                                  </label>
+                                  <div className="relative">
+                                    <Search className={`pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isRtl ? 'right-3' : 'left-3'}`} />
+                                    <input
+                                      ref={registeredCustomerSearchRef}
+                                      type="text"
+                                      value={customerSearch}
+                                      onChange={(e) => setCustomerSearch(e.target.value)}
+                                      placeholder={isRtl ? 'ابحث باسم العميل أو رقم الجوال...' : 'Search by customer name or mobile number...'}
+                                      className={`w-full rounded-2xl border border-slate-200 bg-white py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'pr-10 pl-4' : 'pl-10 pr-4'}`}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="rounded-[22px] border border-slate-200 bg-white">
+                                  <div className="border-b border-slate-100 px-4 py-3">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                      {isRtl ? 'قائمة العملاء المسجلين' : 'Registered Customers'}
+                                    </p>
+                                  </div>
+                                  <div className="max-h-[290px] overflow-y-auto">
+                                    {filteredCustomers.length > 0 ? filteredCustomers.map((customer) => {
+                                      const active = selectedCustId === customer.id;
+                                      return (
+                                        <button
+                                          key={customer.id}
+                                          type="button"
+                                          onClick={() => setSelectedCustId(customer.id)}
+                                          className={`flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-start transition last:border-b-0 ${
+                                            active
+                                              ? 'bg-amber-50/90 text-slate-900'
+                                              : 'bg-white text-slate-700 hover:bg-slate-50'
+                                          }`}
+                                        >
+                                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-bold ${
+                                            active
+                                              ? 'border-amber-300 bg-white text-amber-600'
+                                              : 'border-slate-200 bg-slate-50 text-slate-500'
+                                          }`}>
+                                            {`${customer?.name || 'U'}`.trim().charAt(0).toUpperCase()}
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-center justify-between gap-3">
+                                              <p className="truncate text-sm font-semibold tracking-tight">{customer?.name || '—'}</p>
+                                              <span className="shrink-0 text-[11px] font-mono text-slate-500">{customer?.phone || ''}</span>
+                                            </div>
+                                            <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                                              {customer?.email || (isRtl ? 'عميل مسجل' : 'Registered customer')}
+                                            </p>
+                                          </div>
+                                          {active ? <Check className="h-4 w-4 shrink-0 text-amber-500" /> : null}
+                                        </button>
+                                      );
+                                    }) : (
+                                      <div className="px-4 py-10 text-center text-sm text-slate-500">
+                                        {customerSearch.trim()
+                                          ? (isRtl ? 'لا توجد نتائج مطابقة.' : 'No matching customers found.')
+                                          : (isRtl ? 'لا يوجد عملاء مسجلون حالياً.' : 'No registered customers available.')}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/70 p-4">
+                                  <div className="mb-3 flex items-center justify-between gap-3">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">
+                                      {isRtl ? 'العميل المحدد' : 'Selected Customer'}
+                                    </p>
+                                    {selectedRegisteredCustomer ? (
+                                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+                                        {isRtl ? 'مسجل' : 'Registered'}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {selectedRegisteredCustomer ? (
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-black text-emerald-700 shadow-sm">
+                                        {`${selectedRegisteredCustomer.name || 'U'}`.trim().charAt(0).toUpperCase()}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate text-base font-semibold text-slate-900">
+                                          {selectedRegisteredCustomer.name}
+                                        </p>
+                                        <p className="truncate text-sm text-slate-600">
+                                          {selectedRegisteredCustomer.phone}
+                                        </p>
+                                        {selectedRegisteredCustomer.email ? (
+                                          <p className="truncate text-xs text-slate-500">{selectedRegisteredCustomer.email}</p>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-emerald-800/80">
+                                      {isRtl ? 'اختر عميلًا من القائمة أعلاه لمتابعة الحجز.' : 'Select a customer from the list above to continue.'}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                                  <label className="mb-3 block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                    {isRtl ? 'حجز زائر سريع' : 'Walk-in Customer'}
+                                  </label>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="sm:col-span-2">
+                                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
+                                        {isRtl ? 'الاسم الكامل *' : 'Full Name *'}
+                                      </label>
+                                      <input
+                                        ref={walkinNameRef}
+                                        type="text"
+                                        value={walkinFullName}
+                                        onChange={(e) => setWalkinFullName(e.target.value)}
+                                        placeholder={isRtl ? 'نورة أحمد' : 'Noura Ahmad'}
+                                        className={`w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
+                                        {isRtl ? 'رقم الجوال *' : 'Mobile Number *'}
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={walkinPhone}
+                                        onChange={(e) => setWalkinPhone(e.target.value)}
+                                        placeholder={isRtl ? '+966 50...' : '+966 50...'}
+                                        className={`w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
+                                        {isRtl ? 'الجنس' : 'Gender'}
+                                      </label>
+                                      <select
+                                        value={walkinGender}
+                                        onChange={(e) => setWalkinGender(e.target.value as 'M' | 'F' | '')}
+                                        className={`w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                      >
+                                        <option value="">{isRtl ? 'غير محدد' : 'Not specified'}</option>
+                                        <option value="F">{isRtl ? 'أنثى' : 'Female'}</option>
+                                        <option value="M">{isRtl ? 'ذكر' : 'Male'}</option>
+                                      </select>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
+                                        {isRtl ? 'ملاحظات (اختياري)' : 'Notes (optional)'}
+                                      </label>
+                                      <textarea
+                                        value={walkinNotes}
+                                        onChange={(e) => setWalkinNotes(e.target.value)}
+                                        rows={3}
+                                        placeholder={isRtl ? 'أي تفاصيل مهمة حول الزائر...' : 'Any important notes about the walk-in customer...'}
+                                        className={`w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <label className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={walkinSaveCustomer}
+                                      onChange={(e) => setWalkinSaveCustomer(e.target.checked)}
+                                      className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                    />
+                                    <span className="min-w-0">
+                                      <span className="block text-sm font-semibold text-slate-900">
+                                        {isRtl ? 'حفظ العميل في قاعدة بيانات العملاء' : 'Save customer into customer database'}
+                                      </span>
+                                      <span className="mt-1 block text-[11px] leading-5 text-slate-500">
+                                        {isRtl
+                                          ? 'عند التفعيل سيتم حفظ الملف بعد إتمام الموعد.'
+                                          : 'When enabled, the customer profile will be saved after the appointment is completed.'}
+                                      </span>
+                                    </span>
+                                  </label>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-
-                        {custMode === 'existing' && (
-                          <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase block">{isRtl ? 'البحث واختيار عميلة مسجلة' : 'Search & Associate Customer'}</label>
-                              <select
-                                ref={existingCustomerSelectRef}
-                                value={selectedCustId}
-                                onChange={(e) => setSelectedCustId(e.target.value)}
-                                autoFocus
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700"
-                            >
-                              {customers.map(c => (
-                                <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        {custMode === 'new' && (
-                          <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs text-xs">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="text-[10px] text-slate-400 block mb-1">{isRtl ? 'الاسم بالكامل' : 'Full Name'}</label>
-                                <input
-                                  ref={newCustomerNameRef}
-                                  type="text"
-                                  value={newCustName}
-                                  onChange={(e) => setNewCustName(e.target.value)}
-                                  placeholder="Noura Ahmad"
-                                  autoFocus
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-slate-400 block mb-1">{isRtl ? 'رقم الجوال' : 'Phone'}</label>
-                                <input type="text" value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="+966 50" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs" />
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="text-[10px] text-slate-400 block mb-1">{isRtl ? 'البريد الإلكتروني' : 'Email'}</label>
-                                <input type="email" value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs" />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-slate-400 block mb-1">{isRtl ? 'تاريخ الميلاد' : 'Date of Birth'}</label>
-                                <input type="date" value={newCustDob} onChange={(e) => setNewCustDob(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs" />
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 pt-1">
-                              <input type="checkbox" id="vip-check" checked={newCustIsVip} onChange={(e) => setNewCustIsVip(e.target.checked)} className="rounded text-amber-500" />
-                              <label htmlFor="vip-check" className="font-bold text-slate-700">{isRtl ? 'تصنيف كعميلة VIP 👑' : 'Categorize as Premium VIP 👑'}</label>
-                            </div>
-                          </div>
-                        )}
-
-                        {custMode === 'walkin' && (
-                          <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-4 text-xs text-center py-6">
-                            <p className="font-bold text-slate-800 text-sm">{isRtl ? 'حجز زائر سريع' : 'Walk-In Customer'}</p>
-                            <p className="text-[10px] text-slate-400">
-                              {isRtl 
-                                ? 'حساب مؤقت للزوار السريعين. يمكنك إضافة مرافقين وتفاصيل الجلسة الجماعية في الخطوة التالية.' 
-                                : 'Standard transient profile. Group guests and multi-session details can be managed in the next step.'}
-                            </p>
-                          </div>
-                        )}
                       </div>
                     )}
 
