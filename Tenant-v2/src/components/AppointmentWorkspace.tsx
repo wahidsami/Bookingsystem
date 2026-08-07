@@ -395,8 +395,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const activeSchedulerSettings = isSchedulerSettingsOpen ? schedulerBoardDraft : schedulerBoardSettings;
   const [isSchedulerSettingsSaving, setIsSchedulerSettingsSaving] = useState(false);
   const [visibleEmployeeIds, setVisibleEmployeeIds] = useState<string[]>([]);
-  const [teamMembersDraftIds, setTeamMembersDraftIds] = useState<string[]>([]);
-  const [isTeamMembersPopoverOpen, setIsTeamMembersPopoverOpen] = useState(false);
+  const [isTeamMembersMenuOpen, setIsTeamMembersMenuOpen] = useState(false);
   const [dragMoveDialog, setDragMoveDialog] = useState<{
     appointmentId: string;
     targetStaffId: string;
@@ -438,6 +437,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [focusedEmployeeId, setFocusedEmployeeId] = useState<string | null>(null);
   const [boardCurrentTime, setBoardCurrentTime] = useState<Date>(new Date());
   const [hasHydratedTeamVisibility, setHasHydratedTeamVisibility] = useState(false);
+  const teamMembersButtonRef = useRef<HTMLDivElement | null>(null);
+  const teamMembersMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const localOverride = readSchedulerBoardOverride(schedulerStorageKey);
@@ -465,7 +466,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       const initialVisibility = normalizedPersistedVisibility.length > 0 ? normalizedPersistedVisibility : allEmployeeIds;
 
       setVisibleEmployeeIds(initialVisibility);
-      setTeamMembersDraftIds(initialVisibility);
       setHasHydratedTeamVisibility(true);
 
       if (normalizedPersistedVisibility.length === 0) {
@@ -481,6 +481,44 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     writeSchedulerTeamVisibilityOverride(teamVisibilityStorageKey, visibleEmployeeIds);
   }, [hasHydratedTeamVisibility, teamVisibilityStorageKey, visibleEmployeeIds]);
+
+  useEffect(() => {
+    if (!isTeamMembersMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (
+        teamMembersButtonRef.current?.contains(target) ||
+        teamMembersMenuRef.current?.contains(target)
+      ) {
+        return;
+      }
+
+      setIsTeamMembersMenuOpen(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsTeamMembersMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isTeamMembersMenuOpen]);
 
   // Master Data Fetch
   useEffect(() => {
@@ -3448,71 +3486,104 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     : null;
   const boardModeLabel = getBoardModeLabel(viewMode, isRtl);
   const allEmployeeIds = useMemo(() => liveStylists.map((stylist) => stylist.id), [liveStylists]);
-  const teamMembersDraftSet = useMemo(() => new Set(teamMembersDraftIds), [teamMembersDraftIds]);
-  const isAllTeamMembersDraftSelected = allEmployeeIds.length > 0 && teamMembersDraftIds.length === allEmployeeIds.length;
-  const isTeamMembersPopoverReady = liveStylists.length > 0;
-
-  const openTeamMembersPopover = useCallback(() => {
-    if (!isTeamMembersPopoverReady) {
-      return;
+  const resolvedVisibleEmployeeIds = useMemo(() => {
+    if (visibleEmployeeIds.length > 0) {
+      return visibleEmployeeIds.filter((employeeId) => allEmployeeIds.includes(employeeId));
     }
-    setTeamMembersDraftIds(visibleEmployeeIds.length > 0 ? visibleEmployeeIds : allEmployeeIds);
-    setIsTeamMembersPopoverOpen(true);
-  }, [allEmployeeIds, isTeamMembersPopoverReady, visibleEmployeeIds]);
-
-  const closeTeamMembersPopover = useCallback(() => {
-    setIsTeamMembersPopoverOpen(false);
-    setTeamMembersDraftIds(visibleEmployeeIds.length > 0 ? visibleEmployeeIds : allEmployeeIds);
+    return allEmployeeIds;
   }, [allEmployeeIds, visibleEmployeeIds]);
+  const visibleEmployeeIdSet = useMemo(() => new Set(resolvedVisibleEmployeeIds), [resolvedVisibleEmployeeIds]);
+  const visibleEmployeeNames = useMemo(() => {
+    return liveStylists
+      .filter((stylist) => visibleEmployeeIdSet.has(stylist.id))
+      .map((stylist) => (isRtl ? stylist.nameAr : stylist.nameEn).trim())
+      .filter(Boolean);
+  }, [isRtl, liveStylists, visibleEmployeeIdSet]);
+  const focusedEmployeeName = useMemo(() => {
+    if (!focusedEmployee) {
+      return '';
+    }
 
-  const commitTeamMembersSelection = useCallback((nextIds: string[]) => {
+    return (isRtl ? focusedEmployee.nameAr : focusedEmployee.nameEn).trim();
+  }, [focusedEmployee, isRtl]);
+  const isAllEmployeesVisible = resolvedVisibleEmployeeIds.length === allEmployeeIds.length;
+  const teamMembersButtonLabel = useMemo(() => {
+    if (isEmployeeBoardMode(viewMode) && focusedEmployeeName) {
+      return `👥 ${focusedEmployeeName}`;
+    }
+
+    if (isAllEmployeesVisible || resolvedVisibleEmployeeIds.length === 0) {
+      return isRtl ? '👥 الفريق' : '👥 Team';
+    }
+
+    if (visibleEmployeeNames.length === 1) {
+      return `👥 ${visibleEmployeeNames[0]}`;
+    }
+
+    if (visibleEmployeeNames.length > 1) {
+      return isRtl
+        ? `👥 ${visibleEmployeeNames.length} موظفين`
+        : `👥 ${visibleEmployeeNames.length} staff`;
+    }
+
+    return isRtl ? '👥 الفريق' : '👥 Team';
+  }, [allEmployeeIds.length, focusedEmployeeName, isAllEmployeesVisible, isRtl, resolvedVisibleEmployeeIds.length, viewMode, visibleEmployeeNames]);
+  const updateVisibleEmployeeIds = useCallback((nextIds: string[]) => {
     const normalized = nextIds
       .map((employeeId) => `${employeeId || ''}`.trim())
       .filter((employeeId, index, list) => Boolean(employeeId) && list.indexOf(employeeId) === index && allEmployeeIds.includes(employeeId));
     const finalSelection = normalized.length > 0 ? normalized : allEmployeeIds;
     setVisibleEmployeeIds(finalSelection);
-    setTeamMembersDraftIds(finalSelection);
-    setIsTeamMembersPopoverOpen(false);
   }, [allEmployeeIds]);
 
-  const toggleTeamMemberDraft = useCallback((employeeId: string) => {
-    setTeamMembersDraftIds((current) => {
-      const normalizedEmployeeId = `${employeeId || ''}`.trim();
-      if (!normalizedEmployeeId) {
-        return current;
-      }
+  const toggleVisibleEmployeeId = useCallback((employeeId: string) => {
+    const normalizedEmployeeId = `${employeeId || ''}`.trim();
+    if (!normalizedEmployeeId) {
+      return;
+    }
 
-      const next = current.includes(normalizedEmployeeId)
-        ? current.filter((item) => item !== normalizedEmployeeId)
-        : [...current, normalizedEmployeeId];
+    updateVisibleEmployeeIds(
+      resolvedVisibleEmployeeIds.includes(normalizedEmployeeId)
+        ? resolvedVisibleEmployeeIds.filter((item) => item !== normalizedEmployeeId)
+        : [...resolvedVisibleEmployeeIds, normalizedEmployeeId]
+    );
+  }, [resolvedVisibleEmployeeIds, updateVisibleEmployeeIds]);
 
-      const filtered = next.filter((item, index, list) => allEmployeeIds.includes(item) && list.indexOf(item) === index);
-      return filtered.length > 0 ? filtered : current;
-    });
-  }, [allEmployeeIds]);
+  const setAllVisibleEmployees = useCallback(() => {
+    updateVisibleEmployeeIds(allEmployeeIds);
+  }, [allEmployeeIds, updateVisibleEmployeeIds]);
 
-  const setAllTeamMembersDraft = useCallback(() => {
-    setTeamMembersDraftIds(allEmployeeIds);
-  }, [allEmployeeIds]);
+  const toggleTeamMembersMenu = useCallback(() => {
+    setIsTeamMembersMenuOpen((current) => !current);
+  }, []);
 
   const restoreTeamBoardMode = useCallback(() => {
     setViewMode(previousBoardMode || (isWeekBoardMode(viewMode) ? 'team-week' : 'team-day'));
     setFocusedEmployeeId(null);
     setPreviousBoardMode(null);
     setVisibleEmployeeIds(allEmployeeIds);
-    setTeamMembersDraftIds(allEmployeeIds);
     writeSchedulerTeamVisibilityOverride(teamVisibilityStorageKey, allEmployeeIds);
     setSelectedStylistFilter('all');
-    setIsTeamMembersPopoverOpen(false);
+    setIsTeamMembersMenuOpen(false);
     setEmployeeMenuState(null);
   }, [allEmployeeIds, previousBoardMode, teamVisibilityStorageKey, viewMode]);
+
+  const handleShowAllTeamMembers = useCallback(() => {
+    if (focusedEmployeeId) {
+      restoreTeamBoardMode();
+      return;
+    }
+
+    setAllVisibleEmployees();
+    setIsTeamMembersMenuOpen(false);
+  }, [focusedEmployeeId, restoreTeamBoardMode, setAllVisibleEmployees]);
 
   const enterEmployeeSchedule = useCallback((staffId: string) => {
     setPreviousBoardMode((current) => current || (isWeekBoardMode(viewMode) ? 'team-week' : 'team-day'));
     setFocusedEmployeeId(staffId);
     setSelectedStylistFilter(staffId);
     setViewMode(isWeekBoardMode(viewMode) ? 'employee-week' : 'employee-day');
-    setIsTeamMembersPopoverOpen(false);
+    setIsTeamMembersMenuOpen(false);
     setEmployeeMenuState(null);
   }, [viewMode]);
 
@@ -3934,15 +4005,77 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 </button>
               </div>
 
-            <button
-              type="button"
-              onClick={openTeamMembersPopover}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              title={isRtl ? 'إدارة أعضاء الفريق المرئيين' : 'Manage visible team members'}
-            >
-              <Users size={12} />
-              <span>{isRtl ? 'أعضاء الفريق' : 'Team Members'}</span>
-            </button>
+            <div className="relative" ref={teamMembersButtonRef}>
+              <button
+                type="button"
+                onClick={toggleTeamMembersMenu}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                title={isRtl ? 'عرض أعضاء الفريق' : 'View team members'}
+              >
+                <Users size={12} />
+                <span>{teamMembersButtonLabel}</span>
+                <ChevronDown size={11} className="text-slate-400" />
+              </button>
+
+              {isTeamMembersMenuOpen && (
+                <div
+                  ref={teamMembersMenuRef}
+                  className={`absolute ${isRtl ? 'left-0' : 'right-0'} top-full z-30 mt-2 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl`}
+                >
+                  <div className="border-b border-slate-100 px-4 py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
+                      {isRtl ? 'إظهار الفريق' : 'Team visibility'}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {isRtl ? 'حدّد من يظهر في اللوحة مباشرة.' : 'Pick who appears on the board. Changes apply instantly.'}
+                    </p>
+                  </div>
+
+                  <div className="max-h-72 overflow-y-auto p-2">
+                    <button
+                      type="button"
+                      onClick={handleShowAllTeamMembers}
+                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-start text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-bold ${isAllEmployeesVisible ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 bg-slate-50 text-slate-400'}`}>
+                          ✓
+                        </span>
+                        <span>{isRtl ? 'جميع الموظفين' : 'All Staff'}</span>
+                      </span>
+                      {isAllEmployeesVisible && <Check size={14} className="text-amber-500" />}
+                    </button>
+
+                    <div className="my-2 border-t border-slate-100" />
+
+                    {liveStylists.map((stylist) => {
+                      const checked = visibleEmployeeIdSet.has(stylist.id);
+                      const label = (isRtl ? stylist.nameAr : stylist.nameEn).trim() || stylist.nameEn || stylist.nameAr || stylist.id;
+
+                      return (
+                        <label
+                          key={stylist.id}
+                          className="flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+                        >
+                          <span className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleVisibleEmployeeId(stylist.id)}
+                              className="h-4 w-4 accent-amber-500"
+                            />
+                            <span>{label}</span>
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                            {checked ? (isRtl ? 'ظاهر' : 'Visible') : (isRtl ? 'مخفي' : 'Hidden')}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Refresh button with action */}
             <button 
@@ -4247,139 +4380,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         {boardModeLabel}
                       </span>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={restoreTeamBoardMode}
-                        className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
-                      >
-                        {isRtl ? 'الفريق' : 'Team'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={openTeamMembersPopover}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
-                      >
-                        {isRtl ? 'أعضاء الفريق' : 'Team Members'}
-                      </button>
-                    </div>
                   </div>
                 </div>
               )}
 
-              <AnimatePresence>
-                {isTeamMembersPopoverOpen && (
-                  <div className="fixed inset-0 z-40">
-                    <motion.button
-                      type="button"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 h-full w-full bg-zinc-950/25 backdrop-blur-[1px]"
-                      onClick={closeTeamMembersPopover}
-                      aria-label={isRtl ? 'إغلاق أعضاء الفريق' : 'Close team members'}
-                    />
-                    <motion.div
-                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                      transition={{ type: 'spring', damping: 24, stiffness: 280 }}
-                      className={`absolute top-20 ${isRtl ? 'left-4' : 'right-4'} z-10 w-[320px] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl`}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">
-                            {isRtl ? 'إظهار أعضاء الفريق' : 'Team Members'}
-                          </p>
-                          <h4 className="mt-1 text-sm font-black text-slate-900">
-                            {isRtl ? 'اختر من يظهر في اللوحة' : 'Choose who appears on the board'}
-                          </h4>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={closeTeamMembersPopover}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-
-                      <div className="mt-3 max-h-72 space-y-1 overflow-auto pr-1">
-                        <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                          <span className="text-sm font-bold text-slate-800">
-                            {isRtl ? 'جميع الموظفين' : 'All Staff'}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={isAllTeamMembersDraftSelected}
-                            onChange={(event) => {
-                              if (event.target.checked) {
-                                setAllTeamMembersDraft();
-                              }
-                            }}
-                            className="h-4 w-4 accent-amber-500"
-                          />
-                        </label>
-
-                        <div className="pt-1" />
-
-                        {liveStylists.map((stylist) => {
-                          const checked = teamMembersDraftSet.has(stylist.id);
-                          return (
-                            <label
-                              key={stylist.id}
-                              className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 transition hover:bg-slate-50"
-                            >
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-bold text-slate-800">
-                                  {isRtl ? stylist.nameAr : stylist.nameEn}
-                                </p>
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                  {isRtl ? stylist.roleAr : stylist.roleEn}
-                                </p>
-                              </div>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleTeamMemberDraft(stylist.id)}
-                                className="h-4 w-4 accent-amber-500"
-                              />
-                            </label>
-                          );
-                        })}
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                        <button
-                          type="button"
-                          onClick={setAllTeamMembersDraft}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                        >
-                          {isRtl ? 'جميع الموظفين' : 'All Staff'}
-                        </button>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={closeTeamMembersPopover}
-                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            {isRtl ? 'إلغاء' : 'Cancel'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => commitTeamMembersSelection(teamMembersDraftIds)}
-                            className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
-                          >
-                            {isRtl ? 'تطبيق' : 'Apply'}
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
-              
               {viewMode === 'agenda' ? (
                 /* 1. COMPREHENSIVE AGENDA SCHEDULE VIEW */
                 <div className="p-6 bg-white min-h-[420px]">
