@@ -880,7 +880,6 @@ export default function TeamsWorkspace({
       tips: 0,
       reviewsList: []
     });
-    setActiveFormSection('basic');
     setActiveView('form');
   };
 
@@ -956,7 +955,6 @@ export default function TeamsWorkspace({
           : prev
       ));
     });
-    setActiveFormSection('basic');
     setActiveView('form');
   };
 
