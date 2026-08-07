@@ -495,22 +495,6 @@ export default function TeamsWorkspace({
     };
   };
 
-  const applyEmployeePhotoFile = (file: File | null) => {
-    setEmployeePhotoFile(file);
-
-    if (!file) {
-      setFormData((prev) => ({ ...prev, avatar: DEFAULT_EMPLOYEE_AVATAR }));
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const preview = typeof reader.result === 'string' ? reader.result : DEFAULT_EMPLOYEE_AVATAR;
-      setFormData((prev) => ({ ...prev, avatar: preview || DEFAULT_EMPLOYEE_AVATAR }));
-    };
-    reader.readAsDataURL(file);
-  };
-
   // Raw mock Team members (preserving old dataset and enriching it)
   const [teamMembers, setTeamMembers] = useState<TeamMemberData[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
@@ -822,7 +806,6 @@ export default function TeamsWorkspace({
       return;
     }
     setFormMode('add');
-    setEmployeePhotoFile(null);
     setStaffAppPermissions({ ...DEFAULT_STAFF_APP_PERMISSIONS });
     setFormData({
       id: '',
@@ -903,7 +886,6 @@ export default function TeamsWorkspace({
 
   const handleOpenEditForm = (member: TeamMemberData) => {
     setFormMode('edit');
-    setEmployeePhotoFile(null);
     setStaffAppPermissions({ ...DEFAULT_STAFF_APP_PERMISSIONS });
     setFormData({
       ...member,
