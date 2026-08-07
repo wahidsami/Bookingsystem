@@ -2265,13 +2265,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
+    const contextDateKey = contextMenu?.dateKey || selectedDateKey;
+
     if (actionType === 'new') {
       if (contextMenu) {
-        if (isPastBoardCreationSlot(selectedDateKey, contextMenu.timeInMinutes)) {
+        if (isPastBoardCreationSlot(contextDateKey, contextMenu.timeInMinutes)) {
           showPastBoardSlotWarning(contextMenu.timeInMinutes);
           setContextMenu(null);
           return;
         }
+        setSelectedDate(parseLocalDateKey(contextDateKey));
         setCurrentStaffId(contextMenu.staffId);
         setCurrentStartTime(contextMenu.timeInMinutes);
       }
@@ -2283,6 +2286,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     } else if (actionType === 'block') {
       setActiveBlockedTime(null);
       if (contextMenu) {
+        setSelectedDate(parseLocalDateKey(contextDateKey));
         setBlockStaffId(contextMenu.staffId);
         setBlockStartTime(contextMenu.timeInMinutes);
         setBlockDuration(45);
