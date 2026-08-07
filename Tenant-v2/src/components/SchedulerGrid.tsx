@@ -290,9 +290,10 @@ export default function SchedulerGrid({
   const currentTimeLinePosition = showCurrentTimeIndicator && isDayBoardMode && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
     ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
     : null;
-  const eventLayerInsetStyle = isRtl
-    ? { right: `${timeColumnWidth}px`, left: 0 }
-    : { left: `${timeColumnWidth}px`, right: 0 };
+  const eventLayerInsetStyle = {
+    insetInlineStart: `${timeColumnWidth}px`,
+    insetInlineEnd: 0,
+  };
 
   const rows = useMemo(() => Array.from({ length: slotCount }, (_, slotIndex) => {
     const startMinutes = slotIndex * slotMinutes;
@@ -545,7 +546,7 @@ export default function SchedulerGrid({
             style={{ top: `${currentTimeLinePosition}px` }}
           >
             <div className="relative h-px bg-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,0.18)]">
-              <div className={`absolute -top-2 ${isRtl ? 'left-3' : 'right-3'} flex items-center gap-2`}>
+              <div className="absolute -top-2 flex items-center gap-2" style={{ insetInlineStart: '0.75rem' }}>
                 <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-[0_0_0_4px_rgba(244,63,94,0.18)]" />
                 <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-[10px] font-black text-white shadow-lg">
                   {isRtl ? 'الوقت الحالي' : 'Current Time'}{' '}
@@ -685,9 +686,7 @@ export default function SchedulerGrid({
             const height = durationSlots * slotHeight;
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
-            const rtlColumnIndex = isRtl ? (columns.length - columnIndex - 1) : columnIndex;
-            const rtlLaneIndex = isRtl ? (event.laneCount - event.laneIndex - 1) : event.laneIndex;
-            const left = `calc(${rtlColumnIndex * cellWidth}px + ${rtlLaneIndex * laneWidthPx}px)`;
+            const inlineStart = `calc(${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;
             const serviceStyles = getServiceCategoryStyles(event.serviceCategory || event.raw?.service?.category);
             const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
             const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
@@ -714,7 +713,7 @@ export default function SchedulerGrid({
                 key={event.id}
                 className="absolute"
                 style={{
-                  left,
+                  insetInlineStart: inlineStart,
                   width: `calc(${laneWidthPx}px - 8px)`,
                   maxWidth: `calc(${laneWidthPx}px - 8px)`,
                   top: `${top}px`,
