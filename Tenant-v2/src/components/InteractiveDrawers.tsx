@@ -810,9 +810,12 @@ export default function InteractiveDrawers({
     // Pre-validate staged services and guest services staff assignment
     for (const item of finalStaged) {
       const srv = canonicalServices.find(s => s.id === item.serviceId);
-      if (srv && srv.employeeAssignments && !srv.employeeAssignments.includes(item.staffId)) {
-        setShowAssignWarning(true);
-        return;
+      if (srv && srv.employeeAssignments) {
+        const normalizedAssignments = srv.employeeAssignments.map(id => String(id));
+        if (!normalizedAssignments.includes(String(item.staffId))) {
+          setShowAssignWarning(true);
+          return;
+        }
       }
     }
 
@@ -820,9 +823,12 @@ export default function InteractiveDrawers({
       for (const guest of guestsList) {
         for (const gs of guest.services) {
           const srv = canonicalServices.find(s => s.id === gs.serviceId);
-          if (srv && srv.employeeAssignments && !srv.employeeAssignments.includes(gs.staffId)) {
-            setShowAssignWarning(true);
-            return;
+          if (srv && srv.employeeAssignments) {
+            const normalizedAssignments = srv.employeeAssignments.map(id => String(id));
+            if (!normalizedAssignments.includes(String(gs.staffId))) {
+              setShowAssignWarning(true);
+              return;
+            }
           }
         }
       }
