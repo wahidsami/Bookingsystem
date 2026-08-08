@@ -3485,12 +3485,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
   };
 
-  // Helper to calculate active 4-day block for Week view
-  const getDaysOfActiveBlock = (baseDate: Date) => {
+  const getDaysOfActiveWeek = (baseDate: Date) => {
     const list: string[] = [];
-    for (let i = 0; i < 4; i++) {
-      const d = new Date(baseDate);
-      d.setDate(baseDate.getDate() + i);
+    const startOfWeek = new Date(baseDate);
+    const dayOfWeek = startOfWeek.getDay();
+    const saturdayIndex = 6;
+    const daysSinceSaturday = (dayOfWeek - saturdayIndex + 7) % 7;
+    startOfWeek.setDate(startOfWeek.getDate() - daysSinceSaturday);
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
       list.push(getLocalDateKey(d));
     }
     return list;
@@ -3518,13 +3523,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // Filters application
   const filteredAppointments = appointments.filter(apt => {
-    const boardFocusStaffId = isEmployeeBoardMode(viewMode) ? focusedEmployeeId : null;
     const boardVisibleStaffIds = isEmployeeBoardMode(viewMode)
-      ? (boardFocusStaffId ? [boardFocusStaffId] : [])
-      : visibleEmployeeIds;
-    const matchesStaff = viewMode === 'agenda'
-      ? (selectedStylistFilter === 'all' || apt.staffId === selectedStylistFilter)
-      : (boardVisibleStaffIds.length === 0 || boardVisibleStaffIds.includes(apt.staffId));
+      ? (focusedEmployeeId ? [focusedEmployeeId] : [])
+      : resolvedVisibleEmployeeIds;
+    const matchesStaff = boardVisibleStaffIds.length === 0 || boardVisibleStaffIds.includes(apt.staffId);
     const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
     const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
       const matchesSearch = searchQuery === '' || 
@@ -3541,7 +3543,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     if (isDayBoardMode(viewMode)) {
       matchesDate = dateStr === getSelectedDateKey();
     } else if (isWeekBoardMode(viewMode)) {
-      const activeBlock = getDaysOfActiveBlock(selectedDate);
+      const activeBlock = getDaysOfActiveWeek(selectedDate);
       matchesDate = activeBlock.includes(dateStr);
     } else if (isMonthBoardMode(viewMode)) {
       const currentMonth = selectedDate.getMonth();
@@ -3609,7 +3611,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           statusTone: stylistStatuses[stylist.id] || 'neutral',
           isToday: false,
         }))
-    : getDaysOfActiveBlock(selectedDate).map((dayStr) => {
+    : getDaysOfActiveWeek(selectedDate).map((dayStr) => {
         const dateValue = parseLocalDateKey(dayStr);
         const dayName = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
         const dateLabel = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
@@ -3694,7 +3696,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     if (isAllEmployeesVisible || resolvedVisibleEmployeeIds.length === 0) {
-      return isRtl ? '👥 الموظفون' : '👥 Team Members';
+      return isRtl ? '👥 كل الموظفين' : '👥 All Staff';
     }
 
     if (visibleEmployeeNames.length === 1) {
@@ -4220,6 +4222,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <p className="mt-1 text-xs text-slate-500">
                       {isRtl ? 'حدّد من يظهر في اللوحة مباشرة.' : 'Pick who appears on the board. Changes apply instantly.'}
                     </p>
+                    {!isAllEmployeesVisible && resolvedVisibleEmployeeIds.length > 0 && (
+                      <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600">
+                        {isRtl
+                          ? `${resolvedVisibleEmployeeIds.length} من ${allEmployeeIds.length} موظفين ظاهرين`
+                          : `${resolvedVisibleEmployeeIds.length} of ${allEmployeeIds.length} staff visible`}
+                      </p>
+                    )}
                   </div>
 
                   <div className="max-h-72 overflow-y-auto p-2">

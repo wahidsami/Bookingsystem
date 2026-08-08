@@ -291,6 +291,7 @@ export default function SchedulerGrid({
     ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
     : null;
   const pastAreaHeight = currentTimeLinePosition !== null ? Math.max(0, currentTimeLinePosition) : null;
+  const showAssignedStaffIdentity = !isDayBoardMode;
   const eventLayerInsetStyle = isRtl
     ? {
         right: `${timeColumnWidth}px`,
@@ -860,6 +861,21 @@ export default function SchedulerGrid({
                           </span>
                         )}
                       </div>
+                    </div>
+                  )}
+
+                  {isCompact && showAssignedStaffIdentity && assignedStaffName && (
+                    <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[8px] font-bold text-slate-500">
+                      {showStaffPhotos && staffAvatar ? (
+                        <div className="h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full border border-white shadow-sm">
+                          <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                        </div>
+                      ) : (
+                        <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[6px] font-black text-slate-600">
+                          {getInitials(assignedStaffName)}
+                        </div>
+                      )}
+                      <span className="truncate">{assignedStaffName}</span>
                     </div>
                   )}
 
