@@ -27,30 +27,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 export function PurchasesScreen({ navigation, route }: any) {
     const { t, language } = useLanguage();
     const isRTL = language === 'ar';
-    const { showLogin } = useAppSession();
+    const { showLogin, isAuthenticated } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const deepLinkOrderId = `${route?.params?.orderId || ''}`.trim();
 
-    useFocusEffect(
-        React.useCallback(() => {
-            loadOrders();
-        }, [])
-    );
-
-    const loadOrders = async () => {
+    const loadOrders = React.useCallback(async () => {
         try {
             setLoading(true);
-            const user = await api.getUser();
-            if (!user) {
-                setIsAuthenticated(false);
+            if (!isAuthenticated) {
                 return;
             }
-            setIsAuthenticated(true);
             const data = await api.getOrders();
             setOrders(data);
             if (deepLinkOrderId) {
@@ -61,7 +51,7 @@ export function PurchasesScreen({ navigation, route }: any) {
             }
         } catch (error: any) {
             if (error.status === 401 || error.message?.includes('unauthorized') || error.message?.includes('Invalid or expired token')) {
-                setIsAuthenticated(false);
+                showLogin();
             } else {
                 console.error('Failed to load orders:', error);
             }
@@ -69,7 +59,13 @@ export function PurchasesScreen({ navigation, route }: any) {
             setLoading(false);
             setRefreshing(false);
         }
-    };
+    }, [deepLinkOrderId, isAuthenticated, showLogin]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadOrders();
+        }, [loadOrders])
+    );
 
     const handleRefresh = () => {
         setRefreshing(true);

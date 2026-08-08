@@ -5,7 +5,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { UserAvatar } from '../components/UserAvatar';
 import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api, PublicAppContent, User } from '../api/client';
+import { api, PublicAppContent } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
@@ -18,27 +18,13 @@ interface MoreScreenProps {
 
 export function MoreScreen({ navigation }: MoreScreenProps) {
     const { t, language } = useLanguage();
-    const { isAuthenticated, logout, showLogin, ensureAuthenticated } = useAppSession();
+    const { isAuthenticated, logout, showLogin, user } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
-    const [user, setUser] = useState<User | null>(null);
     const [appContent, setAppContent] = useState<PublicAppContent | null>(null);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
 
-    useEffect(() => {
-        api.getUser().then(setUser).catch(() => setUser(null));
-    }, [isAuthenticated]);
-
     useFocusEffect(
         React.useCallback(() => {
-            api.getProfile()
-                .then(async (profile) => {
-                    setUser(profile);
-                    await api.setUser(profile);
-                })
-                .catch(() => {
-                    api.getUser().then(setUser).catch(() => setUser(null));
-                });
-
             api.getCustomerAppContent()
                 .then(setAppContent)
                 .catch(() => setAppContent(null));
@@ -171,7 +157,10 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                             key={item.id}
                             style={styles.menuItem}
                             onPress={() => {
-                                if (item.id !== 'browse' && !ensureAuthenticated()) return;
+                                if (item.id !== 'browse' && !isAuthenticated) {
+                                    showLogin();
+                                    return;
+                                }
 
                                 if (item.action) {
                                     item.action();
@@ -219,7 +208,10 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                             key={item.id}
                             style={styles.menuItem}
                             onPress={() => {
-                                if (!ensureAuthenticated()) return;
+                                if (!isAuthenticated) {
+                                    showLogin();
+                                    return;
+                                }
 
                                 void item.action();
                             }}

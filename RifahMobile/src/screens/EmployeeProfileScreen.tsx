@@ -7,6 +7,7 @@ import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 type StaffReview = {
   id: string;
@@ -20,6 +21,7 @@ type StaffReview = {
 export function EmployeeProfileScreen({ route, navigation }: any) {
   const { provider } = route.params;
   const { isRTL } = useLanguage();
+  const { isAuthenticated } = useAppSession();
   const tenantName = route?.params?.tenant?.name || route?.params?.tenant?.name_en || route?.params?.tenant?.name_ar;
   const replyLabel = isRTL ? `رد ${tenantName || 'المركز'}` : `${tenantName || 'Center'} reply`;
   const { topInset, scrollBottomPadding } = useScreenSafeArea();
@@ -58,8 +60,7 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
   useEffect(() => {
     const loadReviewEligibility = async () => {
       try {
-        const user = await api.getUser();
-        if (!user) {
+        if (!isAuthenticated) {
           setReviewEligibleBookings([]);
           setReviewedAppointmentIds(new Set());
           return;
@@ -85,7 +86,7 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
     };
 
     loadReviewEligibility();
-  }, []);
+  }, [isAuthenticated]);
 
   const openProviderReviewPrompt = () => {
     const tenantId = provider?.tenantId || route?.params?.tenant?.id;

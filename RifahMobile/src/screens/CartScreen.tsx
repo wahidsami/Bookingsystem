@@ -17,7 +17,7 @@ interface CartScreenProps {
 
 export function CartScreen({ route, navigation }: CartScreenProps) {
     const { t, isRTL } = useLanguage();
-    const { showLogin } = useAppSession();
+    const { showLogin, isAuthenticated, user, refreshSession } = useAppSession();
     const { cartItems, cartTotal, updateQuantity, removeFromCart, clearCart, cartTenantId } = useCart();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
@@ -52,10 +52,14 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
     };
 
     useEffect(() => {
+        if (isAuthenticated && !user) {
+            void refreshSession();
+            return;
+        }
+
         let isMounted = true;
 
         const hydrateCustomerDefaults = async () => {
-            const user = await api.getUser();
             if (!user || !isMounted) {
                 return;
             }
@@ -73,7 +77,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [isAuthenticated, refreshSession, user]);
 
     // Calculations
     const deliveryFee = deliveryMethod === 'express' ? 50 : (cartTotal >= 200 ? 0 : 25);
@@ -107,8 +111,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
             return;
         }
 
-        const user = await api.getUser();
-        if (!user) {
+        if (!isAuthenticated) {
             Alert.alert(t('guestTitle'), t('loginToOrderOrders'), [
                 { text: t('cancel'), style: 'cancel' },
                 { text: t('loginNow'), onPress: showLogin },

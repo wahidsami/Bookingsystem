@@ -42,13 +42,12 @@ interface BookingGroup {
 export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
     const isRTL = language === 'ar';
-    const { showLogin } = useAppSession();
+    const { showLogin, isAuthenticated } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'no_show' | 'cancelled'>('upcoming');
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
     const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
     const [reviewedAppointmentIds, setReviewedAppointmentIds] = useState<Set<string>>(new Set());
     const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
@@ -56,21 +55,12 @@ export function BookingsScreen({ navigation }: any) {
     const [rescheduleTime, setRescheduleTime] = useState('');
     const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
 
-    useFocusEffect(
-        React.useCallback(() => {
-            loadBookings();
-        }, [activeTab])
-    );
-
-    const loadBookings = async () => {
+    const loadBookings = React.useCallback(async () => {
         try {
             setLoading(true);
-            const user = await api.getUser();
-            if (!user) {
-                setIsAuthenticated(false);
+            if (!isAuthenticated) {
                 return;
             }
-            setIsAuthenticated(true);
             const [data, reviews] = await Promise.all([
                 api.getBookings(activeTab),
                 api.getMyReviews(200).catch(() => []),
@@ -84,7 +74,7 @@ export function BookingsScreen({ navigation }: any) {
             setBookings(data);
         } catch (error: any) {
             if (error.status === 401 || error.message?.includes('unauthorized') || error.message?.includes('Invalid or expired token')) {
-                setIsAuthenticated(false);
+                showLogin();
             } else {
                 console.error('Failed to load bookings:', error);
             }
@@ -92,7 +82,13 @@ export function BookingsScreen({ navigation }: any) {
             setLoading(false);
             setRefreshing(false);
         }
-    };
+    }, [activeTab, isAuthenticated, showLogin]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadBookings();
+        }, [loadBookings])
+    );
 
     const handleRefresh = () => {
         setRefreshing(true);

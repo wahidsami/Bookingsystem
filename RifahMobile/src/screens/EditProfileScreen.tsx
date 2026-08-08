@@ -14,6 +14,7 @@ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api, User } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 interface EditProfileScreenProps {
     navigation: any;
@@ -22,7 +23,8 @@ interface EditProfileScreenProps {
 export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
     const { t, isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
-    const [loading, setLoading] = useState(true);
+    const { isAuthenticated, user } = useAppSession();
+    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [formData, setFormData] = useState<Partial<User>>({
@@ -37,33 +39,24 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
     });
 
     useEffect(() => {
-        const loadProfile = async () => {
-            try {
-                const user = await api.getProfile().catch(() => api.getUser());
-                if (!user) {
-                    setError(t('failedToLoadProfile'));
-                    return;
-                }
+        if (!isAuthenticated || !user) {
+            setError(t('failedToLoadProfile'));
+            setLoading(false);
+            return;
+        }
 
-                setFormData({
-                    firstName: user.firstName || '',
-                    lastName: user.lastName || '',
-                    dateOfBirth: user.dateOfBirth || '',
-                    gender: user.gender || '',
-                    addressCity: user.addressCity || '',
-                    addressStreet: user.addressStreet || '',
-                    addressBuilding: user.addressBuilding || '',
-                    addressPhone: user.addressPhone || user.phone || '',
-                });
-            } catch (err: any) {
-                setError(err.message || t('failedToLoadProfile'));
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadProfile();
-    }, [t]);
+        setFormData({
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            dateOfBirth: user.dateOfBirth || '',
+            gender: user.gender || '',
+            addressCity: user.addressCity || '',
+            addressStreet: user.addressStreet || '',
+            addressBuilding: user.addressBuilding || '',
+            addressPhone: user.addressPhone || user.phone || '',
+        });
+        setLoading(false);
+    }, [isAuthenticated, t, user]);
 
     const handleSave = async () => {
         if (!formData.firstName?.trim() || !formData.lastName?.trim()) {

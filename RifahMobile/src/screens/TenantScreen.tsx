@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AppIcon } from '../components/AppIcon';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
+import { useAppSession } from '../contexts/AppSessionContext';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
 
 interface TenantDetailsProps {
@@ -133,6 +134,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const pageEnterAnim = useMemo(() => new Animated.Value(0), []);
     const { itemCount, addToCart, clearCart } = useCart();
     const { itemCount: serviceBookingItemCount } = useServiceBookingCart();
+    const { isAuthenticated } = useAppSession();
 
     useEffect(() => {
         loadTenantDetails();
@@ -595,8 +597,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
     const loadReviewEligibility = async () => {
         try {
-            const user = await api.getUser();
-            if (!user) {
+            if (!isAuthenticated) {
                 setReviewEligibleBookings([]);
                 setReviewedAppointmentIds(new Set());
                 return;

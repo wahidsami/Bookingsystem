@@ -64,7 +64,7 @@ export default function AppointmentServicesStep({
 
   return (
     <div className="flex flex-col h-full animate-fadeIn">
-      <div className="grid flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,340px)] min-h-0">
+      <div className="grid flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)] min-h-0">
         
         {/* Left Column: Service Browser */}
         <section className="flex flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm h-full">
@@ -174,25 +174,6 @@ export default function AppointmentServicesStep({
             onRemoveService={onRemoveService}
           />
         </div>
-      </div>
-
-      {/* Footer Navigation */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 pt-5 mt-auto">
-        <button
-          type="button"
-          onClick={onPrevious}
-          className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-        >
-          {isRtl ? 'السابق' : 'Previous'}
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!canProceed}
-          className="rounded-2xl bg-primary px-8 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isRtl ? 'التالي' : 'Next'}
-        </button>
       </div>
     </div>
   );

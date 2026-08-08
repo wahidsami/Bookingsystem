@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { UserAvatar } from '../components/UserAvatar';
 import { colors, spacing, fontSize } from '../theme/colors';
@@ -16,43 +15,26 @@ interface ProfileScreenProps {
 
 export function ProfileScreen({ navigation }: ProfileScreenProps) {
     const { t } = useLanguage();
-    const { isAuthenticated, showLogin, showRegister } = useAppSession();
+    const { isAuthenticated, showLogin, showRegister, user: sessionUser, refreshSession } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState<User | null>(sessionUser);
+    const [loading, setLoading] = useState(false);
     const [uploadLoading, setUploadLoading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
 
-    useFocusEffect(
-        React.useCallback(() => {
-            loadUserData();
-        }, [isAuthenticated])
-    );
-
-    const loadUserData = async () => {
-        setLoading(true);
-        if (!isAuthenticated) {
-            setUser(null);
-            setLoading(false);
-            return;
+    useEffect(() => {
+        if (isAuthenticated && !sessionUser) {
+            void refreshSession();
         }
 
-        try {
-            const userData = await api.getProfile().catch(() => api.getUser());
-            setUser(userData);
-            if (userData) {
-                await api.setUser(userData);
-            }
-        } catch (error) {
-            console.error('Failed to load user data:', error);
-            setUser(null);
-        } finally {
-            setLoading(false);
-        }
-    };
+        setUser(sessionUser);
+        setLoading(false);
+    }, [isAuthenticated, refreshSession, sessionUser]);
+
+    const displayUser = user ?? sessionUser;
 
     const handleEditPhoto = async () => {
-        if (!user || uploadLoading) return;
+        if (!displayUser || uploadLoading) return;
         setUploadError(null);
         try {
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -74,7 +56,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
             const type = asset.mimeType ?? `image/${ext === 'jpg' ? 'jpeg' : ext}`;
             setUploadLoading(true);
             const res = await api.uploadProfilePhoto(uri, fileName, type);
-            const updatedUser = { ...user, profileImage: res.profileImage };
+            const updatedUser = { ...displayUser, profileImage: res.profileImage };
             setUser(updatedUser);
             await api.setUser(updatedUser);
         } catch (err: any) {
@@ -93,7 +75,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         );
     }
 
-    if (!user) {
+    if (!isAuthenticated) {
         return (
             <View style={styles.container}>
                 <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
@@ -127,7 +109,17 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         );
     }
 
-    const fullName = `${user.firstName} ${user.lastName}`;
+    if (isAuthenticated && !displayUser) {
+        return (
+            <View style={[styles.container, styles.centerContent]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
+
+    const currentUser = displayUser!;
+
+    const fullName = `${currentUser.firstName} ${currentUser.lastName}`;
     return (
         <View style={styles.container}>
             <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
@@ -140,9 +132,9 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
                 {/* Profile Picture */}
                 <View style={styles.avatarSection}>
                     <UserAvatar
-                        firstName={user.firstName}
-                        lastName={user.lastName}
-                        profileImage={user.profileImage}
+                        firstName={currentUser.firstName}
+                        lastName={currentUser.lastName}
+                        profileImage={currentUser.profileImage}
                         size={100}
                         style={styles.profileAvatar}
                     />
@@ -170,17 +162,17 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
                     </View>
                     <View style={styles.infoItem}>
                         <Text style={styles.infoLabel}>{t('email')}</Text>
-                        <Text style={styles.infoValue}>{user.email}</Text>
+                    <Text style={styles.infoValue}>{currentUser.email}</Text>
                     </View>
                     <View style={styles.infoItem}>
                         <Text style={styles.infoLabel}>{t('phone')}</Text>
-                        <Text style={styles.infoValue}>{user.phone}</Text>
+                    <Text style={styles.infoValue}>{currentUser.phone}</Text>
                     </View>
-                    {user.createdAt && (
+                    {currentUser.createdAt && (
                         <View style={styles.infoItem}>
                             <Text style={styles.infoLabel}>{t('memberSince')}</Text>
                             <Text style={styles.infoValue}>
-                                {new Date(user.createdAt).toLocaleDateString()}
+                                {new Date(currentUser.createdAt).toLocaleDateString()}
                             </Text>
                         </View>
                     )}

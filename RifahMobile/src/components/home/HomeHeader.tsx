@@ -5,11 +5,11 @@ import * as Notifications from 'expo-notifications';
 import { ThemedText as Text } from '../ThemedText';
 import { colors, spacing, fontSize } from '../../theme/colors';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { api, User } from '../../api/client';
 import { useAppSession } from '../../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../../utils/safeArea';
 import { UserAvatar } from '../UserAvatar';
 import { AppIcon } from '../AppIcon';
+import { api } from '../../api/client';
 
 interface HomeHeaderProps {
     navigation: any;
@@ -17,15 +17,9 @@ interface HomeHeaderProps {
 
 export function HomeHeader({ navigation }: HomeHeaderProps) {
     const { t } = useLanguage();
-    const { ensureAuthenticated, isAuthenticated } = useAppSession();
+    const { isAuthenticated, showLogin, user } = useAppSession();
     const { topInset } = useScreenSafeArea();
-    const [user, setUser] = useState<User | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
-
-    const loadUser = useCallback(async () => {
-        const userData = await api.getProfile().catch(() => api.getUser());
-        setUser(userData);
-    }, []);
 
     const loadUnreadCount = useCallback(async () => {
         if (!isAuthenticated) {
@@ -44,9 +38,8 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
 
     useFocusEffect(
         useCallback(() => {
-            loadUser();
             loadUnreadCount();
-        }, [loadUnreadCount, loadUser])
+        }, [loadUnreadCount])
     );
 
     useEffect(() => {
@@ -65,7 +58,14 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
         <View style={[styles.container, { paddingTop: spacing.xl + topInset }]}>
             {/* Left: Avatar */}
             <TouchableOpacity
-                onPress={() => ensureAuthenticated(() => navigation.navigate('Profile'))}
+                onPress={() => {
+                    if (!isAuthenticated) {
+                        showLogin();
+                        return;
+                    }
+
+                    navigation.navigate('Profile');
+                }}
                 style={styles.avatarTouchable}
             >
                 <UserAvatar
@@ -86,7 +86,14 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
             <View style={styles.iconsRow}>
                 <TouchableOpacity
                     style={styles.iconButton}
-                    onPress={() => ensureAuthenticated(() => navigation.navigate('Notifications'))}
+                    onPress={() => {
+                        if (!isAuthenticated) {
+                            showLogin();
+                            return;
+                        }
+
+                        navigation.navigate('Notifications');
+                    }}
                 >
                     <AppIcon name="bell" size={20} color={colors.primary} />
                     {unreadCount > 0 ? (

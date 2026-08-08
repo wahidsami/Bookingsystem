@@ -49,7 +49,7 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const bookingSessionId = route.params?.bookingSessionId || null;
     const bookingReference = route.params?.bookingReference || null;
     const { t, isRTL, language } = useLanguage();
-    const { ensureAuthenticated } = useAppSession();
+    const { isAuthenticated, showLogin, user } = useAppSession();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
     const {
         itemCount,
@@ -320,16 +320,16 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const handleBooking = async () => {
         if (!selectedTime) return;
 
-        if (!ensureAuthenticated()) {
+        if (!isAuthenticated) {
+            showLogin();
             Alert.alert(t('guestTitle'), t('loginToOrderBookings'), [
                 { text: t('cancel'), style: 'cancel' },
                 { text: t('loginNow') },
             ]);
             return;
         }
-            const user = await api.getUser();
-            if (!user) return;
-            const primaryCustomerName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || (language === 'ar' ? 'العميل الأساسي' : 'Primary customer');
+        const primaryCustomerName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+            || (language === 'ar' ? 'العميل الأساسي' : 'Primary customer');
 
         if (includeGuest && (!guestFirstName.trim() || !guestLastName.trim())) {
             Alert.alert('Guest Details', 'Please provide guest first and last name.');

@@ -141,49 +141,51 @@ export default function AppointmentServiceRow({
           <div className="h-full w-3 shrink-0 rounded-full bg-primary/10" />
         )}
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-2">
           <p className={`truncate font-semibold tracking-tight text-slate-900 ${isVariantRow ? 'text-sm' : 'text-base sm:text-[15px]'}`}>
             {title}
           </p>
         </div>
 
-        <div className="shrink-0 whitespace-nowrap text-sm font-semibold text-slate-900">
-          {price.toFixed(2)} SAR
-        </div>
+        <div className="flex shrink-0 items-center justify-end gap-3 md:gap-4">
+          <div className="whitespace-nowrap text-[13px] sm:text-sm font-semibold text-slate-900">
+            {price.toFixed(2)} <span className="text-[10px] sm:text-xs text-slate-500 font-medium">SAR</span>
+          </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {isAdded && (
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {isAdded && (
+              <button
+                type="button"
+                onClick={handleToggleExpand}
+                className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border transition ${isExpanded ? 'bg-slate-100 border-slate-300' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                aria-label="Configure service"
+              >
+                <Settings2 className="h-4 w-4 text-slate-700" />
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={handleToggleExpand}
-              className={`inline-flex items-center justify-center rounded-full border border-slate-200 p-2 transition hover:bg-slate-50 ${isExpanded ? 'bg-slate-50 border-slate-300' : 'bg-white'}`}
-              aria-label="Configure service"
+              onClick={handleAddClick}
+              className={`flex h-8 sm:h-9 items-center justify-center gap-1.5 rounded-full px-3 sm:px-4 text-[11px] sm:text-xs font-semibold transition ${
+                isAdded
+                  ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100'
+                  : 'border border-primary bg-primary text-white hover:bg-primary/90'
+              }`}
             >
-              <Settings2 className="h-4 w-4 text-slate-700" />
+              {isAdded ? (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{isRtl ? 'تمت الإضافة' : 'Added'}</span>
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{isRtl ? 'إضافة' : 'Add'}</span>
+                </>
+              )}
             </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleAddClick}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-              isAdded
-                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100'
-                : 'border border-primary bg-primary text-white hover:bg-primary/90'
-            }`}
-          >
-            {isAdded ? (
-              <>
-                <Check className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{isRtl ? 'تمت الإضافة' : 'Added'}</span>
-              </>
-            ) : (
-              <>
-                <PlusCircle className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{isRtl ? 'إضافة' : 'Add'}</span>
-              </>
-            )}
-          </button>
+          </div>
         </div>
       </div>
 

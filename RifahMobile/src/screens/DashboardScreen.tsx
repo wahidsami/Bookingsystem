@@ -3,17 +3,18 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl }
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
-import { api, User, Booking, bookingNeedsPayment, getImageUrl } from '../api/client';
+import { api, Booking, bookingNeedsPayment, getImageUrl } from '../api/client';
 import { useNavigation } from '@react-navigation/native';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAppSession } from '../contexts/AppSessionContext';
 
 export function DashboardScreen() {
     const { t, isRTL } = useLanguage();
     const navigation = useNavigation<any>();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
-    const [user, setUser] = useState<User | null>(null);
+    const { user } = useAppSession();
     const [stats, setStats] = useState({ upcomingCount: 0, pendingPayment: 0 });
     const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
@@ -25,9 +26,6 @@ export function DashboardScreen() {
 
     const loadData = async () => {
         try {
-            const userData = await api.getUser();
-            setUser(userData);
-
             // api.getBookings() already returns Booking[] (unwrapped)
             const bookings = await api.getBookings();
             const upcoming = bookings.filter((booking) => ['pending', 'confirmed', 'checked_in', 'in_service'].includes(booking.status));

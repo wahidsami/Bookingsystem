@@ -14,7 +14,7 @@ import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
 
 export function ServiceBookingCartScreen({ navigation }: any) {
     const { language, isRTL, t } = useLanguage();
-    const { showLogin } = useAppSession();
+    const { showLogin, isAuthenticated } = useAppSession();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
     const { items, itemCount, cartTenant, cartTenantId, totalPrice, payableNowTotal, paymentGroups, removeItem, clearCart } = useServiceBookingCart();
     const [loading, setLoading] = useState(false);
@@ -51,8 +51,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
             return;
         }
 
-        const user = await api.getUser();
-        if (!user) {
+        if (!isAuthenticated) {
             Alert.alert(t('guestTitle'), t('loginToOrderBookings'), [
                 { text: t('cancel'), style: 'cancel' },
                 { text: t('loginNow'), onPress: showLogin },
