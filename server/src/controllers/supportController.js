@@ -79,6 +79,12 @@ const createTicket = async (req, res) => {
 
         return sendSuccess(res, { ticket }, 201);
     } catch (error) {
+        console.error('Error creating support ticket:', error);
+
+        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+            error.statusCode = 400;
+        }
+
         return sendError(res, error, 'Failed to create support ticket');
     }
 };

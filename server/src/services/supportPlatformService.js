@@ -1351,7 +1351,10 @@ async function createTicket({
         }
         const category = await resolveCategoryOrNull(normalizedSupportCategoryId, normalizedTenantId, transaction);
 
+        const ticketNumber = await db.SupportTicket.generateTicketNumber({ transaction });
+
         const ticket = await db.SupportTicket.create({
+            ticketNumber,
             tenantId: normalizedTenantId,
             customerPlatformUserId: normalizedCustomerId,
             supportCategoryId: category ? category.id : null,
