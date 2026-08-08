@@ -31,7 +31,22 @@ function getAppointmentInvoiceDiscountAmount(appointments = []) {
     return formatAmount(appointments.reduce((sum, appointment) => {
         const rawPrice = formatAmount(appointment?.rawPrice ?? 0);
         const finalPrice = formatAmount(appointment?.price ?? 0);
-        return sum + Math.max(rawPrice - finalPrice, 0);
+        const taxAmount = formatAmount(appointment?.taxAmount ?? 0);
+        const platformFee = formatAmount(appointment?.platformFee ?? 0);
+        
+        // The raw price that was actually charged (discounted base price)
+        const discountedRawPrice = formatAmount(finalPrice - taxAmount - platformFee);
+        
+        // If there was a discount, the original pre-tax rawPrice will be greater
+        if (rawPrice > discountedRawPrice + 0.01) {
+            // Find the tax and fee rate applied to the discounted base price
+            const rate = discountedRawPrice > 0 ? (taxAmount + platformFee) / discountedRawPrice : 0;
+            // The original final price if no discount was applied
+            const originalFinalPrice = rawPrice * (1 + rate);
+            return sum + Math.max(originalFinalPrice - finalPrice, 0);
+        }
+        
+        return sum;
     }, 0));
 }
 

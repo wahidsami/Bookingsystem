@@ -485,9 +485,22 @@ function getTransactionDiscountAmount(transaction, invoice = null) {
         return invoiceDiscount;
     }
 
-    // Mathematical derivation was removed here to prevent VAT double-counting.
-    // Accepted sources: invoice discount, coupon, voucher, gift card, manual discount.
-    // If none exists, return 0.
+    // Mathematical derivation fallback (VAT-adjusted) for appointments without an invoice
+    if (transaction?.appointment) {
+        const appt = transaction.appointment;
+        const rawPrice = Number(appt.rawPrice ?? 0);
+        const finalPrice = Number(appt.price ?? 0);
+        const taxAmount = Number(appt.taxAmount ?? 0);
+        const platformFee = Number(appt.platformFee ?? 0);
+        
+        const discountedRawPrice = finalPrice - taxAmount - platformFee;
+        if (rawPrice > discountedRawPrice + 0.01) {
+            const rate = discountedRawPrice > 0 ? (taxAmount + platformFee) / discountedRawPrice : 0;
+            const originalFinalPrice = rawPrice * (1 + rate);
+            return Math.max(originalFinalPrice - finalPrice, 0);
+        }
+    }
+
     return 0;
 }
 

@@ -374,6 +374,11 @@ class BookingService {
             duration: resolvedDuration
         };
         const pricing = db.Appointment.calculateRevenueBreakdown(pricingSource, staff);
+        
+        // Restore the original base gross price so it is recorded in the ledger
+        // This allows mathematical derivation of the discount amount later
+        pricing.rawPrice = baseRawPrice;
+
         const bookingSplit = normalizedPaymentMethod === 'booking-fee'
             ? calculateServiceDeposit(pricing.price, tenantPaymentSettings)
             : {
