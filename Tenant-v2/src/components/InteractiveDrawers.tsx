@@ -217,11 +217,7 @@ export default function InteractiveDrawers({
     }
   }, [isCreateDrawerOpen, initialCreateMode]);
 
-  useEffect(() => {
-    if (isCreateDrawerOpen && typeof initialDuration === 'number' && Number.isFinite(initialDuration) && initialDuration > 0) {
-      setCurrentDuration(Math.max(5, Math.round(initialDuration / 5) * 5));
-    }
-  }, [isCreateDrawerOpen, initialDuration]);
+  // setCurrentDuration is obsolete as duration is now handled directly by the service configuration component
 
   const availableStylists = stylists;
 
