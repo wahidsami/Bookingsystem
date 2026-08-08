@@ -696,24 +696,6 @@ export default function InteractiveDrawers({
     }
   }, [customers, selectedCustId]);
 
-  useEffect(() => {
-    if (custMode !== 'existing') {
-      return;
-    }
-
-    if (filteredCustomers.length === 0) {
-      if (selectedCustId) {
-        setSelectedCustId('');
-      }
-      return;
-    }
-
-    const selectionStillVisible = filteredCustomers.some((customer) => customer.id === selectedCustId);
-    if (!selectedCustId || !selectionStillVisible) {
-      setSelectedCustId(filteredCustomers[0].id);
-    }
-  }, [custMode, customers, customerSearch, selectedCustId]);
-
   const filteredCustomers = useMemo(() => {
     const query = customerSearch.trim().toLowerCase();
     const sortedCustomers = [...customers].sort((left, right) => {
