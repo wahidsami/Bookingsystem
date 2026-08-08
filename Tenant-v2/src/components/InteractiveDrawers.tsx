@@ -462,6 +462,9 @@ export default function InteractiveDrawers({
   const [expandedServiceIds, setExpandedServiceIds] = useState<Record<string, boolean>>({});
   const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
   const [editingQueueDraft, setEditingQueueDraft] = useState<QueuedServiceEditDraft | null>(null);
+  const [inlineConfigServiceId, setInlineConfigServiceId] = useState<string | null>(null);
+  const [inlineConfigVariantId, setInlineConfigVariantId] = useState<string | null>(null);
+  const [inlineConfigDraft, setInlineConfigDraft] = useState<QueuedServiceEditDraft | null>(null);
   const canonicalServices = useMemo<ServiceRecord[]>(() => services.map((service) => normalizeServiceRecord(service)), [services]);
   const serviceCategories = useMemo(() => groupServicesByCategory(canonicalServices), [canonicalServices]);
   const serviceCategoryTabs = useMemo(() => {
@@ -943,14 +946,172 @@ export default function InteractiveDrawers({
     );
   };
 
-  const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
-    const isSelected = isQueuedServiceSelected(service.id, variantOverride?.id || null);
-    if (isSelected) {
-      removeQueuedService(service.id, variantOverride?.id || null);
+  const handleOpenInlineConfig = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
+    const resolvedVariant = variantOverride || null;
+
+    let nextStartTime = currentStartTime;
+    if (stagedServices.length > 0) {
+      const lastItem = stagedServices[stagedServices.length - 1];
+      nextStartTime = lastItem.startTime + lastItem.duration;
+    }
+
+    setInlineConfigServiceId(service.id);
+    setInlineConfigVariantId(resolvedVariant?.id || null);
+    setInlineConfigDraft({
+      serviceId: service.id,
+      variantId: resolvedVariant?.id || '',
+      staffId: currentStaffId || availableStylists[0]?.id || '',
+      startTime: nextStartTime,
+      duration: resolvedVariant?.duration || service.duration || 60,
+      discountType: 'none',
+      discountValue: 0,
+      notes: ''
+    });
+    setExpandedServiceIds((current) => ({
+      ...current,
+      [service.id]: true
+    }));
+  };
+
+  const handleCancelInlineConfig = () => {
+    setInlineConfigServiceId(null);
+    setInlineConfigVariantId(null);
+    setInlineConfigDraft(null);
+  };
+
+  const handleSaveInlineConfig = () => {
+    if (!inlineConfigDraft || !inlineConfigServiceId) return;
+    const srv = canonicalServices.find(s => s.id === inlineConfigServiceId);
+    if (!srv) return;
+
+    if (srv.employeeAssignments?.length && inlineConfigDraft.staffId && !srv.employeeAssignments.includes(inlineConfigDraft.staffId)) {
+      setShowAssignWarning(true);
       return;
     }
 
-    handleAddStagedService(service, variantOverride);
+    const sanitizedDiscountValue = inlineConfigDraft.discountType === 'none'
+      ? 0
+      : Math.max(0, Number(inlineConfigDraft.discountValue || 0));
+
+    const newItem: StagedService = {
+      id: `stg-${Date.now()}`,
+      serviceId: inlineConfigDraft.serviceId,
+      variantId: inlineConfigDraft.variantId || undefined,
+      serviceCategory: srv.category,
+      staffId: inlineConfigDraft.staffId,
+      startTime: inlineConfigDraft.startTime,
+      duration: inlineConfigDraft.duration,
+      discountType: inlineConfigDraft.discountType,
+      discountValue: sanitizedDiscountValue,
+      notes: inlineConfigDraft.notes,
+    };
+
+    setStagedServices(prev => [...prev, newItem]);
+    addLocalToast(
+      `تمت إضافة الخدمة "${isRtl ? srv.nameAr : srv.nameEn}" للموعد المجدول.`,
+      `Service "${isRtl ? srv.nameAr : srv.nameEn}" added to session queue.`,
+      'success'
+    );
+
+    handleCancelInlineConfig();
+  };
+
+  const renderInlineConfigForm = (serviceId: string, variantId?: string | null) => {
+    if (!inlineConfigDraft || inlineConfigServiceId !== serviceId) return null;
+    if ((variantId || null) !== (inlineConfigVariantId || null)) return null;
+
+    return (
+      <div className="mt-2 rounded-[22px] border border-primary/20 bg-primary/5 p-4 sm:p-5 shadow-sm animate-fadeIn relative mb-4">
+        <div className="mb-4 flex items-center justify-between border-b border-primary/10 pb-3">
+          <h5 className="font-bold text-primary">{isRtl ? 'إعداد الخدمة' : 'Service Configuration'}</h5>
+          <button type="button" onClick={handleCancelInlineConfig} className="text-slate-400 hover:text-slate-600 transition">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'عضو الفريق' : 'Team Member'}</label>
+            <select 
+              value={inlineConfigDraft.staffId} 
+              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, staffId: e.target.value } : null)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="" disabled>{isRtl ? 'اختر...' : 'Select...'}</option>
+              {availableStylists.map(s => (
+                <option key={s.id} value={s.id}>{isRtl ? s.nameAr : s.nameEn}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'وقت البدء (دقيقة من منتصف الليل)' : 'Start Time (Minutes)'}</label>
+            <input 
+              type="number" 
+              min={0}
+              max={1440}
+              value={inlineConfigDraft.startTime}
+              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, startTime: parseInt(e.target.value) || 0 } : null)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'المدة (دقيقة)' : 'Duration (Min)'}</label>
+            <input 
+              type="number" 
+              min={1}
+              value={inlineConfigDraft.duration}
+              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, duration: parseInt(e.target.value) || 0 } : null)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'نوع الخصم' : 'Discount Type'}</label>
+            <select 
+              value={inlineConfigDraft.discountType} 
+              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, discountType: e.target.value as any } : null)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="none">{isRtl ? 'بدون خصم' : 'None'}</option>
+              <option value="percentage">{isRtl ? 'نسبة مئوية (%)' : 'Percentage (%)'}</option>
+              <option value="fixed">{isRtl ? 'مبلغ ثابت' : 'Fixed Amount'}</option>
+            </select>
+          </div>
+          {inlineConfigDraft.discountType !== 'none' && (
+            <div className="space-y-1.5 xl:col-start-1">
+              <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'قيمة الخصم' : 'Discount Value'}</label>
+              <input 
+                type="number" 
+                min={0}
+                value={inlineConfigDraft.discountValue}
+                onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, discountValue: parseInt(e.target.value) || 0 } : null)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          )}
+          <div className={`space-y-1.5 ${inlineConfigDraft.discountType !== 'none' ? 'sm:col-span-1 xl:col-span-3' : 'sm:col-span-2 xl:col-span-4'}`}>
+            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'ملاحظات داخلية' : 'Internal Notes'}</label>
+            <input 
+              type="text" 
+              value={inlineConfigDraft.notes || ''}
+              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, notes: e.target.value } : null)}
+              placeholder={isRtl ? 'ملاحظات خاصة بهذه الخدمة...' : 'Notes for this service...'}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end gap-3 border-t border-primary/10 pt-4">
+          <button type="button" onClick={handleCancelInlineConfig} className="rounded-xl border border-slate-300 bg-white px-5 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50">
+            {isRtl ? 'إلغاء' : 'Cancel'}
+          </button>
+          <button type="button" onClick={handleSaveInlineConfig} className="rounded-xl bg-primary px-5 py-2 text-[13px] font-semibold text-white transition hover:bg-primary/90">
+            {isRtl ? 'حفظ في الموعد' : 'Save to Appointment'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
+    handleOpenInlineConfig(service, variantOverride);
   };
 
   const handleConfirmAppointmentCreation = async () => {
@@ -2344,11 +2505,13 @@ export default function InteractiveDrawers({
                                                     onToggleAdd={() => handleToggleServiceSelection(service, variant)}
                                                     description={variant.descriptionEn || variant.descriptionAr || variant.description || ''}
                                                   />
+                                                  {renderInlineConfigForm(service.id, variant.id)}
                                                 </React.Fragment>
                                               ))}
                                             </div>
                                           ) : null}
                                         </ExpandableServiceRow>
+                                        {renderInlineConfigForm(service.id, null)}
                                       </div>
                                     );
                                   })}
