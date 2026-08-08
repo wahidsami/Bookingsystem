@@ -1751,6 +1751,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }))
   ] : [];
   const activeInvoiceSubtotal = activeInvoiceLineItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+  // Compute embedded appointment discount from raw vs final price
+  const _rawPrice = Number(activeAppointment?.rawPrice || 0);
+  const _finalPrice = Number(activeAppointment?.price || 0);
+  const _taxAmount = Number(activeAppointment?.taxAmount || 0);
+  const _platformFee = Number(activeAppointment?.platformFee || 0);
+  const _discountedRawPrice = _finalPrice - _taxAmount - _platformFee;
+  let appointmentServiceDiscount = 0;
+  if (_rawPrice > _discountedRawPrice + 0.01) {
+    const _rate = _discountedRawPrice > 0 ? (_taxAmount + _platformFee) / _discountedRawPrice : 0;
+    const _originalFinalPrice = _rawPrice * (1 + _rate);
+    appointmentServiceDiscount = Math.max(_originalFinalPrice - _finalPrice, 0);
+  }
+
   const activeInvoiceDiscount = Number(appliedGiftCardAmount || 0);
   const activeInvoiceTotal = Math.max(0, activeInvoiceSubtotal - activeInvoiceDiscount);
   const activeInvoiceTaxable = Number((activeInvoiceTotal / 1.15).toFixed(2));
@@ -2601,11 +2615,24 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
     
+    // Calculate appointment discount for receipt
+    const _rawPrice = Number(activeAppointment?.rawPrice || 0);
+    const _finalPrice = Number(activeAppointment?.price || 0);
+    const _taxAmount = Number(activeAppointment?.taxAmount || 0);
+    const _platformFee = Number(activeAppointment?.platformFee || 0);
+    const _discountedRawPrice = _finalPrice - _taxAmount - _platformFee;
+    let appointmentServiceDiscount = 0;
+    if (_rawPrice > _discountedRawPrice + 0.01) {
+      const _rate = _discountedRawPrice > 0 ? (_taxAmount + _platformFee) / _discountedRawPrice : 0;
+      const _originalFinalPrice = _rawPrice * (1 + _rate);
+      appointmentServiceDiscount = Math.max(_originalFinalPrice - _finalPrice, 0);
+    }
+
     // Calculate totals
-    const serviceSubtotal = activeAppointment.price;
+    const serviceSubtotal = activeAppointment.price + appointmentServiceDiscount;
     const productsSubtotal = checkoutProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
     const subtotal = serviceSubtotal + productsSubtotal;
-    const discount = appliedGiftCardAmount;
+    const discount = appliedGiftCardAmount + appointmentServiceDiscount;
     const computedTotal = Math.max(0, subtotal - discount);
     const taxableAmount = computedTotal / 1.15;
     const vat = computedTotal - taxableAmount;
@@ -6157,9 +6184,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     {/* Pricing breakdown */}
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between text-slate-500">
-                        <span>{isRtl ? 'رسوم الخدمة الأساسية' : 'Service Subtotal'}</span>
-                        <span className="font-mono font-bold">{activeServiceSummary.price.toFixed(2)} {t.riyal}</span>
+                        <span>{isRtl ? 'الإجمالي الأساسي' : 'Original Subtotal'}</span>
+                        <span className="font-mono font-bold">{(activeInvoiceSubtotal + appointmentServiceDiscount).toFixed(2)} {t.riyal}</span>
                       </div>
+
+                      {appointmentServiceDiscount > 0 && (
+                        <div className="flex justify-between text-emerald-600 font-semibold">
+                          <span>{isRtl ? 'خصم الخدمة/الموعد' : 'Appointment Discount'}</span>
+                          <span className="font-mono font-black">-{appointmentServiceDiscount.toFixed(2)} {t.riyal}</span>
+                        </div>
+                      )}
 
 
 

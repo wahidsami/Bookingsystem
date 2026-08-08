@@ -172,11 +172,12 @@ async function renderCustomerInvoicePdf(invoiceRecord, kind = 'invoice') {
         cursorY += 6;
         const summaryWidth = 220;
         const summaryX = pageWidth - margin - summaryWidth;
-        doc.roundedRect(summaryX, cursorY, summaryWidth, 150, 16).fillAndStroke(accentSoft, border);
+        doc.roundedRect(summaryX, cursorY, summaryWidth, 165, 16).fillAndStroke(accentSoft, border);
         doc.fillColor(text).font('Helvetica-Bold').fontSize(11).text('Summary', summaryX + 14, cursorY + 14);
 
         const summaryRows = [
             ['Subtotal', formatMoney(loadedInvoice.subtotalAmount, currency)],
+            ...(Number(loadedInvoice.discountAmount || 0) > 0 ? [['Discount', `-${formatMoney(loadedInvoice.discountAmount, currency)}`]] : []),
             ['VAT', formatMoney(loadedInvoice.vatAmount, currency)],
             ['Total', formatMoney(loadedInvoice.totalAmount, currency)],
             ['Paid', formatMoney(loadedInvoice.paidAmount, currency)],
@@ -185,7 +186,7 @@ async function renderCustomerInvoicePdf(invoiceRecord, kind = 'invoice') {
 
         let summaryY = cursorY + 34;
         summaryRows.forEach(([label, value], index) => {
-            const isTotal = index === 2;
+            const isTotal = label === 'Total';
             doc.fillColor(isTotal ? accent : muted)
                 .font(isTotal ? 'Helvetica-Bold' : 'Helvetica')
                 .fontSize(isTotal ? 11 : 9)
