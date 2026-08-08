@@ -866,6 +866,19 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     base.setHours(9 + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
     return base.toISOString();
   };
+  const getMinimumAdvanceBookingMinutes = () => {
+    const rawAdvance = Number(tenantSettings?.bookingSettings?.minimumAdvanceBookingMinutes ?? 15);
+    return Number.isFinite(rawAdvance) ? Math.max(15, Math.round(rawAdvance)) : 15;
+  };
+  const isAppointmentCreationTimeAllowed = (dateKey: string, timeInMinutesFromNine: number) => {
+    const selectedKey = `${dateKey || ''}`;
+    const todayKey = getRiyadhDateKey(new Date());
+    if (selectedKey < todayKey) return false;
+    if (selectedKey > todayKey) return true;
+    const slotAbsoluteMinutes = (START_HOUR * 60) + Math.max(0, Math.round(timeInMinutesFromNine));
+    const minimumAdvanceMinutes = getMinimumAdvanceBookingMinutes();
+    return slotAbsoluteMinutes >= (getRiyadhMinutesSinceMidnight(new Date()) + minimumAdvanceMinutes);
+  };
   const buildClockTime = (minutesFromNine: number) => {
     const absoluteMinutes = 9 * 60 + Math.max(0, Math.round(minutesFromNine));
     const hours = Math.floor(absoluteMinutes / 60);
@@ -908,7 +921,26 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       'warning'
     );
   };
+  const showMinimumAdvanceBookingWarning = (timeInMinutesFromNine: number) => {
+    const slotLabel = formatMinutesToTime(timeInMinutesFromNine);
+    const currentLabel = getRiyadhCurrentTimeLabel();
+    const minimumAdvanceMinutes = getMinimumAdvanceBookingMinutes();
+    addLocalToast(
+      `يجب أن يكون الحجز قبل ${minimumAdvanceMinutes} دقيقة على الأقل من الآن. الوقت المختار ${slotLabel} والوقت الحالي في الرياض ${currentLabel}.`,
+      `Bookings must be scheduled at least ${minimumAdvanceMinutes} minutes in advance. Selected time: ${slotLabel}. Riyadh time is currently ${currentLabel}.`,
+      'warning'
+    );
+  };
   const openCreateAppointmentAtSlot = (staffId: string, timeInMinutes: number, dateKey = selectedDateKey, durationMinutes?: number) => {
+    if (!isAppointmentCreationTimeAllowed(dateKey, timeInMinutes)) {
+      if (`${dateKey || ''}` === getRiyadhDateKey(new Date())) {
+        showMinimumAdvanceBookingWarning(timeInMinutes);
+      } else {
+        showPastBoardSlotWarning(timeInMinutes);
+      }
+      return false;
+    }
+
     if (isPastBoardCreationSlot(dateKey, timeInMinutes)) {
       showPastBoardSlotWarning(timeInMinutes);
       return false;
@@ -3060,8 +3092,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
-    if (isPastBoardCreationSlot(getSelectedDateKey(), finalStaged[0].startTime)) {
-      showPastBoardSlotWarning(finalStaged[0].startTime);
+    if (!isAppointmentCreationTimeAllowed(getSelectedDateKey(), finalStaged[0].startTime)) {
+      if (getSelectedDateKey() === getRiyadhDateKey(new Date())) {
+        showMinimumAdvanceBookingWarning(finalStaged[0].startTime);
+      } else {
+        showPastBoardSlotWarning(finalStaged[0].startTime);
+      }
       return;
     }
 
@@ -3911,6 +3947,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
+    if (!isAppointmentCreationTimeAllowed(range.startSlot.dateKey, range.startSlot.startMinutes)) {
+      if (range.startSlot.dateKey === getRiyadhDateKey(new Date())) {
+        showMinimumAdvanceBookingWarning(range.startSlot.startMinutes);
+      } else {
+        showPastBoardSlotWarning(range.startSlot.startMinutes);
+      }
+      return;
+    }
+
     const dateValue = parseLocalDateKey(range.startSlot.dateKey);
     setSelectedDate(dateValue);
     setCurrentStaffId(targetStaffId);
@@ -4591,11 +4636,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   </div>
 
                   <div className="grid grid-cols-7 gap-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    {isRtl
+                    {(isRtl
                       ? ['ح', 'خ', 'ج', 'س', 'ر', 'ث', 'ن']
                       : ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-                    .map((day) => (
-                      <div key={day} className="px-2 py-1 text-center">{day}</div>
+                    ).map((day, index) => (
+                      <div key={`${day}-${index}`} className="px-2 py-1 text-center">{day}</div>
                     ))}
                   </div>
 

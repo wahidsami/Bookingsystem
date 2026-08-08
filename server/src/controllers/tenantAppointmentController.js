@@ -1389,7 +1389,10 @@ exports.createAppointment = async (req, res) => {
             errorMessage = error.message;
         }
 
-        res.status(500).json({
+        const isKnownAdvanceBookingValidation = /Booking must be at least \d+ minutes in advance/i.test(errorMessage);
+        const statusCode = isKnownAdvanceBookingValidation ? 400 : 500;
+
+        res.status(statusCode).json({
             success: false,
             message: errorMessage,
             error: error.message,
