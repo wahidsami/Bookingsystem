@@ -213,6 +213,50 @@ function getReplyPreview(message) {
     };
 }
 
+function normalizeSupportAgent(supportAgent) {
+    const json = typeof supportAgent?.toJSON === 'function' ? supportAgent.toJSON() : (supportAgent || {});
+    return {
+        id: json.id,
+        superAdminId: json.superAdminId || null,
+        displayName: json.displayName || null,
+        displayNameAr: json.displayNameAr || null,
+        title: json.title || null,
+        avatarUrl: json.avatarUrl || null,
+        status: json.status || null,
+        presenceStatus: json.presenceStatus || null,
+        supportedLanguages: Array.isArray(json.supportedLanguages) ? json.supportedLanguages : [],
+        skills: Array.isArray(json.skills) ? json.skills : [],
+        metadata: json.metadata || {},
+        lastSeenAt: json.lastSeenAt || null,
+        createdAt: json.createdAt || null,
+        updatedAt: json.updatedAt || null
+    };
+}
+
+function normalizeTenantSummary(tenant) {
+    const json = typeof tenant?.toJSON === 'function' ? tenant.toJSON() : (tenant || {});
+    return {
+        id: json.id,
+        name: json.name || null,
+        name_en: json.name_en || null,
+        name_ar: json.name_ar || null,
+        nameAr: json.nameAr || null,
+        slug: json.slug || null,
+        email: json.email || null,
+        phone: json.phone || null,
+        mobile: json.mobile || null,
+        logo: json.logo || null,
+        status: json.status || null,
+        createdAt: json.createdAt || null,
+        updatedAt: json.updatedAt || null
+    };
+}
+
+function buildPersonName({ firstName = null, lastName = null, email = null, fallback = null } = {}) {
+    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+    return fullName || email || fallback || null;
+}
+
 function normalizeAttachment(attachment) {
     const json = typeof attachment?.toJSON === 'function' ? attachment.toJSON() : (attachment || {});
     return {
@@ -288,6 +332,15 @@ function normalizeTicketEvent(ticketEvent) {
         actorType: json.actorType,
         customerPlatformUserId: json.customerPlatformUserId || null,
         supportAgentId: json.supportAgentId || null,
+        customer: json.customer ? {
+            id: json.customer.id,
+            firstName: json.customer.firstName || null,
+            lastName: json.customer.lastName || null,
+            email: json.customer.email || null,
+            phone: json.customer.phone || null,
+            profileImage: json.customer.profileImage || null
+        } : null,
+        supportAgent: json.supportAgent ? normalizeSupportAgent(json.supportAgent) : null,
         eventType: json.eventType,
         fromStatus: json.fromStatus || null,
         toStatus: json.toStatus || null,
@@ -313,13 +366,46 @@ function normalizeMessage(message, actorContext = {}) {
     const attachments = Array.isArray(json.attachments)
         ? json.attachments.map(normalizeAttachment)
         : [];
+    const senderType = normalizeText(json.senderType).toLowerCase() || 'system';
+    const customer = json.customer ? {
+        id: json.customer.id,
+        firstName: json.customer.firstName || null,
+        lastName: json.customer.lastName || null,
+        email: json.customer.email || null,
+        phone: json.customer.phone || null,
+        profileImage: json.customer.profileImage || null
+    } : null;
+    const supportAgent = json.supportAgent ? normalizeSupportAgent(json.supportAgent) : null;
+    const senderRole = senderType === 'support_agent'
+        ? (supportAgent?.superAdminId ? 'support_agent' : 'tenant_admin')
+        : senderType;
+    const senderId = senderType === 'customer'
+        ? (json.customerPlatformUserId || customer?.id || null)
+        : senderType === 'support_agent'
+            ? (json.supportAgentId || supportAgent?.id || null)
+            : null;
+    const senderName = senderType === 'customer'
+        ? buildPersonName({
+            firstName: customer?.firstName,
+            lastName: customer?.lastName,
+            email: customer?.email,
+            fallback: 'Customer'
+        })
+        : senderType === 'support_agent'
+            ? (supportAgent?.displayNameAr || supportAgent?.displayName || supportAgent?.title || (supportAgent?.superAdminId ? 'Support Agent' : 'Tenant Admin'))
+            : senderType === 'ai'
+                ? 'AI'
+                : 'System';
 
     return {
         id: json.id,
         tenantId: json.tenantId,
         supportTicketId: json.supportTicketId,
         replyToMessageId: json.replyToMessageId || null,
-        senderType: json.senderType,
+        senderType,
+        senderRole,
+        senderId,
+        senderName,
         customerPlatformUserId: json.customerPlatformUserId || null,
         supportAgentId: json.supportAgentId || null,
         content: json.content,
@@ -331,6 +417,19 @@ function normalizeMessage(message, actorContext = {}) {
         metadata: json.metadata || {},
         replyToMessage: json.replyToMessage ? getReplyPreview(json.replyToMessage) : null,
         attachments,
+        customer,
+        supportAgent,
+        isOwnMessage: (() => {
+            if (senderType === 'customer') {
+                return Boolean(actorContext.isCustomer && actorContext.actorId && String(actorContext.actorId) === String(json.customerPlatformUserId || customer?.id || ''));
+            }
+
+            if (senderType === 'support_agent') {
+                return Boolean(actorContext.supportAgentId && String(actorContext.supportAgentId) === String(json.supportAgentId || supportAgent?.id || ''));
+            }
+
+            return false;
+        })(),
         createdAt: json.createdAt || null,
         updatedAt: json.updatedAt || null
     };
@@ -525,11 +624,84 @@ function normalizeTicket(ticket, actorContext = {}) {
     const allReadStates = Array.isArray(json.readStates)
         ? json.readStates.map(normalizeReadState)
         : [];
+    const tenant = json.tenant ? normalizeTenantSummary(json.tenant) : null;
+    const ticketCreatedEvent = Array.isArray(json.events)
+        ? json.events.find((event) => `${event.eventType || ''}` === 'ticket_created')
+        : null;
+    const createdByActorType = normalizeText(json.metadata?.createdByActorType).toLowerCase();
+    const createdByActorId = json.metadata?.createdByActorId || null;
+    const requesterSupportAgent = ticketCreatedEvent?.supportAgent ? normalizeSupportAgent(ticketCreatedEvent.supportAgent) : null;
+    const requester = (() => {
+        if (createdByActorType === 'customer' && json.customer) {
+            return {
+                id: json.customer.id,
+                type: 'customer',
+                actorType: 'customer',
+                name: buildPersonName({
+                    firstName: json.customer.firstName,
+                    lastName: json.customer.lastName,
+                    email: json.customer.email,
+                    fallback: 'Customer'
+                }),
+                email: json.customer.email || null,
+                phone: json.customer.phone || null,
+                profileImage: json.customer.profileImage || null
+            };
+        }
+
+        if (createdByActorType === 'support_agent') {
+            const requesterType = requesterSupportAgent
+                ? (requesterSupportAgent.superAdminId ? 'support_agent' : 'tenant_admin')
+                : 'support_agent';
+
+            return {
+                id: requesterSupportAgent?.id || createdByActorId || null,
+                type: requesterType,
+                actorType: 'support_agent',
+                name: requesterSupportAgent?.displayNameAr || requesterSupportAgent?.displayName || requesterSupportAgent?.title || null,
+                title: requesterSupportAgent?.title || null,
+                avatarUrl: requesterSupportAgent?.avatarUrl || null,
+                superAdminId: requesterSupportAgent?.superAdminId || null,
+                tenantId: requesterSupportAgent?.metadata?.tenantId || tenant?.id || json.tenantId || null,
+                metadata: requesterSupportAgent?.metadata || {},
+                createdAt: requesterSupportAgent?.createdAt || null,
+                updatedAt: requesterSupportAgent?.updatedAt || null
+            };
+        }
+
+        if (json.customer) {
+            return {
+                id: json.customer.id,
+                type: 'customer',
+                actorType: 'customer',
+                name: buildPersonName({
+                    firstName: json.customer.firstName,
+                    lastName: json.customer.lastName,
+                    email: json.customer.email,
+                    fallback: 'Customer'
+                }),
+                email: json.customer.email || null,
+                phone: json.customer.phone || null,
+                profileImage: json.customer.profileImage || null
+            };
+        }
+
+        if (createdByActorId || createdByActorType) {
+            return {
+                id: createdByActorId || null,
+                type: createdByActorType || null,
+                actorType: createdByActorType || null
+            };
+        }
+
+        return null;
+    })();
 
     const normalized = {
         id: json.id,
         ticketNumber: json.ticketNumber,
         tenantId: json.tenantId,
+        tenant,
         customerPlatformUserId: json.customerPlatformUserId || null,
         supportCategoryId: json.supportCategoryId || null,
         assignedSupportAgentId: json.assignedSupportAgentId || null,
@@ -548,6 +720,7 @@ function normalizeTicket(ticket, actorContext = {}) {
         closedAt: json.closedAt || null,
         reopenedAt: json.reopenedAt || null,
         metadata: json.metadata || {},
+        requester,
         links: Array.isArray(json.links)
             ? json.links.map((link) => {
                 const linkJson = typeof link.toJSON === 'function' ? link.toJSON() : link;
@@ -629,6 +802,11 @@ function normalizeTicket(ticket, actorContext = {}) {
 function buildTicketInclude({ includeMessages = false, includeEvents = false, includeNotificationEvents = false, includeReadStates = false, includeLinks = true } = {}) {
     const includes = [
         {
+            model: db.Tenant,
+            as: 'tenant',
+            attributes: ['id', 'name', 'name_en', 'name_ar', 'nameAr', 'slug', 'email', 'phone', 'mobile', 'logo', 'status']
+        },
+        {
             model: db.PlatformUser,
             as: 'customer',
             attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage']
@@ -677,7 +855,19 @@ function buildTicketInclude({ includeMessages = false, includeEvents = false, in
             as: 'events',
             separate: true,
             order: [['occurredAt', 'ASC']],
-            attributes: ['id', 'tenantId', 'supportTicketId', 'supportMessageId', 'supportAttachmentId', 'actorType', 'customerPlatformUserId', 'supportAgentId', 'eventType', 'fromStatus', 'toStatus', 'fromPriority', 'toPriority', 'payload', 'occurredAt', 'createdAt', 'updatedAt']
+            attributes: ['id', 'tenantId', 'supportTicketId', 'supportMessageId', 'supportAttachmentId', 'actorType', 'customerPlatformUserId', 'supportAgentId', 'eventType', 'fromStatus', 'toStatus', 'fromPriority', 'toPriority', 'payload', 'occurredAt', 'createdAt', 'updatedAt'],
+            include: [
+                {
+                    model: db.PlatformUser,
+                    as: 'customer',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage']
+                },
+                {
+                    model: db.SupportAgent,
+                    as: 'supportAgent',
+                    attributes: ['id', 'superAdminId', 'displayName', 'displayNameAr', 'title', 'avatarUrl', 'status', 'presenceStatus', 'metadata', 'createdAt', 'updatedAt']
+                }
+            ]
         });
     }
 
@@ -689,6 +879,16 @@ function buildTicketInclude({ includeMessages = false, includeEvents = false, in
             order: [['createdAt', 'ASC']],
             attributes: ['id', 'tenantId', 'supportTicketId', 'replyToMessageId', 'senderType', 'customerPlatformUserId', 'supportAgentId', 'content', 'language', 'contentFormat', 'visibility', 'isEdited', 'editedAt', 'metadata', 'createdAt', 'updatedAt'],
             include: [
+                {
+                    model: db.PlatformUser,
+                    as: 'customer',
+                    attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'profileImage']
+                },
+                {
+                    model: db.SupportAgent,
+                    as: 'supportAgent',
+                    attributes: ['id', 'superAdminId', 'displayName', 'displayNameAr', 'title', 'avatarUrl', 'status', 'presenceStatus', 'metadata', 'createdAt', 'updatedAt']
+                },
                 {
                     model: db.SupportAttachment,
                     as: 'attachments',

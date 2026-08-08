@@ -166,6 +166,27 @@ function buildFileListPayload(files: File[]) {
   }));
 }
 
+function getSupportSenderRoleLabel(message: any, lang: Language) {
+  const role = `${message?.senderRole || message?.senderType || ''}`.toLowerCase();
+  const map: Record<string, { ar: string; en: string }> = {
+    customer: { ar: 'العميل', en: 'Customer' },
+    tenant_admin: { ar: 'مدير الحساب', en: 'Tenant Admin' },
+    support_agent: { ar: 'موظف الدعم', en: 'Support Agent' },
+    ai: { ar: 'الذكاء الاصطناعي', en: 'AI' },
+    system: { ar: 'النظام', en: 'System' },
+  };
+  const item = map[role] || { ar: 'غير معروف', en: 'Unknown' };
+  return lang === 'ar' ? item.ar : item.en;
+}
+
+function getSupportSenderDisplayName(message: any, lang: Language) {
+  if (message?.isOwnMessage) {
+    return lang === 'ar' ? 'أنت' : 'You';
+  }
+
+  return message?.senderName || getSupportSenderRoleLabel(message, lang);
+}
+
 interface SupportWorkspaceProps {
   lang: Language;
   darkMode?: boolean;
@@ -182,6 +203,33 @@ interface SupportTicket {
   descriptionAr?: string | null;
   source?: string;
   sourceChannel?: string;
+  tenant?: {
+    id: string;
+    name?: string | null;
+    name_en?: string | null;
+    name_ar?: string | null;
+    nameAr?: string | null;
+    slug?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    mobile?: string | null;
+    logo?: string | null;
+    status?: string | null;
+  } | null;
+  requester?: {
+    id?: string | null;
+    type?: string | null;
+    actorType?: string | null;
+    name?: string | null;
+    title?: string | null;
+    avatarUrl?: string | null;
+    superAdminId?: string | null;
+    tenantId?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    profileImage?: string | null;
+    metadata?: Record<string, any>;
+  } | null;
   customer?: { id: string; firstName?: string; lastName?: string; email?: string; phone?: string; profileImage?: string | null } | null;
   category?: { id: string; name?: string; nameAr?: string | null; slug?: string; color?: string | null; icon?: string | null } | null;
   assignedAgent?: { id: string; displayName?: string; displayNameAr?: string | null; title?: string | null; avatarUrl?: string | null; status?: string } | null;
@@ -1123,15 +1171,16 @@ export default function SupportWorkspace({ lang, darkMode = false }: SupportWork
                                   </div>
                                 )}
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-300">
-                                      <User size={16} />
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-300">
+                                        <User size={16} />
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-bold">{getSupportSenderDisplayName(message, isRtl ? 'ar' : 'en')}</p>
+                                        <p className="text-[11px] text-neutral-400">{getSupportSenderRoleLabel(message, isRtl ? 'ar' : 'en')}</p>
+                                        <p className="text-[11px] text-neutral-400">{formatDateTime(message.createdAt, lang)}</p>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <p className="text-sm font-bold">{message.senderType === 'customer' ? (isRtl ? 'العميل' : 'Customer') : message.senderType === 'support_agent' ? (isRtl ? 'موظف الدعم' : 'Support Agent') : message.senderType === 'ai' ? 'AI' : (isRtl ? 'النظام' : 'System')}</p>
-                                      <p className="text-[11px] text-neutral-400">{formatDateTime(message.createdAt, lang)}</p>
-                                    </div>
-                                  </div>
                                   <div className="flex items-center gap-2 text-[11px] text-neutral-400">
                                     <span className={`rounded-full border px-2 py-0.5 font-bold ${isInternal ? 'border-violet-200 text-violet-600' : 'border-neutral-200 text-neutral-500'}`}>
                                       {isInternal ? (isRtl ? 'داخلي' : 'Internal') : (isRtl ? 'عام' : 'Public')}
@@ -1297,8 +1346,8 @@ export default function SupportWorkspace({ lang, darkMode = false }: SupportWork
                       <h4 className="text-xs font-black uppercase tracking-[0.22em] text-neutral-400">{isRtl ? 'المعلومات العامة' : 'General'}</h4>
                       <div className="mt-4 space-y-3 text-sm">
                         <div className="flex items-center justify-between gap-3">
-                          <span className="text-neutral-500">{isRtl ? 'العميل' : 'Customer'}</span>
-                          <span className="font-bold">{ticketDrawerTicket.customer ? `${ticketDrawerTicket.customer.firstName || ''} ${ticketDrawerTicket.customer.lastName || ''}`.trim() || ticketDrawerTicket.customer.email || ticketDrawerTicket.customer.phone : (isRtl ? 'غير متوفر' : 'Unavailable')}</span>
+                          <span className="text-neutral-500">{ticketDrawerTicket.requester?.type && ticketDrawerTicket.requester.type !== 'customer' && ticketDrawerTicket.requester?.name ? (isRtl ? 'المُنشئ' : 'Requester') : (isRtl ? 'العميل' : 'Customer')}</span>
+                          <span className="font-bold">{ticketDrawerTicket.requester?.name || (ticketDrawerTicket.customer ? `${ticketDrawerTicket.customer.firstName || ''} ${ticketDrawerTicket.customer.lastName || ''}`.trim() || ticketDrawerTicket.customer.email || ticketDrawerTicket.customer.phone : (isRtl ? 'غير متوفر' : 'Unavailable'))}</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-neutral-500">{isRtl ? 'القناة' : 'Source'}</span>
@@ -1325,9 +1374,12 @@ export default function SupportWorkspace({ lang, darkMode = false }: SupportWork
                             className={`w-full rounded-2xl border px-3 py-3 text-start ${darkMode ? 'border-zinc-800 bg-zinc-950/30 hover:bg-zinc-800/30' : 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100'}`}
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <span className="font-bold">{message.senderType === 'customer' ? (isRtl ? 'العميل' : 'Customer') : message.senderType === 'support_agent' ? (isRtl ? 'فريق الدعم' : 'Support Agent') : message.senderType === 'ai' ? 'AI' : (isRtl ? 'النظام' : 'System')}</span>
+                              <span className="font-bold">{getSupportSenderDisplayName(message, isRtl ? 'ar' : 'en')}</span>
                               <span className="text-[11px] text-neutral-400">{formatRelative(message.createdAt, lang)}</span>
                             </div>
+                            <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+                              {getSupportSenderRoleLabel(message, isRtl ? 'ar' : 'en')}
+                            </p>
                             <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{message.content}</p>
                           </button>
                         ))}

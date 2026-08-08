@@ -44,6 +44,10 @@ type SupportAttachment = {
 type SupportMessage = {
   id: string;
   senderType: "customer" | "support_agent" | "ai" | "system";
+  senderRole?: "customer" | "tenant_admin" | "support_agent" | "ai" | "system" | string;
+  senderName?: string | null;
+  senderId?: string | null;
+  isOwnMessage?: boolean;
   content: string;
   visibility: "public" | "internal";
   replyToMessageId?: string | null;
@@ -75,7 +79,34 @@ type SupportTicket = {
   id: string;
   ticketNumber: string;
   tenantId?: string | null;
+  tenant?: {
+    id: string;
+    name?: string | null;
+    name_en?: string | null;
+    name_ar?: string | null;
+    nameAr?: string | null;
+    slug?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    mobile?: string | null;
+    logo?: string | null;
+    status?: string | null;
+  } | null;
   customerPlatformUserId?: string | null;
+  requester?: {
+    id?: string | null;
+    type?: string | null;
+    actorType?: string | null;
+    name?: string | null;
+    title?: string | null;
+    avatarUrl?: string | null;
+    superAdminId?: string | null;
+    tenantId?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    profileImage?: string | null;
+    metadata?: Record<string, any>;
+  } | null;
   supportCategoryId?: string | null;
   assignedSupportAgentId?: string | null;
   source?: string | null;
@@ -235,8 +266,32 @@ function formatExact(value?: string | null) {
 
 function getTicketDisplayName(ticket: SupportTicket | null) {
   if (!ticket) return "—";
+  const requesterName = ticket.requester?.type && ticket.requester.type !== "customer"
+    ? ticket.requester?.name || ticket.requester?.title || null
+    : null;
+  if (requesterName) return requesterName;
   const name = [ticket.customer?.firstName, ticket.customer?.lastName].filter(Boolean).join(" ").trim();
   return name || ticket.customer?.email || ticket.ticketNumber || "—";
+}
+
+function getSupportSenderRoleLabel(message: SupportMessage, lang: "ar" | "en" = "en") {
+  const role = `${message.senderRole || message.senderType || ""}`.toLowerCase();
+  const map: Record<string, { ar: string; en: string }> = {
+    customer: { ar: "العميل", en: "Customer" },
+    tenant_admin: { ar: "مدير الحساب", en: "Tenant Admin" },
+    support_agent: { ar: "فريق الدعم", en: "Support Agent" },
+    ai: { ar: "الذكاء الاصطناعي", en: "AI" },
+    system: { ar: "النظام", en: "System" },
+  };
+  return (lang === "ar" ? map[role]?.ar : map[role]?.en) || (lang === "ar" ? "غير معروف" : "Unknown");
+}
+
+function getSupportSenderDisplayName(message: SupportMessage, lang: "ar" | "en" = "en") {
+  if (message.isOwnMessage) {
+    return lang === "ar" ? "أنت" : "You";
+  }
+
+  return message.senderName || getSupportSenderRoleLabel(message, lang);
 }
 
 function getTicketCategoryName(ticket: SupportTicket | null) {
@@ -292,15 +347,10 @@ function MessageCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-white">
-              {message.senderType === "customer"
-                ? "Customer"
-                : message.senderType === "support_agent"
-                  ? "Support Agent"
-                  : message.senderType === "ai"
-                    ? "AI"
-                    : "System"}
-            </p>
+            <p className="text-sm font-semibold text-white">{getSupportSenderDisplayName(message, "en")}</p>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-white/70">
+              {getSupportSenderRoleLabel(message, "en")}
+            </span>
             <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${isInternal ? "border-amber-500/30 bg-amber-500/10 text-amber-300" : "border-white/10 bg-white/5 text-white/70"}`}>
               {isInternal ? "Internal" : "Public"}
             </span>
@@ -1492,7 +1542,7 @@ export function SupportOperationsConsole({ initialTicketId = null }: { initialTi
             {selectedTicket && !ticketLoading && (
               <div className="space-y-4 px-5 py-5">
                 <div className="flex flex-wrap items-center gap-3 text-xs text-dark-400">
-                  <span>Customer: {getTicketDisplayName(selectedTicket)}</span>
+                  <span>{selectedTicket?.requester?.type && selectedTicket.requester.type !== "customer" && selectedTicket.requester?.name ? "Requester" : "Customer"}: {getTicketDisplayName(selectedTicket)}</span>
                   <span>•</span>
                   <span>Last activity: {formatRelative(getTicketActivityDate(selectedTicket))}</span>
                   <span>•</span>
