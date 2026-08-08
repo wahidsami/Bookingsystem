@@ -360,7 +360,16 @@ export default function InteractiveDrawers({
         const resolvedService = service.serviceId ? services.find((srv) => srv.id === service.serviceId) : null;
         const resolvedStaff = service.staffId ? availableStylists.find((staff) => staff.id === service.staffId) : null;
         const nextService = resolvedService || primaryService;
-        const nextStaffId = resolvedStaff?.id || primaryStaff?.id || '';
+        
+        let nextStaffId = resolvedStaff?.id || primaryStaff?.id || '';
+        if (nextService) {
+          const normalizedAssignments = (nextService.employeeAssignments || []).map((id: any) => String(id));
+          if (normalizedAssignments.length > 0 && !normalizedAssignments.includes(String(nextStaffId))) {
+            const validStylists = availableStylists.filter(s => normalizedAssignments.includes(String(s.id)));
+            nextStaffId = validStylists[0]?.id || availableStylists[0]?.id || '';
+          }
+        }
+
         const nextBasePrice = toMoney(nextService?.price);
         return {
           ...service,
@@ -381,14 +390,22 @@ export default function InteractiveDrawers({
       if (g.id === guestId) {
         const guestServices = g.services || [];
         const catalogService = services[0];
-        const catalogStylist = availableStylists[0];
+        let defaultStaffId = availableStylists[0]?.id || '';
+        if (catalogService) {
+          const normalizedAssignments = (catalogService.employeeAssignments || []).map((id: any) => String(id));
+          if (normalizedAssignments.length > 0) {
+            const validStylists = availableStylists.filter(s => normalizedAssignments.includes(String(s.id)));
+            defaultStaffId = validStylists[0]?.id || defaultStaffId;
+          }
+        }
+
         const newService: GuestService = {
           id: `gs-${Date.now()}-${guestServices.length}`,
           serviceId: catalogService?.id || '',
           serviceName: isRtl ? (catalogService?.nameAr || '') : (catalogService?.nameEn || ''),
           category: catalogService?.categoryEn || catalogService?.categoryAr || '',
           duration: catalogService?.duration || 0,
-          staffId: catalogStylist?.id || '',
+          staffId: defaultStaffId,
           startTime: 540,
           basePrice: toMoney(catalogService?.price),
           discountType: 'none',
@@ -704,12 +721,21 @@ export default function InteractiveDrawers({
 
       const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
 
+      let defaultStaffId = currentStaffId;
+      const normalizedAssignments = (service.employeeAssignments || []).map(id => String(id));
+      if (!defaultStaffId || (normalizedAssignments.length > 0 && !normalizedAssignments.includes(String(defaultStaffId)))) {
+        const validStylists = availableStylists.filter(s => 
+          normalizedAssignments.length === 0 || normalizedAssignments.includes(String(s.id))
+        );
+        defaultStaffId = validStylists[0]?.id || availableStylists[0]?.id || '';
+      }
+
       const newItem: StagedService = {
         id: `stg-${Date.now()}`,
         serviceId: service.id,
         variantId: resolvedVariant?.id || undefined,
         serviceCategory: service.category,
-        staffId: currentStaffId || availableStylists[0]?.id || '',
+        staffId: defaultStaffId,
         startTime: nextStartTime,
         duration: resolvedVariant?.duration || service.duration || 60,
         discountType: 'none',
