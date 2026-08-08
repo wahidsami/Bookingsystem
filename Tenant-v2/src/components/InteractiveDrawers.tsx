@@ -13,6 +13,7 @@ import {
   type ServiceRecord,
   type ServiceVariantRecord
 } from '../lib/serviceContract';
+import { to12HourTime, to24HourTime } from '../lib/employeeHelpers';
 import {
   PRODUCT_CATEGORY_OPTIONS,
   resolveProductImageUrl,
@@ -670,6 +671,36 @@ export default function InteractiveDrawers({
     const hours = Math.floor(absoluteMinutes / 60);
     const minutes = absoluteMinutes % 60;
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  };
+
+  const blockStartTimeOptions = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [];
+    for (let absoluteMinutes = 9 * 60; absoluteMinutes < (24 * 60); absoluteMinutes += 15) {
+      const hours = Math.floor(absoluteMinutes / 60);
+      const minutes = absoluteMinutes % 60;
+      const value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+      options.push({ value, label: to12HourTime(value) });
+    }
+    return options;
+  }, []);
+
+  const formatBlockStartClockValue = (minutesFromNine?: number | null) => {
+    const safeOffset = Math.max(0, Math.round(Number(minutesFromNine || 0)));
+    const absoluteMinutes = (9 * 60) + safeOffset;
+    const hours = Math.floor(absoluteMinutes / 60);
+    const minutes = absoluteMinutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  };
+
+  const convertBlockClockToOffset = (value: string) => {
+    const normalized = to24HourTime(value);
+    const match = normalized.match(/^(\d{2}):(\d{2})$/);
+    if (!match) {
+      return blockStartTime;
+    }
+
+    const absoluteMinutes = (Number(match[1]) * 60) + Number(match[2]);
+    return Math.max(0, absoluteMinutes - (9 * 60));
   };
 
   // Removed obsolete auto-populate duration and warning validation
@@ -2421,8 +2452,17 @@ export default function InteractiveDrawers({
 
                     <div>
                       <label className="text-[10px] text-slate-400 block mb-1">{isRtl ? 'ساعة البدء' : 'Start time'}</label>
-                      <input type="number" step={15} value={blockStartTime} onChange={(e) => setBlockStartTime(parseInt(e.target.value) || 0)} className="border p-1.5 rounded font-mono font-bold" />
-                      <span className="text-[10px] font-mono text-slate-500 ml-2">{formatMinutesToTime(blockStartTime)}</span>
+                      <select
+                        value={formatBlockStartClockValue(blockStartTime)}
+                        onChange={(e) => setBlockStartTime(convertBlockClockToOffset(e.target.value))}
+                        className="border p-1.5 rounded font-mono font-bold min-w-[12rem] bg-white"
+                      >
+                        {blockStartTimeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
