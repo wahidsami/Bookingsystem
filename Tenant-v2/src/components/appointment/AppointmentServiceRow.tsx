@@ -170,7 +170,7 @@ export default function AppointmentServiceRow({
               className={`flex h-8 items-center justify-center gap-1.5 rounded-full px-3 text-[11px] font-semibold transition whitespace-nowrap ${
                 isAdded
                   ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100'
-                  : 'border border-primary bg-primary text-white hover:bg-primary/90'
+                  : 'border border-zinc-950 bg-zinc-950 text-white hover:bg-zinc-800'
               }`}
             >
               {isAdded ? (
