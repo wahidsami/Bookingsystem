@@ -36,13 +36,23 @@ export const resolveEmployeeImageUrl = (value: unknown): string => {
 
 export const normalizeEmployeeAvatarRecord = <T extends Record<string, any>>(record: T): T => {
   const avatar = resolveEmployeeImageUrl(record?.avatar || record?.photo || record?.profileImage || record?.imageUrl || record?.image);
+  
+  const nameEn = record?.nameEn || record?.name_en || record?.name || record?.firstName || '—';
+  const nameAr = record?.nameAr || record?.name_ar || record?.name || record?.firstName || '—';
+  const roleEn = record?.roleEn || record?.role_en || record?.role || record?.title || 'Stylist';
+  const roleAr = record?.roleAr || record?.role_ar || record?.role || record?.title || 'أخصائية';
+
   return {
     ...record,
     avatar,
     photo: avatar,
     profileImage: avatar,
     imageUrl: avatar,
-    image: avatar
+    image: avatar,
+    nameEn,
+    nameAr,
+    roleEn,
+    roleAr
   };
 };
 
