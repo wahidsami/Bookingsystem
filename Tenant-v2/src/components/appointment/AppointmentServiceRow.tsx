@@ -147,17 +147,17 @@ export default function AppointmentServiceRow({
           </p>
         </div>
 
-        <div className="flex shrink-0 items-center justify-end gap-3 md:gap-4">
-          <div className="whitespace-nowrap text-[13px] sm:text-sm font-semibold text-slate-900">
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="whitespace-nowrap text-[13px] sm:text-sm font-semibold text-slate-900" dir="ltr">
             {price.toFixed(2)} <span className="text-[10px] sm:text-xs text-slate-500 font-medium">SAR</span>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             {isAdded && (
               <button
                 type="button"
                 onClick={handleToggleExpand}
-                className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border transition ${isExpanded ? 'bg-slate-100 border-slate-300' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${isExpanded ? 'bg-slate-100 border-slate-300' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
                 aria-label="Configure service"
               >
                 <Settings2 className="h-4 w-4 text-slate-700" />
@@ -167,7 +167,7 @@ export default function AppointmentServiceRow({
             <button
               type="button"
               onClick={handleAddClick}
-              className={`flex h-8 sm:h-9 items-center justify-center gap-1.5 rounded-full px-3 sm:px-4 text-[11px] sm:text-xs font-semibold transition ${
+              className={`flex h-8 items-center justify-center gap-1.5 rounded-full px-3 text-[11px] font-semibold transition whitespace-nowrap ${
                 isAdded
                   ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100'
                   : 'border border-primary bg-primary text-white hover:bg-primary/90'
@@ -176,12 +176,12 @@ export default function AppointmentServiceRow({
               {isAdded ? (
                 <>
                   <Check className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{isRtl ? 'تمت الإضافة' : 'Added'}</span>
+                  <span>{isRtl ? 'تمت الإضافة' : 'Added'}</span>
                 </>
               ) : (
                 <>
                   <PlusCircle className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{isRtl ? 'إضافة' : 'Add'}</span>
+                  <span>{isRtl ? 'إضافة' : 'Add'}</span>
                 </>
               )}
             </button>

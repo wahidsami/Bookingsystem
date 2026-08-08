@@ -2465,6 +2465,24 @@ export default function InteractiveDrawers({
                       <button 
                         type="button" 
                         onClick={() => {
+                          if (createStep === 1) {
+                            if (activeTab === 'existing' && !selectedRegisteredCustomer) {
+                              addLocalToast(
+                                isRtl ? 'يرجى اختيار عميل مسجل للمتابعة.' : 'Please select a registered customer to continue.',
+                                isRtl ? 'Please select a registered customer to continue.' : 'يرجى اختيار عميل مسجل للمتابعة.',
+                                'warning'
+                              );
+                              return;
+                            }
+                            if (activeTab === 'walkin' && (!walkinFullName || walkinFullName.trim() === '')) {
+                              addLocalToast(
+                                isRtl ? 'يرجى إدخال اسم العميل للمتابعة.' : 'Please enter the walk-in customer name to continue.',
+                                isRtl ? 'Please enter the walk-in customer name to continue.' : 'يرجى إدخال اسم العميل للمتابعة.',
+                                'warning'
+                              );
+                              return;
+                            }
+                          }
                           if (createStep === 2 && includeGroupGuests) {
                             const emptyGuestName = guestsList.some(g => g.name.trim() === '');
                             if (emptyGuestName) {
