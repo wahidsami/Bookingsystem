@@ -3521,6 +3521,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     return monthDays;
   };
 
+  const allEmployeeIds = useMemo(() => liveStylists.map((stylist) => stylist.id), [liveStylists]);
+  const resolvedVisibleEmployeeIds = useMemo(() => {
+    if (visibleEmployeeIds.length > 0) {
+      return visibleEmployeeIds.filter((employeeId) => allEmployeeIds.includes(employeeId));
+    }
+    return allEmployeeIds;
+  }, [allEmployeeIds, visibleEmployeeIds]);
+
   // Filters application
   const filteredAppointments = appointments.filter(apt => {
     const boardVisibleStaffIds = isEmployeeBoardMode(viewMode)
@@ -3668,13 +3676,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     ? liveStylists.find((stylist) => stylist.id === focusedEmployeeId) || null
     : null;
   const boardModeLabel = getBoardModeLabel(viewMode, isRtl);
-  const allEmployeeIds = useMemo(() => liveStylists.map((stylist) => stylist.id), [liveStylists]);
-  const resolvedVisibleEmployeeIds = useMemo(() => {
-    if (visibleEmployeeIds.length > 0) {
-      return visibleEmployeeIds.filter((employeeId) => allEmployeeIds.includes(employeeId));
-    }
-    return allEmployeeIds;
-  }, [allEmployeeIds, visibleEmployeeIds]);
   const visibleEmployeeIdSet = useMemo(() => new Set(resolvedVisibleEmployeeIds), [resolvedVisibleEmployeeIds]);
   const visibleEmployeeNames = useMemo(() => {
     return liveStylists
