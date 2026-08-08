@@ -4,7 +4,7 @@ import {
   X, Calendar as CalendarIcon, User, Users, PlusCircle, Check, 
   Trash, ChevronLeft, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search
 } from 'lucide-react';
-import ExpandableServiceRow from './ExpandableServiceRow';
+import AppointmentServicesStep from './appointment/AppointmentServicesStep';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import {
   getServiceDisplayName,
@@ -2224,305 +2224,33 @@ export default function InteractiveDrawers({
                     )}
 
                     {createStep === 3 && (
-                      <div className="space-y-5 animate-fadeIn text-xs">
-                        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-                          <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-                            <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/70">
-                                    {isRtl ? 'تصفح الخدمات' : 'Appointment Service Browser'}
-                                  </p>
-                                </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-left">
-                                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                    {isRtl ? 'الخدمات في الجلسة' : 'Queued services'}
-                                  </p>
-                                  <p className="mt-0.5 text-lg font-semibold text-slate-900 leading-none">{stagedServices.length}</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-5 pr-2 sm:p-6">
-                              <div className="relative">
-                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                <input
-                                  type="text"
-                                  value={serviceSearch}
-                                  onChange={(e) => setServiceSearch(e.target.value)}
-                                  placeholder={isRtl ? 'ابحث عن الخدمة أو الفئة...' : 'Search by service or category...'}
-                                  className="w-full rounded-[20px] border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
-                                />
-                              </div>
-
-                              <div className="flex flex-wrap gap-2">
-                                {serviceCategoryTabs.map((tab) => {
-                                  const active = currentServiceCategory === tab.key || (!currentServiceCategory && tab.key === 'all');
-                                  return (
-                                    <button
-                                      key={tab.key}
-                                      type="button"
-                                      onClick={() => setCurrentServiceCategory(tab.key)}
-                                      className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                                        active
-                                          ? 'border-primary bg-primary/5 text-primary shadow-sm'
-                                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
-                                      }`}
-                                    >
-                                      {isRtl ? tab.labelAr : tab.labelEn}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-
-                              {filteredCategoryServices.length > 0 ? (
-                                <div className="space-y-3">
-                                  {filteredCategoryServices.map((service) => {
-                                    const serviceVariants = Array.isArray(service.variants) ? service.variants : [];
-                                    const isExpanded = Boolean(expandedServiceIds[service.id]);
-                                    const parentAdded = isQueuedServiceSelected(service.id, null);
-                                    const assignedStaffNames = (service.employeeAssignments || [])
-                                      .map((staffId) => {
-                                        const stylist = availableStylists.find((item) => item.id === staffId);
-                                        return stylist ? (isRtl ? stylist.nameAr : stylist.nameEn) : '';
-                                      })
-                                      .filter(Boolean);
-
-                                    return (
-                                      <div key={service.id} className="space-y-2">
-                                        <ExpandableServiceRow
-                                          service={service}
-                                          isRtl={isRtl}
-                                          isAdded={parentAdded}
-                                          isExpanded={isExpanded}
-                                          onToggleExpand={() => toggleServiceExpansion(service.id)}
-                                          onToggleAdd={() => handleToggleServiceSelection(service)}
-                                          assignedStaffNames={assignedStaffNames}
-                                          availableStylists={availableStylists}
-                                          stagedItem={stagedServices.find(s => s.serviceId === service.id && !s.variantId) || null}
-                                          onSaveConfig={(updates) => {
-                                            const item = stagedServices.find(s => s.serviceId === service.id && !s.variantId);
-                                            if (item) {
-                                              handleUpdateStagedService(item.id, updates);
-                                              toggleServiceExpansion(service.id);
-                                            }
-                                          }}
-                                        >
-                                          {isExpanded && serviceVariants.length > 0 ? (
-                                            <div className="space-y-2 pt-2 border-t border-slate-100">
-                                              {serviceVariants.map((variant) => {
-                                                const variantAdded = isQueuedServiceSelected(service.id, variant.id);
-                                                return (
-                                                  <ExpandableServiceRow
-                                                    key={variant.id}
-                                                    service={service}
-                                                    variant={variant}
-                                                    isRtl={isRtl}
-                                                    depth={1}
-                                                    isAdded={variantAdded}
-                                                    isExpanded={true} // Variants don't have nested expansion, but they can be configured
-                                                    onToggleExpand={() => {}} // Not used for variants, configuration is always visible if added or can just be toggled
-                                                    onToggleAdd={() => handleToggleServiceSelection(service, variant)}
-                                                    availableStylists={availableStylists}
-                                                    stagedItem={stagedServices.find(s => s.serviceId === service.id && s.variantId === variant.id) || null}
-                                                    onSaveConfig={(updates) => {
-                                                      const item = stagedServices.find(s => s.serviceId === service.id && s.variantId === variant.id);
-                                                      if (item) {
-                                                        handleUpdateStagedService(item.id, updates);
-                                                      }
-                                                    }}
-                                                  />
-                                                );
-                                              })}
-                                            </div>
-                                          ) : null}
-                                        </ExpandableServiceRow>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
-                                  {serviceSearch.trim()
-                                    ? (isRtl ? 'لا توجد خدمات مطابقة للبحث الحالي.' : 'No services match the current search.')
-                                    : (isRtl ? 'لا توجد خدمات ضمن هذه الفئة.' : 'No services available in this category.')}
-                                </div>
-                              )}
-                            </div>
-                          </section>
-
-                          <aside className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-                            <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/70">
-                                    {isRtl ? 'جلسة الموعد' : 'Appointment session'}
-                                  </p>
-                                  <h4 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-                                    {isRtl ? 'قائمة الخدمات المختارة' : 'Selected service queue'}
-                                  </h4>
-                                  <p className="mt-1 text-sm text-slate-500">
-                                    {isRtl
-                                      ? 'أضف الخدمات ثم عدّل ما يلزم فقط.'
-                                      : 'Add services first, then edit only what needs to change.'}
-                                  </p>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 text-left">
-                                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{isRtl ? 'خدمات' : 'Items'}</p>
-                                    <p className="mt-1 text-base font-semibold text-slate-900">{stagedServices.length}</p>
-                                  </div>
-                                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{isRtl ? 'مدة' : 'Duration'}</p>
-                                    <p className="mt-1 text-base font-semibold text-slate-900">
-                                      {stagedServices.reduce((sum, item) => sum + item.duration, 0)} {isRtl ? 'د' : 'm'}
-                                    </p>
-                                  </div>
-                                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{isRtl ? 'إجمالي' : 'Total'}</p>
-                                    <p className="mt-1 text-base font-semibold text-slate-900">
-                                      {stagedServices.reduce((sum, item) => {
-                                        const service = canonicalServices.find((entry) => entry.id === item.serviceId);
-                                        const variant = service?.variants?.find((entry) => entry.id === item.variantId) || service?.variants?.[0] || null;
-                                        const basePrice = toMoney(variant?.finalPrice ?? service?.finalPrice ?? service?.price ?? 0);
-                                        let finalPrice = basePrice;
-                                        if (item.discountType === 'flat') {
-                                          finalPrice = Math.max(0, basePrice - item.discountValue);
-                                        } else if (item.discountType === 'percent') {
-                                          finalPrice = Math.max(0, basePrice - (basePrice * item.discountValue) / 100);
-                                        }
-                                        return sum + finalPrice;
-                                      }, 0).toFixed(2)} SAR
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="space-y-4 p-5 sm:p-6">
-                              {stagedServices.length > 0 ? (
-                                stagedServices.map((item, index) => {
-                                  const service = canonicalServices.find((entry) => entry.id === item.serviceId) || null;
-                                  const variant = service?.variants?.find((entry) => entry.id === item.variantId) || null;
-                                  const staff = availableStylists.find((stylist) => stylist.id === item.staffId) || null;
-                                  const basePrice = toMoney(variant?.finalPrice ?? service?.finalPrice ?? service?.price ?? 0);
-                                  const discountedPrice = item.discountType === 'flat'
-                                    ? Math.max(0, basePrice - item.discountValue)
-                                    : item.discountType === 'percent'
-                                      ? Math.max(0, basePrice - (basePrice * item.discountValue) / 100)
-                                      : basePrice;
-                                  const isCompact = item.duration <= 30;
-                                  const variantOptions = service?.variants || [];
-                                  return (
-                                    <div
-                                      key={item.id}
-                                      className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm transition hover:border-primary/30"
-                                    >
-                                      <div className={`flex items-start gap-3 p-4 ${isCompact ? 'sm:p-4' : 'sm:p-5'}`}>
-                                        <div className="flex min-w-0 flex-1 items-start gap-3">
-                                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-[11px] font-black text-white">
-                                            #{index + 1}
-                                          </div>
-                                          <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-start justify-between gap-2">
-                                              <div className="min-w-0">
-                                                <p className="truncate text-sm font-semibold text-slate-900">
-                                                  {isRtl ? service?.nameAr || service?.nameEn || item.serviceId : service?.nameEn || service?.nameAr || item.serviceId}
-                                                </p>
-                                                <p className="mt-1 truncate text-[11px] text-slate-500">
-                                                  {service?.category || service?.categoryAr || service?.categoryEn || ''}
-                                                  {variant?.description ? ` • ${variant.description}` : ''}
-                                                </p>
-                                              </div>
-                                              <div className="text-right">
-                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                                  {isRtl ? 'السعر' : 'Price'}
-                                                </p>
-                                                <p className="font-mono text-sm font-semibold text-slate-900">{discountedPrice.toFixed(2)} SAR</p>
-                                              </div>
-                                            </div>
-
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                                                {isRtl ? 'الموظف' : 'Stylist'}: {staff ? (isRtl ? staff.nameAr : staff.nameEn) : (isRtl ? 'تعيين تلقائي' : 'Auto assign')}
-                                              </span>
-                                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                                                {isRtl ? 'الوقت' : 'Start'}: {formatMinutesToTime(item.startTime)}
-                                              </span>
-                                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                                                {isRtl ? 'المدة' : 'Duration'}: {item.duration} {isRtl ? 'دقيقة' : 'min'}
-                                              </span>
-                                              {variant ? (
-                                                <span className="rounded-full bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                                                  {isRtl ? 'بديل' : 'Variant'}: {isRtl ? variant.nameAr || variant.nameEn : variant.nameEn || variant.nameAr}
-                                                </span>
-                                              ) : (
-                                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                                                  {isRtl ? 'بدون بديل' : 'No variant selected'}
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        <div className="flex shrink-0 flex-col gap-2">
-
-                                          <button
-                                            type="button"
-                                            onClick={() => setStagedServices((current) => current.filter((_, currentIndex) => currentIndex !== index))}
-                                            className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-red-200 hover:text-red-600"
-                                          >
-                                            <Trash className="h-4 w-4" />
-                                          </button>
-                                        </div>
-                                      </div>
-
-
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
-                                  {isRtl
-                                    ? 'ابدأ بإضافة خدمة من الجانب الأيسر، وستظهر هنا كعناصر منفصلة في جلسة الموعد.'
-                                    : 'Start by adding a service from the left side. It will appear here as a separate appointment card.'}
-                                </div>
-                              )}
-                            </div>
-                          </aside>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => setCreateStep(2)}
-                            disabled={stagedServices.length === 0}
-                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {isRtl ? 'السابق' : 'Previous'}
-                          </button>
-                          <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (stagedServices.length === 0) {
-                                  addLocalToast(
-                                    isRtl ? 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة' : 'Please add at least one service before opening the invoice step',
-                                    isRtl ? 'Please add at least one service before opening the invoice step' : 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
-                                    'warning'
-                                  );
-                                  return;
-                                }
-                                setCreateStep(4);
-                              }}
-                              disabled={stagedServices.length === 0}
-                              className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {isRtl ? 'التالي' : 'Next'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                      <AppointmentServicesStep
+                        isRtl={isRtl}
+                        canonicalServices={canonicalServices}
+                        stagedServices={stagedServices as any[]}
+                        availableStylists={availableStylists}
+                        serviceCategoryTabs={serviceCategoryTabs}
+                        currentServiceCategory={currentServiceCategory}
+                        setCurrentServiceCategory={setCurrentServiceCategory}
+                        serviceSearch={serviceSearch}
+                        setServiceSearch={setServiceSearch}
+                        onAddService={handleToggleServiceSelection}
+                        onUpdateService={handleUpdateStagedService}
+                        onRemoveService={(index) => setStagedServices(prev => prev.filter((_, i) => i !== index))}
+                        formatMinutesToTime={formatMinutesToTime}
+                        onPrevious={() => setCreateStep(2)}
+                        onNext={() => {
+                          if (stagedServices.length === 0) {
+                            addLocalToast(
+                              isRtl ? 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة' : 'Please add at least one service before opening the invoice step',
+                              isRtl ? 'Please add at least one service before opening the invoice step' : 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
+                              'warning'
+                            );
+                            return;
+                          }
+                          setCreateStep(4);
+                        }}
+                      />
                     )}
 
                     {createStep === 4 && (
