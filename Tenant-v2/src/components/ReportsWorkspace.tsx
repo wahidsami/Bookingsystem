@@ -354,7 +354,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         || appointment?.platformUserId
         || '-';
       const stylistName = appointment?.staff?.name || appointment?.staffName || '-';
-      const serviceName = appointment?.service?.name_en || appointment?.service?.name_ar || appointment?.serviceName || '-';
+      const baseServiceName = appointment?.service?.name_en || appointment?.service?.name_ar || appointment?.serviceName || '-';
+      const serviceVariantName = appointment?.serviceVariantName || appointment?.serviceVariant?.name_en || appointment?.serviceVariant?.nameAr || appointment?.serviceVariant?.description || '';
+      const serviceName = serviceVariantName ? `${baseServiceName} / ${serviceVariantName}` : baseServiceName;
       const paymentStatus = formatAppointmentPaymentStatus(appointment?.paymentStatus);
       const lifecycleStatus = formatAppointmentStatus(appointment?.status);
 
@@ -369,7 +371,9 @@ export default function ReportsWorkspace({ lang }: ReportsWorkspaceProps) {
         stylistId: appointment?.staff?.id || appointment?.staffId || null,
         service: serviceName,
         serviceAr: serviceName,
-        duration: appointment?.service?.duration ? `${appointment.service.duration} min` : appointment?.duration || '-',
+        serviceVariant: serviceVariantName || '-',
+        serviceVariantAr: serviceVariantName || '-',
+        duration: appointment?.serviceVariantDuration ? `${appointment.serviceVariantDuration} min` : (appointment?.service?.duration ? `${appointment.service.duration} min` : appointment?.duration || '-'),
         price: Number(appointment?.price || 0),
         status: lifecycleStatus.en,
         statusAr: lifecycleStatus.ar,

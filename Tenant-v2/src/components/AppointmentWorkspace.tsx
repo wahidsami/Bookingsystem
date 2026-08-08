@@ -689,8 +689,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       remainderAmount
     });
     const normalizeServiceName = (item: any, key: 'en' | 'ar') => {
-      if (key === 'en') {
-        return item?.service?.name_en
+      const variantName = key === 'en'
+        ? (item?.serviceVariantName || item?.serviceVariant?.name_en || item?.serviceVariant?.nameEn || item?.serviceVariant?.description || '')
+        : (item?.serviceVariantDescription || item?.serviceVariant?.name_ar || item?.serviceVariant?.nameAr || item?.serviceVariant?.description || item?.serviceVariantName || '');
+      const baseName = key === 'en'
+        ? (
+          item?.service?.name_en
           || item?.service?.nameEn
           || item?.service?.name
           || item?.serviceNameEn
@@ -698,24 +702,37 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           || item?.nameEn
           || item?.name
           || item?.title
-          || '';
+          || ''
+        )
+        : (
+          item?.service?.name_ar
+          || item?.service?.nameAr
+          || item?.service?.name
+          || item?.serviceNameAr
+          || item?.serviceName
+          || item?.nameAr
+          || item?.name
+          || item?.title
+          || ''
+        );
+      const normalizedBaseName = `${baseName || ''}`.trim();
+      const normalizedVariantName = `${variantName || ''}`.trim();
+      if (normalizedVariantName && normalizedVariantName !== normalizedBaseName) {
+        return `${normalizedBaseName} / ${normalizedVariantName}`.trim();
       }
-      return item?.service?.name_ar
-        || item?.service?.nameAr
-        || item?.service?.name
-        || item?.serviceNameAr
-        || item?.serviceName
-        || item?.nameAr
-        || item?.name
-        || item?.title
-        || '';
+      if (normalizedVariantName) {
+        return normalizedVariantName;
+      }
+      return normalizedBaseName;
     };
+    const primaryServiceNameEn = normalizeServiceName(a, 'en') || a.service?.name_en || a.service?.nameEn || a.service?.name || a.serviceNameEn || 'Service';
+    const primaryServiceNameAr = normalizeServiceName(a, 'ar') || a.service?.name_ar || a.service?.nameAr || a.service?.name || a.serviceNameAr || 'الخدمة';
     const serviceNameEn = services.length > 1
       ? services.map((item: any) => normalizeServiceName(item, 'en')).filter(Boolean).join(' + ')
-      : a.service?.name_en || a.service?.nameEn || a.service?.name || a.serviceNameEn || 'Service';
+      : primaryServiceNameEn;
     const serviceNameAr = services.length > 1
       ? services.map((item: any) => normalizeServiceName(item, 'ar')).filter(Boolean).join(' + ')
-      : a.service?.name_ar || a.service?.nameAr || a.service?.name || a.serviceNameAr || 'الخدمة';
+      : primaryServiceNameAr;
     const duration = sessionAppointments.length > 0
       ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.duration || item?.service?.duration || 0), 0)
       : (a.service?.duration || a.duration || 60);
@@ -2421,6 +2438,35 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     const historyDate = historyItem?.date || historyItem?.details?.startTime || getSelectedDateKey();
+    const historyService = historyItem?.details?.service || historyItem?.service || null;
+    const historyServiceVariantId = historyItem?.serviceVariantId || historyItem?.details?.serviceVariantId || historyItem?.serviceVariant?.id || null;
+    const historyServiceVariantName = historyItem?.serviceVariantName || historyItem?.details?.serviceVariantName || historyItem?.serviceVariant?.name_en || historyItem?.serviceVariant?.nameEn || historyItem?.serviceVariant?.description || '';
+    const historyServiceVariantDescription = historyItem?.serviceVariantDescription || historyItem?.details?.serviceVariantDescription || historyItem?.serviceVariant?.name_ar || historyItem?.serviceVariant?.nameAr || historyItem?.serviceVariant?.description || '';
+    const historyServiceNameEn = historyItem?.serviceLabelEn
+      || historyItem?.serviceLabel
+      || historyItem?.details?.serviceLabelEn
+      || historyItem?.details?.serviceLabel
+      || historyItem?.details?.serviceNameEn
+      || historyItem?.details?.service?.name_en
+      || historyItem?.details?.service?.nameEn
+      || historyItem?.details?.service?.name
+      || historyItem?.serviceNameEn
+      || historyItem?.serviceName
+      || historyItem?.title
+      || 'Service';
+    const historyServiceNameAr = historyItem?.serviceLabelAr
+      || historyItem?.serviceLabelArText
+      || historyItem?.details?.serviceLabelAr
+      || historyItem?.details?.serviceLabelArText
+      || historyItem?.details?.serviceNameAr
+      || historyItem?.details?.service?.name_ar
+      || historyItem?.details?.service?.nameAr
+      || historyItem?.details?.service?.name
+      || historyItem?.serviceNameAr
+      || historyItem?.serviceName
+      || historyItem?.title
+      || 'الخدمة';
+
     const fallbackAppointment = mapBoardAppointment({
       id: historyItem.id,
       customerId: activeAppointment?.customerId,
@@ -2428,10 +2474,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       customerNameAr: activeAppointment?.customerNameAr || historyItem?.customerNameAr || activeCustomerName || 'زائرة',
       customerPhone: activeCustomerPhone || '',
       customerEmail: activeCustomerEmail || '',
-      service: historyItem?.details?.service || null,
+      service: historyService,
       serviceId: historyItem?.details?.service?.id || historyItem?.service?.id || null,
-      serviceNameEn: historyItem?.details?.service?.name_en || historyItem?.details?.service?.nameEn || historyItem?.details?.service?.name || historyItem?.serviceName || historyItem?.title || 'Service',
-      serviceNameAr: historyItem?.details?.service?.name_ar || historyItem?.details?.service?.nameAr || historyItem?.details?.service?.name || historyItem?.serviceName || historyItem?.title || 'الخدمة',
+      serviceVariantId: historyServiceVariantId,
+      serviceVariantName: historyServiceVariantName || null,
+      serviceVariantDescription: historyServiceVariantDescription || null,
+      serviceNameEn: historyServiceNameEn,
+      serviceNameAr: historyServiceNameAr,
       staff: historyItem?.details?.staff || null,
       staffId: historyItem?.details?.staff?.id || historyItem?.staffId || null,
       staffName: historyItem?.details?.staff?.name || historyItem?.staffName || '',
@@ -2446,9 +2495,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       invoiceNumber: historyItem?.invoiceNumber || historyItem?.invoice?.number || historyItem?.invoice?.invoiceNumber || null,
       invoiceStatus: historyItem?.paymentStatus || historyItem?.normalizedPaymentStatus || 'paid',
       notes: historyItem?.details?.notes || '',
-      services: historyItem?.details?.service ? [historyItem.details.service] : [],
-      serviceItems: historyItem?.details?.service ? [{
-        service: historyItem.details.service,
+      services: historyService ? [historyService] : [],
+      serviceItems: historyService ? [{
+        service: historyService,
+        serviceVariantId: historyServiceVariantId,
+        serviceVariantName: historyServiceVariantName || null,
+        serviceVariantDescription: historyServiceVariantDescription || null,
         duration: historyItem?.details?.duration || 0,
         price: Number(historyItem?.amount ?? 0)
       }] : [],
@@ -7120,12 +7172,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       const linkedAppointment = {
                         id: customerTransactionDetail.appointmentIdLinked,
                         date: customerTransactionDetail.date || getSelectedDateKey(),
+                        serviceVariantId: customerTransactionDetail?.appointment?.serviceVariantId || customerTransactionDetail?.details?.serviceVariantId || null,
+                        serviceVariantName: customerTransactionDetail?.appointment?.serviceVariantName || customerTransactionDetail?.details?.serviceVariantName || null,
+                        serviceVariantDescription: customerTransactionDetail?.appointment?.serviceVariantDescription || customerTransactionDetail?.details?.serviceVariantDescription || null,
                         details: {
                           service: customerTransactionDetail?.appointment?.service || customerTransactionDetail?.details?.service || null,
                           staff: customerTransactionDetail?.appointment?.staff || customerTransactionDetail?.details?.staff || null,
                           duration: customerTransactionDetail?.details?.duration || customerTransactionDetail?.appointment?.duration || 0,
                           startTime: customerTransactionDetail?.appointment?.startTime || customerTransactionDetail?.date || customerTransactionDetail?.createdAt || '',
-                          notes: customerTransactionDetail?.notes || ''
+                          notes: customerTransactionDetail?.notes || '',
+                          serviceVariantId: customerTransactionDetail?.appointment?.serviceVariantId || customerTransactionDetail?.details?.serviceVariantId || null,
+                          serviceVariantName: customerTransactionDetail?.appointment?.serviceVariantName || customerTransactionDetail?.details?.serviceVariantName || null,
+                          serviceVariantDescription: customerTransactionDetail?.appointment?.serviceVariantDescription || customerTransactionDetail?.details?.serviceVariantDescription || null
                         },
                         serviceId: customerTransactionDetail?.appointment?.service?.id || customerTransactionDetail?.appointment?.serviceId || null,
                         serviceNameEn: customerTransactionDetail?.appointment?.service?.name_en || customerTransactionDetail?.appointment?.serviceName || customerTransactionDetail?.serviceLabel || customerTransactionDetail?.title || '',
@@ -7147,6 +7205,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         services: customerTransactionDetail?.appointment?.service ? [customerTransactionDetail.appointment.service] : [],
                         serviceItems: customerTransactionDetail?.appointment?.service ? [{
                           service: customerTransactionDetail.appointment.service,
+                          serviceVariantId: customerTransactionDetail?.appointment?.serviceVariantId || customerTransactionDetail?.details?.serviceVariantId || null,
+                          serviceVariantName: customerTransactionDetail?.appointment?.serviceVariantName || customerTransactionDetail?.details?.serviceVariantName || null,
+                          serviceVariantDescription: customerTransactionDetail?.appointment?.serviceVariantDescription || customerTransactionDetail?.details?.serviceVariantDescription || null,
                           duration: customerTransactionDetail?.appointment?.service?.duration || customerTransactionDetail?.details?.duration || 0,
                           price: Number(customerTransactionDetail.amount || 0)
                         }] : [],

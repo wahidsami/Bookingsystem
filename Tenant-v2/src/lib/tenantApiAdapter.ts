@@ -286,6 +286,31 @@ function normalizeCustomerHistoryResponse(payload: any): CanonicalCustomerHistor
     const normalizedType = canonicalKind === 'booking_session' ? 'appointment' : canonicalKind;
     const services = toArray(row?.details?.services || row?.serviceLines || row?.serviceItems).filter(Boolean);
     const appointmentDate = row?.date || row?.startTime || row?.processedAt || row?.createdAt || '';
+    const primaryService = row?.details?.service || row?.service || services[0] || null;
+    const serviceVariantName = row?.serviceVariantName || row?.details?.serviceVariantName || row?.serviceVariant?.nameEn || row?.serviceVariant?.name_ar || row?.serviceVariant?.name_ar || '';
+    const serviceVariantDescription = row?.serviceVariantDescription || row?.details?.serviceVariantDescription || row?.serviceVariant?.description || '';
+    const serviceNameEn = row?.serviceNameEn
+      || row?.details?.serviceNameEn
+      || row?.service?.name_en
+      || row?.service?.name
+      || primaryService?.name_en
+      || primaryService?.name
+      || row?.title
+      || '';
+    const serviceNameAr = row?.serviceNameAr
+      || row?.details?.serviceNameAr
+      || row?.service?.name_ar
+      || row?.service?.name
+      || primaryService?.name_ar
+      || primaryService?.name
+      || row?.title
+      || '';
+    const serviceLabelEn = serviceVariantName
+      ? `${serviceNameEn} / ${serviceVariantName}`
+      : serviceNameEn;
+    const serviceLabelAr = serviceVariantName
+      ? `${serviceNameAr} / ${serviceVariantName}`
+      : serviceNameAr;
     return {
       ...row,
       type: normalizedType,
@@ -316,10 +341,24 @@ function normalizeCustomerHistoryResponse(payload: any): CanonicalCustomerHistor
         bookingSessionId: row?.bookingSessionId || row?.details?.bookingSessionId || null,
         bookingReference: row?.bookingReference || row?.details?.bookingReference || null,
         bookingItemCount: toNumber(row?.details?.bookingItemCount ?? row?.bookingItemCount ?? services.length),
-        notes: row?.details?.notes || row?.notes || ''
+        notes: row?.details?.notes || row?.notes || '',
+        serviceVariantId: row?.serviceVariantId || row?.details?.serviceVariantId || row?.serviceVariant?.id || null,
+        serviceVariantName,
+        serviceVariantDescription,
+        serviceLabelEn,
+        serviceLabelAr,
+        serviceLabel: serviceLabelEn,
+        serviceLabelArText: serviceLabelAr
       },
-      serviceNameEn: row?.serviceNameEn || row?.service?.name_en || row?.service?.name || row?.title || '',
-      serviceNameAr: row?.serviceNameAr || row?.service?.name_ar || row?.service?.name || row?.title || '',
+      serviceNameEn: serviceLabelEn,
+      serviceNameAr: serviceLabelAr,
+      serviceVariantId: row?.serviceVariantId || row?.details?.serviceVariantId || row?.serviceVariant?.id || null,
+      serviceVariantName,
+      serviceVariantDescription,
+      serviceLabelEn,
+      serviceLabelAr,
+      serviceLabel: serviceLabelEn,
+      serviceLabelArText: serviceLabelAr,
       assignedStaffName: row?.assignedStaffName || row?.details?.staffName || row?.staff?.name || '',
       bookingSessionId: row?.bookingSessionId || row?.details?.bookingSessionId || null,
       bookingReference: row?.bookingReference || row?.details?.bookingReference || null,
