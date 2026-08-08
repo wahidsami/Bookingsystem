@@ -223,6 +223,57 @@ const normalizeRefundPaymentMethod = (value: any) => {
   return raw;
 };
 
+const normalizeAppointmentPaymentMethod = (value: any) => {
+  const raw = `${value || ''}`.trim().toLowerCase();
+  if (!raw) return '';
+
+  const collapsed = raw.replace(/[\s-]+/g, '_');
+  if (['cash', 'wallet', 'bank_transfer', 'gift_card_code', 'card_pos'].includes(collapsed)) {
+    return collapsed;
+  }
+
+  if (['card', 'mada', 'mada_card', 'visa', 'mastercard', 'credit_card', 'card_pos', 'pos', 'terminal'].includes(collapsed)) {
+    return 'card_pos';
+  }
+
+  if (['bank', 'banktransfer', 'bank_transfer_payment'].includes(collapsed)) {
+    return 'bank_transfer';
+  }
+
+  if (['gift_card', 'giftcard', 'gift_card', 'gift_card_code'].includes(collapsed)) {
+    return 'gift_card_code';
+  }
+
+  if (['online', 'booking_fee', 'online_full', 'card', 'mada', 'mada_card', 'visa', 'mastercard', 'credit_card'].includes(collapsed)) {
+    return 'card_pos';
+  }
+
+  if (['pay_on_visit', 'cash_on_delivery', 'at_center', 'atcenter'].includes(collapsed)) {
+    return 'cash';
+  }
+
+  return '';
+};
+
+const resolveAppointmentPaymentMethod = (appointment: any) => {
+  const candidates = [
+    appointment?.paymentMethod,
+    appointment?.paymentAllocations?.[0]?.paymentMethod,
+    appointment?.paymentAllocations?.[0]?.method,
+    appointment?.bookingSession?.paymentMethod,
+    appointment?.paymentMethodLabel
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeAppointmentPaymentMethod(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return 'cash';
+};
+
 function resolveEffectivePaymentStatus(item?: {
   paymentStatus?: string | null;
   price?: number | null;
@@ -1739,6 +1790,25 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [showPaymentRequiredDialog, setShowPaymentRequiredDialog] = useState(false);
   const [showCancelReasonDialog, setShowCancelReasonDialog] = useState(false);
   const [cancelReasonText, setCancelReasonText] = useState('');
+  const resolvedAppointmentPaymentMethod = useMemo(
+    () => resolveAppointmentPaymentMethod(activeAppointment),
+    [
+      activeAppointment?.id,
+      activeAppointment?.paymentMethod,
+      activeAppointment?.paymentMethodLabel,
+      activeAppointment?.bookingSession?.paymentMethod,
+      activeAppointment?.paymentAllocations
+    ]
+  );
+
+  useEffect(() => {
+    if (!activeAppointment?.id) {
+      setSelectedPaymentMethod('cash');
+      return;
+    }
+
+    setSelectedPaymentMethod(resolvedAppointmentPaymentMethod);
+  }, [activeAppointment?.id, resolvedAppointmentPaymentMethod]);
 
   const activeInvoiceServiceItems = activeAppointment ? (
     activeAppointmentServiceSources.length > 0
@@ -1858,15 +1928,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     { value: 'bank_transfer', labelEn: 'Bank transfer', labelAr: 'تحويل بنكي' },
     { value: 'gift_card_code', labelEn: 'Gift card code', labelAr: 'رمز بطاقة هدية' }
   ];
-
-  useEffect(() => {
-    if (!activeAppointment?.id) {
-      setSelectedPaymentMethod('cash');
-      return;
-    }
-
-    setSelectedPaymentMethod('cash');
-  }, [activeAppointment?.id]);
 
   // Skeletons / Refresh Simulation
   const [isLoading, setIsLoading] = useState(false);
@@ -2784,7 +2845,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           items: checkoutProducts.map(p => ({ productId: p.id, quantity: p.quantity, price: p.price })),
           customerId: activeAppointment.customerId || undefined,
           customerName: activeAppointment.customerNameEn || activeAppointment.customerNameAr || 'Walk-in',
-          paymentMethod: paymentMethodSummary
+          paymentMethod: paymentMethodApi,
+          paymentAllocations: paymentAllocationsPayload,
+          notes: paymentMethodSummary
         });
       }
 
