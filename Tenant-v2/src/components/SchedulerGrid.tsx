@@ -486,7 +486,7 @@ export default function SchedulerGrid({
 
   return (
     <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-visible" dir={isRtl ? 'rtl' : 'ltr'}>
-      <div className="sticky top-0 z-40 grid border-b border-slate-200 bg-slate-50/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
+      <div className="sticky top-0 z-50 grid border-b border-slate-200 bg-slate-50/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
         <div
           className="flex items-center justify-center border-r border-slate-200 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 bg-slate-50"
           style={{ width: timeColumnWidth }}

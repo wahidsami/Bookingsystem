@@ -2334,7 +2334,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     if (!isBoardEditable) {
       return;
     }
-    if (isPastBoardCreationSlot(dateKey, timeInMinutes)) {
+    if (isPastBoardCreationDate(dateKey)) {
       e.preventDefault();
       showPastBoardSlotWarning(timeInMinutes);
       return;
@@ -2374,7 +2374,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     if (actionType === 'new') {
       if (contextMenu) {
-        if (isPastBoardCreationSlot(contextDateKey, contextMenu.timeInMinutes)) {
+        if (isPastBoardCreationDate(contextDateKey)) {
           showPastBoardSlotWarning(contextMenu.timeInMinutes);
           setContextMenu(null);
           return;
@@ -4596,7 +4596,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         <div className="lg:col-span-12">
           
           <div
-            className="relative z-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col"
+            className="relative z-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-visible flex flex-col"
             style={{
               width: '100%',
               minWidth: '100%'
