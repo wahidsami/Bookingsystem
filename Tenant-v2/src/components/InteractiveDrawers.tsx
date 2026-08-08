@@ -178,6 +178,30 @@ const getBlockPresetTexts = (type: 'Break' | 'Lunch' | 'Meeting') => {
   };
 };
 
+const normalizeBlockPreset = (value?: string | null): 'Break' | 'Lunch' | 'Meeting' => {
+  const normalized = `${value || ''}`.trim().toLowerCase();
+
+  if (normalized === 'lunch') {
+    return 'Lunch';
+  }
+
+  if (normalized === 'prayer' || normalized === 'meeting') {
+    return 'Meeting';
+  }
+
+  return 'Break';
+};
+
+const mapBlockPresetToBackendType = (preset: 'Break' | 'Lunch' | 'Meeting') => {
+  if (preset === 'Lunch') {
+    return 'lunch';
+  }
+
+  // The backend supports `other` for generic blocked intervals.
+  // `Break` and `Meeting` are UI presets only.
+  return 'other';
+};
+
 export default function InteractiveDrawers({
   isRtl,
   isCreateDrawerOpen,
@@ -231,8 +255,7 @@ export default function InteractiveDrawers({
       if (loadedBreakIdRef.current === existingBreak.id) {
         return;
       }
-      const presetType = (existingBreak.blockedType || existingBreak.type || 'Break') as 'Break' | 'Lunch' | 'Meeting';
-      const normalizedType = ['Break', 'Lunch', 'Meeting'].includes(presetType) ? presetType : 'Break';
+      const normalizedType = normalizeBlockPreset(existingBreak.blockedType || existingBreak.type || 'Break');
       setBlockStaffId(existingBreak.staffId || currentStaffId || availableStylists[0]?.id || '');
       setBlockStartTime(Number(existingBreak.startTime ?? 180));
       setBlockDuration(Number(existingBreak.duration ?? 45));
@@ -1057,7 +1080,7 @@ export default function InteractiveDrawers({
         specificDate: getLocalDateKey(selectedDate),
         startTime: buildClockTime(blockStartTime),
         endTime: buildClockTime(blockStartTime + blockDuration),
-        type: (blockType === 'Meeting' ? 'other' : blockType.toLowerCase() as any),
+        type: mapBlockPresetToBackendType(blockType),
         label: blockTitleEn,
         isRecurring: blockIsRecurring,
         referenceDate: getLocalDateKey(selectedDate)
