@@ -2275,7 +2275,9 @@ export default function InteractiveDrawers({
                               staffName: isRtl ? staff?.nameAr : staff?.nameEn,
                               duration: variant?.duration || item.duration,
                               startTime: item.startTime,
-                              price: finalPrice
+                              price: finalPrice,
+                              basePrice,
+                              hasDiscount: item.discountType !== 'none' && item.discountValue > 0
                             };
                           });
                           const primarySubtotal = queuedLineItems.reduce((sum, item) => sum + item.price, 0);

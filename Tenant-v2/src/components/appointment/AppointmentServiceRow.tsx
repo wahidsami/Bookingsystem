@@ -36,9 +36,10 @@ export default function AppointmentServiceRow({
   children
 }: AppointmentServiceRowProps) {
   const isVariantRow = Boolean(variant);
+  const serviceName = getServiceDisplayName(service, isRtl ? 'ar' : 'en');
   const title = isVariantRow
-    ? `${variant?.nameEn || variant?.nameAr || variant?.description || ''}`.trim() || getServiceDisplayName(service, isRtl ? 'ar' : 'en')
-    : getServiceDisplayName(service, isRtl ? 'ar' : 'en');
+    ? `${serviceName} - ${variant?.nameEn || variant?.nameAr || variant?.description || ''}`.trim() || serviceName
+    : serviceName;
   const price = isVariantRow
     ? Number(variant?.finalPrice ?? variant?.price ?? service.finalPrice ?? service.price ?? 0)
     : Number(getServiceDisplayPrice(service) || 0);
@@ -111,38 +112,28 @@ export default function AppointmentServiceRow({
 
   return (
     <article
-      className={`overflow-hidden rounded-[22px] border shadow-sm transition ${
-        isVariantRow
-          ? 'border-slate-200 bg-slate-50/80'
-          : 'border-slate-200 bg-white hover:border-primary/30 hover:shadow-md'
-      }`}
+      className={`overflow-hidden rounded-[22px] border shadow-sm transition border-slate-200 bg-white hover:border-primary/30 hover:shadow-md`}
       style={{ marginInlineStart: depth > 0 ? `${depth * 1.25}rem` : 0 }}
     >
-      <div className={`flex items-center gap-3 px-3 py-2.5 sm:px-4 ${
-        isVariantRow ? 'min-h-[52px] border-l-4 border-l-primary/20 bg-slate-50/80' : 'min-h-[68px]'
-      } ${isExpanded && !isVariantRow ? 'bg-slate-50' : ''}`}>
+      <div className={`flex items-center gap-3 px-3 py-2.5 sm:px-4 min-h-[68px] ${isExpanded ? 'bg-slate-50' : ''}`}>
         
-        {!isVariantRow ? (
-          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-            {service.image ? (
-              <img
-                src={resolveServiceImageUrl(service.image)}
-                alt={title}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-slate-400">
-                <ImageIcon className="h-5 w-5" />
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="h-full w-3 shrink-0 rounded-full bg-primary/10" />
-        )}
+        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+          {service.image ? (
+            <img
+              src={resolveServiceImageUrl(service.image)}
+              alt={title}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-slate-400">
+              <ImageIcon className="h-5 w-5" />
+            </div>
+          )}
+        </div>
 
         <div className="flex-1 min-w-0 pr-2">
-          <p className={`truncate font-semibold tracking-tight text-slate-900 ${isVariantRow ? 'text-sm' : 'text-base sm:text-[15px]'}`}>
+          <p className={`truncate font-semibold tracking-tight text-slate-900 text-base sm:text-[15px]`}>
             {title}
           </p>
         </div>
@@ -189,7 +180,7 @@ export default function AppointmentServiceRow({
         </div>
       </div>
 
-      {isExpanded && isAdded && stagedItem && (
+      {isExpanded && (
         <AppointmentServiceConfiguration
           isRtl={isRtl}
           draftConfig={draftConfig}
@@ -200,7 +191,7 @@ export default function AppointmentServiceRow({
         />
       )}
 
-      {children && !isVariantRow ? (
+      {children ? (
         <div className="border-t border-slate-200 bg-slate-50/50 p-3 sm:p-4 space-y-2">
           {children}
         </div>
