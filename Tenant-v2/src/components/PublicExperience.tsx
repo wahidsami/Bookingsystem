@@ -53,6 +53,9 @@ function resolvePublicRoute(path: string): PublicRoute {
   if (pathWithoutLocale.startsWith('/forgot-password')) return 'forgot-password';
   if (pathWithoutLocale.startsWith('/reset-password')) return 'reset-password';
   if (pathWithoutLocale.startsWith('/payment')) return 'payment';
+  
+  if (pathWithoutLocale.startsWith('/dashboard')) return 'login';
+
   return 'landing';
 }
 
