@@ -712,7 +712,7 @@ export default function InteractiveDrawers({
     if (!selectedCustId || !selectionStillVisible) {
       setSelectedCustId(filteredCustomers[0].id);
     }
-  }, [custMode, filteredCustomers, selectedCustId]);
+  }, [custMode, customers, customerSearch, selectedCustId]);
 
   const filteredCustomers = useMemo(() => {
     const query = customerSearch.trim().toLowerCase();
