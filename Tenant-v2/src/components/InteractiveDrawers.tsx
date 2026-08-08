@@ -119,6 +119,8 @@ interface StagedService {
   discountType: 'none' | 'flat' | 'percent';
   discountValue: number;
   notes: string;
+  basePrice?: number;
+  finalPrice?: number;
 }
 
 interface QueuedServiceEditDraft {
@@ -460,11 +462,7 @@ export default function InteractiveDrawers({
   const [serviceSearch, setServiceSearch] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
   const [expandedServiceIds, setExpandedServiceIds] = useState<Record<string, boolean>>({});
-  const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
-  const [editingQueueDraft, setEditingQueueDraft] = useState<QueuedServiceEditDraft | null>(null);
-  const [inlineConfigServiceId, setInlineConfigServiceId] = useState<string | null>(null);
-  const [inlineConfigVariantId, setInlineConfigVariantId] = useState<string | null>(null);
-  const [inlineConfigDraft, setInlineConfigDraft] = useState<QueuedServiceEditDraft | null>(null);
+
   const canonicalServices = useMemo<ServiceRecord[]>(() => services.map((service) => normalizeServiceRecord(service)), [services]);
   const serviceCategories = useMemo(() => groupServicesByCategory(canonicalServices), [canonicalServices]);
   const serviceCategoryTabs = useMemo(() => {
@@ -597,101 +595,7 @@ export default function InteractiveDrawers({
     setCurrentDuration((current) => (current === nextDuration ? current : nextDuration));
   }, [selectedService, selectedVariant, currentVariantId]);
 
-  const openQueuedServiceEditor = (index: number) => {
-    const service = stagedServices[index];
-    if (!service) {
-      return;
-    }
 
-    const resolvedService = canonicalServices.find((entry) => entry.id === service.serviceId) || null;
-    const resolvedVariant = resolvedService?.variants?.find((variant) => variant.id === service.variantId) || null;
-
-    setEditingQueueIndex(index);
-    setEditingQueueDraft({
-      serviceId: service.serviceId,
-      variantId: service.variantId || '',
-      staffId: service.staffId || currentStaffId || availableStylists[0]?.id || '',
-      startTime: service.startTime,
-      duration: service.duration || resolvedVariant?.duration || resolvedService?.duration || 60,
-      discountType: service.discountType || 'none',
-      discountValue: service.discountValue || 0,
-      notes: service.notes || ''
-    });
-  };
-
-  const closeQueuedServiceEditor = () => {
-    setEditingQueueIndex(null);
-    setEditingQueueDraft(null);
-  };
-
-  const applyQueuedServiceEdit = () => {
-    if (editingQueueIndex === null || !editingQueueDraft) {
-      return;
-    }
-
-    const resolvedService = canonicalServices.find((entry) => entry.id === editingQueueDraft.serviceId) || null;
-    if (!resolvedService) {
-      return;
-    }
-
-    if (resolvedService.employeeAssignments?.length && editingQueueDraft.staffId && !resolvedService.employeeAssignments.includes(editingQueueDraft.staffId)) {
-      setShowAssignWarning(true);
-      return;
-    }
-
-    const resolvedVariant = resolvedService.variants?.find((variant) => variant.id === editingQueueDraft.variantId) || null;
-    const sanitizedDuration = Math.max(
-      5,
-      Math.round(Number(editingQueueDraft.duration || 0)) || resolvedVariant?.duration || resolvedService.duration || 30
-    );
-    const sanitizedStartTime = Math.max(0, Math.round(Number(editingQueueDraft.startTime || 0)));
-    const sanitizedDiscountValue = editingQueueDraft.discountType === 'none'
-      ? 0
-      : Math.max(0, Number(editingQueueDraft.discountValue || 0));
-
-    setStagedServices((current) => {
-      const next = [...current];
-      if (!next[editingQueueIndex]) {
-        return current;
-      }
-
-      next[editingQueueIndex] = {
-        ...next[editingQueueIndex],
-        serviceId: resolvedService.id,
-        variantId: resolvedVariant?.id || undefined,
-        serviceCategory: resolvedService.category,
-        staffId: editingQueueDraft.staffId || currentStaffId,
-        startTime: sanitizedStartTime,
-        duration: sanitizedDuration,
-        discountType: editingQueueDraft.discountType,
-        discountValue: sanitizedDiscountValue,
-        notes: editingQueueDraft.notes
-      };
-
-      for (let index = editingQueueIndex + 1; index < next.length; index += 1) {
-        const previousItem = next[index - 1];
-        next[index] = {
-          ...next[index],
-          startTime: previousItem.startTime + previousItem.duration
-        };
-      }
-
-      return next;
-    });
-
-    if (editingQueueIndex === 0) {
-      setCurrentStartTime(sanitizedStartTime);
-      setCurrentStaffId(editingQueueDraft.staffId || currentStaffId);
-    }
-
-    setCurrentDuration(sanitizedDuration);
-    setCurrentVariantId(resolvedVariant?.id || '');
-    setCurrentDiscountType(editingQueueDraft.discountType);
-    setCurrentDiscountValue(sanitizedDiscountValue);
-    setCurrentServiceNotes(editingQueueDraft.notes);
-    setEditingQueueIndex(null);
-    setEditingQueueDraft(null);
-  };
 
   useEffect(() => {
     if (selectedCustId && !customers.some((customer) => customer.id === selectedCustId)) {
@@ -924,6 +828,16 @@ export default function InteractiveDrawers({
       nextStartTime = lastItem.startTime + lastItem.duration;
     }
 
+    const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? srv.finalPrice ?? srv.price ?? 0);
+    let priceAfterDiscount = basePrice;
+    const discountType = serviceOverride ? 'none' : currentDiscountType;
+    const discountValue = serviceOverride ? 0 : currentDiscountValue;
+    if (discountType === 'flat') {
+      priceAfterDiscount = Math.max(0, basePrice - discountValue);
+    } else if (discountType === 'percent') {
+      priceAfterDiscount = Math.max(0, basePrice - (basePrice * discountValue) / 100);
+    }
+
     const newItem: StagedService = {
       id: `stg-${Date.now()}`,
       serviceId: resolvedServiceId,
@@ -932,9 +846,11 @@ export default function InteractiveDrawers({
       staffId: currentStaffId,
       startTime: nextStartTime,
       duration: resolvedVariant?.duration || serviceOverride?.duration || currentDuration,
-      discountType: serviceOverride ? 'none' : currentDiscountType,
-      discountValue: serviceOverride ? 0 : currentDiscountValue,
+      discountType,
+      discountValue,
       notes: serviceOverride ? '' : currentServiceNotes,
+      basePrice,
+      finalPrice: priceAfterDiscount
     };
 
     setStagedServices(prev => [...prev, newItem]);
@@ -946,172 +862,73 @@ export default function InteractiveDrawers({
     );
   };
 
-  const handleOpenInlineConfig = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
-    const resolvedVariant = variantOverride || null;
-
-    let nextStartTime = currentStartTime;
-    if (stagedServices.length > 0) {
-      const lastItem = stagedServices[stagedServices.length - 1];
-      nextStartTime = lastItem.startTime + lastItem.duration;
-    }
-
-    setInlineConfigServiceId(service.id);
-    setInlineConfigVariantId(resolvedVariant?.id || null);
-    setInlineConfigDraft({
-      serviceId: service.id,
-      variantId: resolvedVariant?.id || '',
-      staffId: currentStaffId || availableStylists[0]?.id || '',
-      startTime: nextStartTime,
-      duration: resolvedVariant?.duration || service.duration || 60,
-      discountType: 'none',
-      discountValue: 0,
-      notes: ''
-    });
-    setExpandedServiceIds((current) => ({
-      ...current,
-      [service.id]: true
+  const handleUpdateStagedService = (itemId: string, updates: Partial<StagedService>) => {
+    setStagedServices(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const next = { ...item, ...updates };
+      if (next.basePrice !== undefined) {
+        let priceAfterDiscount = next.basePrice;
+        if (next.discountType === 'flat') {
+          priceAfterDiscount = Math.max(0, next.basePrice - next.discountValue);
+        } else if (next.discountType === 'percent') {
+          priceAfterDiscount = Math.max(0, next.basePrice - (next.basePrice * next.discountValue) / 100);
+        }
+        next.finalPrice = priceAfterDiscount;
+      }
+      return next;
     }));
   };
 
-  const handleCancelInlineConfig = () => {
-    setInlineConfigServiceId(null);
-    setInlineConfigVariantId(null);
-    setInlineConfigDraft(null);
-  };
-
-  const handleSaveInlineConfig = () => {
-    if (!inlineConfigDraft || !inlineConfigServiceId) return;
-    const srv = canonicalServices.find(s => s.id === inlineConfigServiceId);
-    if (!srv) return;
-
-    if (srv.employeeAssignments?.length && inlineConfigDraft.staffId && !srv.employeeAssignments.includes(inlineConfigDraft.staffId)) {
-      setShowAssignWarning(true);
-      return;
-    }
-
-    const sanitizedDiscountValue = inlineConfigDraft.discountType === 'none'
-      ? 0
-      : Math.max(0, Number(inlineConfigDraft.discountValue || 0));
-
-    const newItem: StagedService = {
-      id: `stg-${Date.now()}`,
-      serviceId: inlineConfigDraft.serviceId,
-      variantId: inlineConfigDraft.variantId || undefined,
-      serviceCategory: srv.category,
-      staffId: inlineConfigDraft.staffId,
-      startTime: inlineConfigDraft.startTime,
-      duration: inlineConfigDraft.duration,
-      discountType: inlineConfigDraft.discountType,
-      discountValue: sanitizedDiscountValue,
-      notes: inlineConfigDraft.notes,
-    };
-
-    setStagedServices(prev => [...prev, newItem]);
-    addLocalToast(
-      `تمت إضافة الخدمة "${isRtl ? srv.nameAr : srv.nameEn}" للموعد المجدول.`,
-      `Service "${isRtl ? srv.nameAr : srv.nameEn}" added to session queue.`,
-      'success'
-    );
-
-    handleCancelInlineConfig();
-  };
-
-  const renderInlineConfigForm = (serviceId: string, variantId?: string | null) => {
-    if (!inlineConfigDraft || inlineConfigServiceId !== serviceId) return null;
-    if ((variantId || null) !== (inlineConfigVariantId || null)) return null;
-
-    return (
-      <div className="mt-2 rounded-[22px] border border-primary/20 bg-primary/5 p-4 sm:p-5 shadow-sm animate-fadeIn relative mb-4">
-        <div className="mb-4 flex items-center justify-between border-b border-primary/10 pb-3">
-          <h5 className="font-bold text-primary">{isRtl ? 'إعداد الخدمة' : 'Service Configuration'}</h5>
-          <button type="button" onClick={handleCancelInlineConfig} className="text-slate-400 hover:text-slate-600 transition">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'عضو الفريق' : 'Team Member'}</label>
-            <select 
-              value={inlineConfigDraft.staffId} 
-              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, staffId: e.target.value } : null)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="" disabled>{isRtl ? 'اختر...' : 'Select...'}</option>
-              {availableStylists.map(s => (
-                <option key={s.id} value={s.id}>{isRtl ? s.nameAr : s.nameEn}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'وقت البدء (دقيقة من منتصف الليل)' : 'Start Time (Minutes)'}</label>
-            <input 
-              type="number" 
-              min={0}
-              max={1440}
-              value={inlineConfigDraft.startTime}
-              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, startTime: parseInt(e.target.value) || 0 } : null)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'المدة (دقيقة)' : 'Duration (Min)'}</label>
-            <input 
-              type="number" 
-              min={1}
-              value={inlineConfigDraft.duration}
-              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, duration: parseInt(e.target.value) || 0 } : null)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'نوع الخصم' : 'Discount Type'}</label>
-            <select 
-              value={inlineConfigDraft.discountType} 
-              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, discountType: e.target.value as any } : null)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="none">{isRtl ? 'بدون خصم' : 'None'}</option>
-              <option value="percentage">{isRtl ? 'نسبة مئوية (%)' : 'Percentage (%)'}</option>
-              <option value="fixed">{isRtl ? 'مبلغ ثابت' : 'Fixed Amount'}</option>
-            </select>
-          </div>
-          {inlineConfigDraft.discountType !== 'none' && (
-            <div className="space-y-1.5 xl:col-start-1">
-              <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'قيمة الخصم' : 'Discount Value'}</label>
-              <input 
-                type="number" 
-                min={0}
-                value={inlineConfigDraft.discountValue}
-                onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, discountValue: parseInt(e.target.value) || 0 } : null)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-          )}
-          <div className={`space-y-1.5 ${inlineConfigDraft.discountType !== 'none' ? 'sm:col-span-1 xl:col-span-3' : 'sm:col-span-2 xl:col-span-4'}`}>
-            <label className="text-[11px] font-semibold text-slate-700">{isRtl ? 'ملاحظات داخلية' : 'Internal Notes'}</label>
-            <input 
-              type="text" 
-              value={inlineConfigDraft.notes || ''}
-              onChange={(e) => setInlineConfigDraft(prev => prev ? { ...prev, notes: e.target.value } : null)}
-              placeholder={isRtl ? 'ملاحظات خاصة بهذه الخدمة...' : 'Notes for this service...'}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-        </div>
-        <div className="mt-5 flex justify-end gap-3 border-t border-primary/10 pt-4">
-          <button type="button" onClick={handleCancelInlineConfig} className="rounded-xl border border-slate-300 bg-white px-5 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50">
-            {isRtl ? 'إلغاء' : 'Cancel'}
-          </button>
-          <button type="button" onClick={handleSaveInlineConfig} className="rounded-xl bg-primary px-5 py-2 text-[13px] font-semibold text-white transition hover:bg-primary/90">
-            {isRtl ? 'حفظ في الموعد' : 'Save to Appointment'}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
   const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
-    handleOpenInlineConfig(service, variantOverride);
+    const isSelected = isQueuedServiceSelected(service.id, variantOverride?.id);
+    if (isSelected) {
+      setStagedServices((current) => current.filter((item) => {
+        if (variantOverride) {
+          return !(item.serviceId === service.id && item.variantId === variantOverride.id);
+        }
+        return item.serviceId !== service.id;
+      }));
+      setExpandedServiceIds((current) => ({
+        ...current,
+        [service.id]: false
+      }));
+    } else {
+      const resolvedVariant = variantOverride || null;
+      let nextStartTime = currentStartTime;
+      if (stagedServices.length > 0) {
+        const lastItem = stagedServices[stagedServices.length - 1];
+        nextStartTime = lastItem.startTime + lastItem.duration;
+      }
+
+      const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
+
+      const newItem: StagedService = {
+        id: `stg-${Date.now()}`,
+        serviceId: service.id,
+        variantId: resolvedVariant?.id || undefined,
+        serviceCategory: service.category,
+        staffId: currentStaffId || availableStylists[0]?.id || '',
+        startTime: nextStartTime,
+        duration: resolvedVariant?.duration || service.duration || 60,
+        discountType: 'none',
+        discountValue: 0,
+        notes: '',
+        basePrice,
+        finalPrice: basePrice
+      };
+
+      setStagedServices(prev => [...prev, newItem]);
+      addLocalToast(
+        `تمت إضافة الخدمة "${isRtl ? service.nameAr : service.nameEn}" للموعد المجدول.`,
+        `Service "${isRtl ? service.nameAr : service.nameEn}" added to session queue.`,
+        'success'
+      );
+      
+      setExpandedServiceIds((current) => ({
+        ...current,
+        [service.id]: true
+      }));
+    }
   };
 
   const handleConfirmAppointmentCreation = async () => {
@@ -2411,25 +2228,17 @@ export default function InteractiveDrawers({
                         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
                           <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
                             <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div>
                                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/70">
-                                    {isRtl ? 'خدمات الحجز' : 'Appointment service browser'}
-                                  </p>
-                                  <h4 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-                                    {isRtl ? 'أضف الخدمات بنقرة واحدة' : 'Add services with one click'}
-                                  </h4>
-                                  <p className="mt-1 text-sm text-slate-500">
-                                    {isRtl
-                                      ? 'ابحث، اختر الفئة، ثم أضف الخدمة مباشرة إلى جلسة الموعد.'
-                                      : 'Search, filter by category, then add each service directly to the session queue.'}
+                                    {isRtl ? 'تصفح الخدمات' : 'Appointment Service Browser'}
                                   </p>
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-left">
                                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
                                     {isRtl ? 'الخدمات في الجلسة' : 'Queued services'}
                                   </p>
-                                  <p className="mt-1 text-lg font-semibold text-slate-900">{stagedServices.length}</p>
+                                  <p className="mt-0.5 text-lg font-semibold text-slate-900 leading-none">{stagedServices.length}</p>
                                 </div>
                               </div>
                             </div>
@@ -2485,33 +2294,49 @@ export default function InteractiveDrawers({
                                           service={service}
                                           isRtl={isRtl}
                                           isAdded={parentAdded}
-                                          canExpand={serviceVariants.length > 0}
                                           isExpanded={isExpanded}
                                           onToggleExpand={() => toggleServiceExpansion(service.id)}
                                           onToggleAdd={() => handleToggleServiceSelection(service)}
                                           assignedStaffNames={assignedStaffNames}
-                                          description={service.descriptionEn || service.descriptionAr || ''}
+                                          availableStylists={availableStylists}
+                                          stagedItem={stagedServices.find(s => s.serviceId === service.id && !s.variantId) || null}
+                                          onSaveConfig={(updates) => {
+                                            const item = stagedServices.find(s => s.serviceId === service.id && !s.variantId);
+                                            if (item) {
+                                              handleUpdateStagedService(item.id, updates);
+                                              toggleServiceExpansion(service.id);
+                                            }
+                                          }}
                                         >
                                           {isExpanded && serviceVariants.length > 0 ? (
-                                            <div className="space-y-2">
-                                              {serviceVariants.map((variant) => (
-                                                <React.Fragment key={variant.id}>
+                                            <div className="space-y-2 pt-2 border-t border-slate-100">
+                                              {serviceVariants.map((variant) => {
+                                                const variantAdded = isQueuedServiceSelected(service.id, variant.id);
+                                                return (
                                                   <ExpandableServiceRow
+                                                    key={variant.id}
                                                     service={service}
                                                     variant={variant}
                                                     isRtl={isRtl}
                                                     depth={1}
-                                                    isAdded={isQueuedServiceSelected(service.id, variant.id)}
+                                                    isAdded={variantAdded}
+                                                    isExpanded={true} // Variants don't have nested expansion, but they can be configured
+                                                    onToggleExpand={() => {}} // Not used for variants, configuration is always visible if added or can just be toggled
                                                     onToggleAdd={() => handleToggleServiceSelection(service, variant)}
-                                                    description={variant.descriptionEn || variant.descriptionAr || variant.description || ''}
+                                                    availableStylists={availableStylists}
+                                                    stagedItem={stagedServices.find(s => s.serviceId === service.id && s.variantId === variant.id) || null}
+                                                    onSaveConfig={(updates) => {
+                                                      const item = stagedServices.find(s => s.serviceId === service.id && s.variantId === variant.id);
+                                                      if (item) {
+                                                        handleUpdateStagedService(item.id, updates);
+                                                      }
+                                                    }}
                                                   />
-                                                  {renderInlineConfigForm(service.id, variant.id)}
-                                                </React.Fragment>
-                                              ))}
+                                                );
+                                              })}
                                             </div>
                                           ) : null}
                                         </ExpandableServiceRow>
-                                        {renderInlineConfigForm(service.id, null)}
                                       </div>
                                     );
                                   })}
@@ -2580,8 +2405,6 @@ export default function InteractiveDrawers({
                                   const service = canonicalServices.find((entry) => entry.id === item.serviceId) || null;
                                   const variant = service?.variants?.find((entry) => entry.id === item.variantId) || null;
                                   const staff = availableStylists.find((stylist) => stylist.id === item.staffId) || null;
-                                  const isEditing = editingQueueIndex === index && editingQueueDraft !== null;
-                                  const editDraft = editingQueueDraft;
                                   const basePrice = toMoney(variant?.finalPrice ?? service?.finalPrice ?? service?.price ?? 0);
                                   const discountedPrice = item.discountType === 'flat'
                                     ? Math.max(0, basePrice - item.discountValue)
@@ -2593,9 +2416,7 @@ export default function InteractiveDrawers({
                                   return (
                                     <div
                                       key={item.id}
-                                      className={`overflow-hidden rounded-[24px] border bg-white shadow-sm transition ${
-                                        isEditing ? 'border-primary/30 ring-1 ring-primary/15' : 'border-slate-200 hover:border-primary/30'
-                                      }`}
+                                      className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm transition hover:border-primary/30"
                                     >
                                       <div className={`flex items-start gap-3 p-4 ${isCompact ? 'sm:p-4' : 'sm:p-5'}`}>
                                         <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -2645,13 +2466,7 @@ export default function InteractiveDrawers({
                                         </div>
 
                                         <div className="flex shrink-0 flex-col gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => (isEditing ? closeQueuedServiceEditor() : openQueuedServiceEditor(index))}
-                                            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50"
-                                          >
-                                            {isEditing ? (isRtl ? 'إغلاق' : 'Close') : (isRtl ? 'تعديل' : 'Edit')}
-                                          </button>
+
                                           <button
                                             type="button"
                                             onClick={() => setStagedServices((current) => current.filter((_, currentIndex) => currentIndex !== index))}
@@ -2662,167 +2477,7 @@ export default function InteractiveDrawers({
                                         </div>
                                       </div>
 
-                                      <AnimatePresence>
-                                        {isEditing && editDraft ? (
-                                          <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            transition={{ duration: 0.18 }}
-                                            className="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-5"
-                                          >
-                                            <div className="grid gap-3 md:grid-cols-2">
-                                              <label className="block">
-                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                  {isRtl ? 'البديل' : 'Variant'}
-                                                </span>
-                                                <select
-                                                  value={editDraft.variantId}
-                                                  onChange={(event) => {
-                                                    const nextVariantId = event.target.value;
-                                                    const nextVariant = variantOptions.find((variantItem) => variantItem.id === nextVariantId) || null;
-                                                    setEditingQueueDraft((current) => current ? ({
-                                                      ...current,
-                                                      variantId: nextVariantId,
-                                                      duration: nextVariant?.duration || service?.duration || current.duration
-                                                    }) : current);
-                                                  }}
-                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
-                                                >
-                                                  <option value="">{isRtl ? 'الخدمة الأساسية' : 'Base service'}</option>
-                                                  {variantOptions.map((variantItem) => (
-                                                    <option key={variantItem.id} value={variantItem.id}>
-                                                      {(isRtl ? variantItem.nameAr || variantItem.nameEn : variantItem.nameEn || variantItem.nameAr) || variantItem.description || variantItem.id}
-                                                    </option>
-                                                  ))}
-                                                </select>
-                                              </label>
 
-                                              <label className="block">
-                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                  {isRtl ? 'أخصائية التجميل' : 'Stylist'}
-                                                </span>
-                                                <select
-                                                  value={editDraft.staffId}
-                                                  onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, staffId: event.target.value }) : current)}
-                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
-                                                >
-                                                  {availableStylists.map((stylist) => (
-                                                    <option key={stylist.id} value={stylist.id}>
-                                                      {isRtl ? stylist.nameAr : stylist.nameEn}
-                                                    </option>
-                                                  ))}
-                                                </select>
-                                              </label>
-
-                                              <label className="block">
-                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                  {isRtl ? 'وقت البدء' : 'Start time'}
-                                                </span>
-                                                <div className="flex items-center gap-2">
-                                                  <input
-                                                    type="number"
-                                                    step={15}
-                                                    min={0}
-                                                    value={editDraft.startTime}
-                                                    onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, startTime: Number(event.target.value) || 0 }) : current)}
-                                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-mono font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
-                                                  />
-                                                  <span className="min-w-[4.5rem] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold text-slate-500">
-                                                    {formatMinutesToTime(editDraft.startTime)}
-                                                  </span>
-                                                </div>
-                                              </label>
-
-                                              <label className="block">
-                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                  {isRtl ? 'المدة' : 'Duration'}
-                                                </span>
-                                                <input
-                                                  type="number"
-                                                  step={5}
-                                                  min={5}
-                                                  value={editDraft.duration}
-                                                  onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, duration: Math.max(5, Number(event.target.value) || 0) }) : current)}
-                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-mono font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
-                                                />
-                                              </label>
-                                            </div>
-
-                                            <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                              <label className="block">
-                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                  {isRtl ? 'نوع الخصم' : 'Discount type'}
-                                                </span>
-                                                <select
-                                                  value={editDraft.discountType}
-                                                  onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, discountType: event.target.value as QueuedServiceEditDraft['discountType'], discountValue: event.target.value === 'none' ? 0 : current.discountValue }) : current)}
-                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
-                                                >
-                                                  <option value="none">{isRtl ? 'بدون خصم' : 'No discount'}</option>
-                                                  <option value="flat">{isRtl ? 'قيمة ثابتة' : 'Fixed amount'}</option>
-                                                  <option value="percent">{isRtl ? 'نسبة مئوية' : 'Percent'}</option>
-                                                </select>
-                                              </label>
-
-                                              <label className="block">
-                                                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                  {isRtl ? 'قيمة الخصم' : 'Discount value'}
-                                                </span>
-                                                <input
-                                                  type="number"
-                                                  min={0}
-                                                  step={0.5}
-                                                  disabled={editDraft.discountType === 'none'}
-                                                  value={editDraft.discountValue}
-                                                  onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, discountValue: Number(event.target.value) || 0 }) : current)}
-                                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-mono font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-slate-100"
-                                                />
-                                              </label>
-                                            </div>
-
-                                            <label className="mt-3 block">
-                                              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                {isRtl ? 'ملاحظات' : 'Notes'}
-                                              </span>
-                                              <textarea
-                                                rows={3}
-                                                value={editDraft.notes}
-                                                onChange={(event) => setEditingQueueDraft((current) => current ? ({ ...current, notes: event.target.value }) : current)}
-                                                placeholder={isRtl ? 'تفضيلات، ملاحظات، أو تعليمات خاصة...' : 'Preferences, notes, or special instructions...'}
-                                                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary"
-                                              />
-                                            </label>
-
-                                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                              <div className="space-y-1 text-[11px] text-slate-600">
-                                                <p className="font-semibold text-slate-900">
-                                                  {isRtl ? 'السعر الحالي' : 'Current price'}: {Number(discountedPrice || 0).toFixed(2)} SAR
-                                                </p>
-                                                <p>
-                                                  {isRtl ? 'تحديث هذا الكارت لا يغيّر البنية الخلفية أو payload.' : 'Updating this card does not change the backend contract or payload shape.'}
-                                                </p>
-                                              </div>
-                                              <div className="flex flex-wrap gap-2">
-                                                <button
-                                                  type="button"
-                                                  onClick={closeQueuedServiceEditor}
-                                                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                                                >
-                                                  {isRtl ? 'إلغاء' : 'Cancel'}
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={applyQueuedServiceEdit}
-                                                  className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                                                >
-                                                  {isRtl ? 'حفظ' : 'Save'}
-                                                </button>
-                                              </div>
-                                            </div>
-                                          </motion.div>
-                                        ) : null}
-                                      </AnimatePresence>
                                     </div>
                                   );
                                 })
@@ -2877,6 +2532,14 @@ export default function InteractiveDrawers({
                             const srv = canonicalServices.find((service) => service.id === item.serviceId);
                             const variant = srv?.variants.find((entry) => entry.id === item.variantId) || srv?.variants[0] || null;
                             const staff = availableStylists.find((stylist) => stylist.id === item.staffId);
+                            const basePrice = variant ? toMoney(variant.finalPrice ?? variant.price) : (srv ? toMoney(srv.price) : 0);
+                            let finalPrice = basePrice;
+                            if (item.discountType === 'flat') {
+                              finalPrice = Math.max(0, basePrice - item.discountValue);
+                            } else if (item.discountType === 'percent') {
+                              finalPrice = Math.max(0, basePrice - (basePrice * item.discountValue) / 100);
+                            }
+
                             return {
                               id: item.id,
                               index,
@@ -2884,7 +2547,7 @@ export default function InteractiveDrawers({
                               staffName: isRtl ? staff?.nameAr : staff?.nameEn,
                               duration: variant?.duration || item.duration,
                               startTime: item.startTime,
-                              price: variant ? toMoney(variant.finalPrice ?? variant.price) : (srv ? toMoney(srv.price) : 0)
+                              price: finalPrice
                             };
                           });
                           const primarySubtotal = queuedLineItems.reduce((sum, item) => sum + item.price, 0);
@@ -2924,9 +2587,16 @@ export default function InteractiveDrawers({
                                             {formatMinutesToTime(item.startTime)} · {item.duration} {isRtl ? 'دقيقة' : 'min'}
                                           </p>
                                         </div>
-                                        <span className="font-mono font-bold text-slate-700 whitespace-nowrap">
-                                          {item.price.toFixed(2)} ر.س
-                                        </span>
+                                        <div className="text-right flex flex-col items-end">
+                                          <span className="font-mono font-bold text-slate-700 whitespace-nowrap">
+                                            {item.price.toFixed(2)} ر.س
+                                          </span>
+                                          {item.hasDiscount && (
+                                            <span className="font-mono text-[9px] text-slate-400 line-through">
+                                              {item.basePrice.toFixed(2)} ر.س
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   ))
