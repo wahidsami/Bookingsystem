@@ -9,7 +9,7 @@ import {
   Lock, Scissors, Sparkles, Smile, ShieldCheck, Mail, Phone,
   TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy, Settings2,
   PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift, Banknote,
-  CalendarDays, Ban
+  CalendarDays, Ban, Save
 } from 'lucide-react';
 import { Language, Product, QuickLaunchRequest } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
@@ -29,6 +29,9 @@ interface AppointmentWorkspaceProps {
   lang: Language;
   onQuickAction: (type: any) => void;
   quickLaunchRequest?: QuickLaunchRequest | null;
+  onToggleFavoritePage?: () => void;
+  isFavorited?: boolean;
+  setShowSavedViewModal?: (show: boolean) => void;
 }
 
 // Full types
@@ -376,7 +379,7 @@ const writeSchedulerTeamVisibilityOverride = (storageKey: string, value: string[
   }
 };
 
-export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest }: AppointmentWorkspaceProps) {
+export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest, onToggleFavoritePage, isFavorited, setShowSavedViewModal }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
   const { tenant, tenantSettings, user } = useTenantAuth();
   const schedulerConfig = useMemo(() => getTenantSchedulerConfig(tenantSettings, tenant), [tenantSettings, tenant]);
@@ -4241,38 +4244,27 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
 
+            {/* Star Favorite Button */}
+            <button
+              onClick={() => onToggleFavoritePage && onToggleFavoritePage()}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                isFavorited ? 'border-amber-200 bg-amber-50 text-amber-500' : 'border-slate-200 bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200'
+              }`}
+              title={isFavorited ? (isRtl ? 'إزالة من المفضلة' : 'Remove from Favorites') : (isRtl ? 'إضافة للمفضلة' : 'Save to Favorites')}
+            >
+              <Star size={14} fill={isFavorited ? 'currentColor' : 'none'} className="stroke-[2]" />
+            </button>
+
+            {/* Save View Button */}
+            <button
+              onClick={() => setShowSavedViewModal && setShowSavedViewModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 cursor-pointer"
+            >
+              <Save size={12} />
+              <span>{isRtl ? 'حفظ المنظر' : 'Save view filter'}</span>
+            </button>
+
             {/* Add Appointment Global Trigger */}
-            <button 
-              onClick={() => {
-                if (!isBoardEditable) {
-                  return;
-                }
-                setCreateMode('appointment');
-                setCreateStep(1);
-                setStagedServices([]);
-                setIsCreateDrawerOpen(true);
-              }}
-              className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus size={13} className="text-amber-400" />
-              <span>{isRtl ? 'حجز موعد جديد 🗓️' : 'New Appointment 🗓️'}</span>
-            </button>
-
-            {/* POS Cart Counter Trigger */}
-            <button 
-              onClick={() => {
-                if (!isBoardEditable) {
-                  return;
-                }
-                setIsCartDrawerOpen(true);
-                setCompletedOrder(null);
-              }}
-              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-zinc-950 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-            >
-              <ShoppingBag size={13} className="text-zinc-950" />
-              <span>{isRtl ? 'صندوق المبيعات والبطاقات 🛒' : 'POS Retail Counter 🛒'}</span>
-            </button>
-
           </div>
         </div>
 
@@ -4491,7 +4483,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold text-slate-400 uppercase mr-2">{isRtl ? 'مستوى الدقة:' : 'Step Precision:'}</span>
                 <span className="bg-amber-500/10 text-amber-700 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold">5 {isRtl ? 'دقائق' : 'Mins'}</span>
-                <span className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded text-[10px] font-bold">ZATCA Compliant</span>
               </div>
             </div>
 
@@ -5305,7 +5296,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       )}
                     </h2>
                     <p className="text-[10px] text-slate-400 font-semibold mt-1">
-                      {isRtl ? 'معتمد عبر الفاتورة الإلكترونية هيئة الزكاة والضريبة والجمارك' : 'ZATCA Cryptographic Stamp Compliant • ID: ' + activeAppointment.id}
+                      {isRtl ? 'رقم الموعد: ' + activeAppointment.id : 'ID: ' + activeAppointment.id}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">

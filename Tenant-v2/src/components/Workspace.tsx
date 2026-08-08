@@ -320,6 +320,7 @@ export default function Workspace({
     <div className="space-y-6" id="workspace-container">
       
       {/* View Header with dynamic favoriting capability (Personalization Hook) */}
+      {view !== 'appointments' && (
       <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 rounded-2xl border transition-colors duration-200 shadow-sm ${
         darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 text-neutral-800'
       }`}>
@@ -371,15 +372,7 @@ export default function Workspace({
             <span>{isRtl ? 'حفظ هذا المنظر مسبقاً' : 'Save view filter'}</span>
           </button>
 
-          {view === 'appointments' && (
-            <button
-              onClick={() => onQuickAction('appointment')}
-              className="px-4 py-2 rounded-xl bg-brand-700 hover:bg-brand-800 text-white font-bold text-xs md:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus size={16} />
-              <span>{isRtl ? 'حجز موعد سريع' : 'Book Appointment'}</span>
-            </button>
-          )}
+
           {view === 'customers' && (
             <button
               onClick={() => onQuickAction('customer')}
@@ -427,6 +420,7 @@ export default function Workspace({
           )}
         </div>
       </div>
+      )}
 
       {/* RENDER HIGH-FIDELITY VIEWS */}
 
@@ -650,7 +644,14 @@ export default function Workspace({
 
       {/* 2. APPOINTMENTS */}
       {view === 'appointments' && (
-        <AppointmentWorkspace lang={lang} onQuickAction={onQuickAction} quickLaunchRequest={quickLaunchRequest} />
+        <AppointmentWorkspace 
+          lang={lang} 
+          onQuickAction={onQuickAction} 
+          quickLaunchRequest={quickLaunchRequest}
+          onToggleFavoritePage={() => onToggleFavoritePage && onToggleFavoritePage('appointments')}
+          isFavorited={isFavorited}
+          setShowSavedViewModal={setShowSavedViewModal}
+        />
       )}
 
       {/* 3. CUSTOMERS */}
