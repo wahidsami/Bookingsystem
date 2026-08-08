@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -9,7 +9,7 @@ import {
   Lock, Scissors, Sparkles, Smile, ShieldCheck, Mail, Phone,
   TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy, Settings2,
   PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift, Banknote,
-  CalendarDays, Ban, Save
+  CalendarDays, Ban, Save, Maximize2, Minimize2
 } from 'lucide-react';
 import { Language, Product, QuickLaunchRequest } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
@@ -433,6 +433,7 @@ const writeSchedulerTeamVisibilityOverride = (storageKey: string, value: string[
 export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest, onToggleFavoritePage, isFavorited, setShowSavedViewModal }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
   const { tenant, tenantSettings, user } = useTenantAuth();
+  const workspaceShellRef = useRef<HTMLDivElement | null>(null);
   const schedulerConfig = useMemo(() => getTenantSchedulerConfig(tenantSettings, tenant), [tenantSettings, tenant]);
   const schedulerStorageKey = useMemo(() => buildSchedulerBoardStorageKey(tenant?.id, user?.id), [tenant?.id, user?.id]);
   const teamVisibilityStorageKey = useMemo(() => buildSchedulerTeamVisibilityStorageKey(tenant?.id, user?.id), [tenant?.id, user?.id]);
@@ -491,6 +492,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<SchedulerBoardMode>('team-day');
+  const [isWorkspaceMaximized, setIsWorkspaceMaximized] = useState(false);
+  const [workspaceHeight, setWorkspaceHeight] = useState<number | null>(null);
   const [previousBoardMode, setPreviousBoardMode] = useState<SchedulerBoardMode | null>(null);
   const [focusedEmployeeId, setFocusedEmployeeId] = useState<string | null>(null);
   const [boardCurrentTime, setBoardCurrentTime] = useState<Date>(new Date());
@@ -498,6 +501,70 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const teamMembersButtonRef = useRef<HTMLDivElement | null>(null);
   const teamMembersMenuRef = useRef<HTMLDivElement | null>(null);
   const [teamMembersMenuStyle, setTeamMembersMenuStyle] = useState<React.CSSProperties | null>(null);
+
+  const syncWorkspaceHeight = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const frame = workspaceShellRef.current;
+    if (!frame) {
+      return;
+    }
+
+    const topOffset = frame.getBoundingClientRect().top;
+    const bottomGap = isWorkspaceMaximized ? 8 : 16;
+    const availableHeight = Math.max(560, Math.floor(window.innerHeight - topOffset - bottomGap));
+    setWorkspaceHeight(availableHeight);
+  }, [isWorkspaceMaximized]);
+
+  useLayoutEffect(() => {
+    syncWorkspaceHeight();
+  }, [syncWorkspaceHeight, viewMode, isSidebarCollapsed, isSchedulerSettingsOpen, focusedEmployeeId, liveStylists.length, searchQuery, serviceCategoryFilter, statusFilter, selectedStylistFilter]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleResize = () => {
+      window.requestAnimationFrame(syncWorkspaceHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [syncWorkspaceHeight]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return undefined;
+    }
+
+    const mainPanel = document.getElementById('main-content-panel') as HTMLElement | null;
+    if (!mainPanel) {
+      return undefined;
+    }
+
+    const snapshot = {
+      padding: mainPanel.style.padding,
+      overflow: mainPanel.style.overflow,
+    };
+
+    if (isWorkspaceMaximized) {
+      mainPanel.style.padding = '0px';
+      mainPanel.style.overflow = 'hidden';
+    } else {
+      mainPanel.style.padding = '';
+      mainPanel.style.overflow = '';
+    }
+
+    window.requestAnimationFrame(syncWorkspaceHeight);
+
+    return () => {
+      mainPanel.style.padding = snapshot.padding;
+      mainPanel.style.overflow = snapshot.overflow;
+    };
+  }, [isWorkspaceMaximized, syncWorkspaceHeight]);
 
   useEffect(() => {
     const localOverride = readSchedulerBoardOverride(schedulerStorageKey);
@@ -4179,10 +4246,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   };
 
   return (
-    <div className="space-y-4 select-none font-sans" id="appointments-workspace" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div
+      ref={workspaceShellRef}
+      className="flex min-h-0 flex-col gap-0 overflow-hidden select-none font-sans transition-all duration-200"
+      id="appointments-workspace"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      style={workspaceHeight ? { height: `${workspaceHeight}px` } : undefined}
+    >
       
       {/* 1. COMPREHENSIVE CONTROL BAR & BOARD CONTROLS */}
-      <div className="relative z-50 bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+      <div className={`relative z-50 flex-none rounded-t-2xl rounded-b-none border border-slate-200 border-b-0 bg-white p-4 shadow-sm space-y-3 ${isWorkspaceMaximized ? 'p-3' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           
           {/* Unified Tool controls: Prev, Next, Today, Date Picker, Day / Week, Refresh */}
@@ -4370,6 +4443,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             </button>
 
             <button
+              type="button"
+              onClick={() => setIsWorkspaceMaximized((current) => !current)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              title={isWorkspaceMaximized ? (isRtl ? 'استعادة مساحة الجدولة' : 'Restore workspace') : (isRtl ? 'تكبير مساحة الجدولة' : 'Maximize workspace')}
+            >
+              {isWorkspaceMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+              <span>{isWorkspaceMaximized ? (isRtl ? 'استعادة' : 'Restore') : (isRtl ? 'تكبير' : 'Maximize')}</span>
+            </button>
+
+            <button
               onClick={() => setIsSidebarCollapsed((current) => !current)}
               className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center justify-center cursor-pointer"
               title={isSidebarCollapsed ? (isRtl ? 'توسيع الشريط الجانبي' : 'Expand sidebar') : (isRtl ? 'طي الشريط الجانبي' : 'Collapse sidebar')}
@@ -4435,7 +4518,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       </div>
 
       {/* 2. GRID WORKSPACE: LEFT CONTROLLER & CENTER BOARD */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
         
         {/* LEFT COLUMN: CONTROLS & DATE NAVIGATOR (col-span-3) */}
         <div className="hidden lg:col-span-3 space-y-4">
@@ -4593,10 +4676,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         </div>
 
         {/* CENTER COLUMN: INTERACTIVE SCHEDULER BOARD (col-span-9) */}
-        <div className="lg:col-span-12">
+        <div className="min-h-0 flex flex-1 flex-col">
           
           <div
-            className="relative z-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-visible flex flex-col"
+            className="relative z-0 flex min-h-0 flex-col overflow-hidden rounded-b-2xl rounded-t-none border border-slate-200 border-t-0 bg-white shadow-sm"
             style={{
               width: '100%',
               minWidth: '100%'
@@ -4621,10 +4704,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
             {/* THE INTERACTIVE SCHEDULE BOARD CONTAINER */}
               <div
-              className="overflow-auto scrollbar-thin relative"
+              className="relative flex-1 min-h-0 overflow-auto scrollbar-thin"
               id="interactive-board-scroll"
               style={{
-                height: viewMode === 'agenda' || viewMode === 'month' ? 'auto' : `${activeSchedulerSettings.gridHeight}px`
+                height: '100%'
               }}
             >
               {isEmployeeBoardMode(viewMode) && focusedEmployee && (
