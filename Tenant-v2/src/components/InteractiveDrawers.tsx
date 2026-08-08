@@ -281,9 +281,9 @@ export default function InteractiveDrawers({
   const [customerSearch, setCustomerSearch] = useState('');
   const [walkinFullName, setWalkinFullName] = useState('');
   const [walkinPhone, setWalkinPhone] = useState('');
-  const [walkinGender, setWalkinGender] = useState<'M' | 'F' | ''>('');
-  const [walkinNotes, setWalkinNotes] = useState('');
-  const [walkinSaveCustomer, setWalkinSaveCustomer] = useState(false);
+  const [walkinEmail, setWalkinEmail] = useState('');
+  const [walkinDob, setWalkinDob] = useState('');
+  const [walkinIsVip, setWalkinIsVip] = useState(false);
   const [includeGroupGuests, setIncludeGroupGuests] = useState(false);
   const [guestCount, setGuestCount] = useState<number>(1);
   const [guestNames, setGuestNames] = useState('');
@@ -1010,8 +1010,8 @@ export default function InteractiveDrawers({
       custNameEn = walkinFullName.trim();
       custNameAr = walkinFullName.trim();
       custPhone = walkinPhone.trim();
-      custEmail = '';
-      loyalty = walkinSaveCustomer ? 'Classic Base' : 'Guest Account';
+      custEmail = walkinEmail.trim() || '';
+      loyalty = walkinIsVip ? 'Premium VIP' : 'Guest Account';
       balance = 0;
     }
 
@@ -1154,9 +1154,9 @@ export default function InteractiveDrawers({
             lastName: derivedCustomerNameParts.lastName,
             email: custEmail.trim(),
             phone: custPhone.trim(),
-            gender: walkinGender || undefined,
-            notes: walkinNotes.trim() || undefined,
-            isGuest: !walkinSaveCustomer
+            gender: undefined,
+            notes: undefined,
+            isGuest: !walkinIsVip
           }
         : null
     };
@@ -1228,9 +1228,11 @@ export default function InteractiveDrawers({
       setIsCreateDrawerOpen(false);
       setStagedServices([]);
       setCreateStep(1);
-      setNewCustName('');
-      setNewCustPhone('');
-      setNewCustEmail('');
+      setWalkinFullName('');
+      setWalkinPhone('');
+      setWalkinEmail('');
+      setWalkinDob('');
+      setWalkinIsVip(false);
       setSessionNotes('');
       setGiftCardCodeInput('');
       setCreateSplitActive(false);
@@ -1755,89 +1757,90 @@ export default function InteractiveDrawers({
                             </div>
                           </div>
 
-                          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+                          <div className="mt-6">
                             {custMode === 'existing' ? (
                               <div className="space-y-4">
-                                <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
+                                <div>
                                   <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                                     {isRtl ? 'البحث واختيار عميلة مسجلة' : 'Search & Select Customer'}
                                   </label>
                                   <div className="relative">
-                                    <Search className={`pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isRtl ? 'right-3' : 'left-3'}`} />
+                                    <Search className={`pointer-events-none absolute top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 ${isRtl ? 'right-4' : 'left-4'}`} />
                                     <input
                                       ref={registeredCustomerSearchRef}
                                       type="text"
                                       value={customerSearch}
                                       onChange={(e) => setCustomerSearch(e.target.value)}
-                                      placeholder={isRtl ? 'ابحث باسم العميل أو رقم الجوال...' : 'Search by customer name or mobile number...'}
-                                      className={`w-full rounded-2xl border border-slate-200 bg-white py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'pr-10 pl-4' : 'pl-10 pr-4'}`}
+                                      placeholder={isRtl ? 'ابحث باسم العميل أو رقم الجوال...' : 'Search by name or phone...'}
+                                      className={`w-full rounded-2xl border border-slate-200 bg-white py-4 text-base font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
                                     />
                                   </div>
                                 </div>
 
-                                <div className="rounded-[22px] border border-slate-200 bg-white">
-                                  <div className="border-b border-slate-100 px-4 py-3">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                      {isRtl ? 'قائمة العملاء المسجلين' : 'Registered Customers'}
-                                    </p>
-                                  </div>
-                                  <div className="max-h-[290px] overflow-y-auto">
-                                    {filteredCustomers.length > 0 ? filteredCustomers.map((customer) => {
-                                      const active = selectedCustId === customer.id;
-                                      return (
-                                        <button
-                                          key={customer.id}
-                                          type="button"
-                                          onClick={() => setSelectedCustId(customer.id)}
-                                          className={`flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-start transition last:border-b-0 ${
-                                            active
-                                              ? 'bg-amber-50/90 text-slate-900'
-                                              : 'bg-white text-slate-700 hover:bg-slate-50'
-                                          }`}
-                                        >
-                                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-bold ${
-                                            active
-                                              ? 'border-amber-300 bg-white text-amber-600'
-                                              : 'border-slate-200 bg-slate-50 text-slate-500'
-                                          }`}>
-                                            {`${customer?.name || 'U'}`.trim().charAt(0).toUpperCase()}
-                                          </div>
-                                          <div className="min-w-0 flex-1">
-                                            <div className="flex items-center justify-between gap-3">
-                                              <p className="truncate text-sm font-semibold tracking-tight">{customer?.name || '—'}</p>
-                                              <span className="shrink-0 text-[11px] font-mono text-slate-500">{customer?.phone || ''}</span>
+                                <div>
+                                  <p className="mb-2 mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                    {isRtl ? 'قائمة العملاء المسجلين' : 'Registered Customers'}
+                                  </p>
+                                  <div className="rounded-[22px] border border-slate-200 bg-white">
+                                    <div className="max-h-[360px] overflow-y-auto">
+                                      {filteredCustomers.length > 0 ? filteredCustomers.map((customer) => {
+                                        const active = selectedCustId === customer.id;
+                                        return (
+                                          <button
+                                            key={customer.id}
+                                            type="button"
+                                            onClick={() => setSelectedCustId(customer.id)}
+                                            className={`flex w-full items-center gap-4 border-b border-slate-100 px-5 py-4 text-start transition last:border-b-0 ${
+                                              active
+                                                ? 'bg-amber-50/80 text-slate-900 ring-1 ring-inset ring-amber-500/20'
+                                                : 'bg-white text-slate-700 hover:bg-slate-50'
+                                            }`}
+                                          >
+                                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-base font-bold ${
+                                              active
+                                                ? 'border-amber-300 bg-white text-amber-600'
+                                                : 'border-slate-200 bg-slate-50 text-slate-500'
+                                            }`}>
+                                              {`${customer?.name || 'U'}`.trim().charAt(0).toUpperCase()}
                                             </div>
-                                            <p className="mt-0.5 truncate text-[11px] text-slate-400">
-                                              {customer?.email || (isRtl ? 'عميل مسجل' : 'Registered customer')}
-                                            </p>
-                                          </div>
-                                          {active ? <Check className="h-4 w-4 shrink-0 text-amber-500" /> : null}
-                                        </button>
-                                      );
-                                    }) : (
-                                      <div className="px-4 py-10 text-center text-sm text-slate-500">
-                                        {customerSearch.trim()
-                                          ? (isRtl ? 'لا توجد نتائج مطابقة.' : 'No matching customers found.')
-                                          : (isRtl ? 'لا يوجد عملاء مسجلون حالياً.' : 'No registered customers available.')}
-                                      </div>
-                                    )}
+                                            <div className="min-w-0 flex-1">
+                                              <p className="truncate text-base font-semibold tracking-tight">{customer?.name || '—'}</p>
+                                              <p className="mt-0.5 truncate text-[12px] text-slate-400">
+                                                {customer?.email || (isRtl ? 'عميل مسجل' : 'Registered customer')}
+                                              </p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                              <span className="shrink-0 text-sm font-mono text-slate-600">{customer?.phone || ''}</span>
+                                              {active ? <Check className="h-5 w-5 shrink-0 text-amber-500" /> : <div className="h-5 w-5" />}
+                                            </div>
+                                          </button>
+                                        );
+                                      }) : (
+                                        <div className="px-5 py-12 text-center text-sm text-slate-500">
+                                          {customerSearch.trim()
+                                            ? (isRtl ? 'لا توجد نتائج مطابقة.' : 'No matching customers found.')
+                                            : (isRtl ? 'لا يوجد عملاء مسجلون حالياً.' : 'No registered customers available.')}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
 
-                                <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/70 p-4">
-                                  <div className="mb-3 flex items-center justify-between gap-3">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">
-                                      {isRtl ? 'العميل المحدد' : 'Selected Customer'}
-                                    </p>
-                                    {selectedRegisteredCustomer ? (
+                                {selectedRegisteredCustomer ? (
+                                  <div className="mt-4 rounded-[22px] border border-emerald-200 bg-emerald-50/70 p-4">
+                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">
+                                        {isRtl ? 'العميل المحدد' : 'Selected Customer'}
+                                      </p>
                                       <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
                                         {isRtl ? 'مسجل' : 'Registered'}
                                       </span>
-                                    ) : null}
-                                  </div>
-                                  {selectedRegisteredCustomer ? (
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-black text-emerald-700 shadow-sm">
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-base font-black text-emerald-700 shadow-sm border border-emerald-100">
+                                        <Check className="h-6 w-6" />
+                                      </div>
+                                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-base font-black text-emerald-700 shadow-sm">
                                         {`${selectedRegisteredCustomer.name || 'U'}`.trim().charAt(0).toUpperCase()}
                                       </div>
                                       <div className="min-w-0 flex-1">
@@ -1847,96 +1850,78 @@ export default function InteractiveDrawers({
                                         <p className="truncate text-sm text-slate-600">
                                           {selectedRegisteredCustomer.phone}
                                         </p>
-                                        {selectedRegisteredCustomer.email ? (
-                                          <p className="truncate text-xs text-slate-500">{selectedRegisteredCustomer.email}</p>
-                                        ) : null}
                                       </div>
                                     </div>
-                                  ) : (
-                                    <p className="text-sm text-emerald-800/80">
-                                      {isRtl ? 'اختر عميلًا من القائمة أعلاه لمتابعة الحجز.' : 'Select a customer from the list above to continue.'}
-                                    </p>
-                                  )}
-                                </div>
+                                  </div>
+                                ) : null}
                               </div>
                             ) : (
-                              <div className="space-y-4">
-                                <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
-                                  <label className="mb-3 block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                    {isRtl ? 'حجز زائر سريع' : 'Walk-in Customer'}
-                                  </label>
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <div className="sm:col-span-2">
-                                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
-                                        {isRtl ? 'الاسم الكامل *' : 'Full Name *'}
-                                      </label>
+                              <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                                <div className="grid gap-6 sm:grid-cols-2">
+                                  <div>
+                                    <label className="mb-2 block text-xs font-semibold text-slate-600">
+                                      {isRtl ? 'الاسم الكامل' : 'Full Name'}
+                                    </label>
+                                    <input
+                                      ref={walkinNameRef}
+                                      type="text"
+                                      value={walkinFullName}
+                                      onChange={(e) => setWalkinFullName(e.target.value)}
+                                      placeholder={isRtl ? 'نورة أحمد' : 'Noura Ahmad'}
+                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="mb-2 block text-xs font-semibold text-slate-600">
+                                      {isRtl ? 'رقم الجوال' : 'Phone'}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={walkinPhone}
+                                      onChange={(e) => setWalkinPhone(e.target.value)}
+                                      placeholder={isRtl ? '+966 50...' : '+966 50...'}
+                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="mb-2 block text-xs font-semibold text-slate-600">
+                                      {isRtl ? 'البريد الإلكتروني' : 'Email'}
+                                    </label>
+                                    <input
+                                      type="email"
+                                      value={walkinEmail}
+                                      onChange={(e) => setWalkinEmail(e.target.value)}
+                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="mb-2 block text-xs font-semibold text-slate-600">
+                                      {isRtl ? 'تاريخ الميلاد' : 'Date of Birth'}
+                                    </label>
+                                    <div className="relative">
                                       <input
-                                        ref={walkinNameRef}
                                         type="text"
-                                        value={walkinFullName}
-                                        onChange={(e) => setWalkinFullName(e.target.value)}
-                                        placeholder={isRtl ? 'نورة أحمد' : 'Noura Ahmad'}
-                                        className={`w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                        value={walkinDob}
+                                        onChange={(e) => setWalkinDob(e.target.value)}
+                                        placeholder="12/05/1998"
+                                        className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 ${isRtl ? 'text-right' : 'text-left'}`}
                                       />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
-                                        {isRtl ? 'رقم الجوال *' : 'Mobile Number *'}
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={walkinPhone}
-                                        onChange={(e) => setWalkinPhone(e.target.value)}
-                                        placeholder={isRtl ? '+966 50...' : '+966 50...'}
-                                        className={`w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'text-right' : 'text-left'}`}
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
-                                        {isRtl ? 'الجنس' : 'Gender'}
-                                      </label>
-                                      <select
-                                        value={walkinGender}
-                                        onChange={(e) => setWalkinGender(e.target.value as 'M' | 'F' | '')}
-                                        className={`w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'text-right' : 'text-left'}`}
-                                      >
-                                        <option value="">{isRtl ? 'غير محدد' : 'Not specified'}</option>
-                                        <option value="F">{isRtl ? 'أنثى' : 'Female'}</option>
-                                        <option value="M">{isRtl ? 'ذكر' : 'Male'}</option>
-                                      </select>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                      <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
-                                        {isRtl ? 'ملاحظات (اختياري)' : 'Notes (optional)'}
-                                      </label>
-                                      <textarea
-                                        value={walkinNotes}
-                                        onChange={(e) => setWalkinNotes(e.target.value)}
-                                        rows={3}
-                                        placeholder={isRtl ? 'أي تفاصيل مهمة حول الزائر...' : 'Any important notes about the walk-in customer...'}
-                                        className={`w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 ${isRtl ? 'text-right' : 'text-left'}`}
-                                      />
+                                      <CalendarIcon className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isRtl ? 'left-4' : 'right-4'}`} />
                                     </div>
                                   </div>
-
-                                  <label className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <input
-                                      type="checkbox"
-                                      checked={walkinSaveCustomer}
-                                      onChange={(e) => setWalkinSaveCustomer(e.target.checked)}
-                                      className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                    />
-                                    <span className="min-w-0">
-                                      <span className="block text-sm font-semibold text-slate-900">
-                                        {isRtl ? 'حفظ العميل في قاعدة بيانات العملاء' : 'Save customer into customer database'}
+                                  <div className="sm:col-span-2 mt-2">
+                                    <label className="flex items-center gap-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={walkinIsVip}
+                                        onChange={(e) => setWalkinIsVip(e.target.checked)}
+                                        className="h-5 w-5 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                                      />
+                                      <span className="text-sm font-bold text-slate-700">
+                                        {isRtl ? 'تصنيف كعميل مميز VIP 👑' : 'Categorize as Premium VIP 👑'}
                                       </span>
-                                      <span className="mt-1 block text-[11px] leading-5 text-slate-500">
-                                        {isRtl
-                                          ? 'عند التفعيل سيتم حفظ الملف بعد إتمام الموعد.'
-                                          : 'When enabled, the customer profile will be saved after the appointment is completed.'}
-                                      </span>
-                                    </span>
-                                  </label>
+                                    </label>
+                                  </div>
                                 </div>
                               </div>
                             )}
