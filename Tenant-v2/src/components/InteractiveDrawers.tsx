@@ -452,13 +452,7 @@ export default function InteractiveDrawers({
   };
 
   // Step 2: Service Queue Staging
-  const [currentServiceId, setCurrentServiceId] = useState<string>('');
-  const [currentServiceCategory, setCurrentServiceCategory] = useState<string>('');
-  const [currentVariantId, setCurrentVariantId] = useState<string>('');
-  const [currentDuration, setCurrentDuration] = useState<number>(60);
-  const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
-  const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
-  const [currentServiceNotes, setCurrentServiceNotes] = useState<string>('');
+  const [currentServiceCategory, setCurrentServiceCategory] = useState<string>('all');
   const [serviceSearch, setServiceSearch] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
   const [expandedServiceIds, setExpandedServiceIds] = useState<Record<string, boolean>>({});
@@ -475,125 +469,12 @@ export default function InteractiveDrawers({
       }))
     ];
   }, [serviceCategories]);
-  const selectedCategoryGroup = useMemo(() => {
-    if (!serviceCategories.length) {
-      return null;
-    }
-
-    if (currentServiceCategory === 'all' || !currentServiceCategory) {
-      return {
-        key: 'all',
-        labelAr: 'الكل',
-        labelEn: 'All',
-        services: canonicalServices
-      };
-    }
-
-    return serviceCategories.find((group) => group.key === currentServiceCategory)
-      || serviceCategories[0]
-      || null;
-  }, [canonicalServices, currentServiceCategory, serviceCategories]);
-  const categoryServices = selectedCategoryGroup?.services || [];
-  const filteredCategoryServices = useMemo(() => {
-    const query = serviceSearch.trim().toLowerCase();
-    if (!query) {
-      return categoryServices;
-    }
-
-    return categoryServices.filter((service) => {
-      const searchableValues = [
-        getServiceDisplayName(service, isRtl ? 'ar' : 'en'),
-        service.category,
-        service.categoryAr,
-        service.categoryEn,
-        service.parentName,
-        service.parentService,
-        service.descriptionAr,
-        service.descriptionEn,
-        service.descriptionEn,
-        service.descriptionAr,
-        ...(Array.isArray(service.variants) ? service.variants.flatMap((variant) => [
-          variant.nameAr,
-          variant.nameEn,
-          variant.descriptionAr,
-          variant.descriptionEn,
-          variant.description
-        ]) : [])
-      ];
-
-      return searchableValues.some((value) => `${value ?? ''}`.toLowerCase().includes(query));
-    });
-  }, [categoryServices, isRtl, serviceSearch]);
-  const selectedService = useMemo(() => {
-    if (!canonicalServices.length) {
-      return null;
-    }
-
-    return canonicalServices.find((service) => service.id === currentServiceId)
-      || categoryServices[0]
-      || canonicalServices[0]
-      || null;
-  }, [canonicalServices, currentServiceId, categoryServices]);
-  const selectedVariants = selectedService?.variants || [];
-  const selectedVariant = useMemo(() => {
-    if (!selectedVariants.length) {
-      return null;
-    }
-
-    return selectedVariants.find((variant) => variant.id === currentVariantId) || selectedVariants[0] || null;
-  }, [selectedVariants, currentVariantId]);
-  const selectedBookablePrice = selectedVariant?.finalPrice ?? selectedService?.finalPrice ?? selectedService?.price ?? 0;
-  const selectedBookableDuration = selectedVariant?.duration ?? selectedService?.duration ?? currentDuration;
 
   useEffect(() => {
     if (createStep === 4 && stagedServices.length === 0) {
       setCreateStep(3);
     }
   }, [createStep, stagedServices.length]);
-
-  useEffect(() => {
-    if (canonicalServices.length > 0) {
-      const selectedServiceExists = canonicalServices.some((service) => service.id === currentServiceId);
-      if (!selectedServiceExists) {
-        setCurrentServiceId(canonicalServices[0].id);
-      }
-    }
-  }, [canonicalServices, currentServiceId]);
-
-  useEffect(() => {
-    if (serviceCategories.length === 0) {
-      return;
-    }
-
-    if (!currentServiceCategory) {
-      setCurrentServiceCategory('all');
-    }
-  }, [currentServiceCategory, serviceCategories.length]);
-
-  useEffect(() => {
-    if (selectedService?.category || selectedService?.categoryEn || selectedService?.categoryAr) {
-      const nextCategory = selectedService.category || selectedService.categoryEn || selectedService.categoryAr || '';
-      if (nextCategory && nextCategory !== currentServiceCategory) {
-        setCurrentServiceCategory(nextCategory);
-      }
-    }
-  }, [selectedService, currentServiceCategory]);
-
-  useEffect(() => {
-    if (selectedService?.variants?.length) {
-      const selectedVariantExists = selectedService.variants.some((variant) => variant.id === currentVariantId);
-      if (!selectedVariantExists) {
-        setCurrentVariantId(selectedService.variants[0].id);
-      }
-      const nextDuration = selectedVariant?.duration || selectedService.duration || 60;
-      setCurrentDuration((current) => (current === nextDuration ? current : nextDuration));
-      return;
-    }
-
-    setCurrentVariantId('');
-    const nextDuration = selectedService?.duration || 60;
-    setCurrentDuration((current) => (current === nextDuration ? current : nextDuration));
-  }, [selectedService, selectedVariant, currentVariantId]);
 
 
 
@@ -755,22 +636,7 @@ export default function InteractiveDrawers({
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   };
 
-  // Auto pre-populate duration when service changes
-  useEffect(() => {
-    const srv = services.find(s => s.id === currentServiceId);
-    if (srv) {
-      setCurrentDuration(srv.duration);
-    }
-  }, [currentServiceId, services]);
-
-  // Validate immediate employee service assignment selection in Step 3
-  useEffect(() => {
-    if (!isCreateDrawerOpen || createStep !== 3 || !currentServiceId || !currentStaffId) return;
-    const srv = canonicalServices.find(s => s.id === currentServiceId);
-    if (srv && srv.employeeAssignments && !srv.employeeAssignments.includes(currentStaffId)) {
-      setShowAssignWarning(true);
-    }
-  }, [currentServiceId, currentStaffId, createStep, isCreateDrawerOpen, canonicalServices]);
+  // Removed obsolete auto-populate duration and warning validation
 
   const removeQueuedService = (serviceId: string, variantId?: string | null) => {
     setStagedServices((current) => current.filter((item) => {
@@ -800,67 +666,7 @@ export default function InteractiveDrawers({
     });
   };
 
-  const toggleServiceExpansion = (serviceId: string) => {
-    setExpandedServiceIds((current) => ({
-      ...current,
-      [serviceId]: !current[serviceId]
-    }));
-  };
-
-  const handleAddStagedService = (serviceOverride?: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
-    const resolvedServiceId = `${serviceOverride?.id || currentServiceId || ''}`.trim();
-    const srv = serviceOverride || canonicalServices.find(s => s.id === resolvedServiceId);
-    if (!srv) return;
-
-    if (srv.employeeAssignments && !srv.employeeAssignments.includes(currentStaffId)) {
-      setShowAssignWarning(true);
-      return;
-    }
-
-    const resolvedVariant = variantOverride
-      || (serviceOverride
-        ? null
-        : srv.variants.find((variant) => variant.id === currentVariantId) || srv.variants[0] || null);
-
-    let nextStartTime = currentStartTime;
-    if (stagedServices.length > 0) {
-      const lastItem = stagedServices[stagedServices.length - 1];
-      nextStartTime = lastItem.startTime + lastItem.duration;
-    }
-
-    const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? srv.finalPrice ?? srv.price ?? 0);
-    let priceAfterDiscount = basePrice;
-    const discountType = serviceOverride ? 'none' : currentDiscountType;
-    const discountValue = serviceOverride ? 0 : currentDiscountValue;
-    if (discountType === 'flat') {
-      priceAfterDiscount = Math.max(0, basePrice - discountValue);
-    } else if (discountType === 'percent') {
-      priceAfterDiscount = Math.max(0, basePrice - (basePrice * discountValue) / 100);
-    }
-
-    const newItem: StagedService = {
-      id: `stg-${Date.now()}`,
-      serviceId: resolvedServiceId,
-      variantId: resolvedVariant?.id,
-      serviceCategory: srv.category,
-      staffId: currentStaffId,
-      startTime: nextStartTime,
-      duration: resolvedVariant?.duration || serviceOverride?.duration || currentDuration,
-      discountType,
-      discountValue,
-      notes: serviceOverride ? '' : currentServiceNotes,
-      basePrice,
-      finalPrice: priceAfterDiscount
-    };
-
-    setStagedServices(prev => [...prev, newItem]);
-    setCurrentServiceNotes('');
-    addLocalToast(
-      `تمت إضافة الخدمة "${isRtl ? srv.nameAr : srv.nameEn}" للموعد المجدول.`,
-      `Service "${isRtl ? srv.nameAr : srv.nameEn}" added to session queue.`,
-      'success'
-    );
-  };
+  // Removed obsolete handleAddStagedService and toggleServiceExpansion since AppointmentServicesStep handles it
 
   const handleUpdateStagedService = (itemId: string, updates: Partial<StagedService>) => {
     setStagedServices(prev => prev.map(item => {
