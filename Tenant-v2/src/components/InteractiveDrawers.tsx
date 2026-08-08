@@ -1409,7 +1409,7 @@ export default function InteractiveDrawers({
               animate={{ x: 0 }}
               exit={{ x: isRtl ? '-100%' : '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 220 }}
-              className={`relative w-full max-w-xl h-screen bg-slate-50 shadow-2xl flex flex-col z-10 overflow-hidden ${
+              className={`relative w-full max-w-3xl h-screen bg-slate-50 shadow-2xl flex flex-col z-10 overflow-hidden ${
                 isRtl ? 'border-r border-slate-200' : 'border-l border-slate-200'
               }`}
             >

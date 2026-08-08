@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { type StagedService } from './AppointmentServicesStep';
+import { to12HourTime, to24HourTime } from '../../lib/employeeHelpers';
 
 interface AppointmentServiceConfigurationProps {
   isRtl: boolean;
@@ -18,6 +19,40 @@ export default function AppointmentServiceConfiguration({
   onSave,
   onCancel
 }: AppointmentServiceConfigurationProps) {
+  const offsetBaseMinutes = 9 * 60;
+  const formatOffsetToClockValue = (offsetMinutes?: number | null) => {
+    const safeOffset = Math.max(0, Math.round(Number(offsetMinutes || 0)));
+    const absoluteMinutes = offsetBaseMinutes + safeOffset;
+    const hours = Math.floor(absoluteMinutes / 60);
+    const minutes = absoluteMinutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  };
+
+  const convertClockToOffset = (value: string) => {
+    const normalized = to24HourTime(value);
+    const match = normalized.match(/^(\d{2}):(\d{2})$/);
+    if (!match) {
+      return Number(draftConfig.startTime || 0);
+    }
+
+    const absoluteMinutes = (Number(match[1]) * 60) + Number(match[2]);
+    return Math.max(0, absoluteMinutes - offsetBaseMinutes);
+  };
+
+  const timeOptions = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [];
+    for (let absoluteMinutes = offsetBaseMinutes; absoluteMinutes < (24 * 60); absoluteMinutes += 15) {
+      const hours = Math.floor(absoluteMinutes / 60);
+      const minutes = absoluteMinutes % 60;
+      const value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+      options.push({
+        value,
+        label: to12HourTime(value)
+      });
+    }
+    return options;
+  }, []);
+
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">
       <div className="space-y-5">
@@ -76,16 +111,19 @@ export default function AppointmentServiceConfiguration({
           {/* Start Time */}
           <label className="block">
             <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              {isRtl ? 'وقت البدء (دقائق)' : 'Start time (min offset)'}
+              {isRtl ? 'وقت البدء' : 'Start Time'}
             </span>
-            <input
-              type="number"
-              step={15}
-              min={0}
-              value={draftConfig.startTime || 0}
-              onChange={(e) => setDraftConfig(c => ({ ...c, startTime: Number(e.target.value) || 0 }))}
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-mono font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary shadow-sm"
-            />
+            <select
+              value={formatOffsetToClockValue(draftConfig.startTime)}
+              onChange={(e) => setDraftConfig((c) => ({ ...c, startTime: convertClockToOffset(e.target.value) }))}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary shadow-sm"
+            >
+              {timeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
 
           {/* Duration */}
