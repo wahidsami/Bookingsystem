@@ -8,7 +8,7 @@ import {
   type ServiceVariantRecord
 } from '../../lib/serviceContract';
 import AppointmentServiceConfiguration from './AppointmentServiceConfiguration';
-import { type StagedService } from './AppointmentServiceQueue';
+import { type StagedService } from './AppointmentServicesStep';
 
 interface AppointmentServiceRowProps {
   service: ServiceRecord;
@@ -120,7 +120,7 @@ export default function AppointmentServiceRow({
     >
       <div className={`flex items-center gap-3 px-3 py-2.5 sm:px-4 ${
         isVariantRow ? 'min-h-[52px] border-l-4 border-l-primary/20 bg-slate-50/80' : 'min-h-[68px]'
-      }`}>
+      } ${isExpanded && !isVariantRow ? 'bg-slate-50' : ''}`}>
         
         {!isVariantRow ? (
           <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
