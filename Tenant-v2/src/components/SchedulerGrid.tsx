@@ -290,6 +290,7 @@ export default function SchedulerGrid({
   const currentTimeLinePosition = showCurrentTimeIndicator && isDayBoardMode && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
     ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
     : null;
+  const pastAreaHeight = currentTimeLinePosition !== null ? Math.max(0, currentTimeLinePosition) : null;
   const eventLayerInsetStyle = isRtl
     ? {
         right: `${timeColumnWidth}px`,
@@ -484,7 +485,7 @@ export default function SchedulerGrid({
 
   return (
     <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-x-auto" dir={isRtl ? 'rtl' : 'ltr'}>
-      <div className="sticky top-0 z-30 grid border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
+      <div className="sticky top-0 z-40 grid border-b border-slate-200 bg-slate-50/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
         <div
           className="flex items-center justify-center border-r border-slate-200 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 bg-slate-50"
           style={{ width: timeColumnWidth }}
@@ -544,7 +545,16 @@ export default function SchedulerGrid({
         );})}
       </div>
 
-      <div className="relative" style={{ minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}>
+      <div className="relative isolate" style={{ minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}>
+        {pastAreaHeight !== null && (
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-[5]"
+            style={{ height: `${pastAreaHeight}px` }}
+          >
+            <div className="h-full bg-slate-100/70" />
+          </div>
+        )}
+
         {currentTimeLinePosition !== null && (
           <div
             className="pointer-events-none absolute inset-x-0 z-20"
@@ -570,7 +580,7 @@ export default function SchedulerGrid({
           </div>
         )}
 
-        <div className="relative">
+        <div className="relative z-10">
           {rows.map((row) => {
             const hourBoundary = row.slotIndex % slotsPerHour === 0;
             const rowLabel = hourBoundary ? formatSlotTime(row.startMinutes, startHour, isRtl) : '';
@@ -681,7 +691,7 @@ export default function SchedulerGrid({
         </div>
 
         <div
-          className="pointer-events-none absolute inset-y-0 z-10 overflow-hidden"
+          className="pointer-events-none absolute inset-y-0 z-20 overflow-hidden"
           style={eventLayerInsetStyle}
         >
           {positionedEvents.map((event) => {
