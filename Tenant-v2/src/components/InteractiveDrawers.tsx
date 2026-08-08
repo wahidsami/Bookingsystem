@@ -2466,7 +2466,7 @@ export default function InteractiveDrawers({
                         type="button" 
                         onClick={() => {
                           if (createStep === 1) {
-                            if (activeTab === 'existing' && !selectedRegisteredCustomer) {
+                            if (custMode === 'existing' && !selectedCustId) {
                               addLocalToast(
                                 isRtl ? 'يرجى اختيار عميل مسجل للمتابعة.' : 'Please select a registered customer to continue.',
                                 isRtl ? 'Please select a registered customer to continue.' : 'يرجى اختيار عميل مسجل للمتابعة.',
@@ -2474,7 +2474,7 @@ export default function InteractiveDrawers({
                               );
                               return;
                             }
-                            if (activeTab === 'walkin' && (!walkinFullName || walkinFullName.trim() === '')) {
+                            if (custMode === 'walkin' && (!walkinFullName || walkinFullName.trim() === '')) {
                               addLocalToast(
                                 isRtl ? 'يرجى إدخال اسم العميل للمتابعة.' : 'Please enter the walk-in customer name to continue.',
                                 isRtl ? 'Please enter the walk-in customer name to continue.' : 'يرجى إدخال اسم العميل للمتابعة.',
