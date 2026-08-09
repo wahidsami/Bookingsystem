@@ -20,7 +20,7 @@ import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
 import SchedulerGrid, { SchedulerColumn, SchedulerEvent, SchedulerSlot } from './SchedulerGrid';
 import { resolveEmployeeImageUrl } from '../lib/employeeImage';
 import { resolveProductImageUrl } from '../lib/productContract';
-import { normalizeServiceRecord } from '../lib/serviceContract';
+import { getServiceCategoryKey, getServiceCategoryLabel, normalizeServiceRecord } from '../lib/serviceContract';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import { DEFAULT_SCHEDULER_BOARD_SETTINGS, getTenantSchedulerConfig, normalizeSchedulerBoardSettings, type SchedulerBoardSettings, MIN_STAFF_COLUMN_WIDTH, MAX_STAFF_COLUMN_WIDTH } from '../lib/tenantWorkingHours';
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
@@ -3655,12 +3655,42 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   };
 
   const allEmployeeIds = useMemo(() => liveStylists.map((stylist) => stylist.id), [liveStylists]);
+  const serviceCategoryOptions = useMemo(() => {
+    const categories = new Map<string, { id: string; labelAr: string; labelEn: string }>();
+
+    liveServices.forEach((service) => {
+      const categoryId = getServiceCategoryKey(service);
+      if (!categoryId || categories.has(categoryId)) {
+        return;
+      }
+
+      categories.set(categoryId, {
+        id: categoryId,
+        labelAr: getServiceCategoryLabel(service, 'ar'),
+        labelEn: getServiceCategoryLabel(service, 'en'),
+      });
+    });
+
+    return Array.from(categories.values());
+  }, [liveServices]);
   const resolvedVisibleEmployeeIds = useMemo(() => {
     if (visibleEmployeeIds.length > 0) {
       return visibleEmployeeIds.filter((employeeId) => allEmployeeIds.includes(employeeId));
     }
     return allEmployeeIds;
   }, [allEmployeeIds, visibleEmployeeIds]);
+
+  useEffect(() => {
+    if (serviceCategoryFilter === 'all') {
+      return;
+    }
+
+    if (serviceCategoryOptions.some((category) => category.id === serviceCategoryFilter)) {
+      return;
+    }
+
+    setServiceCategoryFilter('all');
+  }, [serviceCategoryFilter, serviceCategoryOptions]);
 
   // Filters application
   const filteredAppointments = appointments.filter(apt => {
@@ -4491,10 +4521,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             {isRtl ? 'تصنيف الخدمات:' : 'Category Filter:'}
           </span>
           {[
-            { id: 'all', labelEn: 'All Services', labelAr: 'جميع الخدمات', color: 'bg-slate-100 border-slate-200 text-slate-700' },
-            { id: 'hair', labelEn: 'Hair Styling & Dye', labelAr: 'الشعر والصبغات', color: 'bg-amber-50 border-amber-200 text-amber-800' },
-            { id: 'spa', labelEn: 'Spa & Hydra-Facial', labelAr: 'العناية بالبشرة والسبا', color: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
-            { id: 'nails', labelEn: 'Premium Nails Art', labelAr: 'فن العناية بالأظافر', color: 'bg-rose-50 border-rose-200 text-rose-800' }
+            { id: 'all', labelEn: 'All Services', labelAr: 'جميع الخدمات' },
+            ...serviceCategoryOptions
           ].map(cat => (
             <button
               key={cat.id}
