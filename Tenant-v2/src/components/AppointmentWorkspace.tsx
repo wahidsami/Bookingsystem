@@ -5013,7 +5013,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs"
+              className="absolute inset-0 bg-zinc-950/40"
               onClick={cancelSchedulerBoardSettings}
             />
             <motion.div

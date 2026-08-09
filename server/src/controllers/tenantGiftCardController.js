@@ -161,19 +161,6 @@ const normalizeGiftCardPackage = (item) => ({
   updatedAt: item.updatedAt || null
 });
 
-const getActiveGiftPackageWhere = (tenantId, extraWhere = {}) => {
-  const now = new Date();
-  return {
-    tenantId,
-    ...extraWhere,
-    isActive: true,
-    [Op.and]: [
-      { [Op.or]: [{ startsAt: null }, { startsAt: { [Op.lte]: now } }] },
-      { [Op.or]: [{ endsAt: null }, { endsAt: { [Op.gte]: now } }] }
-    ]
-  };
-};
-
 const formatPersonName = (person, fallback = 'Unavailable') => {
   if (!person) return fallback;
   const name = `${person.firstName || ''} ${person.lastName || ''}`.trim();
@@ -369,7 +356,7 @@ exports.listPackages = async (req, res) => {
   try {
     const tenantId = ensureTenantId(req);
     const rows = await db.TenantGiftCardPackage.findAll({
-      where: getActiveGiftPackageWhere(tenantId),
+      where: { tenantId },
       order: [['displayOrder', 'ASC'], ['createdAt', 'DESC']]
     });
     return res.json({ success: true, packages: rows.map(normalizeGiftCardPackage) });

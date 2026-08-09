@@ -50,14 +50,14 @@ function normalizeText(value: unknown): string {
 }
 
 function formatMoney(value: unknown, lang: Language): string {
-  if (value === null || value === undefined || value === '') return 'Unavailable';
+  if (value === null || value === undefined || value === '') return lang === 'ar' ? 'غير متاح' : 'Unavailable';
   const number = Number(value);
-  if (!Number.isFinite(number)) return 'Unavailable';
+  if (!Number.isFinite(number)) return lang === 'ar' ? 'غير متاح' : 'Unavailable';
   return `${number.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${lang === 'ar' ? 'ر.س' : 'SAR'}`;
 }
 
 function formatDate(value: unknown, lang: Language): string {
-  if (!value) return 'Unavailable';
+  if (!value) return lang === 'ar' ? 'غير متاح' : 'Unavailable';
   const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString(lang === 'ar' ? 'ar-SA' : undefined, {
@@ -69,14 +69,33 @@ function formatDate(value: unknown, lang: Language): string {
   });
 }
 
-function formatText(value: unknown): string {
-  if (value === null || value === undefined || value === '' || value === '-') return 'Unavailable';
+function formatText(value: unknown, fallback = 'Unavailable'): string {
+  if (value === null || value === undefined || value === '' || value === '-') return fallback;
   return `${value}`;
 }
 
-function humanizeStatus(value: unknown): string {
+function humanizeStatus(value: unknown, lang: Language): string {
   const text = `${value ?? ''}`.trim();
-  if (!text) return 'Unavailable';
+  if (!text) return lang === 'ar' ? 'غير متاح' : 'Unavailable';
+  if (lang === 'ar') {
+    const normalized = text.toLowerCase();
+    const translations: Record<string, string> = {
+      issued: 'صادرة',
+      purchased: 'مشتراة',
+      redeemed: 'مستردة',
+      partially: 'مستردة جزئياً',
+      partial: 'مستردة جزئياً',
+      expired: 'منتهية الصلاحية',
+      active: 'نشطة',
+      inactive: 'غير نشطة',
+      disabled: 'معطلة',
+      pending: 'قيد الانتظار',
+      available: 'متاحة',
+      unavailable: 'غير متاحة',
+    };
+    const direct = translations[normalized];
+    if (direct) return direct;
+  }
   return text
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -124,7 +143,7 @@ function buildPrintHtml({
       ? column.accessor(row)
       : row[column.accessor as keyof GiftCardListTableRow];
     const formatted = column.format ? column.format(rawValue, row) : rawValue;
-    if (formatted === null || formatted === undefined || formatted === '') return 'Unavailable';
+    if (formatted === null || formatted === undefined || formatted === '') return lang === 'ar' ? 'غير متاح' : 'Unavailable';
     if (typeof formatted === 'number') return formatted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return `${formatted}`;
   };
@@ -189,9 +208,9 @@ function SectionBlock({
   );
 }
 
-function Field({ label, value }: { label: string; value: ReactNode }) {
+function Field({ label, value, emptyLabel = 'Unavailable' }: { label: string; value: ReactNode; emptyLabel?: string }) {
   const normalizedValue = value === null || value === undefined || value === '' || value === '-'
-    ? 'Unavailable'
+    ? emptyLabel
     : value;
   return (
     <div className="flex items-start justify-between gap-4">
@@ -201,7 +220,8 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function buildGiftCardRows(report: GiftCardListPayload): GiftCardListTableRow[] {
+function buildGiftCardRows(report: GiftCardListPayload, lang: Language): GiftCardListTableRow[] {
+  const unavailableText = lang === 'ar' ? 'غير متاح' : 'Unavailable';
   const giftCardRows = Array.isArray(report.giftCards) && report.giftCards.length
     ? report.giftCards
     : Array.isArray(report.transactions)
@@ -210,21 +230,21 @@ function buildGiftCardRows(report: GiftCardListPayload): GiftCardListTableRow[] 
 
   return giftCardRows.map((row: any) => ({
     id: String(row?.id || row?.giftCardCode || row?.saleNumber || row?.sourceTransaction?.id || '-'),
-    giftCardCode: formatText(row?.giftCardCode || row?.code || row?.sourceTransaction?.giftCardCode || 'Unavailable'),
-    saleNumber: formatText(row?.saleNumber || row?.sourceTransaction?.id || 'Unavailable'),
-    purchasedBy: formatText(row?.purchasedBy || row?.sourceTransaction?.metadata?.createdByLabel || row?.sourceTransaction?.metadata?.paymentCollectedByLabel || 'Unavailable'),
-    redeemedBy: formatText(row?.redeemedBy || 'Unavailable'),
-    customer: formatText(row?.customer || 'Unavailable'),
-    status: humanizeStatus(row?.status),
+    giftCardCode: formatText(row?.giftCardCode || row?.code || row?.sourceTransaction?.giftCardCode || unavailableText, unavailableText),
+    saleNumber: formatText(row?.saleNumber || row?.sourceTransaction?.id || unavailableText, unavailableText),
+    purchasedBy: formatText(row?.purchasedBy || row?.sourceTransaction?.metadata?.createdByLabel || row?.sourceTransaction?.metadata?.paymentCollectedByLabel || unavailableText, unavailableText),
+    redeemedBy: formatText(row?.redeemedBy || unavailableText, unavailableText),
+    customer: formatText(row?.customer || unavailableText, unavailableText),
+    status: humanizeStatus(row?.status, lang),
     issueDate: row?.issueDate || row?.createdAt || row?.sourceTransaction?.createdAt || null,
     expiryDate: row?.expiryDate || row?.expiresAt || row?.sourceTransaction?.expiresAt || null,
     originalAmount: row?.originalAmount === null || row?.originalAmount === undefined ? null : Number(row.originalAmount),
     redeemedAmount: row?.redeemedAmount === null || row?.redeemedAmount === undefined ? null : Number(row.redeemedAmount),
     remainingBalance: row?.remainingBalance === null || row?.remainingBalance === undefined ? null : Number(row.remainingBalance),
-    invoiceNumber: formatText(row?.invoiceNumber || row?.sourceTransaction?.metadata?.invoiceNumber || 'Unavailable'),
-    location: formatText(row?.location || 'Unavailable'),
-    employee: formatText(row?.employee || row?.purchasedBy || 'Unavailable'),
-    paymentMethod: formatText(row?.paymentMethod || 'Unavailable'),
+    invoiceNumber: formatText(row?.invoiceNumber || row?.sourceTransaction?.metadata?.invoiceNumber || unavailableText, unavailableText),
+    location: formatText(row?.location || unavailableText, unavailableText),
+    employee: formatText(row?.employee || row?.purchasedBy || unavailableText, unavailableText),
+    paymentMethod: formatText(row?.paymentMethod || unavailableText, unavailableText),
     sourceTransaction: row?.sourceTransaction || row,
     redemptions: Array.isArray(row?.redemptions) ? row.redemptions : [],
     latestRedemption: row?.latestRedemption || null,
@@ -243,6 +263,123 @@ function buildGiftCardBackendGaps(rows: GiftCardListTableRow[]) {
 export default function GiftCardListReport({ lang }: { lang: Language }) {
   const isRtl = lang === 'ar';
   const reportId = 'gift-card-list';
+  const copy = useMemo(() => isRtl ? {
+    allStatuses: 'جميع الحالات',
+    allCustomers: 'جميع العملاء',
+    allEmployees: 'جميع الموظفين',
+    allLocations: 'كل المواقع',
+    allCodes: 'جميع الرموز',
+    giftCards: 'بطاقات الهدايا',
+    originalAmount: 'القيمة الأصلية',
+    redeemedAmount: 'قيمة الاسترداد',
+    remainingBalance: 'الرصيد المتبقي',
+    issued: 'صادرة',
+    redeemed: 'مستردة',
+    partiallyRedeemed: 'مستردة جزئياً',
+    expired: 'منتهية الصلاحية',
+    totalCards: 'إجمالي البطاقات',
+    originalAmountNote: 'القيمة الأصلية',
+    redeemedAmountNote: 'المبلغ المسترد',
+    remainingBalanceNote: 'الرصيد المتبقي',
+    issuedNote: 'بطاقات صادرة',
+    redeemedNote: 'بطاقات مستردة',
+    partiallyRedeemedNote: 'استرداد جزئي',
+    expiredNote: 'بطاقات منتهية الصلاحية',
+    tableTitle: 'جدول بطاقات الهدايا',
+    tableDescription: 'صفوف سجل بطاقات الهدايا المعيارية من سجل الواجهة الخلفية للمنشأة.',
+    emptyState: 'لا توجد بطاقات هدايا مطابقة للمعايير المحددة.',
+    backendGapTitle: 'فجوات الواجهة الخلفية',
+    backendGapDescription: 'لا تزال الحقول المفقودة أدناه غير متوفرة في الحمولة المعيارية الحالية لكل صف.',
+    general: 'عام',
+    purchase: 'الشراء',
+    redemption: 'الاسترداد',
+    customer: 'العميل',
+    invoice: 'الفاتورة',
+    timeline: 'الخط الزمني',
+    backendSnapshot: 'لقطة الواجهة الخلفية',
+    unavailable: 'غير متاح',
+    sourceTransaction: 'المعاملة الأصلية',
+    redemptionsCount: 'عدد عمليات الاسترداد',
+    latestRedemption: 'آخر عملية استرداد',
+    issuedAt: 'تم الإصدار في',
+    latestRedemptionAt: 'آخر استرداد في',
+    lastUpdated: 'آخر تحديث',
+    backendUpdated: 'تحديث الواجهة الخلفية',
+    purchasedFor: 'تم الشراء من أجل',
+    redeemedFor: 'تم الاسترداد من أجل',
+    giftCardCode: 'رمز بطاقة الهدايا',
+    saleNumber: 'رقم البيع',
+    purchasedBy: 'تم الشراء بواسطة',
+    redeemedBy: 'تم الاسترداد بواسطة',
+    status: 'الحالة',
+    issueDate: 'تاريخ الإصدار',
+    expiryDate: 'تاريخ الانتهاء',
+    originalAmountField: 'القيمة الأصلية',
+    redeemedAmountField: 'قيمة الاسترداد',
+    remainingBalanceField: 'الرصيد المتبقي',
+    paymentMethod: 'طريقة الدفع',
+    location: 'الموقع',
+    employee: 'الموظف',
+    invoiceNumber: 'رقم الفاتورة'
+  } : {
+    allStatuses: 'All Statuses',
+    allCustomers: 'All Customers',
+    allEmployees: 'All Employees',
+    allLocations: 'All Locations',
+    allCodes: 'All Gift Card Codes',
+    giftCards: 'Gift Cards',
+    originalAmount: 'Original Amount',
+    redeemedAmount: 'Redeemed Amount',
+    remainingBalance: 'Remaining Balance',
+    issued: 'Issued',
+    redeemed: 'Redeemed',
+    partiallyRedeemed: 'Partially Redeemed',
+    expired: 'Expired',
+    totalCards: 'Total cards',
+    originalAmountNote: 'Original amount',
+    redeemedAmountNote: 'Redeemed amount',
+    remainingBalanceNote: 'Remaining balance',
+    issuedNote: 'Issued cards',
+    redeemedNote: 'Redeemed cards',
+    partiallyRedeemedNote: 'Partially redeemed',
+    expiredNote: 'Expired cards',
+    tableTitle: 'Gift Card Table',
+    tableDescription: 'Canonical gift card ledger rows from the production tenant ledger.',
+    emptyState: 'No gift cards found for the selected criteria.',
+    backendGapTitle: 'Backend gaps',
+    backendGapDescription: 'Missing backend fields are still not exposed by the current canonical row payload.',
+    general: 'General',
+    purchase: 'Purchase',
+    redemption: 'Redemption',
+    customer: 'Customer',
+    invoice: 'Invoice',
+    timeline: 'Timeline',
+    backendSnapshot: 'Backend Snapshot',
+    unavailable: 'Unavailable',
+    sourceTransaction: 'Source Transaction',
+    redemptionsCount: 'Redemptions Count',
+    latestRedemption: 'Latest Redemption',
+    issuedAt: 'Issued At',
+    latestRedemptionAt: 'Latest Redemption At',
+    lastUpdated: 'Last Updated',
+    backendUpdated: 'Backend Updated',
+    purchasedFor: 'Purchased For',
+    redeemedFor: 'Redeemed For',
+    giftCardCode: 'Gift Card Code',
+    saleNumber: 'Sale Number',
+    purchasedBy: 'Purchased By',
+    redeemedBy: 'Redeemed By',
+    status: 'Status',
+    issueDate: 'Issue Date',
+    expiryDate: 'Expiry Date',
+    originalAmountField: 'Original Amount',
+    redeemedAmountField: 'Redeemed Amount',
+    remainingBalanceField: 'Remaining Balance',
+    paymentMethod: 'Payment Method',
+    location: 'Location',
+    employee: 'Employee',
+    invoiceNumber: 'Invoice Number'
+  }, [isRtl]);
   const [loading, setLoading] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -301,27 +438,27 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
     };
   }, [customDateRange, datePreset, filterValues, refreshTick, search]);
 
-  const rows = useMemo(() => buildGiftCardRows(report), [report]);
+  const rows = useMemo(() => buildGiftCardRows(report, lang), [lang, report]);
 
   const definitionOptions = useMemo(() => {
     const statuses = dedupeOptions([
-      { label: isRtl ? 'جميع الحالات' : 'All Statuses', value: '' },
-      ...uniqueValues(rows, (row) => row.status).map((option) => ({ label: humanizeStatus(option.value), value: option.value })),
+      { label: copy.allStatuses, value: '' },
+      ...uniqueValues(rows, (row) => row.status).map((option) => ({ label: humanizeStatus(option.value, lang), value: option.value })),
     ]);
     const customers = dedupeOptions([
-      { label: isRtl ? 'جميع العملاء' : 'All Customers', value: '' },
+      { label: copy.allCustomers, value: '' },
       ...uniqueValues(rows, (row) => row.customer),
     ]);
     const employees = dedupeOptions([
-      { label: isRtl ? 'جميع الموظفين' : 'All Employees', value: '' },
+      { label: copy.allEmployees, value: '' },
       ...uniqueValues(rows, (row) => row.employee),
     ]);
     const locations = dedupeOptions([
-      { label: isRtl ? 'كل المواقع' : 'All Locations', value: '' },
+      { label: copy.allLocations, value: '' },
       ...uniqueValues(rows, (row) => row.location),
     ]);
     const giftCardCodes = dedupeOptions([
-      { label: isRtl ? 'جميع الرموز' : 'All Gift Card Codes', value: '' },
+      { label: copy.allCodes, value: '' },
       ...uniqueValues(rows, (row) => row.giftCardCode),
     ]);
 
@@ -334,11 +471,11 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
     };
 
     return options;
-  }, [isRtl, rows]);
+  }, [copy.allCodes, copy.allCustomers, copy.allEmployees, copy.allLocations, copy.allStatuses, lang, rows]);
 
   const reportDefinition = useMemo(
-    () => createGiftCardListReportDefinition(definitionOptions),
-    [definitionOptions]
+    () => createGiftCardListReportDefinition(definitionOptions, lang),
+    [definitionOptions, lang]
   );
   useEffect(() => {
     setPageSize(reportDefinition.defaultPageSize || 10);
@@ -388,14 +525,14 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
 
   const summary = report.giftCardSummary || {};
   const kpiItems = [
-    { id: 'gift-cards', label: 'Gift Cards', value: Number(summary.totalGiftCards ?? rows.length ?? 0).toLocaleString(), note: isRtl ? 'إجمالي البطاقات' : 'Total cards', icon: <Gift size={18} /> },
-    { id: 'original-amount', label: 'Original Amount', value: formatMoney(summary.totalOriginalAmount, lang), note: isRtl ? 'القيمة الأصلية' : 'Original amount', icon: <CreditCard size={18} /> },
-    { id: 'redeemed-amount', label: 'Redeemed Amount', value: formatMoney(summary.totalRedeemedAmount, lang), note: isRtl ? 'المبلغ المسترد' : 'Redeemed amount', icon: <RefreshCw size={18} /> },
-    { id: 'remaining-balance', label: 'Remaining Balance', value: formatMoney(summary.totalRemainingBalance, lang), note: isRtl ? 'الرصيد المتبقي' : 'Remaining balance', icon: <Wallet size={18} /> },
-    { id: 'issued', label: 'Issued', value: Number(summary.issuedCount ?? rows.filter((row) => normalizeText(row.status).includes('issued') || normalizeText(row.status).includes('purchased')).length ?? 0).toLocaleString(), note: isRtl ? 'بطاقات صادرة' : 'Issued cards', icon: <Sparkles size={18} /> },
-    { id: 'redeemed', label: 'Redeemed', value: Number(summary.redeemedCount ?? rows.filter((row) => normalizeText(row.status).includes('redeemed')).length ?? 0).toLocaleString(), note: isRtl ? 'بطاقات مستردة' : 'Redeemed cards', icon: <Users size={18} /> },
-    { id: 'partial', label: 'Partially Redeemed', value: Number(summary.partiallyRedeemedCount ?? rows.filter((row) => normalizeText(row.status).includes('partially')).length ?? 0).toLocaleString(), note: isRtl ? 'استرداد جزئي' : 'Partially redeemed', icon: <Clock size={18} /> },
-    { id: 'expired', label: 'Expired', value: Number(summary.expiredCount ?? rows.filter((row) => normalizeText(row.status).includes('expired')).length ?? 0).toLocaleString(), note: isRtl ? 'منتهية الصلاحية' : 'Expired cards', icon: <AlertTriangle size={18} /> },
+    { id: 'gift-cards', label: copy.giftCards, value: Number(summary.totalGiftCards ?? rows.length ?? 0).toLocaleString(), note: copy.totalCards, icon: <Gift size={18} /> },
+    { id: 'original-amount', label: copy.originalAmount, value: formatMoney(summary.totalOriginalAmount, lang), note: copy.originalAmountNote, icon: <CreditCard size={18} /> },
+    { id: 'redeemed-amount', label: copy.redeemedAmount, value: formatMoney(summary.totalRedeemedAmount, lang), note: copy.redeemedAmountNote, icon: <RefreshCw size={18} /> },
+    { id: 'remaining-balance', label: copy.remainingBalance, value: formatMoney(summary.totalRemainingBalance, lang), note: copy.remainingBalanceNote, icon: <Wallet size={18} /> },
+    { id: 'issued', label: copy.issued, value: Number(summary.issuedCount ?? rows.filter((row) => normalizeText(row.status).includes('issued') || normalizeText(row.status).includes('purchased')).length ?? 0).toLocaleString(), note: copy.issuedNote, icon: <Sparkles size={18} /> },
+    { id: 'redeemed', label: copy.redeemed, value: Number(summary.redeemedCount ?? rows.filter((row) => normalizeText(row.status).includes('redeemed')).length ?? 0).toLocaleString(), note: copy.redeemedNote, icon: <Users size={18} /> },
+    { id: 'partial', label: copy.partiallyRedeemed, value: Number(summary.partiallyRedeemedCount ?? rows.filter((row) => normalizeText(row.status).includes('partially')).length ?? 0).toLocaleString(), note: copy.partiallyRedeemedNote, icon: <Clock size={18} /> },
+    { id: 'expired', label: copy.expired, value: Number(summary.expiredCount ?? rows.filter((row) => normalizeText(row.status).includes('expired')).length ?? 0).toLocaleString(), note: copy.expiredNote, icon: <AlertTriangle size={18} /> },
   ];
 
   const backendGaps = useMemo(() => buildGiftCardBackendGaps(rows), [rows]);
@@ -544,7 +681,7 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
       }
       kpis={<BIKpiCards items={kpiItems} />}
       table={
-        <SectionBlock title="Gift Card Table" description="Canonical gift card ledger rows from the production tenant ledger." icon={<Gift size={18} />}>
+        <SectionBlock title={copy.tableTitle} description={copy.tableDescription} icon={<Gift size={18} />}>
           <BIDataTable<GiftCardListTableRow>
             rows={paginatedRows}
             columns={visibleColumns}
@@ -556,17 +693,22 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
               setPage(1);
             }}
             onRowClick={(row) => setDrawerRow(row)}
-            emptyState={error ? error : 'No gift cards found for the selected criteria.'}
+            emptyState={error ? error : copy.emptyState}
           />
 
           {backendGaps.length ? (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <div className="flex items-center gap-2 font-semibold">
                 <AlertTriangle size={16} />
-                Backend gaps
+                {copy.backendGapTitle}
               </div>
               <p className="mt-2 leading-6">
-                {backendGaps.join(', ')} are not exposed by the current backend payload for every row yet.
+                {backendGaps.map((gap) => ({
+                  'Invoice Number': lang === 'ar' ? 'رقم الفاتورة' : 'Invoice Number',
+                  'Original Amount': lang === 'ar' ? 'القيمة الأصلية' : 'Original Amount',
+                  'Redeemed Amount': lang === 'ar' ? 'قيمة الاسترداد' : 'Redeemed Amount',
+                  'Remaining Balance': lang === 'ar' ? 'الرصيد المتبقي' : 'Remaining Balance',
+                }[gap] || gap)).join(', ')} {copy.backendGapDescription}
               </p>
             </div>
           ) : null}
@@ -597,64 +739,64 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
           <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">General</div>
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.general}</div>
                 <div className="mt-3 space-y-2 text-sm">
-                  <Field label="Gift Card Code" value={row.giftCardCode} />
-                  <Field label="Status" value={row.status} />
-                  <Field label="Issue Date" value={formatDate(row.issueDate, lang)} />
-                  <Field label="Expiry Date" value={formatDate(row.expiryDate, lang)} />
-                  <Field label="Original Amount" value={formatMoney(row.originalAmount, lang)} />
-                  <Field label="Remaining Balance" value={formatMoney(row.remainingBalance, lang)} />
+                  <Field label={copy.giftCardCode} value={row.giftCardCode} emptyLabel={copy.unavailable} />
+                  <Field label={copy.status} value={row.status} emptyLabel={copy.unavailable} />
+                  <Field label={copy.issueDate} value={formatDate(row.issueDate, lang)} emptyLabel={copy.unavailable} />
+                  <Field label={copy.expiryDate} value={formatDate(row.expiryDate, lang)} emptyLabel={copy.unavailable} />
+                  <Field label={copy.originalAmountField} value={formatMoney(row.originalAmount, lang)} emptyLabel={copy.unavailable} />
+                  <Field label={copy.remainingBalanceField} value={formatMoney(row.remainingBalance, lang)} emptyLabel={copy.unavailable} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Purchase</div>
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.purchase}</div>
                 <div className="mt-3 space-y-2 text-sm">
-                  <Field label="Sale Number" value={row.saleNumber} />
-                  <Field label="Purchased By" value={row.purchasedBy} />
-                  <Field label="Payment Method" value={row.paymentMethod} />
-                  <Field label="Location" value={row.location} />
-                  <Field label="Employee" value={row.employee} />
+                  <Field label={copy.saleNumber} value={row.saleNumber} emptyLabel={copy.unavailable} />
+                  <Field label={copy.purchasedBy} value={row.purchasedBy} emptyLabel={copy.unavailable} />
+                  <Field label={copy.paymentMethod} value={row.paymentMethod} emptyLabel={copy.unavailable} />
+                  <Field label={copy.location} value={row.location} emptyLabel={copy.unavailable} />
+                  <Field label={copy.employee} value={row.employee} emptyLabel={copy.unavailable} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Redemption</div>
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.redemption}</div>
                 <div className="mt-3 space-y-2 text-sm">
-                  <Field label="Redeemed By" value={row.redeemedBy} />
-                  <Field label="Redeemed Amount" value={formatMoney(row.redeemedAmount, lang)} />
-                  <Field label="Redemptions Count" value={String(row.redemptions?.length || 0)} />
-                  <Field label="Latest Redemption" value={formatDate(row.latestRedemption?.redeemedAt || row.latestRedemption?.createdAt, lang)} />
+                  <Field label={copy.redeemedBy} value={row.redeemedBy} emptyLabel={copy.unavailable} />
+                  <Field label={copy.redeemedAmountField} value={formatMoney(row.redeemedAmount, lang)} emptyLabel={copy.unavailable} />
+                  <Field label={copy.redemptionsCount} value={String(row.redemptions?.length || 0)} emptyLabel={copy.unavailable} />
+                  <Field label={copy.latestRedemption} value={formatDate(row.latestRedemption?.redeemedAt || row.latestRedemption?.createdAt, lang)} emptyLabel={copy.unavailable} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Customer</div>
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.customer}</div>
                 <div className="mt-3 space-y-2 text-sm">
-                  <Field label="Customer" value={row.customer} />
-                  <Field label="Purchased For" value={row.customer} />
-                  <Field label="Redeemed For" value={row.customer} />
+                  <Field label={copy.customer} value={row.customer} emptyLabel={copy.unavailable} />
+                  <Field label={copy.purchasedFor} value={row.customer} emptyLabel={copy.unavailable} />
+                  <Field label={copy.redeemedFor} value={row.customer} emptyLabel={copy.unavailable} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Invoice</div>
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.invoice}</div>
                 <div className="mt-3 space-y-2 text-sm">
-                  <Field label="Invoice Number" value={row.invoiceNumber} />
-                  <Field label="Source Transaction" value={row.sourceTransaction?.id || 'Unavailable'} />
-                  <Field label="Payment Method" value={row.paymentMethod} />
+                  <Field label={copy.invoiceNumber} value={row.invoiceNumber} emptyLabel={copy.unavailable} />
+                  <Field label={copy.sourceTransaction} value={row.sourceTransaction?.id || copy.unavailable} emptyLabel={copy.unavailable} />
+                  <Field label={copy.paymentMethod} value={row.paymentMethod} emptyLabel={copy.unavailable} />
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Timeline</div>
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.timeline}</div>
                 <div className="mt-3 space-y-2 text-sm">
-                  <Field label="Issued At" value={formatDate(row.issueDate, lang)} />
-                  <Field label="Latest Redemption At" value={formatDate(row.latestRedemption?.redeemedAt || row.latestRedemption?.createdAt, lang)} />
-                  <Field label="Last Updated" value={formatDate(row.sourceTransaction?.updatedAt || row.sourceTransaction?.createdAt, lang)} />
-                  <Field label="Backend Updated" value={formatDate(row.sourceTransaction?.updatedAt || row.sourceTransaction?.createdAt, lang)} />
+                  <Field label={copy.issuedAt} value={formatDate(row.issueDate, lang)} emptyLabel={copy.unavailable} />
+                  <Field label={copy.latestRedemptionAt} value={formatDate(row.latestRedemption?.redeemedAt || row.latestRedemption?.createdAt, lang)} emptyLabel={copy.unavailable} />
+                  <Field label={copy.lastUpdated} value={formatDate(row.sourceTransaction?.updatedAt || row.sourceTransaction?.createdAt, lang)} emptyLabel={copy.unavailable} />
+                  <Field label={copy.backendUpdated} value={formatDate(row.sourceTransaction?.updatedAt || row.sourceTransaction?.createdAt, lang)} emptyLabel={copy.unavailable} />
                 </div>
               </div>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Backend Snapshot</div>
+              <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.backendSnapshot}</div>
               <pre className="mt-3 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">{JSON.stringify(row.sourceTransaction || row, null, 2)}</pre>
             </div>
           </div>

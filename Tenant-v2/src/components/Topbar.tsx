@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Search, Bell, Plus, Sparkle, Globe, ChevronDown, Check, 
   User, Shield, CalendarDays, KeyRound, LogOut, Info, AlertTriangle,
@@ -76,27 +77,141 @@ export default function Topbar({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
+  const [quickCreateMenuStyle, setQuickCreateMenuStyle] = useState<CSSProperties | null>(null);
+  const [notificationsMenuStyle, setNotificationsMenuStyle] = useState<CSSProperties | null>(null);
+  const [profileMenuStyle, setProfileMenuStyle] = useState<CSSProperties | null>(null);
 
   // Refs for closing on outside click
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const quickCreateRef = useRef<HTMLDivElement>(null);
+  const notificationsMenuRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const quickCreateMenuRef = useRef<HTMLDivElement>(null);
+
+  const resolveAnchoredMenuStyle = (button: HTMLDivElement | null, menuWidth: number) => {
+    if (!button || typeof window === 'undefined') {
+      return null;
+    }
+
+    const buttonRect = button.getBoundingClientRect();
+    const top = Math.max(12, Math.round(buttonRect.bottom + 8));
+    const viewportPadding = 12;
+    const actualWidth = Math.min(menuWidth, Math.max(160, window.innerWidth - (viewportPadding * 2)));
+
+    if (isRtl) {
+      const left = Math.min(
+        Math.max(viewportPadding, Math.round(buttonRect.left)),
+        Math.max(viewportPadding, window.innerWidth - actualWidth - viewportPadding)
+      );
+
+      return {
+        position: 'fixed',
+        top,
+        left,
+        width: actualWidth,
+        zIndex: 9999
+      } satisfies CSSProperties;
+    }
+
+    const left = Math.min(
+      Math.max(viewportPadding, Math.round(buttonRect.right - actualWidth)),
+      Math.max(viewportPadding, window.innerWidth - actualWidth - viewportPadding)
+    );
+
+    return {
+      position: 'fixed',
+      top,
+      left,
+      width: actualWidth,
+      zIndex: 9999
+    } satisfies CSSProperties;
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        if (notificationsMenuRef.current?.contains(event.target as Node)) {
+          return;
+        }
         setIsNotificationsOpen(false);
       }
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        if (profileMenuRef.current?.contains(event.target as Node)) {
+          return;
+        }
         setIsProfileOpen(false);
       }
       if (quickCreateRef.current && !quickCreateRef.current.contains(event.target as Node)) {
+        if (quickCreateMenuRef.current?.contains(event.target as Node)) {
+          return;
+        }
         setIsQuickCreateOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isQuickCreateOpen) {
+      setQuickCreateMenuStyle(null);
+      return;
+    }
+
+    const updateMenuPosition = () => {
+      setQuickCreateMenuStyle(resolveAnchoredMenuStyle(quickCreateRef.current, 224));
+    };
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [isQuickCreateOpen, isRtl]);
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      setNotificationsMenuStyle(null);
+      return;
+    }
+
+    const updateMenuPosition = () => {
+      setNotificationsMenuStyle(resolveAnchoredMenuStyle(notificationsRef.current, 384));
+    };
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [isNotificationsOpen, isRtl]);
+
+  useEffect(() => {
+    if (!isProfileOpen) {
+      setProfileMenuStyle(null);
+      return;
+    }
+
+    const updateMenuPosition = () => {
+      setProfileMenuStyle(resolveAnchoredMenuStyle(profileRef.current, 256));
+    };
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [isProfileOpen, isRtl]);
 
   const handleQuickCreateClick = (type: any) => {
     onQuickAction(type);
@@ -166,10 +281,15 @@ export default function Topbar({
             </button>
 
             {/* Quick Create Menu */}
-            {isQuickCreateOpen && (
-              <div className={`absolute ${isRtl ? 'left-0' : 'right-0'} mt-2 w-56 rounded-2xl shadow-xl border p-2 space-y-0.5 z-50 text-start ${
-                darkMode ? 'bg-zinc-800 border-zinc-700 text-zinc-200' : 'bg-white border-neutral-100 text-neutral-800'
-              }`}>
+            {isQuickCreateOpen && quickCreateMenuStyle && typeof document !== 'undefined' && createPortal(
+              <div
+                ref={quickCreateMenuRef}
+                dir={isRtl ? 'rtl' : 'ltr'}
+                className={`rounded-2xl shadow-xl border p-2 space-y-0.5 text-start ${
+                  darkMode ? 'bg-zinc-800 border-zinc-700 text-zinc-200' : 'bg-white border-neutral-100 text-neutral-800'
+                }`}
+                style={quickCreateMenuStyle}
+              >
                 <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider p-2">
                   {lang === 'ar' ? 'إجراء تشغيل فوري' : 'SELECT CORE ENTITY'}
                 </p>
@@ -209,7 +329,8 @@ export default function Topbar({
                 >
                   {t.quickActions.newGiftCard}
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
 
@@ -270,10 +391,11 @@ export default function Topbar({
             </button>
 
             {/* Notification Center Dropdown */}
-            {isNotificationsOpen && (
-              <div className={`absolute ${isRtl ? 'left-0' : 'right-0'} mt-3 z-50`}>
+            {isNotificationsOpen && notificationsMenuStyle && typeof document !== 'undefined' && createPortal(
+              <div ref={notificationsMenuRef} dir={isRtl ? 'rtl' : 'ltr'} style={notificationsMenuStyle}>
                 <NotificationCenter lang={lang} onClose={() => setIsNotificationsOpen(false)} />
-              </div>
+              </div>,
+              document.body
             )}
           </div>
 
@@ -301,8 +423,8 @@ export default function Topbar({
             </button>
 
             {/* Profile Dropdown */}
-            {isProfileOpen && (
-              <div className={`absolute ${isRtl ? 'left-0' : 'right-0'} mt-3 z-50`}>
+            {isProfileOpen && profileMenuStyle && typeof document !== 'undefined' && createPortal(
+              <div ref={profileMenuRef} dir={isRtl ? 'rtl' : 'ltr'} style={profileMenuStyle}>
                 <UserProfileMenu
                   lang={lang}
                   onClose={() => setIsProfileOpen(false)}
@@ -311,7 +433,8 @@ export default function Topbar({
                   currentTenant={currentTenant}
                   onNavigateToSettings={onNavigateToSettings}
                 />
-              </div>
+              </div>,
+              document.body
             )}
           </div>
 
