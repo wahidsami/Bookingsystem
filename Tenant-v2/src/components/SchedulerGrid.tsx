@@ -113,56 +113,6 @@ const toneClasses: Record<NonNullable<SchedulerColumn['statusTone']>, string> = 
   neutral: 'bg-slate-300',
 };
 
-const serviceCategoryStyles: Record<string, {
-  accent: string;
-  card: string;
-  badge: string;
-  avatar: string;
-}> = {
-  hair: {
-    accent: 'bg-fuchsia-500',
-    card: 'border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 to-white',
-    badge: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
-    avatar: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
-  },
-  spa: {
-    accent: 'bg-emerald-500',
-    card: 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white',
-    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    avatar: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  },
-  nails: {
-    accent: 'bg-rose-500',
-    card: 'border-rose-200 bg-gradient-to-br from-rose-50 to-white',
-    badge: 'bg-rose-50 text-rose-700 border-rose-200',
-    avatar: 'border-rose-200 bg-rose-50 text-rose-700',
-  },
-  beauty: {
-    accent: 'bg-amber-500',
-    card: 'border-amber-200 bg-gradient-to-br from-amber-50 to-white',
-    badge: 'bg-amber-50 text-amber-700 border-amber-200',
-    avatar: 'border-amber-200 bg-amber-50 text-amber-700',
-  },
-  barber: {
-    accent: 'bg-sky-500',
-    card: 'border-sky-200 bg-gradient-to-br from-sky-50 to-white',
-    badge: 'bg-sky-50 text-sky-700 border-sky-200',
-    avatar: 'border-sky-200 bg-sky-50 text-sky-700',
-  },
-  skin: {
-    accent: 'bg-violet-500',
-    card: 'border-violet-200 bg-gradient-to-br from-violet-50 to-white',
-    badge: 'bg-violet-50 text-violet-700 border-violet-200',
-    avatar: 'border-violet-200 bg-violet-50 text-violet-700',
-  },
-  default: {
-    accent: 'bg-slate-500',
-    card: 'border-slate-200 bg-white',
-    badge: 'bg-slate-50 text-slate-700 border-slate-200',
-    avatar: 'border-slate-200 bg-slate-50 text-slate-700',
-  },
-};
-
 const getInitials = (value?: string | null) => {
   const words = `${value || ''}`.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return '•';
@@ -170,33 +120,171 @@ const getInitials = (value?: string | null) => {
   return `${words[0][0] || ''}${words[1][0] || ''}`.toUpperCase();
 };
 
-const getServiceCategoryStyles = (value?: string | null) => {
-  const key = `${value || ''}`.trim().toLowerCase();
-  if (serviceCategoryStyles[key]) {
-    return serviceCategoryStyles[key];
-  }
-  if (key.includes('spa')) return serviceCategoryStyles.spa;
-  if (key.includes('nail')) return serviceCategoryStyles.nails;
-  if (key.includes('hair')) return serviceCategoryStyles.hair;
-  if (key.includes('beauty')) return serviceCategoryStyles.beauty;
-  if (key.includes('barber')) return serviceCategoryStyles.barber;
-  if (key.includes('skin')) return serviceCategoryStyles.skin;
-  return serviceCategoryStyles.default;
-};
-
 const formatAppointmentStatusLabel = (status?: string | null, kind?: SchedulerEvent['kind']) => {
   if (kind === 'blocked') {
     return 'Blocked';
   }
-  const normalized = `${status || ''}`.trim().toLowerCase();
-  if (!normalized) return 'Pending';
+  const normalized = normalizeAppointmentStatus(status);
+  if (normalized === 'booked') return 'Booked';
+  if (normalized === 'confirmed') return 'Confirmed';
+  if (normalized === 'arrived') return 'Arrived';
+  if (normalized === 'started') return 'Started';
   if (normalized === 'completed') return 'Completed';
-  if (['checked_in', 'checked-in', 'arrived'].includes(normalized)) return 'Arrived';
-  if (['in_service', 'in-service'].includes(normalized)) return 'In Service';
-  if (['confirmed', 'scheduled'].includes(normalized)) return 'Confirmed';
-  if (['cancelled', 'canceled'].includes(normalized)) return 'Cancelled';
-  if (['no_show', 'no-show'].includes(normalized)) return 'No Show';
-  return normalized.replace(/[_-]+/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
+  if (normalized === 'cancelled') return 'Cancelled';
+  if (normalized === 'no_show') return 'No Show';
+  return 'Booked';
+};
+
+type AppointmentStatusKey = 'booked' | 'confirmed' | 'arrived' | 'started' | 'completed' | 'no_show' | 'cancelled' | 'blocked';
+
+type AppointmentStatusTheme = {
+  shell: string;
+  accent: string;
+  primaryText: string;
+  secondaryText: string;
+  mutedText: string;
+  serviceBadge: string;
+  statusBadge: string;
+  paymentBadgePaid: string;
+  paymentBadgePartial: string;
+  paymentBadgeUnpaid: string;
+  staffAvatar: string;
+};
+
+const normalizeAppointmentStatus = (status?: string | null, kind?: SchedulerEvent['kind']): AppointmentStatusKey => {
+  if (kind === 'blocked') {
+    return 'blocked';
+  }
+
+  const normalized = `${status || ''}`.trim().toLowerCase();
+  if (!normalized || normalized === 'pending' || normalized === 'booked') return 'booked';
+  if (['confirmed', 'scheduled'].includes(normalized)) return 'confirmed';
+  if (['checked_in', 'checked-in', 'arrived'].includes(normalized)) return 'arrived';
+  if (['in_service', 'in-service', 'started'].includes(normalized)) return 'started';
+  if (normalized === 'completed' || normalized === 'done' || normalized === 'served') return 'completed';
+  if (['cancelled', 'canceled'].includes(normalized)) return 'cancelled';
+  if (['no_show', 'no-show', 'noshow'].includes(normalized)) return 'no_show';
+  return 'booked';
+};
+
+const getAppointmentStatusTheme = (status?: string | null, kind?: SchedulerEvent['kind']): AppointmentStatusTheme => {
+  const normalized = normalizeAppointmentStatus(status, kind);
+
+  switch (normalized) {
+    case 'blocked':
+      return {
+        shell: 'bg-slate-50 border-slate-200 text-slate-700',
+        accent: 'bg-slate-400',
+        primaryText: 'text-slate-900',
+        secondaryText: 'text-slate-500',
+        mutedText: 'text-slate-400',
+        serviceBadge: 'border-slate-200 bg-slate-100 text-slate-700',
+        statusBadge: 'border-slate-200 bg-slate-100 text-slate-700',
+        paymentBadgePaid: 'border-slate-200 bg-slate-100 text-slate-700',
+        paymentBadgePartial: 'border-slate-200 bg-slate-100 text-slate-700',
+        paymentBadgeUnpaid: 'border-slate-200 bg-slate-100 text-slate-700',
+        staffAvatar: 'border-slate-200 bg-white text-slate-600',
+      };
+    case 'confirmed':
+      return {
+        shell: 'bg-amber-50 border-amber-200 text-amber-950',
+        accent: 'bg-amber-500',
+        primaryText: 'text-amber-950',
+        secondaryText: 'text-amber-800/90',
+        mutedText: 'text-amber-700/70',
+        serviceBadge: 'border-amber-200 bg-amber-100 text-amber-800',
+        statusBadge: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
+        staffAvatar: 'border-amber-200 bg-white text-amber-800',
+      };
+    case 'arrived':
+      return {
+        shell: 'bg-emerald-50 border-emerald-200 text-emerald-950',
+        accent: 'bg-emerald-500',
+        primaryText: 'text-emerald-950',
+        secondaryText: 'text-emerald-800/90',
+        mutedText: 'text-emerald-700/70',
+        serviceBadge: 'border-emerald-200 bg-emerald-100 text-emerald-800',
+        statusBadge: 'border-emerald-200 bg-emerald-100 text-emerald-800',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
+        staffAvatar: 'border-emerald-200 bg-white text-emerald-800',
+      };
+    case 'started':
+      return {
+        shell: 'bg-indigo-50 border-indigo-200 text-indigo-950',
+        accent: 'bg-indigo-500',
+        primaryText: 'text-indigo-950',
+        secondaryText: 'text-indigo-800/90',
+        mutedText: 'text-indigo-700/70',
+        serviceBadge: 'border-indigo-200 bg-indigo-100 text-indigo-800',
+        statusBadge: 'border-indigo-200 bg-indigo-100 text-indigo-800',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
+        staffAvatar: 'border-indigo-200 bg-white text-indigo-800',
+      };
+    case 'completed':
+      return {
+        shell: 'bg-zinc-100 border-zinc-300 text-zinc-800',
+        accent: 'bg-zinc-500',
+        primaryText: 'text-zinc-800',
+        secondaryText: 'text-zinc-600',
+        mutedText: 'text-zinc-500',
+        serviceBadge: 'border-zinc-200 bg-white text-zinc-700',
+        statusBadge: 'border-zinc-200 bg-zinc-50 text-zinc-700',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
+        staffAvatar: 'border-zinc-200 bg-white text-zinc-700',
+      };
+    case 'cancelled':
+      return {
+        shell: 'bg-rose-50 border-rose-200 text-rose-950',
+        accent: 'bg-rose-500',
+        primaryText: 'text-rose-950',
+        secondaryText: 'text-rose-800/90',
+        mutedText: 'text-rose-700/70',
+        serviceBadge: 'border-rose-200 bg-rose-100 text-rose-800',
+        statusBadge: 'border-rose-200 bg-rose-100 text-rose-800',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-100 text-rose-800',
+        staffAvatar: 'border-rose-200 bg-white text-rose-800',
+      };
+    case 'no_show':
+      return {
+        shell: 'bg-slate-800 border-slate-700 text-slate-50',
+        accent: 'bg-slate-300',
+        primaryText: 'text-white',
+        secondaryText: 'text-slate-200',
+        mutedText: 'text-slate-300',
+        serviceBadge: 'border-white/15 bg-white/10 text-white',
+        statusBadge: 'border-white/15 bg-white/10 text-white',
+        paymentBadgePaid: 'border-white/15 bg-white/10 text-white',
+        paymentBadgePartial: 'border-white/15 bg-white/10 text-white',
+        paymentBadgeUnpaid: 'border-white/15 bg-white/10 text-white',
+        staffAvatar: 'border-white/20 bg-white/10 text-white',
+      };
+    case 'booked':
+    default:
+      return {
+        shell: 'bg-slate-50 border-slate-200 text-slate-900',
+        accent: 'bg-slate-400',
+        primaryText: 'text-slate-900',
+        secondaryText: 'text-slate-600',
+        mutedText: 'text-slate-500',
+        serviceBadge: 'border-slate-200 bg-white text-slate-700',
+        statusBadge: 'border-slate-200 bg-slate-100 text-slate-700',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
+        staffAvatar: 'border-slate-200 bg-white text-slate-600',
+      };
+  }
 };
 
 const formatSlotTime = (totalMinutesFromStart: number, startHour: number, isRtl: boolean) => {
@@ -699,14 +787,12 @@ export default function SchedulerGrid({
             const columnIndex = getColumnIndex(event.columnId);
             if (columnIndex === -1) return null;
 
-            const slotIndex = Math.max(0, Math.round(event.startMinutes / slotMinutes));
-            const durationSlots = Math.max(1, Math.ceil(Math.max(event.durationMinutes, slotMinutes) / slotMinutes));
-            const top = slotIndex * slotHeight;
-            const height = durationSlots * slotHeight;
+            const top = (Math.max(0, event.startMinutes) / slotMinutes) * slotHeight;
+            const height = Math.max(slotHeight, (Math.max(event.durationMinutes, slotMinutes) / slotMinutes) * slotHeight);
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
             const inlineStart = `calc(${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;
-            const serviceStyles = getServiceCategoryStyles(event.serviceCategory || event.raw?.service?.category);
+            const statusTheme = getAppointmentStatusTheme(event.status, event.kind);
             const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
             const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
             const assignedStaffName = event.assignedStaffName || event.raw?.staff?.name || event.role || '';
@@ -717,21 +803,11 @@ export default function SchedulerGrid({
             const isMedium = height >= 42 && height < 64;
             const showStatusMeta = showAppointmentStatusBadges;
 
-            const styleVariant = event.kind === 'blocked'
-              ? 'bg-slate-50 text-slate-500 border-slate-200'
-              : event.status === 'completed'
-                ? 'bg-zinc-100 text-zinc-700 border-zinc-200'
-                : event.paymentStatus === 'paid'
-                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                  : event.paymentStatus === 'partial'
-                    ? 'bg-amber-50 text-amber-900 border-amber-200'
-                    : 'bg-rose-50 text-rose-900 border-rose-200';
-
             return (
               <div
                 key={event.id}
-                className="absolute"
-                style={{
+              className="absolute"
+              style={{
                   ...(isRtl ? { right: inlineStart } : { left: inlineStart }),
                   width: `calc(${laneWidthPx}px - 8px)`,
                   maxWidth: `calc(${laneWidthPx}px - 8px)`,
@@ -764,15 +840,13 @@ export default function SchedulerGrid({
                     contextEvent.stopPropagation();
                     onEventContextMenu?.(contextEvent, event);
                   }}
-                  className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${styleVariant} ${event.kind !== 'blocked' ? serviceStyles.card : ''} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'}`}
+                  className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'}`}
                 >
-                  {event.kind !== 'blocked' && (
-                    <div className={`absolute inset-x-0 top-0 h-1 ${serviceStyles.accent}`} />
-                  )}
+                  <div className={`absolute inset-x-0 top-0 h-1 ${statusTheme.accent}`} />
 
                   <div className="flex min-w-0 items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-1 items-start gap-2">
-                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border text-[10px] font-black ${serviceStyles.avatar}`}>
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border text-[10px] font-black ${statusTheme.staffAvatar}`}>
                         {customerAvatar ? (
                           <img src={customerAvatar} alt={event.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
@@ -780,16 +854,16 @@ export default function SchedulerGrid({
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11px] font-black leading-tight text-slate-900">
+                        <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
                           {event.title}
                         </p>
                         {!isCompact && (
                           <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                            <span className={`max-w-full truncate rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide ${serviceStyles.badge}`}>
+                            <span className={`max-w-full truncate rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide ${statusTheme.serviceBadge}`}>
                               {event.subtitle || 'Service'}
                             </span>
                             {variantLabel && (
-                              <span className="truncate text-[9px] font-semibold text-slate-500">
+                              <span className={`truncate text-[9px] font-semibold ${statusTheme.secondaryText}`}>
                                 {variantLabel}
                               </span>
                             )}
@@ -798,28 +872,21 @@ export default function SchedulerGrid({
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="rounded bg-zinc-900/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tight text-slate-700">
+                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tight ${statusTheme.statusBadge}`}>
                         {formatSlotTime(event.startMinutes, startHour, isRtl)}
                       </span>
                       {!isCompact && showStatusMeta && (
-                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${
-                          event.kind === 'blocked'
-                            ? 'border-slate-200 bg-slate-50 text-slate-600'
-                            : event.status === 'completed'
-                              ? 'border-zinc-200 bg-zinc-100 text-zinc-700'
-                              : event.status === 'cancelled'
-                                ? 'border-rose-200 bg-rose-50 text-rose-700'
-                                : 'border-amber-200 bg-amber-50 text-amber-700'
-                        }`}>
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${statusTheme.statusBadge}`}>
                           {formatAppointmentStatusLabel(event.status, event.kind)}
                         </span>
                       )}
                       {!isCompact && event.kind !== 'blocked' && showStatusMeta && (
-                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${event.paymentStatus === 'paid'
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                          : event.paymentStatus === 'partial'
-                            ? 'border-amber-200 bg-amber-50 text-amber-700'
-                            : 'border-rose-200 bg-rose-50 text-rose-700'
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${
+                          event.paymentStatus === 'paid'
+                            ? statusTheme.paymentBadgePaid
+                            : event.paymentStatus === 'partial'
+                              ? statusTheme.paymentBadgePartial
+                              : statusTheme.paymentBadgeUnpaid
                         }`}>
                           {event.paymentStatus === 'paid' ? 'Paid' : event.paymentStatus === 'partial' ? 'Partial' : 'Unpaid'}
                         </span>
@@ -831,32 +898,32 @@ export default function SchedulerGrid({
                     <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[9px]">
                       <div className="flex min-w-0 items-center gap-1.5">
                         {showStaffPhotos && staffAvatar ? (
-                          <div className="h-4 w-4 shrink-0 overflow-hidden rounded-full border border-white shadow-sm">
+                          <div className={`h-4 w-4 shrink-0 overflow-hidden rounded-full border shadow-sm ${statusTheme.staffAvatar}`}>
                             <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                           </div>
                         ) : assignedStaffName ? (
-                          <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[7px] font-black text-slate-600">
+                          <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[7px] font-black ${statusTheme.staffAvatar}`}>
                             {getInitials(assignedStaffName)}
                           </div>
                         ) : null}
-                        <span className="truncate font-bold text-slate-600">
+                        <span className={`truncate font-bold ${statusTheme.secondaryText}`}>
                           {assignedStaffName || (event.kind === 'blocked' ? (event.blockedType || 'Blocked') : 'Unassigned')}
                         </span>
                         {assignedStaffRole && (
-                          <span className="truncate text-slate-400">
+                          <span className={`truncate ${statusTheme.mutedText}`}>
                             · {assignedStaffRole}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5">
                         {event.isGroupBooking && (
-                          <span className="flex items-center gap-0.5 rounded bg-zinc-900/10 px-1 py-0.5 text-[8px] font-bold text-slate-600">
+                          <span className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[8px] font-bold ${statusTheme.secondaryText}`}>
                             <Users size={9} />
                             <span>{event.guestCount || 2}</span>
                           </span>
                         )}
                         {typeof event.price === 'number' && (
-                          <span className="font-black font-mono text-slate-700">
+                          <span className={`font-black font-mono ${statusTheme.secondaryText}`}>
                             {event.price}
                           </span>
                         )}
@@ -865,13 +932,13 @@ export default function SchedulerGrid({
                   )}
 
                   {isCompact && showAssignedStaffIdentity && assignedStaffName && (
-                    <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[8px] font-bold text-slate-500">
+                    <div className={`mt-1 flex min-w-0 items-center gap-1.5 text-[8px] font-bold ${statusTheme.secondaryText}`}>
                       {showStaffPhotos && staffAvatar ? (
-                        <div className="h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full border border-white shadow-sm">
+                        <div className={`h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full border shadow-sm ${statusTheme.staffAvatar}`}>
                           <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                         </div>
                       ) : (
-                        <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[6px] font-black text-slate-600">
+                        <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[6px] font-black ${statusTheme.staffAvatar}`}>
                           {getInitials(assignedStaffName)}
                         </div>
                       )}
@@ -880,23 +947,23 @@ export default function SchedulerGrid({
                   )}
 
                   {isMedium && variantDescription && (
-                    <p className="mt-1 truncate text-[8px] italic text-slate-500">
+                    <p className={`mt-1 truncate text-[8px] italic ${statusTheme.mutedText}`}>
                       {variantDescription}
                     </p>
                   )}
 
                   {!isCompact && event.notes && (
-                    <p className={`mt-1 truncate text-[9px] italic ${event.kind === 'blocked' ? 'text-slate-500' : 'text-slate-500'}`}>
+                    <p className={`mt-1 truncate text-[9px] italic ${statusTheme.mutedText}`}>
                       "{event.notes}"
                     </p>
                   )}
 
                   {isCompact && (
-                    <div className="mt-1 flex items-center justify-between gap-1 text-[8px] font-bold text-slate-500">
+                    <div className={`mt-1 flex items-center justify-between gap-1 text-[8px] font-bold ${statusTheme.secondaryText}`}>
                       <span className="truncate">
                         {event.subtitle || variantLabel || formatAppointmentStatusLabel(event.status, event.kind)}
                       </span>
-                      {typeof event.price === 'number' && <span className="font-mono text-slate-700">{event.price}</span>}
+                      {typeof event.price === 'number' && <span className={`font-mono ${statusTheme.secondaryText}`}>{event.price}</span>}
                     </div>
                   )}
 
