@@ -203,6 +203,96 @@ const mapBlockPresetToBackendType = (preset: 'Break' | 'Lunch' | 'Meeting') => {
   return 'other';
 };
 
+const APPOINTMENT_DRAFT_STORAGE_KEY = 'refah.interactiveDrawers.appointmentDraft';
+const CART_DRAFT_STORAGE_KEY = 'refah.interactiveDrawers.cartDraft';
+
+type AppointmentDraftSnapshot = {
+  createMode: 'appointment' | 'blocked';
+  createStep: number;
+  custMode: 'existing' | 'walkin';
+  selectedCustId: string;
+  customerSearch: string;
+  walkinFullName: string;
+  walkinPhone: string;
+  walkinEmail: string;
+  walkinDob: string;
+  walkinIsVip: boolean;
+  includeGroupGuests: boolean;
+  guestCount: number;
+  guestNames: string;
+  guestsList: GuestProfile[];
+  currentServiceId: string;
+  currentStaffId: string;
+  currentStartTime: number;
+  currentDuration: number;
+  currentDiscountType: 'none' | 'flat' | 'percent';
+  currentDiscountValue: number;
+  currentServiceNotes: string;
+  stagedServices: StagedService[];
+  sessionNotes: string;
+  notifyWhatsApp: boolean;
+  createSplitActive: boolean;
+  createSplitAmounts: { card: number; cash: number; online: number; bank_transfer: number; wallet: number; gift_card: number };
+  giftCardCodeInput: string;
+  blockTitleAr: string;
+  blockTitleEn: string;
+  blockStaffId: string;
+  blockStartTime: number;
+  blockDuration: number;
+  blockType: 'Break' | 'Lunch' | 'Meeting';
+  blockIsRecurring: boolean;
+  blockEndDate: string;
+};
+
+type CartDraftSnapshot = {
+  cartTab: 'products' | 'giftcards';
+  productSearch: string;
+  productCategoryFilter: string;
+  cartItems: CartItem[];
+  gcSender: string;
+  gcRecipient: string;
+  gcValue: number;
+  generatedGcCode: string;
+  posCustMode: 'walkin' | 'existing';
+  posSelectedCustId: string;
+  posCustomerSearch: string;
+  posSplitActive: boolean;
+  posSplitAmounts: { card: number; cash: number; wallet: number };
+  posWalkinName: string;
+  posWalkinEmail: string;
+  posWalkinPhone: string;
+  showWalkinModal: boolean;
+};
+
+const readDraftStorage = <T,>(key: string): T | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+const writeDraftStorage = (key: string, value: unknown) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore sessionStorage quota / serialization issues.
+  }
+};
+
+const removeDraftStorage = (key: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // Ignore storage removal failures.
+  }
+};
+
 export default function InteractiveDrawers({
   isRtl,
   isCreateDrawerOpen,
@@ -296,6 +386,45 @@ export default function InteractiveDrawers({
       setPosCheckoutComplete(false);
     }
   }, [isCartDrawerOpen]);
+
+  const appointmentDraftTypeLabel = createMode === 'blocked'
+    ? (isRtl ? 'فترة حظر' : 'blocked time')
+    : (isRtl ? 'موعد' : 'appointment');
+  const cartDraftTypeLabel = cartTab === 'giftcards'
+    ? (isRtl ? 'بطاقة هدايا' : 'gift card order')
+    : (isRtl ? 'طلب منتجات' : 'product order');
+
+  const handleContinueAppointmentDraft = () => {
+    const snapshot = readDraftStorage<AppointmentDraftSnapshot>(APPOINTMENT_DRAFT_STORAGE_KEY);
+    if (snapshot) {
+      restoreAppointmentDraft(snapshot);
+    }
+    setShowAppointmentDraftPrompt(false);
+    setAppointmentDraftPending(true);
+  };
+
+  const handleDiscardAppointmentDraft = () => {
+    resetAppointmentDraft();
+    removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+    setAppointmentDraftPending(false);
+    setShowAppointmentDraftPrompt(false);
+  };
+
+  const handleContinueCartDraft = () => {
+    const snapshot = readDraftStorage<CartDraftSnapshot>(CART_DRAFT_STORAGE_KEY);
+    if (snapshot) {
+      restoreCartDraft(snapshot);
+    }
+    setShowCartDraftPrompt(false);
+    setCartDraftPending(true);
+  };
+
+  const handleDiscardCartDraft = () => {
+    resetCartDraft();
+    removeDraftStorage(CART_DRAFT_STORAGE_KEY);
+    setCartDraftPending(false);
+    setShowCartDraftPrompt(false);
+  };
 
   // Step 1: Customer Info
   const [custMode, setCustMode] = useState<'existing' | 'walkin'>('existing');
@@ -606,6 +735,12 @@ export default function InteractiveDrawers({
   const [posWalkinEmail, setPosWalkinEmail] = useState('');
   const [posWalkinPhone, setPosWalkinPhone] = useState('');
   const [showWalkinModal, setShowWalkinModal] = useState(false);
+  const [appointmentDraftPending, setAppointmentDraftPending] = useState<boolean>(() => Boolean(readDraftStorage<AppointmentDraftSnapshot>(APPOINTMENT_DRAFT_STORAGE_KEY)));
+  const [cartDraftPending, setCartDraftPending] = useState<boolean>(() => Boolean(readDraftStorage<CartDraftSnapshot>(CART_DRAFT_STORAGE_KEY)));
+  const [showAppointmentDraftPrompt, setShowAppointmentDraftPrompt] = useState(false);
+  const [showCartDraftPrompt, setShowCartDraftPrompt] = useState(false);
+  const previousCreateDrawerOpenRef = useRef(isCreateDrawerOpen);
+  const previousCartDrawerOpenRef = useRef(isCartDrawerOpen);
 
   const canonicalProducts = useMemo<ProductRecord[]>(() => {
     return products.map((product: any) => ({
@@ -702,6 +837,415 @@ export default function InteractiveDrawers({
     const absoluteMinutes = (Number(match[1]) * 60) + Number(match[2]);
     return Math.max(0, absoluteMinutes - (9 * 60));
   };
+
+  const appointmentDraftSnapshot = useMemo<AppointmentDraftSnapshot>(() => ({
+    createMode,
+    createStep,
+    custMode,
+    selectedCustId,
+    customerSearch,
+    walkinFullName,
+    walkinPhone,
+    walkinEmail,
+    walkinDob,
+    walkinIsVip,
+    includeGroupGuests,
+    guestCount,
+    guestNames,
+    guestsList,
+    currentServiceId,
+    currentStaffId,
+    currentStartTime,
+    currentDuration,
+    currentDiscountType,
+    currentDiscountValue,
+    currentServiceNotes,
+    stagedServices,
+    sessionNotes,
+    notifyWhatsApp,
+    createSplitActive,
+    createSplitAmounts,
+    giftCardCodeInput,
+    blockTitleAr,
+    blockTitleEn,
+    blockStaffId,
+    blockStartTime,
+    blockDuration,
+    blockType,
+    blockIsRecurring,
+    blockEndDate
+  }), [
+    createMode,
+    createStep,
+    custMode,
+    selectedCustId,
+    customerSearch,
+    walkinFullName,
+    walkinPhone,
+    walkinEmail,
+    walkinDob,
+    walkinIsVip,
+    includeGroupGuests,
+    guestCount,
+    guestNames,
+    guestsList,
+    currentServiceId,
+    currentStaffId,
+    currentStartTime,
+    currentDuration,
+    currentDiscountType,
+    currentDiscountValue,
+    currentServiceNotes,
+    stagedServices,
+    sessionNotes,
+    notifyWhatsApp,
+    createSplitActive,
+    createSplitAmounts,
+    giftCardCodeInput,
+    blockTitleAr,
+    blockTitleEn,
+    blockStaffId,
+    blockStartTime,
+    blockDuration,
+    blockType,
+    blockIsRecurring,
+    blockEndDate
+  ]);
+
+  const appointmentDraftHasContent = useMemo(() => (
+    createMode !== 'appointment'
+    || createStep !== 1
+    || custMode !== 'existing'
+    || Boolean(
+      selectedCustId
+      || customerSearch.trim()
+      || walkinFullName.trim()
+      || walkinPhone.trim()
+      || walkinEmail.trim()
+      || walkinDob.trim()
+      || walkinIsVip
+      || includeGroupGuests
+      || guestCount !== 1
+      || guestNames.trim()
+      || currentServiceId
+      || currentStaffId
+      || currentStartTime !== 120
+      || currentDuration !== 60
+      || currentDiscountType !== 'none'
+      || currentDiscountValue !== 0
+      || currentServiceNotes.trim()
+      || stagedServices.length > 0
+      || sessionNotes.trim()
+      || !notifyWhatsApp
+      || createSplitActive
+      || Object.values(createSplitAmounts).some((amount) => Number(amount) > 0)
+      || giftCardCodeInput.trim()
+      || blockTitleAr.trim() !== 'استراحة قهوة الموظفين'
+      || blockTitleEn.trim() !== 'Staff Espresso Recess'
+      || blockStaffId
+      || blockStartTime !== 180
+      || blockDuration !== 45
+      || blockType !== 'Break'
+      || blockIsRecurring
+      || blockEndDate.trim()
+    )
+  ), [
+    createMode,
+    createStep,
+    custMode,
+    selectedCustId,
+    customerSearch,
+    walkinFullName,
+    walkinPhone,
+    walkinEmail,
+    walkinDob,
+    walkinIsVip,
+    includeGroupGuests,
+    guestCount,
+    guestNames,
+    currentServiceId,
+    currentStaffId,
+    currentStartTime,
+    currentDuration,
+    currentDiscountType,
+    currentDiscountValue,
+    currentServiceNotes,
+    stagedServices.length,
+    sessionNotes,
+    notifyWhatsApp,
+    createSplitActive,
+    createSplitAmounts,
+    giftCardCodeInput,
+    blockTitleAr,
+    blockTitleEn,
+    blockStaffId,
+    blockStartTime,
+    blockDuration,
+    blockType,
+    blockIsRecurring,
+    blockEndDate
+  ]);
+
+  const cartDraftSnapshot = useMemo<CartDraftSnapshot>(() => ({
+    cartTab,
+    productSearch,
+    productCategoryFilter,
+    cartItems,
+    gcSender,
+    gcRecipient,
+    gcValue,
+    generatedGcCode,
+    posCustMode,
+    posSelectedCustId,
+    posCustomerSearch,
+    posSplitActive,
+    posSplitAmounts,
+    posWalkinName,
+    posWalkinEmail,
+    posWalkinPhone,
+    showWalkinModal
+  }), [
+    cartTab,
+    productSearch,
+    productCategoryFilter,
+    cartItems,
+    gcSender,
+    gcRecipient,
+    gcValue,
+    generatedGcCode,
+    posCustMode,
+    posSelectedCustId,
+    posCustomerSearch,
+    posSplitActive,
+    posSplitAmounts,
+    posWalkinName,
+    posWalkinEmail,
+    posWalkinPhone,
+    showWalkinModal
+  ]);
+
+  const cartDraftHasContent = useMemo(() => (
+    Boolean(
+      cartTab !== 'products'
+      || productSearch.trim()
+      || productCategoryFilter !== 'all'
+      || cartItems.length > 0
+      || gcSender.trim()
+      || gcRecipient.trim()
+      || gcValue !== 500
+      || posCustMode !== 'walkin'
+      || posSelectedCustId
+      || posCustomerSearch.trim()
+      || posSplitActive
+      || Object.values(posSplitAmounts).some((amount) => Number(amount) > 0)
+      || posWalkinName.trim()
+      || posWalkinEmail.trim()
+      || posWalkinPhone.trim()
+      || showWalkinModal
+    )
+  ), [
+    cartTab,
+    productSearch,
+    productCategoryFilter,
+    cartItems.length,
+    gcSender,
+    gcRecipient,
+    gcValue,
+    posCustMode,
+    posSelectedCustId,
+    posCustomerSearch,
+    posSplitActive,
+    posSplitAmounts,
+    posWalkinName,
+    posWalkinEmail,
+    posWalkinPhone,
+    showWalkinModal
+  ]);
+
+  const restoreAppointmentDraft = (snapshot: AppointmentDraftSnapshot | null) => {
+    if (!snapshot) {
+      return;
+    }
+
+    setCreateMode(snapshot.createMode);
+    setCreateStep(snapshot.createStep);
+    setCustMode(snapshot.custMode);
+    setSelectedCustId(snapshot.selectedCustId);
+    setCustomerSearch(snapshot.customerSearch);
+    setWalkinFullName(snapshot.walkinFullName);
+    setWalkinPhone(snapshot.walkinPhone);
+    setWalkinEmail(snapshot.walkinEmail);
+    setWalkinDob(snapshot.walkinDob);
+    setWalkinIsVip(snapshot.walkinIsVip);
+    setIncludeGroupGuests(snapshot.includeGroupGuests);
+    setGuestCount(snapshot.guestCount);
+    setGuestNames(snapshot.guestNames);
+    setGuestsList(snapshot.guestsList || []);
+    setCurrentServiceId(snapshot.currentServiceId);
+    setCurrentStaffId(snapshot.currentStaffId);
+    setCurrentStartTime(snapshot.currentStartTime);
+    setCurrentDuration(snapshot.currentDuration);
+    setCurrentDiscountType(snapshot.currentDiscountType);
+    setCurrentDiscountValue(snapshot.currentDiscountValue);
+    setCurrentServiceNotes(snapshot.currentServiceNotes);
+    setStagedServices(snapshot.stagedServices || []);
+    setSessionNotes(snapshot.sessionNotes);
+    setNotifyWhatsApp(snapshot.notifyWhatsApp);
+    setCreateSplitActive(snapshot.createSplitActive);
+    setCreateSplitAmounts(snapshot.createSplitAmounts);
+    setGiftCardCodeInput(snapshot.giftCardCodeInput);
+    setBlockTitleAr(snapshot.blockTitleAr);
+    setBlockTitleEn(snapshot.blockTitleEn);
+    setBlockStaffId(snapshot.blockStaffId);
+    setBlockStartTime(snapshot.blockStartTime);
+    setBlockDuration(snapshot.blockDuration);
+    setBlockType(snapshot.blockType);
+    setBlockIsRecurring(snapshot.blockIsRecurring);
+    setBlockEndDate(snapshot.blockEndDate);
+  };
+
+  const resetAppointmentDraft = () => {
+    setCreateMode('appointment');
+    setCreateStep(1);
+    setCustMode('existing');
+    setSelectedCustId('');
+    setCustomerSearch('');
+    setWalkinFullName('');
+    setWalkinPhone('');
+    setWalkinEmail('');
+    setWalkinDob('');
+    setWalkinIsVip(false);
+    setIncludeGroupGuests(false);
+    setGuestCount(1);
+    setGuestNames('');
+    setGuestsList([
+      {
+        id: 'g-1',
+        name: '',
+        phone: '',
+        email: '',
+        birthDate: '',
+        notes: '',
+        isFree: false,
+        services: [createEmptyGuestService()]
+      }
+    ]);
+    setCurrentServiceId('');
+    setCurrentStaffId('');
+    setCurrentStartTime(120);
+    setCurrentDuration(60);
+    setCurrentDiscountType('none');
+    setCurrentDiscountValue(0);
+    setCurrentServiceNotes('');
+    setStagedServices([]);
+    setSessionNotes('');
+    setNotifyWhatsApp(true);
+    setCreateSplitActive(false);
+    setCreateSplitAmounts({ card: 0, cash: 0, online: 0, bank_transfer: 0, wallet: 0, gift_card: 0 });
+    setGiftCardCodeInput('');
+    setBlockTitleAr('استراحة قهوة الموظفين');
+    setBlockTitleEn('Staff Espresso Recess');
+    setBlockStaffId('');
+    setBlockStartTime(180);
+    setBlockDuration(45);
+    setBlockType('Break');
+    setBlockIsRecurring(false);
+    setBlockEndDate('');
+  };
+
+  const restoreCartDraft = (snapshot: CartDraftSnapshot | null) => {
+    if (!snapshot) {
+      return;
+    }
+
+    setCartTab(snapshot.cartTab);
+    setProductSearch(snapshot.productSearch);
+    setProductCategoryFilter(snapshot.productCategoryFilter);
+    setCartItems(snapshot.cartItems || []);
+    setGcSender(snapshot.gcSender);
+    setGcRecipient(snapshot.gcRecipient);
+    setGcValue(snapshot.gcValue);
+    setGeneratedGcCode(snapshot.generatedGcCode);
+    setPosCustMode(snapshot.posCustMode);
+    setPosSelectedCustId(snapshot.posSelectedCustId);
+    setPosCustomerSearch(snapshot.posCustomerSearch);
+    setPosSplitActive(snapshot.posSplitActive);
+    setPosSplitAmounts(snapshot.posSplitAmounts);
+    setPosWalkinName(snapshot.posWalkinName);
+    setPosWalkinEmail(snapshot.posWalkinEmail);
+    setPosWalkinPhone(snapshot.posWalkinPhone);
+    setShowWalkinModal(snapshot.showWalkinModal);
+  };
+
+  const resetCartDraft = () => {
+    setCartTab('products');
+    setProductSearch('');
+    setProductCategoryFilter('all');
+    setCartItems([]);
+    setGcSender('');
+    setGcRecipient('');
+    setGcValue(500);
+    setGeneratedGcCode(`REF-GFT-2026-${Math.floor(1000 + Math.random() * 9000)}`);
+    setPosCustMode('walkin');
+    setPosSelectedCustId('');
+    setPosCustomerSearch('');
+    setPosSplitActive(false);
+    setPosSplitAmounts({ card: 0, cash: 0, wallet: 0 });
+    setPosWalkinName('');
+    setPosWalkinEmail('');
+    setPosWalkinPhone('');
+    setShowWalkinModal(false);
+    setCompletedOrder(null);
+    setPosCheckoutComplete(false);
+  };
+
+  useEffect(() => {
+    if (appointmentDraftHasContent) {
+      writeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY, appointmentDraftSnapshot);
+    } else {
+      removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+      if (!isCreateDrawerOpen) {
+        setAppointmentDraftPending(false);
+      }
+    }
+  }, [appointmentDraftHasContent, appointmentDraftSnapshot, isCreateDrawerOpen]);
+
+  useEffect(() => {
+    if (cartDraftHasContent) {
+      writeDraftStorage(CART_DRAFT_STORAGE_KEY, cartDraftSnapshot);
+    } else {
+      removeDraftStorage(CART_DRAFT_STORAGE_KEY);
+      if (!isCartDrawerOpen) {
+        setCartDraftPending(false);
+      }
+    }
+  }, [cartDraftHasContent, cartDraftSnapshot, isCartDrawerOpen]);
+
+  useEffect(() => {
+    const wasOpen = previousCreateDrawerOpenRef.current;
+    previousCreateDrawerOpenRef.current = isCreateDrawerOpen;
+
+    if (wasOpen && !isCreateDrawerOpen && appointmentDraftHasContent) {
+      setAppointmentDraftPending(true);
+    }
+
+    if (isCreateDrawerOpen && appointmentDraftPending) {
+      setShowAppointmentDraftPrompt(true);
+    }
+  }, [isCreateDrawerOpen, appointmentDraftHasContent, appointmentDraftPending]);
+
+  useEffect(() => {
+    const wasOpen = previousCartDrawerOpenRef.current;
+    previousCartDrawerOpenRef.current = isCartDrawerOpen;
+
+    if (wasOpen && !isCartDrawerOpen && cartDraftHasContent) {
+      setCartDraftPending(true);
+    }
+
+    if (isCartDrawerOpen && cartDraftPending) {
+      setShowCartDraftPrompt(true);
+    }
+  }, [isCartDrawerOpen, cartDraftHasContent, cartDraftPending]);
 
   // Removed obsolete auto-populate duration and warning validation
 
@@ -1073,20 +1617,11 @@ export default function InteractiveDrawers({
       if (!response?.success) {
         throw new Error(response?.message || 'Failed to create appointment');
       }
+      resetAppointmentDraft();
+      removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+      setAppointmentDraftPending(false);
+      setShowAppointmentDraftPrompt(false);
       setIsCreateDrawerOpen(false);
-      setStagedServices([]);
-      setCreateStep(1);
-      setWalkinFullName('');
-      setWalkinPhone('');
-      setWalkinEmail('');
-      setWalkinDob('');
-      setWalkinIsVip(false);
-      setSessionNotes('');
-      setGiftCardCodeInput('');
-      setCreateSplitActive(false);
-      setGuestsList([{ id: 'g-1', name: '', phone: '', services: [createEmptyGuestService()], notes: '', isFree: false }]);
-      setIncludeGroupGuests(false);
-      setGuestCount(1);
       if (onBoardChanged) {
         await onBoardChanged();
       }
@@ -1133,6 +1668,10 @@ export default function InteractiveDrawers({
         throw new Error(response?.message || (existingBreak?.id ? 'Failed to update blocked time' : 'Failed to create blocked time'));
       }
 
+      resetAppointmentDraft();
+      removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+      setAppointmentDraftPending(false);
+      setShowAppointmentDraftPrompt(false);
       setIsCreateDrawerOpen(false);
       if (onBoardChanged) {
         await onBoardChanged();
@@ -1175,6 +1714,10 @@ export default function InteractiveDrawers({
         throw new Error(response?.message || 'Failed to delete blocked time');
       }
 
+      resetAppointmentDraft();
+      removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+      setAppointmentDraftPending(false);
+      setShowAppointmentDraftPrompt(false);
       setIsCreateDrawerOpen(false);
       if (onBoardChanged) {
         await onBoardChanged();
@@ -1406,7 +1949,7 @@ export default function InteractiveDrawers({
         }
       }
 
-      setCompletedOrder({
+      const completedReceipt = {
         orderId: orderId,
         date: new Date().toISOString().replace('T', ' ').substring(0, 16),
         customerName: buyerName,
@@ -1415,18 +1958,13 @@ export default function InteractiveDrawers({
         vat,
         total,
         paymentSummary: paymentMethodSummary
-      });
+      };
 
-      setCartItems([]);
-      setPosSplitActive(false);
-      setPosSplitAmounts({ card: 0, cash: 0, wallet: 0 });
-      setPosWalkinName('');
-      setPosWalkinEmail('');
-      setPosWalkinPhone('');
-      setPosSelectedCustId('');
-      setPosCustMode('walkin');
-      setPosCustomerSearch('');
-      setShowWalkinModal(false);
+      resetCartDraft();
+      removeDraftStorage(CART_DRAFT_STORAGE_KEY);
+      setCartDraftPending(false);
+      setShowCartDraftPrompt(false);
+      setCompletedOrder(completedReceipt);
       setPosCheckoutComplete(true);
 
       if (onBoardChanged) {
@@ -1467,6 +2005,57 @@ export default function InteractiveDrawers({
                 isRtl ? 'border-r border-slate-200' : 'border-l border-slate-200'
               }`}
             >
+              <AnimatePresence>
+                {showAppointmentDraftPrompt && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-[80] flex items-center justify-center bg-zinc-950/55 px-4 backdrop-blur-sm"
+                  >
+                    <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-white p-6 shadow-2xl">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-2xl bg-amber-500/10 p-2 text-amber-600">
+                          <AlertTriangle size={20} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">
+                            {isRtl ? 'جلسة مسودة غير مكتملة' : 'Unfinished draft session'}
+                          </p>
+                          <h4 className="mt-1 text-lg font-black text-slate-900">
+                            {isRtl
+                              ? `لديك ${appointmentDraftTypeLabel} غير مكتمل`
+                              : `You have an unfinished ${appointmentDraftTypeLabel}`}
+                          </h4>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                            {isRtl
+                              ? 'بدأت العملية سابقاً ولم تكتمل. هل تريد المتابعة من حيث توقفت أم تجاهل المسودة وبدء عملية جديدة؟'
+                              : 'You started this workflow earlier but did not complete it. Would you like to continue where you left off or discard the draft and start a fresh one?'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={handleDiscardAppointmentDraft}
+                          className="rounded-full border border-rose-200 bg-rose-50 px-5 py-2.5 text-sm font-bold text-rose-700 transition hover:bg-rose-100"
+                        >
+                          {isRtl ? 'تجاهل وبدء جديد' : 'Discard & Start New'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleContinueAppointmentDraft}
+                          className="rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-zinc-800"
+                        >
+                          {isRtl ? 'متابعة المسودة' : 'Continue'}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Header */}
               <div className="p-5 bg-zinc-900 text-white flex items-center justify-between border-b border-zinc-800">
                 <div>
@@ -2520,6 +3109,57 @@ export default function InteractiveDrawers({
                 isRtl ? 'border-r border-slate-200' : 'border-l border-slate-200'
               }`}
             >
+              <AnimatePresence>
+                {showCartDraftPrompt && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-[80] flex items-center justify-center bg-zinc-950/55 px-4 backdrop-blur-sm"
+                  >
+                    <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-white p-6 shadow-2xl">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-2xl bg-amber-500/10 p-2 text-amber-600">
+                          <AlertTriangle size={20} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">
+                            {isRtl ? 'جلسة مبيعات غير مكتملة' : 'Unfinished sale session'}
+                          </p>
+                          <h4 className="mt-1 text-lg font-black text-slate-900">
+                            {isRtl
+                              ? `لديك ${cartDraftTypeLabel} غير مكتمل`
+                              : `You have an unfinished ${cartDraftTypeLabel}`}
+                          </h4>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                            {isRtl
+                              ? 'توجد بيانات محفوظة غير مكتملة لهذه العملية. هل تريد المتابعة من حيث توقفت أم تجاهل المسودة وبدء عملية جديدة؟'
+                              : 'There is unfinished data for this drawer. Would you like to continue where you left off or discard the draft and start fresh?'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={handleDiscardCartDraft}
+                          className="rounded-full border border-rose-200 bg-rose-50 px-5 py-2.5 text-sm font-bold text-rose-700 transition hover:bg-rose-100"
+                        >
+                          {isRtl ? 'تجاهل وبدء جديد' : 'Discard & Start New'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleContinueCartDraft}
+                          className="rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-zinc-800"
+                        >
+                          {isRtl ? 'متابعة المسودة' : 'Continue'}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Header */}
               <div className="p-4 bg-amber-500 text-zinc-950 flex items-center justify-between border-b border-amber-600">
                 <div>
