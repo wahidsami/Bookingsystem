@@ -387,45 +387,6 @@ export default function InteractiveDrawers({
     }
   }, [isCartDrawerOpen]);
 
-  const appointmentDraftTypeLabel = createMode === 'blocked'
-    ? (isRtl ? 'فترة حظر' : 'blocked time')
-    : (isRtl ? 'موعد' : 'appointment');
-  const cartDraftTypeLabel = cartTab === 'giftcards'
-    ? (isRtl ? 'بطاقة هدايا' : 'gift card order')
-    : (isRtl ? 'طلب منتجات' : 'product order');
-
-  const handleContinueAppointmentDraft = () => {
-    const snapshot = readDraftStorage<AppointmentDraftSnapshot>(APPOINTMENT_DRAFT_STORAGE_KEY);
-    if (snapshot) {
-      restoreAppointmentDraft(snapshot);
-    }
-    setShowAppointmentDraftPrompt(false);
-    setAppointmentDraftPending(true);
-  };
-
-  const handleDiscardAppointmentDraft = () => {
-    resetAppointmentDraft();
-    removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
-    setAppointmentDraftPending(false);
-    setShowAppointmentDraftPrompt(false);
-  };
-
-  const handleContinueCartDraft = () => {
-    const snapshot = readDraftStorage<CartDraftSnapshot>(CART_DRAFT_STORAGE_KEY);
-    if (snapshot) {
-      restoreCartDraft(snapshot);
-    }
-    setShowCartDraftPrompt(false);
-    setCartDraftPending(true);
-  };
-
-  const handleDiscardCartDraft = () => {
-    resetCartDraft();
-    removeDraftStorage(CART_DRAFT_STORAGE_KEY);
-    setCartDraftPending(false);
-    setShowCartDraftPrompt(false);
-  };
-
   // Step 1: Customer Info
   const [custMode, setCustMode] = useState<'existing' | 'walkin'>('existing');
   const [selectedCustId, setSelectedCustId] = useState<string>('');
@@ -1197,6 +1158,45 @@ export default function InteractiveDrawers({
     setShowWalkinModal(false);
     setCompletedOrder(null);
     setPosCheckoutComplete(false);
+  };
+
+  const appointmentDraftTypeLabel = createMode === 'blocked'
+    ? (isRtl ? 'فترة حظر' : 'blocked time')
+    : (isRtl ? 'موعد' : 'appointment');
+  const cartDraftTypeLabel = cartTab === 'giftcards'
+    ? (isRtl ? 'بطاقة هدايا' : 'gift card order')
+    : (isRtl ? 'طلب منتجات' : 'product order');
+
+  const handleContinueAppointmentDraft = () => {
+    const snapshot = readDraftStorage<AppointmentDraftSnapshot>(APPOINTMENT_DRAFT_STORAGE_KEY);
+    if (snapshot) {
+      restoreAppointmentDraft(snapshot);
+    }
+    setShowAppointmentDraftPrompt(false);
+    setAppointmentDraftPending(true);
+  };
+
+  const handleDiscardAppointmentDraft = () => {
+    resetAppointmentDraft();
+    removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+    setAppointmentDraftPending(false);
+    setShowAppointmentDraftPrompt(false);
+  };
+
+  const handleContinueCartDraft = () => {
+    const snapshot = readDraftStorage<CartDraftSnapshot>(CART_DRAFT_STORAGE_KEY);
+    if (snapshot) {
+      restoreCartDraft(snapshot);
+    }
+    setShowCartDraftPrompt(false);
+    setCartDraftPending(true);
+  };
+
+  const handleDiscardCartDraft = () => {
+    resetCartDraft();
+    removeDraftStorage(CART_DRAFT_STORAGE_KEY);
+    setCartDraftPending(false);
+    setShowCartDraftPrompt(false);
   };
 
   useEffect(() => {
