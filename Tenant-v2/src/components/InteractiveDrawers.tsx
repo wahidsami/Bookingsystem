@@ -402,6 +402,13 @@ export default function InteractiveDrawers({
   const registeredCustomerSearchRef = useRef<HTMLInputElement>(null);
   const walkinNameRef = useRef<HTMLInputElement>(null);
 
+  // Appointment service staging state
+  const [currentServiceId, setCurrentServiceId] = useState('');
+  const [currentDuration, setCurrentDuration] = useState<number>(60);
+  const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
+  const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
+  const [currentServiceNotes, setCurrentServiceNotes] = useState('');
+
   useEffect(() => {
     if (availableStylists.length > 0 && !availableStylists.some((stylist) => stylist.id === currentStaffId)) {
       setCurrentStaffId(availableStylists[0].id);
