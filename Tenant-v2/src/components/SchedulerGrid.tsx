@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Users, ChevronDown } from 'lucide-react';
+import { Users, ChevronDown, Link2 } from 'lucide-react';
 
 export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
 
@@ -572,6 +572,83 @@ export default function SchedulerGrid({
     return positioned;
   }, [columns, events, slotMinutes]);
 
+  const chainedSessionIds = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const ev of positionedEvents) {
+        if (ev.kind !== 'appointment' || !ev.raw?.bookingSessionId) continue;
+        const sid = ev.raw.bookingSessionId;
+        counts.set(sid, (counts.get(sid) || 0) + 1);
+    }
+    const chained = new Set<string>();
+    for (const [sid, count] of counts.entries()) {
+        if (count > 1) chained.add(sid);
+    }
+    return chained;
+  }, [positionedEvents]);
+
+  const chainConnectors = useMemo(() => {
+    const groups = new Map<string, typeof positionedEvents>();
+    for (const ev of positionedEvents) {
+        if (ev.kind !== 'appointment' || !ev.raw?.bookingSessionId) continue;
+        const sid = ev.raw.bookingSessionId;
+        if (!groups.has(sid)) groups.set(sid, []);
+        groups.get(sid)!.push(ev);
+    }
+    
+    const lines: Array<{
+      key: string;
+      x1: number; y1: number;
+      x2: number; y2: number;
+      isSameColumn: boolean;
+    }> = [];
+    
+    Array.from(groups.values()).forEach(group => {
+        if (group.length <= 1) return;
+        
+        // Sort chronologically
+        group.sort((a,b) => a.startMinutes - b.startMinutes);
+        
+        for (let i = 0; i < group.length - 1; i++) {
+            const ev1 = group[i];
+            const ev2 = group[i+1];
+            
+            const colIdx1 = getColumnIndex(ev1.columnId);
+            const colIdx2 = getColumnIndex(ev2.columnId);
+            if (colIdx1 === -1 || colIdx2 === -1) continue;
+            
+            const cellWidth = Math.max(50, staffColumnWidth);
+            
+            // Calc x1, y1
+            const top1 = (Math.max(0, ev1.startMinutes) / slotMinutes) * slotHeight;
+            const height1 = Math.max(slotHeight, (Math.max(ev1.durationMinutes, slotMinutes) / slotMinutes) * slotHeight);
+            const laneWidthPx1 = cellWidth / Math.max(1, ev1.laneCount);
+            const eventCardWidth1 = laneWidthPx1 - 8;
+            const inlineStart1 = (colIdx1 * cellWidth) + (ev1.laneIndex * laneWidthPx1);
+            const cx1 = inlineStart1 + (eventCardWidth1 / 2);
+            const y1 = top1 + height1;
+            
+            // Calc x2, y2
+            const top2 = (Math.max(0, ev2.startMinutes) / slotMinutes) * slotHeight;
+            const laneWidthPx2 = cellWidth / Math.max(1, ev2.laneCount);
+            const eventCardWidth2 = laneWidthPx2 - 8;
+            const inlineStart2 = (colIdx2 * cellWidth) + (ev2.laneIndex * laneWidthPx2);
+            const cx2 = inlineStart2 + (eventCardWidth2 / 2);
+            const y2 = top2;
+            
+            lines.push({
+                key: `chain-${ev1.id}-${ev2.id}`,
+                x1: cx1,
+                y1,
+                x2: cx2,
+                y2,
+                isSameColumn: colIdx1 === colIdx2
+            });
+        }
+    });
+    
+    return lines;
+  }, [positionedEvents, slotMinutes, slotHeight, staffColumnWidth, getColumnIndex]);
+
   return (
     <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-visible" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="sticky top-0 z-50 grid border-b border-slate-200 bg-slate-50/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
@@ -802,6 +879,8 @@ export default function SchedulerGrid({
             const isCompact = height < 42;
             const isMedium = height >= 42 && height < 64;
             const showStatusMeta = showAppointmentStatusBadges;
+            
+            const isPartOfChain = event.kind === 'appointment' && event.raw?.bookingSessionId && chainedSessionIds.has(event.raw.bookingSessionId);
 
             return (
               <div
@@ -840,7 +919,7 @@ export default function SchedulerGrid({
                     contextEvent.stopPropagation();
                     onEventContextMenu?.(contextEvent, event);
                   }}
-                  className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'}`}
+                  className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${isPartOfChain ? 'ring-2 ring-amber-400/80 shadow-amber-500/20' : ''}`}
                 >
                   <div className={`absolute inset-x-0 top-0 h-1 ${statusTheme.accent}`} />
 
