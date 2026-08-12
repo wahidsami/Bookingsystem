@@ -1,0 +1,1496 @@
+[
+  {
+    "column": "workingHours",
+    "model": "Tenant",
+    "file": "FIX_STAFF_JSON_COLUMNS.sql",
+    "context": "om existing type to JSONB for workingHours\r \r -- Step 1: Check current c"
+  },
+  {
+    "column": "workingHours",
+    "model": "Tenant",
+    "file": "FIX_STAFF_JSON_COLUMNS.sql",
+    "context": "END;\r \r -- Step 3: Convert workingHours to JSONB\r -- Handle different"
+  },
+  {
+    "column": "workingHours",
+    "model": "Tenant",
+    "file": "FIX_STAFF_JSON_COLUMNS.sql",
+    "context": "BEGIN\r     -- Try to convert workingHours to JSONB\r     -- If it's alre"
+  },
+  {
+    "column": "workingHours",
+    "model": "Tenant",
+    "file": "FIX_STAFF_JSON_COLUMNS_SIMPLE.sql",
+    "context": "b(\"skills\");\r \r -- 2. Convert workingHours to JSONB (if it exists and is"
+  },
+  {
+    "column": "workingHours",
+    "model": "Tenant",
+    "file": "FIX_STAFF_JSON_COLUMNS_SIMPLE.sql",
+    "context": "is not already JSONB)\r -- If workingHours is text/varchar, convert it"
+  },
+  {
+    "column": "heroSliders",
+    "model": "PublicPageData",
+    "file": "MIGRATE_HERO_SLIDER.sql",
+    "context": "table\r -- This migration adds heroSliders JSONB field to store hero sli"
+  },
+  {
+    "column": "heroSliders",
+    "model": "PublicPageData",
+    "file": "MIGRATE_HERO_SLIDER.sql",
+    "context": "figurations\r \r -- Step 1: Add heroSliders column\r ALTER TABLE \"public_p"
+  },
+  {
+    "column": "rawPrice",
+    "model": "Service",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "table\r -- This migration adds rawPrice, taxRate, and commissionRate"
+  },
+  {
+    "column": "rawPrice",
+    "model": "Service",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "grates existing price data to rawPrice\r \r -- Step 1: Add new columns"
+  },
+  {
+    "column": "rawPrice",
+    "model": "Service",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "igrate existing price data to rawPrice\r -- For existing products, se"
+  },
+  {
+    "column": "rawPrice",
+    "model": "Service",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "-- For existing products, set rawPrice = price (we'll recalculate fi"
+  },
+  {
+    "column": "rawPrice",
+    "model": "Service",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "ng products\r -- Final price = rawPrice + (rawPrice * taxRate/100) +"
+  },
+  {
+    "column": "rawPrice",
+    "model": "Service",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "-- Final price = rawPrice + (rawPrice * taxRate/100) + (rawPrice *"
+  },
+  {
+    "column": "rawPrice",
+    "model": "Service",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "+ (rawPrice * taxRate/100) + (rawPrice * commissionRate/100)\r UPDATE"
+  },
+  {
+    "column": "rawPrice",
+    "model": "Service",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "NOT NULL;\r \r -- Step 5: Make rawPrice NOT NULL (after migration)\r A"
+  },
+  {
+    "column": "taxRate",
+    "model": "TenantSettings",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "This migration adds rawPrice, taxRate, and commissionRate fields to"
+  },
+  {
+    "column": "taxRate",
+    "model": "TenantSettings",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "ed\r -- For now, set defaults: taxRate = 15%, commissionRate = 10%"
+  },
+  {
+    "column": "taxRate",
+    "model": "TenantSettings",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "rice = rawPrice + (rawPrice * taxRate/100) + (rawPrice * commission"
+  },
+  {
+    "column": "commissionRate",
+    "model": "TenantSettings",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "n adds rawPrice, taxRate, and commissionRate fields to products\r -- and mi"
+  },
+  {
+    "column": "commissionRate",
+    "model": "TenantSettings",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "set defaults: taxRate = 15%, commissionRate = 10%\r UPDATE products \r SET"
+  },
+  {
+    "column": "commissionRate",
+    "model": "TenantSettings",
+    "file": "MIGRATE_PRODUCT_PRICING.sql",
+    "context": "* taxRate/100) + (rawPrice * commissionRate/100)\r UPDATE products \r SET p"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "MIGRATE_PUBLIC_PAGE_DATA.sql",
+    "context": "p 4: Create trigger to update updatedAt timestamp\r CREATE OR REPLACE"
+  },
+  {
+    "column": "availableInCenter",
+    "model": "Service",
+    "file": "MIGRATE_SERVICE_AVAILABILITY.sql",
+    "context": "- This migration adds:\r -- 1. availableInCenter - Boolean (default: true)\r --"
+  },
+  {
+    "column": "availableHomeVisit",
+    "model": "Service",
+    "file": "MIGRATE_SERVICE_AVAILABILITY.sql",
+    "context": "oolean (default: true)\r -- 2. availableHomeVisit - Boolean (default: false)"
+  },
+  {
+    "column": "workingHours",
+    "model": "Tenant",
+    "file": "MIGRATE_STAFF_TO_JSONB.sql",
+    "context": "::jsonb;\r \r -- Step 4: Handle workingHours default if it exists\r ALTER T"
+  },
+  {
+    "column": "workingHours",
+    "model": "Tenant",
+    "file": "MIGRATE_STAFF_TO_JSONB.sql",
+    "context": "EFAULT;\r \r -- Step 5: Convert workingHours to JSONB\r -- Try to convert d"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "hift\", etc.'\r       },\r       createdAt: {\r         type: DataTypes.D"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "'is_active'\r       },\r       createdAt: {\r         type: DataTypes.D"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "approved_at'\r       },\r       createdAt: {\r         type: DataTypes.D"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "vent\", etc.'\r       },\r       createdAt: {\r         type: DataTypes.D"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "'created_at'\r       },\r       updatedAt: {\r         type: DataTypes.D"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "'created_at'\r       },\r       updatedAt: {\r         type: DataTypes.D"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "'created_at'\r       },\r       updatedAt: {\r         type: DataTypes.D"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "'created_at'\r       },\r       updatedAt: {\r         type: DataTypes.D"
+  },
+  {
+    "column": "staffId",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "aryKey: true\r       },\r       staffId: {\r         type: DataTypes.U"
+  },
+  {
+    "column": "staffId",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "aryKey: true\r       },\r       staffId: {\r         type: DataTypes.U"
+  },
+  {
+    "column": "staffId",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "aryKey: true\r       },\r       staffId: {\r         type: DataTypes.U"
+  },
+  {
+    "column": "staffId",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "aryKey: true\r       },\r       staffId: {\r         type: DataTypes.U"
+  },
+  {
+    "column": "startTime",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "ecific_date'\r       },\r       startTime: {\r         type: DataTypes.T"
+  },
+  {
+    "column": "startTime",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "ecific_date'\r       },\r       startTime: {\r         type: DataTypes.T"
+  },
+  {
+    "column": "startTime",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "ecial hours'\r       },\r       startTime: {\r         type: DataTypes.T"
+  },
+  {
+    "column": "endTime",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "'start_time'\r       },\r       endTime: {\r         type: DataTypes.T"
+  },
+  {
+    "column": "endTime",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "'start_time'\r       },\r       endTime: {\r         type: DataTypes.T"
+  },
+  {
+    "column": "endTime",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "'start_time'\r       },\r       endTime: {\r         type: DataTypes.T"
+  },
+  {
+    "column": "isActive",
+    "model": "TenantGiftCardPackage",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": ": 'end_date'\r       },\r       isActive: {\r         type: DataTypes.B"
+  },
+  {
+    "column": "isActive",
+    "model": "TenantGiftCardPackage",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": ": 'end_date'\r       },\r       isActive: {\r         type: DataTypes.B"
+  },
+  {
+    "column": "isAvailable",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": ": 'end_time'\r       },\r       isAvailable: {\r         type: DataTypes.B"
+  },
+  {
+    "column": "dayOfWeek",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": ": 'staff_id'\r       },\r       dayOfWeek: {\r         type: DataTypes.I"
+  },
+  {
+    "column": "dayOfWeek",
+    "model": "StaffSchedule",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": ": 'staff_id'\r       },\r       dayOfWeek: {\r         type: DataTypes.I"
+  },
+  {
+    "column": "approvedAt",
+    "model": "Tenant",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "approved_by'\r       },\r       approvedAt: {\r         type: DataTypes.D"
+  },
+  {
+    "column": "approvedBy",
+    "model": "Tenant",
+    "file": "20240101000000-create-scheduling-tables.js",
+    "context": "is_approved'\r       },\r       approvedBy: {\r         type: DataTypes.U"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "llowNull: true       },       createdAt: {         type: Sequelize.DA"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "NT_TIMESTAMP')       },       updatedAt: {         type: Sequelize.DA"
+  },
+  {
+    "column": "platformUserId",
+    "model": "WalletLedgerEntry",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "ete: 'CASCADE'       },       platformUserId: {         type: Sequelize.UU"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "unique: true       },       tenantId: {         type: Sequelize.UU"
+  },
+  {
+    "column": "bookingReference",
+    "model": "BookingSession",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "lowNull: false       },       bookingReference: {         type: Sequelize.ST"
+  },
+  {
+    "column": "taxAmount",
+    "model": "Order",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "efaultValue: 0       },       taxAmount: {         type: Sequelize.DE"
+  },
+  {
+    "column": "platformFee",
+    "model": "Transaction",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "efaultValue: 0       },       platformFee: {         type: Sequelize.DE"
+  },
+  {
+    "column": "paymentMethod",
+    "model": "Order",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "efaultValue: 0       },       paymentMethod: {         type: Sequelize.ST"
+  },
+  {
+    "column": "totalAmount",
+    "model": "Order",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "efaultValue: 0       },       totalAmount: {         type: Sequelize.DE"
+  },
+  {
+    "column": "itemCount",
+    "model": "BookingSession",
+    "file": "20260421150000-create-booking-sessions.js",
+    "context": "Value: 'draft'       },       itemCount: {         type: Sequelize.IN"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260531173000-create-payment-idempotency-keys.js",
+    "context": "ue             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260531173000-create-payment-idempotency-keys.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "platformUserId",
+    "model": "WalletLedgerEntry",
+    "file": "20260531173000-create-payment-idempotency-keys.js",
+    "context": "se             },             platformUserId: {                 type: Sequ"
+  },
+  {
+    "column": "idempotencyKey",
+    "model": "PaymentIdempotencyKey",
+    "file": "20260531173000-create-payment-idempotency-keys.js",
+    "context": "E'             },             idempotencyKey: {                 type: Sequ"
+  },
+  {
+    "column": "requestHash",
+    "model": "PaymentIdempotencyKey",
+    "file": "20260531173000-create-payment-idempotency-keys.js",
+    "context": "se             },             requestHash: {                 type: Sequ"
+  },
+  {
+    "column": "responsePayload",
+    "model": "PaymentIdempotencyKey",
+    "file": "20260531173000-create-payment-idempotency-keys.js",
+    "context": "g'             },             responsePayload: {                 type: Sequ"
+  },
+  {
+    "column": "errorMessage",
+    "model": "PaymentIdempotencyKey",
+    "file": "20260531173000-create-payment-idempotency-keys.js",
+    "context": "ue             },             errorMessage: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "ue             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "reportType",
+    "model": "TenantSavedReport",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "L'             },             reportType: {                 type: Sequ"
+  },
+  {
+    "column": "reportConfig",
+    "model": "TenantSavedReport",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "{}             },             reportConfig: {                 type: Sequ"
+  },
+  {
+    "column": "isFavorite",
+    "model": "TenantSavedReport",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "{}             },             isFavorite: {                 type: Sequ"
+  },
+  {
+    "column": "duplicatedFromId",
+    "model": "TenantSavedReport",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "se             },             duplicatedFromId: {                 type: Sequ"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "se             },             tenantId: {                 type: Sequ"
+  },
+  {
+    "column": "createdByUserId",
+    "model": "TenantSavedReport",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "E'             },             createdByUserId: {                 type: Sequ"
+  },
+  {
+    "column": "createdBy",
+    "model": "SupportTicketLink",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "E'             },             createdByUserId: {                 type"
+  },
+  {
+    "column": "selectedMetrics",
+    "model": "TenantSavedReport",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "{}             },             selectedMetrics: {                 type: Sequ"
+  },
+  {
+    "column": "lastOpenedAt",
+    "model": "TenantSavedReport",
+    "file": "20260627183000-create-tenant-saved-reports.js",
+    "context": "L'             },             lastOpenedAt: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "{}             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "{}             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "{}             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "{}             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             tenantId: {                 type: Sequ"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             tenantId: {                 type: Sequ"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             tenantId: {                 type: Sequ"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             tenantId: {                 type: Sequ"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             tenantId: {                 type: Sequ"
+  },
+  {
+    "column": "actorType",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             actorType: {                 type: Sequ"
+  },
+  {
+    "column": "eventType",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             eventType: {                 type: Sequ"
+  },
+  {
+    "column": "occurredAt",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "{}             },             occurredAt: {                 type: Sequ"
+  },
+  {
+    "column": "lastMessageAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             lastMessageAt: {                 type: Sequ"
+  },
+  {
+    "column": "fromStatus",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             fromStatus: {                 type: Sequ"
+  },
+  {
+    "column": "toStatus",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             toStatus: {                 type: Sequ"
+  },
+  {
+    "column": "nameAr",
+    "model": "Tenant",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             nameAr: {                 type: Sequ"
+  },
+  {
+    "column": "isActive",
+    "model": "TenantGiftCardPackage",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "0             },             isActive: {                 type: Sequ"
+  },
+  {
+    "column": "lastSeenAt",
+    "model": "SupportAgent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "{}             },             lastSeenAt: {                 type: Sequ"
+  },
+  {
+    "column": "sortOrder",
+    "model": "SupportCategory",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             sortOrder: {                 type: Sequ"
+  },
+  {
+    "column": "superAdminId",
+    "model": "SupportAgent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             superAdminId: {                 type: Sequ"
+  },
+  {
+    "column": "displayName",
+    "model": "TenantDashboardAccount",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             displayName: {                 type: Sequ"
+  },
+  {
+    "column": "displayName",
+    "model": "TenantDashboardAccount",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             displayNameAr: {                 type: Se"
+  },
+  {
+    "column": "displayNameAr",
+    "model": "SupportAgent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             displayNameAr: {                 type: Sequ"
+  },
+  {
+    "column": "avatarUrl",
+    "model": "SupportAgent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             avatarUrl: {                 type: Sequ"
+  },
+  {
+    "column": "presenceStatus",
+    "model": "SupportAgent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "e'             },             presenceStatus: {                 type: Sequ"
+  },
+  {
+    "column": "supportedLanguages",
+    "model": "TenantSettings",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "e'             },             supportedLanguages: {                 type: Sequ"
+  },
+  {
+    "column": "deletedAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             deletedAt: {                 type: Sequ"
+  },
+  {
+    "column": "deletedAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             deletedAt: {                 type: Sequ"
+  },
+  {
+    "column": "deletedAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             deletedAt: {                 type: Sequ"
+  },
+  {
+    "column": "deletedAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             deletedAt: {                 type: Sequ"
+  },
+  {
+    "column": "deletedAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "')             },             deletedAt: {                 type: Sequ"
+  },
+  {
+    "column": "supportTicketId",
+    "model": "SupportTicketReadState",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "E'             },             supportTicketId: {                 type: Sequ"
+  },
+  {
+    "column": "supportTicketId",
+    "model": "SupportTicketReadState",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "E'             },             supportTicketId: {                 type: Sequ"
+  },
+  {
+    "column": "supportTicketId",
+    "model": "SupportTicketReadState",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "E'             },             supportTicketId: {                 type: Sequ"
+  },
+  {
+    "column": "supportMessageId",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "E'             },             supportMessageId: {                 type: Sequ"
+  },
+  {
+    "column": "supportMessageId",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "E'             },             supportMessageId: {                 type: Sequ"
+  },
+  {
+    "column": "uploadedByType",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "E'             },             uploadedByType: {                 type: Sequ"
+  },
+  {
+    "column": "customerPlatformUserId",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "E'             },             customerPlatformUserId: {                 type: Sequ"
+  },
+  {
+    "column": "customerPlatformUserId",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             customerPlatformUserId: {                 type: Sequ"
+  },
+  {
+    "column": "customerPlatformUserId",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "r'             },             customerPlatformUserId: {                 type: Sequ"
+  },
+  {
+    "column": "customerPlatformUserId",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "m'             },             customerPlatformUserId: {                 type: Sequ"
+  },
+  {
+    "column": "supportAgentId",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             supportAgentId: {                 type: Sequ"
+  },
+  {
+    "column": "supportAgentId",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             supportAgentId: {                 type: Sequ"
+  },
+  {
+    "column": "supportAgentId",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             supportAgentId: {                 type: Sequ"
+  },
+  {
+    "column": "fileName",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             fileName: {                 type: Sequ"
+  },
+  {
+    "column": "originalName",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             originalName: {                 type: Sequ"
+  },
+  {
+    "column": "mimeType",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             mimeType: {                 type: Sequ"
+  },
+  {
+    "column": "fileCategory",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             fileCategory: {                 type: Sequ"
+  },
+  {
+    "column": "storageProvider",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             storageProvider: {                 type: Sequ"
+  },
+  {
+    "column": "storagePath",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "l'             },             storagePath: {                 type: Sequ"
+  },
+  {
+    "column": "storageUrl",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             storageUrl: {                 type: Sequ"
+  },
+  {
+    "column": "fileSize",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             fileSize: {                 type: Sequ"
+  },
+  {
+    "column": "isInline",
+    "model": "SupportAttachment",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             isInline: {                 type: Sequ"
+  },
+  {
+    "column": "descriptionAr",
+    "model": "Tenant",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             descriptionAr: {                 type: Sequ"
+  },
+  {
+    "column": "descriptionAr",
+    "model": "Tenant",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             descriptionAr: {                 type: Sequ"
+  },
+  {
+    "column": "replyToMessageId",
+    "model": "SupportMessage",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "E'             },             replyToMessageId: {                 type: Sequ"
+  },
+  {
+    "column": "senderType",
+    "model": "SupportMessage",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             senderType: {                 type: Sequ"
+  },
+  {
+    "column": "contentFormat",
+    "model": "SupportMessage",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "r'             },             contentFormat: {                 type: Sequ"
+  },
+  {
+    "column": "isEdited",
+    "model": "SupportMessage",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "c'             },             isEdited: {                 type: Sequ"
+  },
+  {
+    "column": "editedAt",
+    "model": "SupportMessage",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             editedAt: {                 type: Sequ"
+  },
+  {
+    "column": "ticketNumber",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             ticketNumber: {                 type: Sequ"
+  },
+  {
+    "column": "supportCategoryId",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             supportCategoryId: {                 type: Sequ"
+  },
+  {
+    "column": "assignedSupportAgentId",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             assignedSupportAgentId: {                 type: Sequ"
+  },
+  {
+    "column": "sourceChannel",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             sourceChannel: {                 type: Sequ"
+  },
+  {
+    "column": "subjectAr",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "se             },             subjectAr: {                 type: Sequ"
+  },
+  {
+    "column": "firstResponseAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             firstResponseAt: {                 type: Sequ"
+  },
+  {
+    "column": "resolvedAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             resolvedAt: {                 type: Sequ"
+  },
+  {
+    "column": "closedAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             closedAt: {                 type: Sequ"
+  },
+  {
+    "column": "reopenedAt",
+    "model": "SupportTicket",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             reopenedAt: {                 type: Sequ"
+  },
+  {
+    "column": "supportAttachmentId",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "L'             },             supportAttachmentId: {                 type: Sequ"
+  },
+  {
+    "column": "fromPriority",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             fromPriority: {                 type: Sequ"
+  },
+  {
+    "column": "toPriority",
+    "model": "SupportTicketEvent",
+    "file": "20260730000000-create-support-platform.js",
+    "context": "ue             },             toPriority: {                 type: Sequ"
+  },
+  {
+    "column": "entityType",
+    "model": "SupportTicketLink",
+    "file": "20260730010000-support-platform-refinements.js",
+    "context": "E'             },             entityType: {                 type: Sequ"
+  },
+  {
+    "column": "entityId",
+    "model": "SupportTicketLink",
+    "file": "20260730010000-support-platform-refinements.js",
+    "context": "se             },             entityId: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730010000-support-platform-refinements.js",
+    "context": "ue             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730010000-support-platform-refinements.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "createdBy",
+    "model": "SupportTicketLink",
+    "file": "20260730010000-support-platform-refinements.js",
+    "context": "se             },             createdBy: {                 type: Sequ"
+  },
+  {
+    "column": "ticketId",
+    "model": "SupportTicketLink",
+    "file": "20260730010000-support-platform-refinements.js",
+    "context": "se             },             ticketId: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "'             }),             createdAt: new Date(),             upda"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "edAt: new Date(),             updatedAt: new Date()         });"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "{             id,             tenantId: null,             parentId,"
+  },
+  {
+    "column": "nameAr",
+    "model": "Tenant",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "name: node.name,             nameAr: node.nameAr || null,"
+  },
+  {
+    "column": "nameAr",
+    "model": "Tenant",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "ame,             nameAr: node.nameAr || null,             descript"
+  },
+  {
+    "column": "featureKey",
+    "model": "SupportCategory",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "de.color || null,             featureKey: node.featureKey || node.key,"
+  },
+  {
+    "column": "featureKey",
+    "model": "SupportCategory",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "featureKey: node.featureKey || node.key,             feat"
+  },
+  {
+    "column": "isActive",
+    "model": "TenantGiftCardPackage",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "rder : index + 1,             isActive: node.isActive !== false,"
+  },
+  {
+    "column": "isActive",
+    "model": "TenantGiftCardPackage",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "1,             isActive: node.isActive !== false,             metada"
+  },
+  {
+    "column": "sortOrder",
+    "model": "SupportCategory",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "ureRoute || null,             sortOrder: Number.isFinite(node.sortOrd"
+  },
+  {
+    "column": "sortOrder",
+    "model": "SupportCategory",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "rtOrder: Number.isFinite(node.sortOrder) ? node.sortOrder : index + 1"
+  },
+  {
+    "column": "sortOrder",
+    "model": "SupportCategory",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "Finite(node.sortOrder) ? node.sortOrder : index + 1,             isAc"
+  },
+  {
+    "column": "parentId",
+    "model": "SupportCategory",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "on materializeTaxonomy(nodes, parentId = null, bucket = [], level ="
+  },
+  {
+    "column": "parentId",
+    "model": "SupportCategory",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "tenantId: null,             parentId,             slug,"
+  },
+  {
+    "column": "descriptionAr",
+    "model": "Tenant",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "cription || null,             descriptionAr: node.descriptionAr || null,"
+  },
+  {
+    "column": "descriptionAr",
+    "model": "Tenant",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "descriptionAr: node.descriptionAr || null,             icon: no"
+  },
+  {
+    "column": "featureRoute",
+    "model": "SupportCategory",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "eKey || node.key,             featureRoute: node.featureRoute || null,"
+  },
+  {
+    "column": "featureRoute",
+    "model": "SupportCategory",
+    "file": "20260730010000_support_taxonomy_hierarchy.js",
+    "context": "featureRoute: node.featureRoute || null,             sortOrde"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "ue             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "{}             },             createdAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "')             },             updatedAt: {                 type: Sequ"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "se             },             tenantId: {                 type: Sequ"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "se             },             tenantId: {                 type: Sequ"
+  },
+  {
+    "column": "eventType",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "L'             },             eventType: {                 type: Sequ"
+  },
+  {
+    "column": "failureReason",
+    "model": "Transaction",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "ue             },             failureReason: {                 type: Sequ"
+  },
+  {
+    "column": "processedAt",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "{}             },             processedAt: {                 type: Sequ"
+  },
+  {
+    "column": "recipientType",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "se             },             recipientType: {                 type: Sequ"
+  },
+  {
+    "column": "recipientId",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "se             },             recipientId: {                 type: Sequ"
+  },
+  {
+    "column": "supportTicketId",
+    "model": "SupportTicketReadState",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "E'             },             supportTicketId: {                 type: Sequ"
+  },
+  {
+    "column": "supportTicketId",
+    "model": "SupportTicketReadState",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "E'             },             supportTicketId: {                 type: Sequ"
+  },
+  {
+    "column": "supportMessageId",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "E'             },             supportMessageId: {                 type: Sequ"
+  },
+  {
+    "column": "deliveryState",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "{}             },             deliveryState: {                 type: Sequ"
+  },
+  {
+    "column": "failedAt",
+    "model": "SupportTicketNotificationEvent",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "ue             },             failedAt: {                 type: Sequ"
+  },
+  {
+    "column": "participantType",
+    "model": "SupportTicketReadState",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "E'             },             participantType: {                 type: Sequ"
+  },
+  {
+    "column": "participantId",
+    "model": "SupportTicketReadState",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "se             },             participantId: {                 type: Sequ"
+  },
+  {
+    "column": "lastReadMessageId",
+    "model": "SupportTicketReadState",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "ue             },             lastReadMessageId: {                 type: Sequ"
+  },
+  {
+    "column": "lastReadAt",
+    "model": "SupportTicketReadState",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "L'             },             lastReadAt: {                 type: Sequ"
+  },
+  {
+    "column": "unreadCount",
+    "model": "SupportTicketReadState",
+    "file": "20260730020000-support-conversation-architecture.js",
+    "context": "ue             },             unreadCount: {                 type: Sequ"
+  },
+  {
+    "column": "totalBookings",
+    "model": "Staff",
+    "file": "20260731123000-add-tenant-runtime-fields.js",
+    "context": "defaultValue: {         totalBookings: 0,         totalRevenue: 0,"
+  },
+  {
+    "column": "averageRating",
+    "model": "CustomerInsight",
+    "file": "20260731123000-add-tenant-runtime-fields.js",
+    "context": "totalCustomers: 0,         averageRating: 0,         totalReviews: 0"
+  },
+  {
+    "column": "cancellationPolicy",
+    "model": "TenantSettings",
+    "file": "20260731123000-add-tenant-runtime-fields.js",
+    "context": "axAdvanceBooking: 30,         cancellationPolicy: 24,         autoConfirmBooki"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "defaultValue: {}     },     createdAt: {       type: Sequelize.DATE"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "URRENT_TIMESTAMP')     },     updatedAt: {       type: Sequelize.DATE"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: false     },     tenantId: {       type: Sequelize.UUID"
+  },
+  {
+    "column": "paymentMethod",
+    "model": "Order",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     paymentMethod: {       type: Sequelize.STRI"
+  },
+  {
+    "column": "paidAt",
+    "model": "CustomerInvoice",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     paidAt: {       type: Sequelize.DATE"
+  },
+  {
+    "column": "tenantSubscriptionId",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: false     },     tenantSubscriptionId: {       type: Sequelize.UUID"
+  },
+  {
+    "column": "billNumber",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: false     },     billNumber: {       type: Sequelize.STRI"
+  },
+  {
+    "column": "subtotalAmount",
+    "model": "CustomerInvoice",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: false     },     subtotalAmount: {       type: Sequelize.DECI"
+  },
+  {
+    "column": "platformMarkupRate",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     platformMarkupRate: {       type: Sequelize.DECI"
+  },
+  {
+    "column": "platformMarkupAmount",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     platformMarkupAmount: {       type: Sequelize.DECI"
+  },
+  {
+    "column": "vatRate",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     vatRate: {       type: Sequelize.DECI"
+  },
+  {
+    "column": "vatAmount",
+    "model": "CustomerInvoice",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     vatAmount: {       type: Sequelize.DECI"
+  },
+  {
+    "column": "discountAmount",
+    "model": "CustomerInvoice",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     discountAmount: {       type: Sequelize.DECI"
+  },
+  {
+    "column": "totalAmount",
+    "model": "Order",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "llowNull: false     },     subtotalAmount: {       type: Sequelize.DECI"
+  },
+  {
+    "column": "totalAmount",
+    "model": "Order",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "defaultValue: 0     },     totalAmount: {       type: Sequelize.DECI"
+  },
+  {
+    "column": "dueDate",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "efaultValue: 'SAR'     },     dueDate: {       type: Sequelize.DATE"
+  },
+  {
+    "column": "paymentToken",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "ultValue: 'UNPAID'     },     paymentToken: {       type: Sequelize.STRI"
+  },
+  {
+    "column": "paymentToken",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: false     },     paymentTokenExpiresAt: {       type: Seque"
+  },
+  {
+    "column": "paymentTokenExpiresAt",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: false     },     paymentTokenExpiresAt: {       type: Sequelize.DATE"
+  },
+  {
+    "column": "invoiceIssuedAt",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     invoiceIssuedAt: {       type: Sequelize.DATE"
+  },
+  {
+    "column": "invoiceTitle",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     invoiceTitle: {       type: Sequelize.STRI"
+  },
+  {
+    "column": "invoiceTemplateMode",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     invoiceTemplateMode: {       type: Sequelize.STRI"
+  },
+  {
+    "column": "sellerSnapshot",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "'bilingual_ar_en'     },     sellerSnapshot: {       type: Sequelize.JSON"
+  },
+  {
+    "column": "buyerSnapshot",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "defaultValue: {}     },     buyerSnapshot: {       type: Sequelize.JSON"
+  },
+  {
+    "column": "lineItemsSnapshot",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "defaultValue: {}     },     lineItemsSnapshot: {       type: Sequelize.JSON"
+  },
+  {
+    "column": "planSnapshot",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "defaultValue: []     },     planSnapshot: {       type: Sequelize.JSON"
+  },
+  {
+    "column": "invoicePdfPath",
+    "model": "CustomerInvoice",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "defaultValue: {}     },     invoicePdfPath: {       type: Sequelize.STRI"
+  },
+  {
+    "column": "receiptPdfPath",
+    "model": "CustomerInvoice",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     receiptPdfPath: {       type: Sequelize.STRI"
+  },
+  {
+    "column": "paymentProvider",
+    "model": "BillPaymentAttempt",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     paymentProvider: {       type: Sequelize.STRI"
+  },
+  {
+    "column": "paymentReference",
+    "model": "BillPaymentAttempt",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     paymentReference: {       type: Sequelize.STRI"
+  },
+  {
+    "column": "paymentCapturedAmount",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     paymentCapturedAmount: {       type: Sequelize.DECI"
+  },
+  {
+    "column": "paymentFailureReason",
+    "model": "Bill",
+    "file": "20260731124000-create-bills-table.js",
+    "context": "allowNull: true     },     paymentFailureReason: {       type: Sequelize.TEXT"
+  },
+  {
+    "column": "entityType",
+    "model": "SupportTicketLink",
+    "file": "20260803072822-create-financial-ledger-entries.js",
+    "context": "te: 'SET NULL'       },       entityType: {         type: Sequelize.ST"
+  },
+  {
+    "column": "entityId",
+    "model": "SupportTicketLink",
+    "file": "20260803072822-create-financial-ledger-entries.js",
+    "context": "lowNull: false       },       entityId: {         type: Sequelize.UU"
+  },
+  {
+    "column": "createdAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260803072822-create-financial-ledger-entries.js",
+    "context": "llowNull: true       },       createdAt: {         allowNull: false,"
+  },
+  {
+    "column": "updatedAt",
+    "model": "WalletLedgerEntry",
+    "file": "20260803072822-create-financial-ledger-entries.js",
+    "context": "Sequelize.DATE       },       updatedAt: {         allowNull: false,"
+  },
+  {
+    "column": "customerId",
+    "model": "FinancialLedgerEntry",
+    "file": "20260803072822-create-financial-ledger-entries.js",
+    "context": "ete: 'CASCADE'       },       customerId: {         type: Sequelize.UU"
+  },
+  {
+    "column": "tenantId",
+    "model": "User",
+    "file": "20260803072822-create-financial-ledger-entries.js",
+    "context": "quelize.UUIDV4       },       tenantId: {         type: Sequelize.UU"
+  },
+  {
+    "column": "paymentMethod",
+    "model": "Order",
+    "file": "20260803072822-create-financial-ledger-entries.js",
+    "context": "e: 'completed'       },       paymentMethod: {         type: Sequelize.ST"
+  },
+  {
+    "column": "productImage",
+    "model": "OrderItem",
+    "file": "20260804125722-change-order-item-product-image-to-text.js",
+    "context": "e, Sequelize) {     // Change productImage from VARCHAR(255) to TEXT"
+  },
+  {
+    "column": "productImage",
+    "model": "OrderItem",
+    "file": "20260804125722-change-order-item-product-image-to-text.js",
+    "context": "e, Sequelize) {     // Revert productImage from TEXT to VARCHAR(255)"
+  },
+  {
+    "column": "discountAmount",
+    "model": "CustomerInvoice",
+    "file": "20260805000000-fix-order-invoices-discounts.js",
+    "context": "console.log('Fixed camelCase discountAmount in customer_invoices');     }"
+  }
+]

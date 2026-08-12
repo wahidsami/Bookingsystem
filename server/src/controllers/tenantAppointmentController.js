@@ -351,9 +351,17 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
     const rawFirstName = `${normalizedCustomer.firstName || ''}`.trim();
     const rawLastName = `${normalizedCustomer.lastName || ''}`.trim();
     const firstName = rawFirstName || (isGuest ? 'Customer' : '');
-    const lastName = rawLastName || (isGuest ? '001' : '');
+    const lastName = rawLastName || null;
     let email = `${normalizedCustomer.email || ''}`.trim().toLowerCase();
     let phone = `${normalizedCustomer.phone || ''}`.trim();
+    
+    if (phone) {
+        phone = phone.replace(/[\s\-\(\)]/g, '');
+        if (/^05\d{8}$/.test(phone)) {
+            phone = `+966${phone.substring(1)}`;
+        }
+    }
+
     const password = `${normalizedCustomer.password || ''}`;
 
     // PlatformUser requires non-null unique email/phone in DB.
@@ -363,8 +371,13 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
         email = `guest+${guestTag}@guest.refah.local`;
     }
     if (!phone) {
-        const phoneSuffix = `${String(Date.now()).slice(-5)}${crypto.randomInt(100, 999)}`;
-        phone = `+9665${phoneSuffix}`;
+        if (tenantId) {
+            const tenantSettings = await db.TenantSettings.findOne({ where: { tenantId }, transaction });
+            if (tenantSettings?.bookingSettings?.requireWalkInPhone === true) {
+                throw new Error('Customer phone number is required by tenant configuration');
+            }
+        }
+        phone = null;
     }
 
     const isDefaultWalkInPlaceholder = isGuest && (
@@ -384,8 +397,8 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
     const finalFirstName = resolvedWalkInName?.firstName || firstName;
     const finalLastName = resolvedWalkInName?.lastName || lastName;
 
-    if (!finalFirstName || !finalLastName) {
-        throw new Error('Customer first and last name are required when no existing customer is selected');
+    if (!finalFirstName) {
+        throw new Error('Customer name is required when no existing customer is selected');
     }
 
     const existingUser = await userService.findUserByEmailOrPhone(email, phone);

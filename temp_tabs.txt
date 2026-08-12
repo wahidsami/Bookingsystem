@@ -1,0 +1,320 @@
+﻿
+                          : []),
+                  ]
+              );
+              if (options?.navigateToCart) {
+                  navigation.navigate('Cart', { tenant });
+              }
+              return;
+          }
+  
+          if (result.reason === 'different_tenant') {
+              Alert.alert(
+                  'Replace cart?',
+                  'Your cart already contains products from another tenant. Clear it and add this product instead?',
+                  [
+                      { text: t('cancel'), style: 'cancel' },
+                      {
+                          text: 'Replace Cart',
+                          style: 'destructive',
+                          onPress: () => {
+                              clearCart();
+                              const replaceResult = addToCart(product);
+                              if (replaceResult.success) {
+                                  Alert.alert(
+                                      isRTL ? 'ØªÙ…Øª Ø§Ù„Ø¥Ø¶Ø§ÙØ© Ø¥Ù„Ù‰ Ø§Ù„Ø³Ù„Ø©' : 'Added to Cart',
+                                      isRTL
+                                          ? `ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© "${product.name_ar || product.name_en}" Ø¥Ù„Ù‰ Ø³Ù„Ø© 
+Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª.`
+                                          : `"${product.name_en || product.name_ar}" was added to your product cart.`,
+                                      [
+                                          { text: isRTL ? 'Ù…ØªØ§Ø¨Ø¹Ø© Ø§Ù„ØªØ³ÙˆÙ‚' : 'Continue Shopping', style: 
+'cancel' },
+                                          ...(options?.navigateToCart
+                                              ? [{
+                                                  text: isRTL ? 'ÙØªØ­ Ø§Ù„Ø³Ù„Ø©' : 'Open Cart',
+                                                  onPress: () => navigation.navigate('Cart', { tenant }),
+                                              }]
+                                              : []),
+                                      ]
+                                  );
+                                  if (options?.navigateToCart) {
+                                      navigation.navigate('Cart', { tenant });
+                                  }
+                              }
+                          },
+                      },
+                  ]
+              );
+          }
+      };
+  
+      const loadReviewEligibility = async () => {
+          try {
+              if (!isAuthenticated) {
+                  setReviewEligibleBookings([]);
+                  setReviewedAppointmentIds(new Set());
+                  return;
+              }
+  
+              const [completedBookings, myReviews] = await Promise.all([
+                  api.getBookings('completed'),
+                  api.getMyReviews(200).catch(() => []),
+              ]);
+  
+              const reviewedIds = new Set<string>(
+                  (myReviews || [])
+                      .map((review: any) => review?.appointmentId)
+                      .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+              );
+  
+              setReviewedAppointmentIds(reviewedIds);
+              setReviewEligibleBookings(completedBookings || []);
+          } catch (error) {
+              console.warn('Failed to load review eligibility:', error);
+              setReviewEligibleBookings([]);
+          }
+      };
+  
+      const openTenantReviewPrompt = () => {
+          const tenantBooking = reviewEligibleBookings.find((booking) =>
+              booking.tenantId === tenant?.id
+              && booking.status === 'completed'
+              && !reviewedAppointmentIds.has(booking.id)
+          );
+  
+          if (!tenantBooking) {
+              Alert.alert(
+                  isRTL ? 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù…ÙˆØ¹Ø¯ Ù…Ø¤Ù‡Ù„' : 'No eligible appointment',
+                  isRTL ? 'Ø£ÙƒÙ…Ù„ Ù…ÙˆØ¹Ø¯Ù‹Ø§ ÙÙŠ Ù‡Ø°Ø§ Ø§Ù„Ù…Ø±ÙƒØ² Ø£ÙˆÙ„Ù‹Ø§ Ù„Ø¥Ø¶Ø§ÙØ© ØªÙ‚ÙŠÙŠÙ….' : 
+'Complete an appointment with this center first to add a review.'
+              );
+              return;
+          }
+  
+          setReviewTargetBooking(tenantBooking);
+      };
+  
+      const getServiceDescription = (service: Service) =>
+          (isRTL ? service.description_ar : service.description_en)
+          || service.description_en
+          || service.description_ar
+          || '';
+  
+      const openServiceDetails = (service: Service) => {
+          navigation.navigate('ServiceDetails', {
+              tenant,
+              tenantId: tenant?.id || tenantId,
+              service,
+              bookingSessionId: route.params?.bookingSessionId || null,
+              bookingReference: route.params?.bookingReference || null,
+          });
+      };
+  
+      const openServiceBrowser = () => {
+          navigation.navigate('ServiceBrowser', {
+              tenant,
+              tenantId: tenant?.id || tenantId,
+              slug: tenant?.slug || slug,
+              bookingSessionId: route.params?.bookingSessionId || null,
+              bookingReference: route.params?.bookingReference || null,
+          });
+      };
+  
+      const openProviderProfile = (provider: Staff) => {
+          navigation.navigate('EmployeeProfile', { provider, tenant });
+      };
+  
+      const extractMapCoordinates = (mapUrl?: string | null): { lat: number; lng: number } | null => {
+          if (!mapUrl) return null;
+          const decodedUrl = decodeURIComponent(mapUrl);
+          const atMatch = decodedUrl.match(/@(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
+          if (atMatch) {
+              return { lat: Number(atMatch[1]), lng: Number(atMatch[3]) };
+          }
+          const qMatch = decodedUrl.match(/[?&]q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/i);
+          if (qMatch) {
+              return { lat: Number(qMatch[1]), lng: Number(qMatch[3]) };
+          }
+          const llMatch = decodedUrl.match(/[?&]ll=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/i);
+          if (llMatch) {
+              return { lat: Number(llMatch[1]), lng: Number(llMatch[3]) };
+          }
+          return null;
+      };
+  
+      const buildMapPreviewImage = (mapUrl?: string | null): string | null => {
+          const coords = extractMapCoordinates(mapUrl);
+          if (!coords) return null;
+          const center = `${coords.lat},${coords.lng}`;
+          return `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(center)}&zoom=15&size=80
+0x360&markers=${encodeURIComponent(center + ',red-pushpin')}`;
+      };
+      const mapPreviewImage = buildMapPreviewImage(mapUrl);
+  
+  
+>     const renderHero = () => {
+          if (!tenant) return null;
+  
+          const coverImage = getTenantCoverUri();
+          const logoImage = getTenantLogoUri();
+          const ratingValue = reviewsSummary.avgRating ? reviewsSummary.avgRating.toFixed(1) : null;
+          const businessLabel = getBusinessTypeLabel();
+  
+          return (
+              <View style={styles.heroContainer}>
+                  {/* 1. Background Cover */}
+                  <ImageBackground source={{ uri: coverImage }} style={styles.heroImage} resizeMode="cover">
+                      <LinearGradient
+                          colors={['rgba(0,0,0,0.5)', 'transparent']}
+                          style={StyleSheet.absoluteFillObject}
+                          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.5 }}
+                      />
+                      {/* Top Header: Back & Cart */}
+                      <View style={[styles.heroHeaderRow, { marginTop: topInset }]}>
+                          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.circularButton}>
+                              <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color="#FFFFFF" />
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.circularButton} onPress={() => navigation.navigate('Cart', { 
+tenant })}>
+                              <AppIcon name="cart" size={24} color="#FFFFFF" />
+                              {itemCount > 0 && (
+                                  <View style={styles.badgeContainer}>
+                                      <Text style={styles.badgeText}>{itemCount}</Text>
+                                  </View>
+                              )}
+                          </TouchableOpacity>
+                      </View>
+                  </ImageBackground>
+  
+                  {/* 2. Overlapping Logo */}
+                  <View style={styles.heroIdentityContainer}>
+                      <View style={styles.heroLogoWrapper}>
+                          {logoImage ? (
+                              <Image source={{ uri: logoImage }} style={styles.heroLogo} resizeMode="cover" />
+                          ) : (
+                              <View style={[styles.heroLogo, { backgroundColor: colors.surface, alignItems: 'center', 
+justifyContent: 'center' }]}>
+                                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.primary }}>
+                                      {tenant.name?.charAt(0) || 'R'}
+                                  </Text>
+                              </View>
+                          )}
+                      </View>
+                      
+                      <Text style={styles.tenantNameTitle}>{tenant.name}</Text>
+                      {businessLabel ? (
+                          <View style={styles.businessTypeBadge}>
+                              <Text style={styles.businessTypeText}>{businessLabel}</Text>
+                          </View>
+                      ) : null}
+  
+                      {/* Status & Rating Row */}
+                      <View style={styles.tenantStatusRow}>
+                          <View style={[styles.tenantStatusChip, tenant.isAvailable ? styles.statusChipOpen : 
+styles.statusChipClosed]}>
+                              <Text style={[styles.tenantStatusText, tenant.isAvailable ? styles.statusTextOpen : 
+styles.statusTextClosed]}>
+                                  {tenant.isAvailable ? (isRTL ? 'Ù…ÙØªÙˆØ' : 'Open') : (isRTL ? 'Ù…ØºÙ„Ù‚' : 
+'Closed')}
+                              </Text>
+                          </View>
+                          {tenant?.workingHours && tenant.workingHours[new Date().toLocaleDateString('en-US', { 
+weekday: 'long' }).toLowerCase()] && (
+                              <View style={styles.tenantStatusChip}>
+                                  <Text style={styles.tenantStatusText}>
+                                      {tenant.isAvailable ? `opens at ${tenant.workingHours[new 
+Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()].open}` : ''}
+                                  </Text>
+                              </View>
+                          )}
+                          <View style={styles.tenantStatusChip}>
+                              <Text style={styles.tenantStatusText}>
+                                  {ratingValue ? `â˜… ${ratingValue}` : (isRTL ? 'Ø¬Ø¯ÙŠØ¯' : 'New')}
+                              </Text>
+                          </View>
+                      </View>
+                  </View>
+  
+                  {/* 3. Horizontal Tabs */}
+                  <View style={styles.tabsContainer}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} 
+contentContainerStyle={styles.tabsScrollContent}>
+                          {['about', 'services', 'products', 'reviews'].map((tab) => {
+                              if (tab === 'products' && products.length === 0) return null;
+                              const isActive = activeTab === tab;
+                              return (
+                                  <TouchableOpacity 
+                                      key={tab} 
+                                      style={[styles.tabButton, isActive && styles.tabButtonActive]}
+                                      onPress={() => setActiveTab(tab as any)}
+                                  >
+                                      <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                                          {t(tab as any) || tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                      </Text>
+                                      {isActive && <View style={styles.activeTabUnderline} />}
+                                  </TouchableOpacity>
+                              );
+                          })}
+                      </ScrollView>
+                  </View>
+              </View>
+          );
+      };
+  
+      const renderGifts = () => (
+          <View style={styles.contentSection}>
+              <View style={styles.giftsHeaderBlock}>
+                  <Text style={styles.giftsHeaderTitle}>{isRTL ? 'Ø¨Ø·Ø§Ù‚Ø§Øª Ø§Ù„Ù‡Ø¯Ø§ÙŠØ§' : 'Gift Cards'}</Text>
+                  <Text style={styles.giftsHeaderSubtitle}>
+                      {isRTL ? 'Ù‚Ø¯Ù‘Ù… Ù‡Ø¯ÙŠØ© Ø§Ù„Ø¹Ù†Ø§ÙŠØ© ÙˆØ§Ù„Ø±ÙØ§Ù‡ÙŠØ© Ù„Ù…Ù† ØªØØ¨.' : 'Give the gift of 
+wellness and self-care.'}
+                  </Text>
+              </View>
+  
+              {giftPackages.length === 0 ? (
+                  renderEmptyState(isRTL ? 'Ù„Ø§ ØªØªÙˆÙØ± ØªØ¬Ø§Ø±Ø¨ Ù‡Ø¯Ø§ÙŠØ§ ØØ§Ù„ÙŠØ§Ù‹.' : 'No gift experiences 
+are available right now.')
+              ) : (
+                  giftPackages.map((pkg, index) => {
+                      const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
+                      const bonusAmount = Number(pkg.bonusAmount || 0);
+                      const hasImage = !!pkg.imageUrl && !giftImageErrors[pkg.id];
+                      const localizedTitle = getGiftPackageTitle(pkg);
+                      const localizedDescription = getGiftPackageDescription(pkg);
+                      const discountPercent = getGiftPackageDiscountPercent(pkg);
+                      const expirationPreset = getGiftPackageExpirationPreset(pkg);
+                      const expirationLabel = EXPIRATION_PRESETS[expirationPreset]?.[isRTL ? 'labelAr' : 'labelEn'] || 
+(isRTL ? 'ØºÙŠØ± Ù…ØØ¯Ø¯' : 'Unspecified');
+                      const badgeLabel = index === 0
+                          ? (isRTL ? 'Ø§Ù„Ø£ÙƒØ«Ø± Ø·Ù„Ø¨Ø§Ù‹' : 'Most Popular')
+                          : bonusAmount > 0
+                              ? (isRTL ? 'Ù‚ÙŠÙ…Ø© Ø¥Ø¶Ø§ÙÙŠØ©' : 'Best Value')
+                              : null;
+  
+                      return (
+                          <TouchableOpacity
+                              key={pkg.id}
+                              style={styles.giftCard}
+                              activeOpacity={0.92}
+                              onPress={() => navigation.navigate('Gifts', {
+                                  tenantId: tenant?.id,
+                                  tenantName: tenant?.name,
+                                  previewOnly: true,
+                              })}
+                          >
+                              <View style={[styles.giftCardRow, isRTL ? styles.giftCardRowRtl : null]}>
+                                  <View style={styles.giftCardMediaWrap}>
+                                      {hasImage ? (
+                                          <Image
+                                              source={{ uri: getImageUrl(pkg.imageUrl) }}
+                                              style={styles.giftCardImage}
+                                              onError={() => setGiftImageErrors((prev) => ({ ...prev, [pkg.id]: true 
+}))}
+                                          />
+                                      ) : (
+                                          <LinearGradient
+                                              colors={['#221146', '#6D3BC8', '#A18AF5']}
+                                              start={{ x: 0, y: 0 }}
+
+

@@ -1,0 +1,963 @@
+﻿
+  
+>         return () => {
+              cancelled = true;
+              clearTimeout(timer);
+          };
+      }, [allTenantProducts, productCategoryFilter, productSearchQuery, showProductsTab, tenant?.id]);
+  
+      useEffect(() => {
+          const availableTabs: Array<'services' | 'products' | 'gifts' | 'reviews' | 'about'> = [];
+          if (showServicesTab) availableTabs.push('services');
+          if (showProductsTab) availableTabs.push('products');
+          if (showGiftsTab) availableTabs.push('gifts');
+          if (showReviewsTab) availableTabs.push('reviews');
+          if (showAboutTab) availableTabs.push('about');
+          if (!availableTabs.length) return;
+          if (!availableTabs.includes(activeTab)) {
+              setActiveTab(availableTabs[0]);
+          }
+      }, [activeTab, showServicesTab, showProductsTab, showGiftsTab, showReviewsTab, showAboutTab]);
+  
+      const loadTenantDetails = async () => {
+          try {
+              setLoading(true);
+              let resolvedTenant: Tenant | null = route.params.tenant || null;
+  
+              if (resolvedTenant) {
+                  setTenant(resolvedTenant);
+              } else if (slug) {
+                  const tenantRes = await api.get<{ success: boolean; data: Tenant }>(`/public/tenant/${slug}`);
+                  if (tenantRes.success && tenantRes.data) {
+                      resolvedTenant = normalizeTenant(tenantRes.data);
+                      setTenant(resolvedTenant);
+                  }
+              } else {
+                  const tenantsRes = await api.get<{ success: boolean; tenants: Tenant[] }>('/public/tenants');
+                  const matchedTenant = (tenantsRes.tenants || [])
+                      .map((item) => normalizeTenant(item))
+                      .find((item) => item.id === tenantId);
+                  if (matchedTenant) {
+                      resolvedTenant = matchedTenant;
+                      setTenant(resolvedTenant);
+                  }
+              }
+  
+              const idToFetch = tenantId || resolvedTenant?.id;
+              if (!idToFetch) {
+                  throw new Error('Tenant information is missing.');
+              }
+  
+              // 2. Fetch page-data for dynamic sections
+              const pageDataRes = await api.get<{ success: boolean; data: any 
+}>(`/public/tenant/${idToFetch}/page-data`);
+              let isProductsEnabled = false;
+              let isServicesEnabled = true;
+              let isReviewsEnabled = false;
+              let isAboutEnabled = true;
+  
+              if (pageDataRes.success && pageDataRes.data) {
+                  setPageData(pageDataRes.data);
+              }
+  
+              if (pageDataRes.success && pageDataRes.data?.generalSettings?.sections) {
+                  const sections = pageDataRes.data.generalSettings.sections;
+                  isProductsEnabled = sections.products !== false;
+                  isServicesEnabled = sections.services !== false;
+                  isAboutEnabled = sections.about !== false && sections.callToAction !== false;
+                  isReviewsEnabled = sections.reviews === true;
+  
+                  setShowProductsTab(isProductsEnabled);
+                  setShowServicesTab(isServicesEnabled);
+                  setShowReviewsTab(isReviewsEnabled);
+                  setShowAboutTab(isAboutEnabled);
+              } else {
+                  setShowProductsTab(true); // Fallback to true if no settings found
+                  isProductsEnabled = true;
+                  setShowReviewsTab(false);
+                  setShowAboutTab(true);
+              }
+  
+              const normalizedInitialTab = typeof initialTab === 'string' ? initialTab.trim() : '';
+              const availableTabs: Array<'services' | 'products' | 'gifts' | 'reviews' | 'about'> = [];
+              if (isServicesEnabled) availableTabs.push('services');
+              if (isProductsEnabled) availableTabs.push('products');
+              if (showGiftsTab) availableTabs.push('gifts');
+              if (isReviewsEnabled) availableTabs.push('reviews');
+              if (isAboutEnabled) availableTabs.push('about');
+  
+              if (normalizedInitialTab && availableTabs.includes(normalizedInitialTab as any)) {
+                  setActiveTab(normalizedInitialTab as any);
+              }
+  
+              // Fallback for activeTab if the default 'services' is hidden
+              if ((!normalizedInitialTab || !availableTabs.includes(normalizedInitialTab as any)) && 
+!isServicesEnabled) {
+                  if (isProductsEnabled) setActiveTab('products');
+                  else if (isReviewsEnabled) setActiveTab('reviews');
+                  else if (isAboutEnabled) setActiveTab('about');
+              }
+  
+              // 3. Fetch Services
+              if (isServicesEnabled) {
+                  try {
+                      const servicesRes = await api.get<{ success: boolean; services: Service[] 
+}>(`/public/tenant/${idToFetch}/services`);
+                      if (servicesRes.success) setServices((servicesRes.services || []).map((service) => 
+normalizeService(service)));
+  
+>         return (
+              <View style={styles.heroContainer}>
+                  {/* 1. Background Cover */}
+                  <ImageBackground source={{ uri: coverImage }} style={styles.heroImage} resizeMode="cover">
+                      <LinearGradient
+                          colors={['rgba(0,0,0,0.5)', 'transparent']}
+                          style={StyleSheet.absoluteFillObject}
+                          start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.5 }}
+                      />
+                      {/* Top Header: Back & Cart */}
+                      <View style={[styles.heroHeaderRow, { marginTop: topInset }]}>
+                          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.circularButton}>
+                              <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color="#FFFFFF" />
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.circularButton} onPress={() => navigation.navigate('Cart', { 
+tenant })}>
+                              <AppIcon name="cart" size={24} color="#FFFFFF" />
+                              {itemCount > 0 && (
+                                  <View style={styles.badgeContainer}>
+                                      <Text style={styles.badgeText}>{itemCount}</Text>
+                                  </View>
+                              )}
+                          </TouchableOpacity>
+                      </View>
+                  </ImageBackground>
+  
+                  {/* 2. Overlapping Logo */}
+                  <View style={styles.heroIdentityContainer}>
+                      <View style={styles.heroLogoWrapper}>
+                          {logoImage ? (
+                              <Image source={{ uri: logoImage }} style={styles.heroLogo} resizeMode="cover" />
+                          ) : (
+                              <View style={[styles.heroLogo, { backgroundColor: colors.surface, alignItems: 'center', 
+justifyContent: 'center' }]}>
+                                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.primary }}>
+                                      {tenant.name?.charAt(0) || 'R'}
+                                  </Text>
+                              </View>
+                          )}
+                      </View>
+                      
+                      <Text style={styles.tenantNameTitle}>{tenant.name}</Text>
+                      {businessLabel ? (
+                          <View style={styles.businessTypeBadge}>
+                              <Text style={styles.businessTypeText}>{businessLabel}</Text>
+                          </View>
+                      ) : null}
+  
+                      {/* Status & Rating Row */}
+                      <View style={styles.tenantStatusRow}>
+                          <View style={[styles.tenantStatusChip, tenant.isAvailable ? styles.statusChipOpen : 
+styles.statusChipClosed]}>
+                              <Text style={[styles.tenantStatusText, tenant.isAvailable ? styles.statusTextOpen : 
+styles.statusTextClosed]}>
+                                  {tenant.isAvailable ? (isRTL ? 'Ù…ÙØªÙˆØ' : 'Open') : (isRTL ? 'Ù…ØºÙ„Ù‚' : 
+'Closed')}
+                              </Text>
+                          </View>
+                          {tenant?.workingHours && tenant.workingHours[new Date().toLocaleDateString('en-US', { 
+weekday: 'long' }).toLowerCase()] && (
+                              <View style={styles.tenantStatusChip}>
+                                  <Text style={styles.tenantStatusText}>
+                                      {tenant.isAvailable ? `opens at ${tenant.workingHours[new 
+Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()].open}` : ''}
+                                  </Text>
+                              </View>
+                          )}
+                          <View style={styles.tenantStatusChip}>
+                              <Text style={styles.tenantStatusText}>
+                                  {ratingValue ? `â˜… ${ratingValue}` : (isRTL ? 'Ø¬Ø¯ÙŠØ¯' : 'New')}
+                              </Text>
+                          </View>
+                      </View>
+                  </View>
+  
+                  {/* 3. Horizontal Tabs */}
+                  <View style={styles.tabsContainer}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} 
+contentContainerStyle={styles.tabsScrollContent}>
+                          {['about', 'services', 'products', 'reviews'].map((tab) => {
+                              if (tab === 'products' && products.length === 0) return null;
+                              const isActive = activeTab === tab;
+>                             return (
+                                  <TouchableOpacity 
+                                      key={tab} 
+                                      style={[styles.tabButton, isActive && styles.tabButtonActive]}
+                                      onPress={() => setActiveTab(tab as any)}
+                                  >
+                                      <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                                          {t(tab as any) || tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                      </Text>
+                                      {isActive && <View style={styles.activeTabUnderline} />}
+                                  </TouchableOpacity>
+                              );
+                          })}
+                      </ScrollView>
+                  </View>
+              </View>
+          );
+      };
+  
+      const renderGifts = () => (
+          <View style={styles.contentSection}>
+              <View style={styles.giftsHeaderBlock}>
+                  <Text style={styles.giftsHeaderTitle}>{isRTL ? 'Ø¨Ø·Ø§Ù‚Ø§Øª Ø§Ù„Ù‡Ø¯Ø§ÙŠØ§' : 'Gift Cards'}</Text>
+                  <Text style={styles.giftsHeaderSubtitle}>
+                      {isRTL ? 'Ù‚Ø¯Ù‘Ù… Ù‡Ø¯ÙŠØ© Ø§Ù„Ø¹Ù†Ø§ÙŠØ© ÙˆØ§Ù„Ø±ÙØ§Ù‡ÙŠØ© Ù„Ù…Ù† ØªØØ¨.' : 'Give the gift of 
+wellness and self-care.'}
+                  </Text>
+              </View>
+  
+              {giftPackages.length === 0 ? (
+                  renderEmptyState(isRTL ? 'Ù„Ø§ ØªØªÙˆÙØ± ØªØ¬Ø§Ø±Ø¨ Ù‡Ø¯Ø§ÙŠØ§ ØØ§Ù„ÙŠØ§Ù‹.' : 'No gift experiences 
+are available right now.')
+              ) : (
+                  giftPackages.map((pkg, index) => {
+                      const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
+                      const bonusAmount = Number(pkg.bonusAmount || 0);
+                      const hasImage = !!pkg.imageUrl && !giftImageErrors[pkg.id];
+                      const localizedTitle = getGiftPackageTitle(pkg);
+                      const localizedDescription = getGiftPackageDescription(pkg);
+                      const discountPercent = getGiftPackageDiscountPercent(pkg);
+                      const expirationPreset = getGiftPackageExpirationPreset(pkg);
+                      const expirationLabel = EXPIRATION_PRESETS[expirationPreset]?.[isRTL ? 'labelAr' : 'labelEn'] || 
+(isRTL ? 'ØºÙŠØ± Ù…ØØ¯Ø¯' : 'Unspecified');
+                      const badgeLabel = index === 0
+                          ? (isRTL ? 'Ø§Ù„Ø£ÙƒØ«Ø± Ø·Ù„Ø¨Ø§Ù‹' : 'Most Popular')
+                          : bonusAmount > 0
+                              ? (isRTL ? 'Ù‚ÙŠÙ…Ø© Ø¥Ø¶Ø§ÙÙŠØ©' : 'Best Value')
+                              : null;
+  
+>                     return (
+                          <TouchableOpacity
+                              key={pkg.id}
+                              style={styles.giftCard}
+                              activeOpacity={0.92}
+                              onPress={() => navigation.navigate('Gifts', {
+                                  tenantId: tenant?.id,
+                                  tenantName: tenant?.name,
+                                  previewOnly: true,
+                              })}
+                          >
+                              <View style={[styles.giftCardRow, isRTL ? styles.giftCardRowRtl : null]}>
+                                  <View style={styles.giftCardMediaWrap}>
+                                      {hasImage ? (
+                                          <Image
+                                              source={{ uri: getImageUrl(pkg.imageUrl) }}
+                                              style={styles.giftCardImage}
+                                              onError={() => setGiftImageErrors((prev) => ({ ...prev, [pkg.id]: true 
+}))}
+                                          />
+                                      ) : (
+                                          <LinearGradient
+                                              colors={['#221146', '#6D3BC8', '#A18AF5']}
+                                              start={{ x: 0, y: 0 }}
+                                              end={{ x: 1, y: 1 }}
+                                              style={styles.giftCardImageFallback}
+                                          >
+                                              <AppIcon name="sparkles" size={22} color="#F8F2FF" />
+                                              <Text style={styles.giftCardImageFallbackTitle} numberOfLines={2}>
+                                                  {localizedTitle}
+                                              </Text>
+                                              <Text style={styles.giftCardImageFallbackSub}>
+                                                  {isRTL ? 'Ù‡Ø¯ÙŠØ© Ø±ÙØ§Ù‡ÙŠØ©' : 'Wellness Gift'}
+                                              </Text>
+                                          </LinearGradient>
+                                      )}
+                                      {badgeLabel ? (
+                                          <View style={[styles.giftBadge, isRTL ? styles.giftBadgeRtl : null]}>
+                                              <Text style={styles.giftBadgeText}>{badgeLabel}</Text>
+                                          </View>
+                                      ) : null}
+                                  </View>
+  
+                                  <View style={[styles.giftCardContent, isRTL ? styles.giftCardContentRtl : null]}>
+                                      <Text style={[styles.giftCardTitle, isRTL ? styles.giftCardTitleRtl : null]} 
+numberOfLines={1}>{localizedTitle}</Text>
+                                      {localizedDescription ? (
+                                          <Text style={[styles.giftCardDesc, isRTL ? styles.giftCardDescRtl : null]} 
+numberOfLines={2}>
+                                              {localizedDescription}
+                                          </Text>
+                                      ) : null}
+                                      <View style={styles.giftMetaRow}>
+                                          <View style={styles.giftMetaChip}><Text 
+style={styles.giftMetaChipText}>{isRTL ? 'Ø§Ù„Ù‚ÙŠÙ…Ø©' : 'Value'} {formatRiyal(Number(pkg.walletCreditAmount || 0), 
+isRTL ? 'ar' : 'en')}</Text></View>
+                                          <View style={styles.giftMetaChip}><Text 
+style={styles.giftMetaChipText}>{isRTL ? 'Ø§Ù„Ø®ØµÙ…' : 'Discount'} {discountPercent.toFixed(2)}%</Text></View>
+                                          <View style={styles.giftMetaChip}><Text 
+style={styles.giftMetaChipText}>{expirationLabel}</Text></View>
+                                      </View>
+  
+                                      <View style={[styles.giftValueBlock, isRTL ? styles.giftValueBlockRtl : null]}>
+                                          <View style={[styles.giftValueColumn, isRTL ? styles.giftValueColumnRtl : 
+null]}>
+                                              <Text style={[styles.giftValueLabel, isRTL ? styles.giftValueLabelRtl : 
+null]}>{isRTL ? 'Ø£Ù†Øª ØªØ¯ÙØ¹' : 'You Pay'}</Text>
+                                              <Text style={[styles.giftValueAmount, isRTL ? styles.giftValueAmountRtl 
+: null]}>{formatRiyal(Number(pkg.priceAmount), isRTL ? 'ar' : 'en')}</Text>
+                                          </View>
+                                          <Text style={styles.giftValueArrow}>{isRTL ? 'â†' : 'â†’'}</Text>
+                                          <View style={[styles.giftValueColumn, { alignItems: 'flex-end' }, isRTL ? 
+styles.giftValueColumnGetRtl : null]}>
+                                              <Text style={[styles.giftValueLabel, styles.giftValueGetLabel, isRTL ? 
+styles.giftValueLabelRtl : null]}>{isRTL ? 'ÙŠØØµÙ„ Ø¹Ù„Ù‰' : 'They Get'}</Text>
+                                              <Text style={styles.giftValueGetAmount}>{formatRiyal(totalCredit, isRTL 
+? 'ar' : 'en')}</Text>
+                                          </View>
+                                      </View>
+  
+                                      <View style={[styles.giftCardFooterRow, isRTL ? styles.giftCardFooterRowRtl : 
+null]}>
+                                          {bonusAmount > 0 ? (
+                                              <View style={styles.giftBonusPill}>
+                                                  <Text style={styles.giftBonusText}>
+                                                      + {formatRiyal(bonusAmount, isRTL ? 'ar' : 'en')} {isRTL ? 
+'Ù‡Ø¯ÙŠØ© Ø¥Ø¶Ø§ÙÙŠØ©' : 'Bonus'}
+                                                  </Text>
+                                              </View>
+                                          ) : <View />}
+                                          <View style={styles.giftValidityPill}>
+                                              <Text style={styles.giftValidityText}>{expirationLabel}</Text>
+                                          </View>
+                                          <View style={styles.giftArrowButton}>
+                                              <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={18} 
+color={colors.primary} />
+                                          </View>
+                                      </View>
+                                  </View>
+                              </View>
+                          </TouchableOpacity>
+                      );
+                  })
+              )}
+  
+              {giftPackages.length > 0 ? (
+                  <View style={[styles.giftInfoBanner, isRTL ? styles.giftInfoBannerRtl : null]}>
+                      <View style={styles.giftInfoIconWrap}>
+                          <AppIcon name="card" size={16} color={colors.primary} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                          <Text style={styles.giftInfoText}>
+                              {isRTL
+                                  ? 'ØªØ®ØªÙ„Ù ØµÙ„Ø§ØÙŠØ© ÙƒÙ„ Ø¨Ø·Ø§Ù‚Ø© ØØ³Ø¨ Ù†ÙˆØ¹Ù‡Ø§ Ø§Ù„Ù…ØØ¯Ø¯ Ù…Ù† 
+Ø§Ù„Ù…Ø±ÙƒØ².'
+                                  : 'Each gift card follows the expiration selected by the center.'}
+                          </Text>
+                          <Text style={styles.giftInfoSubText}>
+  
+>         return (
+              <View style={styles.contentSection}>
+                  {/* 1. Category Filters */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} 
+contentContainerStyle={styles.filterChipRowPremium}>
+                      <TouchableOpacity
+                          style={[styles.filterChipPremium, serviceFilterCategory === 'all' ? 
+styles.filterChipPremiumActive : null]}
+                          onPress={() => { setServiceFilterCategory('all'); setVisibleServicesCount(10); }}
+                      >
+                          <Text style={[styles.filterChipTextPremium, serviceFilterCategory === 'all' ? 
+styles.filterChipTextPremiumActive : null]}>
+                              {isRTL ? 'Ø§Ù„ÙƒÙ„' : 'All'}
+                          </Text>
+                      </TouchableOpacity>
+                      {categories.map((category) => {
+                          const active = serviceFilterCategory === category;
+>                         return (
+                              <TouchableOpacity
+                                  key={category}
+                                  style={[styles.filterChipPremium, active ? styles.filterChipPremiumActive : null]}
+                                  onPress={() => { setServiceFilterCategory(category); setVisibleServicesCount(10); }}
+                              >
+                                  <Text style={[styles.filterChipTextPremium, active ? 
+styles.filterChipTextPremiumActive : null]}>{category}</Text>
+                              </TouchableOpacity>
+                          );
+                      })}
+                  </ScrollView>
+  
+                  {/* 2. Service List */}
+                  {services.length === 0 ? (
+                      renderEmptyState(isRTL ? 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø®Ø¯Ù…Ø§Øª Ù…ØªØ§ØØ© ØØ§Ù„ÙŠØ§Ù‹.' : 'No services 
+available yet.')
+                  ) : (
+                      <View style={styles.servicesListContainerPremium}>
+                          {visibleServices.map((service) => {
+                              const serviceName = isRTL ? service.name_ar : service.name_en;
+                              const serviceImage = resolveServiceImageUri(service);
+>                             return (
+                                  <View key={service.id} style={styles.serviceCardPremium}>
+                                      <TouchableOpacity style={styles.serviceCardContentPremium} onPress={() => 
+openServiceDetails(service)} activeOpacity={0.9}>
+                                          {/* Left: Image */}
+                                          <View style={styles.serviceCardImageWrapperPremium}>
+                                              {serviceImage && !serviceImageErrors[service.id] ? (
+                                                  <Image
+                                                      source={{ uri: serviceImage }}
+                                                      style={styles.serviceCardImagePremium}
+                                                      onError={() => setServiceImageErrors((prev) => ({ ...prev, 
+[service.id]: true }))}
+                                                  />
+                                              ) : (
+                                                  <View style={styles.serviceCardImageFallbackPremium}>
+                                                      <Text style={styles.serviceCardImageFallbackTextPremium}>
+                                                          {(serviceName || 'S').charAt(0).toUpperCase()}
+                                                      </Text>
+                                                  </View>
+                                              )}
+                                          </View>
+  
+                                          {/* Center: Details */}
+                                          <View style={[styles.serviceCardInfoPremium, isRTL ? 
+styles.serviceCardInfoPremiumRtl : null]}>
+                                              <Text style={styles.serviceCardNamePremium} 
+numberOfLines={1}>{serviceName}</Text>
+                                              {service.duration && (
+                                                  <Text style={styles.serviceCardDurationPremium}>
+                                                      {service.duration} {isRTL ? 'Ø¯Ù‚ÙŠÙ‚Ø©' : 'min'}
+                                                  </Text>
+                                              )}
+                                              <Text style={styles.serviceCardPricePremium}>
+                                                  {formatRiyal(getServicePrice(service), isRTL ? 'ar' : 'en')}
+                                              </Text>
+                                          </View>
+                                      </TouchableOpacity>
+                                      
+                                      {/* Right: Book Action */}
+                                      <View style={styles.serviceCardActionPremium}>
+                                          <TouchableOpacity style={styles.bookButtonPremium} onPress={() => 
+handleQuickBook(service)}>
+                                              <Text style={styles.bookButtonTextPremium}>{isRTL ? 'Ø§ØØ¬Ø²' : 
+'Book'}</Text>
+                                          </TouchableOpacity>
+                                      </View>
+                                  </View>
+                              );
+                          })}
+  
+                          {/* 3. Load More */}
+                          {hasMoreServices && (
+                              <TouchableOpacity style={styles.loadMoreButtonPremium} onPress={() => 
+setVisibleServicesCount((prev) => prev + 10)}>
+                                  <Text style={styles.loadMoreButtonTextPremium}>{isRTL ? 'Ø¹Ø±Ø¶ Ø§Ù„Ù…Ø²ÙŠØ¯' : 
+'Load more'}</Text>
+                              </TouchableOpacity>
+                          )}
+                      </View>
+                  )}
+              </View>
+          );
+      };
+  
+      const renderProducts = () => {
+          const productCategories = Array.from(new Set((allTenantProducts.length > 0 ? allTenantProducts : 
+products).map((product) => product.category || 'General')));
+          
+          const filteredProducts = productCategoryFilter === 'all' 
+              ? products 
+              : products.filter(p => (p.category || 'General') === productCategoryFilter);
+              
+          const visibleProducts = filteredProducts.slice(0, visibleProductsCount);
+          const hasMoreProducts = filteredProducts.length > visibleProducts.length;
+  
+>         return (
+              <View style={styles.contentSection}>
+                  {/* 1. Category Filters */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} 
+contentContainerStyle={styles.filterChipRowPremium}>
+                      <TouchableOpacity
+                          style={[styles.filterChipPremium, productCategoryFilter === 'all' ? 
+styles.filterChipPremiumActive : null]}
+                          onPress={() => { setProductCategoryFilter('all'); setVisibleProductsCount(10); }}
+                      >
+                          <Text style={[styles.filterChipTextPremium, productCategoryFilter === 'all' ? 
+styles.filterChipTextPremiumActive : null]}>
+                              {isRTL ? 'Ø§Ù„ÙƒÙ„' : 'All'}
+                          </Text>
+                      </TouchableOpacity>
+                      {productCategories.map((category) => {
+                          const active = productCategoryFilter === category;
+>                         return (
+                              <TouchableOpacity
+                                  key={category}
+                                  style={[styles.filterChipPremium, active ? styles.filterChipPremiumActive : null]}
+                                  onPress={() => { setProductCategoryFilter(category); setVisibleProductsCount(10); }}
+                              >
+                                  <Text style={[styles.filterChipTextPremium, active ? 
+styles.filterChipTextPremiumActive : null]} numberOfLines={1}>
+                                      {category}
+                                  </Text>
+                              </TouchableOpacity>
+                          );
+                      })}
+                  </ScrollView>
+  
+                  {/* 2. Product Grid */}
+                  {products.length === 0 ? (
+                      <View style={styles.emptyState}>
+                          <Text style={styles.emptyText}>
+                              {productSearchLoading
+                                  ? (isRTL ? 'Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¨Ø­Ø« ÙÙŠ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª...' : 'Searching products...')
+                                  : (isRTL ? 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª Ù…ØªØ§ØØ© ØØ§Ù„ÙŠØ§Ù‹.' : 'No products 
+available yet.')}
+                          </Text>
+                      </View>
+                  ) : (
+                      <View style={styles.productGridContainerPremium}>
+                          {visibleProducts.map(product => {
+                              const imageUri = product.images && product.images.length > 0
+                                  ? getImageUrl(product.images[0])
+                                  : 
+'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?q=80&w=600&auto=format&fit=crop';
+                              const productName = isRTL ? product.name_ar : product.name_en;
+  
+>                             return (
+                                  <View key={product.id} style={styles.productCardCompactPremium}>
+                                      <TouchableOpacity 
+                                          style={{flex: 1}}
+                                          activeOpacity={0.9}
+                                          onPress={() => navigation.navigate('ProductDetails', { product, tenant })}
+                                      >
+                                          <View style={styles.productCardImageWrapperPremium}>
+                                              <Image source={{ uri: imageUri }} 
+style={styles.productCardImageCompactPremium} />
+                                          </View>
+                                          
+                                          <View style={styles.productCardDetailsPremium}>
+                                              <Text style={styles.productCardNameCompactPremium} numberOfLines={2}>
+                                                  {productName}
+                                              </Text>
+                                              <View style={styles.productCardStockBadgePremium}>
+                                                  <Text style={[styles.productCardStockTextPremium, product.stock <= 0 
+&& styles.productCardOutStockTextPremium]}>
+                                                      {product.stock > 0
+                                                          ? (isRTL ? `Ù…ØªÙˆÙØ± (${product.stock})` : `In stock 
+(${product.stock})`)
+                                                          : (isRTL ? 'ØºÙŠØ± Ù…ØªÙˆÙØ±' : 'Out of stock')}
+                                                  </Text>
+                                              </View>
+                                              <Text style={styles.productCardPriceCompactPremium}>
+                                                  {formatRiyal(product.price, isRTL ? 'ar' : 'en')}
+                                              </Text>
+                                          </View>
+                                      </TouchableOpacity>
+  
+                                      <View style={styles.productCardActionsRowPremium}>
+                                          <TouchableOpacity
+                                              style={[styles.compactActionButtonPremium, product.stock <= 0 ? 
+styles.compactActionButtonDisabledPremium : null]}
+                                              onPress={() => handleAddProduct(product, { navigateToCart: true })}
+                                              disabled={product.stock <= 0}
+                                          >
+                                              <Text style={styles.compactActionTextPremium}>
+                                                  {isRTL ? 'Ø§Ø´ØªØ±ÙŠ' : 'Buy Now'}
+                                              </Text>
+                                          </TouchableOpacity>
+                                          <TouchableOpacity
+                                              style={[styles.compactActionButtonPremium, product.stock <= 0 ? 
+styles.compactActionButtonDisabledPremium : null]}
+                                              onPress={() => handleAddProduct(product)}
+                                              disabled={product.stock <= 0}
+                                          >
+                                              <Text style={styles.compactActionTextPremium}>
+                                                  {isRTL ? 'Ø£Ø¶Ù' : 'Add to cart'}
+                                              </Text>
+                                          </TouchableOpacity>
+                                      </View>
+                                  </View>
+                              );
+                          })}
+                      </View>
+                  )}
+  
+                  {/* 3. Load More */}
+                  {hasMoreProducts && (
+                      <TouchableOpacity style={[styles.loadMoreButtonPremium, { marginHorizontal: spacing.lg }]} 
+onPress={() => setVisibleProductsCount((prev) => prev + 10)}>
+                          <Text style={styles.loadMoreButtonTextPremium}>{isRTL ? 'Ø¹Ø±Ø¶ Ø§Ù„Ù…Ø²ÙŠØ¯' : 'Load 
+more'}</Text>
+                      </TouchableOpacity>
+                  )}
+              </View>
+          );
+      };
+  
+      const renderReviews = () => (
+          <View style={styles.contentSection}>
+              <View style={styles.reviewsHero}>
+                  <View style={{ flex: 1 }}>
+                      <Text style={styles.reviewsHeroTitle}>{isRTL ? 'Ø§Ù„ØªÙ‚ÙŠÙŠÙ…Ø§Øª' : 'Reviews'}</Text>
+                      <Text style={styles.reviewsHeroSubtitle}>
+                          {isRTL ? 'Ø¢Ø±Ø§Ø¡ Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡ ÙˆØªØ¬Ø§Ø±Ø¨Ù‡Ù… Ù…Ø¹ Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ù…Ø±ÙƒØ².' : 'See 
+what customers are saying about this center.'}
+                      </Text>
+                  </View>
+                  <TouchableOpacity style={styles.writeReviewButton} onPress={openTenantReviewPrompt}>
+                      <AppIcon name="star" size={16} color={colors.textInverse} />
+                      <Text style={styles.writeReviewButtonText}>{isRTL ? 'Ø£Ø¶Ù ØªÙ‚ÙŠÙŠÙ…Ùƒ' : 'Write a 
+Review'}</Text>
+                  </TouchableOpacity>
+              </View>
+  
+              <View style={styles.reviewSummaryPremiumCard}>
+                  <View style={styles.reviewSummaryScoreBlock}>
+                      <Text style={styles.reviewSummaryScoreValue}>{reviewsSummary.avgRating ? 
+reviewsSummary.avgRating.toFixed(1) : '-'}</Text>
+                      <View style={styles.reviewSummaryStarsRow}>
+                          {Array.from({ length: 5 }).map((_, index) => (
+                              <Text key={`summary-star-${index}`} style={[styles.reviewStar, index < 
+Math.round(Number(reviewsSummary.avgRating || 0)) ? styles.reviewStarActive : null]}>
+                                  â˜…
+                              </Text>
+                          ))}
+                      </View>
+                      <Text style={styles.reviewSummaryScoreLabel}>{isRTL ? 'Ù…ØªÙˆØ³Ø· Ø§Ù„ØªÙ‚ÙŠÙŠÙ…' : 'Average 
+rating'}</Text>
+                  </View>
+                  <View style={styles.reviewSummaryVerticalDivider} />
+                  <View style={styles.reviewSummaryStatsBlock}>
+                      <Text style={styles.reviewSummaryStatNumber}>{reviewsSummary.total}</Text>
+                      <Text style={styles.reviewSummaryStatLabel}>{isRTL ? 'Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ØªÙ‚ÙŠÙŠÙ…Ø§Øª' : 'Total 
+reviews'}</Text>
+                      <Text style={styles.reviewSummaryStatHint}>{isRTL ? 'Ø¢Ø±Ø§Ø¡ Ù…ÙˆØ«Ù‚Ø© Ù…Ù† Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡' : 
+'Verified customer feedback'}</Text>
+                  </View>
+              </View>
+  
+              {reviewsLoading ? (
+                  renderLoadingBlock()
+  
+>                     return (
+                          <View key={review.id} style={styles.reviewCardPremium}>
+                              <View style={styles.reviewHeader}>
+                                  <View style={styles.reviewAuthorBlock}>
+                                      <Text style={styles.reviewAuthor}>
+                                          {review.customerName && review.customerName.toLowerCase() !== 'valued 
+customer'
+                                              ? review.customerName
+                                              : (isRTL ? 'Ø¹Ù…ÙŠÙ„ Ù…ÙˆØ«Ù‘Ù‚' : 'Verified Customer')}
+                                      </Text>
+                                      {dateLabel ? <Text style={styles.reviewDateText}>{dateLabel}</Text> : null}
+                                  </View>
+                                  <View style={styles.reviewStarsRow}>
+                                      {Array.from({ length: 5 }).map((_, index) => (
+                                          <Text key={`${review.id}-star-${index}`} style={[styles.reviewStar, index < 
+Number(review.rating || 0) ? styles.reviewStarActive : null]}>
+                                              â˜…
+                                          </Text>
+                                      ))}
+                                  </View>
+                              </View>
+  
+                              {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+                              {review.staff?.name ? (
+                                  <Text style={styles.reviewStaffName}>
+                                      {isRTL ? `Ù…Ù‚Ø¯Ù… Ø§Ù„Ø®Ø¯Ù…Ø©: ${review.staff.name}` : `Provider: 
+${review.staff.name}`}
+                                  </Text>
+                              ) : null}
+                              {review.staffReply ? (
+                                  <View style={styles.reviewReplyBox}>
+                                      <Text style={styles.reviewReplyLabel}>
+                                          {isRTL
+                                              ? `Ø±Ø¯ ${tenant?.name_ar || tenant?.name || 'Ø§Ù„Ù…Ø±ÙƒØ²'}`
+                                              : `${tenant?.name_en || tenant?.name || 'Center'} reply`}
+                                      </Text>
+                                      <Text style={styles.reviewReplyText}>{review.staffReply}</Text>
+                                  </View>
+                              ) : null}
+                          </View>
+                      );
+                  })
+              )}
+          </View>
+      );
+  
+      const renderAbout = () => (
+          <View style={styles.contentSection}>
+              {/* 1. About Text */}
+              <View style={styles.aboutCardPremium}>
+                  <Text style={styles.aboutCardTitlePremium}>{t('about')}</Text>
+                  <Text style={styles.aboutTextPremium} numberOfLines={3}>
+                      {aboutStory || (isRTL ? 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ ÙˆØµÙ Ù…ØªØ§Ø­.' : 'No description available.')}
+                  </Text>
+                  <TouchableOpacity style={styles.readMoreButton}>
+                      <Text style={styles.readMoreText}>{isRTL ? 'Ø§Ù„Ù…Ø²ÙŠØ¯' : 'More'}</Text>
+                  </TouchableOpacity>
+              </View>
+  
+              {/* 2. Team Section */}
+              {staff && staff.length > 0 && (
+                  <View style={styles.aboutCardPremium}>
+                      <Text style={styles.aboutCardTitlePremium}>{isRTL ? 'ÙØ±ÙŠÙ‚ Ø§Ù„Ø¹Ù…Ù„' : 'Team'}</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} 
+contentContainerStyle={styles.teamRow}>
+                          {staff.map((member) => (
+                              <View key={member.id} style={styles.teamMemberCard}>
+                                  <View style={styles.teamMemberAvatarWrap}>
+                                      {member.avatar || member.image ? (
+                                          <Image source={{ uri: getImageUrl(member.avatar || member.image) }} 
+style={styles.teamMemberAvatar} />
+                                      ) : (
+                                          <View style={[styles.teamMemberAvatar, { backgroundColor: '#8B5CF6', 
+alignItems: 'center', justifyContent: 'center' }]}>
+                                              <Text style={{ color: '#FFF', fontSize: 24, fontWeight: 'bold' 
+}}>{member.name.charAt(0)}</Text>
+                                          </View>
+                                      )}
+                                  </View>
+                                  <Text style={styles.teamMemberName} numberOfLines={1}>{member.name}</Text>
+                                  <Text style={styles.teamMemberRating}>â˜… {member.rating ? member.rating.toFixed(1) 
+: '5.0'}</Text>
+                              </View>
+                          ))}
+                      </ScrollView>
+                  </View>
+              )}
+  
+              {/* 3. Reviews Summary Section */}
+              <View style={styles.aboutCardPremium}>
+                  <Text style={styles.aboutCardTitlePremium}>{isRTL ? 'Ø§Ù„ØªÙ‚ÙŠÙŠÙ…Ø§Øª' : 'Reviews'}</Text>
+                  <View style={styles.reviewsSummaryHeader}>
+                      <View style={styles.reviewsSummaryStarsRow}>
+                          {Array.from({ length: 5 }).map((_, index) => (
+                              <Text key={`star-${index}`} style={[styles.reviewStarMini, index < 
+Math.round(Number(reviewsSummary.avgRating || 0)) ? styles.reviewStarActiveMini : null]}>
+                                  â˜…
+                              </Text>
+                          ))}
+                      </View>
+                      <Text style={styles.reviewsSummaryScoreText}>
+                          {reviewsSummary.avgRating ? reviewsSummary.avgRating.toFixed(1) : '0.0'} <Text 
+style={{color: colors.textSecondary}}>({reviewsSummary.total})</Text>
+                      </Text>
+                  </View>
+                  
+                  {reviews && reviews.slice(0, 3).map((review) => {
+                      const reviewDate = review.createdAt ? new Date(review.createdAt) : null;
+                      const dateStr = reviewDate && !Number.isNaN(reviewDate.getTime())
+                          ? reviewDate.toLocaleDateString(isRTL ? 'ar-SA' : 'en-US', { weekday: 'short', month: 
+'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric' })
+                          : '';
+>                     return (
+                          <View key={review.id} style={styles.miniReviewCard}>
+                              <View style={styles.miniReviewHeader}>
+                                  <View style={styles.miniReviewAvatar}>
+                                      <Text style={styles.miniReviewAvatarText}>{(review.customerName || 
+'A').charAt(0)}</Text>
+                                  </View>
+                                  <View style={styles.miniReviewMeta}>
+                                      <Text style={styles.miniReviewName}>{review.customerName || 'Anonymous'}</Text>
+                                      <Text style={styles.miniReviewDate}>{dateStr}</Text>
+                                  </View>
+                              </View>
+                              <View style={styles.miniReviewStars}>
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                      <Text key={i} style={[styles.reviewStarMini, i < (review.rating || 0) ? 
+styles.reviewStarActiveMini : null]}>â˜…</Text>
+                                  ))}
+                              </View>
+                              {review.comment && (
+                                  <Text style={styles.miniReviewText} numberOfLines={2}>{review.comment}</Text>
+                              )}
+                          </View>
+                      );
+                  })}
+                  <TouchableOpacity style={styles.seeAllReviewsButton} onPress={() => setActiveTab('reviews')}>
+                      <Text style={styles.seeAllReviewsText}>
+                          {isRTL ? `Ø¹Ø±Ø¶ ÙƒÙ„ ${reviewsSummary.total} ØªÙ‚ÙŠÙŠÙ…` : `See all ${reviewsSummary.total} 
+reviews`}
+                      </Text>
+                  </TouchableOpacity>
+              </View>
+  
+              {/* 4. Opening Times */}
+              {tenant?.workingHours && (
+                  <View style={styles.aboutCardPremium}>
+                      <Text style={styles.aboutCardTitlePremium}>{isRTL ? 'Ø£ÙˆÙ‚Ø§Øª Ø§Ù„Ø¹Ù…Ù„' : 'Opening 
+times'}</Text>
+                      <View style={styles.hoursContainerPremium}>
+                          {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => 
+{
+                              const hours = tenant.workingHours?.[day];
+                              if (!hours) return null;
+>                             return (
+                                  <View key={day} style={styles.hoursRowPremium}>
+                                      <View style={styles.hoursDayLeft}>
+                                          <View style={[styles.hoursDot, hours.isOpen ? styles.hoursDotOpen : 
+styles.hoursDotClosed]} />
+                                          <Text style={styles.dayTextPremium}>{t(day as any) || 
+day.charAt(0).toUpperCase() + day.slice(1)}</Text>
+                                      </View>
+                                      <Text style={[styles.timeTextPremium, !hours.isOpen && { color: 
+colors.textSecondary }]}>
+                                          {hours.isOpen ? `${hours.open} - ${hours.close}` : t('closed')}
+                                      </Text>
+                                  </View>
+                              );
+                          })}
+                      </View>
+  
+                      {/* 5. Location */}
+                      {(locationLine || mapUrl) && (
+                          <View style={{ marginTop: spacing.xl }}>
+                              {mapUrl ? (
+                                  <TouchableOpacity style={styles.mapPlaceholderPremium} onPress={() => 
+openExternalUrl(mapUrl)}>
+                                      {mapPreviewImage ? (
+                                          <Image source={{ uri: mapPreviewImage }} 
+style={styles.mapPreviewImagePremium} />
+                                      ) : (
+                                          <View style={styles.mapFallbackPremium}>
+                                              <AppIcon name="location" size={32} color={colors.textSecondary} />
+                                              <Text style={styles.mapText}>{t('viewOnMap')}</Text>
+                                          </View>
+                                      )}
+                                      <View style={styles.mapOverlayMarker}>
+                                          <Text style={styles.mapOverlayMarkerText}>â˜… {reviewsSummary.avgRating ? 
+reviewsSummary.avgRating.toFixed(1) : '5.0'}</Text>
+                                      </View>
+                                  </TouchableOpacity>
+                              ) : null}
+                              {locationLine && (
+                                  <Text style={styles.addressTextPremium}>{locationLine}</Text>
+                              )}
+                              {mapUrl && (
+                                  <TouchableOpacity onPress={() => openExternalUrl(mapUrl)}>
+                                      <Text style={styles.getDirectionsText}>{isRTL ? 'Ø§ØØµÙ„ Ø¹Ù„Ù‰ 
+Ø§Ù„Ø§ØªØ¬Ø§Ù‡Ø§Øª' : 'Get directions'}</Text>
+                                  </TouchableOpacity>
+                              )}
+                          </View>
+                      )}
+                  </View>
+              )}
+          </View>
+      );
+  
+      if (loading) {
+>         return (
+              <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+          );
+      }
+  
+      const hasVisibleTabs = showServicesTab || showGiftsTab || showReviewsTab || showAboutTab;
+  
+>     return (
+          <View style={styles.container}>
+              <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: effectiveBottomPadding }}
+                  stickyHeaderIndices={hasVisibleTabs ? [1] : undefined}
+              >
+                  {renderHero()}
+                  
+                  <Animated.View
+                      style={[
+                          styles.tabContentAnimated,
+                          {
+                              opacity: pageEnterAnim,
+                              transform: [
+                                  {
+                                      translateY: pageEnterAnim.interpolate({
+                                          inputRange: [0, 1],
+                                          outputRange: [12, 0],
+                                      }),
+                                  },
+                              ],
+                          },
+                      ]}
+                  >
+                      {activeTab === 'services' && renderServices()}
+                      {activeTab === 'products' && renderProducts()}
+                      {activeTab === 'gifts' && renderGifts()}
+                      {activeTab === 'reviews' && renderReviews()}
+                      {activeTab === 'about' && renderAbout()}
+                  </Animated.View>
+              </ScrollView>
+  
+              <Modal
+                  visible={!!galleryPreviewImage}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setGalleryPreviewImage(null)}
+              >
+                  <View style={styles.galleryPreviewBackdrop}>
+                      <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => 
+setGalleryPreviewImage(null)} />
+                      {galleryPreviewImage ? (
+                          <View style={styles.galleryPreviewCard}>
+                              <Image source={{ uri: galleryPreviewImage }} style={styles.galleryPreviewImage} 
+resizeMode="contain" />
+                              <TouchableOpacity style={styles.galleryPreviewCloseButton} onPress={() => 
+setGalleryPreviewImage(null)}>
+                                  <AppIcon name="close" size={24} color={colors.textInverse} />
+                              </TouchableOpacity>
+                          </View>
+                      ) : null}
+                  </View>
+              </Modal>
+  
+              {/* Bottom Action Bar (if needed, e.g. View Cart or Quick Book) */}
+              {/* For now, individual service booking is sufficient */}
+              <ReviewPromptModal
+                  visible={!!reviewTargetBooking}
+                  appointment={reviewTargetBooking}
+                  onClose={() => setReviewTargetBooking(null)}
+                  onSuccess={() => {
+                      setReviewTargetBooking(null);
+                      loadReviewEligibility();
+                      if (showReviewsTab) {
+                          loadTenantDetails();
+                      }
+                  }}
+              />
+          </View>
+      );
+  }
+  
+  const styles = StyleSheet.create({
+      container: {
+          flex: 1,
+          backgroundColor: colors.background,
+      },
+      loadingContainer: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+      },
+      heroContainer: {
+          backgroundColor: colors.background,
+      },
+      heroImage: {
+          width: '100%',
+          height: 260,
+          borderBottomLeftRadius: 32,
+          borderBottomRightRadius: 32,
+          overflow: 'hidden',
+      },
+      heroGradient: {
+          flex: 1,
+          paddingHorizontal: spacing.md,
+          paddingBottom: spacing.md,
+      },
+      heroHeaderRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+      },
+      backButton: {
+
+

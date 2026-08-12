@@ -1,0 +1,175 @@
+﻿
+                          </Text>
+                          <Text style={styles.giftInfoSubText}>
+                              {isRTL ? 'ØªÙØ·Ø¨Ù‚ Ø§Ù„Ø´Ø±ÙˆØ· ÙˆØ§Ù„Ø£Ø­ÙƒØ§Ù….' : 'Terms & conditions apply.'}
+                          </Text>
+                      </View>
+                  </View>
+              ) : null}
+          </View>
+      );
+  
+>     const renderServices = () => {
+          const categories = Array.from(new Set(services.map((s) => s.category || 'General')));
+          const filteredServices = serviceFilterCategory === 'all'
+              ? services
+              : services.filter((s) => (s.category || 'General') === serviceFilterCategory);
+          const featuredServices = filteredServices.slice(0, 4);
+          const hasMoreServices = filteredServices.length > featuredServices.length;
+  
+          return (
+              <View style={styles.contentSection}>
+                  <View style={styles.storefrontIntroCard}>
+                      <View style={styles.storefrontIntroTopRow}>
+                          <View style={styles.storefrontIntroBadge}>
+                              <AppIcon name="sparkles" size={14} color={colors.primary} />
+                              <Text style={styles.storefrontIntroBadgeText}>
+                                  {isRTL ? 'ÙˆØ§Ø¬Ù‡Ø© Ø§Ù„Ø®Ø¯Ù…Ø§Øª' : 'Service storefront'}
+                              </Text>
+                          </View>
+                          <View style={styles.storefrontIntroMetaPill}>
+                              <AppIcon name="clock" size={14} color={colors.primary} />
+                              <Text style={styles.storefrontIntroMetaText}>
+                                  {services.length} {isRTL ? 'Ø®Ø¯Ù…Ø©' : 'services'}
+                              </Text>
+                          </View>
+                      </View>
+                      <Text style={styles.storefrontIntroTitle}>
+                          {isRTL ? 'Ø§Ø¨Ø¯Ø¦ÙŠ Ù…Ù† Ø§Ù„Ø®Ø¯Ù…Ø§Øª' : 'Start with services'}
+                      </Text>
+                      <Text style={styles.storefrontIntroSubtitle}>
+                          {isRTL
+                              ? 'Ø§ÙƒØªØ´ÙÙŠ Ù…Ø§ ÙŠÙ‚Ø¯Ù‘Ù…Ù‡ Ø§Ù„Ù…Ø±ÙƒØ² ÙˆØ§ØØ¬Ø²ÙŠ Ø§Ù„Ø®Ø¯Ù…Ø© Ø§Ù„Ù…Ù†Ø§Ø³Ø¨Ø© 
+Ù„Ùƒ Ø¨Ø³Ø±Ø¹Ø© ÙˆØ¨Ø£Ø³Ù„ÙˆØ¨ Ø¹ØµØ±ÙŠ.'
+                              : 'Discover what this salon offers and book the right service in a fast, modern flow.'}
+                      </Text>
+                      <View style={styles.storefrontIntroActions}>
+                          <TouchableOpacity style={styles.primaryStorefrontButton} onPress={openServiceBrowser}>
+                              <Text style={styles.primaryStorefrontButtonText}>
+                                  {isRTL ? 'Ø¹Ø±Ø¶ ÙƒÙ„ Ø§Ù„Ø®Ø¯Ù…Ø§Øª' : 'View All Services'}
+                              </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                              style={styles.secondaryStorefrontButton}
+                              onPress={() => setActiveTab('products')}
+                          >
+                              <Text style={styles.secondaryStorefrontButtonText}>
+                                  {isRTL ? 'Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª' : 'Products'}
+                              </Text>
+                          </TouchableOpacity>
+                      </View>
+                  </View>
+  
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} 
+contentContainerStyle={styles.filterChipRow}>
+                      <TouchableOpacity
+                          style={[styles.filterChip, serviceFilterCategory === 'all' ? styles.filterChipActive : null]}
+                          onPress={() => setServiceFilterCategory('all')}
+                      >
+                          <Text style={[styles.filterChipText, serviceFilterCategory === 'all' ? 
+styles.filterChipTextActive : null]}>
+                              {isRTL ? 'Ø§Ù„ÙƒÙ„' : 'All'}
+                          </Text>
+                      </TouchableOpacity>
+                      {categories.map((category) => {
+                          const active = serviceFilterCategory === category;
+                          return (
+                              <TouchableOpacity
+                                  key={category}
+                                  style={[styles.filterChip, active ? styles.filterChipActive : null]}
+                                  onPress={() => setServiceFilterCategory(category)}
+                              >
+                                  <Text style={[styles.filterChipText, active ? styles.filterChipTextActive : 
+null]}>{category}</Text>
+                              </TouchableOpacity>
+                          );
+                      })}
+                  </ScrollView>
+  
+                  {serviceBookingItemCount > 0 && (
+                      <View style={styles.serviceBookingBanner}>
+                          <View style={styles.serviceBookingBannerLeft}>
+                              <View style={styles.serviceBookingBannerIcon}>
+                                  <AppIcon name="bookings" size={18} color={colors.primary} />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                  <Text style={styles.serviceBookingBannerTitle}>
+                                      {isRTL ? 'Ø®Ø¯Ù…Ø§Øª Ù…Ø­ÙÙˆØ¸Ø© Ù„Ù„Ø­Ø¬Ø²' : 'Saved booking services'}
+                                  </Text>
+                                  <Text style={styles.serviceBookingBannerText}>
+                                      {serviceBookingItemCount}{' '}
+                                      {isRTL ? 'Ø®Ø¯Ù…Ø© ÙÙŠ Ø³Ù„Ø© Ø§Ù„ØØ¬Ø²' : 'service items are in your booking 
+cart'}
+                                  </Text>
+                              </View>
+                          </View>
+                          <TouchableOpacity
+                              style={styles.serviceBookingBannerButton}
+                              onPress={() => navigation.navigate('ServiceBookingCart')}
+                          >
+                              <Text style={styles.serviceBookingBannerButtonText}>
+                                  {isRTL ? 'Ø¹Ø±Ø¶ Ø§Ù„Ø³Ù„Ø©' : 'View Cart'}
+                              </Text>
+                          </TouchableOpacity>
+                      </View>
+                  )}
+  
+                  {services.length === 0 ? (
+                      renderEmptyState(isRTL ? 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø®Ø¯Ù…Ø§Øª Ù…ØªØ§ØØ© ØØ§Ù„ÙŠØ§Ù‹.' : 'No services 
+available yet.')
+                  ) : (
+                      <View style={styles.featuredServicesBlock}>
+                          <View style={styles.featuredServicesHeader}>
+                              <Text style={styles.featuredServicesTitle}>
+                                  {isRTL ? 'Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ù…Ø®ØªØ§Ø±Ø©' : 'Featured services'}
+                              </Text>
+                              <Text style={styles.featuredServicesSubtitle}>
+                                  {isRTL
+                                      ? 'Ø¨Ø§Ù‚Ø§Øª ÙˆØ®Ø¯Ù…Ø§Øª Ù…Ø®ØªØ§Ø±Ø© Ø¨Ø¹Ù†Ø§ÙŠØ© Ù„Ø¨Ø¯Ø¡ Ø§Ù„ØØ¬Ø² 
+Ø¨Ø³Ø±Ø¹Ø©.'
+                                      : 'Carefully selected services to help customers start booking faster.'}
+                              </Text>
+                          </View>
+  
+                          {featuredServices.map((service) => {
+                              const serviceName = isRTL ? service.name_ar : service.name_en;
+                              const serviceDesc = getServiceDescription(service);
+                              const serviceImage = resolveServiceImageUri(service);
+                              return (
+                                  <TouchableOpacity
+                                      key={service.id}
+                                      style={styles.featuredServiceCard}
+                                      onPress={() => openServiceDetails(service)}
+                                      activeOpacity={0.92}
+                                  >
+                                      <View style={[styles.featuredServiceMediaRow, isRTL ? 
+styles.featuredServiceMediaRowRtl : null]}>
+                                          {serviceImage && !serviceImageErrors[service.id] ? (
+                                              <Image
+                                                  source={{ uri: serviceImage }}
+                                                  style={styles.featuredServiceImage}
+                                                  onError={() => setServiceImageErrors((prev) => ({ ...prev, 
+[service.id]: true }))}
+                                              />
+                                          ) : (
+                                              <LinearGradient
+                                                  colors={['#8B5CF6', '#A78BFA']}
+                                                  start={{ x: 0, y: 0 }}
+                                                  end={{ x: 1, y: 1 }}
+                                                  style={styles.featuredServiceImageFallback}
+                                              >
+                                                  <Text style={styles.featuredServiceImageFallbackText}>
+                                                      {(serviceName || 'S').charAt(0).toUpperCase()}
+                                                  </Text>
+                                              </LinearGradient>
+                                          )}
+  
+                                          <View style={[styles.featuredServiceInfo, isRTL ? 
+styles.featuredServiceInfoRtl : null]}>
+                                              <View style={styles.featuredServiceTopRow}>
+                                                  <Text style={[styles.featuredServiceName, isRTL ? 
+styles.featuredServiceNameRtl : null]} numberOfLines={1}>
+                                                      {serviceName}
+                                                  </Text>
+
+

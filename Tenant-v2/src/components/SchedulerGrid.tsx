@@ -331,6 +331,25 @@ const getRiyadhDateKey = (value: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const CHAIN_COLORS = [
+  { border: 'border-purple-400/80', ring: 'ring-purple-400/80', shadow: 'shadow-purple-500/20', text: 'text-purple-500/90' },
+  { border: 'border-cyan-400/80', ring: 'ring-cyan-400/80', shadow: 'shadow-cyan-500/20', text: 'text-cyan-500/90' },
+  { border: 'border-emerald-400/80', ring: 'ring-emerald-400/80', shadow: 'shadow-emerald-500/20', text: 'text-emerald-500/90' },
+  { border: 'border-pink-400/80', ring: 'ring-pink-400/80', shadow: 'shadow-pink-500/20', text: 'text-pink-500/90' },
+  { border: 'border-blue-400/80', ring: 'ring-blue-400/80', shadow: 'shadow-blue-500/20', text: 'text-blue-500/90' },
+  { border: 'border-orange-400/80', ring: 'ring-orange-400/80', shadow: 'shadow-orange-500/20', text: 'text-orange-500/90' },
+  { border: 'border-rose-400/80', ring: 'ring-rose-400/80', shadow: 'shadow-rose-500/20', text: 'text-rose-500/90' },
+  { border: 'border-teal-400/80', ring: 'ring-teal-400/80', shadow: 'shadow-teal-500/20', text: 'text-teal-500/90' }
+];
+
+const getChainColor = (sessionId: string) => {
+  let hash = 0;
+  for (let i = 0; i < sessionId.length; i++) {
+    hash = sessionId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return CHAIN_COLORS[Math.abs(hash) % CHAIN_COLORS.length];
+};
+
 export default function SchedulerGrid({
   viewMode,
   selectedDateKey,
@@ -572,16 +591,18 @@ export default function SchedulerGrid({
     return positioned;
   }, [columns, events, slotMinutes]);
 
-  const chainedSessionIds = useMemo(() => {
+  const chainedSessionColors = useMemo(() => {
     const counts = new Map<string, number>();
     for (const ev of positionedEvents) {
         if (ev.kind !== 'appointment' || !ev.raw?.bookingSessionId) continue;
         const sid = ev.raw.bookingSessionId;
         counts.set(sid, (counts.get(sid) || 0) + 1);
     }
-    const chained = new Set<string>();
+    const chained = new Map<string, typeof CHAIN_COLORS[0]>();
     for (const [sid, count] of counts.entries()) {
-        if (count > 1) chained.add(sid);
+        if (count > 1) {
+            chained.set(sid, getChainColor(sid));
+        }
     }
     return chained;
   }, [positionedEvents]);
@@ -880,7 +901,7 @@ export default function SchedulerGrid({
             const isMedium = height >= 42 && height < 64;
             const showStatusMeta = showAppointmentStatusBadges;
             
-            const isPartOfChain = event.kind === 'appointment' && event.raw?.bookingSessionId && chainedSessionIds.has(event.raw.bookingSessionId);
+            const chainColor = (event.kind === 'appointment' && event.raw?.bookingSessionId) ? chainedSessionColors.get(event.raw.bookingSessionId) : null;
 
             return (
               <div
@@ -919,7 +940,7 @@ export default function SchedulerGrid({
                     contextEvent.stopPropagation();
                     onEventContextMenu?.(contextEvent, event);
                   }}
-                  className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${isPartOfChain ? 'ring-2 ring-amber-400/80 shadow-amber-500/20' : ''}`}
+                  className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${chainColor ? `ring-2 ${chainColor.ring} ${chainColor.shadow}` : ''}`}
                 >
                   <div className={`absolute inset-x-0 top-0 h-1 ${statusTheme.accent}`} />
 

@@ -3146,8 +3146,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         balance = Number(existing.walletBalance || 0);
       }
     } else if (custMode === 'new') {
-      if (!newCustName || !newCustPhone) {
-        addLocalToast('يرجى تعبئة الاسم ورقم الجوال للعميل الجديد', 'Please fill name and phone for new customer', 'warning');
+      const requirePhone = tenantSettings?.bookingSettings?.requireWalkInPhone === true;
+      if (!newCustName) {
+        addLocalToast('يرجى تعبئة الاسم للعميل الجديد', 'Please fill name for new customer', 'warning');
+        return;
+      }
+      if (requirePhone && !newCustPhone) {
+        addLocalToast('يرجى تعبئة رقم الجوال للعميل الجديد', 'Please fill phone for new customer', 'warning');
         return;
       }
       custNameEn = newCustName;

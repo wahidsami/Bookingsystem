@@ -1,0 +1,133 @@
+<USER_REQUEST>
+APPROVE WITH CORRECTIONS — PHASE 2
+
+I approve the Phase 2 direction, but modify the implementation plan before making changes.
+
+IMPORTANT CORRECTIONS:
+
+1. GOOGLE MAPS CONFIGURATION
+
+Do NOT assume the Android native Google Maps SDK requires no billing configuration.
+
+We understand that the deployed Android app using Google Maps requires:
+- Google Cloud project
+- Billing enabled
+- Maps SDK for Android enabled
+- API key
+- Proper Android application/package restriction on the API key
+
+However, do NOT add or hardcode an API key into source code.
+
+Before implementation, identify the exact Expo/EAS configuration required and use environment/EAS configuration appropriately.
+
+Do NOT enable:
+- Distance Matrix
+- Routes API
+- Directions API
+- Places API
+- Geocoding API
+
+Those are NOT required for this phase.
+
+2. LOCATION PERMISSION UX
+
+DO NOT request customer location permission automatically when TenantScreen mounts or when the About tab opens.
+
+The map must work using the tenant's coordinates without customer location permission.
+
+Customer location should only be requested when the customer explicitly needs the distance feature.
+
+If permission has not been granted:
+- still show the tenant map
+- still show the tenant address
+- do not fabricate a distance
+- gracefully hide the distance value or show an explicit action to enable distance
+
+Use foreground/when-in-use location only. No background location.
+
+3. DISTANCE
+
+Implement only straight-line distance for now:
+
+customer GPS coordinates
++
+tenant.coordinates { lat, lng }
+→ local Haversine calculation
+→ display approximately "4.2 km"
+
+Do NOT install geolib. Implement the small Haversine calculation locally or in an existing utility.
+
+4. GOOGLE MAP
+
+Use the canonical tenant.coordinates { lat, lng } as the source of truth.
+
+Do NOT attempt to resolve maps.app.goo.gl links into coordinates inside the mobile app.
+
+The Google Maps Link remains only for the "Get directions" action, which should open the existing googleMapLink externally.
+
+5. ABOUT TAB
+
+Replace the broken static OpenStreetMap preview with the native map.
+
+The map should:
+- center on tenant.coordinates
+- show a marker for the center
+- remain usable without customer location permission
+- work in the existing RTL/LTR UI
+- preserve the existing address and "Get directions" functionality
+
+6. IMPORTANT — DO NOT CHANGE OTHER ABOUT CONTENT
+
+Do not modify:
+- working hours
+- social media
+- reviews
+- team
+- about story
+- booking logic
+- payment logic
+- product logic
+
+Only modify the location/map portion required for this phase.
+
+7. BEFORE CODING
+
+First inspect the current Expo/EAS configuration and tell me:
+- current Expo SDK version
+- exact react-native-maps version to install
+- exact app.config.js changes required
+- exact Google Cloud SDK/API that must be enabled
+- exact API key restriction required for our Android package
+- whether iOS configuration is required now or can be safely deferred
+
+Do not start unrelated work.
+
+After implementation:
+- run typecheck
+- verify the tenant coordinates are consumed from the public API
+- verify map rendering
+- verify permission is NOT requested automatically
+- verify distance calculation only occurs after location permission is granted
+- verify Get Directions still uses googleMapLink
+
+STOP and report all changes.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-08-11T22:03:01+03:00.
+
+The user's current state is as follows:
+Active Document: d:\Waheed\Refah\Bookingsystem\docs\PRODUCTION_READINESS_MATRIX.md (LANGUAGE_MARKDOWN)
+Cursor is on line: 1
+Other open documents:
+- d:\Waheed\Refah\Bookingsystem\docs\PRODUCTION_READINESS_MATRIX.md (LANGUAGE_MARKDOWN)
+Browser State:
+  Page 72DF86A016B706286CDE9E62D16F9FF8 (Tenant) - http://localhost:8081/ [ACTIVE]
+    Viewport: 500x847, Page Height: 847
+  Page 4171A54C2B2B8E633B2D5B26D66DBDDC () - https://www.google.com/maps/place/Panorama+Mall/@24.6928417,46.6673362,16z/data=...
+    Viewport: 0x0, Page Height: 0
+  Page 2834AC066459A2E419F640051FA4F01B (شركة هشام حسن حنبولي الدولية للاستشارات القانونية والمحاماة) - http://localhost:3001/doctor-shield
+    Viewport: 1436x790, Page Height: 6179
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.1 Pro (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

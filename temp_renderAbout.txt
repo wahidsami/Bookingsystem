@@ -1,0 +1,628 @@
+﻿
+                                          </TouchableOpacity>
+                                      </View>
+                                  </TouchableOpacity>
+                              );
+                          })}
+                      </View>
+                  )}
+              </View>
+          );
+      };
+  
+      const renderReviews = () => (
+          <View style={styles.contentSection}>
+              <View style={styles.reviewsHero}>
+                  <View style={{ flex: 1 }}>
+                      <Text style={styles.reviewsHeroTitle}>{isRTL ? 'Ø§Ù„ØªÙ‚ÙŠÙŠÙ…Ø§Øª' : 'Reviews'}</Text>
+                      <Text style={styles.reviewsHeroSubtitle}>
+                          {isRTL ? 'Ø¢Ø±Ø§Ø¡ Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡ ÙˆØªØ¬Ø§Ø±Ø¨Ù‡Ù… Ù…Ø¹ Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ù…Ø±ÙƒØ².' : 'See 
+what customers are saying about this center.'}
+                      </Text>
+                  </View>
+                  <TouchableOpacity style={styles.writeReviewButton} onPress={openTenantReviewPrompt}>
+                      <AppIcon name="star" size={16} color={colors.textInverse} />
+                      <Text style={styles.writeReviewButtonText}>{isRTL ? 'Ø£Ø¶Ù ØªÙ‚ÙŠÙŠÙ…Ùƒ' : 'Write a 
+Review'}</Text>
+                  </TouchableOpacity>
+              </View>
+  
+              <View style={styles.reviewSummaryPremiumCard}>
+                  <View style={styles.reviewSummaryScoreBlock}>
+                      <Text style={styles.reviewSummaryScoreValue}>{reviewsSummary.avgRating ? 
+reviewsSummary.avgRating.toFixed(1) : '-'}</Text>
+                      <View style={styles.reviewSummaryStarsRow}>
+                          {Array.from({ length: 5 }).map((_, index) => (
+                              <Text key={`summary-star-${index}`} style={[styles.reviewStar, index < 
+Math.round(Number(reviewsSummary.avgRating || 0)) ? styles.reviewStarActive : null]}>
+                                  â˜…
+                              </Text>
+                          ))}
+                      </View>
+                      <Text style={styles.reviewSummaryScoreLabel}>{isRTL ? 'Ù…ØªÙˆØ³Ø· Ø§Ù„ØªÙ‚ÙŠÙŠÙ…' : 'Average 
+rating'}</Text>
+                  </View>
+                  <View style={styles.reviewSummaryVerticalDivider} />
+                  <View style={styles.reviewSummaryStatsBlock}>
+                      <Text style={styles.reviewSummaryStatNumber}>{reviewsSummary.total}</Text>
+                      <Text style={styles.reviewSummaryStatLabel}>{isRTL ? 'Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ØªÙ‚ÙŠÙŠÙ…Ø§Øª' : 'Total 
+reviews'}</Text>
+                      <Text style={styles.reviewSummaryStatHint}>{isRTL ? 'Ø¢Ø±Ø§Ø¡ Ù…ÙˆØ«Ù‚Ø© Ù…Ù† Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡' : 
+'Verified customer feedback'}</Text>
+                  </View>
+              </View>
+  
+              {reviewsLoading ? (
+                  renderLoadingBlock()
+              ) : reviews.length === 0 ? (
+                  renderEmptyState(isRTL ? 'Ù„Ø§ ØªÙˆØ¬Ø¯ ØªÙ‚ÙŠÙŠÙ…Ø§Øª Ù…Ù†Ø´ÙˆØ±Ø© Ø¨Ø¹Ø¯.' : 'No published reviews 
+yet.')
+              ) : (
+                  reviews.map((review) => {
+                      const reviewDate = review.createdAt ? new Date(review.createdAt) : null;
+                      const dateLabel = reviewDate && !Number.isNaN(reviewDate.getTime())
+                          ? reviewDate.toLocaleDateString(isRTL ? 'ar-SA' : 'en-US')
+                          : '';
+  
+                      return (
+                          <View key={review.id} style={styles.reviewCardPremium}>
+                              <View style={styles.reviewHeader}>
+                                  <View style={styles.reviewAuthorBlock}>
+                                      <Text style={styles.reviewAuthor}>
+                                          {review.customerName && review.customerName.toLowerCase() !== 'valued 
+customer'
+                                              ? review.customerName
+                                              : (isRTL ? 'Ø¹Ù…ÙŠÙ„ Ù…ÙˆØ«Ù‘Ù‚' : 'Verified Customer')}
+                                      </Text>
+                                      {dateLabel ? <Text style={styles.reviewDateText}>{dateLabel}</Text> : null}
+                                  </View>
+                                  <View style={styles.reviewStarsRow}>
+                                      {Array.from({ length: 5 }).map((_, index) => (
+                                          <Text key={`${review.id}-star-${index}`} style={[styles.reviewStar, index < 
+Number(review.rating || 0) ? styles.reviewStarActive : null]}>
+                                              â˜…
+                                          </Text>
+                                      ))}
+                                  </View>
+                              </View>
+  
+                              {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+                              {review.staff?.name ? (
+                                  <Text style={styles.reviewStaffName}>
+                                      {isRTL ? `Ù…Ù‚Ø¯Ù… Ø§Ù„Ø®Ø¯Ù…Ø©: ${review.staff.name}` : `Provider: 
+${review.staff.name}`}
+                                  </Text>
+                              ) : null}
+                              {review.staffReply ? (
+                                  <View style={styles.reviewReplyBox}>
+                                      <Text style={styles.reviewReplyLabel}>
+                                          {isRTL
+                                              ? `Ø±Ø¯ ${tenant?.name_ar || tenant?.name || 'Ø§Ù„Ù…Ø±ÙƒØ²'}`
+                                              : `${tenant?.name_en || tenant?.name || 'Center'} reply`}
+                                      </Text>
+                                      <Text style={styles.reviewReplyText}>{review.staffReply}</Text>
+                                  </View>
+                              ) : null}
+                          </View>
+                      );
+                  })
+              )}
+          </View>
+      );
+  
+>     const renderAbout = () => (
+          <View style={styles.contentSection}>
+              <View style={styles.aboutHeroBlock}>
+                  <Text style={styles.aboutHeroTitle}>{isRTL ? 'Ø¹Ù† Ø§Ù„Ù…Ø±ÙƒØ²' : 'About'}</Text>
+                  <Text style={styles.aboutHeroSubtitle}>
+                      {isRTL ? 'ØªØ¹Ø±Ù‘Ù Ø¹Ù„Ù‰ Ù‚ØµØ© Ø§Ù„Ù…Ø±ÙƒØ²ØŒ Ø±Ø³Ø§Ù„ØªÙ‡ØŒ ÙˆÙ…Ø¹Ù„ÙˆÙ…Ø§Øª 
+Ø§Ù„ØªÙˆØ§ØµÙ„.' : 'Discover the center story, mission, and key details.'}
+                  </Text>
+              </View>
+  
+              {aboutStory ? (
+                  <View style={styles.aboutCard}>
+                      <Text style={styles.aboutCardTitle}>{t('about')}</Text>
+                      <Text style={styles.aboutText}>{aboutStory}</Text>
+                  </View>
+              ) : null}
+  
+              {missions.length > 0 ? (
+                  <View style={styles.aboutCard}>
+                      <Text style={styles.aboutCardTitle}>{t('mission')}</Text>
+                      {missions.map((item, index) => (
+                          <Text key={`mission-${index}`} style={styles.aboutListItem}>â€¢ {item}</Text>
+                      ))}
+                  </View>
+              ) : null}
+  
+              {visions.length > 0 ? (
+                  <View style={styles.aboutCard}>
+                      <Text style={styles.aboutCardTitle}>{t('vision')}</Text>
+                      {visions.map((item, index) => (
+                          <Text key={`vision-${index}`} style={styles.aboutListItem}>â€¢ {item}</Text>
+                      ))}
+                  </View>
+              ) : null}
+  
+              {facilitiesImages.length > 0 ? (
+                  <View style={styles.aboutCard}>
+                      <Text style={styles.aboutCardTitle}>{isRTL ? 'ØµÙˆØ± Ø§Ù„Ù…Ø±ÙƒØ²' : 'Center Gallery'}</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} 
+contentContainerStyle={styles.galleryRow}>
+                          {facilitiesImages.map((imageUri: string, index: number) => (
+                              <TouchableOpacity key={`gallery-${index}`} activeOpacity={0.9} onPress={() => 
+setGalleryPreviewImage(imageUri)}>
+                                  <Image
+                                      source={{ uri: imageUri }}
+                                      style={styles.galleryImage}
+                                  />
+                              </TouchableOpacity>
+                          ))}
+                      </ScrollView>
+                  </View>
+              ) : null}
+  
+              {locationLine || mapUrl ? (
+                  <View style={styles.aboutCard}>
+                      <Text style={styles.aboutCardTitle}>{t('location')}</Text>
+                      {locationLine ? <Text style={styles.addressText}>{locationLine}</Text> : null}
+                      {mapUrl ? (
+                          <TouchableOpacity style={styles.mapPlaceholder} onPress={() => openExternalUrl(mapUrl)}>
+                              {mapPreviewImage ? (
+                                  <Image source={{ uri: mapPreviewImage }} style={styles.mapPreviewImage} />
+                              ) : (
+                                  <View style={styles.mapFallback}>
+                                      <AppIcon name="location" size={32} color={colors.textSecondary} />
+                                      <Text style={styles.mapText}>{t('viewOnMap')}</Text>
+                                  </View>
+                              )}
+                              <View style={styles.mapOverlayPill}>
+                                  <Text style={styles.mapOverlayPillText}>{t('viewOnMap')}</Text>
+                              </View>
+                          </TouchableOpacity>
+                      ) : null}
+                  </View>
+              ) : null}
+  
+              {tenant?.workingHours ? (
+                  <View style={styles.aboutCard}>
+                      <Text style={styles.aboutCardTitle}>{t('workingHours')}</Text>
+                      <View style={styles.hoursContainer}>
+                          {Object.entries(tenant.workingHours).map(([day, hours]: [string, any]) => (
+                              <View key={day} style={styles.hoursRow}>
+                                  <Text style={styles.dayText}>{t(day as any) || day.charAt(0).toUpperCase() + 
+day.slice(1)}</Text>
+                                  <Text style={[styles.timeText, !hours.isOpen && { color: colors.error }]}>
+                                      {hours.isOpen ? `${hours.open} - ${hours.close}` : t('closed')}
+                                  </Text>
+                              </View>
+                          ))}
+                      </View>
+                  </View>
+              ) : null}
+  
+              {pageSetup?.phone || tenant?.phone || tenant?.mobile || pageSetup?.email || tenant?.email || 
+pageSetup?.website || tenant?.website ? (
+                  <View style={styles.aboutCard}>
+                      <Text style={styles.aboutCardTitle}>{t('contact')}</Text>
+                      {pageSetup?.phone || tenant?.phone || tenant?.mobile ? (
+                          <View style={styles.contactRow}>
+                              <AppIcon name="phone" size={20} color={colors.primary} />
+                              <Text style={styles.contactText}>{pageSetup?.phone || tenant?.phone || 
+tenant?.mobile}</Text>
+                          </View>
+                      ) : null}
+                      {pageSetup?.email || tenant?.email ? (
+                          <View style={styles.contactRow}>
+                              <AppIcon name="mail" size={20} color={colors.primary} />
+                              <Text style={styles.contactText}>{pageSetup?.email || tenant?.email}</Text>
+                          </View>
+                      ) : null}
+                      {pageSetup?.website || tenant?.website ? (
+                          <TouchableOpacity style={styles.contactRow} onPress={() => 
+openExternalUrl(pageSetup?.website || tenant?.website)}>
+                              <AppIcon name="globe" size={20} color={colors.primary} />
+                              <Text style={styles.contactText}>{pageSetup?.website || tenant?.website}</Text>
+                          </TouchableOpacity>
+                      ) : null}
+                  </View>
+              ) : null}
+  
+              {socialLinks.length > 0 ? (
+                  <View style={styles.aboutCard}>
+                      <Text style={styles.aboutCardTitle}>{t('followUs')}</Text>
+                      <View style={styles.socialRow}>
+                          {socialLinks.map((item) => (
+                              <TouchableOpacity key={item.key} style={styles.socialIcon} onPress={() => 
+openExternalUrl(item.url)}>
+                                  <AppIcon name={item.icon as any} size={24} color={item.color} />
+                              </TouchableOpacity>
+                          ))}
+                      </View>
+                  </View>
+              ) : null}
+          </View>
+      );
+  
+      if (loading) {
+          return (
+              <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+          );
+      }
+  
+      const hasVisibleTabs = showServicesTab || showGiftsTab || showReviewsTab || showAboutTab;
+  
+      return (
+          <View style={styles.container}>
+              <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: effectiveBottomPadding }}
+                  stickyHeaderIndices={hasVisibleTabs ? [1] : undefined}
+              >
+                  {renderHero()}
+                  {renderTabs()}
+                  <Animated.View
+                      style={[
+                          styles.tabContentAnimated,
+                          {
+                              opacity: pageEnterAnim,
+                              transform: [
+                                  {
+                                      translateY: pageEnterAnim.interpolate({
+                                          inputRange: [0, 1],
+                                          outputRange: [12, 0],
+                                      }),
+                                  },
+                              ],
+                          },
+                      ]}
+                  >
+                      {activeTab === 'services' && renderServices()}
+                      {activeTab === 'products' && renderProducts()}
+                      {activeTab === 'gifts' && renderGifts()}
+                      {activeTab === 'reviews' && renderReviews()}
+                      {activeTab === 'about' && renderAbout()}
+                  </Animated.View>
+              </ScrollView>
+  
+              <Modal
+                  visible={!!galleryPreviewImage}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setGalleryPreviewImage(null)}
+              >
+                  <View style={styles.galleryPreviewBackdrop}>
+                      <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => 
+setGalleryPreviewImage(null)} />
+                      {galleryPreviewImage ? (
+                          <View style={styles.galleryPreviewCard}>
+                              <Image source={{ uri: galleryPreviewImage }} style={styles.galleryPreviewImage} 
+resizeMode="contain" />
+                              <TouchableOpacity style={styles.galleryPreviewCloseButton} onPress={() => 
+setGalleryPreviewImage(null)}>
+                                  <AppIcon name="close" size={24} color={colors.textInverse} />
+                              </TouchableOpacity>
+                          </View>
+                      ) : null}
+                  </View>
+              </Modal>
+  
+              {/* Bottom Action Bar (if needed, e.g. View Cart or Quick Book) */}
+              {serviceBookingItemCount > 0 && (
+                  <View style={[styles.stickyFooter, { paddingBottom: Math.max(scrollBottomPadding, 20) }]}>
+                      <TouchableOpacity
+                          style={styles.stickyFooterButton}
+                          onPress={() => navigation.navigate('Booking')}
+                          activeOpacity={0.9}
+                      >
+                          <Text style={styles.stickyFooterText}>
+                              {serviceBookingItemCount} {isRTL ? 'Ø®Ø¯Ù…Ø§Øª' : 'Services'} Â· 
+{formatRiyal(serviceBookingTotalPrice, isRTL ? 'ar' : 'en')}
+                          </Text>
+                          <View style={styles.stickyFooterRight}>
+                              <Text style={styles.stickyFooterContinueText}>
+                                  {isRTL ? 'Ù…ØªØ§Ø¨Ø¹Ø©' : 'Continue'}
+                              </Text>
+                              <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={16} color="#FFFFFF" />
+                          </View>
+                      </TouchableOpacity>
+                  </View>
+              )}
+  
+              <Modal
+                  visible={showAbandonedBasketModal}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setShowAbandonedBasketModal(false)}
+              >
+                  <View style={styles.galleryPreviewBackdrop}>
+                      <View style={styles.abandonedBasketModalContent}>
+                          <Text style={styles.abandonedBasketTitle}>
+                              {isRTL ? 'Ù„Ø¯ÙŠÙƒ Ø­Ø¬Ø² ØºÙŠØ± Ù…ÙƒØªÙ…Ù„' : 'You have an unfinished booking'}
+                          </Text>
+                          {serviceBookingItems[0]?.tenant?.name ? (
+                              <Text style={styles.abandonedBasketSubtitle}>
+                                  {serviceBookingItems[0].tenant.name}
+                              </Text>
+                          ) : null}
+                          <Text style={styles.abandonedBasketDetails}>
+                              {serviceBookingItemCount} {isRTL ? 'Ø®Ø¯Ù…Ø§Øª' : 'services'} Â· 
+{formatRiyal(serviceBookingTotalPrice, isRTL ? 'ar' : 'en')}
+                          </Text>
+                          <View style={styles.abandonedBasketActions}>
+                              <TouchableOpacity
+                                  style={styles.abandonedBasketPrimaryButton}
+                                  onPress={() => {
+                                      setShowAbandonedBasketModal(false);
+                                      navigation.navigate('Booking');
+                                  }}
+                              >
+                                  <Text style={styles.abandonedBasketPrimaryButtonText}>
+                                      {isRTL ? 'Ù…ØªØ§Ø¨Ø¹Ø© Ø§Ù„Ø­Ø¬Ø²' : 'Continue booking'}
+                                  </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                  style={styles.abandonedBasketSecondaryButton}
+                                  onPress={() => {
+                                      clearServiceBookingCart();
+                                      setShowAbandonedBasketModal(false);
+                                  }}
+                              >
+                                  <Text style={styles.abandonedBasketSecondaryButtonText}>
+                                      {isRTL ? 'Ø¨Ø¯Ø¡ Ø­Ø¬Ø² Ø¬Ø¯ÙŠØ¯' : 'Start new booking'}
+                                  </Text>
+                              </TouchableOpacity>
+                          </View>
+                      </View>
+                  </View>
+              </Modal>
+  
+              <ReviewPromptModal
+                  visible={!!reviewTargetBooking}
+                  appointment={reviewTargetBooking}
+                  onClose={() => setReviewTargetBooking(null)}
+                  onSuccess={() => {
+                      setReviewTargetBooking(null);
+                      loadReviewEligibility();
+                      if (showReviewsTab) {
+                          loadTenantDetails();
+                      }
+                  }}
+              />
+          </View>
+      );
+  }
+  
+  const styles = StyleSheet.create({
+  
+      circularButton: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          alignItems: 'center',
+          justifyContent: 'center',
+      },
+      heroIdentityContainer: {
+          alignItems: 'center',
+          paddingHorizontal: spacing.lg,
+          marginTop: -40,
+          paddingBottom: spacing.md,
+      },
+      heroLogoWrapper: {
+          width: 80,
+          height: 80,
+          borderRadius: 16,
+          borderWidth: 2,
+          borderColor: colors.surface,
+          backgroundColor: colors.surface,
+          overflow: 'hidden',
+          marginBottom: spacing.sm,
+      },
+      heroLogo: {
+          width: '100%',
+          height: '100%',
+      },
+      tenantNameTitle: {
+          fontSize: 22,
+          fontWeight: 'bold',
+          color: colors.text,
+          textAlign: 'center',
+          marginBottom: spacing.xs,
+      },
+      businessTypeBadge: {
+          backgroundColor: '#1E1E1E',
+          paddingHorizontal: spacing.md,
+          paddingVertical: 4,
+          borderRadius: 12,
+          marginBottom: spacing.md,
+      },
+      businessTypeText: {
+          color: '#FFFFFF',
+          fontSize: 12,
+          fontWeight: '600',
+      },
+      tenantStatusRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+      },
+      tenantStatusChip: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: 6,
+          borderRadius: 16,
+          backgroundColor: '#1E1E1E',
+      },
+      statusChipOpen: {
+          backgroundColor: '#1E1E1E',
+      },
+      statusChipClosed: {
+          backgroundColor: colors.error,
+      },
+      tenantStatusText: {
+          color: '#FFFFFF',
+          fontSize: 12,
+          fontWeight: 'bold',
+      },
+      statusTextOpen: {
+          color: '#4ADE80',
+      },
+      statusTextClosed: {
+          color: '#FFFFFF',
+      },
+      tabButton: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          position: 'relative',
+      },
+      tabText: {
+          fontSize: 15,
+          fontWeight: '600',
+          color: colors.textSecondary,
+      },
+      tabTextActive: {
+          color: colors.text,
+          fontWeight: '800',
+      },
+      activeTabUnderline: {
+          position: 'absolute',
+          bottom: 0,
+          left: spacing.md,
+          right: spacing.md,
+          height: 3,
+          backgroundColor: colors.text,
+          borderRadius: 2,
+      },
+      readMoreButton: {
+          marginTop: spacing.xs,
+      },
+      readMoreText: {
+          color: colors.primary,
+          fontWeight: 'bold',
+          fontSize: 14,
+      },
+      teamRow: {
+          gap: spacing.md,
+          paddingTop: spacing.xs,
+      },
+      teamMemberCard: {
+          alignItems: 'center',
+          width: 80,
+      },
+      teamMemberAvatarWrap: {
+          width: 60,
+          height: 60,
+          borderRadius: 30,
+          overflow: 'hidden',
+          marginBottom: spacing.xs,
+          borderWidth: 1,
+          borderColor: colors.border,
+      },
+      teamMemberAvatar: {
+          width: '100%',
+          height: '100%',
+      },
+      teamMemberName: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.text,
+          textAlign: 'center',
+      },
+      teamMemberRating: {
+          fontSize: 12,
+          color: colors.textSecondary,
+      },
+      reviewsSummaryHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+          marginBottom: spacing.md,
+      },
+      reviewsSummaryStarsRow: {
+          flexDirection: 'row',
+          gap: 2,
+      },
+      reviewsSummaryScoreText: {
+          fontSize: 14,
+          fontWeight: 'bold',
+          color: colors.text,
+      },
+      reviewStarMini: {
+          fontSize: 12,
+          color: '#E5E7EB',
+      },
+      miniReviewCard: {
+          marginBottom: spacing.md,
+          paddingBottom: spacing.sm,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+      },
+      miniReviewHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+          marginBottom: 4,
+      },
+      miniReviewAvatar: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: colors.primary + '20',
+          alignItems: 'center',
+          justifyContent: 'center',
+      },
+      miniReviewAvatarText: {
+          color: colors.primary,
+          fontWeight: 'bold',
+      },
+      miniReviewMeta: {
+          flex: 1,
+      },
+      miniReviewName: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.text,
+      },
+      miniReviewDate: {
+          fontSize: 12,
+          color: colors.textSecondary,
+      },
+      miniReviewStars: {
+          flexDirection: 'row',
+          gap: 2,
+          marginBottom: 4,
+      },
+      miniReviewText: {
+          fontSize: 14,
+          color: colors.text,
+      },
+      seeAllReviewsButton: {
+          alignItems: 'center',
+          paddingVertical: spacing.sm,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          marginTop: spacing.xs,
+      },
+      seeAllReviewsText: {
+          fontSize: 14,
+          fontWeight: 'bold',
+          color: colors.text,
+      },
+      hoursDayLeft: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+      },
+      hoursDot: {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+      },
+      hoursDotOpen: {
+          backgroundColor: '#4ADE80',
+
+

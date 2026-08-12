@@ -987,7 +987,49 @@ class BookingService {
             transaction: transaction
         });
 
-        return conflicts.length > 0;
+        if (conflicts.length > 0) {
+            return true;
+        }
+
+        // Check against blocked periods, breaks, time-offs, and shift hours
+        try {
+            const staff = await db.Staff.findByPk(staffId, { transaction });
+            if (staff && staff.tenantId) {
+                const tenantSettings = await db.TenantSettings.findOne({
+                    where: { tenantId: staff.tenantId },
+                    transaction
+                });
+                const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+
+                const availabilityService = require('./availabilityService');
+                const dateObj = typeof startTime === 'string' ? new Date(startTime) : startTime;
+
+                const validWindows = await availabilityService._calculateAvailabilityWindow(
+                    staff.tenantId,
+                    staffId,
+                    dateObj,
+                    timezone
+                );
+
+                const reqStart = new Date(startTime).getTime();
+                const reqEnd = new Date(endTime).getTime();
+
+                // Slot is valid only if it fits completely within at least one valid window
+                const isInsideValidWindow = validWindows.some(window => {
+                    const winStart = new Date(window.startTime).getTime();
+                    const winEnd = new Date(window.endTime).getTime();
+                    return reqStart >= winStart && reqEnd <= winEnd;
+                });
+
+                if (!isInsideValidWindow) {
+                    return true;
+                }
+            }
+        } catch (error) {
+            console.error('hasConflict: Failed to calculate availability window, falling back to basic check', error.message);
+        }
+
+        return false;
     }
 
     /**
