@@ -6,6 +6,7 @@ export interface BookingSlot {
   available: boolean;
   staffId: string;
   staffName: string;
+  serviceId?: string;
 }
 
 export interface ChainedService {

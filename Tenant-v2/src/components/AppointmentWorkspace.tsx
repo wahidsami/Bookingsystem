@@ -7510,14 +7510,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               </p>
               
               <div className="space-y-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                {chainConflictDialog.proposedChain.chain.map((slot, index) => {
+                {chainConflictDialog.proposedChain.slots.map((slot, index) => {
                   const srv = liveServices.find(s => s.id === slot.serviceId);
                   const st = liveStylists.find(s => s.id === slot.staffId);
+                  const d = new Date(slot.startTime);
+                  const slotMinutes = (d.getHours() * 60 + d.getMinutes()) - (START_HOUR * 60);
                   return (
                     <div key={index} className="flex flex-col gap-1 text-sm border-b border-slate-100 pb-2 last:border-0 last:pb-0">
                       <div className="font-semibold text-slate-800">{isRtl ? srv?.nameAr : srv?.nameEn}</div>
                       <div className="flex justify-between items-center text-slate-500">
-                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5"/> {formatMinutesToTime(slot.startTime)}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5"/> {formatMinutesToTime(slotMinutes)}</span>
                         <span className="flex items-center gap-1"><User className="w-3.5 h-3.5"/> {isRtl ? st?.nameAr : st?.nameEn}</span>
                       </div>
                     </div>
