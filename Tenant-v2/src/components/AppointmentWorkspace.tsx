@@ -9,7 +9,7 @@ import {
   Lock, Scissors, Sparkles, Smile, ShieldCheck, Mail, Phone,
   TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy, Settings2,
   PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift, Banknote,
-  CalendarDays, Ban, Save, Maximize2, Minimize2
+  CalendarDays, Ban, Save, Maximize2, Minimize2, Loader2
 } from 'lucide-react';
 import { Language, Product, QuickLaunchRequest } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
@@ -24,7 +24,7 @@ import { getServiceCategoryKey, getServiceCategoryLabel, normalizeServiceRecord 
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import { DEFAULT_SCHEDULER_BOARD_SETTINGS, getTenantSchedulerConfig, normalizeSchedulerBoardSettings, type SchedulerBoardSettings, MIN_STAFF_COLUMN_WIDTH, MAX_STAFF_COLUMN_WIDTH } from '../lib/tenantWorkingHours';
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
-import { calculateNearestValidChain, ChainResult } from '../utils/bookingChains';
+import { calculateNearestValidChain, calculateAllValidChains, ChainResult } from '../utils/bookingChains';
 
 interface AppointmentWorkspaceProps {
   lang: Language;
@@ -2032,11 +2032,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     notes: string;
   }
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
-  const [chainConflictView, setChainConflictView] = useState<'explanation' | 'alternative'>('explanation');
+  const [chainConflictView, setChainConflictView] = useState<'explanation' | 'date-selection' | 'time-selection' | 'confirmation'>('explanation');
   const [chainConflictDialog, setChainConflictDialog] = useState<{
-    proposedChain: ChainResult | null;
     originalStaged: StagedService[];
+    payloadItems: any[];
     conflictReasons: string[];
+    selectedDate: string;
+    validChains: ChainResult[];
+    selectedChain: ChainResult | null;
+    isRevalidating: boolean;
     onConfirm: (chain: ChainResult) => void;
     onCancel: () => void;
   } | null>(null);
@@ -3129,6 +3133,34 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     );
   };
 
+  const fetchAvailabilityLayers = async (currentItems: any[], dateString: string) => {
+      const layers: import('../utils/bookingChains').BookingSlot[][] = [];
+      let anyFailed = false;
+      for (let i = 0; i < currentItems.length; i++) {
+        const item = currentItems[i];
+        const searchResp = await tenantApiAdapter.searchAvailability({
+          serviceId: item.serviceId,
+          staffId: item.requestedStaffId || undefined,
+          date: dateString
+        });
+        if (searchResp?.success && searchResp.slots) {
+          layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: item.serviceId })));
+        } else {
+          layers.push([]);
+          anyFailed = true;
+        }
+      }
+      return { layers, anyFailed };
+  };
+
+  const handleSearchDate = async (dateStr: string) => {
+    if (!chainConflictDialog || !chainConflictDialog.payloadItems) return;
+    const { layers } = await fetchAvailabilityLayers(chainConflictDialog.payloadItems, dateStr);
+    const validChains = calculateAllValidChains(layers);
+    setChainConflictDialog(prev => prev ? { ...prev, selectedDate: dateStr, validChains } : null);
+    setChainConflictView('time-selection');
+  };
+
   const handleConfirmAppointmentCreation = () => {
     let custNameEn = '';
     let custNameAr = '';
@@ -3242,7 +3274,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
-    void (async () => {
+    const executeFinalSubmission = async (itemsToSubmit: any[]) => {
       try {
         const calculateStagedServiceTotal = () => finalStaged.reduce((sum, item) => {
           const service = liveServices.find((candidate) => candidate.id === item.serviceId);
@@ -3266,15 +3298,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         // const createPaymentAllocations = ... 
 
         const response = await tenantApiAdapter.createAppointment({
-          items: payloadItems,
-          staffId: resolvedPrimaryStaffId,
-          startTime: buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime),
+          items: itemsToSubmit,
+          staffId: itemsToSubmit[0]?.staffId || currentStaffId,
+          startTime: itemsToSubmit[0]?.startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime),
           notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
           assignmentMode: 'tenant_reassigned',
           notifyCustomer: true,
           skipAdvanceValidation: shouldSkipAdvanceValidation(getSelectedDateKey(), earliestStartTime),
-          // paymentMethod: 'at-center',
-          // paymentAllocations: undefined,
           platformUserId: custMode === 'existing' ? selectedCustId : undefined,
           customer: custMode === 'new' || custMode === 'walkin'
             ? {
@@ -3298,6 +3328,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setSessionNotes('');
         setGiftCardCodeInput('');
         setCreateSplitActive(false);
+        setCustMode('walkin');
+        setSelectedCustId('');
 
         await loadBoardData();
         const createdAppointment = response?.appointment || response?.appointments?.[0] || null;
@@ -3319,13 +3351,130 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
           'success'
         );
-      } catch (err) {
-        console.error('Failed to create appointment', err);
-        addLocalToast(
-          'تعذر إنشاء الموعد الجديد',
-          'Failed to create appointment',
-          'warning'
-        );
+      } catch (err: any) {
+        const errMsg = err.message || '';
+        const isConflict = errMsg.includes('conflict') || errMsg.includes('overlap') || errMsg.includes('not available') || errMsg.includes('409');
+        
+        if (isConflict && itemsToSubmit.length > 1) {
+           addLocalToast(isRtl ? 'لم يعد هذا الوقت متاحاً' : 'This time is no longer available', isRtl ? 'This time is no longer available' : 'لم يعد هذا الوقت متاحاً', 'warning');
+           if (!chainConflictDialog) {
+             await preflightMultiServiceChain(itemsToSubmit, true);
+           } else {
+             setChainConflictView('time-selection');
+           }
+        } else {
+           addLocalToast('فشل في إنشاء الموعد: ' + errMsg, 'Failed to create appointment: ' + errMsg, 'warning');
+        }
+      }
+    };
+
+
+
+    const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
+      try {
+        const requestedStartISO = currentItems[0].startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime);
+        const { layers, anyFailed } = await fetchAvailabilityLayers(currentItems, getSelectedDateKey());
+        
+        let isRequestedChainValid = true;
+        const discoveredStaffIds: string[] = [];
+        const conflictReasons: string[] = [];
+
+        if (anyFailed) {
+            isRequestedChainValid = false;
+            conflictReasons.push(isRtl ? 'تعذر جلب الأوقات المتاحة للخدمة.' : 'Could not fetch availability for a service.');
+        } else {
+            for (let i = 0; i < currentItems.length; i++) {
+              const item = currentItems[i];
+              const layerSlots = layers[i];
+              const reqTimeMs = new Date(item.startTime || buildIsoFromMinutes(getSelectedDateKey(), item.startTime)).getTime();
+              
+              const exactSlot = layerSlots.find((s: any) => new Date(s.startTime).getTime() === reqTimeMs);
+              
+              const staff = liveStylists.find(s => s.id === item.requestedStaffId) || liveStylists.find(s => s.id === exactSlot?.staffId);
+              const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : 'المختص';
+
+              if (exactSlot && !exactSlot.available) {
+                isRequestedChainValid = false;
+                conflictReasons.push(isRtl ? `\${staffName} غير متاحة في وقت خدمتها بسبب وجود حجز آخر.` : `\${staffName} is unavailable at this time due to an existing booking.`);
+              } else if (!exactSlot) {
+                isRequestedChainValid = false;
+                conflictReasons.push(isRtl ? `\${staffName} لديها وقت محظور يتداخل مع الوقت المطلوب (أو خارج ساعات العمل).` : `\${staffName} has blocked time or is outside working hours.`);
+              } else {
+                discoveredStaffIds.push(exactSlot.staffId);
+              }
+            }
+        }
+
+        if (isRequestedChainValid && !isRetry) {
+          const validatedItems = currentItems.map((item, idx) => ({
+             ...item,
+             staffId: discoveredStaffIds[idx] || item.staffId,
+             assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
+          }));
+          await executeFinalSubmission(validatedItems);
+        } else {
+          setChainConflictView('explanation');
+          setChainConflictDialog({
+            originalStaged: finalStaged,
+            payloadItems: currentItems,
+            conflictReasons: isRetry ? [isRtl ? 'تغيرت الإتاحة، يرجى المحاولة بوقت آخر.' : 'Availability changed, please try another time.'] : conflictReasons,
+            selectedDate: getSelectedDateKey(),
+            validChains: [],
+            selectedChain: null,
+            isRevalidating: false,
+            onConfirm: async (chain: any) => {
+              setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: true } : null);
+              // Fresh verification immediately before booking
+              const dateToValidate = chain.startTime.split('T')[0];
+              const { layers: freshLayers } = await fetchAvailabilityLayers(currentItems, dateToValidate);
+              
+              let isStillValid = true;
+              for (let i = 0; i < currentItems.length; i++) {
+                 const reqTimeMs = new Date(chain.slots[i].startTime).getTime();
+                 const exactSlot = freshLayers[i].find((s: any) => new Date(s.startTime).getTime() === reqTimeMs && s.staffId === chain.slots[i].staffId);
+                 if (!exactSlot || !exactSlot.available) {
+                    isStillValid = false;
+                    break;
+                 }
+              }
+
+              if (isStillValid) {
+                  const confirmedItems = currentItems.map((item, idx) => {
+                     const slot = chain.slots[idx];
+                     return {
+                       ...item,
+                       startTime: slot.startTime,
+                       staffId: slot.staffId,
+                       assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
+                     };
+                  });
+                  setChainConflictDialog(null);
+                  setChainConflictView('explanation');
+                  await executeFinalSubmission(confirmedItems);
+              } else {
+                  setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: false } : null);
+                  addLocalToast(isRtl ? 'لم يعد هذا الوقت متاحاً' : 'This time is no longer available', isRtl ? 'This time is no longer available' : 'لم يعد هذا الوقت متاحاً', 'warning');
+                  setChainConflictView('time-selection'); // Go back to selection
+              }
+            },
+            onCancel: () => {
+              setChainConflictDialog(null);
+              setChainConflictView('explanation');
+            }
+          });
+        }
+      } catch (err: any) {
+        addLocalToast('خطأ أثناء التحقق من التوفر', 'Error checking availability: ' + err.message, 'warning');
+      }
+    };
+
+
+
+    void (async () => {
+      if (payloadItems.length > 1) {
+        await preflightMultiServiceChain(payloadItems, false);
+      } else {
+        await executeFinalSubmission(payloadItems);
       }
     })();
   };
@@ -7504,7 +7653,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative z-10"
+              className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative z-10 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center gap-3 mb-4 text-rose-600">
                 <AlertTriangle className="w-6 h-6" />
@@ -7513,7 +7662,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 </h3>
               </div>
 
-              {chainConflictView === 'explanation' ? (
+              {chainConflictView === 'explanation' && (
                 <>
                   <p className="text-sm font-medium text-slate-800 mb-2">
                     {isRtl ? 'لا يمكن تنفيذ الخدمات بشكل متواصل في الوقت المحدد للأسباب التالية:' : 'The requested services cannot be booked continuously due to the following reasons:'}
@@ -7526,20 +7675,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                   <div className="flex flex-col gap-3">
                     <button
-                      onClick={() => {
-                        if (chainConflictDialog.proposedChain) {
-                          setChainConflictView('alternative');
-                        } else {
-                          addLocalToast(
-                            isRtl ? 'لم نتمكن من العثور على موعد متواصل مناسب ضمن الفترة المتاحة.' : 'No continuous time found.',
-                            isRtl ? 'No continuous time found.' : 'لم نتمكن من العثور على موعد متواصل مناسب ضمن الفترة المتاحة.',
-                            'warning'
-                          );
-                        }
-                      }}
+                      onClick={() => setChainConflictView('date-selection')}
                       className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors"
                     >
-                      {isRtl ? 'البحث عن أفضل موعد متاح' : 'Search for best available time'}
+                      {isRtl ? 'البحث عن موعد بديل' : 'Search for alternative time'}
                     </button>
                     
                     <button
@@ -7564,27 +7703,130 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     </button>
                   </div>
                 </>
-              ) : (
+              )}
+
+              {chainConflictView === 'date-selection' && (
+                <>
+                  <p className="text-sm font-medium text-slate-800 mb-4">
+                    {isRtl ? 'اختر اليوم الذي تريد البحث فيه' : 'Choose the day to search'}
+                  </p>
+                  
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => handleSearchDate(new Date().toISOString().split('T')[0])}
+                      className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                    >
+                      {isRtl ? 'اليوم' : 'Today'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const d = new Date(); d.setDate(d.getDate() + 1);
+                        handleSearchDate(d.toISOString().split('T')[0]);
+                      }}
+                      className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                    >
+                      {isRtl ? 'غداً' : 'Tomorrow'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const d = new Date(); d.setDate(d.getDate() + 2);
+                        handleSearchDate(d.toISOString().split('T')[0]);
+                      }}
+                      className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                    >
+                      {isRtl ? 'بعد غد' : 'Day after tomorrow'}
+                    </button>
+                    <div className="relative w-full">
+                      <input 
+                        type="date"
+                        className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
+                        onChange={(e) => {
+                          if (e.target.value) handleSearchDate(e.target.value);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => setChainConflictView('explanation')}
+                    className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors mt-4"
+                  >
+                    {isRtl ? 'رجوع' : 'Back'}
+                  </button>
+                </>
+              )}
+
+              {chainConflictView === 'time-selection' && (
+                <>
+                  <p className="text-sm font-bold text-slate-800 mb-4">
+                    {isRtl ? 'الأوقات المتاحة لبدء الحجز' : 'Available Start Times'}
+                  </p>
+                  
+                  {chainConflictDialog.validChains.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2 mb-4">
+                      {chainConflictDialog.validChains.map((chain, i) => {
+                         const d = new Date(chain.startTime);
+                         const min = (d.getHours() * 60 + d.getMinutes()) - (START_HOUR * 60);
+                         return (
+                           <button
+                             key={i}
+                             onClick={() => setChainConflictDialog(prev => prev ? { ...prev, selectedChain: chain } : null) || setChainConflictView('confirmation')}
+                             className="px-2 py-3 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                           >
+                             {formatMinutesToTime(min)}
+                           </button>
+                         );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <p className="text-sm text-slate-600 mb-6">
+                        {isRtl ? 'لا توجد سلسلة متواصلة متاحة في هذا اليوم. يمكنك اختيار يوماً آخر للبحث عن موعد مناسب.' : 'No continuous chain available on this day. Please choose another day.'}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => setChainConflictView('date-selection')}
+                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                    >
+                      {isRtl ? 'اختيار يوم آخر' : 'Choose another day'}
+                    </button>
+                    <button
+                      onClick={chainConflictDialog.onCancel}
+                      className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      {isRtl ? 'إلغاء' : 'Cancel'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {chainConflictView === 'confirmation' && chainConflictDialog.selectedChain && (
                 <>
                   <p className="text-sm font-bold text-emerald-600 mb-2">
-                    {isRtl ? 'وجدنا موعدًا مناسبًا 🎉' : 'We found a suitable time 🎉'}
+                    {isRtl ? 'الموعد متاح' : 'Time is available'}
                   </p>
                   <p className="text-sm text-slate-600 mb-6">
-                    {isRtl ? 'يمكن تنفيذ جميع الخدمات بشكل متواصل كالتالي:' : 'All services can be executed continuously as follows:'}
+                    {isRtl ? 'يمكن تنفيذ الخدمات بالتسلسل في الوقت الذي اخترته:' : 'The services can be executed sequentially at the time you chose:'}
                   </p>
                   
                   <div className="space-y-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    {chainConflictDialog.proposedChain?.slots.map((slot, index) => {
+                    {chainConflictDialog.selectedChain.slots.map((slot, index) => {
                       const srv = liveServices.find(s => s.id === slot.serviceId);
                       const st = liveStylists.find(s => s.id === slot.staffId);
-                      const d = new Date(slot.startTime);
-                      const slotMinutes = (d.getHours() * 60 + d.getMinutes()) - (START_HOUR * 60);
+                      const dStart = new Date(slot.startTime);
+                      const dEnd = new Date(slot.endTime);
+                      const startMin = (dStart.getHours() * 60 + dStart.getMinutes()) - (START_HOUR * 60);
+                      const endMin = (dEnd.getHours() * 60 + dEnd.getMinutes()) - (START_HOUR * 60);
+                      
                       return (
                         <div key={index} className="flex flex-col gap-1 text-sm border-b border-slate-100 pb-2 last:border-0 last:pb-0">
-                          <div className="font-semibold text-slate-800">{isRtl ? srv?.nameAr : srv?.nameEn}</div>
+                          <div className="font-bold text-slate-800">{isRtl ? srv?.nameAr : srv?.nameEn}</div>
                           <div className="flex justify-between items-center text-slate-500">
-                            <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5"/> {formatMinutesToTime(slotMinutes)}</span>
                             <span className="flex items-center gap-1"><User className="w-3.5 h-3.5"/> {isRtl ? st?.nameAr : st?.nameEn}</span>
+                            <span className="flex items-center gap-1 font-mono text-xs">{formatMinutesToTime(startMin)} - {formatMinutesToTime(endMin)}</span>
                           </div>
                         </div>
                       );
@@ -7592,21 +7834,31 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   </div>
 
                   <p className="text-sm font-semibold text-slate-800 text-center mb-6">
-                    {isRtl ? 'هل تريد اعتماد هذا الموعد؟' : 'Do you want to confirm this time?'}
+                    {isRtl ? 'هل تريد حجز هذا الموعد الآن؟' : 'Do you want to book this time now?'}
                   </p>
 
                   <div className="flex flex-col gap-3">
                     <button
-                      onClick={() => chainConflictDialog.proposedChain && chainConflictDialog.onConfirm(chainConflictDialog.proposedChain)}
-                      className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors"
+                      disabled={chainConflictDialog.isRevalidating}
+                      onClick={() => chainConflictDialog.selectedChain && chainConflictDialog.onConfirm(chainConflictDialog.selectedChain)}
+                      className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
                     >
-                      {isRtl ? 'نعم، احجز هذا الموعد' : 'Yes, book this time'}
+                      {chainConflictDialog.isRevalidating && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {isRtl ? 'نعم، احجز الموعد' : 'Yes, book this time'}
                     </button>
                     <button
-                      onClick={() => setChainConflictView('explanation')}
-                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                      disabled={chainConflictDialog.isRevalidating}
+                      onClick={() => setChainConflictView('time-selection')}
+                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50"
                     >
-                      {isRtl ? 'رجوع' : 'Back'}
+                      {isRtl ? 'اختيار وقت آخر' : 'Choose another time'}
+                    </button>
+                    <button
+                      disabled={chainConflictDialog.isRevalidating}
+                      onClick={chainConflictDialog.onCancel}
+                      className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50"
+                    >
+                      {isRtl ? 'إلغاء' : 'Cancel'}
                     </button>
                   </div>
                 </>

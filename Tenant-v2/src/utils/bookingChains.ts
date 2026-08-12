@@ -22,29 +22,32 @@ export interface ChainResult {
 }
 
 /**
- * Calculates the nearest valid continuous chain of services.
+ * Finds all valid continuous chains of services from the provided layers.
  * 
  * @param layers Array of slot arrays, one for each service in sequence.
- * @param requestedStartTime The time the receptionist wants to start the booking (ISO string).
+ * @param requestedStartTime Optional time to filter chains starting at or after this time (ISO string).
  * @param maxGapMinutes Maximum allowed gap between services in minutes (default 45).
- * @param minGapMinutes Minimum required gap between services in minutes (default -5 to handle slight overlaps if needed, though usually 0).
- * @returns The nearest complete chain of slots, or null if no chain exists.
+ * @param minGapMinutes Minimum required gap between services in minutes (default -5).
+ * @returns Array of complete chains of slots.
  */
-export function calculateNearestValidChain(
+export function calculateAllValidChains(
   layers: BookingSlot[][],
-  requestedStartTime: string,
+  requestedStartTime?: string,
   maxGapMinutes: number = 45,
   minGapMinutes: number = -5
-): ChainResult | null {
+): ChainResult[] {
   if (!layers || layers.length === 0 || layers.some(layer => layer.length === 0)) {
-    return null;
+    return [];
   }
 
-  const requestedStart = new Date(requestedStartTime).getTime();
+  let requestedStart = 0;
+  if (requestedStartTime) {
+    requestedStart = new Date(requestedStartTime).getTime();
+  }
 
-  // Find all possible chains
+  // Find all possible chains starting from layer 0
   let chains: BookingSlot[][] = layers[0]
-    .filter(slot => slot.available && new Date(slot.startTime).getTime() >= requestedStart)
+    .filter(slot => slot.available && (!requestedStart || new Date(slot.startTime).getTime() >= requestedStart))
     .map(slot => [slot]);
 
   for (let i = 1; i < layers.length; i++) {
@@ -66,28 +69,49 @@ export function calculateNearestValidChain(
       }
     }
     
-    // Replace current chains with the extended chains. If this layer found no matches, chains will be empty.
     chains = nextChains;
 
-    // Early exit if a layer broke the chain
+    // Early exit if a layer broke all chains
     if (chains.length === 0) {
       break;
     }
   }
 
+  // Sort chains by their start time
+  chains.sort((a, b) => new Date(a[0].startTime).getTime() - new Date(b[0].startTime).getTime());
+
+  // Filter out duplicate start times to only show the "best" contiguous chain per start time
+  // (e.g. if Any Professional results in two chains starting at exactly 10:00, pick the first one)
+  const uniqueChains: ChainResult[] = [];
+  const seenStartTimes = new Set<string>();
+
+  for (const chain of chains) {
+    const startTime = chain[0].startTime;
+    if (!seenStartTimes.has(startTime)) {
+      seenStartTimes.add(startTime);
+      uniqueChains.push({
+        slots: chain,
+        startTime: startTime,
+        endTime: chain[chain.length - 1].endTime
+      });
+    }
+  }
+
+  return uniqueChains;
+}
+
+/**
+ * Calculates the nearest valid continuous chain of services.
+ */
+export function calculateNearestValidChain(
+  layers: BookingSlot[][],
+  requestedStartTime: string,
+  maxGapMinutes: number = 45,
+  minGapMinutes: number = -5
+): ChainResult | null {
+  const chains = calculateAllValidChains(layers, requestedStartTime, maxGapMinutes, minGapMinutes);
   if (chains.length === 0) {
     return null;
   }
-
-  // Sort chains by their start time to find the nearest one to the requested time
-  chains.sort((a, b) => new Date(a[0].startTime).getTime() - new Date(b[0].startTime).getTime());
-
-  // Return the first (nearest) valid chain
-  const bestChain = chains[0];
-  
-  return {
-    slots: bestChain,
-    startTime: bestChain[0].startTime,
-    endTime: bestChain[bestChain.length - 1].endTime
-  };
+  return chains[0];
 }
