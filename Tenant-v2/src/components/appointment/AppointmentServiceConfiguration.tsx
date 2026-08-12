@@ -67,7 +67,7 @@ export default function AppointmentServiceConfiguration({
               onChange={(e) => setDraftConfig(c => ({ ...c, staffId: e.target.value }))}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary shadow-sm"
             >
-              <option value="" disabled>{isRtl ? 'اختر الأخصائية' : 'Select team member'}</option>
+              <option value="">{isRtl ? 'أي أخصائية' : 'Any Professional'}</option>
               {validStylists.map((stylist) => (
                 <option key={stylist.id} value={stylist.id}>
                   {isRtl ? stylist.nameAr : stylist.nameEn}

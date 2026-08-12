@@ -1328,11 +1328,8 @@ export default function InteractiveDrawers({
 
       let defaultStaffId = currentStaffId;
       const normalizedAssignments = (service.employeeAssignments || []).map(id => String(id));
-      if (!defaultStaffId || (normalizedAssignments.length > 0 && !normalizedAssignments.includes(String(defaultStaffId)))) {
-        const validStylists = availableStylists.filter(s => 
-          normalizedAssignments.length === 0 || normalizedAssignments.includes(String(s.id))
-        );
-        defaultStaffId = validStylists[0]?.id || availableStylists[0]?.id || '';
+      if (defaultStaffId && normalizedAssignments.length > 0 && !normalizedAssignments.includes(String(defaultStaffId))) {
+        defaultStaffId = '';
       }
 
       const newItem: StagedService = {

@@ -86,6 +86,8 @@ export default function SettingsPage() {
     country: 'Saudi Arabia',
     postalCode: '',
     googleMapLink: '',
+    latitude: '',
+    longitude: '',
     description: '',
     descriptionAr: '',
     logo: '',
@@ -192,6 +194,8 @@ export default function SettingsPage() {
           country: business.country || 'Saudi Arabia',
           postalCode: business.postalCode || '',
           googleMapLink: business.googleMapLink || '',
+          latitude: business.coordinates?.lat?.toString() || '',
+          longitude: business.coordinates?.lng?.toString() || '',
           description: business.description || '',
           descriptionAr: business.descriptionAr || '',
           logo: business.logo || '',
@@ -641,6 +645,32 @@ export default function SettingsPage() {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                         style={{ textAlign: isRTL ? 'right' : 'left' }}
                         placeholder="https://maps.google.com/..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {isRTL ? 'خط العرض (Latitude)' : 'Latitude'}
+                      </label>
+                      <input
+                        type="text"
+                        value={businessInfo.latitude}
+                        onChange={(e) => setBusinessInfo(prev => ({ ...prev, latitude: e.target.value }))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                        placeholder="e.g. 24.7136"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                        {isRTL ? 'خط الطول (Longitude)' : 'Longitude'}
+                      </label>
+                      <input
+                        type="text"
+                        value={businessInfo.longitude}
+                        onChange={(e) => setBusinessInfo(prev => ({ ...prev, longitude: e.target.value }))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                        placeholder="e.g. 46.6753"
                       />
                     </div>
                   </div>

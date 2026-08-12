@@ -18,6 +18,7 @@ export interface ServiceBookingCartItem {
     bookingReference?: string | null;
     groupGuest?: GroupGuestPayload | null;
     startTime: string;
+    endTime?: string;
     notes?: string;
     paymentMethod: ServiceBookingPaymentMethod;
     totalPrice: number;
@@ -46,6 +47,7 @@ interface ServiceBookingCartContextType {
     updateItem: (id: string, updates: Partial<ServiceBookingCartItem>) => void;
     removeItem: (id: string) => void;
     clearCart: () => void;
+    replaceCart: (item: ServiceBookingCartItem) => void;
 }
 
 const STORAGE_KEY = '@rifah_service_booking_cart';
@@ -87,6 +89,12 @@ export const ServiceBookingCartProvider: React.FC<{ children: React.ReactNode }>
         setItems(nextItems);
         void saveCart(nextItems);
         return { success: true };
+    };
+
+    const replaceCart = (item: ServiceBookingCartItem) => {
+        const nextItems = [item];
+        setItems(nextItems);
+        void saveCart(nextItems);
     };
 
     const removeItem = (id: string) => {
@@ -163,6 +171,7 @@ export const ServiceBookingCartProvider: React.FC<{ children: React.ReactNode }>
                 updateItem,
                 removeItem,
                 clearCart,
+                replaceCart,
             }}
         >
             {children}

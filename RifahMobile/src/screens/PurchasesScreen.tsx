@@ -101,16 +101,27 @@ export function PurchasesScreen({ navigation, route }: any) {
         const isArabic = language === 'ar';
         const dateDate = new Date(item.createdAt);
         const isExpanded = expandedOrderId === item.id;
-        const visibleItems = isExpanded ? item.items : item.items.slice(0, 2);
+        const visibleItems = isExpanded ? item.items : item.items.slice(0, 1);
+
+        const firstItem = item.items[0];
+        const firstItemName = firstItem 
+            ? (isArabic ? firstItem.Product?.name_ar || firstItem.product?.name_ar : firstItem.Product?.name_en || firstItem.product?.name_en)
+            : '';
+        const extraItemsCount = item.items.length - 1;
+        const titleStr = extraItemsCount > 0 
+            ? `${firstItemName} (+ ${extraItemsCount} ${t('moreItems')})`
+            : firstItemName;
+
+        const dateStr = format(dateDate, 'd MMM yyyy', { locale: isArabic ? ar : enUS });
 
         return (
             <TouchableOpacity
                 activeOpacity={0.95}
-                style={styles.card}
+                style={[styles.card, !isExpanded && styles.compactCard]}
                 onPress={() => setExpandedOrderId((prev) => (prev === item.id ? null : item.id))}
             >
-                {/* Header: Tenant Info & Status */}
-                <View style={styles.cardHeader}>
+                {/* Header: Tenant Info & Status (Compact for both) */}
+                <View style={[styles.cardHeader, !isExpanded && styles.compactCardHeader]}>
                     <View style={styles.salonInfo}>
                         {item.tenant?.logo ? (
                             <Image
@@ -124,7 +135,7 @@ export function PurchasesScreen({ navigation, route }: any) {
                                 </Text>
                             </View>
                         )}
-                        <Text style={styles.salonName}>{item.tenant?.name || 'Store Name'}</Text>
+                        <Text style={styles.salonName} numberOfLines={1}>{item.tenant?.name || 'Store Name'}</Text>
                     </View>
                     <View style={[
                         styles.statusBadge,
@@ -139,65 +150,78 @@ export function PurchasesScreen({ navigation, route }: any) {
                     </View>
                 </View>
 
-                {/* Body: Order Info */}
-                <View style={styles.cardBody}>
-                    <Text style={styles.orderId}>#{(item.orderNumber || item.id.slice(0, 8)).toUpperCase()}</Text>
-                    <View style={styles.dateTimeRow}>
-                        <AppIcon name="bookings" size={16} color={colors.primary} />
-                        <Text style={styles.dateTimeText}>
-                            {format(dateDate, 'eeee, d MMMM yyyy', { locale: isArabic ? ar : enUS })}
-                        </Text>
-                    </View>
+                {isExpanded ? (
+                    /* EXPANDED VIEW: Preserve all existing layout */
+                    <>
+                        <View style={styles.cardBody}>
+                            <Text style={styles.orderId}>#{(item.orderNumber || item.id.slice(0, 8)).toUpperCase()}</Text>
+                            <View style={styles.dateTimeRow}>
+                                <AppIcon name="bookings" size={16} color={colors.primary} />
+                                <Text style={styles.dateTimeText}>
+                                    {format(dateDate, 'eeee, d MMMM yyyy', { locale: isArabic ? ar : enUS })}
+                                </Text>
+                            </View>
 
-                    {/* Items Summary */}
-                    <View style={styles.itemsContainer}>
-                        {visibleItems.map((orderItem, index) => (
-                            <Text key={index} style={styles.itemText}>
-                                • {isArabic ? orderItem.Product?.name_ar || orderItem.product?.name_ar : orderItem.Product?.name_en || orderItem.product?.name_en} (x{orderItem.quantity})
-                            </Text>
-                        ))}
-                        {!isExpanded && item.items.length > 2 && (
-                            <Text style={styles.moreItemsText}>
-                                + {item.items.length - 2} {t('moreItems')}
-                            </Text>
-                        )}
-                        <Text style={styles.viewDetailsText}>
-                            {isExpanded
-                                ? (isArabic ? 'إخفاء التفاصيل' : 'Hide details')
-                                : (isArabic ? 'عرض تفاصيل الطلب' : 'View order details')}
-                        </Text>
-                    </View>
-                </View>
+                            <View style={styles.itemsContainer}>
+                                {visibleItems.map((orderItem, index) => (
+                                    <Text key={index} style={styles.itemText}>
+                                        • {isArabic ? orderItem.Product?.name_ar || orderItem.product?.name_ar : orderItem.Product?.name_en || orderItem.product?.name_en} (x{orderItem.quantity})
+                                    </Text>
+                                ))}
+                                <Text style={styles.viewDetailsText}>
+                                    {isArabic ? 'إخفاء التفاصيل' : 'Hide details'}
+                                </Text>
+                            </View>
+                        </View>
 
-                {/* Footer: Price & Actions */}
-                <View style={styles.cardFooter}>
-                    <View style={styles.priceBlock}>
-                        <Text style={styles.price}>{formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
-                        <Text style={styles.totalHint}>{language === 'ar' ? 'إجمالي الطلب' : 'Order total'}</Text>
+                        <View style={styles.cardFooter}>
+                            <View style={styles.priceBlock}>
+                                <Text style={styles.price}>{formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
+                                <Text style={styles.totalHint}>{language === 'ar' ? 'إجمالي الطلب' : 'Order total'}</Text>
+                            </View>
+                            <View style={styles.actions}>
+                                {orderNeedsPayment(item) && (
+                                    <TouchableOpacity
+                                        style={styles.payButton}
+                                        onPress={(e) => {
+                                            e.stopPropagation && e.stopPropagation();
+                                            navigation.navigate('Payment', {
+                                                orderId: item.id,
+                                                amount: Number(item.totalAmount),
+                                                tenantId: item.tenantId,
+                                            });
+                                        }}
+                                    >
+                                        <Text style={styles.payButtonText}>{t('payNow')}</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {['pending', 'confirmed'].includes(item.status) && (
+                                    <TouchableOpacity
+                                        style={styles.cancelButton}
+                                        onPress={(e) => {
+                                            e.stopPropagation && e.stopPropagation();
+                                            handleCancel(item.id);
+                                        }}
+                                    >
+                                        <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                    </>
+                ) : (
+                    /* COMPACT VIEW */
+                    <View style={styles.compactBody}>
+                        <Text style={styles.compactTitle} numberOfLines={2}>{titleStr}</Text>
+                        <View style={styles.compactFooterRow}>
+                            <View style={styles.compactDateTimeRow}>
+                                <AppIcon name="clock" size={14} color={colors.primary} />
+                                <Text style={styles.dateTimeText}>{dateStr}</Text>
+                            </View>
+                            <Text style={styles.compactPrice}>{formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
+                        </View>
                     </View>
-                    <View style={styles.actions}>
-                        {orderNeedsPayment(item) && (
-                            <TouchableOpacity
-                                style={styles.payButton}
-                                onPress={() => navigation.navigate('Payment', {
-                                    orderId: item.id,
-                                    amount: Number(item.totalAmount),
-                                    tenantId: item.tenantId,
-                                })}
-                            >
-                                <Text style={styles.payButtonText}>{t('payNow')}</Text>
-                            </TouchableOpacity>
-                        )}
-                        {['pending', 'confirmed'].includes(item.status) && (
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => handleCancel(item.id)}
-                            >
-                                <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                </View>
+                )}
             </TouchableOpacity>
         );
     };
@@ -351,6 +375,39 @@ const styles = StyleSheet.create({
         padding: spacing.lg,
         gap: spacing.md,
     },
+    compactCard: {
+        padding: 12,
+        borderRadius: 16,
+        shadowRadius: 8,
+    },
+    compactCardHeader: {
+        paddingBottom: 8,
+        marginBottom: 8,
+    },
+    compactBody: {
+        marginTop: 4,
+    },
+    compactTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#171840',
+        marginBottom: 6,
+    },
+    compactFooterRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    compactDateTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    compactPrice: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: colors.primary,
+    },
     card: {
         backgroundColor: '#FFFFFF',
         borderRadius: 22,
@@ -379,9 +436,9 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
     },
     salonLogo: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
     },
     placeholderLogo: {
         backgroundColor: colors.primary + '20',
@@ -444,7 +501,7 @@ const styles = StyleSheet.create({
     },
     viewDetailsText: {
         marginTop: spacing.xs,
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '700',
         color: colors.primary,
     },
@@ -504,7 +561,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     totalHint: {
-        fontSize: 13,
+        fontSize: 12,
         color: '#6E7596',
         fontWeight: '600',
     },

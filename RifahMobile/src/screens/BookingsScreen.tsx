@@ -222,6 +222,14 @@ export function BookingsScreen({ navigation }: any) {
         const canLeaveReview = item.status === 'completed' && !hasCompletedReview;
 
         const isRescheduled = item.items.some((booking) => hasRescheduleAudit(booking));
+        
+        const serviceNameStr = serviceCount > 1
+            ? (language === 'ar' ? `${serviceCount} خدمات` : `${serviceCount} services`)
+            : getServiceName(representative);
+            
+        const dateStr = format(dateDate, 'd MMM yyyy', { locale: isArabic ? ar : enUS });
+        const timeStr = format(dateDate, 'h:mm a', { locale: isArabic ? ar : enUS });
+
         return (
             <TouchableOpacity
                 style={styles.card}
@@ -230,10 +238,10 @@ export function BookingsScreen({ navigation }: any) {
             >
                 {isRescheduled && activeTab === 'upcoming' ? (
                     <View style={styles.rescheduledRibbon}>
-                        <Text style={styles.rescheduledRibbonText}>{language === 'ar' ? 'أعيدت الجدولة' : 'Rescheduled'}</Text>
+                        <Text style={styles.rescheduledRibbonText}>{language === 'ar' ? 'أعيد جدولته' : 'Rescheduled'}</Text>
                     </View>
                 ) : null}
-                {/* Header: Salon Info */}
+                {/* Header: Salon Info & Status */}
                 <View style={styles.cardHeader}>
                     <View style={styles.salonInfo}>
                         {item.tenant?.logo ? (
@@ -248,7 +256,7 @@ export function BookingsScreen({ navigation }: any) {
                                 </Text>
                             </View>
                         )}
-                        <Text style={styles.salonName}>{item.tenant?.name || 'Salon Name'}</Text>
+                        <Text style={styles.salonName} numberOfLines={1}>{item.tenant?.name || 'Salon Name'}</Text>
                     </View>
                     <View style={[
                         styles.statusBadge,
@@ -263,92 +271,49 @@ export function BookingsScreen({ navigation }: any) {
                     </View>
                 </View>
 
-                {/* Body: Service Info */}
+                {/* Body: Service & Time Info */}
                 <View style={styles.cardBody}>
-                    <Text style={styles.bookingNumberLabel}>
-                        {language === 'ar' ? 'رقم الحجز' : 'Booking No.'} {getBookingNumber(representative)}
+                    <Text style={styles.serviceName} numberOfLines={2}>
+                        {serviceNameStr}
                     </Text>
-                    <Text style={styles.serviceName}>
-                        {serviceCount > 1
-                            ? (language === 'ar' ? `${serviceCount} خدمات مرتبطة` : `${serviceCount} linked services`)
-                            : getServiceName(representative)}
-                    </Text>
-                    {serviceCount === 1 && !!getServiceVariantLabel(representative) && (
-                        <Text style={styles.variantLabel}>{getServiceVariantLabel(representative)}</Text>
-                    )}
-                    {serviceCount > 1 && (
-                        <Text style={styles.variantLabel}>
-                            {item.items
-                                .slice(0, 2)
-                                .map((booking) => `${getServiceName(booking)}${getServiceVariantLabel(booking) ? ` · ${getServiceVariantLabel(booking)}` : ''}`)
-                                .join('\n')}
-                            {item.items.length > 2 ? `\n${language === 'ar' ? '...وغيرها' : '...and more'}` : ''}
-                        </Text>
-                    )}
                     <View style={styles.dateTimeRow}>
-                        <AppIcon name="bookings" size={16} color={colors.primary} />
+                        <AppIcon name="clock" size={14} color={colors.primary} />
                         <Text style={styles.dateTimeText}>
-                            {format(dateDate, 'eeee, d MMMM yyyy', { locale: isArabic ? ar : enUS })}
-                        </Text>
-                    </View>
-                    <View style={styles.dateTimeRow}>
-                        <AppIcon name="clock" size={16} color={colors.primary} />
-                        <Text style={styles.dateTimeText}>
-                            {format(dateDate, 'h:mm a', { locale: isArabic ? ar : enUS })}
+                            {dateStr} • {timeStr}
                         </Text>
                     </View>
                     {representative.Staff && (
                         <View style={styles.staffRow}>
                             <Text style={styles.staffLabel}>{t('specialist')}: </Text>
-                            <Text style={styles.staffName}>{representative.Staff.name}</Text>
-                        </View>
-                    )}
-                    {groupGuest && activeTab === 'upcoming' && (
-                        <View style={styles.staffRow}>
-                            <Text style={styles.staffLabel}>{language === 'ar' ? 'الضيف' : 'Guest'}: </Text>
-                            <Text style={styles.staffName}>
-                                {groupGuest.fullName}
-                                {groupGuest.phone ? ` · ${groupGuest.phone}` : ''}
-                                {groupGuest.email ? ` · ${groupGuest.email}` : ''}
-                                {groupGuest.birthDate ? ` · ${groupGuest.birthDate}` : ''}
-                            </Text>
+                            <Text style={styles.staffName} numberOfLines={1}>{representative.Staff.name}</Text>
                         </View>
                     )}
                 </View>
 
-                {/* Footer: Price & Actions */}
-                <View style={styles.cardFooter}>
-                    <View style={styles.priceBlock}>
-                        <Text style={styles.price}>{formatRiyal(item.totalPrice, isRTL ? 'ar' : 'en')}</Text>
-                        <Text style={styles.dueNowText}>
-                            {language === 'ar'
-                                ? `يدفع الآن: ${formatRiyal(item.payableNowTotal, 'ar')}`
-                                : `Due now: ${formatRiyal(item.payableNowTotal, 'en')}`}
-                        </Text>
+                {/* Footer: Contextual Actions Only */}
+                {(canLeaveReview || hasCompletedReview) && (
+                    <View style={styles.cardFooter}>
+                        <View style={styles.actions}>
+                            {canLeaveReview ? (
+                                <TouchableOpacity
+                                    style={styles.reviewButton}
+                                    onPress={(e) => {
+                                        e.stopPropagation(); // prevent navigation
+                                        setReviewBooking(representative);
+                                    }}
+                                >
+                                    <AppIcon name="star" size={12} color={colors.textInverse} />
+                                    <Text style={styles.reviewButtonText}>{t('leaveReview')}</Text>
+                                </TouchableOpacity>
+                            ) : hasCompletedReview ? (
+                                <View style={[styles.reviewButton, styles.reviewedButton]}>
+                                    <AppIcon name="star" size={12} color={colors.accentDark} />
+                                    <Text style={[styles.reviewButtonText, styles.reviewedButtonText]}>{language === 'ar' ? 'تم التقييم' : 'Reviewed'}</Text>
+                                </View>
+                            ) : null}
+                        </View>
                     </View>
-                    <View style={styles.actions}>
-                        {canLeaveReview ? (
-                            <TouchableOpacity
-                                style={styles.reviewButton}
-                                onPress={() => setReviewBooking(representative)}
-                            >
-                                <AppIcon name="star" size={14} color={colors.textInverse} />
-                                <Text style={styles.reviewButtonText}>{t('leaveReview')}</Text>
-                            </TouchableOpacity>
-                        ) : hasCompletedReview ? (
-                            <View style={[styles.reviewButton, styles.reviewedButton]}>
-                                <AppIcon name="star" size={14} color={colors.accentDark} />
-                                <Text style={[styles.reviewButtonText, styles.reviewedButtonText]}>{language === 'ar' ? 'تم التقييم' : 'Reviewed'}</Text>
-                            </View>
-                        ) : null}
-                        <TouchableOpacity
-                            style={styles.payButton}
-                            onPress={() => navigation.navigate('AppointmentDetails', { bookingGroup: item, activeTab })}
-                        >
-                            <Text style={styles.payButtonText}>{language === 'ar' ? 'عرض التفاصيل' : 'View Details'}</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                )}
             </TouchableOpacity>
         );
     };
@@ -567,10 +532,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         paddingHorizontal: spacing.md,
-        paddingBottom: spacing.sm,
+        paddingBottom: 8,
         backgroundColor: colors.background,
-        marginBottom: spacing.sm,
-        gap: spacing.sm,
+        marginBottom: 6,
+        gap: 6,
     },
     tab: {
         flex: 1,
@@ -595,19 +560,19 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     listContent: {
-        padding: spacing.lg,
+        padding: 12,
         gap: spacing.md,
     },
     card: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 22,
-        padding: spacing.lg,
+        borderRadius: 16,
+        padding: 12,
         shadowColor: '#1A1440',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.08,
-        shadowRadius: 14,
+        shadowRadius: 8,
         elevation: 2,
-        marginBottom: spacing.md,
+        marginBottom: 8,
         borderWidth: 1,
         borderColor: '#ECE7FA',
         position: 'relative',
@@ -633,20 +598,20 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.md,
-        paddingBottom: spacing.sm,
+        marginBottom: 8,
+        paddingBottom: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#EDE8FA',
     },
     salonInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
+        gap: 6,
     },
     salonLogo: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
     },
     placeholderLogo: {
         backgroundColor: colors.primary + '20',
@@ -658,7 +623,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     salonName: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '700',
         color: '#1A1A44',
     },
@@ -672,7 +637,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     cardBody: {
-        marginBottom: spacing.md,
+        marginBottom: 8,
     },
     bookingNumberLabel: {
         fontSize: fontSize.xs,
@@ -685,19 +650,19 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '800',
         color: '#171840',
-        marginBottom: spacing.sm,
+        marginBottom: 6,
     },
     variantLabel: {
         fontSize: fontSize.sm,
         fontWeight: '600',
         color: colors.primary,
-        marginBottom: spacing.sm,
+        marginBottom: 6,
     },
     dateTimeRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
-        marginBottom: 4,
+        gap: 6,
+        marginBottom: 2,
     },
     dateIcon: {
         fontSize: 16,
@@ -724,7 +689,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-end',
         marginTop: spacing.sm,
-        gap: spacing.sm,
+        gap: 6,
     },
     priceBlock: {
         flex: 1,
@@ -737,7 +702,7 @@ const styles = StyleSheet.create({
     },
     actions: {
         flexDirection: 'row',
-        gap: spacing.sm,
+        gap: 6,
         alignItems: 'center',
     },
     payButton: {
@@ -855,10 +820,10 @@ const styles = StyleSheet.create({
         width: '90%',
         alignSelf: 'center',
         backgroundColor: '#FFFFFF',
-        borderRadius: 22,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: '#E9DDFD',
-        padding: spacing.lg,
+        padding: 12,
         marginBottom: spacing.xl,
         shadowColor: '#1F123F',
         shadowOffset: { width: 0, height: 10 },
@@ -869,7 +834,7 @@ const styles = StyleSheet.create({
     rescheduleHint: {
         fontSize: fontSize.sm,
         color: colors.textSecondary,
-        marginBottom: spacing.md,
+        marginBottom: 8,
     },
     rescheduleInput: {
         borderWidth: 1,
@@ -879,13 +844,13 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.sm,
         backgroundColor: '#FAFAFF',
         color: colors.text,
-        marginBottom: spacing.sm,
+        marginBottom: 6,
     },
     rescheduleActions: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
         alignItems: 'center',
-        gap: spacing.sm,
+        gap: 6,
         marginTop: spacing.sm,
     },
     rescheduleCancelBtn: {

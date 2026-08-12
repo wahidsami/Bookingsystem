@@ -236,10 +236,10 @@ export function PaymentScreen({ route, navigation }: any) {
                                 </Text>
                             </View>
                         ))}
-                        {renderSummaryRow(isRTL ? 'التاريخ' : 'Date', paymentSummary.date || (isRTL ? 'غير متوفر' : 'Unavailable'))}
-                        {renderSummaryRow(isRTL ? 'الوقت' : 'Time', paymentSummary.time || (isRTL ? 'غير متوفر' : 'Unavailable'))}
-                        {renderSummaryRow(isRTL ? 'الموظف' : 'Employee', paymentSummary.employee || (isRTL ? 'غير متوفر' : 'Unavailable'))}
-                        {renderSummaryRow(isRTL ? 'الصالون' : 'Salon', paymentSummary.salon || (isRTL ? 'غير متوفر' : 'Unavailable'))}
+                        {paymentSummary.date ? renderSummaryRow(isRTL ? 'التاريخ' : 'Date', paymentSummary.date) : null}
+                        {paymentSummary.time ? renderSummaryRow(isRTL ? 'الوقت' : 'Time', paymentSummary.time) : null}
+                        {paymentSummary.employee ? renderSummaryRow(isRTL ? 'الموظف' : 'Employee', paymentSummary.employee) : null}
+                        {paymentSummary.salon ? renderSummaryRow(isRTL ? 'الصالون' : 'Salon', paymentSummary.salon) : null}
                     </View>
                 </View>
 

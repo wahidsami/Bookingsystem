@@ -26,6 +26,11 @@ import { ProductDetailsScreen } from '../screens/ProductDetailsScreen';
 import { WalletBalanceDetailsScreen } from '../screens/WalletBalanceDetailsScreen';
 import { CentersBalanceScreen } from '../screens/CentersBalanceScreen';
 import { AppointmentDetailsScreen } from '../screens/AppointmentDetailsScreen';
+import { BookingStaffSelectionScreen } from '../screens/BookingStaffSelectionScreen';
+import { BookingStaffPerServiceScreen } from '../screens/BookingStaffPerServiceScreen';
+import { BookingDateTimeSelectionScreen } from '../screens/BookingDateTimeSelectionScreen';
+import { BookingReviewScreen } from '../screens/BookingReviewScreen';
+import { BookingPaymentMethodScreen } from '../screens/BookingPaymentMethodScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -61,6 +66,11 @@ export function RootNavigator() {
             <Stack.Screen name="Review" component={ReviewScreen} />
             <Stack.Screen name="Gifts" component={GiftsScreen} />
             <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
+            <Stack.Screen name="BookingStaffSelection" component={BookingStaffSelectionScreen} />
+            <Stack.Screen name="BookingStaffPerServiceScreen" component={BookingStaffPerServiceScreen} />
+            <Stack.Screen name="BookingDateTimeSelection" component={BookingDateTimeSelectionScreen} />
+            <Stack.Screen name="BookingReviewScreen" component={BookingReviewScreen} />
+            <Stack.Screen name="BookingPaymentMethodScreen" component={BookingPaymentMethodScreen} />
             <Stack.Screen name="WalletBalanceDetails" component={WalletBalanceDetailsScreen} />
             <Stack.Screen name="CentersBalance" component={CentersBalanceScreen} />
         </Stack.Navigator>

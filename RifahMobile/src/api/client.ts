@@ -161,6 +161,7 @@ export interface Tenant {
     location?: string;
     address?: string;
     googleMapLink?: string;
+    coordinates?: { lat: number; lng: number };
     description?: string;
     descriptionAr?: string;
     description_en?: string;

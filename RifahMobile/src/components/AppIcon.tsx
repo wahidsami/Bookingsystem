@@ -47,6 +47,7 @@ import TwitterIcon from '../../assets/icons/icon_social_twitter.svg';
 import LinkedinIcon from '../../assets/icons/icon_social_linkedin.svg';
 import SnapchatIcon from '../../assets/icons/icon_social_snapchat.svg';
 import WebsiteIcon from '../../assets/icons/icon_social_website.svg';
+import CheckIcon from '../../assets/icons/icon_check.svg';
 
 type IconName =
   | 'home'
@@ -101,7 +102,8 @@ type IconName =
   | 'card_giftcard'
   | 'account_balance_wallet'
   | 'receipt_long'
-  | 'verified_user';
+  | 'verified_user'
+  | 'check';
 
 type Props = {
   name: IconName;
@@ -163,6 +165,7 @@ const iconMap = {
   account_balance_wallet: WalletIcon,
   receipt_long: FileIcon,
   verified_user: UserIcon,
+  check: CheckIcon,
 } as const;
 
 export function AppIcon({ name, size = 22, color = '#7F50D2' }: Props) {

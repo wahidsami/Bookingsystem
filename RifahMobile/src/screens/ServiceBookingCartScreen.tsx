@@ -1,4 +1,11 @@
-import React, { useMemo, useState } from 'react';
+/**
+ * LEGACY FILE - DO NOT DELETE
+ * 
+ * This screen previously handled the single-service cart experience.
+ * The booking journey has been redesigned into a unified flow within `BookingJourneyScreen.tsx`.
+ * This file remains for backward compatibility or future fallback, but is no longer the active path for bookings.
+ */
+import React, { useMemo, useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { AppIcon } from '../components/AppIcon';
 import { format } from 'date-fns';
@@ -35,8 +42,10 @@ export function ServiceBookingCartScreen({ navigation }: any) {
 
     const groupedByPayment = useMemo(() => paymentGroups.filter((group) => group.count > 0), [paymentGroups]);
 
+    const isSubmittingRef = useRef(false);
+
     const handleCheckout = async () => {
-        if (items.length === 0) {
+        if (items.length === 0 || isSubmittingRef.current) {
             return;
         }
 
@@ -60,6 +69,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
         }
 
         try {
+            isSubmittingRef.current = true;
             setLoading(true);
 
             const response = await api.post<{
@@ -198,6 +208,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
             Alert.alert(language === 'ar' ? 'خطأ' : 'Error', error.message || (language === 'ar' ? 'تعذر إنهاء الحجز' : 'Failed to complete booking'));
         } finally {
             setLoading(false);
+            isSubmittingRef.current = false;
         }
     };
 

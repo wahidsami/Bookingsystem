@@ -18,6 +18,8 @@ import { colors } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
+import { Alert } from 'react-native';
 
 type FullService = Service & { employees?: Staff[]; variants?: ServiceVariant[] };
 
@@ -27,6 +29,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
     const { tenant, service, tenantId, bookingSessionId, bookingReference } = route.params;
     const { isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { items, addItem, removeItem } = useServiceBookingCart();
     const [loading, setLoading] = useState(true);
     const [favorite, setFavorite] = useState(false);
     const [details, setDetails] = useState<FullService | null>(null);
@@ -147,16 +150,38 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
         }
     };
 
-    const handleBook = (provider?: Staff | null, variant?: ServiceVariant | null) => {
-        navigation.navigate('Booking', {
-            initialStep: 'date',
-            service: resolvedService,
-            tenant,
-            selectedStaff: provider || undefined,
-            selectedVariant: variant || selectedVariant || undefined,
-            bookingSessionId: bookingSessionId || undefined,
-            bookingReference: bookingReference || undefined,
-        });
+    const isInCart = items.some(item => item.service.id === resolvedService.id);
+
+    const handleToggleService = (provider?: Staff | null, variant?: ServiceVariant | null) => {
+        if (isInCart) {
+            const existingItem = items.find(item => item.service.id === resolvedService.id);
+            if (existingItem) {
+                removeItem(existingItem.id);
+            }
+        } else {
+            const result = addItem({
+                id: Math.random().toString(36).substring(7),
+                tenantId: tenant?.id || tenantId,
+                tenant: tenant ? { id: tenant.id, name: tenant.name, name_en: tenant.name_en, name_ar: tenant.name_ar, slug: tenant.slug, logo: tenant.logo } : undefined,
+                service: resolvedService,
+                variant: variant || selectedVariant || null,
+                staff: provider || null,
+                requestedStaffId: provider ? provider.id : null,
+                staffId: provider ? provider.id : null,
+                startTime: '',
+                paymentMethod: 'at-center',
+                totalPrice: getServicePrice(resolvedService),
+                payableNowAmount: 0
+            });
+            if (!result.success && result.reason === 'different_tenant') {
+                Alert.alert(
+                    isRTL ? 'تنبيه' : 'Cannot Add Service',
+                    isRTL ? 'لا يمكنك إضافة خدمات من مراكز مختلفة في نفس الحجز. يرجى إفراغ السلة أولاً.' : 'You cannot add services from different centers to the same booking. Please clear your basket first.'
+                );
+            } else {
+                navigation.goBack();
+            }
+        }
     };
 
     return (
@@ -222,8 +247,8 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                                                         {(variant.duration || resolvedService.duration)} {isRTL ? 'دقيقة' : 'min'} • {formatRiyal(getServicePrice(resolvedService, variant), isRTL ? 'ar' : 'en')}
                                                     </Text>
                                                 </View>
-                                                <TouchableOpacity style={styles.variantBtn} onPress={() => handleBook(undefined, variant)}>
-                                                    <Text style={styles.variantBtnText}>{isRTL ? 'احجز' : 'Book'}</Text>
+                                                <TouchableOpacity style={styles.variantBtn} onPress={() => handleToggleService(undefined, variant)}>
+                                                    <Text style={styles.variantBtnText}>{isRTL ? 'إضافة' : 'Add'}</Text>
                                                 </TouchableOpacity>
                                             </TouchableOpacity>
                                         );
@@ -251,8 +276,8 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                                                     <TouchableOpacity style={styles.providerBtn} onPress={() => navigation.navigate('EmployeeProfile', { provider })}>
                                                         <Text style={styles.providerBtnText}>{isRTL ? 'عرض الملف' : 'View profile'}</Text>
                                                     </TouchableOpacity>
-                                                    <TouchableOpacity style={styles.providerBookBtn} onPress={() => handleBook(provider, null)}>
-                                                        <Text style={styles.providerBookBtnText}>{isRTL ? 'احجز معه' : 'Book'}</Text>
+                                                    <TouchableOpacity style={styles.providerBookBtn} onPress={() => handleToggleService(provider, null)}>
+                                                        <Text style={styles.providerBookBtnText}>{isRTL ? 'اختيار' : 'Select'}</Text>
                                                     </TouchableOpacity>
                                                 </View>
                                             );
@@ -266,12 +291,12 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
             </ScrollView>
 
             <View style={[styles.stickyBar, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>
-                <TouchableOpacity style={styles.cartBtn} onPress={() => handleBook()}>
+                <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Booking')}>
                     <AppIcon name="bookings" size={16} color={colors.primary} />
-                    <Text style={styles.cartBtnText}>{isRTL ? 'ابدأ الحجز' : 'Start booking'}</Text>
+                    <Text style={styles.cartBtnText}>{isRTL ? 'السلة' : 'Basket'}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.bookBtn} onPress={() => handleBook()}>
-                    <Text style={styles.bookBtnText}>{isRTL ? 'احجز الآن' : 'Book now'}</Text>
+                <TouchableOpacity style={[styles.bookBtn, isInCart ? { backgroundColor: colors.error } : {}]} onPress={() => handleToggleService(undefined, undefined)}>
+                    <Text style={styles.bookBtnText}>{isInCart ? (isRTL ? 'إزالة الخدمة' : '- Remove Service') : (isRTL ? 'إضافة للسلة' : '+ Add Service')}</Text>
                 </TouchableOpacity>
             </View>
         </View>

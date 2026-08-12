@@ -513,7 +513,8 @@ exports.getTenantBySlug = async (req, res) => {
                 'snapchatUrl',
                 'pinterestUrl',
                 'whatsapp',
-                'workingHours'
+                'workingHours',
+                'coordinates'
             ]
         });
 
@@ -1363,6 +1364,86 @@ exports.createPublicBooking = async (req, res) => {
         res.status(statusCode).json({
             success: false,
             message: error.message || 'Failed to create booking'
+        });
+    }
+};
+
+/**
+ * Get staff available for a specific service (public)
+ */
+exports.getPublicStaffByService = async (req, res) => {
+    try {
+        const { tenantId, serviceId } = req.params;
+
+        // First verify the service exists and belongs to this tenant
+        const service = await db.Service.findOne({
+            where: {
+                id: serviceId,
+                tenantId,
+                isActive: true
+            }
+        });
+
+        if (!service) {
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
+        }
+
+        // Get staff assigned to this service through ServiceEmployee table directly
+        const serviceEmployees = await db.ServiceEmployee.findAll({
+            where: { serviceId },
+            attributes: ['staffId']
+        });
+        const staffIds = serviceEmployees.map(se => se.staffId);
+
+        let staffData = [];
+        if (staffIds.length > 0) {
+            const staff = await db.Staff.findAll({
+                where: {
+                    tenantId,
+                    isActive: true,
+                    id: { [db.Sequelize.Op.in]: staffIds }
+                },
+                attributes: [
+                    'id',
+                    'name',
+                    'name_en',
+                    'name_ar',
+                    'photo',
+                    'rating',
+                    'experience',
+                    'skills',
+                    'bio',
+                    'role'
+                ],
+                order: [['rating', 'DESC']]
+            });
+
+            // Map photo to image for frontend compatibility
+            staffData = staff.map(member => {
+                const memberData = member.toJSON();
+                memberData.image = memberData.photo;
+                memberData.specialty = Array.isArray(memberData.skills) && memberData.skills.length > 0 
+                    ? memberData.skills[0] 
+                    : null;
+                delete memberData.photo;
+                return memberData;
+            });
+        }
+
+        res.json({
+            success: true,
+            staff: staffData,
+            count: staffData.length
+        });
+    } catch (error) {
+        console.error('Get public staff by service error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch staff for service',
+            error: error.message
         });
     }
 };

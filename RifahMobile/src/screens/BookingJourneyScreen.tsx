@@ -23,6 +23,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { buildGroupGuestPayload, GroupGuestPayload } from '../utils/groupGuest';
+import { useServiceBookingCart, ServiceBookingPaymentMethod, ServiceBookingCartItem } from '../contexts/ServiceBookingCartContext';
 
 type BookingStep = 'date' | 'time' | 'review';
 
@@ -88,30 +89,40 @@ const isSameDate = (left: Date, right: Date) =>
     && left.getDate() === right.getDate();
 
 export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps) {
-    const { service, tenant } = route.params || {};
-    const initialVariant = route.params?.selectedVariant || null;
-    const selectedStaff = route.params?.selectedStaff || null;
+    const user: any = null;
+    // Mapped from cart
+    const { items, totalPrice: bookingTotalAmount, cartTenantId, clearCart } = useServiceBookingCart();
+    const firstItem = items[0] || {};
+    const tenantId = cartTenantId || firstItem.tenant?.id || route.params?.tenantId;
+    const tenant = firstItem.tenant || route.params?.tenant;
+    const service = firstItem.service || route.params?.service;
+    const initialVariant = firstItem.variant || route.params?.selectedVariant || null;
+    const selectedStaff = firstItem.staff || route.params?.selectedStaff || null;
     const { isRTL } = useLanguage();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [step, setStep] = useState<BookingStep>('date');
+    // removed replaceCart
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<ServiceBookingPaymentMethod | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const [selectedTime, setSelectedTime] = useState<SlotItem | null>(null);
     const [selectedTimeLoaded, setSelectedTimeLoaded] = useState(false);
     const [availabilityLoading, setAvailabilityLoading] = useState(false);
     const [slotsLoading, setSlotsLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [dateAvailability, setDateAvailability] = useState<Record<string, DateAvailability>>({});
     const [availableSlots, setAvailableSlots] = useState<SlotItem[]>([]);
+    const [slotChains, setSlotChains] = useState<Record<string, SlotItem[]>>({});
     const [serviceImageError, setServiceImageError] = useState(false);
 
-    const tenantId = tenant?.id || route.params?.tenantId || null;
+    // tenantId moved up
 
-    const serviceName = isRTL ? service?.name_ar : service?.name_en;
+    const serviceName = items.length > 1 ? (isRTL ? `${items.length} خدمات` : `${items.length} Services`) : (isRTL ? service?.name_ar : service?.name_en);
     const serviceDescription = (isRTL ? service?.description_ar : service?.description_en)
         || service?.description_en
         || service?.description_ar
         || '';
-    const servicePrice = getServicePrice(service, initialVariant || undefined);
+    const servicePrice = bookingTotalAmount;
     const serviceDuration = initialVariant?.duration || service?.duration || 0;
     const bookingServiceOptions: BookingServiceOption[] = useMemo(() => {
         const rawSelectedServices = Array.isArray(route.params?.selectedServices) ? route.params.selectedServices : [];
@@ -173,7 +184,48 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
 
         return Number(Math.max(0, servicePrice - bookingDepositAmount).toFixed(2));
     }, [bookingDepositAmount, servicePrice]);
-    const bookingTotalAmount = servicePrice;
+    // bookingTotalAmount mapped to servicePrice
+
+    const availablePaymentOptions = useMemo(() => {
+        const options: Array<{ id: ServiceBookingPaymentMethod; label: string }> = [];
+        const tenantAtCenter = bookingPaymentSettings.allowServicePayAtCenter !== false;
+        const tenantOnlineFull = bookingPaymentSettings.allowServiceFullOnline !== false;
+        const tenantDeposit = bookingPaymentSettings.allowServiceDeposit !== false;
+
+        const serviceOptions = service?.paymentOptions || ['at-center', 'online-full', 'booking-fee'];
+        const serviceAtCenter = serviceOptions.includes('at-center');
+        const serviceOnlineFull = serviceOptions.includes('online-full');
+        const serviceDeposit = serviceOptions.includes('booking-fee');
+
+        if (tenantAtCenter && serviceAtCenter) {
+            options.push({ id: 'at-center', label: isRTL ? 'الدفع عند المركز' : 'Pay at Center' });
+        }
+        if (tenantOnlineFull && serviceOnlineFull) {
+            options.push({ id: 'online-full', label: isRTL ? 'الدفع الكامل أونلاين' : 'Pay Full Online' });
+        }
+        if (tenantDeposit && serviceDeposit && bookingDepositAmount !== null && bookingDepositAmount > 0) {
+            options.push({ id: 'booking-fee', label: isRTL ? 'عربون الحجز' : 'Booking Deposit' });
+        }
+
+        return options;
+    }, [
+        bookingPaymentSettings.allowServicePayAtCenter,
+        bookingPaymentSettings.allowServiceFullOnline,
+        bookingPaymentSettings.allowServiceDeposit,
+        service?.paymentOptions,
+        bookingDepositAmount,
+        isRTL
+    ]);
+
+    useEffect(() => {
+        if (availablePaymentOptions.length > 0 && !selectedPaymentMethod) {
+            setSelectedPaymentMethod(availablePaymentOptions[0].id);
+        } else if (availablePaymentOptions.length > 0 && selectedPaymentMethod) {
+            if (!availablePaymentOptions.some(opt => opt.id === selectedPaymentMethod)) {
+                setSelectedPaymentMethod(availablePaymentOptions[0].id);
+            }
+        }
+    }, [availablePaymentOptions, selectedPaymentMethod]);
     const locationLabel = useMemo(() => {
         const parts = [
             tenant?.location,
@@ -251,26 +303,25 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
         let cancelled = false;
 
         const loadAvailability = async () => {
-            if (!tenantId || !service?.id) {
+            if (!tenantId || items.length === 0) {
                 return;
             }
 
             try {
                 setAvailabilityLoading(true);
                 const days = Array.from({ length: BOOKING_WINDOW_DAYS }, (_, index) => addDays(startOfToday(), index));
-                const entries: Array<readonly [string, DateAvailability]> = await Promise.all(days.map(async (day: Date) => {
+                const entries = await Promise.all(days.map(async (day) => {
                     const dateKey = toDateKey(day);
                     try {
-                        const response = await api.post<BookingSearchResponse>(
-                            '/bookings/search',
-                            {
-                                tenantId,
-                                serviceId: service.id,
-                                date: dateKey,
-                                staffId: selectedStaff?.id || undefined,
-                                variantId: initialVariant?.id || undefined,
-                            }
-                        );
+                        // For availability, checking the first item's availability is a good fast path.
+                        // Ideally we check all, but it's expensive. Let's check just the first item.
+                        const response = await api.post<BookingSearchResponse>('/bookings/search', {
+                            tenantId,
+                            serviceId: items[0].service.id,
+                            date: dateKey,
+                            staffId: items[0].requestedStaffId || items[0].staff?.id || undefined,
+                            variantId: items[0].variant?.id || undefined,
+                        });
                         const now = new Date();
                         const slots = (response.slots || []).filter((slot: SlotItem) => {
                             if (!slot?.available) {
@@ -335,45 +386,79 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
             try {
                 setSlotsLoading(true);
                 setAvailableSlots([]);
+                setSlotChains({});
                 setSelectedTime(null);
 
-                const response = await api.post<BookingSearchResponse>(
-                    '/bookings/search',
-                    {
+                if (items.length === 0) return;
+
+                const itemsSlotsResponses = await Promise.all(items.map(item => 
+                    api.post<BookingSearchResponse>('/bookings/search', {
                         tenantId,
-                        serviceId: service.id,
+                        serviceId: item.service.id,
                         date: toDateKey(selectedDate),
-                        staffId: selectedStaff?.id || undefined,
-                        variantId: initialVariant?.id || undefined,
-                    }
-                );
+                        staffId: item.requestedStaffId || item.staff?.id || undefined,
+                        variantId: item.variant?.id || undefined,
+                    })
+                ));
 
                 const now = new Date();
-                const filtered = (response.slots || []).filter((slot: SlotItem) => {
-                    if (!slot?.available) {
-                        return false;
-                    }
-
-                    const slotStart = new Date(slot.startTime);
-                    if (Number.isNaN(slotStart.getTime())) {
-                        return false;
-                    }
-
-                    if (!isSameDate(selectedDate, startOfToday())) {
-                        return true;
-                    }
-
-                    const earliestAllowed = new Date(now.getTime() + (SLOT_LEAD_MINUTES * 60 * 1000));
-                    return slotStart.getTime() >= earliestAllowed.getTime();
+                const earliestAllowed = new Date(now.getTime() + (SLOT_LEAD_MINUTES * 60 * 1000));
+                
+                // Process slots for each item
+                const validLayers = itemsSlotsResponses.map(res => {
+                    return (res.slots || []).filter(slot => {
+                        if (!slot?.available) return false;
+                        const slotStart = new Date(slot.startTime);
+                        if (Number.isNaN(slotStart.getTime())) return false;
+                        if (!isSameDate(selectedDate, startOfToday())) return true;
+                        return slotStart.getTime() >= earliestAllowed.getTime();
+                    });
                 });
 
+                if (validLayers.some(layer => layer.length === 0)) {
+                    if (!cancelled) {
+                        setAvailableSlots([]);
+                        setSlotChains({});
+                    }
+                    return;
+                }
+
+                // Find contiguous chains
+                let chains = validLayers[0].map(slot => [slot]);
+                for (let i = 1; i < items.length; i++) {
+                    const nextLayer = validLayers[i];
+                    const nextChains = [];
+                    for (const chain of chains) {
+                        const lastSlot = chain[chain.length - 1];
+                        const lastSlotEnd = new Date(lastSlot.endTime).getTime();
+                        for (const nextSlot of nextLayer) {
+                            const nextSlotStart = new Date(nextSlot.startTime).getTime();
+                            if (Math.abs(nextSlotStart - lastSlotEnd) < 5 * 60000) {
+                                nextChains.push([...chain, nextSlot]);
+                            }
+                        }
+                    }
+                    chains = nextChains;
+                }
+
                 if (!cancelled) {
-                    setAvailableSlots(filtered);
+                    const finalSlots = chains.map(chain => chain[0]);
+                    const chainMap: Record<string, SlotItem[]> = {};
+                    chains.forEach(chain => {
+                        chainMap[chain[0].startTime] = chain;
+                    });
+                    
+                    // Deduplicate start times
+                    const uniqueSlots = Array.from(new Map(finalSlots.map(s => [s.startTime, s])).values());
+                    
+                    setAvailableSlots(uniqueSlots);
+                    setSlotChains(chainMap);
                 }
             } catch (error) {
                 console.error('Failed to load slots:', error);
                 if (!cancelled) {
                     setAvailableSlots([]);
+                    setSlotChains({});
                 }
             } finally {
                 if (!cancelled) {
@@ -470,13 +555,96 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
         navigation.goBack();
     };
 
-    const handleContinue = () => {
-        Alert.alert(
-            isRTL ? 'قريباً' : 'Coming soon',
-            isRTL
-                ? 'ستكتمل خطوة المراجعة والدفع في المرحلة التالية.'
-                : 'The review and payment step will be completed in the next phase.'
-        );
+    const handleContinue = async () => {
+        if (items.length === 0 || !tenant || !selectedDate || !selectedTime) {
+            Alert.alert(isRTL ? 'خطأ' : 'Error', isRTL ? 'بيانات الحجز غير مكتملة' : 'Booking data is incomplete');
+            return;
+        }
+
+        if (!selectedPaymentMethod) {
+            Alert.alert(isRTL ? 'خطأ' : 'Error', isRTL ? 'يرجى اختيار طريقة الدفع' : 'Please select a payment method');
+            return;
+        }
+
+        const chain = slotChains[selectedTime.startTime];
+        if (!chain || chain.length !== items.length) {
+             Alert.alert(isRTL ? 'خطأ' : 'Error', isRTL ? 'فشل في ترتيب الأوقات المتتالية.' : 'Failed to arrange contiguous times.');
+             return;
+        }
+
+        let payableNowAmount = 0;
+        if (selectedPaymentMethod === 'online-full') {
+            payableNowAmount = bookingTotalAmount;
+        } else if (selectedPaymentMethod === 'booking-fee' && bookingDepositAmount !== null) {
+            payableNowAmount = bookingDepositAmount;
+        }
+
+        try {
+            setLoading(true);
+            const response = await api.post<any>('/bookings/create', {
+                tenantId: tenant.id,
+                bookingSessionId: route.params?.bookingSessionId || undefined,
+                bookingReference: route.params?.bookingReference || undefined,
+                items: items.map((item, index) => ({
+                    serviceId: item.service.id,
+                    variantId: item.variant?.id || null,
+                    staffId: chain[index].staffId || item.staff?.id || null,
+                    requestedStaffId: item.requestedStaffId || item.staff?.id || null,
+                    startTime: chain[index].startTime,
+                    notes: item.notes || undefined,
+                    paymentMethod: selectedPaymentMethod,
+                })),
+            });
+
+            const newBookingReference = response.bookingSession?.bookingReference || response.bookingSession?.id || '';
+            const newBookingSessionId = response.bookingSession?.id;
+            clearCart();
+
+            const bookingTaxAmount = items.reduce((acc, item) => acc + (item.payableNowAmount || 0), 0); // fallback or correct computation
+            const bookingDepositAmount = payableNowAmount;
+            const paymentSummary = {
+                primaryCustomer: (user?.firstName || user?.lastName) ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : (user?.phone || 'Guest'),
+                participants: items.map(item => ({
+                    name: (user?.firstName || user?.lastName) ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() : (user?.phone || 'Guest'),
+                    services: [isRTL ? (item.service.name_ar || item.service.name_en) : (item.service.name_en || item.service.name_ar)]
+                })),
+                services: items.map(item => isRTL ? (item.service.name_ar || item.service.name_en) : (item.service.name_en || item.service.name_ar)),
+                date: selectedDateLabel,
+                time: selectedTimeLabel,
+                employee: selectedEmployeeLabel,
+                salon: tenant?.name,
+                subtotal: bookingTotalAmount - bookingTaxAmount,
+                tax: bookingTaxAmount,
+                deposit: bookingDepositAmount,
+                total: bookingTotalAmount,
+                remaining: bookingDepositAmount !== null ? bookingTotalAmount - bookingDepositAmount : 0,
+            };
+
+            if (payableNowAmount > 0 && newBookingSessionId) {
+                navigation.navigate('Payment', {
+                    bookingSessionId: newBookingSessionId,
+                    bookingReference: newBookingReference,
+                    payableAmount: payableNowAmount,
+                    tenantId: tenant.id,
+                    paymentMethod: selectedPaymentMethod,
+                    paymentSummary,
+                });
+            } else {
+                navigation.navigate('PaymentSuccess', {
+                    bookingSessionId: newBookingSessionId,
+                    bookingReference: newBookingReference,
+                    summary: paymentSummary,
+                });
+            }
+        } catch (error: any) {
+            console.error('Checkout error:', error);
+            Alert.alert(
+                isRTL ? 'حدث خطأ' : 'Error',
+                error?.response?.data?.message || (isRTL ? 'تعذر إتمام الحجز.' : 'Could not complete booking.')
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     const openGuestModal = (participant?: GuestParticipant | null) => {
@@ -927,6 +1095,36 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
 
             <View style={styles.sectionCard}>
                 <View style={styles.sectionCardHeader}>
+                    <Text style={styles.sectionCardLabel}>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</Text>
+                </View>
+                <View style={styles.paymentOptionsContainer}>
+                    {availablePaymentOptions.map((option) => {
+                        const isSelected = selectedPaymentMethod === option.id;
+                        return (
+                            <TouchableOpacity
+                                key={option.id}
+                                style={[styles.paymentOptionCard, isSelected && styles.selectedPaymentOptionCard]}
+                                onPress={() => setSelectedPaymentMethod(option.id)}
+                            >
+                                <View style={styles.paymentOptionRadio}>
+                                    {isSelected && <View style={styles.paymentOptionRadioInner} />}
+                                </View>
+                                <Text style={[styles.paymentOptionTitle, isSelected && styles.selectedPaymentOptionText]}>
+                                    {option.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                    {availablePaymentOptions.length === 0 && (
+                        <Text style={styles.paymentHintText}>
+                            {isRTL ? 'لا توجد طرق دفع متاحة' : 'No payment methods available'}
+                        </Text>
+                    )}
+                </View>
+            </View>
+
+            <View style={styles.sectionCard}>
+                <View style={styles.sectionCardHeader}>
                     <Text style={styles.sectionCardLabel}>{isRTL ? 'ملخص الدفع' : 'Payment summary'}</Text>
                 </View>
                 {renderPriceRow(isRTL ? 'المجموع الفرعي' : 'Subtotal', formatRiyal(servicePrice, isRTL ? 'ar' : 'en'))}
@@ -1326,9 +1524,50 @@ const styles = StyleSheet.create({
         color: colors.text,
     },
     stepSubtitle: {
-        fontSize: fontSize.sm,
+        fontSize: fontSize.md,
         color: colors.textSecondary,
-        lineHeight: 20,
+        marginTop: 4,
+    },
+    paymentOptionsContainer: {
+        gap: spacing.md,
+        paddingTop: spacing.xs,
+    },
+    paymentOptionCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        padding: spacing.md,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E8E1FA',
+        backgroundColor: '#FFFFFF',
+    },
+    selectedPaymentOptionCard: {
+        borderColor: colors.primary,
+        backgroundColor: '#F8F2FF',
+    },
+    paymentOptionRadio: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    paymentOptionRadioInner: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: colors.primary,
+    },
+    paymentOptionTitle: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    selectedPaymentOptionText: {
+        color: colors.primary,
     },
     calendarCard: {
         borderRadius: 28,

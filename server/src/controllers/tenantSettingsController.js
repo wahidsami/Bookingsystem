@@ -152,7 +152,7 @@ exports.getSettings = async (req, res) => {
             attributes: [
                 'id', 'name', 'name_en', 'name_ar', 'businessType', 'slug',
                 'email', 'phone', 'mobile', 'website', 'whatsapp',
-                'buildingNumber', 'street', 'district', 'city', 'country', 'googleMapLink', 'postalCode',
+                'buildingNumber', 'street', 'district', 'city', 'country', 'googleMapLink', 'postalCode', 'coordinates',
                 'logo', 'coverImage', 'description', 'descriptionAr',
                 'workingHours', 'layoutTemplate', 'themeColors',
                 'facebookUrl', 'instagramUrl', 'twitterUrl', 'linkedinUrl',
@@ -262,7 +262,8 @@ exports.updateBusinessInfo = async (req, res) => {
             buildingNumber, street, district, city, country, googleMapLink, postalCode,
             description, descriptionAr,
             facebookUrl, instagramUrl, twitterUrl, linkedinUrl,
-            tiktokUrl, youtubeUrl, snapchatUrl, pinterestUrl
+            tiktokUrl, youtubeUrl, snapchatUrl, pinterestUrl,
+            latitude, longitude
         } = req.body;
 
         const tenant = await db.Tenant.findByPk(tenantId);
@@ -300,7 +301,10 @@ exports.updateBusinessInfo = async (req, res) => {
             tiktokUrl: tiktokUrl !== undefined ? tiktokUrl : tenant.tiktokUrl,
             youtubeUrl: youtubeUrl !== undefined ? youtubeUrl : tenant.youtubeUrl,
             snapchatUrl: snapchatUrl !== undefined ? snapchatUrl : tenant.snapchatUrl,
-            pinterestUrl: pinterestUrl !== undefined ? pinterestUrl : tenant.pinterestUrl
+            pinterestUrl: pinterestUrl !== undefined ? pinterestUrl : tenant.pinterestUrl,
+            coordinates: (latitude !== undefined && longitude !== undefined && latitude !== '' && longitude !== '')
+                ? { lat: Number(latitude), lng: Number(longitude) }
+                : tenant.coordinates
         });
 
         res.json({

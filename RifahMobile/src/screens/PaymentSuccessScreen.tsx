@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
@@ -6,6 +6,7 @@ import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { formatRiyal } from '../utils/currency';
+import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
 
 type Participant = {
     name: string;
@@ -30,6 +31,13 @@ type PaymentSuccessSummary = {
 export function PaymentSuccessScreen({ route, navigation }: any) {
     const { isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { clearCart } = useServiceBookingCart();
+
+    useEffect(() => {
+        // Only clear the cart on terminal success
+        clearCart();
+    }, [clearCart]);
+
     const appointmentId = route.params?.appointmentId || route.params?.bookingId || null;
     const summary: PaymentSuccessSummary = route.params?.paymentSummary || {};
     const participants = Array.isArray(summary.participants) ? summary.participants : [];
@@ -58,21 +66,31 @@ export function PaymentSuccessScreen({ route, navigation }: any) {
 
                 <View style={styles.summaryCard}>
                     <Text style={styles.sectionTitle}>{isRTL ? 'تفاصيل الزيارة' : 'Visit details'}</Text>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>{isRTL ? 'الموعد' : 'Appointment Date'}</Text>
-                        <Text style={styles.summaryValue}>{summary.date || (isRTL ? 'غير متوفر' : 'Unavailable')}</Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>{isRTL ? 'الوقت' : 'Appointment Time'}</Text>
-                        <Text style={styles.summaryValue}>{summary.time || (isRTL ? 'غير متوفر' : 'Unavailable')}</Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>{isRTL ? 'الصالون' : 'Salon'}</Text>
-                        <Text style={styles.summaryValue}>{summary.salon || (isRTL ? 'غير متوفر' : 'Unavailable')}</Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>{isRTL ? 'الموظف' : 'Employee'}</Text>
-                        <Text style={styles.summaryValue}>{summary.employee || (isRTL ? 'غير متوفر' : 'Unavailable')}</Text>
+                    <View>
+                        {summary.date ? (
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>{isRTL ? 'التاريخ' : 'Date'}</Text>
+                                <Text style={styles.summaryValue}>{summary.date}</Text>
+                            </View>
+                        ) : null}
+                        {summary.time ? (
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>{isRTL ? 'الوقت' : 'Time'}</Text>
+                                <Text style={styles.summaryValue}>{summary.time}</Text>
+                            </View>
+                        ) : null}
+                        {summary.salon ? (
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>{isRTL ? 'الصالون' : 'Salon'}</Text>
+                                <Text style={styles.summaryValue}>{summary.salon}</Text>
+                            </View>
+                        ) : null}
+                        {summary.employee ? (
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>{isRTL ? 'الموظف' : 'Employee'}</Text>
+                                <Text style={styles.summaryValue}>{summary.employee}</Text>
+                            </View>
+                        ) : null}
                     </View>
                 </View>
 
@@ -139,7 +157,7 @@ export function PaymentSuccessScreen({ route, navigation }: any) {
                     style={styles.secondaryButton}
                     onPress={() => {
                         if (appointmentId) {
-                            navigation.navigate('AppointmentDetails', { appointmentId });
+                            navigation.navigate('Tabs', { screen: 'Appointments' });
                             return;
                         }
                         navigation.navigate('Tabs', { screen: 'Appointments' });

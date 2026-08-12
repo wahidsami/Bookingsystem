@@ -56,7 +56,7 @@ export default function AppointmentServiceRow({
   });
 
   const [draftConfig, setDraftConfig] = useState<Partial<StagedService>>({
-    staffId: validStylists[0]?.id || '',
+    staffId: '',
     startTime: 0,
     duration,
     discountType: 'none',
@@ -66,7 +66,7 @@ export default function AppointmentServiceRow({
   useEffect(() => {
     if (stagedItem) {
       setDraftConfig({
-        staffId: stagedItem.staffId || (validStylists[0]?.id || ''),
+        staffId: stagedItem.staffId || '',
         startTime: stagedItem.startTime,
         duration: stagedItem.duration,
         discountType: stagedItem.discountType,
