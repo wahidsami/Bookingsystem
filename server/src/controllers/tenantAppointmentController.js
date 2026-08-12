@@ -1389,11 +1389,13 @@ exports.createAppointment = async (req, res) => {
             errorMessage = error.message;
         }
 
+        const isConflict = /Time slot not available/i.test(errorMessage) || /Time slot is no longer available/i.test(errorMessage);
         const isKnownAdvanceBookingValidation = /Booking must be at least \d+ minutes in advance/i.test(errorMessage);
-        const statusCode = isKnownAdvanceBookingValidation ? 400 : 500;
+        const statusCode = isConflict ? 409 : (isKnownAdvanceBookingValidation ? 400 : 500);
 
         res.status(statusCode).json({
             success: false,
+            conflict: isConflict || undefined,
             message: errorMessage,
             error: error.message,
             errorName: error.name,

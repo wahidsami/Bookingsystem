@@ -24,6 +24,7 @@ import { getServiceCategoryKey, getServiceCategoryLabel, normalizeServiceRecord 
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import { DEFAULT_SCHEDULER_BOARD_SETTINGS, getTenantSchedulerConfig, normalizeSchedulerBoardSettings, type SchedulerBoardSettings, MIN_STAFF_COLUMN_WIDTH, MAX_STAFF_COLUMN_WIDTH } from '../lib/tenantWorkingHours';
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
+import { calculateNearestValidChain, ChainResult } from '../utils/bookingChains';
 
 interface AppointmentWorkspaceProps {
   lang: Language;
@@ -2031,6 +2032,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     notes: string;
   }
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
+  const [chainConflictDialog, setChainConflictDialog] = useState<{
+    proposedChain: ChainResult;
+    originalStaged: StagedService[];
+    onConfirm: (chain: ChainResult) => void;
+    onCancel: () => void;
+  } | null>(null);
 
   // Step 3: Global Checkout notes & Custom Payment Rows
   const [sessionNotes, setSessionNotes] = useState('');
@@ -7474,6 +7481,63 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         onBoardChanged={loadBoardData}
         existingBreak={activeBlockedTime}
       />
+
+      {/* Multi-Service Chained Booking Confirmation Modal */}
+      <AnimatePresence>
+        {chainConflictDialog && (
+          <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" dir={isRtl ? 'rtl' : 'ltr'}>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl"
+            >
+              <div className="flex items-center gap-3 mb-4 text-amber-600">
+                <AlertTriangle className="w-6 h-6" />
+                <h3 className="text-lg font-bold">
+                  {isRtl ? 'تعديل جدول الحجز المتسلسل' : 'Chained Booking Schedule Adjustment'}
+                </h3>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                {isRtl 
+                  ? 'تعذر توفير الأخصائيات والأوقات المطلوبة بالضبط لهذه السلسلة من الخدمات. النظام يقترح السلسلة المتوفرة التالية للحفاظ على استمرارية رحلة العميل:'
+                  : 'The requested staff and times are not perfectly available for this chain of services. The system proposes the following valid sequence to maintain a continuous journey:'}
+              </p>
+              
+              <div className="space-y-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                {chainConflictDialog.proposedChain.chain.map((slot, index) => {
+                  const srv = liveServices.find(s => s.id === slot.serviceId);
+                  const st = liveStylists.find(s => s.id === slot.staffId);
+                  return (
+                    <div key={index} className="flex flex-col gap-1 text-sm border-b border-slate-100 pb-2 last:border-0 last:pb-0">
+                      <div className="font-semibold text-slate-800">{isRtl ? srv?.nameAr : srv?.nameEn}</div>
+                      <div className="flex justify-between items-center text-slate-500">
+                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5"/> {formatMinutesToTime(slot.startTime)}</span>
+                        <span className="flex items-center gap-1"><User className="w-3.5 h-3.5"/> {isRtl ? st?.nameAr : st?.nameEn}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={chainConflictDialog.onCancel}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  onClick={() => chainConflictDialog.onConfirm(chainConflictDialog.proposedChain)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors"
+                >
+                  {isRtl ? 'تأكيد الحجز بهذا الاقتراح' : 'Confirm with Proposed Times'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Render Roster / Employee Weekly Schedule Editor Modal */}
       <EmployeeWeeklyScheduleEditor 
