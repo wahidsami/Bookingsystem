@@ -9,6 +9,7 @@ export type ConflictReasonType =
 
 export interface AvailabilityDiagnostic {
   staffId?: string | null;
+  serviceId?: string | null;
   staffName?: string | null;
   avatar?: string | null;
   startTime?: string | null;
@@ -36,8 +37,8 @@ const REASON_PRIORITY: Record<ConflictReasonType, number> = {
   blocked_time: 500,
   staff_break: 400,
   time_off: 300,
-  outside_working_hours: 200,
-  unavailable: 100,
+  unavailable: 200,
+  outside_working_hours: 100,
   unknown: 0
 };
 
@@ -78,6 +79,36 @@ const overlaps = (
   return startA < endB && endA > startB;
 };
 
+const getDiagnosticInterval = (diagnostic: AvailabilityDiagnostic) => {
+  const startTime = diagnostic.reasonStartTime || diagnostic.startTime || null;
+  const endTime = diagnostic.reasonEndTime || diagnostic.endTime || null;
+  return { startTime, endTime };
+};
+
+const isRelevantToRequestedInterval = ({
+  diagnostic,
+  requestedStartTime,
+  requestedEndTime
+}: {
+  diagnostic: AvailabilityDiagnostic;
+  requestedStartTime?: string | null;
+  requestedEndTime?: string | null;
+}) => {
+  const reasonType = normalizeReasonType(diagnostic.reasonType);
+  const { startTime, endTime } = getDiagnosticInterval(diagnostic);
+
+  if (reasonType === 'outside_working_hours') {
+    const requestedEndMs = toMs(requestedEndTime);
+    const workingHoursEndMs = toMs(diagnostic.workingHoursEnd || diagnostic.reasonEndTime || diagnostic.endTime);
+    if (requestedEndMs === null || workingHoursEndMs === null) {
+      return false;
+    }
+    return requestedEndMs > workingHoursEndMs;
+  }
+
+  return overlaps(startTime, endTime, requestedStartTime, requestedEndTime);
+};
+
 export const formatConflictTime = (value?: string | null, isRtl = false) => {
   if (!hasValidTime(value)) return '';
   try {
@@ -93,6 +124,7 @@ export const formatConflictTime = (value?: string | null, isRtl = false) => {
 
 export const pickBestConflictDiagnostic = ({
   diagnostics,
+  serviceId,
   staffId,
   requestedStartTime,
   requestedEndTime,
@@ -100,6 +132,7 @@ export const pickBestConflictDiagnostic = ({
   exactSlotEndTime
 }: {
   diagnostics: AvailabilityDiagnostic[];
+  serviceId?: string | null;
   staffId?: string | null;
   requestedStartTime?: string | null;
   requestedEndTime?: string | null;
@@ -110,19 +143,27 @@ export const pickBestConflictDiagnostic = ({
     return null;
   }
 
-  const exactSlotStartMs = toMs(exactSlotStartTime);
-  const exactSlotEndMs = toMs(exactSlotEndTime);
   const requestedStartMs = toMs(requestedStartTime);
   const requestedEndMs = toMs(requestedEndTime);
 
-  const pool = diagnostics.filter((diagnostic) => {
-    if (!staffId) return true;
-    return `${diagnostic.staffId || ''}` === `${staffId}`;
+  const relevantDiagnostics = diagnostics.filter((diagnostic) => {
+    const diagnosticServiceId = `${diagnostic.serviceId || ''}`.trim();
+    if (serviceId && diagnosticServiceId && diagnosticServiceId !== `${serviceId}`.trim()) {
+      return false;
+    }
+
+    return isRelevantToRequestedInterval({
+      diagnostic,
+      requestedStartTime,
+      requestedEndTime
+    });
   });
 
-  const candidates = pool.length > 0 ? pool : diagnostics;
+  if (relevantDiagnostics.length === 0) {
+    return null;
+  }
 
-  const scored = candidates.map((diagnostic, index) => {
+  const scored = relevantDiagnostics.map((diagnostic, index) => {
     const reasonType = normalizeReasonType(diagnostic.reasonType);
     let score = REASON_PRIORITY[reasonType] ?? 0;
 
@@ -130,30 +171,32 @@ export const pickBestConflictDiagnostic = ({
       score += 200;
     }
 
+    const { startTime: diagnosticStartTime, endTime: diagnosticEndTime } = getDiagnosticInterval(diagnostic);
+    const exactSlotStartMs = toMs(exactSlotStartTime);
+    const exactSlotEndMs = toMs(exactSlotEndTime);
+
     if (exactSlotStartMs !== null && exactSlotEndMs !== null) {
-      if (toMs(diagnostic.startTime) === exactSlotStartMs && toMs(diagnostic.endTime) === exactSlotEndMs) {
+      if (toMs(diagnosticStartTime) === exactSlotStartMs && toMs(diagnosticEndTime) === exactSlotEndMs) {
         score += 160;
       }
 
-      if (overlaps(diagnostic.startTime, diagnostic.endTime, exactSlotStartTime, exactSlotEndTime)) {
+      if (overlaps(diagnosticStartTime, diagnosticEndTime, exactSlotStartTime, exactSlotEndTime)) {
         score += 120;
       }
     }
 
     if (requestedStartMs !== null && requestedEndMs !== null) {
-      if (toMs(diagnostic.startTime) === requestedStartMs && toMs(diagnostic.endTime) === requestedEndMs) {
+      if (toMs(diagnosticStartTime) === requestedStartMs && toMs(diagnosticEndTime) === requestedEndMs) {
         score += 90;
       }
 
-      if (overlaps(diagnostic.startTime, diagnostic.endTime, requestedStartTime, requestedEndTime)) {
+      if (overlaps(diagnosticStartTime, diagnosticEndTime, requestedStartTime, requestedEndTime)) {
         score += 80;
       }
     }
 
-    if (diagnostic.reasonStartTime && diagnostic.reasonEndTime) {
-      if (overlaps(diagnostic.reasonStartTime, diagnostic.reasonEndTime, requestedStartTime, requestedEndTime)) {
-        score += 40;
-      }
+    if (serviceId && `${diagnostic.serviceId || ''}`.trim() === `${serviceId}`.trim()) {
+      score += 30;
     }
 
     return { diagnostic, score, index };
@@ -205,7 +248,7 @@ export const buildConflictCard = ({
     },
     outside_working_hours: {
       ar: 'لا يمكنها إكمال الخدمة لأن نهاية الخدمة تتجاوز نهاية دوامها.',
-      en: 'The service would end after the staff member’s working hours.'
+      en: 'This service extends beyond the staff member’s working hours.'
     },
     staff_break: {
       ar: 'الموعد يتداخل مع استراحة مجدولة.',

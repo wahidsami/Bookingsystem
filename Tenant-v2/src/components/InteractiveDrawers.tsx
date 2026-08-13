@@ -1749,6 +1749,7 @@ const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) 
               isRequestedChainValid = false;
               const diagnostic = pickBestConflictDiagnostic({
                 diagnostics,
+                serviceId: item.serviceId,
                 staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
                 requestedStartTime: requestStartIso,
                 requestedEndTime: requestEndIso,
@@ -1766,6 +1767,7 @@ const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) 
               isRequestedChainValid = false;
               const diagnostic = pickBestConflictDiagnostic({
                 diagnostics,
+                serviceId: item.serviceId,
                 staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
                 requestedStartTime: requestStartIso,
                 requestedEndTime: requestEndIso

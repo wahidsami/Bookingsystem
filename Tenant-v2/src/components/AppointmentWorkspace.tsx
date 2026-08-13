@@ -3420,6 +3420,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 isRequestedChainValid = false;
                 const diagnostic = pickBestConflictDiagnostic({
                   diagnostics,
+                  serviceId: item.serviceId,
                   staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
                   requestedStartTime: requestStartIso,
                   requestedEndTime: requestEndIso,
@@ -3437,6 +3438,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 isRequestedChainValid = false;
                 const diagnostic = pickBestConflictDiagnostic({
                   diagnostics,
+                  serviceId: item.serviceId,
                   staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
                   requestedStartTime: requestStartIso,
                   requestedEndTime: requestEndIso
