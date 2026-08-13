@@ -158,6 +158,7 @@ const searchAvailability = async (req, res) => {
         res.json({
             success: true,
             slots: result.slots,
+            diagnostics: result.diagnostics || [],
             date,
             totalSlots: result.slots.length,
             availableSlots: result.metadata.availableSlots,

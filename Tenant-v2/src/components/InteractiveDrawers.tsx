@@ -20,6 +20,13 @@ import {
   resolveProductImageUrl,
   type ProductRecord
 } from '../lib/productContract';
+import {
+  buildConflictCard,
+  formatConflictTime,
+  pickBestConflictDiagnostic,
+  type AvailabilityDiagnostic,
+  type ConflictCard
+} from '../lib/bookingConflictDiagnostics';
 
 const toMoney = (value: any) => {
   const numeric = Number(value);
@@ -596,7 +603,7 @@ export default function InteractiveDrawers({
   const [chainConflictDialog, setChainConflictDialog] = useState<{
     originalStaged: any[];
     payloadItems: any[];
-    conflictReasons: string[];
+    conflictCards: ConflictCard[];
     selectedDate: string;
     validChains: any[];
     selectedChain: any | null;
@@ -1381,6 +1388,7 @@ export default function InteractiveDrawers({
 
   const fetchAvailabilityLayers = async (currentItems: any[], dateString: string) => {
       const layers: import('../utils/bookingChains').BookingSlot[][] = [];
+      const diagnosticsByLayer: AvailabilityDiagnostic[][] = [];
       let anyFailed = false;
       for (let i = 0; i < currentItems.length; i++) {
         const item = currentItems[i];
@@ -1392,12 +1400,14 @@ export default function InteractiveDrawers({
         });
         if (searchResp?.success && searchResp.slots) {
           layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: item.serviceId })));
+          diagnosticsByLayer.push(Array.isArray(searchResp.diagnostics) ? searchResp.diagnostics : []);
         } else {
           layers.push([]);
+          diagnosticsByLayer.push([]);
           anyFailed = true;
         }
       }
-      return { layers, anyFailed };
+      return { layers, diagnosticsByLayer, anyFailed };
   };
 
   const handleSearchDate = async (dateStr: string) => {
@@ -1703,32 +1713,70 @@ export default function InteractiveDrawers({
 const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
     try {
       const requestedStartISO = currentItems[0].startTime || buildIsoFromMinutes(selectedDate, earliestStartTime);
-      const { layers, anyFailed } = await fetchAvailabilityLayers(currentItems, getLocalDateKey(selectedDate));
+      const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getLocalDateKey(selectedDate));
       
       let isRequestedChainValid = true;
       const discoveredStaffIds: string[] = [];
-      const conflictReasons: string[] = [];
+      const conflictCards: ConflictCard[] = [];
 
       if (anyFailed) {
           isRequestedChainValid = false;
-          conflictReasons.push(isRtl ? 'تعذر جلب الأوقات المتاحة للخدمة.' : 'Could not fetch availability for a service.');
+          conflictCards.push({
+            staffId: '',
+            staffName: isRtl ? 'المختص' : 'Professional',
+            reasonType: 'unknown',
+            reasonTitle: isRtl ? 'تعذر جلب الأوقات المتاحة للخدمة' : 'Could not fetch availability',
+            reasonDescription: isRtl ? 'تعذر التحقق من الإتاحة لهذه الخدمة في الوقت الحالي.' : 'Could not verify availability for this service right now.'
+          });
       } else {
           for (let i = 0; i < currentItems.length; i++) {
             const item = currentItems[i];
             const layerSlots = layers[i];
-            const reqTimeMs = new Date(item.startTime || buildIsoFromMinutes(selectedDate, item.startTime)).getTime();
+            const diagnostics = diagnosticsByLayer[i] || [];
+            const requestStartIso = typeof item.startTime === 'string' && item.startTime.includes('T')
+              ? item.startTime
+              : buildIsoFromMinutes(selectedDate, Number(item.startTime || earliestStartTime));
+            const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
+            const reqTimeMs = new Date(requestStartIso).getTime();
             
             const exactSlot = layerSlots.find((s: any) => new Date(s.startTime).getTime() === reqTimeMs);
             
             const staff = stylists.find(s => s.id === item.requestedStaffId) || stylists.find(s => s.id === exactSlot?.staffId);
             const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : 'المختص';
+            const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
 
             if (exactSlot && !exactSlot.available) {
               isRequestedChainValid = false;
-              conflictReasons.push(isRtl ? `\${staffName} غير متاحة في وقت خدمتها بسبب وجود حجز آخر.` : `\${staffName} is unavailable at this time due to an existing booking.`);
+              const diagnostic = pickBestConflictDiagnostic({
+                diagnostics,
+                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
+                requestedStartTime: requestStartIso,
+                requestedEndTime: requestEndIso,
+                exactSlotStartTime: exactSlot.startTime,
+                exactSlotEndTime: exactSlot.endTime
+              });
+              conflictCards.push(buildConflictCard({
+                diagnostic,
+                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
+                staffName,
+                avatar,
+                isRtl
+              }));
             } else if (!exactSlot) {
               isRequestedChainValid = false;
-              conflictReasons.push(isRtl ? `\${staffName} لديها وقت محظور يتداخل مع الوقت المطلوب (أو خارج ساعات العمل).` : `\${staffName} has blocked time or is outside working hours.`);
+              const diagnostic = pickBestConflictDiagnostic({
+                diagnostics,
+                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
+                requestedStartTime: requestStartIso,
+                requestedEndTime: requestEndIso
+              });
+              conflictCards.push(buildConflictCard({
+                diagnostic,
+                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
+                staffName,
+                avatar,
+                isRtl
+              }));
             } else {
               discoveredStaffIds.push(exactSlot.staffId);
             }
@@ -1747,7 +1795,13 @@ const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) 
         setChainConflictDialog({
           originalStaged: stagedServices,
           payloadItems: currentItems,
-          conflictReasons: isRetry ? [isRtl ? 'تغيرت الإتاحة، يرجى المحاولة بوقت آخر.' : 'Availability changed, please try another time.'] : conflictReasons,
+          conflictCards: isRetry ? [{
+            staffId: '',
+            staffName: isRtl ? 'المختص' : 'Professional',
+            reasonType: 'unknown',
+            reasonTitle: isRtl ? 'تغيرت الإتاحة' : 'Availability changed',
+            reasonDescription: isRtl ? 'تغيرت الإتاحة، يرجى المحاولة بوقت آخر.' : 'Availability changed, please try another time.'
+          }] : conflictCards,
           selectedDate: selectedDate,
           validChains: [],
           selectedChain: null,
@@ -4065,11 +4119,49 @@ const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) 
                   <p className="text-sm font-medium text-slate-800 mb-2">
                     {isRtl ? 'لا يمكن تنفيذ الخدمات بشكل متواصل في الوقت المحدد للأسباب التالية:' : 'The requested services cannot be booked continuously due to the following reasons:'}
                   </p>
-                  <ul className="list-disc list-inside text-sm text-slate-600 mb-6 space-y-1">
-                    {chainConflictDialog.conflictReasons?.map((reason, idx) => (
-                      <li key={idx}>{reason}</li>
+                  <div className="mb-6 space-y-3">
+                    {chainConflictDialog.conflictCards?.map((card, idx) => (
+                      <div key={`${card.staffId || card.staffName || 'conflict'}-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-sm font-bold text-slate-600">
+                            {card.avatar ? (
+                              <img src={card.avatar} alt={card.staffName} className="h-full w-full object-cover" />
+                            ) : (
+                              <span>
+                                {card.staffName
+                                  .split(' ')
+                                  .filter(Boolean)
+                                  .map((part) => part[0])
+                                  .slice(0, 2)
+                                  .join('')
+                                  .toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="truncate text-sm font-extrabold text-slate-900">{card.staffName}</h4>
+                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${card.reasonType === 'existing_booking' ? 'bg-rose-50 text-rose-600' : card.reasonType === 'outside_working_hours' ? 'bg-amber-50 text-amber-700' : card.reasonType === 'time_off' ? 'bg-slate-100 text-slate-600' : card.reasonType === 'blocked_time' ? 'bg-orange-50 text-orange-700' : card.reasonType === 'staff_break' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{card.reasonTitle}</span>
+                            </div>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">{card.reasonDescription}</p>
+                            {(card.conflictStartTime || card.conflictEndTime) && (
+                              <p className="mt-2 text-xs font-semibold text-slate-500">
+                                {formatConflictTime(card.conflictStartTime, isRtl)}
+                                {card.conflictEndTime ? ` – ${formatConflictTime(card.conflictEndTime, isRtl)}` : ''}
+                              </p>
+                            )}
+                            {card.workingHoursEnd && card.reasonType === 'outside_working_hours' && (
+                              <p className="mt-1 text-xs font-semibold text-slate-500">
+                                {isRtl
+                                  ? `ينتهي دوامها: ${formatConflictTime(card.workingHoursEnd, isRtl)}`
+                                  : `Working hours end: ${formatConflictTime(card.workingHoursEnd, isRtl)}`}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
 
                   <div className="flex flex-col gap-3">
                     <button

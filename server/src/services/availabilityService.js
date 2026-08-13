@@ -249,17 +249,38 @@ class AvailabilityService {
             throw new Error('Staff cannot perform this service');
         }
 
-        // Calculate availability window
-        const availabilityWindow = await this._calculateAvailabilityWindow(
+        // Calculate availability window and retain the intermediate layers for diagnostics
+        const availabilityContext = await this._buildAvailabilityContext(
             tenantId,
             staffId,
             date,
             timezone
         );
+        const availabilityWindow = availabilityContext.finalWindows;
 
         if (!availabilityWindow || availabilityWindow.length === 0) {
+            const diagnostics = this._buildAvailabilityDiagnostics({
+                staffId,
+                staffName: staff.name,
+                date,
+                timezone,
+                duration,
+                bufferBefore,
+                bufferAfter,
+                totalSlotLength,
+                stepSize,
+                tenantHours: availabilityContext.tenantHours,
+                rawWindows: availabilityContext.rawWindows,
+                finalWindows: availabilityContext.finalWindows,
+                breaks: availabilityContext.breaks,
+                timeOff: availabilityContext.timeOff,
+                overrides: availabilityContext.overrides,
+                existingAppointments: []
+            });
+
             return {
                 slots: [],
+                diagnostics,
                 metadata: {
                     date,
                     serviceId,
@@ -279,6 +300,24 @@ class AvailabilityService {
 
         // Get existing appointments for the day
         const existingAppointments = await this._getExistingAppointments(staffId, date, timezone);
+        const diagnostics = this._buildAvailabilityDiagnostics({
+            staffId,
+            staffName: staff.name,
+            date,
+            timezone,
+            duration,
+            bufferBefore,
+            bufferAfter,
+            totalSlotLength,
+            stepSize,
+            tenantHours: availabilityContext.tenantHours,
+            rawWindows: availabilityContext.rawWindows,
+            finalWindows: availabilityWindow,
+            breaks: availabilityContext.breaks,
+            timeOff: availabilityContext.timeOff,
+            overrides: availabilityContext.overrides,
+            existingAppointments
+        });
 
         // Generate slots for each availability window
         const allSlots = [];
@@ -301,6 +340,7 @@ class AvailabilityService {
 
         return {
             slots: allSlots,
+            diagnostics,
             metadata: {
                 date,
                 serviceId,
@@ -361,6 +401,7 @@ class AvailabilityService {
         // Get slots for each staff member
         const slotsByStaff = [];
         const staffWorkloads = new Map();
+        const diagnostics = [];
 
         for (const staff of staffMembers) {
             try {
@@ -387,6 +428,16 @@ class AvailabilityService {
                     slot.staffId = staff.id;
                     slot.staffName = staff.name;
                 });
+
+                if (Array.isArray(result.diagnostics)) {
+                    result.diagnostics.forEach((diag) => {
+                        diagnostics.push({
+                            ...diag,
+                            staffId: diag.staffId || staff.id,
+                            staffName: diag.staffName || staff.name
+                        });
+                    });
+                }
                 
                 slotsByStaff.push(...result.slots);
             } catch (error) {
@@ -425,6 +476,7 @@ class AvailabilityService {
 
         return {
             slots: uniqueSlots,
+            diagnostics,
             metadata: {
                 date,
                 serviceId,
@@ -469,115 +521,124 @@ class AvailabilityService {
      * Considers: tenant business hours, staff schedule, breaks, time-off, overrides
      * @private
      */
-    async _calculateAvailabilityWindow(tenantId, staffId, date, timezone = 'Asia/Riyadh') {
-        try {
-            const dateKey = typeof date === 'string' ? date.split('T')[0] : this._getDatePartsInTimeZone(date, timezone).dateKey;
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
-                throw new Error(`Invalid date format: ${date}`);
+    async _buildAvailabilityContext(tenantId, staffId, date, timezone = 'Asia/Riyadh') {
+        const dateKey = typeof date === 'string' ? date.split('T')[0] : this._getDatePartsInTimeZone(date, timezone).dateKey;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+            throw new Error(`Invalid date format: ${date}`);
+        }
+        const dayOfWeek = this._getDayOfWeekForDate(dateKey);
+
+        const tenant = await db.Tenant.findByPk(tenantId);
+        if (!tenant) {
+            throw new Error(`Tenant not found: ${tenantId}`);
+        }
+        const tenantHours = this._parseBusinessHours(tenant.workingHours, dayOfWeek);
+
+        const dateSpecificShifts = await db.StaffShift.findAll({
+            where: {
+                staffId,
+                specificDate: date,
+                isActive: true,
+                isRecurring: false
             }
-            const dayOfWeek = this._getDayOfWeekForDate(dateKey); // 0 = Sunday, 6 = Saturday
+        });
 
-            // Layer A: Get tenant business hours
-            const tenant = await db.Tenant.findByPk(tenantId);
-            if (!tenant) {
-                throw new Error(`Tenant not found: ${tenantId}`);
+        const recurringShifts = await db.StaffShift.findAll({
+            where: {
+                staffId,
+                dayOfWeek,
+                isRecurring: true,
+                isActive: true,
+                [Op.and]: [
+                    {
+                        [Op.or]: [
+                            { startDate: null },
+                            { startDate: { [Op.lte]: date } }
+                        ]
+                    },
+                    {
+                        [Op.or]: [
+                            { endDate: null },
+                            { endDate: { [Op.gte]: date } }
+                        ]
+                    }
+                ]
             }
-            const tenantHours = this._parseBusinessHours(tenant.workingHours, dayOfWeek);
+        });
 
-            // Layer B: Get staff shifts (new model - supports multiple shifts per day)
-            // First check for date-specific shifts
-            const dateSpecificShifts = await db.StaffShift.findAll({
-                where: {
-                    staffId,
-                    specificDate: date,
-                    isActive: true,
-                    isRecurring: false
-                }
-            });
+        const allShifts = [...dateSpecificShifts, ...recurringShifts];
 
-            // Then check for recurring shifts for this day of week
-            const recurringShifts = await db.StaffShift.findAll({
+        let rawWindows = [];
+        let legacySchedule = null;
+
+        if (allShifts.length === 0) {
+            legacySchedule = await db.StaffSchedule.findOne({
                 where: {
                     staffId,
                     dayOfWeek,
-                    isRecurring: true,
-                    isActive: true,
-                    [Op.and]: [
-                        {
-                            [Op.or]: [
-                                { startDate: null },
-                                { startDate: { [Op.lte]: date } }
-                            ]
-                        },
-                        {
-                            [Op.or]: [
-                                { endDate: null },
-                                { endDate: { [Op.gte]: date } }
-                            ]
-                        }
-                    ]
+                    isAvailable: true
                 }
             });
 
-            // Combine all shifts
-            const allShifts = [...dateSpecificShifts, ...recurringShifts];
-
-            // Declare availableWindow variable
-            let availableWindow = [];
-
-            // If no shifts, fall back to legacy StaffSchedule
-            if (allShifts.length === 0) {
-                const legacySchedule = await db.StaffSchedule.findOne({
-                    where: {
-                        staffId,
-                        dayOfWeek,
-                        isAvailable: true
-                    }
-                });
-
-                if (!legacySchedule) {
-                    return []; // No schedule for this day
-                }
-
+            if (legacySchedule) {
                 const scheduleStart = this._combineDateAndTime(dateKey, legacySchedule.startTime, timezone);
                 const scheduleEnd = this._combineDateAndTime(dateKey, legacySchedule.endTime, timezone);
-
-                availableWindow = [{
+                rawWindows = [{
                     startTime: scheduleStart,
                     endTime: scheduleEnd
                 }];
-            } else {
-                // Convert shifts to time windows
-                availableWindow = allShifts.map(shift => ({
-                    startTime: this._combineDateAndTime(dateKey, shift.startTime, timezone),
-                    endTime: this._combineDateAndTime(dateKey, shift.endTime, timezone)
-                }));
             }
+        } else {
+            rawWindows = allShifts.map(shift => ({
+                startTime: this._combineDateAndTime(dateKey, shift.startTime, timezone),
+                endTime: this._combineDateAndTime(dateKey, shift.endTime, timezone)
+            }));
+        }
 
-            // Apply tenant business hours (intersect)
-            if (tenantHours) {
-                const tenantStart = this._combineDateAndTime(dateKey, tenantHours.start, timezone);
-                const tenantEnd = this._combineDateAndTime(dateKey, tenantHours.end, timezone);
-                
-                availableWindow = this._intersectWindows(availableWindow, [{
-                    startTime: tenantStart,
-                    endTime: tenantEnd
-                }]);
-            }
+        if (tenantHours) {
+            const tenantStart = this._combineDateAndTime(dateKey, tenantHours.start, timezone);
+            const tenantEnd = this._combineDateAndTime(dateKey, tenantHours.end, timezone);
 
-            // Layer C - Subtract breaks
-            const breaks = await this._getStaffBreaks(staffId, dateKey, timezone);
-            availableWindow = this._subtractWindows(availableWindow, breaks);
+            rawWindows = this._intersectWindows(rawWindows, [{
+                startTime: tenantStart,
+                endTime: tenantEnd
+            }]);
+        }
 
-            // Layer D - Subtract time-off
-            const timeOff = await this._getStaffTimeOff(staffId, dateKey, timezone);
-            availableWindow = this._subtractWindows(availableWindow, timeOff);
+        const breaks = await this._getStaffBreaks(staffId, dateKey, timezone);
+        const timeOff = await this._getStaffTimeOff(staffId, dateKey, timezone);
+        const overrides = await this._getStaffOverrides(staffId, dateKey);
 
-            // Apply schedule overrides
-            const overrides = await this._getStaffOverrides(staffId, dateKey);
-            availableWindow = this._applyOverrides(availableWindow, overrides, timezone);
+        let finalWindows = this._subtractWindows(rawWindows, breaks);
+        finalWindows = this._subtractWindows(finalWindows, timeOff);
+        finalWindows = this._applyOverrides(finalWindows, overrides, timezone);
 
-            return availableWindow;
+        return {
+            dateKey,
+            dayOfWeek,
+            tenant,
+            tenantHours,
+            dateSpecificShifts,
+            recurringShifts,
+            allShifts,
+            legacySchedule,
+            rawWindows,
+            finalWindows,
+            breaks,
+            timeOff,
+            overrides
+        };
+    }
+
+    /**
+     * Calculate availability window for a staff member on a specific date
+     * Considers: tenant business hours, staff schedule, breaks, time-off, overrides
+     * @private
+     */
+    async _calculateAvailabilityWindow(tenantId, staffId, date, timezone = 'Asia/Riyadh') {
+        try {
+            const context = await this._buildAvailabilityContext(tenantId, staffId, date, timezone);
+            return context.finalWindows;
         } catch (error) {
             console.error('Error in _calculateAvailabilityWindow:', {
                 tenantId,
@@ -588,6 +649,196 @@ class AvailabilityService {
             });
             throw error;
         }
+    }
+
+    /**
+     * Build structured diagnostics for a staff availability evaluation.
+     * @private
+     */
+    _buildAvailabilityDiagnostics({
+        staffId,
+        staffName,
+        date,
+        timezone = 'Asia/Riyadh',
+        duration,
+        bufferBefore,
+        bufferAfter,
+        totalSlotLength,
+        stepSize,
+        tenantHours,
+        rawWindows = [],
+        finalWindows = [],
+        breaks = [],
+        timeOff = [],
+        overrides = [],
+        existingAppointments = []
+    }) {
+        const diagnostics = [];
+        const seen = new Set();
+        const dateKey = typeof date === 'string' ? date.split('T')[0] : this._getDatePartsInTimeZone(date, timezone).dateKey;
+        const fallbackStaffName = staffName || 'Unknown';
+
+        const pushDiagnostic = (diagnostic) => {
+            if (!diagnostic || !diagnostic.reasonType) return;
+            const startKey = diagnostic.reasonStartTime || diagnostic.startTime || '';
+            const endKey = diagnostic.reasonEndTime || diagnostic.endTime || '';
+            const key = [
+                diagnostic.staffId || staffId || '',
+                diagnostic.reasonType,
+                startKey,
+                endKey
+            ].join('|');
+            if (seen.has(key)) {
+                return;
+            }
+            seen.add(key);
+            diagnostics.push({
+                staffId: diagnostic.staffId || staffId || '',
+                staffName: diagnostic.staffName || fallbackStaffName,
+                startTime: diagnostic.startTime || diagnostic.reasonStartTime || null,
+                endTime: diagnostic.endTime || diagnostic.reasonEndTime || null,
+                reasonType: diagnostic.reasonType,
+                reasonStartTime: diagnostic.reasonStartTime || diagnostic.startTime || null,
+                reasonEndTime: diagnostic.reasonEndTime || diagnostic.endTime || null,
+                workingHoursEnd: diagnostic.workingHoursEnd || null
+            });
+        };
+
+        existingAppointments.forEach((appointment) => {
+            const start = new Date(appointment.startTime);
+            const end = new Date(appointment.endTime);
+            const bufferedStart = new Date(start.getTime() - (bufferBefore || 0) * 60000);
+            const bufferedEnd = new Date(end.getTime() + (bufferAfter || 0) * 60000);
+
+            pushDiagnostic({
+                staffId,
+                staffName: fallbackStaffName,
+                startTime: bufferedStart.toISOString(),
+                endTime: bufferedEnd.toISOString(),
+                reasonType: 'existing_booking',
+                reasonStartTime: bufferedStart.toISOString(),
+                reasonEndTime: bufferedEnd.toISOString()
+            });
+        });
+
+        breaks.forEach((breakRecord) => {
+            const rawType = `${breakRecord?.type || ''}`.trim().toLowerCase();
+            const reasonType = rawType === 'other' || rawType === 'meeting' ? 'blocked_time' : 'staff_break';
+            const startTime = breakRecord.startTime instanceof Date
+                ? breakRecord.startTime.toISOString()
+                : new Date(breakRecord.startTime).toISOString();
+            const endTime = breakRecord.endTime instanceof Date
+                ? breakRecord.endTime.toISOString()
+                : new Date(breakRecord.endTime).toISOString();
+
+            pushDiagnostic({
+                staffId,
+                staffName: fallbackStaffName,
+                startTime,
+                endTime,
+                reasonType,
+                reasonStartTime: startTime,
+                reasonEndTime: endTime
+            });
+        });
+
+        timeOff.forEach((timeOffRecord) => {
+            const startTime = timeOffRecord.startTime instanceof Date
+                ? timeOffRecord.startTime.toISOString()
+                : new Date(timeOffRecord.startTime).toISOString();
+            const endTime = timeOffRecord.endTime instanceof Date
+                ? timeOffRecord.endTime.toISOString()
+                : new Date(timeOffRecord.endTime).toISOString();
+
+            pushDiagnostic({
+                staffId,
+                staffName: fallbackStaffName,
+                startTime,
+                endTime,
+                reasonType: 'time_off',
+                reasonStartTime: startTime,
+                reasonEndTime: endTime
+            });
+        });
+
+        overrides.forEach((override) => {
+            if (!override || override.isAvailable !== false) {
+                return;
+            }
+
+            const startTime = this._combineDateAndTime(dateKey, '00:00', timezone).toISOString();
+            const endTime = this._combineDateAndTime(dateKey, '23:59', timezone).toISOString();
+            pushDiagnostic({
+                staffId,
+                staffName: fallbackStaffName,
+                startTime,
+                endTime,
+                reasonType: 'unavailable',
+                reasonStartTime: startTime,
+                reasonEndTime: endTime
+            });
+        });
+
+        finalWindows.forEach((window) => {
+            const windowStartMs = new Date(window.startTime).getTime();
+            const windowEndMs = new Date(window.endTime).getTime();
+            const latestValidStartMs = windowEndMs - (totalSlotLength * 60000);
+
+            if (!Number.isFinite(windowStartMs) || !Number.isFinite(windowEndMs)) {
+                return;
+            }
+
+            if (latestValidStartMs < windowStartMs) {
+                const startTime = new Date(windowStartMs).toISOString();
+                const endTime = new Date(windowEndMs).toISOString();
+                pushDiagnostic({
+                    staffId,
+                    staffName: fallbackStaffName,
+                    startTime,
+                    endTime,
+                    reasonType: 'outside_working_hours',
+                    reasonStartTime: startTime,
+                    reasonEndTime: endTime,
+                    workingHoursEnd: endTime
+                });
+                return;
+            }
+
+            const firstInvalidStartMs = latestValidStartMs + (stepSize * 60000);
+            if (firstInvalidStartMs < windowEndMs) {
+                const startTime = new Date(firstInvalidStartMs).toISOString();
+                const endTime = new Date(windowEndMs).toISOString();
+                pushDiagnostic({
+                    staffId,
+                    staffName: fallbackStaffName,
+                    startTime,
+                    endTime,
+                    reasonType: 'outside_working_hours',
+                    reasonStartTime: startTime,
+                    reasonEndTime: endTime,
+                    workingHoursEnd: endTime
+                });
+            }
+        });
+
+        if (diagnostics.length === 0) {
+            const dayStart = this._combineDateAndTime(dateKey, '00:00', timezone).toISOString();
+            const dayEnd = this._combineDateAndTime(dateKey, '23:59', timezone).toISOString();
+            pushDiagnostic({
+                staffId,
+                staffName: fallbackStaffName,
+                startTime: dayStart,
+                endTime: dayEnd,
+                reasonType: tenantHours ? 'unavailable' : 'outside_working_hours',
+                reasonStartTime: dayStart,
+                reasonEndTime: dayEnd,
+                workingHoursEnd: tenantHours
+                    ? this._combineDateAndTime(dateKey, tenantHours.end, timezone).toISOString()
+                    : undefined
+            });
+        }
+
+        return diagnostics;
     }
 
     /**
