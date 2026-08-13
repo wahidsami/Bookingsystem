@@ -1254,7 +1254,7 @@ class TenantApiAdapter {
     return this.get(`/tenant/appointments/${id}`);
   }
 
-  async searchAvailability(data: { serviceId: string; staffId?: string; date: string; variantId?: string }): Promise<any> {
+  async searchAvailability(data: { tenantId: string; serviceId: string; staffId?: string; date: string; variantId?: string }): Promise<any> {
     return this.post('/api/v1/bookings/search', data);
   }
 

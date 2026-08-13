@@ -3139,6 +3139,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       for (let i = 0; i < currentItems.length; i++) {
         const item = currentItems[i];
         const searchResp = await tenantApiAdapter.searchAvailability({
+          tenantId: tenant?.id || '',
           serviceId: item.serviceId,
           staffId: item.requestedStaffId || undefined,
           date: dateString
@@ -7613,6 +7614,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       {/* Render modular advanced interactive creation & POS checkout drawers */}
       <InteractiveDrawers 
         isRtl={isRtl}
+        tenantId={tenant?.id || ''}
         isCreateDrawerOpen={isCreateDrawerOpen}
         setIsCreateDrawerOpen={setIsCreateDrawerOpen}
         isCartDrawerOpen={isCartDrawerOpen}

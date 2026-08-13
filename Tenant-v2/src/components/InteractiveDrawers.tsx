@@ -50,6 +50,7 @@ const createEmptyGuestService = () => ({
 
 interface InteractiveDrawersProps {
   isRtl: boolean;
+  tenantId: string;
   isCreateDrawerOpen: boolean;
   setIsCreateDrawerOpen: (open: boolean) => void;
   isCartDrawerOpen: boolean;
@@ -296,6 +297,7 @@ const removeDraftStorage = (key: string) => {
 
 export default function InteractiveDrawers({
   isRtl,
+  tenantId,
   isCreateDrawerOpen,
   setIsCreateDrawerOpen,
   isCartDrawerOpen,
@@ -1383,6 +1385,7 @@ export default function InteractiveDrawers({
       for (let i = 0; i < currentItems.length; i++) {
         const item = currentItems[i];
         const searchResp = await tenantApiAdapter.searchAvailability({
+          tenantId,
           serviceId: item.serviceId,
           staffId: item.requestedStaffId || undefined,
           date: dateString
