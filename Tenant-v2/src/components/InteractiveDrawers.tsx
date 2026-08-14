@@ -1459,7 +1459,14 @@ export default function InteractiveDrawers({
     setChainConflictView('time-selection');
   };
 
-      const handleConfirmAppointmentCreation = async () => {
+  const reopenServicesForRecovery = (mode: 'modify_professionals' | 'separate_services') => {
+    setBookingRecoveryMode(mode);
+    setChainConflictDialog(null);
+    setChainConflictView('explanation');
+    setCreateStep(3);
+  };
+
+  const handleConfirmAppointmentCreation = async () => {
     let custNameEn = '';
     let custNameAr = '';
     let custPhone = '';
@@ -1630,13 +1637,6 @@ export default function InteractiveDrawers({
       addLocalToast('يرجى اختيار خدمة صحيحة قبل تأكيد الحجز', 'Please choose a valid service before confirming the booking', 'warning');
       return;
     }
-
-  const reopenServicesForRecovery = (mode: 'modify_professionals' | 'separate_services') => {
-    setBookingRecoveryMode(mode);
-    setChainConflictDialog(null);
-    setChainConflictView('explanation');
-    setCreateStep(3);
-  };
 
   const preflightSeparateServices = async (currentItems: any[]) => {
     try {
