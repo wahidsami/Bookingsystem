@@ -612,6 +612,7 @@ export default function InteractiveDrawers({
   const [currentServiceCategory, setCurrentServiceCategory] = useState<string>('all');
   const [serviceSearch, setServiceSearch] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
+  const [bookingRecoveryMode, setBookingRecoveryMode] = useState<'chain' | 'modify_professionals' | 'separate_services'>('chain');
 
   const [chainConflictDialog, setChainConflictDialog] = useState<{
     originalStaged: any[];
@@ -647,6 +648,12 @@ export default function InteractiveDrawers({
       setCreateStep(3);
     }
   }, [createStep, stagedServices.length]);
+
+  useEffect(() => {
+    if (!isCreateDrawerOpen) {
+      setBookingRecoveryMode('chain');
+    }
+  }, [isCreateDrawerOpen]);
 
 
 
@@ -1370,11 +1377,12 @@ export default function InteractiveDrawers({
     } else {
       const resolvedVariant = variantOverride || null;
       let nextStartTime = currentStartTime;
-      if (stagedServices.length > 0) {
+      const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
+      if (shouldChainServiceTimes && stagedServices.length > 0) {
         const lastItem = stagedServices[stagedServices.length - 1];
         nextStartTime = lastItem.startTime + lastItem.duration;
       }
-      const nextStartTimeIso = stagedServices.length > 0
+      const nextStartTimeIso = shouldChainServiceTimes && stagedServices.length > 0
         ? addMinutesToIso(
             stagedServices[stagedServices.length - 1].startTimeIso || buildIsoFromMinutes(selectedDate, stagedServices[stagedServices.length - 1].startTime),
             stagedServices[stagedServices.length - 1].duration
@@ -1623,6 +1631,93 @@ export default function InteractiveDrawers({
       return;
     }
 
+  const reopenServicesForRecovery = (mode: 'modify_professionals' | 'separate_services') => {
+    setBookingRecoveryMode(mode);
+    setChainConflictDialog(null);
+    setChainConflictView('explanation');
+    setCreateStep(3);
+  };
+
+  const preflightSeparateServices = async (currentItems: any[]) => {
+    try {
+      const validatedItems: any[] = [];
+      const conflictCards: ConflictCard[] = [];
+      let allItemsValid = true;
+
+      for (const item of currentItems) {
+        const requestStartIso = item.startTimeIso || buildIsoFromMinutes(selectedDate, Number(item.startTime || earliestStartTime));
+        const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
+        const requestDate = requestStartIso.includes('T') ? requestStartIso.split('T')[0] : getLocalDateKey(selectedDate);
+        const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers([item], requestDate);
+        const layerSlots = layers[0] || [];
+        const diagnostics = diagnosticsByLayer[0] || [];
+        const reqTimeMs = new Date(requestStartIso).getTime();
+        const normalizedStaffId = `${item.requestedStaffId || item.staffId || ''}`.trim();
+        const exactSlot = layerSlots.find((slot: any) => {
+          const slotTimeMs = new Date(slot.startTime).getTime();
+          const slotStaffId = `${slot.staffId || ''}`.trim();
+          return slotTimeMs === reqTimeMs && (!normalizedStaffId || slotStaffId === normalizedStaffId);
+        });
+
+        const staff = stylists.find((candidate) => `${candidate.id || ''}`.trim() === normalizedStaffId)
+          || stylists.find((candidate) => `${candidate.id || ''}`.trim() === `${exactSlot?.staffId || ''}`.trim());
+        const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : (isRtl ? 'المختص' : 'Professional');
+        const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
+
+        if (anyFailed || !exactSlot || !exactSlot.available) {
+          allItemsValid = false;
+          const diagnostic = pickBestConflictDiagnostic({
+            diagnostics,
+            serviceId: item.serviceId,
+            staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
+            requestedStartTime: requestStartIso,
+            requestedEndTime: requestEndIso,
+            exactSlotStartTime: exactSlot?.startTime,
+            exactSlotEndTime: exactSlot?.endTime
+          });
+
+          conflictCards.push(buildConflictCard({
+            diagnostic,
+            staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
+            staffName,
+            avatar,
+            isRtl
+          }));
+        } else {
+          validatedItems.push({
+            ...item,
+            staffId: exactSlot.staffId || item.staffId,
+            assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
+          });
+        }
+      }
+
+      if (allItemsValid) {
+        await executeFinalSubmission(validatedItems);
+        return;
+      }
+
+      setBookingRecoveryMode('separate_services');
+      setChainConflictView('explanation');
+      setChainConflictDialog({
+        originalStaged: stagedServices,
+        payloadItems: currentItems,
+        conflictCards,
+        selectedDate: selectedDate,
+        validChains: [],
+        selectedChain: null,
+        isRevalidating: false,
+        onConfirm: async () => {},
+        onCancel: () => {
+          setChainConflictDialog(null);
+          setChainConflictView('explanation');
+        }
+      });
+    } catch (err: any) {
+      addLocalToast('خطأ أثناء التحقق من التوفر', 'Error checking availability: ' + err.message, 'warning');
+    }
+  };
+
   const executeFinalSubmission = async (itemsToSubmit: any[]) => {
     const payload: any = {
       items: itemsToSubmit,
@@ -1734,9 +1829,13 @@ export default function InteractiveDrawers({
       if (isConflict && itemsToSubmit.length > 1) {
          addLocalToast(isRtl ? 'لم يعد هذا الوقت متاحاً' : 'This time is no longer available', isRtl ? 'This time is no longer available' : 'لم يعد هذا الوقت متاحاً', 'warning');
          if (!chainConflictDialog) {
-           await preflightMultiServiceChain(itemsToSubmit, true);
+           if (bookingRecoveryMode === 'separate_services') {
+             await preflightSeparateServices(itemsToSubmit);
+           } else {
+             await preflightMultiServiceChain(itemsToSubmit, true);
+           }
          } else {
-           setChainConflictView('time-selection');
+           setChainConflictView(bookingRecoveryMode === 'separate_services' ? 'explanation' : 'time-selection');
          }
       } else {
          addLocalToast('فشل في إنشاء الموعد: ' + errMsg, 'Failed to create appointment: ' + errMsg, 'warning');
@@ -1895,7 +1994,11 @@ export default function InteractiveDrawers({
 
   void (async () => {
     if (items.length > 1) {
-      await preflightMultiServiceChain(items, false);
+      if (bookingRecoveryMode === 'separate_services') {
+        await preflightSeparateServices(items);
+      } else {
+        await preflightMultiServiceChain(items, false);
+      }
     } else {
       await executeFinalSubmission(items);
     }
@@ -2966,6 +3069,8 @@ export default function InteractiveDrawers({
                       <AppointmentServicesStep
                         isRtl={isRtl}
                         boardStartHour={boardStartHour}
+                        bookingRecoveryMode={bookingRecoveryMode}
+                        forceExpandAll={bookingRecoveryMode !== 'chain'}
                         canonicalServices={canonicalServices}
                         stagedServices={stagedServices as any[]}
                         availableStylists={availableStylists}
@@ -2995,6 +3100,13 @@ export default function InteractiveDrawers({
 
                     {createStep === 4 && (
                       <div className="space-y-4 animate-fadeIn text-xs">
+                        {bookingRecoveryMode === 'separate_services' && stagedServices.length > 1 && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-semibold text-amber-900">
+                            {isRtl
+                              ? `سيتم إنشاء ${stagedServices.length} مواعيد منفصلة عند التأكيد النهائي.`
+                              : `${stagedServices.length} separate appointments will be created when you confirm.`}
+                          </div>
+                        )}
                         {(() => {
                           const queuedLineItems = stagedServices.map((item, index) => {
                             const srv = canonicalServices.find((service) => service.id === item.serviceId);
@@ -3252,7 +3364,9 @@ export default function InteractiveDrawers({
                       </button>
                     ) : (
                       <button type="button" onClick={handleConfirmAppointmentCreation} className="py-2 px-5 bg-amber-500 text-zinc-950 font-black rounded-xl text-xs shadow-md">
-                        {isRtl ? 'تأكيد الحجز والجدولة 🗓️' : 'Schedule Booking 🗓️'}
+                        {bookingRecoveryMode === 'separate_services' && stagedServices.length > 1
+                          ? (isRtl ? `تأكيد ${stagedServices.length} مواعيد منفصلة 🗓️` : 'Schedule separate appointments 🗓️')
+                          : (isRtl ? 'تأكيد الحجز والجدولة 🗓️' : 'Schedule Booking 🗓️')}
                       </button>
                     )}
                   </div>
@@ -4211,14 +4325,14 @@ export default function InteractiveDrawers({
                     </button>
                     
                     <button
-                      onClick={chainConflictDialog.onCancel}
+                      onClick={() => reopenServicesForRecovery('modify_professionals')}
                       className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
                     >
                       {isRtl ? 'تعديل المختصين' : 'Modify Professionals'}
                     </button>
 
                     <button
-                      onClick={chainConflictDialog.onCancel}
+                      onClick={() => reopenServicesForRecovery('separate_services')}
                       className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
                     >
                       {isRtl ? 'حجز الخدمات بشكل منفصل' : 'Book services separately'}

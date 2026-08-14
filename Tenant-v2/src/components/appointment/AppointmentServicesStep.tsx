@@ -19,6 +19,8 @@ export interface StagedService {
 interface AppointmentServicesStepProps {
   isRtl: boolean;
   boardStartHour?: number;
+  bookingRecoveryMode?: 'chain' | 'modify_professionals' | 'separate_services';
+  forceExpandAll?: boolean;
   canonicalServices: ServiceRecord[];
   stagedServices: StagedService[];
   availableStylists: any[];
@@ -38,6 +40,8 @@ interface AppointmentServicesStepProps {
 export default function AppointmentServicesStep({
   isRtl,
   boardStartHour = 9,
+  bookingRecoveryMode = 'chain',
+  forceExpandAll = false,
   canonicalServices,
   stagedServices,
   availableStylists,
@@ -119,6 +123,25 @@ export default function AppointmentServicesStep({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 sm:px-6 space-y-6">
+          {bookingRecoveryMode !== 'chain' && (
+            <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 shadow-sm">
+              <p className="font-bold">
+                {bookingRecoveryMode === 'modify_professionals'
+                  ? (isRtl ? 'وضع تعديل المختصين' : 'Modify professionals mode')
+                  : (isRtl ? 'وضع الحجز المنفصل' : 'Separate services mode')}
+              </p>
+              <p className="mt-1 leading-5 text-amber-800/90">
+                {bookingRecoveryMode === 'modify_professionals'
+                  ? (isRtl
+                    ? 'حافظ على الخدمات والأوقات الحالية ثم عدّل المختصين المتاحين قبل المتابعة.'
+                    : 'Keep the current services and times, then adjust the available professionals before continuing.')
+                  : (isRtl
+                    ? 'سيتم التحقق من كل خدمة بشكل مستقل، وسيتم إنشاء مواعيد منفصلة عند التأكيد النهائي.'
+                    : 'Each service will be validated independently and separate appointments will be created on the final confirmation.')}
+              </p>
+            </div>
+          )}
+
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
@@ -170,6 +193,7 @@ export default function AppointmentServicesStep({
                           variant={variant}
                           isRtl={isRtl}
                           boardStartHour={boardStartHour}
+                          forceExpanded={forceExpandAll}
                           availableStylists={availableStylists}
                           stagedItem={stagedItem || null}
                           onAddService={onAddService}

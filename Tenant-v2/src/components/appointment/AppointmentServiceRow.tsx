@@ -16,6 +16,7 @@ interface AppointmentServiceRowProps {
   variant?: ServiceVariantRecord | null;
   depth?: number;
   boardStartHour?: number;
+  forceExpanded?: boolean;
   availableStylists: any[];
   stagedItem: StagedService | null;
   onAddService: (service: ServiceRecord, variant?: ServiceVariantRecord | null) => void;
@@ -30,6 +31,7 @@ export default function AppointmentServiceRow({
   variant = null,
   depth = 0,
   boardStartHour = 9,
+  forceExpanded = false,
   availableStylists,
   stagedItem,
   onAddService,
@@ -76,6 +78,12 @@ export default function AppointmentServiceRow({
       });
     }
   }, [stagedItem, validStylists.length]);
+
+  useEffect(() => {
+    if (forceExpanded) {
+      setIsExpanded(true);
+    }
+  }, [forceExpanded, stagedItem?.id]);
 
   const handleAddClick = () => {
     if (isAdded && stagedItem) {
