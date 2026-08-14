@@ -1104,6 +1104,8 @@ export default function InteractiveDrawers({
   };
 
   const resetAppointmentDraft = () => {
+    const boardSeedStartTime = preserveBoardStartTime ? currentStartTime : null;
+
     setCreateMode('appointment');
     setCreateStep(1);
     setCustMode('existing');
@@ -1131,7 +1133,9 @@ export default function InteractiveDrawers({
     ]);
     setCurrentServiceId('');
     setCurrentStaffId('');
-    if (!preserveBoardStartTime) {
+    if (boardSeedStartTime !== null) {
+      setCurrentStartTime(boardSeedStartTime);
+    } else {
       setCurrentStartTime(120);
     }
     setCurrentDuration(60);
@@ -1147,7 +1151,11 @@ export default function InteractiveDrawers({
     setBlockTitleAr('استراحة قهوة الموظفين');
     setBlockTitleEn('Staff Espresso Recess');
     setBlockStaffId('');
-    setBlockStartTime(180);
+    if (boardSeedStartTime !== null) {
+      setBlockStartTime(boardSeedStartTime);
+    } else {
+      setBlockStartTime(180);
+    }
     setBlockDuration(45);
     setBlockType('Break');
     setBlockIsRecurring(false);

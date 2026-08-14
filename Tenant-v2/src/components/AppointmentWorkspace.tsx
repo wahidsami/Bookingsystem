@@ -1042,6 +1042,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       'warning'
     );
   };
+  const seedCreateDrawerFromBoardSlot = (timeInMinutes: number) => {
+    const safeTime = Math.max(0, Math.round(timeInMinutes));
+    setCurrentStartTime(safeTime);
+    setBlockStartTime(safeTime);
+    setPreserveBoardStartTime(true);
+  };
+  const resetCreateDrawerStartTimes = () => {
+    setCurrentStartTime(120);
+    setBlockStartTime(180);
+    setPreserveBoardStartTime(false);
+  };
   const openCreateAppointmentAtSlot = (staffId: string, timeInMinutes: number, dateKey = selectedDateKey, durationMinutes?: number) => {
     if (isPastBoardCreationDate(dateKey)) {
       showPastBoardSlotWarning(timeInMinutes);
@@ -1052,8 +1063,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       setSelectedDate(parseLocalDateKey(dateKey));
     }
     setCurrentStaffId(staffId);
-    setCurrentStartTime(timeInMinutes);
-    setPreserveBoardStartTime(true);
+    seedCreateDrawerFromBoardSlot(timeInMinutes);
     if (typeof durationMinutes === 'number' && Number.isFinite(durationMinutes) && durationMinutes > 0) {
       setCurrentDuration(durationMinutes);
     }
@@ -2103,8 +2113,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     setInitialCreateMode('appointment');
-    setCurrentStartTime(120);
-    setPreserveBoardStartTime(false);
+    resetCreateDrawerStartTimes('appointment');
     setCreateStep(1);
     setCustMode('existing');
     setSelectedCustId('');
@@ -2479,11 +2488,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         }
         setSelectedDate(parseLocalDateKey(contextDateKey));
         setCurrentStaffId(contextMenu.staffId);
-        setCurrentStartTime(contextMenu.timeInMinutes);
-        setPreserveBoardStartTime(true);
+        seedCreateDrawerFromBoardSlot(contextMenu.timeInMinutes);
       } else {
-        setCurrentStartTime(120);
-        setPreserveBoardStartTime(false);
+        resetCreateDrawerStartTimes();
       }
       setActiveBlockedTime(null);
       setInitialCreateMode('appointment');
@@ -2495,15 +2502,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       if (contextMenu) {
         setSelectedDate(parseLocalDateKey(contextDateKey));
         setBlockStaffId(contextMenu.staffId);
-        setBlockStartTime(contextMenu.timeInMinutes);
         setBlockDuration(45);
         setBlockType('Break');
         setBlockTitleAr('فترة استراحة وحظر');
         setBlockTitleEn('Break Slot');
         setCurrentStaffId(contextMenu.staffId);
-        setCurrentStartTime(contextMenu.timeInMinutes);
+        seedCreateDrawerFromBoardSlot(contextMenu.timeInMinutes);
+      } else {
+        resetCreateDrawerStartTimes();
       }
-      setPreserveBoardStartTime(false);
       setInitialCreateMode('blocked');
       setIsCreateDrawerOpen(true);
     } else if (actionType === 'giftcards') {
@@ -4329,8 +4336,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const dateValue = parseLocalDateKey(range.startSlot.dateKey);
     setSelectedDate(dateValue);
     setCurrentStaffId(targetStaffId);
-    setCurrentStartTime(range.startSlot.startMinutes);
-    setPreserveBoardStartTime(true);
+    seedCreateDrawerFromBoardSlot(range.startSlot.startMinutes);
     setCurrentDuration(range.durationMinutes);
     setCreateMode('appointment');
     setCreateStep(1);
@@ -4423,8 +4429,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       category: 'appointments',
       onClick: (staffId) => {
         setCurrentStaffId(staffId);
-        setCurrentStartTime(120);
-        setPreserveBoardStartTime(false);
+        resetCreateDrawerStartTimes();
         setInitialCreateMode('appointment');
         setIsCreateDrawerOpen(true);
         setEmployeeMenuState(null);
@@ -4438,6 +4443,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       category: 'availability',
       onClick: (staffId) => {
         setCurrentStaffId(staffId);
+        resetCreateDrawerStartTimes();
         setInitialCreateMode('blocked');
         setBlockType('Meeting');
         setIsCreateDrawerOpen(true);
@@ -4452,6 +4458,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       category: 'availability',
       onClick: (staffId) => {
         setCurrentStaffId(staffId);
+        resetCreateDrawerStartTimes();
         setInitialCreateMode('blocked');
         setBlockType('Break');
         setIsCreateDrawerOpen(true);
@@ -4466,6 +4473,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       category: 'availability',
       onClick: (staffId) => {
         setCurrentStaffId(staffId);
+        resetCreateDrawerStartTimes();
         setInitialCreateMode('blocked');
         setBlockType('Meeting');
         setIsCreateDrawerOpen(true);
