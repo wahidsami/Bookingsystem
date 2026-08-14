@@ -447,6 +447,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     () => getTenantSchedulerConfig(tenantSettings, tenant, getLocalDateKey(selectedDate)),
     [tenantSettings, tenant, selectedDate]
   );
+  const boardStartHour = schedulerConfig.startHour;
   const schedulerStorageKey = useMemo(() => buildSchedulerBoardStorageKey(tenant?.id, user?.id), [tenant?.id, user?.id]);
   const teamVisibilityStorageKey = useMemo(() => buildSchedulerTeamVisibilityStorageKey(tenant?.id, user?.id), [tenant?.id, user?.id]);
   const canonicalSchedulerBoardSettings = useMemo(
@@ -789,7 +790,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   const mapBoardAppointment = (a: any, dateKey: string): Appointment => {
     const startDate = new Date(a.startTime);
-    const startMins = startDate.getHours() * 60 + startDate.getMinutes() - 9 * 60;
+    const startMins = startDate.getHours() * 60 + startDate.getMinutes() - (boardStartHour * 60);
     const sessionAppointments = Array.isArray(a.bookingSession?.appointments) ? a.bookingSession.appointments : [];
     const services = sessionAppointments.length > 0
       ? sessionAppointments
@@ -938,7 +939,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   const mapBoardBreak = (b: any): Appointment => {
     const [h, m] = (b.startTime || '12:00').split(':');
-    const startMins = parseInt(h) * 60 + parseInt(m) - 9 * 60;
+    const startMins = parseInt(h) * 60 + parseInt(m) - (boardStartHour * 60);
     const [eh, em] = (b.endTime || '13:00').split(':');
     const dur = (parseInt(eh) * 60 + parseInt(em)) - (parseInt(h) * 60 + parseInt(m));
     return {
@@ -992,14 +993,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const buildIsoFromMinutes = (dateKey: string, minutesFromNine: number) => {
     const safeMinutes = Math.max(0, Math.round(minutesFromNine));
     const base = new Date(`${dateKey}T00:00:00`);
-    base.setHours(9 + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
+    base.setHours(boardStartHour + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
     return base.toISOString();
   };
   const addMinutesToIso = (iso: string, minutes: number) => (
     new Date(new Date(iso).getTime() + Math.max(0, Math.round(minutes)) * 60000).toISOString()
   );
   const buildClockTime = (minutesFromNine: number) => {
-    const absoluteMinutes = 9 * 60 + Math.max(0, Math.round(minutesFromNine));
+    const absoluteMinutes = (boardStartHour * 60) + Math.max(0, Math.round(minutesFromNine));
     const hours = Math.floor(absoluteMinutes / 60);
     const mins = absoluteMinutes % 60;
     return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
@@ -1030,7 +1031,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return false;
     }
 
-    const slotAbsoluteMinutes = (9 * 60) + Math.max(0, Math.round(timeInMinutesFromNine));
+    const slotAbsoluteMinutes = (boardStartHour * 60) + Math.max(0, Math.round(timeInMinutesFromNine));
     return slotAbsoluteMinutes <= getRiyadhMinutesSinceMidnight(new Date());
   };
   const showPastBoardSlotWarning = (timeInMinutesFromNine: number) => {
@@ -7721,6 +7722,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         currentStartTime={currentStartTime}
         setCurrentStartTime={setCurrentStartTime}
         preserveBoardStartTime={preserveBoardStartTime}
+        boardStartHour={START_HOUR}
         currentStaffId={currentStaffId}
         setCurrentStaffId={setCurrentStaffId}
         initialDuration={currentDuration}

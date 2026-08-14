@@ -61,6 +61,7 @@ interface InteractiveDrawersProps {
   isCreateDrawerOpen: boolean;
   setIsCreateDrawerOpen: (open: boolean) => void;
   preserveBoardStartTime?: boolean;
+  boardStartHour?: number;
   isCartDrawerOpen: boolean;
   setIsCartDrawerOpen: (open: boolean) => void;
   appointments: any[];
@@ -310,6 +311,7 @@ export default function InteractiveDrawers({
   isCreateDrawerOpen,
   setIsCreateDrawerOpen,
   preserveBoardStartTime = false,
+  boardStartHour = 9,
   isCartDrawerOpen,
   setIsCartDrawerOpen,
   appointments,
@@ -384,6 +386,14 @@ export default function InteractiveDrawers({
     availableStylists,
     currentStaffId
   ]);
+
+  useEffect(() => {
+    if (!isCreateDrawerOpen || createMode !== 'blocked' || existingBreak?.id) {
+      return;
+    }
+
+    setBlockStartTime((prev) => (prev === currentStartTime ? prev : currentStartTime));
+  }, [isCreateDrawerOpen, createMode, existingBreak?.id, currentStartTime]);
 
   useEffect(() => {
     if (isCartDrawerOpen && initialCartTab) {
@@ -793,7 +803,7 @@ export default function InteractiveDrawers({
     const dateKey = getLocalDateKey(date);
     const safeMinutes = Math.max(0, Math.round(minutesFromNine));
     const next = new Date(`${dateKey}T00:00:00`);
-    next.setHours(9 + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
+    next.setHours(boardStartHour + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
     return next.toISOString();
   };
   const addMinutesToIso = (iso: string, minutes: number) => (
@@ -801,7 +811,7 @@ export default function InteractiveDrawers({
   );
 
   const buildClockTime = (minutesFromNine: number) => {
-    const absoluteMinutes = 9 * 60 + Math.max(0, Math.round(minutesFromNine));
+    const absoluteMinutes = (boardStartHour * 60) + Math.max(0, Math.round(minutesFromNine));
     const hours = Math.floor(absoluteMinutes / 60);
     const minutes = absoluteMinutes % 60;
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
@@ -809,18 +819,18 @@ export default function InteractiveDrawers({
 
   const blockStartTimeOptions = useMemo(() => {
     const options: Array<{ value: string; label: string }> = [];
-    for (let absoluteMinutes = 9 * 60; absoluteMinutes < (24 * 60); absoluteMinutes += 15) {
+    for (let absoluteMinutes = boardStartHour * 60; absoluteMinutes < (24 * 60); absoluteMinutes += 15) {
       const hours = Math.floor(absoluteMinutes / 60);
       const minutes = absoluteMinutes % 60;
       const value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
       options.push({ value, label: to12HourTime(value) });
     }
     return options;
-  }, []);
+  }, [boardStartHour]);
 
   const formatBlockStartClockValue = (minutesFromNine?: number | null) => {
     const safeOffset = Math.max(0, Math.round(Number(minutesFromNine || 0)));
-    const absoluteMinutes = (9 * 60) + safeOffset;
+    const absoluteMinutes = (boardStartHour * 60) + safeOffset;
     const hours = Math.floor(absoluteMinutes / 60);
     const minutes = absoluteMinutes % 60;
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
@@ -834,7 +844,7 @@ export default function InteractiveDrawers({
     }
 
     const absoluteMinutes = (Number(match[1]) * 60) + Number(match[2]);
-    return Math.max(0, absoluteMinutes - (9 * 60));
+    return Math.max(0, absoluteMinutes - (boardStartHour * 60));
   };
 
   const appointmentDraftSnapshot = useMemo<AppointmentDraftSnapshot>(() => ({
