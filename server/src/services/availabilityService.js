@@ -985,9 +985,28 @@ class AvailabilityService {
             return null;
         }
 
+        const normalizeTime = (value) => {
+            const raw = `${value || ''}`.trim();
+            const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+            if (!match) {
+                return null;
+            }
+            const hours = Math.max(0, Math.min(23, Number(match[1]) || 0));
+            const minutes = Math.max(0, Math.min(59, Number(match[2]) || 0));
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        };
+
+        const normalClose = normalizeTime(dayHours.close) || '18:00';
+        const extendedClose = normalizeTime(dayHours.extendedClose);
+        const effectiveClose = dayHours.extendedHoursEnabled && extendedClose
+            ? (extendedClose > normalClose ? extendedClose : normalClose)
+            : normalClose;
+
         return {
-            start: dayHours.open || '09:00',
-            end: dayHours.close || '18:00'
+            start: normalizeTime(dayHours.open) || '09:00',
+            end: effectiveClose,
+            normalEnd: normalClose,
+            extendedEnd: dayHours.extendedHoursEnabled ? extendedClose || null : null
         };
     }
 

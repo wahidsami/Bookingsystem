@@ -15,12 +15,15 @@ export interface WorkingHoursDayState {
   isOpen: boolean;
   open: string;
   close: string;
+  extendedHoursEnabled?: boolean;
+  extendedClose?: string;
 }
 
 export interface TenantSchedulerConfig {
   slotMinutes: number;
   startHour: number;
   endHour: number;
+  normalEndHour: number;
   businessHours: Record<WorkingHoursDayKey, WorkingHoursDayState>;
 }
 
@@ -117,12 +120,36 @@ function getDaySource(settings: any, tenant: any, key: WorkingHoursDayKey): any 
   const businessHours = settings?.businessHours || tenant?.workingHours || {};
   const fallback = DAY_DEFINITIONS.find((item) => item.key === key);
   const source = businessHours?.[key] || businessHours?.[fallback?.labelEn?.toLowerCase?.()] || businessHours?.[fallback?.labelAr] || {};
+  const normalizedClose = normalizeTimeInput(source?.close || fallback?.close || '21:00');
+  const normalizedExtendedClose = normalizeTimeInput(source?.extendedClose || '');
 
   return {
     isOpen: source?.isOpen !== undefined ? Boolean(source.isOpen) : Boolean(fallback?.isOpen),
     open: normalizeTimeInput(source?.open || fallback?.open || '09:00'),
-    close: normalizeTimeInput(source?.close || fallback?.close || '21:00')
+    close: normalizedClose,
+    extendedHoursEnabled: source?.extendedHoursEnabled !== undefined
+      ? Boolean(source.extendedHoursEnabled)
+      : false,
+    extendedClose: normalizedExtendedClose
   };
+}
+
+export function getEffectiveClosingTime(day: WorkingHoursDayState): string {
+  const normalClose = normalizeTimeInput(day?.close || '21:00');
+  const extendedClose = normalizeTimeInput(day?.extendedClose || '');
+
+  if (!day?.extendedHoursEnabled || !extendedClose) {
+    return normalClose;
+  }
+
+  const normalMinutes = Number(normalClose.slice(0, 2)) * 60 + Number(normalClose.slice(3, 5));
+  const extendedMinutes = Number(extendedClose.slice(0, 2)) * 60 + Number(extendedClose.slice(3, 5));
+
+  if (!Number.isFinite(extendedMinutes) || extendedMinutes <= normalMinutes) {
+    return normalClose;
+  }
+
+  return extendedClose;
 }
 
 export function getTenantBusinessHours(settings?: any, tenant?: any): Record<WorkingHoursDayKey, WorkingHoursDayState> {
@@ -135,30 +162,73 @@ export function getTenantBusinessHours(settings?: any, tenant?: any): Record<Wor
   }, {} as Record<WorkingHoursDayKey, WorkingHoursDayState>);
 }
 
-export function getTenantSchedulerConfig(settings?: any, tenant?: any): TenantSchedulerConfig {
+export function getTenantSchedulerConfig(settings?: any, tenant?: any, dateKey?: string): TenantSchedulerConfig {
   const businessHours = getTenantBusinessHours(settings, tenant);
   const slotMinutes = Number(settings?.bookingSettings?.slotInterval || DEFAULT_SLOT_MINUTES);
   const validSlotMinutes = [5, 10, 15].includes(slotMinutes) ? slotMinutes : DEFAULT_SLOT_MINUTES;
 
-  const openDays = Object.values(businessHours).filter((day) => day.isOpen);
-  const openMinutes = openDays
-    .map((day) => Number(day.open?.slice(0, 2) || DEFAULT_START_HOUR) * 60 + Number(day.open?.slice(3, 5) || 0))
-    .filter((value) => Number.isFinite(value));
-  const closeMinutes = openDays
-    .map((day) => Number(day.close?.slice(0, 2) || DEFAULT_END_HOUR) * 60 + Number(day.close?.slice(3, 5) || 0))
-    .filter((value) => Number.isFinite(value));
+  const toMinutes = (value?: string | null, fallbackMinutes = DEFAULT_START_HOUR * 60) => {
+    const normalized = normalizeTimeInput(value || '');
+    if (!normalized || !/^\d{2}:\d{2}$/.test(normalized)) {
+      return fallbackMinutes;
+    }
+    return (Number(normalized.slice(0, 2)) * 60) + Number(normalized.slice(3, 5));
+  };
 
-  const startHour = openMinutes.length > 0
-    ? Math.max(0, Math.min(23, Math.floor(Math.min(...openMinutes) / 60)))
-    : DEFAULT_START_HOUR;
-  const endHour = closeMinutes.length > 0
-    ? Math.max(startHour + 1, Math.min(24, Math.ceil(Math.max(...closeMinutes) / 60)))
-    : DEFAULT_END_HOUR;
+  const resolveDay = (day: WorkingHoursDayState | undefined) => {
+    if (!day || !day.isOpen) {
+      return null;
+    }
+
+    const normalClose = normalizeTimeInput(day.close || `${DEFAULT_END_HOUR.toString().padStart(2, '0')}:00`);
+    const effectiveClose = getEffectiveClosingTime(day);
+    return {
+      startHour: Math.max(0, Math.min(23, Math.floor(toMinutes(day.open, DEFAULT_START_HOUR * 60) / 60))),
+      normalEndHour: Math.max(1, Math.min(24, Math.ceil(toMinutes(normalClose, DEFAULT_END_HOUR * 60) / 60))),
+      endHour: Math.max(1, Math.min(24, Math.ceil(toMinutes(effectiveClose, DEFAULT_END_HOUR * 60) / 60)))
+    };
+  };
+
+  let resolvedStartHour = DEFAULT_START_HOUR;
+  let resolvedNormalEndHour = DEFAULT_END_HOUR;
+  let resolvedEndHour = DEFAULT_END_HOUR;
+  let hasDateSpecificHours = false;
+
+  if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    const dayIndex = new Date(`${dateKey}T00:00:00`).getDay();
+    const dayKeys: WorkingHoursDayKey[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const resolvedDay = resolveDay(businessHours[dayKeys[dayIndex]]);
+    if (resolvedDay) {
+      hasDateSpecificHours = true;
+      resolvedStartHour = resolvedDay.startHour;
+      resolvedNormalEndHour = resolvedDay.normalEndHour;
+      resolvedEndHour = resolvedDay.endHour;
+    }
+  }
+
+  if (!hasDateSpecificHours) {
+    const openDays = Object.values(businessHours).filter((day) => day.isOpen);
+    const openMinutes = openDays
+      .map((day) => toMinutes(day.open, DEFAULT_START_HOUR * 60))
+      .filter((value) => Number.isFinite(value));
+    const closeMinutes = openDays
+      .map((day) => toMinutes(getEffectiveClosingTime(day), DEFAULT_END_HOUR * 60))
+      .filter((value) => Number.isFinite(value));
+
+    resolvedStartHour = openMinutes.length > 0
+      ? Math.max(0, Math.min(23, Math.floor(Math.min(...openMinutes) / 60)))
+      : DEFAULT_START_HOUR;
+    resolvedNormalEndHour = closeMinutes.length > 0
+      ? Math.max(resolvedStartHour + 1, Math.min(24, Math.ceil(Math.max(...closeMinutes) / 60)))
+      : DEFAULT_END_HOUR;
+    resolvedEndHour = resolvedNormalEndHour;
+  }
 
   return {
     slotMinutes: validSlotMinutes,
-    startHour,
-    endHour,
+    startHour: resolvedStartHour,
+    endHour: resolvedEndHour,
+    normalEndHour: resolvedNormalEndHour,
     businessHours
   };
 }

@@ -442,7 +442,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const isRtl = lang === 'ar';
   const { tenant, tenantSettings, user } = useTenantAuth();
   const workspaceShellRef = useRef<HTMLDivElement | null>(null);
-  const schedulerConfig = useMemo(() => getTenantSchedulerConfig(tenantSettings, tenant), [tenantSettings, tenant]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const schedulerConfig = useMemo(
+    () => getTenantSchedulerConfig(tenantSettings, tenant, getLocalDateKey(selectedDate)),
+    [tenantSettings, tenant, selectedDate]
+  );
   const schedulerStorageKey = useMemo(() => buildSchedulerBoardStorageKey(tenant?.id, user?.id), [tenant?.id, user?.id]);
   const teamVisibilityStorageKey = useMemo(() => buildSchedulerTeamVisibilityStorageKey(tenant?.id, user?.id), [tenant?.id, user?.id]);
   const canonicalSchedulerBoardSettings = useMemo(
@@ -493,7 +497,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off'>>({});
 
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedStylistFilter, setSelectedStylistFilter] = useState<string>('all');
   const [serviceCategoryFilter, setServiceCategoryFilter] = useState<string>('all');
@@ -5191,6 +5194,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   slotMinutes={SLOT_MINUTES}
                   startHour={START_HOUR}
                   endHour={END_HOUR}
+                  normalEndHour={schedulerConfig.normalEndHour}
                   timeColumnWidth={84}
                   slotHeight={activeSchedulerSettings.timeSlotHeight}
                   staffColumnWidth={activeSchedulerSettings.staffColumnWidth}

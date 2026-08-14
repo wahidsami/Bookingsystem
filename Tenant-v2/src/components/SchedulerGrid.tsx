@@ -78,6 +78,7 @@ export interface SchedulerGridProps {
   slotMinutes?: number;
   startHour?: number;
   endHour?: number;
+  normalEndHour?: number;
   timeColumnWidth?: number;
   slotHeight?: number;
   staffColumnWidth?: number;
@@ -361,6 +362,7 @@ export default function SchedulerGrid({
   slotMinutes = DEFAULT_SLOT_MINUTES,
   startHour = DEFAULT_START_HOUR,
   endHour = DEFAULT_END_HOUR,
+  normalEndHour,
   timeColumnWidth = DEFAULT_TIME_COLUMN_WIDTH,
   slotHeight = DEFAULT_SLOT_HEIGHT,
   staffColumnWidth = 200,
@@ -394,6 +396,7 @@ export default function SchedulerGrid({
   const visibleDateKey = getRiyadhDateKey(boardCurrentTime);
   const currentMinutesSinceMidnight = getRiyadhMinutesSinceMidnight(boardCurrentTime);
   const isDayBoardMode = viewMode === 'day' || viewMode === 'team-day' || viewMode === 'employee-day';
+  const normalizedNormalEndHour = Math.max(startHour + 1, Math.min(endHour, normalEndHour ?? endHour));
   const currentTimeLinePosition = showCurrentTimeIndicator && isDayBoardMode && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
     ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
     : null;
@@ -742,6 +745,22 @@ export default function SchedulerGrid({
           </div>
         )}
 
+        {normalEndHour !== undefined && normalEndHour < endHour && (
+          <div
+            className="pointer-events-none absolute inset-x-0 z-[6]"
+            style={{ top: `${Math.max(0, ((normalizedNormalEndHour - startHour) * 60 / slotMinutes) * slotHeight)}px` }}
+          >
+            <div className="relative h-0 border-t border-dashed border-slate-400/70">
+              <span
+                className="absolute -top-2 rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-500 shadow-sm"
+                style={isRtl ? { right: '0.75rem' } : { left: '0.75rem' }}
+              >
+                {isRtl ? 'ساعات ممتدة' : 'Extended Hours'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {currentTimeLinePosition !== null && (
           <div
             className="pointer-events-none absolute inset-x-0 z-20"
@@ -771,6 +790,7 @@ export default function SchedulerGrid({
           {rows.map((row) => {
             const hourBoundary = row.slotIndex % slotsPerHour === 0;
             const rowLabel = hourBoundary ? formatSlotTime(row.startMinutes, startHour, isRtl) : '';
+            const isExtendedHourRow = normalEndHour !== undefined && row.startMinutes >= (normalizedNormalEndHour - startHour) * 60;
             return (
               <div
                 key={row.slotIndex}
@@ -778,7 +798,7 @@ export default function SchedulerGrid({
                 style={{ gridTemplateColumns, height: `${slotHeight}px`, minWidth: 'min-content' }}
               >
                 <div
-                  className={`relative flex items-start justify-center pr-2 text-[10px] font-black font-mono tracking-tight text-slate-400 bg-slate-50/60 border-r border-slate-200 ${hourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80'}`}
+                  className={`relative flex items-start justify-center pr-2 text-[10px] font-black font-mono tracking-tight text-slate-400 ${isExtendedHourRow ? 'bg-slate-100/80' : 'bg-slate-50/60'} border-r border-slate-200 ${hourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80'}`}
                   style={{ width: timeColumnWidth }}
                 >
                   {hourBoundary && <span className="mt-[-1px]">{rowLabel}</span>}
@@ -788,7 +808,9 @@ export default function SchedulerGrid({
                   const slot = resolveSlot(column, columnIndex, row.slotIndex);
                   const isHovered = hoveredSlot?.columnId === slot.columnId && hoveredSlot.slotIndex === slot.slotIndex;
                   const isSelected = isSlotInsideSelection(slot);
-                  const laneShade = columnIndex % 2 === 0 ? 'bg-slate-50/70' : 'bg-white';
+                  const laneShade = isExtendedHourRow
+                    ? (columnIndex % 2 === 0 ? 'bg-slate-100/80' : 'bg-slate-50/80')
+                    : (columnIndex % 2 === 0 ? 'bg-slate-50/70' : 'bg-white');
                   return (
                     <button
                       key={`${column.id}-${row.slotIndex}`}

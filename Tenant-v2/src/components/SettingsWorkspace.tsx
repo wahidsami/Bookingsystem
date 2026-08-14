@@ -446,7 +446,9 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
           {
             isOpen: day.isOpen,
             open: normalizeTimeInput(day.open),
-            close: normalizeTimeInput(day.close)
+            close: normalizeTimeInput(day.close),
+            extendedHoursEnabled: Boolean(day.extendedHoursEnabled),
+            extendedClose: normalizeTimeInput(day.extendedClose)
           }
         ])
       );
@@ -934,6 +936,57 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
                       className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none ${darkMode ? 'border-zinc-800 bg-zinc-950 text-zinc-100' : 'border-neutral-200 bg-white text-slate-800'} ${!current.isOpen ? 'opacity-50' : ''}`}
                     />
                   </label>
+                  <div className="md:col-span-2 grid gap-3 rounded-2xl border border-dashed border-slate-200/80 bg-white/70 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-neutral-400">
+                          {isRtl ? 'ساعات العمل الممتدة' : 'Extended working hours'}
+                        </div>
+                        <div className="text-[11px] text-neutral-400">
+                          {isRtl
+                            ? 'فعّلها عندما يحتاج المركز إلى العمل حتى وقت متأخر في هذا اليوم.'
+                            : 'Enable when the center should remain bookable beyond the normal close time for this day.'}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setWorkingHoursForm((prev) => ({
+                          ...prev,
+                          [day.key]: {
+                            ...prev[day.key],
+                            extendedHoursEnabled: !prev[day.key].extendedHoursEnabled,
+                            extendedClose: prev[day.key].extendedClose || prev[day.key].close
+                          }
+                        }))}
+                        className={`rounded-full px-3 py-1 text-[11px] font-bold ${current.extendedHoursEnabled ? 'bg-amber-500/10 text-amber-700' : 'bg-slate-500/10 text-slate-500'}`}
+                      >
+                        {current.extendedHoursEnabled
+                          ? (isRtl ? 'مفعلة' : 'Enabled')
+                          : (isRtl ? 'معطلة' : 'Disabled')}
+                      </button>
+                    </div>
+                    <label className="space-y-1.5">
+                      <span className="block text-[11px] font-bold uppercase tracking-[0.16em] text-neutral-400">
+                        {isRtl ? 'الإغلاق الممتد' : 'Extended close'}
+                      </span>
+                      <input
+                        type="time"
+                        step={900}
+                        value={current.extendedClose || ''}
+                        disabled={!current.isOpen || !current.extendedHoursEnabled}
+                        onChange={(event) => setWorkingHoursForm((prev) => ({
+                          ...prev,
+                          [day.key]: { ...prev[day.key], extendedClose: normalizeTimeInput(event.target.value) }
+                        }))}
+                        className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none ${darkMode ? 'border-zinc-800 bg-zinc-950 text-zinc-100' : 'border-neutral-200 bg-white text-slate-800'} ${!current.isOpen || !current.extendedHoursEnabled ? 'opacity-50' : ''}`}
+                      />
+                    </label>
+                    <p className="text-[11px] leading-5 text-neutral-400">
+                      {isRtl
+                        ? 'تُستخدم هذه القيمة كإغلاق فعلي للوحة الجدولة والبحث عن الإتاحة عندما تكون أطول من الإغلاق الطبيعي.'
+                        : 'This value becomes the effective closing time for the scheduler and availability search when it is later than the normal close.'}
+                    </p>
+                  </div>
                 </div>
               </div>
             );
