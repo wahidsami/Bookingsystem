@@ -60,6 +60,7 @@ interface InteractiveDrawersProps {
   tenantId: string;
   isCreateDrawerOpen: boolean;
   setIsCreateDrawerOpen: (open: boolean) => void;
+  preserveBoardStartTime?: boolean;
   isCartDrawerOpen: boolean;
   setIsCartDrawerOpen: (open: boolean) => void;
   appointments: any[];
@@ -308,6 +309,7 @@ export default function InteractiveDrawers({
   tenantId,
   isCreateDrawerOpen,
   setIsCreateDrawerOpen,
+  preserveBoardStartTime = false,
   isCartDrawerOpen,
   setIsCartDrawerOpen,
   appointments,
@@ -1129,7 +1131,9 @@ export default function InteractiveDrawers({
     ]);
     setCurrentServiceId('');
     setCurrentStaffId('');
-    setCurrentStartTime(120);
+    if (!preserveBoardStartTime) {
+      setCurrentStartTime(120);
+    }
     setCurrentDuration(60);
     setCurrentDiscountType('none');
     setCurrentDiscountValue(0);

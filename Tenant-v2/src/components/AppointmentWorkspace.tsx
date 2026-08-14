@@ -1053,6 +1053,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
     setCurrentStaffId(staffId);
     setCurrentStartTime(timeInMinutes);
+    setPreserveBoardStartTime(true);
     if (typeof durationMinutes === 'number' && Number.isFinite(durationMinutes) && durationMinutes > 0) {
       setCurrentDuration(durationMinutes);
     }
@@ -2028,6 +2029,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [currentServiceId, setCurrentServiceId] = useState<string>('');
   const [currentStaffId, setCurrentStaffId] = useState<string>('');
   const [currentStartTime, setCurrentStartTime] = useState<number>(120); // minutes from 9:00 AM. 120 = 11:00 AM
+  const [preserveBoardStartTime, setPreserveBoardStartTime] = useState(false);
   const [currentDuration, setCurrentDuration] = useState<number>(60);
   const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
   const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
@@ -2101,6 +2103,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     setInitialCreateMode('appointment');
+    setCurrentStartTime(120);
+    setPreserveBoardStartTime(false);
     setCreateStep(1);
     setCustMode('existing');
     setSelectedCustId('');
@@ -2476,6 +2480,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setSelectedDate(parseLocalDateKey(contextDateKey));
         setCurrentStaffId(contextMenu.staffId);
         setCurrentStartTime(contextMenu.timeInMinutes);
+        setPreserveBoardStartTime(true);
+      } else {
+        setCurrentStartTime(120);
+        setPreserveBoardStartTime(false);
       }
       setActiveBlockedTime(null);
       setInitialCreateMode('appointment');
@@ -2495,6 +2503,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setCurrentStaffId(contextMenu.staffId);
         setCurrentStartTime(contextMenu.timeInMinutes);
       }
+      setPreserveBoardStartTime(false);
       setInitialCreateMode('blocked');
       setIsCreateDrawerOpen(true);
     } else if (actionType === 'giftcards') {
@@ -4321,6 +4330,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setSelectedDate(dateValue);
     setCurrentStaffId(targetStaffId);
     setCurrentStartTime(range.startSlot.startMinutes);
+    setPreserveBoardStartTime(true);
     setCurrentDuration(range.durationMinutes);
     setCreateMode('appointment');
     setCreateStep(1);
@@ -4413,6 +4423,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       category: 'appointments',
       onClick: (staffId) => {
         setCurrentStaffId(staffId);
+        setCurrentStartTime(120);
+        setPreserveBoardStartTime(false);
         setInitialCreateMode('appointment');
         setIsCreateDrawerOpen(true);
         setEmployeeMenuState(null);
@@ -7700,6 +7712,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         formatMinutesToTime={formatMinutesToTime}
         currentStartTime={currentStartTime}
         setCurrentStartTime={setCurrentStartTime}
+        preserveBoardStartTime={preserveBoardStartTime}
         currentStaffId={currentStaffId}
         setCurrentStaffId={setCurrentStaffId}
         initialDuration={currentDuration}

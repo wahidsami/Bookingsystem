@@ -48,7 +48,7 @@ export default function AppointmentServicesStep({
   onUpdateService,
   onRemoveService,
 }: AppointmentServicesStepProps) {
-  
+
   const filteredServices = useMemo(() => {
     let filtered = canonicalServices;
     if (currentServiceCategory && currentServiceCategory !== 'all') {
@@ -85,15 +85,22 @@ export default function AppointmentServicesStep({
   }, [canonicalServices, currentServiceCategory, serviceSearch]);
 
   const groupedServices = useMemo(() => {
-    const groups: Record<string, { service: ServiceRecord, variants: ServiceVariantRecord[] }[]> = {};
+    const groups: Record<string, Array<{ service: ServiceRecord; variant: ServiceVariantRecord | null }>> = {};
+
     filteredServices.forEach((service) => {
       const cat = (isRtl ? service.categoryAr || service.category : service.categoryEn || service.category) || (isRtl ? 'أخرى' : 'Other');
       if (!groups[cat]) {
         groups[cat] = [];
       }
+
+      groups[cat].push({ service, variant: null });
+
       const variants = Array.isArray(service.variants) ? service.variants : [];
-      groups[cat].push({ service, variants });
+      variants.forEach((variant) => {
+        groups[cat].push({ service, variant });
+      });
     });
+
     return groups;
   }, [filteredServices, isRtl]);
 
@@ -149,59 +156,26 @@ export default function AppointmentServicesStep({
                     {categoryName}
                   </h3>
                   <div className="space-y-3">
-                    {groupedServices[categoryName].map(({ service, variants }) => {
-                      const parentStagedItem = stagedServices.find((s) => s.serviceId === service.id && !s.variantId);
+                    {groupedServices[categoryName].map(({ service, variant }) => {
+                      const stagedItem = variant
+                        ? stagedServices.find((s) => s.serviceId === service.id && s.variantId === variant.id)
+                        : stagedServices.find((s) => s.serviceId === service.id && !s.variantId);
 
                       return (
                         <AppointmentServiceRow
-                          key={service.id}
+                          key={variant ? `${service.id}-${variant.id}` : service.id}
                           service={service}
+                          variant={variant}
                           isRtl={isRtl}
                           availableStylists={availableStylists}
-                          stagedItem={parentStagedItem || null}
+                          stagedItem={stagedItem || null}
                           onAddService={onAddService}
                           onUpdateService={onUpdateService}
                           onRemoveService={(id) => {
                             const idx = stagedServices.findIndex(s => s.id === id);
                             if (idx !== -1) onRemoveService(idx);
                           }}
-                        >
-                          {variants.length > 0 ? (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between px-1">
-                                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                  {isRtl ? 'البدائل' : 'Variants'}
-                                </p>
-                                <p className="text-[11px] text-slate-400">
-                                  {isRtl ? 'اختر البديل المناسب' : 'Choose the matching variant'}
-                                </p>
-                              </div>
-                              <div className="space-y-2">
-                                {variants.map((variant) => {
-                                  const stagedItem = stagedServices.find(s => s.serviceId === service.id && s.variantId === variant.id);
-
-                                  return (
-                                    <AppointmentServiceRow
-                                      key={`${service.id}-${variant.id}`}
-                                      service={service}
-                                      variant={variant}
-                                      depth={1}
-                                      isRtl={isRtl}
-                                      availableStylists={availableStylists}
-                                      stagedItem={stagedItem || null}
-                                      onAddService={onAddService}
-                                      onUpdateService={onUpdateService}
-                                      onRemoveService={(id) => {
-                                        const idx = stagedServices.findIndex(s => s.id === id);
-                                        if (idx !== -1) onRemoveService(idx);
-                                      }}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ) : null}
-                        </AppointmentServiceRow>
+                        />
                       );
                     })}
                   </div>

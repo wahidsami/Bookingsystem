@@ -133,9 +133,16 @@ export default function AppointmentServiceRow({
         </div>
 
         <div className="flex-1 min-w-0 pr-2">
-          <p className={`truncate font-semibold tracking-tight text-slate-900 text-base sm:text-[15px]`}>
-            {title}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className={`truncate font-semibold tracking-tight text-slate-900 text-base sm:text-[15px]`}>
+              {title}
+            </p>
+            {isVariantRow && (
+              <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                {isRtl ? 'بديل' : 'Variant'}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
