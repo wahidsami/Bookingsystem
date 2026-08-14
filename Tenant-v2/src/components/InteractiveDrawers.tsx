@@ -816,6 +816,20 @@ export default function InteractiveDrawers({
   const addMinutesToIso = (iso: string, minutes: number) => (
     new Date(new Date(iso).getTime() + Math.max(0, Math.round(minutes)) * 60000).toISOString()
   );
+  const getSyncedStagedStartIso = (item: { startTime?: number; startTimeIso?: string | null }) => {
+    const expectedStartIso = buildIsoFromMinutes(selectedDate, Number(item.startTime || 0));
+    if (!item.startTimeIso) {
+      return expectedStartIso;
+    }
+
+    const currentMs = new Date(item.startTimeIso).getTime();
+    const expectedMs = new Date(expectedStartIso).getTime();
+    if (!Number.isFinite(currentMs) || currentMs !== expectedMs) {
+      return expectedStartIso;
+    }
+
+    return item.startTimeIso;
+  };
 
   const buildClockTime = (minutesFromNine: number) => {
     const absoluteMinutes = (boardStartHour * 60) + Math.max(0, Math.round(minutesFromNine));
@@ -1348,6 +1362,16 @@ export default function InteractiveDrawers({
     setStagedServices(prev => prev.map(item => {
       if (item.id !== itemId) return item;
       const next = { ...item, ...updates };
+      const shouldResyncStartIso =
+        Object.prototype.hasOwnProperty.call(updates, 'startTime') ||
+        !next.startTimeIso ||
+        !Number.isFinite(new Date(next.startTimeIso).getTime()) ||
+        new Date(next.startTimeIso).getTime() !== new Date(buildIsoFromMinutes(selectedDate, Number(next.startTime || 0))).getTime();
+
+      if (shouldResyncStartIso) {
+        next.startTimeIso = buildIsoFromMinutes(selectedDate, Number(next.startTime || 0));
+      }
+
       if (next.basePrice !== undefined) {
         let priceAfterDiscount = next.basePrice;
         if (next.discountType === 'flat') {
@@ -1384,7 +1408,7 @@ export default function InteractiveDrawers({
       }
       const nextStartTimeIso = shouldChainServiceTimes && stagedServices.length > 0
         ? addMinutesToIso(
-            stagedServices[stagedServices.length - 1].startTimeIso || buildIsoFromMinutes(selectedDate, stagedServices[stagedServices.length - 1].startTime),
+            getSyncedStagedStartIso(stagedServices[stagedServices.length - 1]),
             stagedServices[stagedServices.length - 1].duration
           )
         : buildIsoFromMinutes(selectedDate, nextStartTime);
@@ -1612,7 +1636,7 @@ export default function InteractiveDrawers({
       const resolvedServiceId = `${item.serviceId || ''}`.trim();
       const service = canonicalServices.find(s => s.id === resolvedServiceId);
       const variant = service?.variants.find((entry) => entry.id === item.variantId) || service?.variants[0] || null;
-      const requestStartIso = item.startTimeIso || buildIsoFromMinutes(selectedDate, item.startTime);
+      const requestStartIso = getSyncedStagedStartIso(item);
       return {
         serviceId: resolvedServiceId,
         staffId: item.staffId,
@@ -1645,7 +1669,7 @@ export default function InteractiveDrawers({
       let allItemsValid = true;
 
       for (const item of currentItems) {
-        const requestStartIso = item.startTimeIso || buildIsoFromMinutes(selectedDate, Number(item.startTime || earliestStartTime));
+        const requestStartIso = getSyncedStagedStartIso(item);
         const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
         const requestDate = requestStartIso.includes('T') ? requestStartIso.split('T')[0] : getLocalDateKey(selectedDate);
         const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers([item], requestDate);
@@ -1845,7 +1869,7 @@ export default function InteractiveDrawers({
 
   const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
     try {
-      const requestedStartISO = currentItems[0].startTimeIso || currentItems[0].startTime || buildIsoFromMinutes(selectedDate, earliestStartTime);
+      const requestedStartISO = getSyncedStagedStartIso(currentItems[0]);
       const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getLocalDateKey(selectedDate));
       
       let isRequestedChainValid = true;
@@ -1866,11 +1890,7 @@ export default function InteractiveDrawers({
             const item = currentItems[i];
             const layerSlots = layers[i];
             const diagnostics = diagnosticsByLayer[i] || [];
-            const requestStartIso = typeof item.startTimeIso === 'string' && item.startTimeIso.includes('T')
-              ? item.startTimeIso
-              : typeof item.startTime === 'string' && item.startTime.includes('T')
-              ? item.startTime
-              : buildIsoFromMinutes(selectedDate, Number(item.startTime || earliestStartTime));
+            const requestStartIso = getSyncedStagedStartIso(item);
             const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
             const reqTimeMs = new Date(requestStartIso).getTime();
             
