@@ -995,6 +995,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     base.setHours(9 + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
     return base.toISOString();
   };
+  const addMinutesToIso = (iso: string, minutes: number) => (
+    new Date(new Date(iso).getTime() + Math.max(0, Math.round(minutes)) * 60000).toISOString()
+  );
   const buildClockTime = (minutesFromNine: number) => {
     const absoluteMinutes = 9 * 60 + Math.max(0, Math.round(minutesFromNine));
     const hours = Math.floor(absoluteMinutes / 60);
@@ -2036,6 +2039,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     serviceId: string;
     staffId: string;
     startTime: number;
+    startTimeIso?: string;
     duration: number;
     discountType: 'none' | 'flat' | 'percent';
     discountValue: number;
@@ -3122,12 +3126,19 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       const lastItem = stagedServices[stagedServices.length - 1];
       nextStartTime = lastItem.startTime + lastItem.duration;
     }
+    const nextStartTimeIso = stagedServices.length > 0
+      ? addMinutesToIso(
+          stagedServices[stagedServices.length - 1].startTimeIso || buildIsoFromMinutes(getSelectedDateKey(), stagedServices[stagedServices.length - 1].startTime),
+          stagedServices[stagedServices.length - 1].duration
+        )
+      : buildIsoFromMinutes(getSelectedDateKey(), nextStartTime);
 
     const newItem: StagedService = {
       id: `stg-${Date.now()}`,
       serviceId: currentServiceId,
       staffId: currentStaffId,
       startTime: nextStartTime,
+      startTimeIso: nextStartTimeIso,
       duration: currentDuration,
       discountType: currentDiscountType,
       discountValue: currentDiscountValue,
@@ -3239,6 +3250,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           serviceId: currentServiceId,
           staffId: currentStaffId,
           startTime: currentStartTime,
+          startTimeIso: buildIsoFromMinutes(getSelectedDateKey(), currentStartTime),
           duration: currentDuration,
           discountType: currentDiscountType,
           discountValue: currentDiscountValue,
@@ -3262,11 +3274,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const payloadItems = finalStaged.map((item) => {
       const resolvedServiceId = `${item.serviceId || ''}`.trim();
       const srv = liveServices.find(s => s.id === resolvedServiceId);
+      const requestStartIso = item.startTimeIso || buildIsoFromMinutes(getSelectedDateKey(), item.startTime);
       return {
         serviceId: resolvedServiceId,
         staffId: item.staffId,
         requestedStaffId: item.staffId,
-        startTime: buildIsoFromMinutes(getSelectedDateKey(), item.startTime),
+        startTime: requestStartIso,
         notes: item.notes || sessionNotes || null,
         paymentMethod: 'at-center',
         assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
@@ -3386,7 +3399,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
       try {
-        const requestedStartISO = currentItems[0].startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime);
+        const requestedStartISO = currentItems[0].startTimeIso || currentItems[0].startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime);
         const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getSelectedDateKey());
         
         let isRequestedChainValid = true;
@@ -3407,7 +3420,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               const item = currentItems[i];
               const layerSlots = layers[i];
               const diagnostics = diagnosticsByLayer[i] || [];
-              const requestStartIso = typeof item.startTime === 'string' && item.startTime.includes('T')
+              const requestStartIso = typeof item.startTimeIso === 'string' && item.startTimeIso.includes('T')
+                ? item.startTimeIso
+                : typeof item.startTime === 'string' && item.startTime.includes('T')
                 ? item.startTime
                 : buildIsoFromMinutes(getSelectedDateKey(), Number(item.startTime || earliestStartTime));
               const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();

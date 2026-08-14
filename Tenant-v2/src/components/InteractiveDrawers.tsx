@@ -125,6 +125,7 @@ interface StagedService {
   serviceCategory?: string;
   staffId: string;
   startTime: number;
+  startTimeIso?: string;
   duration: number;
   discountType: 'none' | 'flat' | 'percent';
   discountValue: number;
@@ -793,6 +794,9 @@ export default function InteractiveDrawers({
     next.setHours(9 + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
     return next.toISOString();
   };
+  const addMinutesToIso = (iso: string, minutes: number) => (
+    new Date(new Date(iso).getTime() + Math.max(0, Math.round(minutes)) * 60000).toISOString()
+  );
 
   const buildClockTime = (minutesFromNine: number) => {
     const absoluteMinutes = 9 * 60 + Math.max(0, Math.round(minutesFromNine));
@@ -1348,6 +1352,12 @@ export default function InteractiveDrawers({
         const lastItem = stagedServices[stagedServices.length - 1];
         nextStartTime = lastItem.startTime + lastItem.duration;
       }
+      const nextStartTimeIso = stagedServices.length > 0
+        ? addMinutesToIso(
+            stagedServices[stagedServices.length - 1].startTimeIso || buildIsoFromMinutes(selectedDate, stagedServices[stagedServices.length - 1].startTime),
+            stagedServices[stagedServices.length - 1].duration
+          )
+        : buildIsoFromMinutes(selectedDate, nextStartTime);
 
       const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
 
@@ -1364,6 +1374,7 @@ export default function InteractiveDrawers({
         serviceCategory: service.category,
         staffId: defaultStaffId,
         startTime: nextStartTime,
+        startTimeIso: nextStartTimeIso,
         duration: resolvedVariant?.duration || service.duration || 60,
         discountType: 'none',
         discountValue: 0,
@@ -1564,11 +1575,12 @@ export default function InteractiveDrawers({
       const resolvedServiceId = `${item.serviceId || ''}`.trim();
       const service = canonicalServices.find(s => s.id === resolvedServiceId);
       const variant = service?.variants.find((entry) => entry.id === item.variantId) || service?.variants[0] || null;
+      const requestStartIso = item.startTimeIso || buildIsoFromMinutes(selectedDate, item.startTime);
       return {
         serviceId: resolvedServiceId,
         staffId: item.staffId,
         requestedStaffId: item.staffId,
-        startTime: buildIsoFromMinutes(selectedDate, item.startTime),
+        startTime: requestStartIso,
         notes: item.notes || undefined,
         duration: variant?.duration || item.duration,
         price: variant ? toMoney(variant.finalPrice ?? variant.price) : (service ? toMoney(service.price) : 0),
@@ -1710,9 +1722,9 @@ export default function InteractiveDrawers({
     }
   };
 
-const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
+  const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
     try {
-      const requestedStartISO = currentItems[0].startTime || buildIsoFromMinutes(selectedDate, earliestStartTime);
+      const requestedStartISO = currentItems[0].startTimeIso || currentItems[0].startTime || buildIsoFromMinutes(selectedDate, earliestStartTime);
       const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getLocalDateKey(selectedDate));
       
       let isRequestedChainValid = true;
@@ -1733,7 +1745,9 @@ const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) 
             const item = currentItems[i];
             const layerSlots = layers[i];
             const diagnostics = diagnosticsByLayer[i] || [];
-            const requestStartIso = typeof item.startTime === 'string' && item.startTime.includes('T')
+            const requestStartIso = typeof item.startTimeIso === 'string' && item.startTimeIso.includes('T')
+              ? item.startTimeIso
+              : typeof item.startTime === 'string' && item.startTime.includes('T')
               ? item.startTime
               : buildIsoFromMinutes(selectedDate, Number(item.startTime || earliestStartTime));
             const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
