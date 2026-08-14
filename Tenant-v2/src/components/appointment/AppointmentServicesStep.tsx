@@ -18,6 +18,7 @@ export interface StagedService {
 }
 interface AppointmentServicesStepProps {
   isRtl: boolean;
+  boardStartHour?: number;
   canonicalServices: ServiceRecord[];
   stagedServices: StagedService[];
   availableStylists: any[];
@@ -36,6 +37,7 @@ interface AppointmentServicesStepProps {
 
 export default function AppointmentServicesStep({
   isRtl,
+  boardStartHour = 9,
   canonicalServices,
   stagedServices,
   availableStylists,
@@ -167,6 +169,7 @@ export default function AppointmentServicesStep({
                           service={service}
                           variant={variant}
                           isRtl={isRtl}
+                          boardStartHour={boardStartHour}
                           availableStylists={availableStylists}
                           stagedItem={stagedItem || null}
                           onAddService={onAddService}

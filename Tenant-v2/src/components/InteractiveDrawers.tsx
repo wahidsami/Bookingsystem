@@ -2965,6 +2965,7 @@ export default function InteractiveDrawers({
                     {createStep === 3 && (
                       <AppointmentServicesStep
                         isRtl={isRtl}
+                        boardStartHour={boardStartHour}
                         canonicalServices={canonicalServices}
                         stagedServices={stagedServices as any[]}
                         availableStylists={availableStylists}

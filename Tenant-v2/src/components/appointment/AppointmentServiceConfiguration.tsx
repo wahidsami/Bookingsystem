@@ -4,6 +4,7 @@ import { to12HourTime, to24HourTime } from '../../lib/employeeHelpers';
 
 interface AppointmentServiceConfigurationProps {
   isRtl: boolean;
+  boardStartHour?: number;
   draftConfig: Partial<StagedService>;
   setDraftConfig: React.Dispatch<React.SetStateAction<Partial<StagedService>>>;
   validStylists: any[];
@@ -13,13 +14,14 @@ interface AppointmentServiceConfigurationProps {
 
 export default function AppointmentServiceConfiguration({
   isRtl,
+  boardStartHour = 9,
   draftConfig,
   setDraftConfig,
   validStylists,
   onSave,
   onCancel
 }: AppointmentServiceConfigurationProps) {
-  const offsetBaseMinutes = 9 * 60;
+  const offsetBaseMinutes = boardStartHour * 60;
   const formatOffsetToClockValue = (offsetMinutes?: number | null) => {
     const safeOffset = Math.max(0, Math.round(Number(offsetMinutes || 0)));
     const absoluteMinutes = offsetBaseMinutes + safeOffset;
@@ -51,7 +53,7 @@ export default function AppointmentServiceConfiguration({
       });
     }
     return options;
-  }, []);
+  }, [offsetBaseMinutes]);
 
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">
