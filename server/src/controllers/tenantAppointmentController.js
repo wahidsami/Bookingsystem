@@ -220,6 +220,31 @@ function parseBoardDate(value) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function getBoardDayOfWeek(dateKey, timeZone = 'Asia/Riyadh') {
+    if (!dateKey || typeof dateKey !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+        return null;
+    }
+
+    const [year, month, day] = dateKey.split('-').map((value) => Number(value));
+    const utcNoon = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    const weekday = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        weekday: 'long'
+    }).format(utcNoon);
+
+    const map = {
+        Sunday: 0,
+        Monday: 1,
+        Tuesday: 2,
+        Wednesday: 3,
+        Thursday: 4,
+        Friday: 5,
+        Saturday: 6
+    };
+
+    return Object.prototype.hasOwnProperty.call(map, weekday) ? map[weekday] : utcNoon.getUTCDay();
+}
+
 function buildBreakDateTime(date, timeValue) {
     if (!date || !timeValue) {
         return null;
@@ -1610,6 +1635,11 @@ exports.getAppointmentsBoard = async (req, res) => {
     try {
         const tenantId = req.tenantId;
 
+        res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Surrogate-Control', 'no-store');
+
         // Auto mark past appointments as no-show
         const now = new Date();
         await db.Appointment.update(
@@ -1631,8 +1661,7 @@ exports.getAppointmentsBoard = async (req, res) => {
             paymentStatus
         } = req.query;
 
-        const selectedDate = parseBoardDate(date);
-        if (!selectedDate) {
+        if (!parseBoardDate(date)) {
             return res.status(400).json({
                 success: false,
                 message: 'A valid date (YYYY-MM-DD) is required'
@@ -1640,17 +1669,21 @@ exports.getAppointmentsBoard = async (req, res) => {
         }
 
         const dateKey = date;
-        const dayStart = new Date(`${dateKey}T00:00:00`);
-        const dayEnd = new Date(`${dateKey}T23:59:59.999`);
-        // Add tolerance window to reduce timezone-edge misses between
-        // booking source timezone and dashboard viewer timezone.
-        const boardWindowStart = new Date(dayStart.getTime() - (12 * 60 * 60 * 1000));
-        const boardWindowEnd = new Date(dayEnd.getTime() + (12 * 60 * 60 * 1000));
-        const dayOfWeek = selectedDate.getDay();
+        const tenantSettings = await db.TenantSettings.findOne({
+            where: { tenantId },
+            attributes: ['timezone']
+        });
+        const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+        const { startOfDay, endOfDay } = availabilityService._getTimeZoneDayRange(dateKey, timezone);
+        const dayOfWeek = getBoardDayOfWeek(dateKey, timezone);
+        const nextDayStart = new Date(endOfDay.getTime() + 1);
 
         const appointmentWhere = {
             startTime: {
-                [Op.between]: [boardWindowStart, boardWindowEnd]
+                [Op.lt]: nextDayStart
+            },
+            endTime: {
+                [Op.gt]: startOfDay
             }
         };
 
