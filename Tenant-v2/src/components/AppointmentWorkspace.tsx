@@ -36,6 +36,10 @@ import {
   type BookingDialogCopy
 } from '../lib/bookingUiDialogs';
 import {
+  buildTenantIsoFromMinutes,
+  resolveTenantTimezone
+} from '../lib/tenantTime';
+import {
   buildConflictCard,
   formatConflictTime,
   pickBestConflictDiagnostic,
@@ -451,6 +455,10 @@ const writeSchedulerTeamVisibilityOverride = (storageKey: string, value: string[
 export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest, onToggleFavoritePage, isFavorited, setShowSavedViewModal }: AppointmentWorkspaceProps) {
   const isRtl = lang === 'ar';
   const { tenant, tenantSettings, user } = useTenantAuth();
+  const tenantTimezone = useMemo(
+    () => resolveTenantTimezone(tenantSettings?.timezone, tenant?.timezone),
+    [tenantSettings?.timezone, tenant?.timezone]
+  );
   const workspaceShellRef = useRef<HTMLDivElement | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const schedulerConfig = useMemo(
@@ -1001,10 +1009,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   const getSelectedDateKey = () => selectedDateKey;
   const buildIsoFromMinutes = (dateKey: string, minutesFromNine: number) => {
-    const safeMinutes = Math.max(0, Math.round(minutesFromNine));
-    const base = new Date(`${dateKey}T00:00:00`);
-    base.setHours(boardStartHour + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
-    return base.toISOString();
+    return buildTenantIsoFromMinutes(dateKey, minutesFromNine, tenantTimezone, boardStartHour);
   };
   const addMinutesToIso = (iso: string, minutes: number) => (
     new Date(new Date(iso).getTime() + Math.max(0, Math.round(minutes)) * 60000).toISOString()
@@ -7796,6 +7801,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       <InteractiveDrawers 
         isRtl={isRtl}
         tenantId={tenant?.id || ''}
+        tenantTimezone={tenantTimezone}
         isCreateDrawerOpen={isCreateDrawerOpen}
         setIsCreateDrawerOpen={setIsCreateDrawerOpen}
         isCartDrawerOpen={isCartDrawerOpen}

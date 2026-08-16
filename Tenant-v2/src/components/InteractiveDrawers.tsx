@@ -28,6 +28,10 @@ import {
   type ConflictCard
 } from '../lib/bookingConflictDiagnostics';
 import {
+  buildTenantIsoFromMinutes,
+  resolveTenantTimezone
+} from '../lib/tenantTime';
+import {
   buildAdvanceBookingDialog,
   buildExtendedHoursBookingDialog,
   buildGenericBookingErrorDialog,
@@ -77,6 +81,7 @@ const createEmptyGuestService = () => ({
 interface InteractiveDrawersProps {
   isRtl: boolean;
   tenantId: string;
+  tenantTimezone?: string;
   normalEndHour?: number;
   isCreateDrawerOpen: boolean;
   setIsCreateDrawerOpen: (open: boolean) => void;
@@ -353,8 +358,10 @@ export default function InteractiveDrawers({
   giftCardPackages = [],
   stylists,
   onBoardChanged,
-  existingBreak
+  existingBreak,
+  tenantTimezone
 }: InteractiveDrawersProps) {
+  const resolvedTenantTimezone = useMemo(() => resolveTenantTimezone(tenantTimezone), [tenantTimezone]);
   
   // Create Modal Step
   const [createMode, setCreateMode] = useState<'appointment' | 'blocked'>('appointment');
@@ -836,10 +843,7 @@ export default function InteractiveDrawers({
 
   const buildIsoFromMinutes = (date: Date, minutesFromNine: number) => {
     const dateKey = getLocalDateKey(date);
-    const safeMinutes = Math.max(0, Math.round(minutesFromNine));
-    const next = new Date(`${dateKey}T00:00:00`);
-    next.setHours(boardStartHour + Math.floor(safeMinutes / 60), safeMinutes % 60, 0, 0);
-    return next.toISOString();
+    return buildTenantIsoFromMinutes(dateKey, minutesFromNine, resolvedTenantTimezone, boardStartHour);
   };
   const addMinutesToIso = (iso: string, minutes: number) => (
     new Date(new Date(iso).getTime() + Math.max(0, Math.round(minutes)) * 60000).toISOString()
