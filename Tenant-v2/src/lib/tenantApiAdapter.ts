@@ -663,8 +663,14 @@ class TenantApiAdapter {
   private async handleResponse(response: Response): Promise<any> {
     const data = await response.json().catch(() => null);
     if (!response.ok) {
-      const error = new Error(data?.message || data?.error || 'Request failed') as Error & { status?: number };
+      const error = new Error(data?.message || data?.error || 'Request failed') as Error & {
+        status?: number;
+        payload?: any;
+        response?: { status: number; data: any };
+      };
       error.status = response.status;
+      error.payload = data;
+      error.response = { status: response.status, data };
       throw error;
     }
     return data;
@@ -905,7 +911,15 @@ class TenantApiAdapter {
     const parsed = safeJsonParse(text);
 
     if (!response.ok || (parsed && parsed.success === false)) {
-      throw new Error(parsed?.message || parsed?.error || `HTTP Error ${response.status}`);
+      const error = new Error(parsed?.message || parsed?.error || `HTTP Error ${response.status}`) as Error & {
+        status?: number;
+        payload?: any;
+        response?: { status: number; data: any };
+      };
+      error.status = response.status;
+      error.payload = parsed;
+      error.response = { status: response.status, data: parsed };
+      throw error;
     }
 
     if (!parsed) {

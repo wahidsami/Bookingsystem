@@ -26,6 +26,16 @@ import { DEFAULT_SCHEDULER_BOARD_SETTINGS, getTenantSchedulerConfig, normalizeSc
 import { emitBIReportRefresh } from '../lib/bi/refreshSignals';
 import { calculateNearestValidChain, calculateAllValidChains, ChainResult } from '../utils/bookingChains';
 import {
+  buildAdvanceBookingDialog,
+  buildExtendedHoursBookingDialog,
+  buildGenericBookingErrorDialog,
+  extractBookingErrorMeta,
+  hasStructuredBookingDiagnostics,
+  isBookingConflictError,
+  isBookingTooSoonError,
+  type BookingDialogCopy
+} from '../lib/bookingUiDialogs';
+import {
   buildConflictCard,
   formatConflictTime,
   pickBestConflictDiagnostic,
@@ -1034,14 +1044,25 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const slotAbsoluteMinutes = (boardStartHour * 60) + Math.max(0, Math.round(timeInMinutesFromNine));
     return slotAbsoluteMinutes <= getRiyadhMinutesSinceMidnight(new Date());
   };
+  const showBookingErrorDialog = (dialog: {
+    titleAr: string;
+    titleEn: string;
+    bodyAr: string;
+    bodyEn: string;
+  }) => {
+    setBookingErrorDialog(dialog);
+  };
+  const getBookingChainFinalEndMinutes = (items: Array<{ startTime?: number; duration?: number }>) => (
+    items.reduce((max, item) => {
+      const startOffset = Math.max(0, Math.round(Number(item.startTime || 0)));
+      const duration = Math.max(0, Math.round(Number(item.duration || 0)));
+      return Math.max(max, startOffset + duration);
+    }, 0)
+  );
   const showPastBoardSlotWarning = (timeInMinutesFromNine: number) => {
     const slotLabel = formatMinutesToTime(timeInMinutesFromNine);
     const currentLabel = getRiyadhCurrentTimeLabel();
-    addLocalToast(
-      `لا يمكنك إنشاء موعد عند ${slotLabel}. الوقت الحالي في الرياض هو ${currentLabel}. يرجى اختيار وقت بعد الوقت الحالي.`,
-      `You cannot create an appointment at ${slotLabel}. Riyadh time is currently ${currentLabel}. Please select a time after the current time.`,
-      'warning'
-    );
+    showBookingErrorDialog(buildAdvanceBookingDialog({ isRtl, currentLabel, slotLabel }));
   };
   const seedCreateDrawerFromBoardSlot = (timeInMinutes: number) => {
     const safeTime = Math.max(0, Math.round(timeInMinutes));
@@ -2071,6 +2092,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     onConfirm: (chain: ChainResult) => void;
     onCancel: () => void;
   } | null>(null);
+  const [bookingErrorDialog, setBookingErrorDialog] = useState<BookingDialogCopy | null>(null);
+  const [bookingHoursDecisionDialog, setBookingHoursDecisionDialog] = useState<(BookingDialogCopy & {
+    extensionMinutes: number;
+    onChooseAnotherDay: () => void;
+    onExtendHours: () => void;
+    onCancel: () => void;
+  }) | null>(null);
 
   // Step 3: Global Checkout notes & Custom Payment Rows
   const [sessionNotes, setSessionNotes] = useState('');
@@ -2114,7 +2142,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     setInitialCreateMode('appointment');
-    resetCreateDrawerStartTimes('appointment');
+    resetCreateDrawerStartTimes();
     setCreateStep(1);
     setCustMode('existing');
     setSelectedCustId('');
@@ -3224,11 +3252,21 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     } else if (custMode === 'new') {
       const requirePhone = tenantSettings?.bookingSettings?.requireWalkInPhone === true;
       if (!newCustName) {
-        addLocalToast('يرجى تعبئة الاسم للعميل الجديد', 'Please fill name for new customer', 'warning');
+        showBookingErrorDialog({
+          titleAr: 'يرجى إدخال اسم العميل',
+          titleEn: 'Missing customer name',
+          bodyAr: 'لا يمكن متابعة الحجز بدون اسم العميل الجديد.',
+          bodyEn: 'The booking cannot continue without the new customer name.'
+        });
         return;
       }
       if (requirePhone && !newCustPhone) {
-        addLocalToast('يرجى تعبئة رقم الجوال للعميل الجديد', 'Please fill phone for new customer', 'warning');
+        showBookingErrorDialog({
+          titleAr: 'يرجى إدخال رقم الجوال',
+          titleEn: 'Missing customer phone',
+          bodyAr: 'لا يمكن متابعة الحجز بدون رقم الجوال للعميل الجديد.',
+          bodyEn: 'The booking cannot continue without the new customer phone number.'
+        });
         return;
       }
       custNameEn = newCustName;
@@ -3277,7 +3315,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     if (finalStaged.length === 0) {
-      addLocalToast('يرجى إدراج خدمة واحدة على الأقل لتأكيد الحجز', 'Please add at least one service to confirm booking', 'warning');
+      showBookingErrorDialog({
+        titleAr: 'لا توجد خدمات محددة',
+        titleEn: 'No service selected',
+        bodyAr: 'يرجى إدراج خدمة واحدة على الأقل لتأكيد الحجز.',
+        bodyEn: 'Please add at least one service before confirming the booking.'
+      });
       return;
     }
 
@@ -3288,142 +3331,178 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     let firstStaffId = finalStaged[0].staffId;
     let earliestStartTime = finalStaged[0].startTime;
-    const payloadItems = finalStaged.map((item) => {
-      const resolvedServiceId = `${item.serviceId || ''}`.trim();
-      const srv = liveServices.find(s => s.id === resolvedServiceId);
-      const requestStartIso = item.startTimeIso || buildIsoFromMinutes(getSelectedDateKey(), item.startTime);
-      return {
-        serviceId: resolvedServiceId,
-        staffId: item.staffId,
-        requestedStaffId: item.staffId,
-        startTime: requestStartIso,
-        notes: item.notes || sessionNotes || null,
-        paymentMethod: 'at-center',
-        assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
-        duration: item.duration || srv?.duration || 60,
-        discountType: item.discountType,
-        discountValue: item.discountValue,
-        serviceName: isRtl ? (srv?.nameAr || srv?.name || '') : (srv?.nameEn || srv?.name || '')
-      };
-    });
 
-    const resolvedPrimaryServiceId = `${payloadItems[0]?.serviceId || currentServiceId || ''}`.trim();
-    const resolvedPrimaryStaffId = `${firstStaffId || currentStaffId || ''}`.trim();
-    if (!resolvedPrimaryServiceId) {
-      addLocalToast(
-        isRtl ? 'يرجى اختيار خدمة صحيحة قبل تأكيد الحجز.' : 'Please choose a valid service before confirming the booking.',
-        isRtl ? 'Please choose a valid service before confirming the booking.' : 'يرجى اختيار خدمة صحيحة قبل تأكيد الحجز.',
-        'warning'
-      );
-      return;
-    }
+    const runAppointmentCreationFlow = async (allowExtendedHours = false) => {
+      const finalChainEndMinutes = (boardStartHour * 60) + getBookingChainFinalEndMinutes(finalStaged);
+      const normalClosingMinutes = schedulerConfig.normalEndHour * 60;
+      const extensionMinutes = finalChainEndMinutes - normalClosingMinutes;
 
-    const executeFinalSubmission = async (itemsToSubmit: any[]) => {
-      try {
-        const calculateStagedServiceTotal = () => finalStaged.reduce((sum, item) => {
-          const service = liveServices.find((candidate) => candidate.id === item.serviceId);
-          const basePrice = Number(service?.price || 0);
-          const discountType = item.discountType || 'none';
-          const discountValue = Number(item.discountValue || 0);
+      if (!allowExtendedHours && extensionMinutes > 0) {
+        setBookingHoursDecisionDialog({
+          ...buildExtendedHoursBookingDialog({ isRtl, extensionMinutes }),
+          extensionMinutes,
+          onChooseAnotherDay: () => {
+            setBookingHoursDecisionDialog(null);
+          },
+          onExtendHours: () => {
+            setBookingHoursDecisionDialog(null);
+            void runAppointmentCreationFlow(true);
+          },
+          onCancel: () => setBookingHoursDecisionDialog(null)
+        });
+        return;
+      }
 
-          let discountedPrice = basePrice;
-          if (discountType === 'flat') {
-            discountedPrice = Math.max(basePrice - discountValue, 0);
-          } else if (discountType === 'percent') {
-            discountedPrice = Math.max(basePrice - (basePrice * (discountValue / 100)), 0);
+      const payloadItems = finalStaged.map((item) => {
+        const resolvedServiceId = `${item.serviceId || ''}`.trim();
+        const srv = liveServices.find((s) => s.id === resolvedServiceId);
+        const requestStartIso = item.startTimeIso || buildIsoFromMinutes(getSelectedDateKey(), item.startTime);
+        return {
+          serviceId: resolvedServiceId,
+          staffId: item.staffId,
+          requestedStaffId: item.staffId,
+          startTime: requestStartIso,
+          notes: item.notes || sessionNotes || null,
+          paymentMethod: 'at-center',
+          assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
+          duration: item.duration || srv?.duration || 60,
+          discountType: item.discountType,
+          discountValue: item.discountValue,
+          serviceName: isRtl ? (srv?.nameAr || srv?.name || '') : (srv?.nameEn || srv?.name || '')
+        };
+      });
+
+      const resolvedPrimaryServiceId = `${payloadItems[0]?.serviceId || currentServiceId || ''}`.trim();
+      const resolvedPrimaryStaffId = `${firstStaffId || currentStaffId || ''}`.trim();
+      if (!resolvedPrimaryServiceId) {
+        showBookingErrorDialog({
+          titleAr: 'إعدادات خدمة غير صالحة',
+          titleEn: 'Invalid service configuration',
+          bodyAr: 'تعذر إكمال الحجز بسبب إعدادات الخدمة المحددة.',
+          bodyEn: 'The booking cannot continue because the selected service configuration is invalid.'
+        });
+        return;
+      }
+
+      const executeFinalSubmission = async (itemsToSubmit: any[]) => {
+        try {
+          const calculateStagedServiceTotal = () => finalStaged.reduce((sum, item) => {
+            const service = liveServices.find((candidate) => candidate.id === item.serviceId);
+            const basePrice = Number(service?.price || 0);
+            const discountType = item.discountType || 'none';
+            const discountValue = Number(item.discountValue || 0);
+
+            let discountedPrice = basePrice;
+            if (discountType === 'flat') {
+              discountedPrice = Math.max(basePrice - discountValue, 0);
+            } else if (discountType === 'percent') {
+              discountedPrice = Math.max(basePrice - (basePrice * (discountValue / 100)), 0);
+            }
+
+            return sum + discountedPrice;
+          }, 0);
+
+          const createAppointmentTotal = Number(calculateStagedServiceTotal().toFixed(2));
+
+          // TEMPORARILY DISABLED (Refah - Remove Payment from Wizard)
+          // const createPaymentAllocations = ...
+
+          const response = await tenantApiAdapter.createAppointment({
+            items: itemsToSubmit,
+            staffId: itemsToSubmit[0]?.staffId || currentStaffId,
+            startTime: itemsToSubmit[0]?.startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime),
+            notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
+            assignmentMode: 'tenant_reassigned',
+            notifyCustomer: true,
+            skipAdvanceValidation: shouldSkipAdvanceValidation(getSelectedDateKey(), earliestStartTime),
+            platformUserId: custMode === 'existing' ? selectedCustId : undefined,
+            customer: custMode === 'new' || custMode === 'walkin'
+              ? {
+                  ...splitCustomerName(custNameEn.trim() || custNameAr.trim()),
+                  email: custEmail.trim(),
+                  phone: custPhone.trim()
+                }
+              : null
+          });
+
+          if (!response?.success) {
+            throw new Error(response?.message || 'Failed to create appointment');
           }
 
-          return sum + discountedPrice;
-        }, 0);
+          setIsCreateDrawerOpen(false);
+          setStagedServices([]);
+          setCreateStep(1);
+          setNewCustName('');
+          setNewCustPhone('');
+          setNewCustEmail('');
+          setSessionNotes('');
+          setGiftCardCodeInput('');
+          setCreateSplitActive(false);
+          setCustMode('walkin');
+          setSelectedCustId('');
 
-        const createAppointmentTotal = Number(calculateStagedServiceTotal().toFixed(2));
-        
-        // TEMPORARILY DISABLED (Refah - Remove Payment from Wizard)
-        // const createPaymentAllocations = ... 
-
-        const response = await tenantApiAdapter.createAppointment({
-          items: itemsToSubmit,
-          staffId: itemsToSubmit[0]?.staffId || currentStaffId,
-          startTime: itemsToSubmit[0]?.startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime),
-          notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
-          assignmentMode: 'tenant_reassigned',
-          notifyCustomer: true,
-          skipAdvanceValidation: shouldSkipAdvanceValidation(getSelectedDateKey(), earliestStartTime),
-          platformUserId: custMode === 'existing' ? selectedCustId : undefined,
-          customer: custMode === 'new' || custMode === 'walkin'
-            ? {
-                ...splitCustomerName(custNameEn.trim() || custNameAr.trim()),
-                email: custEmail.trim(),
-                phone: custPhone.trim()
+          await loadBoardData();
+          const createdAppointment = response?.appointment || response?.appointments?.[0] || null;
+          if (createdAppointment) {
+            const createdSessionSeed = {
+              ...createdAppointment,
+              bookingSession: {
+                ...(createdAppointment.bookingSession || {}),
+                appointments: Array.isArray(response?.appointments) ? response.appointments : (createdAppointment.bookingSession?.appointments || []),
+                id: createdAppointment.bookingSession?.id || createdAppointment.bookingSessionId || response?.bookingSession?.id || createdAppointment.bookingSession?.bookingReference || createdAppointment.bookingReference || undefined,
+                bookingReference: createdAppointment.bookingSession?.bookingReference || createdAppointment.bookingReference || response?.bookingSession?.bookingReference || undefined
               }
-            : null
-        });
+            };
+            setActiveAppointment(mapBoardAppointment(createdSessionSeed, getSelectedDateKey()));
+          }
 
-        if (!response?.success) {
-          throw new Error(response?.message || 'Failed to create appointment');
-        }
+          addLocalToast(
+            `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
+            `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
+            'success'
+          );
+        } catch (err: any) {
+          const errorMeta = extractBookingErrorMeta(err);
 
-        setIsCreateDrawerOpen(false);
-        setStagedServices([]);
-        setCreateStep(1);
-        setNewCustName('');
-        setNewCustPhone('');
-        setNewCustEmail('');
-        setSessionNotes('');
-        setGiftCardCodeInput('');
-        setCreateSplitActive(false);
-        setCustMode('walkin');
-        setSelectedCustId('');
+          if (isBookingTooSoonError(errorMeta)) {
+            showBookingErrorDialog(
+              buildAdvanceBookingDialog({
+                isRtl,
+                currentLabel: getRiyadhCurrentTimeLabel(),
+                slotLabel: formatMinutesToTime(itemsToSubmit[0]?.startTime ? Number(itemsToSubmit[0].startTime) : earliestStartTime)
+              })
+            );
+            return;
+          }
 
-        await loadBoardData();
-        const createdAppointment = response?.appointment || response?.appointments?.[0] || null;
-        if (createdAppointment) {
-          const createdSessionSeed = {
-            ...createdAppointment,
-            bookingSession: {
-              ...(createdAppointment.bookingSession || {}),
-              appointments: Array.isArray(response?.appointments) ? response.appointments : (createdAppointment.bookingSession?.appointments || []),
-              id: createdAppointment.bookingSession?.id || createdAppointment.bookingSessionId || response?.bookingSession?.id || createdAppointment.bookingSession?.bookingReference || createdAppointment.bookingReference || undefined,
-              bookingReference: createdAppointment.bookingSession?.bookingReference || createdAppointment.bookingReference || response?.bookingSession?.bookingReference || undefined
+          if (isBookingConflictError(errorMeta)) {
+            if (hasStructuredBookingDiagnostics(errorMeta)) {
+              if (!chainConflictDialog) {
+                await preflightMultiServiceChain(itemsToSubmit, false);
+              } else {
+                setChainConflictView('time-selection');
+              }
+              return;
             }
-          };
-          setActiveAppointment(mapBoardAppointment(createdSessionSeed, getSelectedDateKey()));
+
+            showBookingErrorDialog(buildGenericBookingErrorDialog());
+            return;
+          }
+
+          showBookingErrorDialog(buildGenericBookingErrorDialog());
         }
+      };
 
-        addLocalToast(
-          `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
-          `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
-          'success'
-        );
-      } catch (err: any) {
-        const errMsg = err.message || '';
-        const isConflict = errMsg.includes('conflict') || errMsg.includes('overlap') || errMsg.includes('not available') || errMsg.includes('409');
-        
-        if (isConflict && itemsToSubmit.length > 1) {
-           addLocalToast(isRtl ? 'لم يعد هذا الوقت متاحاً' : 'This time is no longer available', isRtl ? 'This time is no longer available' : 'لم يعد هذا الوقت متاحاً', 'warning');
-           if (!chainConflictDialog) {
-             await preflightMultiServiceChain(itemsToSubmit, true);
-           } else {
-             setChainConflictView('time-selection');
-           }
-        } else {
-           addLocalToast('فشل في إنشاء الموعد: ' + errMsg, 'Failed to create appointment: ' + errMsg, 'warning');
-        }
-      }
-    };
+      const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
+        try {
+          const requestedStartISO = currentItems[0].startTimeIso || currentItems[0].startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime);
+          const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getSelectedDateKey());
 
+          let isRequestedChainValid = true;
+          const discoveredStaffIds: string[] = [];
+          const conflictCards: ConflictCard[] = [];
 
-
-    const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
-      try {
-        const requestedStartISO = currentItems[0].startTimeIso || currentItems[0].startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime);
-        const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getSelectedDateKey());
-        
-        let isRequestedChainValid = true;
-        const discoveredStaffIds: string[] = [];
-        const conflictCards: ConflictCard[] = [];
-
-        if (anyFailed) {
+          if (anyFailed) {
             isRequestedChainValid = false;
             conflictCards.push({
               staffId: '',
@@ -3432,7 +3511,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               reasonTitle: isRtl ? 'تعذر جلب الأوقات المتاحة للخدمة' : 'Could not fetch availability',
               reasonDescription: isRtl ? 'تعذر التحقق من الإتاحة لهذه الخدمة في الوقت الحالي.' : 'Could not verify availability for this service right now.'
             });
-        } else {
+          } else {
             for (let i = 0; i < currentItems.length; i++) {
               const item = currentItems[i];
               const layerSlots = layers[i];
@@ -3440,8 +3519,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               const requestStartIso = typeof item.startTimeIso === 'string' && item.startTimeIso.includes('T')
                 ? item.startTimeIso
                 : typeof item.startTime === 'string' && item.startTime.includes('T')
-                ? item.startTime
-                : buildIsoFromMinutes(getSelectedDateKey(), Number(item.startTime || earliestStartTime));
+                  ? item.startTime
+                  : buildIsoFromMinutes(getSelectedDateKey(), Number(item.startTime || earliestStartTime));
               const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
               const reqTimeMs = new Date(requestStartIso).getTime();
               
@@ -3489,87 +3568,93 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 discoveredStaffIds.push(exactSlot.staffId);
               }
             }
-        }
+          }
 
-        if (isRequestedChainValid && !isRetry) {
-          const validatedItems = currentItems.map((item, idx) => ({
-             ...item,
-             staffId: discoveredStaffIds[idx] || item.staffId,
-             assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
-          }));
-          await executeFinalSubmission(validatedItems);
-        } else {
-          setChainConflictView('explanation');
-          setChainConflictDialog({
-            originalStaged: finalStaged,
-            payloadItems: currentItems,
-            conflictCards: isRetry ? [{
-              staffId: '',
-              staffName: isRtl ? 'المختص' : 'Professional',
-              reasonType: 'unknown',
-              reasonTitle: isRtl ? 'تغيرت الإتاحة' : 'Availability changed',
-              reasonDescription: isRtl ? 'تغيرت الإتاحة، يرجى المحاولة بوقت آخر.' : 'Availability changed, please try another time.'
-            }] : conflictCards,
-            selectedDate: getSelectedDateKey(),
-            validChains: [],
-            selectedChain: null,
-            isRevalidating: false,
-            onConfirm: async (chain: any) => {
-              setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: true } : null);
-              // Fresh verification immediately before booking
-              const dateToValidate = chain.startTime.split('T')[0];
-              const { layers: freshLayers } = await fetchAvailabilityLayers(currentItems, dateToValidate);
-              
-              let isStillValid = true;
-              for (let i = 0; i < currentItems.length; i++) {
-                 const reqTimeMs = new Date(chain.slots[i].startTime).getTime();
-                 const exactSlot = freshLayers[i].find((s: any) => new Date(s.startTime).getTime() === reqTimeMs && s.staffId === chain.slots[i].staffId);
-                 if (!exactSlot || !exactSlot.available) {
+          if (isRequestedChainValid && !isRetry) {
+            const validatedItems = currentItems.map((item, idx) => ({
+              ...item,
+              staffId: discoveredStaffIds[idx] || item.staffId,
+              assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
+            }));
+            await executeFinalSubmission(validatedItems);
+          } else {
+            setChainConflictView('explanation');
+            setChainConflictDialog({
+              originalStaged: finalStaged,
+              payloadItems: currentItems,
+              conflictCards: isRetry ? [{
+                staffId: '',
+                staffName: isRtl ? 'المختص' : 'Professional',
+                reasonType: 'unknown',
+                reasonTitle: isRtl ? 'تغيرت الإتاحة' : 'Availability changed',
+                reasonDescription: isRtl ? 'تغيرت الإتاحة، يرجى المحاولة بوقت آخر.' : 'Availability changed, please try another time.'
+              }] : conflictCards,
+              selectedDate: getSelectedDateKey(),
+              validChains: [],
+              selectedChain: null,
+              isRevalidating: false,
+              onConfirm: async (chain: any) => {
+                setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: true } : null);
+                // Fresh verification immediately before booking
+                const dateToValidate = chain.startTime.split('T')[0];
+                const { layers: freshLayers } = await fetchAvailabilityLayers(currentItems, dateToValidate);
+
+                let isStillValid = true;
+                for (let i = 0; i < currentItems.length; i++) {
+                  const reqTimeMs = new Date(chain.slots[i].startTime).getTime();
+                  const exactSlot = freshLayers[i].find((s: any) => new Date(s.startTime).getTime() === reqTimeMs && s.staffId === chain.slots[i].staffId);
+                  if (!exactSlot || !exactSlot.available) {
                     isStillValid = false;
                     break;
-                 }
-              }
+                  }
+                }
 
-              if (isStillValid) {
+                if (isStillValid) {
                   const confirmedItems = currentItems.map((item, idx) => {
-                     const slot = chain.slots[idx];
-                     return {
-                       ...item,
-                       startTime: slot.startTime,
-                       staffId: slot.staffId,
-                       assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
-                     };
+                    const slot = chain.slots[idx];
+                    return {
+                      ...item,
+                      startTime: slot.startTime,
+                      staffId: slot.staffId,
+                      assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
+                    };
                   });
                   setChainConflictDialog(null);
                   setChainConflictView('explanation');
                   await executeFinalSubmission(confirmedItems);
-              } else {
+                } else {
                   setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: false } : null);
-                  addLocalToast(isRtl ? 'لم يعد هذا الوقت متاحاً' : 'This time is no longer available', isRtl ? 'This time is no longer available' : 'لم يعد هذا الوقت متاحاً', 'warning');
+                  showBookingErrorDialog({
+                    titleAr: 'تعذر إكمال الحجز',
+                    titleEn: 'Unable to complete booking',
+                    bodyAr: 'لم يعد هذا الوقت متاحاً. يرجى اختيار وقت آخر.',
+                    bodyEn: 'This time is no longer available. Please choose another time.'
+                  });
                   setChainConflictView('time-selection'); // Go back to selection
+                }
+              },
+              onCancel: () => {
+                setChainConflictDialog(null);
+                setChainConflictView('explanation');
               }
-            },
-            onCancel: () => {
-              setChainConflictDialog(null);
-              setChainConflictView('explanation');
-            }
+            });
+          }
+        } catch (err: any) {
+          showBookingErrorDialog({
+            titleAr: 'تعذر التحقق من التوفر',
+            titleEn: 'Unable to check availability',
+            bodyAr: 'تعذر التحقق من الإتاحة في الوقت الحالي. يرجى المحاولة مرة أخرى.',
+            bodyEn: 'We could not check availability right now. Please try again.'
           });
         }
-      } catch (err: any) {
-        addLocalToast('خطأ أثناء التحقق من التوفر', 'Error checking availability: ' + err.message, 'warning');
-      }
-    };
+      };
 
-
-
-    void (async () => {
       if (payloadItems.length > 1) {
         await preflightMultiServiceChain(payloadItems, false);
       } else {
         await executeFinalSubmission(payloadItems);
       }
-    })();
-  };
+    };
 
   const handleConfirmBlockCreation = () => {
     const newBlock: Appointment = {
@@ -7723,6 +7808,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setCurrentStartTime={setCurrentStartTime}
         preserveBoardStartTime={preserveBoardStartTime}
         boardStartHour={START_HOUR}
+        normalEndHour={schedulerConfig.normalEndHour}
         currentStaffId={currentStaffId}
         setCurrentStaffId={setCurrentStaffId}
         initialDuration={currentDuration}
@@ -8001,6 +8087,114 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   </div>
                 </>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {bookingErrorDialog && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" dir={isRtl ? 'rtl' : 'ltr'}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm"
+              onClick={() => setBookingErrorDialog(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="relative z-10 w-full max-w-lg rounded-2xl border border-amber-200 bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-3 text-amber-700">
+                <span className="rounded-xl bg-amber-50 p-2">
+                  <AlertTriangle className="h-6 w-6" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500">
+                    {isRtl ? 'تنبيه الحجز' : 'Booking alert'}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black text-slate-900">
+                    {isRtl ? bookingErrorDialog.titleAr : bookingErrorDialog.titleEn}
+                  </h3>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-700">
+                {isRtl ? bookingErrorDialog.bodyAr : bookingErrorDialog.bodyEn}
+              </p>
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setBookingErrorDialog(null)}
+                  className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                >
+                  {isRtl ? 'حسناً' : 'OK'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {bookingHoursDecisionDialog && (
+          <div className="fixed inset-0 z-[111] flex items-center justify-center p-4" dir={isRtl ? 'rtl' : 'ltr'}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm"
+              onClick={bookingHoursDecisionDialog.onCancel}
+            />
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="relative z-10 w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-3 text-slate-900">
+                <span className="rounded-xl bg-slate-100 p-2 text-slate-700">
+                  <Clock className="h-6 w-6" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                    {isRtl ? 'قرار التمديد' : 'Extension decision'}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black text-slate-900">
+                    {isRtl ? bookingHoursDecisionDialog.titleAr : bookingHoursDecisionDialog.titleEn}
+                  </h3>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-700">
+                {isRtl ? bookingHoursDecisionDialog.bodyAr : bookingHoursDecisionDialog.bodyEn}
+              </p>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={bookingHoursDecisionDialog.onChooseAnotherDay}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  {isRtl ? 'اختيار يوم آخر' : 'Choose another day'}
+                </button>
+                <button
+                  type="button"
+                  onClick={bookingHoursDecisionDialog.onExtendHours}
+                  className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-zinc-950 transition hover:bg-amber-400"
+                >
+                  {isRtl
+                    ? `تمديد الساعات ${bookingHoursDecisionDialog.extensionMinutes} دقيقة`
+                    : `Extend Hours by ${bookingHoursDecisionDialog.extensionMinutes} Minutes`}
+                </button>
+                <button
+                  type="button"
+                  onClick={bookingHoursDecisionDialog.onCancel}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
@@ -8585,4 +8779,5 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     </div>
   );
+}
 }

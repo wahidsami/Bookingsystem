@@ -27,18 +27,37 @@ import {
   type AvailabilityDiagnostic,
   type ConflictCard
 } from '../lib/bookingConflictDiagnostics';
+import {
+  buildAdvanceBookingDialog,
+  buildExtendedHoursBookingDialog,
+  buildGenericBookingErrorDialog,
+  extractBookingErrorMeta,
+  hasStructuredBookingDiagnostics,
+  isBookingConflictError,
+  isBookingTooSoonError,
+  type BookingDialogCopy
+} from '../lib/bookingUiDialogs';
 
 const toMoney = (value: any) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
-const getLocalDateKey = (value: Date) => {
-  const year = value.getFullYear();
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+  const getLocalDateKey = (value: Date) => {
+    const year = value.getFullYear();
+    const month = `${value.getMonth() + 1}`.padStart(2, '0');
+    const day = `${value.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getRiyadhCurrentTimeLabel = (value = new Date()) => (
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Riyadh',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(value)
+  );
 
 const createEmptyGuestService = () => ({
   id: `gs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -58,6 +77,7 @@ const createEmptyGuestService = () => ({
 interface InteractiveDrawersProps {
   isRtl: boolean;
   tenantId: string;
+  normalEndHour?: number;
   isCreateDrawerOpen: boolean;
   setIsCreateDrawerOpen: (open: boolean) => void;
   preserveBoardStartTime?: boolean;
@@ -308,6 +328,7 @@ const removeDraftStorage = (key: string) => {
 export default function InteractiveDrawers({
   isRtl,
   tenantId,
+  normalEndHour,
   isCreateDrawerOpen,
   setIsCreateDrawerOpen,
   preserveBoardStartTime = false,
@@ -626,6 +647,13 @@ export default function InteractiveDrawers({
     onCancel: () => void;
   } | null>(null);
   const [chainConflictView, setChainConflictView] = useState<'explanation' | 'date-selection' | 'time-selection' | 'confirmation'>('explanation');
+  const [bookingErrorDialog, setBookingErrorDialog] = useState<BookingDialogCopy | null>(null);
+  const [bookingHoursDecisionDialog, setBookingHoursDecisionDialog] = useState<(BookingDialogCopy & {
+    extensionMinutes: number;
+    onChooseAnotherDay: () => void;
+    onExtendHours: () => void;
+    onCancel: () => void;
+  }) | null>(null);
   const START_HOUR = 9;
 
   const [expandedServiceIds, setExpandedServiceIds] = useState<Record<string, boolean>>({});
@@ -1490,7 +1518,24 @@ export default function InteractiveDrawers({
     setCreateStep(3);
   };
 
-  const handleConfirmAppointmentCreation = async () => {
+  const showBookingErrorDialog = (dialog: {
+    titleAr: string;
+    titleEn: string;
+    bodyAr: string;
+    bodyEn: string;
+  }) => {
+    setBookingErrorDialog(dialog);
+  };
+
+  const getBookingChainFinalEndMinutes = (items: Array<{ startTime?: number; duration?: number }>) => (
+    items.reduce((max, item) => {
+      const startOffset = Math.max(0, Math.round(Number(item.startTime || 0)));
+      const duration = Math.max(0, Math.round(Number(item.duration || 0)));
+      return Math.max(max, startOffset + duration);
+    }, 0)
+  );
+
+  const handleConfirmAppointmentCreation = async (allowExtendedHours = false) => {
     let custNameEn = '';
     let custNameAr = '';
     let custPhone = '';
@@ -1502,11 +1547,12 @@ export default function InteractiveDrawers({
     if (includeGroupGuests) {
       const emptyGuestName = guestsList.some(g => g.name.trim() === '');
       if (emptyGuestName) {
-        addLocalToast(
-          'يرجى تعبئة أسماء جميع المرافقين أولاً لتأكيد الجلسة الجماعية.',
-          'Please fill out all guest names before confirming the group session.',
-          'warning'
-        );
+        showBookingErrorDialog({
+          titleAr: 'يرجى تعبئة أسماء المرافقين',
+          titleEn: 'Missing guest names',
+          bodyAr: 'لا يمكن متابعة الحجز الجماعي قبل تعبئة أسماء جميع المرافقين.',
+          bodyEn: 'The group booking cannot continue until all guest names are filled in.'
+        });
         return;
       }
     }
@@ -1523,7 +1569,12 @@ export default function InteractiveDrawers({
       }
     } else {
       if (!walkinFullName.trim() || !walkinPhone.trim()) {
-        addLocalToast('يرجى تعبئة الاسم ورقم الجوال للعميل الزائر أولاً', 'Please fill the walk-in name and mobile number first', 'warning');
+        showBookingErrorDialog({
+          titleAr: 'يرجى تعبئة بيانات العميل الزائر',
+          titleEn: 'Missing walk-in details',
+          bodyAr: 'لا يمكن متابعة الحجز بدون اسم العميل الزائر ورقم جواله.',
+          bodyEn: 'The booking cannot continue without the walk-in customer name and mobile number.'
+        });
         return;
       }
       custNameEn = walkinFullName.trim();
@@ -1560,7 +1611,12 @@ export default function InteractiveDrawers({
 
     const finalStaged = [...stagedServices];
     if (finalStaged.length === 0) {
-      addLocalToast('يرجى إدراج خدمة واحدة على الأقل لتأكيد الحجز', 'Please add at least one service to confirm booking', 'warning');
+      showBookingErrorDialog({
+        titleAr: 'لا توجد خدمات محددة',
+        titleEn: 'No service selected',
+        bodyAr: 'يرجى إدراج خدمة واحدة على الأقل لتأكيد الحجز.',
+        bodyEn: 'Please add at least one service before confirming the booking.'
+      });
       return;
     }
 
@@ -1658,7 +1714,32 @@ export default function InteractiveDrawers({
     const resolvedPrimaryServiceId = `${items[0]?.serviceId || ''}`.trim();
     const resolvedPrimaryStaffId = `${firstStaffId || currentStaffId || ''}`.trim();
     if (!resolvedPrimaryServiceId) {
-      addLocalToast('يرجى اختيار خدمة صحيحة قبل تأكيد الحجز', 'Please choose a valid service before confirming the booking', 'warning');
+      showBookingErrorDialog({
+        titleAr: 'إعدادات خدمة غير صالحة',
+        titleEn: 'Invalid service configuration',
+        bodyAr: 'تعذر إكمال الحجز بسبب إعدادات الخدمة المحددة.',
+        bodyEn: 'The booking cannot continue because the selected service configuration is invalid.'
+      });
+      return;
+    }
+
+    const normalClosingMinutes = Math.max(0, Math.round(Number(normalEndHour ?? (boardStartHour + 8)))) * 60;
+    const finalChainEndMinutes = (boardStartHour * 60) + getBookingChainFinalEndMinutes(finalStaged);
+    const extensionMinutes = finalChainEndMinutes - normalClosingMinutes;
+
+    if (!allowExtendedHours && extensionMinutes > 0) {
+      setBookingHoursDecisionDialog({
+        extensionMinutes,
+        onChooseAnotherDay: () => {
+          setBookingHoursDecisionDialog(null);
+          setCreateStep(3);
+        },
+        onExtendHours: () => {
+          setBookingHoursDecisionDialog(null);
+          void handleConfirmAppointmentCreation(true);
+        },
+        onCancel: () => setBookingHoursDecisionDialog(null)
+      });
       return;
     }
 
@@ -1738,7 +1819,12 @@ export default function InteractiveDrawers({
         }
       });
     } catch (err: any) {
-      addLocalToast('خطأ أثناء التحقق من التوفر', 'Error checking availability: ' + err.message, 'warning');
+      showBookingErrorDialog({
+        titleAr: 'تعذر التحقق من التوفر',
+        titleEn: 'Unable to check availability',
+        bodyAr: 'تعذر التحقق من الإتاحة في الوقت الحالي. يرجى المحاولة مرة أخرى.',
+        bodyEn: 'We could not check availability right now. Please try again.'
+      });
     }
   };
 
@@ -1847,23 +1933,36 @@ export default function InteractiveDrawers({
       );
     } catch (err: any) {
       console.error('Failed to create appointment', err);
-      const errMsg = err.message || '';
-      const isConflict = errMsg.includes('conflict') || errMsg.includes('overlap') || errMsg.includes('not available') || errMsg.includes('409');
-      
-      if (isConflict && itemsToSubmit.length > 1) {
-         addLocalToast(isRtl ? 'لم يعد هذا الوقت متاحاً' : 'This time is no longer available', isRtl ? 'This time is no longer available' : 'لم يعد هذا الوقت متاحاً', 'warning');
-         if (!chainConflictDialog) {
-           if (bookingRecoveryMode === 'separate_services') {
-             await preflightSeparateServices(itemsToSubmit);
-           } else {
-             await preflightMultiServiceChain(itemsToSubmit, true);
-           }
-         } else {
-           setChainConflictView(bookingRecoveryMode === 'separate_services' ? 'explanation' : 'time-selection');
-         }
-      } else {
-         addLocalToast('فشل في إنشاء الموعد: ' + errMsg, 'Failed to create appointment: ' + errMsg, 'warning');
+      const errorMeta = extractBookingErrorMeta(err);
+
+      if (isBookingTooSoonError(errorMeta)) {
+        showBookingErrorDialog(buildAdvanceBookingDialog({
+          isRtl,
+          currentLabel: getRiyadhCurrentTimeLabel(),
+          slotLabel: formatMinutesToTime(itemsToSubmit[0]?.startTime ? Number(itemsToSubmit[0].startTime) : currentStartTime)
+        }));
+        return;
       }
+
+      if (isBookingConflictError(errorMeta)) {
+        if (hasStructuredBookingDiagnostics(errorMeta) && itemsToSubmit.length > 1) {
+          if (!chainConflictDialog) {
+            if (bookingRecoveryMode === 'separate_services') {
+              await preflightSeparateServices(itemsToSubmit);
+            } else {
+              await preflightMultiServiceChain(itemsToSubmit, true);
+            }
+          } else {
+            setChainConflictView(bookingRecoveryMode === 'separate_services' ? 'explanation' : 'time-selection');
+          }
+          return;
+        }
+
+        showBookingErrorDialog(buildGenericBookingErrorDialog());
+        return;
+      }
+
+      showBookingErrorDialog(buildGenericBookingErrorDialog());
     }
   };
 
@@ -1979,7 +2078,7 @@ export default function InteractiveDrawers({
                }
             }
 
-            if (isStillValid) {
+              if (isStillValid) {
                 const confirmedItems = currentItems.map((item, idx) => {
                    const slot = chain.slots[idx];
                    return {
@@ -1992,12 +2091,17 @@ export default function InteractiveDrawers({
                 setChainConflictDialog(null);
                 setChainConflictView('explanation');
                 await executeFinalSubmission(confirmedItems);
-            } else {
-                setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: false } : null);
-                addLocalToast(isRtl ? 'لم يعد هذا الوقت متاحاً' : 'This time is no longer available', isRtl ? 'This time is no longer available' : 'لم يعد هذا الوقت متاحاً', 'warning');
-                setChainConflictView('time-selection'); // Go back to selection
-            }
-          },
+              } else {
+                  setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: false } : null);
+                  showBookingErrorDialog({
+                    titleAr: 'تعذر إكمال الحجز',
+                    titleEn: 'Unable to complete booking',
+                    bodyAr: 'لم يعد هذا الوقت متاحاً. يرجى اختيار وقت آخر.',
+                    bodyEn: 'This time is no longer available. Please choose another time.'
+                  });
+                  setChainConflictView('time-selection'); // Go back to selection
+              }
+            },
           onCancel: () => {
             setChainConflictDialog(null);
             setChainConflictView('explanation');
@@ -2005,7 +2109,23 @@ export default function InteractiveDrawers({
         });
       }
     } catch (err: any) {
-      addLocalToast('خطأ أثناء التحقق من التوفر', 'Error checking availability: ' + err.message, 'warning');
+      const errorMeta = extractBookingErrorMeta(err);
+
+      if (isBookingTooSoonError(errorMeta)) {
+        showBookingErrorDialog(buildAdvanceBookingDialog({
+          isRtl,
+          currentLabel: getRiyadhCurrentTimeLabel(),
+          slotLabel: formatMinutesToTime(currentStartTime)
+        }));
+        return;
+      }
+
+      if (isBookingConflictError(errorMeta)) {
+        showBookingErrorDialog(buildGenericBookingErrorDialog());
+        return;
+      }
+
+      showBookingErrorDialog(buildGenericBookingErrorDialog());
     }
   };
 
@@ -3341,39 +3461,23 @@ export default function InteractiveDrawers({
                         onClick={() => {
                           if (createStep === 1) {
                             if (custMode === 'existing' && !selectedCustId) {
-                              addLocalToast(
-                                isRtl ? 'يرجى اختيار عميل مسجل للمتابعة.' : 'Please select a registered customer to continue.',
-                                isRtl ? 'Please select a registered customer to continue.' : 'يرجى اختيار عميل مسجل للمتابعة.',
-                                'warning'
-                              );
+                              showBookingErrorDialog(buildGenericBookingErrorDialog());
                               return;
                             }
                             if (custMode === 'walkin' && (!walkinFullName || walkinFullName.trim() === '')) {
-                              addLocalToast(
-                                isRtl ? 'يرجى إدخال اسم العميل للمتابعة.' : 'Please enter the walk-in customer name to continue.',
-                                isRtl ? 'Please enter the walk-in customer name to continue.' : 'يرجى إدخال اسم العميل للمتابعة.',
-                                'warning'
-                              );
+                              showBookingErrorDialog(buildGenericBookingErrorDialog());
                               return;
                             }
                           }
                           if (createStep === 2 && includeGroupGuests) {
                             const emptyGuestName = guestsList.some(g => g.name.trim() === '');
                             if (emptyGuestName) {
-                              addLocalToast(
-                                'يرجى تعبئة أسماء جميع المرافقين أولاً للمتابعة.',
-                                'Please fill out all guest names to continue.',
-                                'warning'
-                              );
+                              showBookingErrorDialog(buildGenericBookingErrorDialog());
                               return;
                             }
                           }
                           if (createStep === 3 && stagedServices.length === 0) {
-                            addLocalToast(
-                              'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
-                              'Please add at least one service before continuing to the invoice step',
-                              'warning'
-                            );
+                            showBookingErrorDialog(buildGenericBookingErrorDialog());
                             return;
                           }
                           setCreateStep(prev => prev + 1);
@@ -4263,6 +4367,113 @@ export default function InteractiveDrawers({
         </div>
       )}
 
+      <AnimatePresence>
+        {bookingErrorDialog && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" dir={isRtl ? 'rtl' : 'ltr'}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm"
+              onClick={() => setBookingErrorDialog(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="relative z-10 w-full max-w-lg rounded-2xl border border-amber-200 bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-3 text-amber-700">
+                <span className="rounded-xl bg-amber-50 p-2">
+                  <AlertTriangle size={24} />
+                </span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500">
+                    {isRtl ? 'تنبيه الحجز' : 'Booking alert'}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black text-slate-900">
+                    {isRtl ? bookingErrorDialog.titleAr : bookingErrorDialog.titleEn}
+                  </h3>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-700">
+                {isRtl ? bookingErrorDialog.bodyAr : bookingErrorDialog.bodyEn}
+              </p>
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setBookingErrorDialog(null)}
+                  className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                >
+                  {isRtl ? 'حسناً' : 'OK'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {bookingHoursDecisionDialog && (
+          <div className="fixed inset-0 z-[111] flex items-center justify-center p-4" dir={isRtl ? 'rtl' : 'ltr'}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm"
+              onClick={bookingHoursDecisionDialog.onCancel}
+            />
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="relative z-10 w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-3 text-slate-900">
+                <span className="rounded-xl bg-slate-100 p-2 text-slate-700">
+                  <CalendarIcon size={24} />
+                </span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                    {isRtl ? 'قرار التمديد' : 'Extension decision'}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black text-slate-900">
+                    {isRtl ? bookingHoursDecisionDialog.titleAr : bookingHoursDecisionDialog.titleEn}
+                  </h3>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-700">
+                {isRtl ? bookingHoursDecisionDialog.bodyAr : bookingHoursDecisionDialog.bodyEn}
+              </p>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={bookingHoursDecisionDialog.onChooseAnotherDay}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  {isRtl ? 'اختيار يوم آخر' : 'Choose another day'}
+                </button>
+                <button
+                  type="button"
+                  onClick={bookingHoursDecisionDialog.onExtendHours}
+                  className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-zinc-950 transition hover:bg-amber-400"
+                >
+                  {isRtl
+                    ? `تمديد الساعات ${bookingHoursDecisionDialog.extensionMinutes} دقيقة`
+                    : `Extend Hours by ${bookingHoursDecisionDialog.extensionMinutes} Minutes`}
+                </button>
+                <button
+                  type="button"
+                  onClick={bookingHoursDecisionDialog.onCancel}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
 <AnimatePresence>
         {chainConflictDialog && (
