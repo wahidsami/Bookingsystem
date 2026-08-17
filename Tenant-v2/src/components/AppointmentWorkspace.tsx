@@ -5965,7 +5965,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     {/* Customer Info Card Header */}
                     <div className="text-center pb-4 border-b border-slate-100">
                       <div className="w-16 h-16 bg-amber-100 border border-amber-200 rounded-full flex items-center justify-center font-bold text-amber-700 text-xl mx-auto mb-2 select-none shadow-xs">
-                        {activeAppointment.customerNameEn.slice(0, 2).toUpperCase()}
+                        {String(activeAppointment.customerNameEn || activeAppointment.customerNameAr || activeAppointment.id || '').trim().slice(0, 2).toUpperCase()}
                       </div>
                       <h3 className="font-bold text-slate-800 text-sm leading-tight">
                         {isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn}
