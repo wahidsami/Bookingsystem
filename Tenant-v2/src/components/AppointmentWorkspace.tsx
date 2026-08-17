@@ -739,8 +739,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         const employees = (empRes?.employees || []).filter((emp: any) => `${emp?.status || ''}`.toLowerCase() !== 'off' && emp?.isActive !== false);
         setLiveStylists(employees.map((emp: any, index: number) => ({
           id: emp.id,
-          nameEn: emp.name,
-          nameAr: emp.name,
+          nameEn: emp.nameEn || emp.nameAr || emp.name || emp.firstName || '—',
+          nameAr: emp.nameAr || emp.nameEn || emp.name || emp.firstName || '—',
           roleEn: emp.title || 'Staff',
           roleAr: emp.title || 'موظف',
           avatar: resolveEmployeeImageUrl(emp.avatar || emp.photo || emp.profileImage),
@@ -4188,7 +4188,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const visibleEmployeeNames = useMemo(() => {
     return liveStylists
       .filter((stylist) => visibleEmployeeIdSet.has(stylist.id))
-      .map((stylist) => (isRtl ? stylist.nameAr : stylist.nameEn).trim())
+      .map((stylist) => String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim())
       .filter(Boolean);
   }, [isRtl, liveStylists, visibleEmployeeIdSet]);
   const focusedEmployeeName = useMemo(() => {
@@ -4196,7 +4196,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return '';
     }
 
-    return (isRtl ? focusedEmployee.nameAr : focusedEmployee.nameEn).trim();
+    return String(isRtl ? focusedEmployee.nameAr : focusedEmployee.nameEn || focusedEmployee.id || '').trim();
   }, [focusedEmployee, isRtl]);
   const isAllEmployeesVisible = resolvedVisibleEmployeeIds.length === allEmployeeIds.length;
   const teamMembersButtonLabel = useMemo(() => {
@@ -4774,7 +4774,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                     {liveStylists.map((stylist) => {
                       const checked = visibleEmployeeIdSet.has(stylist.id);
-                      const label = (isRtl ? stylist.nameAr : stylist.nameEn).trim() || stylist.nameEn || stylist.nameAr || stylist.id;
+                      const label = String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim() || stylist.nameEn || stylist.nameAr || stylist.id;
 
                       return (
                         <label
