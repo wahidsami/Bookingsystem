@@ -4042,14 +4042,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const boardVisibleStaffIds = isEmployeeBoardMode(viewMode)
       ? (focusedEmployeeId ? [focusedEmployeeId] : [])
       : resolvedVisibleEmployeeIds;
+    const customerNameEn = String(apt.customerNameEn || '');
+    const customerNameAr = String(apt.customerNameAr || '');
+    const serviceNameEn = String(apt.serviceNameEn || '');
+    const serviceNameAr = String(apt.serviceNameAr || '');
     const matchesStaff = boardVisibleStaffIds.length === 0 || boardVisibleStaffIds.includes(apt.staffId);
     const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
     const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
       const matchesSearch = searchQuery === '' || 
-      apt.customerNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.customerNameAr.includes(searchQuery) ||
-      apt.serviceNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.serviceNameAr.includes(searchQuery) ||
+      customerNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customerNameAr.includes(searchQuery) ||
+      serviceNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      serviceNameAr.includes(searchQuery) ||
       `${apt.customerPhone || ''}`.includes(searchQuery) ||
       `${apt.id || ''}`.toLowerCase().includes(searchQuery.toLowerCase());
 
