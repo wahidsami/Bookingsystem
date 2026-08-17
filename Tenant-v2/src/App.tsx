@@ -454,6 +454,7 @@ export default function App() {
       else if (path === '/dashboard/page-setup') targetView = 'marketing-page-setup';
       else if (path === '/dashboard/support') targetView = 'support';
       else if (path === '/dashboard/messages') targetView = 'messages';
+      else if (path === '/dashboard/appointments') targetView = 'appointments';
       else if (path === '/dashboard/customers' || path.startsWith('/dashboard/customers/')) targetView = 'customers';
       
       if (targetView) {
@@ -476,6 +477,7 @@ export default function App() {
     else if (activeView === 'marketing-page-setup') path = '/dashboard/page-setup';
     else if (activeView === 'support') path = '/dashboard/support';
     else if (activeView === 'messages') path = '/dashboard/messages';
+    else if (activeView === 'appointments') path = '/dashboard/appointments';
     else if (activeView === 'customers') {
       if (window.location.pathname.startsWith('/dashboard/customers/')) {
         path = window.location.pathname;
