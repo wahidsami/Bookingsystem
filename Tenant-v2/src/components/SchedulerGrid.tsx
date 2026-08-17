@@ -702,7 +702,7 @@ export default function SchedulerGrid({
                 </div>
               ) : (
                 <div className={`h-8 w-8 shrink-0 rounded-full text-[10px] font-black text-white flex items-center justify-center ${toneClasses[column.statusTone || 'neutral']}`}>
-                  {column.title.charAt(0).toUpperCase()}
+                  {String(column.title || '•').charAt(0).toUpperCase()}
                 </div>
               )}
 

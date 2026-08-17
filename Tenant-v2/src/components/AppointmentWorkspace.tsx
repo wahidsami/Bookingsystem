@@ -4118,7 +4118,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           id: getSchedulerColumnId(viewMode, stylist.id),
           kind: 'employee',
           resourceId: stylist.id,
-          title: isRtl ? stylist.nameAr : stylist.nameEn,
+          title: String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim() || stylist.nameEn || stylist.nameAr || stylist.id || '—',
           subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
           avatar: stylist.avatar,
           statusLabel: stylistStatuses[stylist.id]
