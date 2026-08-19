@@ -3661,6 +3661,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       }
     };
 
+  };
+
   const handleConfirmBlockCreation = () => {
     const newBlock: Appointment = {
       id: `block-created-${Date.now()}`,
@@ -4622,8 +4624,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       anchorEl: event.currentTarget,
       staffId
     });
-  };
-
   };
 
   return (
