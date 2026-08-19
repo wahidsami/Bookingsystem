@@ -4,7 +4,6 @@ node_modules
 .vscode
 .env.local
 .env.development
-public
 docs
 documentation
 tests
