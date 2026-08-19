@@ -4249,10 +4249,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     updateVisibleEmployeeIds(allEmployeeIds);
   }, [allEmployeeIds, updateVisibleEmployeeIds]);
 
-  const toggleTeamMembersMenu = useCallback(() => {
-    setIsTeamMembersMenuOpen((current) => !current);
-  }, []);
-
   const restoreTeamBoardMode = useCallback(() => {
     setViewMode(previousBoardMode || (isWeekBoardMode(viewMode) ? 'team-week' : 'team-day'));
     setFocusedEmployeeId(null);
@@ -4729,7 +4725,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             <div className="relative" ref={teamMembersButtonRef}>
               <button
                 type="button"
-                onClick={toggleTeamMembersMenu}
+                onClick={() => setIsTeamMembersMenuOpen((current) => !current)}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                 title={isRtl ? 'عرض أعضاء الفريق' : 'View team members'}
               >
