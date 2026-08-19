@@ -4628,6 +4628,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     });
   };
 
+  };
+
   return (
     <div
       ref={workspaceShellRef}
@@ -8789,5 +8791,4 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     </div>
   );
-}
 }
