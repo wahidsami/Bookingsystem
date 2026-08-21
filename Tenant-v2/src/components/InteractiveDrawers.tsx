@@ -1958,7 +1958,7 @@ export default function InteractiveDrawers({
       }
 
       if (isBookingConflictError(errorMeta)) {
-        if (hasStructuredBookingDiagnostics(errorMeta) && itemsToSubmit.length > 1) {
+        if (itemsToSubmit.length > 1 || hasStructuredBookingDiagnostics(errorMeta)) {
           if (!chainConflictDialog) {
             if (bookingRecoveryMode === 'separate_services') {
               await preflightSeparateServices(itemsToSubmit);
