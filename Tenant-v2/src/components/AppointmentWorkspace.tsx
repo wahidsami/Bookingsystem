@@ -3481,16 +3481,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           }
 
           if (isBookingConflictError(errorMeta)) {
-            if (hasStructuredBookingDiagnostics(errorMeta)) {
-              if (!chainConflictDialog) {
-                await preflightMultiServiceChain(itemsToSubmit, false);
-              } else {
-                setChainConflictView('time-selection');
-              }
-              return;
+            if (!chainConflictDialog) {
+              await preflightMultiServiceChain(itemsToSubmit, false);
+            } else {
+              setChainConflictView('time-selection');
             }
-
-            showBookingErrorDialog(buildGenericBookingErrorDialog());
             return;
           }
 
