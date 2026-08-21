@@ -1562,6 +1562,15 @@ export default function InteractiveDrawers({
     }
 
     if (custMode === 'existing') {
+      if (!selectedCustId) {
+        showBookingErrorDialog({
+          titleAr: 'يرجى اختيار عميل',
+          titleEn: 'Missing customer',
+          bodyAr: 'يرجى اختيار عميل من القائمة لإكمال الحجز.',
+          bodyEn: 'Please select a customer from the list to continue.'
+        });
+        return;
+      }
       const existing = customers.find(c => c.id === selectedCustId);
       if (existing) {
         custNameEn = existing.name;
