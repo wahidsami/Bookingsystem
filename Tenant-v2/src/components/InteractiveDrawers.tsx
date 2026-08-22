@@ -656,6 +656,7 @@ export default function InteractiveDrawers({
     setBookingRecoveryMode,
     preflightMultiServiceChain,
     preflightSeparateServices,
+    acceptSuggestedChain,
     selectAlternativeDate,
     closeDialog
   } = useSmartConflictResolver({
