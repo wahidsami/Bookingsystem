@@ -180,39 +180,19 @@ export const SmartConflictModal: React.FC<SmartConflictModalProps> = ({
               </p>
 
               <div className="flex flex-col gap-3">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
+                />
+
                 <button
-                  onClick={() => onSearchDate(new Date().toISOString().split('T')[0])}
-                  className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                  onClick={() => onSearchDate && onSearchDate(selectedDate)}
+                  className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors"
                 >
-                  {isRtl ? 'اليوم' : 'Today'}
+                  {isRtl ? 'بحث في هذا التاريخ' : 'Search this date'}
                 </button>
-                <button
-                  onClick={() => {
-                    const d = new Date(); d.setDate(d.getDate() + 1);
-                    onSearchDate(d.toISOString().split('T')[0]);
-                  }}
-                  className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                >
-                  {isRtl ? 'غداً' : 'Tomorrow'}
-                </button>
-                <button
-                  onClick={() => {
-                    const d = new Date(); d.setDate(d.getDate() + 2);
-                    onSearchDate(d.toISOString().split('T')[0]);
-                  }}
-                  className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                >
-                  {isRtl ? 'بعد غد' : 'Day after tomorrow'}
-                </button>
-                <div className="relative w-full">
-                  <input
-                    type="date"
-                    className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
-                    onChange={(e) => {
-                      if (e.target.value) onSearchDate(e.target.value);
-                    }}
-                  />
-                </div>
               </div>
 
               <button
