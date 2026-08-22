@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { calculateNearestValidChain, calculateAllValidChains } from '../utils/bookingChains';
+import { useAppointmentSubmission } from '../hooks/useAppointmentSubmission';
+import { useSmartConflictResolver } from '../hooks/useSmartConflictResolver';
+import { SmartConflictModal } from './appointment/SmartConflictModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Calendar, Loader2 as CalendarIcon, User, Users, PlusCircle, Check, 
@@ -640,20 +643,33 @@ export default function InteractiveDrawers({
   const [currentServiceCategory, setCurrentServiceCategory] = useState<string>('all');
   const [serviceSearch, setServiceSearch] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
-  const [bookingRecoveryMode, setBookingRecoveryMode] = useState<'chain' | 'modify_professionals' | 'separate_services'>('chain');
 
-  const [chainConflictDialog, setChainConflictDialog] = useState<{
-    originalStaged: any[];
-    payloadItems: any[];
-    conflictCards: ConflictCard[];
-    selectedDate: string;
-    validChains: any[];
-    selectedChain: any | null;
-    isRevalidating: boolean;
-    onConfirm: (chain: any) => void;
-    onCancel: () => void;
-  } | null>(null);
-  const [chainConflictView, setChainConflictView] = useState<'explanation' | 'date-selection' | 'time-selection' | 'confirmation'>('explanation');
+  const { executeFinalSubmission: sharedExecuteSubmission, isSubmitting } = useAppointmentSubmission();
+  const executeFinalSubmissionRef = useRef<((items: any[]) => Promise<void>) | null>(null);
+
+  const {
+    conflictDialog,
+    setConflictDialog,
+    conflictView,
+    setConflictView,
+    bookingRecoveryMode,
+    setBookingRecoveryMode,
+    preflightMultiServiceChain,
+    preflightSeparateServices,
+    selectAlternativeDate,
+    closeDialog
+  } = useSmartConflictResolver({
+    tenantId,
+    isRtl,
+    stylists,
+    onSubmitValidatedItems: async (itemsToSubmit) => {
+       if (executeFinalSubmissionRef.current) {
+         await executeFinalSubmissionRef.current(itemsToSubmit);
+       }
+    },
+    onRevalidationFailed: () => {}
+  });
+
   const [bookingErrorDialog, setBookingErrorDialog] = useState<BookingDialogCopy | null>(null);
   const [bookingHoursDecisionDialog, setBookingHoursDecisionDialog] = useState<(BookingDialogCopy & {
     extensionMinutes: number;
@@ -1486,45 +1502,6 @@ export default function InteractiveDrawers({
     }
   };
 
-  const fetchAvailabilityLayers = async (currentItems: any[], dateString: string) => {
-      const layers: import('../utils/bookingChains').BookingSlot[][] = [];
-      const diagnosticsByLayer: AvailabilityDiagnostic[][] = [];
-      let anyFailed = false;
-      for (let i = 0; i < currentItems.length; i++) {
-        const item = currentItems[i];
-        const searchResp = await tenantApiAdapter.searchAvailability({
-          tenantId,
-          serviceId: item.serviceId,
-          staffId: item.requestedStaffId || undefined,
-          date: dateString
-        });
-        if (searchResp?.success && searchResp.slots) {
-          layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: item.serviceId })));
-          diagnosticsByLayer.push(Array.isArray(searchResp.diagnostics) ? searchResp.diagnostics : []);
-        } else {
-          layers.push([]);
-          diagnosticsByLayer.push([]);
-          anyFailed = true;
-        }
-      }
-      return { layers, diagnosticsByLayer, anyFailed };
-  };
-
-  const handleSearchDate = async (dateStr: string) => {
-    if (!chainConflictDialog || !chainConflictDialog.payloadItems) return;
-    const { layers } = await fetchAvailabilityLayers(chainConflictDialog.payloadItems, dateStr);
-    const validChains = calculateAllValidChains(layers);
-    setChainConflictDialog(prev => prev ? { ...prev, selectedDate: dateStr, validChains } : null);
-    setChainConflictView('time-selection');
-  };
-
-  const reopenServicesForRecovery = (mode: 'modify_professionals' | 'separate_services') => {
-    setBookingRecoveryMode(mode);
-    setChainConflictDialog(null);
-    setChainConflictView('explanation');
-    setCreateStep(3);
-  };
-
   const showBookingErrorDialog = (dialog: {
     titleAr: string;
     titleEn: string;
@@ -1759,91 +1736,6 @@ export default function InteractiveDrawers({
       return;
     }
 
-  const preflightSeparateServices = async (currentItems: any[]) => {
-    try {
-      const validatedItems: any[] = [];
-      const conflictCards: ConflictCard[] = [];
-      let allItemsValid = true;
-
-      for (const item of currentItems) {
-        const requestStartIso = getSyncedStagedStartIso(item);
-        const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
-        const requestDate = requestStartIso.includes('T') ? requestStartIso.split('T')[0] : getLocalDateKey(selectedDate);
-        const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers([item], requestDate);
-        const layerSlots = layers[0] || [];
-        const diagnostics = diagnosticsByLayer[0] || [];
-        const reqTimeMs = new Date(requestStartIso).getTime();
-        const normalizedStaffId = `${item.requestedStaffId || item.staffId || ''}`.trim();
-        const exactSlot = layerSlots.find((slot: any) => {
-          const slotTimeMs = new Date(slot.startTime).getTime();
-          const slotStaffId = `${slot.staffId || ''}`.trim();
-          return slotTimeMs === reqTimeMs && (!normalizedStaffId || slotStaffId === normalizedStaffId);
-        });
-
-        const staff = stylists.find((candidate) => `${candidate.id || ''}`.trim() === normalizedStaffId)
-          || stylists.find((candidate) => `${candidate.id || ''}`.trim() === `${exactSlot?.staffId || ''}`.trim());
-        const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : (isRtl ? 'المختص' : 'Professional');
-        const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
-
-        if (anyFailed || !exactSlot || !exactSlot.available) {
-          allItemsValid = false;
-          const diagnostic = pickBestConflictDiagnostic({
-            diagnostics,
-            serviceId: item.serviceId,
-            staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-            requestedStartTime: requestStartIso,
-            requestedEndTime: requestEndIso,
-            exactSlotStartTime: exactSlot?.startTime,
-            exactSlotEndTime: exactSlot?.endTime
-          });
-
-          conflictCards.push(buildConflictCard({
-            diagnostic,
-            staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
-            staffName,
-            avatar,
-            isRtl
-          }));
-        } else {
-          validatedItems.push({
-            ...item,
-            staffId: exactSlot.staffId || item.staffId,
-            assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
-          });
-        }
-      }
-
-      if (allItemsValid) {
-        await executeFinalSubmission(validatedItems);
-        return;
-      }
-
-      setBookingRecoveryMode('separate_services');
-      setChainConflictView('explanation');
-      setChainConflictDialog({
-        originalStaged: stagedServices,
-        payloadItems: currentItems,
-        conflictCards,
-        selectedDate: selectedDate,
-        validChains: [],
-        selectedChain: null,
-        isRevalidating: false,
-        onConfirm: async () => {},
-        onCancel: () => {
-          setChainConflictDialog(null);
-          setChainConflictView('explanation');
-        }
-      });
-    } catch (err: any) {
-      showBookingErrorDialog({
-        titleAr: 'تعذر التحقق من التوفر',
-        titleEn: 'Unable to check availability',
-        bodyAr: 'تعذر التحقق من الإتاحة في الوقت الحالي. يرجى المحاولة مرة أخرى.',
-        bodyEn: 'We could not check availability right now. Please try again.'
-      });
-    }
-  };
-
   const executeFinalSubmission = async (itemsToSubmit: any[]) => {
     const payload: any = {
       items: itemsToSubmit,
@@ -1930,230 +1822,61 @@ export default function InteractiveDrawers({
         payload.paymentAllocations = paymentAllocations;
       }
 
-      const response = await tenantApiAdapter.createAppointment(payload);
-      if (!response?.success) {
-        throw new Error(response?.message || 'Failed to create appointment');
-      }
-      resetAppointmentDraft();
-      removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
-      setAppointmentDraftPending(false);
-      setShowAppointmentDraftPrompt(false);
-      setIsCreateDrawerOpen(false);
-      if (onBoardChanged) {
-        await onBoardChanged();
-      }
-      addLocalToast(
-        `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
-        `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
-        'success'
-      );
-    } catch (err: any) {
-      console.error('Failed to create appointment', err);
-      const errorMeta = extractBookingErrorMeta(err);
-
-      if (isBookingTooSoonError(errorMeta)) {
-        showBookingErrorDialog(buildAdvanceBookingDialog({
-          isRtl,
-          currentLabel: getRiyadhCurrentTimeLabel(),
-          slotLabel: formatMinutesToTime(itemsToSubmit[0]?.startTime ? Number(itemsToSubmit[0].startTime) : currentStartTime)
-        }));
-        return;
-      }
-
-      if (isBookingConflictError(errorMeta)) {
-        if (itemsToSubmit.length > 1 || hasStructuredBookingDiagnostics(errorMeta)) {
-          if (!chainConflictDialog) {
-            if (bookingRecoveryMode === 'separate_services') {
-              await preflightSeparateServices(itemsToSubmit);
+      await sharedExecuteSubmission(itemsToSubmit, payload, {
+        onSuccess: async () => {
+          resetAppointmentDraft();
+          removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+          setAppointmentDraftPending(false);
+          setShowAppointmentDraftPrompt(false);
+          setIsCreateDrawerOpen(false);
+          if (onBoardChanged) {
+            await onBoardChanged();
+          }
+          addLocalToast(
+            `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
+            `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
+            'success'
+          );
+        },
+        onTooSoon: (meta) => {
+          showBookingErrorDialog(buildAdvanceBookingDialog({
+            isRtl,
+            currentLabel: getRiyadhCurrentTimeLabel(),
+            slotLabel: formatMinutesToTime(itemsToSubmit[0]?.startTime ? (typeof itemsToSubmit[0].startTime === 'string' && itemsToSubmit[0].startTime.includes('T') ? (new Date(itemsToSubmit[0].startTime).getHours() * 60 + new Date(itemsToSubmit[0].startTime).getMinutes()) : Number(itemsToSubmit[0].startTime)) : currentStartTime)
+          }));
+        },
+        onConflict: async (itemsArg, meta) => {
+          if (itemsArg.length > 1 || hasStructuredBookingDiagnostics(meta)) {
+            if (!conflictDialog) {
+              if (bookingRecoveryMode === 'separate_services') {
+                await preflightSeparateServices(itemsArg, stagedServices, getLocalDateKey(selectedDate));
+              } else {
+                await preflightMultiServiceChain(itemsArg, stagedServices, getLocalDateKey(selectedDate), true);
+              }
             } else {
-              await preflightMultiServiceChain(itemsToSubmit, true);
+              setConflictView(bookingRecoveryMode === 'separate_services' ? 'explanation' : 'time-selection');
             }
           } else {
-            setChainConflictView(bookingRecoveryMode === 'separate_services' ? 'explanation' : 'time-selection');
+            showBookingErrorDialog(buildGenericBookingErrorDialog());
           }
-          return;
+        },
+        onError: (err) => {
+          showBookingErrorDialog(buildGenericBookingErrorDialog());
         }
-
-        showBookingErrorDialog(buildGenericBookingErrorDialog());
-        return;
-      }
-
-      showBookingErrorDialog(buildGenericBookingErrorDialog());
-    }
-  };
-
-  const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
-    try {
-      const requestedStartISO = getSyncedStagedStartIso(currentItems[0]);
-      const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getLocalDateKey(selectedDate));
-      
-      let isRequestedChainValid = true;
-      const discoveredStaffIds: string[] = [];
-      const conflictCards: ConflictCard[] = [];
-
-      if (anyFailed) {
-          isRequestedChainValid = false;
-          conflictCards.push({
-            staffId: '',
-            staffName: isRtl ? 'المختص' : 'Professional',
-            reasonType: 'unknown',
-            reasonTitle: isRtl ? 'تعذر جلب الأوقات المتاحة للخدمة' : 'Could not fetch availability',
-            reasonDescription: isRtl ? 'تعذر التحقق من الإتاحة لهذه الخدمة في الوقت الحالي.' : 'Could not verify availability for this service right now.'
-          });
-      } else {
-          for (let i = 0; i < currentItems.length; i++) {
-            const item = currentItems[i];
-            const layerSlots = layers[i];
-            const diagnostics = diagnosticsByLayer[i] || [];
-            const requestStartIso = getSyncedStagedStartIso(item);
-            const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
-            const reqTimeMs = new Date(requestStartIso).getTime();
-            
-            const exactSlot = layerSlots.find((s: any) => new Date(s.startTime).getTime() === reqTimeMs);
-            
-            const staff = stylists.find(s => s.id === item.requestedStaffId) || stylists.find(s => s.id === exactSlot?.staffId);
-            const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : 'المختص';
-            const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
-
-            if (exactSlot && !exactSlot.available) {
-              isRequestedChainValid = false;
-              const diagnostic = pickBestConflictDiagnostic({
-                diagnostics,
-                serviceId: item.serviceId,
-                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-                requestedStartTime: requestStartIso,
-                requestedEndTime: requestEndIso,
-                exactSlotStartTime: exactSlot.startTime,
-                exactSlotEndTime: exactSlot.endTime
-              });
-              conflictCards.push(buildConflictCard({
-                diagnostic,
-                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
-                staffName,
-                avatar,
-                isRtl
-              }));
-            } else if (!exactSlot) {
-              isRequestedChainValid = false;
-              const diagnostic = pickBestConflictDiagnostic({
-                diagnostics,
-                serviceId: item.serviceId,
-                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-                requestedStartTime: requestStartIso,
-                requestedEndTime: requestEndIso
-              });
-              conflictCards.push(buildConflictCard({
-                diagnostic,
-                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
-                staffName,
-                avatar,
-                isRtl
-              }));
-            } else {
-              discoveredStaffIds.push(exactSlot.staffId);
-            }
-          }
-      }
-
-      if (isRequestedChainValid && !isRetry) {
-        const validatedItems = currentItems.map((item, idx) => ({
-           ...item,
-           staffId: discoveredStaffIds[idx] || item.staffId,
-           assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
-        }));
-        await executeFinalSubmission(validatedItems);
-      } else {
-        setChainConflictView('explanation');
-        setChainConflictDialog({
-          originalStaged: stagedServices,
-          payloadItems: currentItems,
-          conflictCards: isRetry ? [{
-            staffId: '',
-            staffName: isRtl ? 'المختص' : 'Professional',
-            reasonType: 'unknown',
-            reasonTitle: isRtl ? 'تغيرت الإتاحة' : 'Availability changed',
-            reasonDescription: isRtl ? 'تغيرت الإتاحة، يرجى المحاولة بوقت آخر.' : 'Availability changed, please try another time.'
-          }] : conflictCards,
-          selectedDate: selectedDate,
-          validChains: [],
-          selectedChain: null,
-          isRevalidating: false,
-          onConfirm: async (chain: any) => {
-            setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: true } : null);
-            // Fresh verification immediately before booking
-            const dateToValidate = chain.startTime.split('T')[0];
-            const { layers: freshLayers } = await fetchAvailabilityLayers(currentItems, dateToValidate);
-            
-            let isStillValid = true;
-            for (let i = 0; i < currentItems.length; i++) {
-               const reqTimeMs = new Date(chain.slots[i].startTime).getTime();
-               const exactSlot = freshLayers[i].find((s: any) => new Date(s.startTime).getTime() === reqTimeMs && s.staffId === chain.slots[i].staffId);
-               if (!exactSlot || !exactSlot.available) {
-                  isStillValid = false;
-                  break;
-               }
-            }
-
-              if (isStillValid) {
-                const confirmedItems = currentItems.map((item, idx) => {
-                   const slot = chain.slots[idx];
-                   return {
-                     ...item,
-                     startTime: slot.startTime,
-                     staffId: slot.staffId,
-                     assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
-                   };
-                });
-                setChainConflictDialog(null);
-                setChainConflictView('explanation');
-                await executeFinalSubmission(confirmedItems);
-              } else {
-                  setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: false } : null);
-                  showBookingErrorDialog({
-                    titleAr: 'تعذر إكمال الحجز',
-                    titleEn: 'Unable to complete booking',
-                    bodyAr: 'لم يعد هذا الوقت متاحاً. يرجى اختيار وقت آخر.',
-                    bodyEn: 'This time is no longer available. Please choose another time.'
-                  });
-                  setChainConflictView('time-selection'); // Go back to selection
-              }
-            },
-          onCancel: () => {
-            setChainConflictDialog(null);
-            setChainConflictView('explanation');
-          }
-        });
-      }
+      });
     } catch (err: any) {
-      const errorMeta = extractBookingErrorMeta(err);
-
-      if (isBookingTooSoonError(errorMeta)) {
-        showBookingErrorDialog(buildAdvanceBookingDialog({
-          isRtl,
-          currentLabel: getRiyadhCurrentTimeLabel(),
-          slotLabel: formatMinutesToTime(currentStartTime)
-        }));
-        return;
-      }
-
-      if (isBookingConflictError(errorMeta)) {
-        showBookingErrorDialog(buildGenericBookingErrorDialog());
-        return;
-      }
-
+      console.error('Failed to calculate payments or construct payload', err);
       showBookingErrorDialog(buildGenericBookingErrorDialog());
     }
   };
-
-
-
 
   void (async () => {
+    executeFinalSubmissionRef.current = executeFinalSubmission;
     if (items.length > 1) {
       if (bookingRecoveryMode === 'separate_services') {
-        await preflightSeparateServices(items);
+        await preflightSeparateServices(items, stagedServices, getLocalDateKey(selectedDate));
       } else {
-        await preflightMultiServiceChain(items, false);
+        await preflightMultiServiceChain(items, stagedServices, getLocalDateKey(selectedDate), false);
       }
     } else {
       await executeFinalSubmission(items);
@@ -4491,272 +4214,30 @@ export default function InteractiveDrawers({
         )}
       </AnimatePresence>
 
-<AnimatePresence>
-        {chainConflictDialog && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" dir={isRtl ? 'rtl' : 'ltr'}>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={chainConflictDialog.onCancel}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative z-10 max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-center gap-3 mb-4 text-rose-600">
-                <AlertTriangle className="w-6 h-6" />
-                <h3 className="text-lg font-bold">
-                  {isRtl ? 'تعذر إكمال الحجز' : 'Unable to complete booking'}
-                </h3>
-              </div>
 
-              {chainConflictView === 'explanation' && (
-                <>
-                  <p className="text-sm font-medium text-slate-800 mb-2">
-                    {isRtl ? 'لا يمكن تنفيذ الخدمات بشكل متواصل في الوقت المحدد للأسباب التالية:' : 'The requested services cannot be booked continuously due to the following reasons:'}
-                  </p>
-                  <div className="mb-6 space-y-3">
-                    {chainConflictDialog.conflictCards?.map((card, idx) => (
-                      <div key={`${card.staffId || card.staffName || 'conflict'}-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-sm font-bold text-slate-600">
-                            {card.avatar ? (
-                              <img src={card.avatar} alt={card.staffName} className="h-full w-full object-cover" />
-                            ) : (
-                              <span>
-                                {card.staffName
-                                  .split(' ')
-                                  .filter(Boolean)
-                                  .map((part) => part[0])
-                                  .slice(0, 2)
-                                  .join('')
-                                  .toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="truncate text-sm font-extrabold text-slate-900">{card.staffName}</h4>
-                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${card.reasonType === 'existing_booking' ? 'bg-rose-50 text-rose-600' : card.reasonType === 'outside_working_hours' ? 'bg-amber-50 text-amber-700' : card.reasonType === 'time_off' ? 'bg-slate-100 text-slate-600' : card.reasonType === 'blocked_time' ? 'bg-orange-50 text-orange-700' : card.reasonType === 'staff_break' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{card.reasonTitle}</span>
-                            </div>
-                            <p className="mt-2 text-sm leading-6 text-slate-600">{card.reasonDescription}</p>
-                            {(card.conflictStartTime || card.conflictEndTime) && (
-                              <p className="mt-2 text-xs font-semibold text-slate-500">
-                                {formatConflictTime(card.conflictStartTime, isRtl)}
-                                {card.conflictEndTime ? ` – ${formatConflictTime(card.conflictEndTime, isRtl)}` : ''}
-                              </p>
-                            )}
-                            {card.workingHoursEnd && card.reasonType === 'outside_working_hours' && (
-                              <p className="mt-1 text-xs font-semibold text-slate-500">
-                                {isRtl
-                                  ? `ينتهي دوامها: ${formatConflictTime(card.workingHoursEnd, isRtl)}`
-                                  : `Working hours end: ${formatConflictTime(card.workingHoursEnd, isRtl)}`}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <button
-                      onClick={() => setChainConflictView('date-selection')}
-                      className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors"
-                    >
-                      {isRtl ? 'البحث عن موعد بديل' : 'Search for alternative time'}
-                    </button>
-                    
-                    <button
-                      onClick={() => reopenServicesForRecovery('modify_professionals')}
-                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                    >
-                      {isRtl ? 'تعديل المختصين' : 'Modify Professionals'}
-                    </button>
-
-                    <button
-                      onClick={() => reopenServicesForRecovery('separate_services')}
-                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                    >
-                      {isRtl ? 'حجز الخدمات بشكل منفصل' : 'Book services separately'}
-                    </button>
-                    
-                    <button
-                      onClick={chainConflictDialog.onCancel}
-                      className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors mt-2"
-                    >
-                      {isRtl ? 'إلغاء' : 'Cancel'}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {chainConflictView === 'date-selection' && (
-                <>
-                  <p className="text-sm font-medium text-slate-800 mb-4">
-                    {isRtl ? 'اختر اليوم الذي تريد البحث فيه' : 'Choose the day to search'}
-                  </p>
-                  
-                  <div className="flex flex-col gap-3">
-                    <button
-                      onClick={() => handleSearchDate(new Date().toISOString().split('T')[0])}
-                      className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                    >
-                      {isRtl ? 'اليوم' : 'Today'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        const d = new Date(); d.setDate(d.getDate() + 1);
-                        handleSearchDate(d.toISOString().split('T')[0]);
-                      }}
-                      className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                    >
-                      {isRtl ? 'غداً' : 'Tomorrow'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        const d = new Date(); d.setDate(d.getDate() + 2);
-                        handleSearchDate(d.toISOString().split('T')[0]);
-                      }}
-                      className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                    >
-                      {isRtl ? 'بعد غد' : 'Day after tomorrow'}
-                    </button>
-                    <div className="relative w-full">
-                      <input 
-                        type="date"
-                        className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
-                        onChange={(e) => {
-                          if (e.target.value) handleSearchDate(e.target.value);
-                        }}
-                      />
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={() => setChainConflictView('explanation')}
-                    className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors mt-4"
-                  >
-                    {isRtl ? 'رجوع' : 'Back'}
-                  </button>
-                </>
-              )}
-
-              {chainConflictView === 'time-selection' && (
-                <>
-                  <p className="text-sm font-bold text-slate-800 mb-4">
-                    {isRtl ? 'الأوقات المتاحة لبدء الحجز' : 'Available Start Times'}
-                  </p>
-                  
-                  {chainConflictDialog.validChains.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2 mb-4">
-                      {chainConflictDialog.validChains.map((chain, i) => {
-                         const d = new Date(chain.startTime);
-                         const min = (d.getHours() * 60 + d.getMinutes()) - (START_HOUR * 60);
-                         return (
-                           <button
-                             key={i}
-                             onClick={() => setChainConflictDialog(prev => prev ? { ...prev, selectedChain: chain } : null) || setChainConflictView('confirmation')}
-                             className="px-2 py-3 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                           >
-                             {formatMinutesToTime(min)}
-                           </button>
-                         );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6">
-                      <p className="text-sm text-slate-600 mb-6">
-                        {isRtl ? 'لا توجد سلسلة متواصلة متاحة في هذا اليوم. يمكنك اختيار يوماً آخر للبحث عن موعد مناسب.' : 'No continuous chain available on this day. Please choose another day.'}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => setChainConflictView('date-selection')}
-                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                    >
-                      {isRtl ? 'اختيار يوم آخر' : 'Choose another day'}
-                    </button>
-                    <button
-                      onClick={chainConflictDialog.onCancel}
-                      className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-                    >
-                      {isRtl ? 'إلغاء' : 'Cancel'}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {chainConflictView === 'confirmation' && chainConflictDialog.selectedChain && (
-                <>
-                  <p className="text-sm font-bold text-emerald-600 mb-2">
-                    {isRtl ? 'الموعد متاح' : 'Time is available'}
-                  </p>
-                  <p className="text-sm text-slate-600 mb-6">
-                    {isRtl ? 'يمكن تنفيذ الخدمات بالتسلسل في الوقت الذي اخترته:' : 'The services can be executed sequentially at the time you chose:'}
-                  </p>
-                  
-                  <div className="space-y-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    {chainConflictDialog.selectedChain.slots.map((slot, index) => {
-                      const srv = canonicalServices.find(s => s.id === slot.serviceId);
-                      const st = stylists.find(s => s.id === slot.staffId);
-                      const dStart = new Date(slot.startTime);
-                      const dEnd = new Date(slot.endTime);
-                      const startMin = (dStart.getHours() * 60 + dStart.getMinutes()) - (START_HOUR * 60);
-                      const endMin = (dEnd.getHours() * 60 + dEnd.getMinutes()) - (START_HOUR * 60);
-                      
-                      return (
-                        <div key={index} className="flex flex-col gap-1 text-sm border-b border-slate-100 pb-2 last:border-0 last:pb-0">
-                          <div className="font-bold text-slate-800">{isRtl ? srv?.nameAr : srv?.nameEn}</div>
-                          <div className="flex justify-between items-center text-slate-500">
-                            <span className="flex items-center gap-1"><User className="w-3.5 h-3.5"/> {isRtl ? st?.nameAr : st?.nameEn}</span>
-                            <span className="flex items-center gap-1 font-mono text-xs">{formatMinutesToTime(startMin)} - {formatMinutesToTime(endMin)}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <p className="text-sm font-semibold text-slate-800 text-center mb-6">
-                    {isRtl ? 'هل تريد حجز هذا الموعد الآن؟' : 'Do you want to book this time now?'}
-                  </p>
-
-                  <div className="flex flex-col gap-3">
-                    <button
-                      disabled={chainConflictDialog.isRevalidating}
-                      onClick={() => chainConflictDialog.selectedChain && chainConflictDialog.onConfirm(chainConflictDialog.selectedChain)}
-                      className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
-                    >
-                      {chainConflictDialog.isRevalidating && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {isRtl ? 'نعم، احجز الموعد' : 'Yes, book this time'}
-                    </button>
-                    <button
-                      disabled={chainConflictDialog.isRevalidating}
-                      onClick={() => setChainConflictView('time-selection')}
-                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50"
-                    >
-                      {isRtl ? 'اختيار وقت آخر' : 'Choose another time'}
-                    </button>
-                    <button
-                      disabled={chainConflictDialog.isRevalidating}
-                      onClick={chainConflictDialog.onCancel}
-                      className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50"
-                    >
-                      {isRtl ? 'إلغاء' : 'Cancel'}
-                    </button>
-                  </div>
-                </>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <SmartConflictModal
+        isRtl={isRtl}
+        startHour={boardStartHour}
+        stylists={stylists}
+        canonicalServices={canonicalServices}
+        conflictDialog={conflictDialog as any}
+        conflictView={conflictView as any}
+        bookingRecoveryMode={bookingRecoveryMode}
+        setConflictView={setConflictView}
+        setConflictDialog={setConflictDialog as any}
+        onClose={closeDialog}
+        onSearchDate={selectAlternativeDate}
+        onModifyProfessionals={() => {
+           setBookingRecoveryMode('modify_professionals');
+           closeDialog();
+           setCreateStep(3);
+        }}
+        onSeparateServices={() => {
+           setBookingRecoveryMode('separate_services');
+           closeDialog();
+           setCreateStep(3);
+        }}
+      />
 
     </>
   );
