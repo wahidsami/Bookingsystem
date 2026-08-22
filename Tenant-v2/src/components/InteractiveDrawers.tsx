@@ -848,7 +848,10 @@ export default function InteractiveDrawers({
   const addMinutesToIso = (iso: string, minutes: number) => (
     new Date(new Date(iso).getTime() + Math.max(0, Math.round(minutes)) * 60000).toISOString()
   );
-  const getSyncedStagedStartIso = (item: { startTime?: number; startTimeIso?: string | null }) => {
+  const getSyncedStagedStartIso = (item: { startTime?: number | string; startTimeIso?: string | null }) => {
+    if (typeof item.startTime === 'string' && item.startTime.includes('T') && !Number.isNaN(new Date(item.startTime).getTime())) {
+      return item.startTime;
+    }
     const expectedStartIso = buildIsoFromMinutes(selectedDate, Number(item.startTime || 0));
     if (!item.startTimeIso) {
       return expectedStartIso;
