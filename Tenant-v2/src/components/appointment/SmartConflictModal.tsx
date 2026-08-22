@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, User, Loader2 } from 'lucide-react';
 import { ChainConflictDialogState, ChainConflictView, BookingRecoveryMode } from '../../hooks/useSmartConflictResolver';
@@ -111,6 +111,12 @@ export const SmartConflictModal: React.FC<SmartConflictModalProps> = ({
   };
 
   const [selectedDate, setSelectedDate] = useState<string>(getInitialDate);
+
+  useEffect(() => {
+    if (conflictDialog?.selectedDateKey) {
+      setSelectedDate(getInitialDate());
+    }
+  }, [conflictDialog?.selectedDateKey]);
 
   if (!conflictDialog) return null;
 
