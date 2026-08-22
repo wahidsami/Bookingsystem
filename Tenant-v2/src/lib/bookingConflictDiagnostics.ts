@@ -5,7 +5,8 @@ export type ConflictReasonType =
   | 'staff_break'
   | 'time_off'
   | 'unavailable'
-  | 'unknown';
+  | 'unknown'
+  | 'available';
 
 export interface AvailabilityDiagnostic {
   staffId?: string | null;
@@ -39,7 +40,8 @@ const REASON_PRIORITY: Record<ConflictReasonType, number> = {
   time_off: 300,
   unavailable: 200,
   outside_working_hours: 100,
-  unknown: 0
+  unknown: 0,
+  available: -1
 };
 
 const normalizeReasonType = (value?: string | null): ConflictReasonType => {
@@ -50,6 +52,7 @@ const normalizeReasonType = (value?: string | null): ConflictReasonType => {
   if (raw === 'time_off') return 'time_off';
   if (raw === 'outside_working_hours') return 'outside_working_hours';
   if (raw === 'unavailable') return 'unavailable';
+  if (raw === 'available') return 'available';
   return 'unknown';
 };
 
@@ -225,7 +228,8 @@ export const buildConflictCard = ({
   avatar?: string | null;
   isRtl: boolean;
 }): ConflictCard => {
-  const normalizedReason = normalizeReasonType(diagnostic?.reasonType);
+  // If diagnostic is null, it means no overlapping blocker was found, so they are available for this specific slot check.
+  const normalizedReason = diagnostic === null ? 'available' : normalizeReasonType(diagnostic?.reasonType);
   const resolvedName = `${staffName || diagnostic?.staffName || ''}`.trim() || (isRtl ? 'المختص' : 'Professional');
   const reasonTitles: Record<ConflictReasonType, { ar: string; en: string }> = {
     blocked_time: { ar: 'وقت محظور', en: 'Blocked Time' },
@@ -234,7 +238,8 @@ export const buildConflictCard = ({
     staff_break: { ar: 'استراحة الموظفة', en: 'Staff break' },
     time_off: { ar: 'إجازة / غياب', en: 'Time off' },
     unavailable: { ar: 'غير متاحة', en: 'Unavailable' },
-    unknown: { ar: 'تعذر تحديد السبب', en: 'Reason unavailable' }
+    unknown: { ar: 'تعذر تحديد السبب', en: 'Reason unavailable' },
+    available: { ar: 'متاحة', en: 'Available' }
   };
 
   const reasonDescriptions: Record<ConflictReasonType, { ar: string; en: string }> = {
@@ -265,6 +270,10 @@ export const buildConflictCard = ({
     unknown: {
       ar: 'تعذر تحديد سبب عدم الإتاحة بدقة.',
       en: 'The availability reason could not be determined precisely.'
+    },
+    available: {
+      ar: 'الموظفة متاحة لتقديم الخدمة في هذا الوقت.',
+      en: 'The professional is available for this requested time.'
     }
   };
 
@@ -279,4 +288,23 @@ export const buildConflictCard = ({
     conflictEndTime: diagnostic?.reasonEndTime || diagnostic?.endTime || undefined,
     workingHoursEnd: diagnostic?.workingHoursEnd || undefined
   };
+};
+
+export const getConflictBadgeClasses = (reasonType: ConflictReasonType): string => {
+  switch (reasonType) {
+    case 'existing_booking':
+      return 'bg-rose-50 text-rose-600';
+    case 'outside_working_hours':
+      return 'bg-amber-50 text-amber-700';
+    case 'time_off':
+      return 'bg-slate-100 text-slate-600';
+    case 'blocked_time':
+      return 'bg-orange-50 text-orange-700';
+    case 'staff_break':
+      return 'bg-indigo-50 text-indigo-700';
+    case 'available':
+      return 'bg-emerald-50 text-emerald-700';
+    default:
+      return 'bg-slate-100 text-slate-600';
+  }
 };

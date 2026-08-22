@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, User, Loader2 } from 'lucide-react';
 import { ChainConflictDialogState, ChainConflictView, BookingRecoveryMode } from '../../hooks/useSmartConflictResolver';
+import { getConflictBadgeClasses } from '../../lib/bookingConflictDiagnostics';
 import { useTenantAuth } from '../../contexts/TenantAuthContext';
 import { getTenantBusinessHours, getEffectiveClosingTime, type WorkingHoursDayKey } from '../../lib/tenantWorkingHours';
 import { resolveTenantTimezone, getDatePartsInTimeZone } from '../../lib/tenantTime';
@@ -170,7 +171,7 @@ export const SmartConflictModal: React.FC<SmartConflictModalProps> = ({
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="truncate text-sm font-extrabold text-slate-900">{card.staffName}</h4>
-                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${card.reasonType === 'existing_booking' ? 'bg-rose-50 text-rose-600' : card.reasonType === 'outside_working_hours' ? 'bg-amber-50 text-amber-700' : card.reasonType === 'time_off' ? 'bg-slate-100 text-slate-600' : card.reasonType === 'blocked_time' ? 'bg-orange-50 text-orange-700' : card.reasonType === 'staff_break' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{card.reasonTitle}</span>
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${getConflictBadgeClasses(card.reasonType)}`}>{card.reasonTitle}</span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-600">{card.reasonDescription}</p>
                         {(card.conflictStartTime || card.conflictEndTime) && (
