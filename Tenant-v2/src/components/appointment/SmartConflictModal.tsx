@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, User, Loader2 } from 'lucide-react';
 import { ChainConflictDialogState, ChainConflictView, BookingRecoveryMode } from '../../hooks/useSmartConflictResolver';
+import { useTenantAuth } from '../../contexts/TenantAuthContext';
+import { getTenantBusinessHours, getEffectiveClosingTime, type WorkingHoursDayKey } from '../../lib/tenantWorkingHours';
+import { resolveTenantTimezone, getDatePartsInTimeZone } from '../../lib/tenantTime';
 
 interface SmartConflictModalProps {
   isRtl?: boolean;
@@ -61,9 +64,53 @@ export const SmartConflictModal: React.FC<SmartConflictModalProps> = ({
   onConfirm,
   onSearchDate
 }) => {
-  const [selectedDate, setSelectedDate] = useState<string>(
-    conflictDialog?.selectedDateKey || new Date().toISOString().split('T')[0]
-  );
+  const authContext = useTenantAuth();
+
+  const getInitialDate = () => {
+    const failedDate = conflictDialog?.selectedDateKey;
+    if (!failedDate) return new Date().toISOString().split('T')[0];
+
+    try {
+      const tenantSettings = authContext?.tenantSettings;
+      const tenant = authContext?.tenant;
+      const tz = resolveTenantTimezone(tenantSettings?.timezone, tenant?.settings?.timezone);
+
+      const now = new Date();
+      const parts = getDatePartsInTimeZone(now, tz);
+      const currentTenantDate = parts.dateKey;
+
+      if (failedDate === currentTenantDate) {
+        const weekdayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long' });
+        const weekday = weekdayFormatter.format(now).toLowerCase() as WorkingHoursDayKey;
+
+        const businessHours = getTenantBusinessHours(tenantSettings, tenant);
+        const todayHours = businessHours[weekday];
+
+        if (todayHours && todayHours.isOpen) {
+          const closingTimeStr = getEffectiveClosingTime(todayHours);
+          const currentMinutes = parseInt(parts.hour, 10) * 60 + parseInt(parts.minute, 10);
+          const closingMinutes = parseInt(closingTimeStr.slice(0, 2), 10) * 60 + parseInt(closingTimeStr.slice(3, 5), 10);
+
+          if (currentMinutes >= closingMinutes) {
+            const d = new Date(failedDate);
+            for (let i = 1; i <= 7; i++) {
+              d.setDate(d.getDate() + 1);
+              const nextParts = getDatePartsInTimeZone(d, tz);
+              const nextWeekday = weekdayFormatter.format(d).toLowerCase() as WorkingHoursDayKey;
+              if (businessHours[nextWeekday]?.isOpen) {
+                return nextParts.dateKey;
+              }
+            }
+          }
+        }
+      }
+      return failedDate;
+    } catch (err) {
+      return failedDate;
+    }
+  };
+
+  const [selectedDate, setSelectedDate] = useState<string>(getInitialDate);
 
   if (!conflictDialog) return null;
 
