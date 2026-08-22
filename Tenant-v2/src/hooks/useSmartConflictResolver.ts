@@ -61,6 +61,18 @@ export const useSmartConflictResolver = ({
     const discoveredStaffIds: string[] = [];
     const conflictCards: ConflictCard[] = [];
 
+    const getDurationsFromLayers = (items: any[], fetchedLayers: any[][]) => {
+      return items.map((item, idx) => {
+        const layerSlots = fetchedLayers[idx];
+        const sampleSlot = layerSlots?.find((s: any) => s.available) || layerSlots?.[0];
+        return sampleSlot
+            ? (new Date(sampleSlot.endTime).getTime() - new Date(sampleSlot.startTime).getTime()) / 60000
+            : Number(item.duration || 60);
+      });
+    };
+    
+    const durations = getDurationsFromLayers(currentItems, layers);
+
     if (anyFailed) {
       isRequestedChainValid = false;
       conflictCards.push({
@@ -71,15 +83,17 @@ export const useSmartConflictResolver = ({
         reasonDescription: isRtl ? 'تعذر التحقق من التوافر' : 'Could not verify availability for this service right now.'
       });
     } else {
+      let currentCalculatedStart = new Date(currentItems[0].startTime).getTime();
+
       for (let i = 0; i < currentItems.length; i++) {
         const item = currentItems[i];
-        const layerSlots = layers[i];
+        const layerSlots = layers[i] || [];
         const diagnostics = diagnosticsByLayer[i] || [];
+        const durationForSlot = durations[i] || 60;
 
-        // Ensure startTime is treated as ISO string here
-        const requestStartIso = item.startTime;
-        const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || 0) * 60000).toISOString();
-        const reqTimeMs = new Date(requestStartIso).getTime();
+        const requestStartIso = new Date(currentCalculatedStart).toISOString();
+        const requestEndIso = new Date(currentCalculatedStart + durationForSlot * 60000).toISOString();
+        const reqTimeMs = currentCalculatedStart;
 
         const exactSlot = layerSlots.find((s: any) => new Date(s.startTime).getTime() === reqTimeMs);
 
@@ -99,6 +113,7 @@ export const useSmartConflictResolver = ({
             exactSlotEndTime: exactSlot.endTime
           });
           conflictCards.push(buildConflictCard({ diagnostic, staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '', staffName, avatar, isRtl }));
+          currentCalculatedStart += durationForSlot * 60000;
         } else if (!exactSlot) {
           isRequestedChainValid = false;
           const diagnostic = pickBestConflictDiagnostic({
@@ -109,8 +124,10 @@ export const useSmartConflictResolver = ({
             requestedEndTime: requestEndIso
           });
           conflictCards.push(buildConflictCard({ diagnostic, staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '', staffName, avatar, isRtl }));
+          currentCalculatedStart += durationForSlot * 60000;
         } else {
           discoveredStaffIds.push(exactSlot.staffId);
+          currentCalculatedStart = new Date(exactSlot.endTime).getTime();
         }
       }
     }
@@ -135,7 +152,7 @@ export const useSmartConflictResolver = ({
           reasonDescription: isRtl ? 'تغير التوافر، يرجى المحاولة في وقت آخر.' : 'Availability changed, please try another time.'
         }] : conflictCards,
         selectedDateKey: dateKey,
-        validChains: calculateAllValidChains(layers),
+        validChains: calculateAllValidChains(layers, durations),
         selectedChain: null,
         isRevalidating: false
       });
@@ -275,7 +292,14 @@ export const useSmartConflictResolver = ({
       dateKey: dateStr,
       isRtl
     });
-    const validChains = calculateAllValidChains(layers);
+    const durations = conflictDialog.payloadItems.map((item, idx) => {
+      const layerSlots = layers[idx];
+      const sampleSlot = layerSlots?.find((s: any) => s.available) || layerSlots?.[0];
+      return sampleSlot
+          ? (new Date(sampleSlot.endTime).getTime() - new Date(sampleSlot.startTime).getTime()) / 60000
+          : Number(item.duration || 60);
+    });
+    const validChains = calculateAllValidChains(layers, durations);
     setConflictDialog(prev => prev ? { ...prev, selectedDateKey: dateStr, validChains } : null);
     setConflictView('time-selection');
   };

@@ -4226,6 +4226,7 @@ export default function InteractiveDrawers({
         setConflictView={setConflictView}
         setConflictDialog={setConflictDialog as any}
         onClose={closeDialog}
+        onConfirm={acceptSuggestedChain}
         onSearchDate={selectAlternativeDate}
         onModifyProfessionals={() => {
            setBookingRecoveryMode('modify_professionals');

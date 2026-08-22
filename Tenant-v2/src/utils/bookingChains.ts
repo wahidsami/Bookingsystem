@@ -25,6 +25,7 @@ export interface ChainResult {
  * Finds all valid continuous chains of services from the provided layers.
  * 
  * @param layers Array of slot arrays, one for each service in sequence.
+ * @param durations Array of numbers representing the total occupied duration of each service (duration + buffers) in minutes.
  * @param requestedStartTime Optional time to filter chains starting at or after this time (ISO string).
  * @param maxGapMinutes Maximum allowed gap between services in minutes (default 45).
  * @param minGapMinutes Minimum required gap between services in minutes (default -5).
@@ -32,6 +33,7 @@ export interface ChainResult {
  */
 export function calculateAllValidChains(
   layers: BookingSlot[][],
+  durations: number[],
   requestedStartTime?: string,
   maxGapMinutes: number = 45,
   minGapMinutes: number = -5
@@ -55,8 +57,23 @@ export function calculateAllValidChains(
     const nextChains: BookingSlot[][] = [];
 
     for (const chain of chains) {
-      const lastSlot = chain[chain.length - 1];
-      const lastSlotEnd = new Date(lastSlot.endTime).getTime();
+      const lastSlotIndex = chain.length - 1;
+      const lastSlot = chain[lastSlotIndex];
+      const durationForSlot = durations[lastSlotIndex] || 60; // Fallback if missing
+      
+      // Calculate true sequential end time based on startTime + occupied duration
+      const lastSlotStartMs = new Date(lastSlot.startTime).getTime();
+      const calculatedEndMs = lastSlotStartMs + (durationForSlot * 60000);
+      
+      // Optional consistency diagnostic check against API's slot.endTime
+      const apiSlotEndMs = new Date(lastSlot.endTime).getTime();
+      if (Math.abs(calculatedEndMs - apiSlotEndMs) > 60000) {
+         // This typically happens if the backend slot is just a grid interval
+         // rather than the true occupied duration of the service.
+         // We proceed with calculatedEndMs as the deterministic source of truth.
+      }
+
+      const lastSlotEnd = calculatedEndMs;
 
       for (const nextSlot of nextLayer) {
         const nextSlotStart = new Date(nextSlot.startTime).getTime();
@@ -105,11 +122,12 @@ export function calculateAllValidChains(
  */
 export function calculateNearestValidChain(
   layers: BookingSlot[][],
+  durations: number[],
   requestedStartTime: string,
   maxGapMinutes: number = 45,
   minGapMinutes: number = -5
 ): ChainResult | null {
-  const chains = calculateAllValidChains(layers, requestedStartTime, maxGapMinutes, minGapMinutes);
+  const chains = calculateAllValidChains(layers, durations, requestedStartTime, maxGapMinutes, minGapMinutes);
   if (chains.length === 0) {
     return null;
   }

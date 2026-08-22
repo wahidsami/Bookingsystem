@@ -16,7 +16,8 @@ interface SmartConflictModalProps {
   onClose: () => void;
   onModifyProfessionals: () => void;
   onSeparateServices: () => void;
-  onSearchDate: (dateStr: string) => void;
+  onConfirm?: (chain: any) => void;
+  onSearchDate?: (dateStr: string) => void;
 }
 
 const formatConflictTime = (isoString: string, isRtl: boolean) => {
@@ -57,8 +58,13 @@ export const SmartConflictModal: React.FC<SmartConflictModalProps> = ({
   onClose,
   onModifyProfessionals,
   onSeparateServices,
+  onConfirm,
   onSearchDate
 }) => {
+  const [selectedDate, setSelectedDate] = useState<string>(
+    conflictDialog?.selectedDateKey || new Date().toISOString().split('T')[0]
+  );
+
   if (!conflictDialog) return null;
 
   return (
@@ -302,7 +308,7 @@ export const SmartConflictModal: React.FC<SmartConflictModalProps> = ({
               <div className="flex flex-col gap-3">
                 <button
                   disabled={conflictDialog.isRevalidating}
-                  onClick={() => (conflictDialog as any).onConfirm ? (conflictDialog as any).onConfirm(conflictDialog.selectedChain) : null}
+                  onClick={() => onConfirm ? onConfirm(conflictDialog.selectedChain) : null}
                   className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
                 >
                   {conflictDialog.isRevalidating && <Loader2 className="w-4 h-4 animate-spin" />}

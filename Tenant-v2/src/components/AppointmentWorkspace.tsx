@@ -3231,7 +3231,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const handleSearchDate = async (dateStr: string) => {
     if (!chainConflictDialog || !chainConflictDialog.payloadItems) return;
     const { layers } = await fetchAvailabilityLayers(chainConflictDialog.payloadItems, dateStr);
-    const validChains = calculateAllValidChains(layers);
+    const durations = chainConflictDialog.payloadItems.map((item, idx) => {
+      const layerSlots = layers[idx];
+      const sampleSlot = layerSlots?.find((s: any) => s.available) || layerSlots?.[0];
+      return sampleSlot
+          ? (new Date(sampleSlot.endTime).getTime() - new Date(sampleSlot.startTime).getTime()) / 60000
+          : Number(item.duration || 60);
+    });
+    const validChains = calculateAllValidChains(layers, durations);
     setChainConflictDialog(prev => prev ? { ...prev, selectedDate: dateStr, validChains } : null);
     setChainConflictView('time-selection');
   };
