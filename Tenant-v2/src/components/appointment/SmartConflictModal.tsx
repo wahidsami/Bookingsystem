@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, User, Loader2 } from 'lucide-react';
 import { ChainConflictDialogState, ChainConflictView, BookingRecoveryMode } from '../../hooks/useSmartConflictResolver';
