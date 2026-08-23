@@ -1,0 +1,24 @@
+# Phase 2 Sally Schedule Data Fix
+
+- **Date of correction:** 2026-08-23
+- **Sally's previous configuration:**
+  - 3 recurring StaffBreak records with `dayOfWeek = null`
+- **Her valid StaffShift days:**
+  - Monday (1)
+  - Tuesday (2)
+  - Wednesday (3)
+  - Thursday (4)
+  - Saturday (6)
+- **The correction:**
+  - Deleted the 3 `dayOfWeek=null` break records
+  - Created 15 explicit recurring break records
+  - 3 breaks × 5 valid working days
+- **Confirmations:**
+  - Friday = 0 breaks
+  - Sunday = 0 breaks
+  - `dayOfWeek=null` = 0
+- **Live Data Correction:**
+  - This was a live data correction executed against the database and API.
+  - No source code was changed.
+- **Purpose:**
+  - The purpose of this data fix was to remove ghost breaks from the Appointment Board and align the board presentation with StaffShift-based availability logic.
