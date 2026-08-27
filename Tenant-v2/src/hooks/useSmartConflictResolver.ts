@@ -59,6 +59,7 @@ export const useSmartConflictResolver = ({
 
     let isRequestedChainValid = true;
     const discoveredStaffIds: string[] = [];
+    const discoveredStartTimes: string[] = [];
     const conflictCards: ConflictCard[] = [];
 
     const getDurationsFromLayers = (items: any[], fetchedLayers: any[][]) => {
@@ -94,6 +95,7 @@ export const useSmartConflictResolver = ({
         const requestStartIso = new Date(currentCalculatedStart).toISOString();
         const requestEndIso = new Date(currentCalculatedStart + durationForSlot * 60000).toISOString();
         const reqTimeMs = currentCalculatedStart;
+        discoveredStartTimes.push(requestStartIso);
 
         const exactSlot = layerSlots.find((s: any) => new Date(s.startTime).getTime() === reqTimeMs);
 
@@ -135,6 +137,7 @@ export const useSmartConflictResolver = ({
     if (isRequestedChainValid && !isRetry) {
       const validatedItems = currentItems.map((item, idx) => ({
          ...item,
+         startTime: discoveredStartTimes[idx] || item.startTime,
          staffId: discoveredStaffIds[idx] || item.staffId,
          assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
       }));

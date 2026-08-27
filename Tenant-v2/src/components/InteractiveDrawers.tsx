@@ -4,8 +4,8 @@ import { useAppointmentSubmission } from '../hooks/useAppointmentSubmission';
 import { useSmartConflictResolver } from '../hooks/useSmartConflictResolver';
 import { SmartConflictModal } from './appointment/SmartConflictModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  X, Calendar, Loader2 as CalendarIcon, User, Users, PlusCircle, Check, 
+import {
+  X, Calendar, Loader2 as CalendarIcon, User, Users, PlusCircle, Check,
   Trash, ChevronLeft, Loader2, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search
 } from 'lucide-react';
 import AppointmentServicesStep from './appointment/AppointmentServicesStep';
@@ -365,7 +365,7 @@ export default function InteractiveDrawers({
   tenantTimezone
 }: InteractiveDrawersProps) {
   const resolvedTenantTimezone = useMemo(() => resolveTenantTimezone(tenantTimezone), [tenantTimezone]);
-  
+
   // Create Modal Step
   const [createMode, setCreateMode] = useState<'appointment' | 'blocked'>('appointment');
   const [createStep, setCreateStep] = useState<number>(1);
@@ -487,15 +487,15 @@ export default function InteractiveDrawers({
 
   // Structured Guest State
   const [guestsList, setGuestsList] = useState<GuestProfile[]>([
-    { 
-      id: 'g-1', 
-      name: '', 
-      phone: '', 
+    {
+      id: 'g-1',
+      name: '',
+      phone: '',
       email: '',
       birthDate: '',
-      notes: '', 
-      isFree: false, 
-      services: [createEmptyGuestService()] 
+      notes: '',
+      isFree: false,
+      services: [createEmptyGuestService()]
     }
   ]);
 
@@ -535,7 +535,7 @@ export default function InteractiveDrawers({
         const resolvedService = service.serviceId ? services.find((srv) => srv.id === service.serviceId) : null;
         const resolvedStaff = service.staffId ? availableStylists.find((staff) => staff.id === service.staffId) : null;
         const nextService = resolvedService || primaryService;
-        
+
         let nextStaffId = resolvedStaff?.id || primaryStaff?.id || '';
         if (nextService) {
           const normalizedAssignments = (nextService.employeeAssignments || []).map((id: any) => String(id));
@@ -744,13 +744,13 @@ export default function InteractiveDrawers({
   const [sessionNotes, setSessionNotes] = useState('');
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(true);
   const [createSplitActive, setCreateSplitActive] = useState(false);
-  const [createSplitAmounts, setCreateSplitAmounts] = useState({ 
-    card: 0, 
-    cash: 0, 
-    online: 0, 
-    bank_transfer: 0, 
-    wallet: 0, 
-    gift_card: 0 
+  const [createSplitAmounts, setCreateSplitAmounts] = useState({
+    card: 0,
+    cash: 0,
+    online: 0,
+    bank_transfer: 0,
+    wallet: 0,
+    gift_card: 0
   });
   const [giftCardCodeInput, setGiftCardCodeInput] = useState('');
 
@@ -1411,30 +1411,56 @@ export default function InteractiveDrawers({
   // Removed obsolete handleAddStagedService and toggleServiceExpansion since AppointmentServicesStep handles it
 
   const handleUpdateStagedService = (itemId: string, updates: Partial<StagedService>) => {
-    setStagedServices(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
-      const next = { ...item, ...updates };
-      const shouldResyncStartIso =
-        Object.prototype.hasOwnProperty.call(updates, 'startTime') ||
-        !next.startTimeIso ||
-        !Number.isFinite(new Date(next.startTimeIso).getTime()) ||
-        new Date(next.startTimeIso).getTime() !== new Date(buildIsoFromMinutes(selectedDate, Number(next.startTime || 0))).getTime();
+    setStagedServices(prev => {
+      // 1. Update the target item
+      const updatedList = prev.map(item => {
+        if (item.id !== itemId) return item;
+        const next = { ...item, ...updates };
+        const shouldResyncStartIso =
+          Object.prototype.hasOwnProperty.call(updates, 'startTime') ||
+          !next.startTimeIso ||
+          !Number.isFinite(new Date(next.startTimeIso).getTime()) ||
+          new Date(next.startTimeIso).getTime() !== new Date(buildIsoFromMinutes(selectedDate, Number(next.startTime || 0))).getTime();
 
-      if (shouldResyncStartIso) {
-        next.startTimeIso = buildIsoFromMinutes(selectedDate, Number(next.startTime || 0));
-      }
-
-      if (next.basePrice !== undefined) {
-        let priceAfterDiscount = next.basePrice;
-        if (next.discountType === 'flat') {
-          priceAfterDiscount = Math.max(0, next.basePrice - next.discountValue);
-        } else if (next.discountType === 'percent') {
-          priceAfterDiscount = Math.max(0, next.basePrice - (next.basePrice * next.discountValue) / 100);
+        if (shouldResyncStartIso) {
+          next.startTimeIso = buildIsoFromMinutes(selectedDate, Number(next.startTime || 0));
         }
-        next.finalPrice = priceAfterDiscount;
+
+        if (next.basePrice !== undefined) {
+          let priceAfterDiscount = next.basePrice;
+          if (next.discountType === 'flat') {
+            priceAfterDiscount = Math.max(0, next.basePrice - next.discountValue);
+          } else if (next.discountType === 'percent') {
+            priceAfterDiscount = Math.max(0, next.basePrice - (next.basePrice * next.discountValue) / 100);
+          }
+          next.finalPrice = priceAfterDiscount;
+        }
+        return next;
+      });
+
+      // 2. Cascade start times for subsequent items
+      const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
+      if (!shouldChainServiceTimes) {
+        return updatedList;
       }
-      return next;
-    }));
+
+      for (let i = 1; i < updatedList.length; i++) {
+        const prevItem = updatedList[i - 1];
+        const currentItem = updatedList[i];
+
+        const nextStartTime = prevItem.startTime + prevItem.duration;
+        const nextStartTimeIso = addMinutesToIso(
+          getSyncedStagedStartIso(prevItem),
+          prevItem.duration
+        );
+
+        // Always enforce the cascading chain rule if chain mode is active
+        currentItem.startTime = nextStartTime;
+        currentItem.startTimeIso = nextStartTimeIso;
+      }
+
+      return updatedList;
+    });
   };
 
   const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
@@ -1495,7 +1521,7 @@ export default function InteractiveDrawers({
         `Service "${isRtl ? service.nameAr : service.nameEn}" added to session queue.`,
         'success'
       );
-      
+
       setExpandedServiceIds((current) => ({
         ...current,
         [service.id]: true
@@ -2058,7 +2084,7 @@ export default function InteractiveDrawers({
     setCartItems(prev => {
       const exists = prev.find(item => item.id === prod.id);
       if (exists) {
-        return prev.map(item => 
+        return prev.map(item =>
           item.id === prod.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       } else {
@@ -2086,7 +2112,7 @@ export default function InteractiveDrawers({
       setCartItems(prev => prev.filter(item => item.id !== id));
       return;
     }
-    setCartItems(prev => prev.map(item => 
+    setCartItems(prev => prev.map(item =>
       item.id === id ? { ...item, quantity: newQty } : item
     ));
   };
@@ -2233,15 +2259,15 @@ export default function InteractiveDrawers({
       <AnimatePresence>
         {isCreateDrawerOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity"
               onClick={() => setIsCreateDrawerOpen(false)}
             />
-            
-            <motion.div 
+
+            <motion.div
               initial={{ x: isRtl ? '-100%' : '100%' }}
               animate={{ x: 0 }}
               exit={{ x: isRtl ? '-100%' : '100%' }}
@@ -2324,7 +2350,7 @@ export default function InteractiveDrawers({
                       : (isRtl ? 'جدولة الخدمات والخصومات وتخصيص الدفع لعملاء صالون واستجمام رفاه الفاخر' : 'Schedule luxury services, client profiles, and payment allocations')}
                   </p>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsCreateDrawerOpen(false)}
                   className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all cursor-pointer"
                 >
@@ -2621,12 +2647,12 @@ export default function InteractiveDrawers({
                               <p className="text-[10px] text-slate-400">{isRtl ? 'حجز خدمات إضافية لمرافقين في نفس الموعد' : 'Schedule additional treatments for guests in this reservation'}</p>
                             </div>
                             <div className="flex items-center gap-1.5 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/20">
-                              <input 
-                                type="checkbox" 
-                                id="group-check-step2" 
-                                checked={includeGroupGuests} 
-                                onChange={(e) => setIncludeGroupGuests(e.target.checked)} 
-                                className="rounded text-amber-500 focus:ring-0 cursor-pointer h-4 w-4" 
+                              <input
+                                type="checkbox"
+                                id="group-check-step2"
+                                checked={includeGroupGuests}
+                                onChange={(e) => setIncludeGroupGuests(e.target.checked)}
+                                className="rounded text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
                               />
                               <label htmlFor="group-check-step2" className="font-bold text-amber-800 text-[11px] cursor-pointer">
                                 {isRtl ? 'تفعيل حجز المرافقين' : 'Enable Guest Bookings'}
@@ -2643,8 +2669,8 @@ export default function InteractiveDrawers({
                                   <span>{isRtl ? 'قواعد ملكية حجز المرافقين' : 'GUEST OWNERSHIP & BOOKING RULES'}</span>
                                 </p>
                                 <p className="text-[10px] leading-relaxed">
-                                  {isRtl 
-                                    ? 'الضيوف المرافقين تابعين للحساب الرئيسي للعميل. لا يمكن تعديل أو تتبع حالة دفعهم بشكل منفصل؛ يتم إصدار فاتورة موحدة لكافة الخدمات.' 
+                                  {isRtl
+                                    ? 'الضيوف المرافقين تابعين للحساب الرئيسي للعميل. لا يمكن تعديل أو تتبع حالة دفعهم بشكل منفصل؛ يتم إصدار فاتورة موحدة لكافة الخدمات.'
                                     : 'All guest reservations are owned by the primary customer account. Individual rescheduling is locked; payment and checkout are processed under a unified invoice.'}
                                 </p>
                               </div>
@@ -2655,7 +2681,7 @@ export default function InteractiveDrawers({
                                   <p className="text-[10px] text-slate-400">{isRtl ? 'الحد الأقصى 8 ضيوف في الجلسة' : 'Maximum of 8 guests'}</p>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <button 
+                                  <button
                                     type="button"
                                     onClick={() => setGuestCount(prev => Math.max(1, prev - 1))}
                                     className="w-7 h-7 bg-white hover:bg-slate-100 border rounded-lg font-bold flex items-center justify-center cursor-pointer text-sm text-slate-700"
@@ -2663,7 +2689,7 @@ export default function InteractiveDrawers({
                                     -
                                   </button>
                                   <span className="w-8 text-center font-mono font-black text-slate-800 text-sm">{guestCount}</span>
-                                  <button 
+                                  <button
                                     type="button"
                                     onClick={() => setGuestCount(prev => Math.min(8, prev + 1))}
                                     className="w-7 h-7 bg-white hover:bg-slate-100 border rounded-lg font-bold flex items-center justify-center cursor-pointer text-sm text-slate-700"
@@ -2684,11 +2710,11 @@ export default function InteractiveDrawers({
                                   const guestServicesSubtotal = (guest.services || []).reduce((acc, gs) => acc + (guest.isFree || gs.isFree ? 0 : gs.finalPrice), 0);
 
                                   return (
-                                    <div 
-                                      key={guest.id} 
+                                    <div
+                                      key={guest.id}
                                       className={`p-4 bg-slate-50/50 rounded-xl border transition-all space-y-4 ${
-                                        hasValidationError 
-                                          ? 'border-red-200 bg-red-50/10 focus-within:border-red-400' 
+                                        hasValidationError
+                                          ? 'border-red-200 bg-red-50/10 focus-within:border-red-400'
                                           : 'border-slate-200 focus-within:border-amber-400'
                                       }`}
                                     >
@@ -2707,25 +2733,25 @@ export default function InteractiveDrawers({
                                       <div className="grid grid-cols-2 gap-2.5">
                                         <div>
                                           <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'الاسم بالكامل *' : 'Full Name *'}</label>
-                                          <input 
-                                            type="text" 
+                                          <input
+                                            type="text"
                                             required
-                                            value={guest.name} 
+                                            value={guest.name}
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, name: e.target.value } : g))}
-                                            placeholder={isRtl ? `الاسم الأول (مثال: سارة)` : `e.g. Guest ${index + 1}`} 
+                                            placeholder={isRtl ? `الاسم الأول (مثال: سارة)` : `e.g. Guest ${index + 1}`}
                                             className={`w-full bg-white border p-2 rounded-lg text-xs font-semibold focus:outline-none ${
                                               isNameEmpty ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-amber-400'
-                                            }`} 
+                                            }`}
                                           />
                                         </div>
                                         <div>
                                           <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'رقم الجوال' : 'Phone'}</label>
-                                          <input 
-                                            type="text" 
-                                            value={guest.phone} 
+                                          <input
+                                            type="text"
+                                            value={guest.phone}
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, phone: e.target.value } : g))}
-                                            placeholder="+966 50" 
-                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold" 
+                                            placeholder="+966 50"
+                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold"
                                           />
                                         </div>
                                       </div>
@@ -2733,23 +2759,23 @@ export default function InteractiveDrawers({
                                       <div className="grid grid-cols-2 gap-2.5">
                                         <div>
                                           <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'البريد الإلكتروني' : 'Email Address'}</label>
-                                          <input 
-                                            type="email" 
-                                            value={guest.email || ''} 
+                                          <input
+                                            type="email"
+                                            value={guest.email || ''}
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, email: e.target.value } : g))}
-                                            placeholder="guest@example.com" 
+                                            placeholder="guest@example.com"
                                             className={`w-full bg-white border p-2 rounded-lg text-xs font-semibold focus:outline-none ${
                                               isEmailInvalid ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-amber-400'
-                                            }`} 
+                                            }`}
                                           />
                                         </div>
                                         <div>
                                           <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'تاريخ الميلاد' : 'Birth Date'}</label>
-                                          <input 
-                                            type="date" 
-                                            value={guest.birthDate || ''} 
+                                          <input
+                                            type="date"
+                                            value={guest.birthDate || ''}
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, birthDate: e.target.value } : g))}
-                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold" 
+                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold"
                                           />
                                         </div>
                                       </div>
@@ -2852,12 +2878,12 @@ export default function InteractiveDrawers({
 
                                       <div>
                                         <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'ملاحظات وتفضيلات الضيف (حقل أساسي)' : 'Guest Notes / Requests'}</label>
-                                        <textarea 
+                                        <textarea
                                           rows={1}
                                           value={guest.notes}
                                           onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, notes: e.target.value } : g))}
-                                          placeholder={isRtl ? 'تفضيلات العناية، تفاصيل مخصصة، حساسية للمنتجات...' : 'Allergies, design reference, specific preferences.'} 
-                                          className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold" 
+                                          placeholder={isRtl ? 'تفضيلات العناية، تفاصيل مخصصة، حساسية للمنتجات...' : 'Allergies, design reference, specific preferences.'}
+                                          className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold"
                                         />
                                       </div>
 
@@ -2868,12 +2894,12 @@ export default function InteractiveDrawers({
                                             {guestServicesSubtotal} SAR
                                           </span>
                                         </span>
-                                        
+
                                         {/* Guest free-service toggle as a clear control */}
                                         <label className="flex items-center gap-1.5 cursor-pointer">
-                                          <input 
-                                            type="checkbox" 
-                                            checked={guest.isFree} 
+                                          <input
+                                            type="checkbox"
+                                            checked={guest.isFree}
                                             onChange={(e) => {
                                               const checked = e.target.checked;
                                               setGuestsList(prev => prev.map(g => {
@@ -2884,7 +2910,7 @@ export default function InteractiveDrawers({
                                                 return g;
                                               }));
                                             }}
-                                            className="rounded text-emerald-500 focus:ring-0 cursor-pointer h-4 w-4" 
+                                            className="rounded text-emerald-500 focus:ring-0 cursor-pointer h-4 w-4"
                                           />
                                           <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg flex items-center gap-0.5">
                                             <span>🎁</span>
@@ -2935,8 +2961,8 @@ export default function InteractiveDrawers({
                             <div className="py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center space-y-1">
                               <p className="font-black text-slate-700">{isRtl ? 'حجز عميل فردي' : 'Single Customer Reservation'}</p>
                               <p className="text-[10px] text-slate-400 max-w-sm mx-auto">
-                                {isRtl 
-                                  ? 'لم يتم تفعيل المرافقين لهذا الحجز. سيتم جدولة العميل الرئيسي فقط.' 
+                                {isRtl
+                                  ? 'لم يتم تفعيل المرافقين لهذا الحجز. سيتم جدولة العميل الرئيسي فقط.'
                                   : 'No guest profiles included. Proceeding with single customer booking only.'}
                               </p>
                             </div>
@@ -3141,7 +3167,7 @@ export default function InteractiveDrawers({
                           );
                         })()}
 
-{/* TEMPORARILY DISABLED (Refah – Remove Payment from Wizard) 
+{/* TEMPORARILY DISABLED (Refah – Remove Payment from Wizard)
                         <div className="p-4 bg-white border rounded-xl space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="font-bold">{isRtl ? 'طريقة الدفع' : 'Payment allocation'}</span>
@@ -3196,8 +3222,8 @@ export default function InteractiveDrawers({
                     ) : <div />}
 
                     {createStep < 4 ? (
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => {
                           if (createStep === 1) {
                             if (custMode === 'existing' && !selectedCustId) {
@@ -3221,7 +3247,7 @@ export default function InteractiveDrawers({
                             return;
                           }
                           setCreateStep(prev => prev + 1);
-                        }} 
+                        }}
                         className="py-2 px-5 bg-zinc-950 text-white rounded-xl text-xs font-bold"
                       >
                         {isRtl ? 'التالي' : 'Next Step'}
@@ -3333,15 +3359,15 @@ export default function InteractiveDrawers({
       <AnimatePresence>
         {isCartDrawerOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity"
               onClick={() => setIsCartDrawerOpen(false)}
             />
-            
-            <motion.div 
+
+            <motion.div
               initial={{ x: isRtl ? '-100%' : '100%' }}
               animate={{ x: 0 }}
               exit={{ x: isRtl ? '-100%' : '100%' }}
@@ -3413,7 +3439,7 @@ export default function InteractiveDrawers({
                     </h3>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsCartDrawerOpen(false)}
                   className="p-1 rounded bg-zinc-950/10 hover:bg-zinc-950/20 text-zinc-950 cursor-pointer"
                 >
@@ -3601,7 +3627,7 @@ export default function InteractiveDrawers({
                 <div className="w-5/12 bg-slate-50 flex flex-col justify-between h-full overflow-hidden border-s border-slate-200">
                   <div className="flex-1 p-3 flex flex-col overflow-hidden">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-2">{isRtl ? 'سلة المشتريات' : 'POS Checkout Items'}</span>
-                    
+
                     <div className="flex-1 overflow-y-auto space-y-1.5 mb-3">
                       {cartItems.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-xs">
@@ -3755,7 +3781,7 @@ export default function InteractiveDrawers({
                       const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                       const vat = total - (total / 1.15);
                       const subtotal = total - vat;
-                      
+
                       const posSplitSum = (posSplitAmounts.card || 0) + (posSplitAmounts.cash || 0) + (posSplitAmounts.wallet || 0);
                       const posRemaining = Math.max(0, total - posSplitSum);
                       const isPosSplitValid = total > 0 && Math.abs(posSplitSum - total) < 0.01;
@@ -3778,7 +3804,7 @@ export default function InteractiveDrawers({
                               <span className="font-mono text-amber-600 font-black">{total.toFixed(2)} SAR</span>
                             </div>
                           </div>
-                        
+
                           <div className="p-3 bg-white border-t space-y-2 mt-3">
                             <div className="flex justify-between items-center">
                               <span className="text-[9px] font-black text-slate-400">{isRtl ? 'بوابة التحصيل مدى' : 'Integrated Mada Gate'}</span>
@@ -3809,8 +3835,8 @@ export default function InteractiveDrawers({
                                 <div className="grid grid-cols-3 gap-2 text-[10px]">
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Mada</label>
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         if (!posSplitAmounts.card && posRemaining > 0) {
                                           setPosSplitAmounts(prev => ({ ...prev, card: parseFloat((posRemaining + (prev.card || 0)).toFixed(2)) }));
@@ -3824,8 +3850,8 @@ export default function InteractiveDrawers({
                                   </div>
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Cash</label>
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         if (!posSplitAmounts.cash && posRemaining > 0) {
                                           setPosSplitAmounts(prev => ({ ...prev, cash: parseFloat((posRemaining + (prev.cash || 0)).toFixed(2)) }));
@@ -3839,8 +3865,8 @@ export default function InteractiveDrawers({
                                   </div>
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Wallet</label>
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         if (!posSplitAmounts.wallet && posRemaining > 0) {
                                           setPosSplitAmounts(prev => ({ ...prev, wallet: parseFloat((posRemaining + (prev.wallet || 0)).toFixed(2)) }));
@@ -3864,8 +3890,8 @@ export default function InteractiveDrawers({
 
                             {posCustMode === 'walkin' && cartItems.some(i => i.type === 'giftcard') && !posCheckoutComplete && (
                               <div className="w-full py-2 px-3 bg-rose-50 border border-rose-200 text-rose-700 font-bold rounded-xl text-[10px] text-center my-2 animate-fadeIn">
-                                ⚠️ {isRtl 
-                                  ? 'لن يتم إيداع هذه البطاقة في أي محفظة. سيتم إنشاء رمز استرداد بدلاً من ذلك.' 
+                                ⚠️ {isRtl
+                                  ? 'لن يتم إيداع هذه البطاقة في أي محفظة. سيتم إنشاء رمز استرداد بدلاً من ذلك.'
                                   : 'This gift card will not be credited to any customer wallet. A redemption code will be generated instead.'}
                               </div>
                             )}
@@ -3977,11 +4003,11 @@ export default function InteractiveDrawers({
                 {isRtl ? 'بيانات المستلم (زائر)' : 'Walk-in Recipient Details'}
               </h3>
             </div>
-            
+
             <div className="text-xs text-slate-600 space-y-3 leading-relaxed">
               <p>
-                {isRtl 
-                  ? 'يرجى إدخال بيانات المشتري لضمان إرسال بطاقة الهدية الرقمية بنجاح وعدم فقدانها.' 
+                {isRtl
+                  ? 'يرجى إدخال بيانات المشتري لضمان إرسال بطاقة الهدية الرقمية بنجاح وعدم فقدانها.'
                   : 'Please enter the buyer details to ensure the digital gift card is sent successfully and not lost.'}
               </p>
 
@@ -4026,13 +4052,13 @@ export default function InteractiveDrawers({
             </div>
 
             <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100">
-              <button 
+              <button
                 onClick={() => setShowWalkinModal(false)}
                 className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
               >
                 {isRtl ? 'إلغاء' : 'Cancel'}
               </button>
-              <button 
+              <button
                 onClick={() => {
                   if (!posWalkinName || !posWalkinEmail) {
                     addLocalToast(
@@ -4065,23 +4091,23 @@ export default function InteractiveDrawers({
                 {isRtl ? 'الخدمة غير معينة' : 'Service Not Assigned'}
               </h3>
             </div>
-            
+
             <div className="text-xs text-slate-600 space-y-2 leading-relaxed">
               <p>
-                {isRtl 
-                  ? 'الخدمة المحددة غير معينة للموظف المحدد.' 
+                {isRtl
+                  ? 'الخدمة المحددة غير معينة للموظف المحدد.'
                   : 'The selected service is not assigned to the selected employee.'}
               </p>
               <p className="font-bold">{isRtl ? 'يرجى إما:' : 'Please either:'}</p>
               <ul className="list-disc pl-4 space-y-1">
                 <li>
-                  {isRtl 
-                    ? '• اختيار موظف آخر يقوم بتقديم هذه الخدمة.' 
+                  {isRtl
+                    ? '• اختيار موظف آخر يقوم بتقديم هذه الخدمة.'
                     : '• Select another employee who performs this service.'}
                 </li>
                 <li>
-                  {isRtl 
-                    ? '• تعيين هذه الخدمة للموظف المحدد أولاً من إدارة الموظفين.' 
+                  {isRtl
+                    ? '• تعيين هذه الخدمة للموظف المحدد أولاً من إدارة الموظفين.'
                     : '• Assign this service to the selected employee first from Employee Management.'}
                 </li>
               </ul>
