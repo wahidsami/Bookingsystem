@@ -2974,6 +2974,7 @@ export default function InteractiveDrawers({
                     {createStep === 3 && (
                       <AppointmentServicesStep
                         tenantId={tenantId}
+                        tenantTimezone={resolvedTenantTimezone}
                         selectedDate={getLocalDateKey(selectedDate)}
                         isRtl={isRtl}
                         boardStartHour={boardStartHour}

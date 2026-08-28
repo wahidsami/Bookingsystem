@@ -13,6 +13,7 @@ import { type StagedService } from './AppointmentServicesStep';
 interface AppointmentServiceRowProps {
   key?: React.Key;
   tenantId: string;
+  tenantTimezone: string;
   selectedDate: string;
   service: ServiceRecord;
   isRtl: boolean;
@@ -30,6 +31,7 @@ interface AppointmentServiceRowProps {
 
 export default function AppointmentServiceRow({
   tenantId,
+  tenantTimezone,
   selectedDate,
   service,
   isRtl,
@@ -205,6 +207,7 @@ export default function AppointmentServiceRow({
       {isExpanded && (
         <AppointmentServiceConfiguration
           tenantId={tenantId}
+          tenantTimezone={tenantTimezone}
           selectedDate={selectedDate}
           serviceId={service.id}
           variantId={variant?.id || stagedItem?.variantId}

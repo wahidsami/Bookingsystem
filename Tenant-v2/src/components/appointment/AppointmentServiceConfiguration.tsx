@@ -6,6 +6,7 @@ import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface AppointmentServiceConfigurationProps {
   tenantId: string;
+  tenantTimezone: string;
   selectedDate: string;
   serviceId: string;
   variantId?: string;
@@ -20,6 +21,7 @@ interface AppointmentServiceConfigurationProps {
 
 export default function AppointmentServiceConfiguration({
   tenantId,
+  tenantTimezone,
   selectedDate,
   serviceId,
   variantId,
@@ -37,6 +39,8 @@ export default function AppointmentServiceConfiguration({
     variantId,
     staffId: draftConfig.staffId,
     dateKey: selectedDate,
+    tenantTimezone,
+    boardStartHour,
     startTimeMinutes: Number(draftConfig.startTime || 0)
   });
 

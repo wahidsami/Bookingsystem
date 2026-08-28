@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchAvailabilityLayers } from '../services/availabilityService';
 import { AvailabilityDiagnostic } from '../lib/bookingConflictDiagnostics';
-import { buildIsoFromMinutes } from '../lib/employeeHelpers';
+import { buildTenantIsoFromMinutes } from '../lib/tenantTime';
 
 export interface EarlyValidationResult {
   status: 'idle' | 'loading' | 'available' | 'unavailable';
@@ -14,7 +14,9 @@ export function useEarlyAvailabilityValidation({
   variantId,
   staffId,
   dateKey,
-  startTimeMinutes, // offset from midnight
+  startTimeMinutes,
+  tenantTimezone,
+  boardStartHour = 9,
 }: {
   tenantId: string;
   serviceId: string;
@@ -22,6 +24,8 @@ export function useEarlyAvailabilityValidation({
   staffId?: string;
   dateKey: string;
   startTimeMinutes: number;
+  tenantTimezone: string;
+  boardStartHour?: number;
 }) {
   const [result, setResult] = useState<EarlyValidationResult>({ status: 'idle' });
 
@@ -58,7 +62,7 @@ export function useEarlyAvailabilityValidation({
         const diagnostics = diagnosticsByLayer[0] || [];
         
         // Convert the proposed startTime from minutes to an ISO string on the dateKey date
-        const proposedStartTimeIso = buildIsoFromMinutes(dateKey, startTimeMinutes);
+        const proposedStartTimeIso = buildTenantIsoFromMinutes(dateKey, startTimeMinutes, tenantTimezone, boardStartHour);
         const proposedStartTimeMs = new Date(proposedStartTimeIso).getTime();
 
         // Find the slot matching the proposed start time
@@ -103,7 +107,7 @@ export function useEarlyAvailabilityValidation({
       isMounted = false;
       clearTimeout(timerId);
     };
-  }, [tenantId, serviceId, variantId, staffId, dateKey, startTimeMinutes]);
+  }, [tenantId, serviceId, variantId, staffId, dateKey, startTimeMinutes, tenantTimezone, boardStartHour]);
 
   return result;
 }

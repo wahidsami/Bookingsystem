@@ -18,6 +18,7 @@ export interface StagedService {
 }
 interface AppointmentServicesStepProps {
   tenantId: string;
+  tenantTimezone: string;
   selectedDate: string;
   isRtl: boolean;
   boardStartHour?: number;
@@ -41,6 +42,7 @@ interface AppointmentServicesStepProps {
 
 export default function AppointmentServicesStep({
   tenantId,
+  tenantTimezone,
   selectedDate,
   isRtl,
   boardStartHour = 9,
@@ -193,6 +195,7 @@ export default function AppointmentServicesStep({
                       return (
                         <AppointmentServiceRow
                           tenantId={tenantId}
+                          tenantTimezone={tenantTimezone}
                           selectedDate={selectedDate}
                           key={variant ? `${service.id}-${variant.id}` : service.id}
                           service={service}

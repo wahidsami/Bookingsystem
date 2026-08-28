@@ -202,21 +202,3 @@ export const mapApiEmployeeToTeamMember = (emp: any, schedule: TeamMemberData['s
 };
 
 
-export const buildIsoFromMinutes = (dateKey: string | Date, minutes: number): string => {
-  let baseDate: Date;
-  if (typeof dateKey === 'string') {
-    baseDate = new Date(`${dateKey}T00:00:00`);
-  } else {
-    baseDate = new Date(dateKey);
-    baseDate.setHours(0, 0, 0, 0);
-  }
-
-  if (Number.isNaN(baseDate.getTime())) {
-    return new Date().toISOString();
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  baseDate.setHours(hours, mins, 0, 0);
-  return baseDate.toISOString();
-};
