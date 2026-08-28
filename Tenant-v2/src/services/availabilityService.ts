@@ -8,6 +8,7 @@ export interface AvailabilityLayerConfig {
     duration?: number | string;
     requestedStaffId?: string;
     staffId?: string;
+    variantId?: string;
   }>;
   dateKey: string;
   isRtl?: boolean;
@@ -40,7 +41,8 @@ export const fetchAvailabilityLayers = async ({
         tenantId,
         serviceId: item.serviceId,
         date: dateKey,
-        staffId: item.requestedStaffId || undefined
+        staffId: item.requestedStaffId || undefined,
+        variantId: item.variantId
       });
 
       if (searchResp?.success && searchResp.slots) {
