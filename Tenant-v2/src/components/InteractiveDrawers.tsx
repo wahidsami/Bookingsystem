@@ -2973,6 +2973,8 @@ export default function InteractiveDrawers({
 
                     {createStep === 3 && (
                       <AppointmentServicesStep
+                        tenantId={tenantId}
+                        selectedDate={getLocalDateKey(selectedDate)}
                         isRtl={isRtl}
                         boardStartHour={boardStartHour}
                         bookingRecoveryMode={bookingRecoveryMode}

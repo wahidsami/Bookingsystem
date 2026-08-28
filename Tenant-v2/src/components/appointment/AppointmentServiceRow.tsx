@@ -11,6 +11,9 @@ import AppointmentServiceConfiguration from './AppointmentServiceConfiguration';
 import { type StagedService } from './AppointmentServicesStep';
 
 interface AppointmentServiceRowProps {
+  key?: React.Key;
+  tenantId: string;
+  selectedDate: string;
   service: ServiceRecord;
   isRtl: boolean;
   variant?: ServiceVariantRecord | null;
@@ -26,6 +29,8 @@ interface AppointmentServiceRowProps {
 }
 
 export default function AppointmentServiceRow({
+  tenantId,
+  selectedDate,
   service,
   isRtl,
   variant = null,
@@ -199,6 +204,10 @@ export default function AppointmentServiceRow({
 
       {isExpanded && (
         <AppointmentServiceConfiguration
+          tenantId={tenantId}
+          selectedDate={selectedDate}
+          serviceId={service.id}
+          variantId={variant?.id || stagedItem?.variantId}
           isRtl={isRtl}
           boardStartHour={boardStartHour}
           draftConfig={draftConfig}

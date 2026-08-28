@@ -1,8 +1,14 @@
 import React, { useMemo } from 'react';
 import { type StagedService } from './AppointmentServicesStep';
 import { to12HourTime, to24HourTime } from '../../lib/employeeHelpers';
+import { useEarlyAvailabilityValidation } from '../../hooks/useEarlyAvailabilityValidation';
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface AppointmentServiceConfigurationProps {
+  tenantId: string;
+  selectedDate: string;
+  serviceId: string;
+  variantId?: string;
   isRtl: boolean;
   boardStartHour?: number;
   draftConfig: Partial<StagedService>;
@@ -13,6 +19,10 @@ interface AppointmentServiceConfigurationProps {
 }
 
 export default function AppointmentServiceConfiguration({
+  tenantId,
+  selectedDate,
+  serviceId,
+  variantId,
   isRtl,
   boardStartHour = 9,
   draftConfig,
@@ -21,6 +31,15 @@ export default function AppointmentServiceConfiguration({
   onSave,
   onCancel
 }: AppointmentServiceConfigurationProps) {
+  const validation = useEarlyAvailabilityValidation({
+    tenantId,
+    serviceId,
+    variantId,
+    staffId: draftConfig.staffId,
+    dateKey: selectedDate,
+    startTimeMinutes: Number(draftConfig.startTime || 0)
+  });
+
   const offsetBaseMinutes = boardStartHour * 60;
   const formatOffsetToClockValue = (offsetMinutes?: number | null) => {
     const safeOffset = Math.max(0, Math.round(Number(offsetMinutes || 0)));
@@ -77,6 +96,46 @@ export default function AppointmentServiceConfiguration({
               ))}
             </select>
           </label>
+
+
+          {/* Validation Status */}
+          {draftConfig.staffId && validation.status !== 'idle' && (
+            <div className="col-span-full md:col-span-2 -mt-2 mb-1">
+              {validation.status === 'loading' && (
+                <p className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {isRtl ? 'جاري التحقق من التوفر...' : 'Checking availability...'}
+                </p>
+              )}
+              {validation.status === 'available' && (
+                <p className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {isRtl ? 'متاح في الوقت المحدد' : `Available at ${to12HourTime(formatOffsetToClockValue(draftConfig.startTime))}`}
+                </p>
+              )}
+              {validation.status === 'unavailable' && validation.diagnostic && (
+                <div className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                  <div>
+                    <span className="font-semibold text-amber-800">
+                      {isRtl ? 'الموظف غير متاح.' : 'Unavailable at this time.'}
+                    </span>
+                    <span className="ml-1 opacity-90">
+                      {validation.diagnostic.reasonType === 'staff_break' && (isRtl ? 'لديه استراحة' : 'Staff break')}
+                      {validation.diagnostic.reasonType === 'time_off' && (isRtl ? 'في إجازة' : 'Time off')}
+                      {validation.diagnostic.reasonType === 'existing_booking' && (isRtl ? 'لديه حجز آخر' : 'Existing booking')}
+                      {validation.diagnostic.reasonType === 'outside_working_hours' && (isRtl ? 'خارج أوقات العمل' : 'Outside working hours')}
+                      {validation.diagnostic.reasonType === 'blocked_time' && (isRtl ? 'وقت محجوز' : 'Blocked time')}
+                      {validation.diagnostic.reasonType === 'unavailable' && (isRtl ? 'غير متوفر' : 'Unavailable')}
+                      {validation.diagnostic.startTime && validation.diagnostic.endTime && (
+                        ` (${new Date(validation.diagnostic.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${new Date(validation.diagnostic.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Discount Setup */}
           <div className="grid grid-cols-2 gap-3">

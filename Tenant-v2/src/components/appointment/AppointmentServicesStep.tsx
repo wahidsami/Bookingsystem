@@ -17,6 +17,8 @@ export interface StagedService {
   finalPrice?: number;
 }
 interface AppointmentServicesStepProps {
+  tenantId: string;
+  selectedDate: string;
   isRtl: boolean;
   boardStartHour?: number;
   bookingRecoveryMode?: 'chain' | 'modify_professionals' | 'separate_services';
@@ -38,6 +40,8 @@ interface AppointmentServicesStepProps {
 }
 
 export default function AppointmentServicesStep({
+  tenantId,
+  selectedDate,
   isRtl,
   boardStartHour = 9,
   bookingRecoveryMode = 'chain',
@@ -188,6 +192,8 @@ export default function AppointmentServicesStep({
 
                       return (
                         <AppointmentServiceRow
+                          tenantId={tenantId}
+                          selectedDate={selectedDate}
                           key={variant ? `${service.id}-${variant.id}` : service.id}
                           service={service}
                           variant={variant}
