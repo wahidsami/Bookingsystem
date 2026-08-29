@@ -177,28 +177,55 @@ export default function AccessSecuritySection({
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {STAFF_APP_PERMISSION_KEYS.map((key) => (
-                <label key={key} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5">
-                  <span className="text-[11px] font-semibold text-neutral-700">
-                    {key === 'view_earnings' && (isRtl ? 'عرض الأرباح' : 'View earnings')}
-                    {key === 'view_reviews' && (isRtl ? 'عرض التقييمات' : 'View reviews')}
-                    {key === 'reply_reviews' && (isRtl ? 'الرد على التقييمات' : 'Reply to reviews')}
-                    {key === 'view_clients' && (isRtl ? 'عرض العملاء' : 'View clients')}
-                    {key === 'view_booking_notes' && (isRtl ? 'عرض ملاحظات الحجز' : 'View booking notes')}
-                    {key === 'can_start_service' && (isRtl ? 'إظهار زر بدء الخدمة' : 'Show Start button')}
-                    {key === 'can_mark_no_show' && (isRtl ? 'إظهار زر عدم الحضور' : 'Show No-show button')}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={staffAppPermissions[key as StaffAppPermissionKey]}
-                    onChange={(event) => setStaffAppPermissions((prev) => ({
-                      ...prev,
-                      [key]: event.target.checked
-                    }))}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                </label>
-              ))}
+              {STAFF_APP_PERMISSION_KEYS.map((key) => {
+                const isReplyReviews = key === 'reply_reviews';
+                const replyDisabled = isReplyReviews && !staffAppPermissions.view_reviews;
+
+                const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+                  const checked = event.target.checked;
+                  setStaffAppPermissions((prev) => {
+                    const next = { ...prev, [key]: checked };
+                    // Cascade: turning off view_reviews must also disable reply_reviews
+                    if (key === 'view_reviews' && !checked) {
+                      next.reply_reviews = false;
+                    }
+                    return next;
+                  });
+                };
+
+                return (
+                  <label
+                    key={key}
+                    className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 ${replyDisabled ? 'border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed' : 'border-slate-200'}`}
+                  >
+                    <span className="text-[11px] font-semibold text-neutral-700">
+                      {key === 'view_earnings' && (isRtl ? 'عرض الأرباح' : 'View earnings')}
+                      {key === 'view_reviews' && (isRtl ? 'عرض التقييمات' : 'View reviews')}
+                      {key === 'reply_reviews' && (
+                        <span>
+                          {isRtl ? 'الرد على التقييمات' : 'Reply to reviews'}
+                          {replyDisabled && (
+                            <span className="block text-[9px] text-neutral-400 font-medium mt-0.5">
+                              {isRtl ? 'يتطلب تفعيل: عرض التقييمات' : 'Requires: View reviews'}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {key === 'view_clients' && (isRtl ? 'عرض العملاء' : 'View clients')}
+                      {key === 'view_booking_notes' && (isRtl ? 'عرض ملاحظات الحجز' : 'View booking notes')}
+                      {key === 'can_start_service' && (isRtl ? 'إظهار زر بدء الخدمة' : 'Show Start button')}
+                      {key === 'can_mark_no_show' && (isRtl ? 'إظهار زر عدم الحضور' : 'Show No-show button')}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={staffAppPermissions[key as StaffAppPermissionKey]}
+                      disabled={replyDisabled}
+                      onChange={handleChange}
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed"
+                    />
+                  </label>
+                );
+              })}
             </div>
           </div>
           

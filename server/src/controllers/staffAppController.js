@@ -568,7 +568,7 @@ const getClientSummary = async (req, res) => {
             startTime: appointment.startTime,
             status: appointment.status,
             price: appointment.price,
-            notes: appointment.notes,
+            notes: permissions.view_booking_notes ? appointment.notes : null,
             service: appointment.service ? {
                 id: appointment.service.id,
                 name_en: appointment.service.name_en,
