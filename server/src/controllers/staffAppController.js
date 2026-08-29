@@ -398,9 +398,20 @@ const getAppointments = async (req, res) => {
             order: [['startTime', 'ASC']]
         });
 
+        const permissions = await getStaffPermissions(req.staffId);
+        const canViewNotes = permissions.view_booking_notes;
+
+        const processedAppointments = appointments.map(app => {
+            const appointmentData = app.toJSON ? app.toJSON() : app;
+            if (!canViewNotes) {
+                delete appointmentData.notes;
+            }
+            return appointmentData;
+        });
+
         res.json({
             success: true,
-            appointments,
+            appointments: processedAppointments,
             date: dayStart.toISOString().split('T')[0]
         });
     } catch (error) {
@@ -1060,6 +1071,24 @@ const updateAppointmentStatus = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid staff appointment status update'
+            });
+        }
+
+        const permissions = await getStaffPermissions(req.staffId);
+
+        if (normalizedStatus === 'in_service' && !permissions.can_start_service) {
+            await transaction.rollback();
+            return res.status(403).json({
+                success: false,
+                message: 'Starting appointments is not enabled for this employee account'
+            });
+        }
+
+        if (normalizedStatus === 'no_show' && !permissions.can_mark_no_show) {
+            await transaction.rollback();
+            return res.status(403).json({
+                success: false,
+                message: 'Marking no-shows is not enabled for this employee account'
             });
         }
 
