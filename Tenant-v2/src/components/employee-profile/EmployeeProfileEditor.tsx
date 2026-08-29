@@ -147,6 +147,7 @@ export default function EmployeeProfileEditor({
                 isRtl={isRtl}
                 staffAppPermissions={staffAppPermissions}
                 setStaffAppPermissions={setStaffAppPermissions}
+                formMode={formMode}
               />
             )}
           </div>

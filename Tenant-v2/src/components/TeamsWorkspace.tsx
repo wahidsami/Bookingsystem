@@ -1037,7 +1037,9 @@ export default function TeamsWorkspace({
       payload.append('serviceCommissionEnabled', String(submittedData.serviceCommissionEnabled));
       payload.append('productCommissionEnabled', String(submittedData.productCommissionEnabled));
       payload.append('scheduleVisibilityWeeks', String(submittedData.scheduleVisibilityWeeks || 1));
-      payload.append('staffAppPassword', submittedData.staffAppPassword || '');
+      if (formMode === 'add' && submittedData.staffAppPassword) {
+        payload.append('staffAppPassword', submittedData.staffAppPassword.trim());
+      }
       payload.append('dashboardPermissions', JSON.stringify(submittedData.dashboardPermissions || {}));
       payload.append('status', submittedData.status);
       payload.append('isActive', String(submittedData.status === 'active'));

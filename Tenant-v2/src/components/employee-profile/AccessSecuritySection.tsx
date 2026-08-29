@@ -1,6 +1,8 @@
 import React from 'react';
 import { Lock, Shield, CheckSquare, Square } from 'lucide-react';
 import { TeamMemberData, STAFF_APP_PERMISSION_KEYS, StaffAppPermissionKey } from '../../types/employee';
+import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
+import { Mail, KeyRound } from 'lucide-react';
 
 interface AccessSecuritySectionProps {
   formData: TeamMemberData;
@@ -8,6 +10,7 @@ interface AccessSecuritySectionProps {
   isRtl: boolean;
   staffAppPermissions: Record<StaffAppPermissionKey, boolean>;
   setStaffAppPermissions: React.Dispatch<React.SetStateAction<Record<StaffAppPermissionKey, boolean>>>;
+  formMode?: 'add' | 'edit';
 }
 
 export default function AccessSecuritySection({
@@ -15,8 +18,40 @@ export default function AccessSecuritySection({
   setFormData,
   isRtl,
   staffAppPermissions,
-  setStaffAppPermissions
+  setStaffAppPermissions,
+  formMode
 }: AccessSecuritySectionProps) {
+
+
+  const handleSendAppInvite = async () => {
+    if (!formData.id) return;
+    try {
+      const res = await tenantApiAdapter.sendEmployeeAppInvite(formData.id);
+      if (res.success) {
+        alert(isRtl ? 'تم إرسال دعوة التطبيق بنجاح.' : 'App invite sent successfully.');
+      } else {
+        alert(isRtl ? 'فشل في إرسال الدعوة.' : 'Failed to send invite.');
+      }
+    } catch (err: any) {
+      alert(isRtl ? 'حدث خطأ: ' + err.message : 'Error: ' + err.message);
+    }
+  };
+
+  const handleResetAppPassword = async () => {
+    if (!formData.id) return;
+    if (!window.confirm(isRtl ? 'هل أنت متأكد من رغبتك في إعادة تعيين كلمة المرور؟ سيتم إرسالها بالبريد الإلكتروني.' : 'Are you sure you want to reset the password? It will be emailed to the employee.')) return;
+    
+    try {
+      const res = await tenantApiAdapter.resetEmployeePassword(formData.id);
+      if (res.success) {
+        alert(isRtl ? 'تم إعادة تعيين كلمة المرور وإرسالها بنجاح.' : 'Password reset successfully and sent via email.');
+      } else {
+        alert(isRtl ? 'فشل في إعادة تعيين كلمة المرور.' : 'Failed to reset password.');
+      }
+    } catch (err: any) {
+      alert(isRtl ? 'حدث خطأ: ' + err.message : 'Error: ' + err.message);
+    }
+  };
 
   const applyRolePreset = (preset: string) => {
     // We map preset to a set of boolean flags.
@@ -115,13 +150,15 @@ export default function AccessSecuritySection({
             <label className="text-[10px] text-indigo-900 font-extrabold block">{isRtl ? 'رمز المرور المؤقت للتطبيق (الحد الأدنى ٨ خانات) *' : 'Temporary App Password (Min 8 Characters) *'}</label>
             <input
               type="text"
-              required
+              required={formMode === 'add'}
               minLength={8}
               value={formData.staffAppPassword}
               onChange={e => setFormData(p => ({ ...p, staffAppPassword: e.target.value }))}
-              className="w-full bg-white border border-indigo-200 rounded-xl p-3 text-xs font-bold font-mono text-neutral-800 focus:ring-1 focus:ring-indigo-500"
+              placeholder={formMode === 'edit' ? (isRtl ? 'اتركه فارغاً، استخدم أزرار الإدارة أدناه' : 'Leave blank, use action buttons below') : ''}
+              disabled={formMode === 'edit'}
+              className={`w-full bg-white border border-indigo-200 rounded-xl p-3 text-xs font-bold font-mono text-neutral-800 focus:ring-1 focus:ring-indigo-500 ${formMode === 'edit' ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}`}
             />
-            {formData.staffAppPassword && formData.staffAppPassword.length < 8 && (
+            {formMode === 'add' && formData.staffAppPassword && formData.staffAppPassword.length < 8 && (
               <p className="text-rose-600 text-[10px] font-bold mt-1">
                 {isRtl ? '⚠️ يجب أن يتكون الرمز من ٨ خانات على الأقل!' : '⚠️ Password must be at least 8 characters long!'}
               </p>
@@ -164,6 +201,33 @@ export default function AccessSecuritySection({
               ))}
             </div>
           </div>
+          
+          {/* V1 Parity: Access Management Actions for Existing Employees */}
+          {formMode === 'edit' && (
+            <div className="mt-4 pt-4 border-t border-indigo-200/50">
+              <h5 className="text-[11px] font-black text-indigo-900 mb-3">
+                {isRtl ? 'إدارة وصول التطبيق' : 'Access Management'}
+              </h5>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleSendAppInvite}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition-colors shadow-sm"
+                >
+                  <Mail size={14} />
+                  {isRtl ? 'إرسال دعوة التطبيق' : 'Send app invite'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetAppPassword}
+                  className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-lg text-[11px] font-bold transition-colors shadow-sm"
+                >
+                  <KeyRound size={14} />
+                  {isRtl ? 'إعادة تعيين كلمة المرور' : 'Reset app password'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Dashboard Admin permissions matrix with Role Presets */
@@ -196,6 +260,33 @@ export default function AccessSecuritySection({
               ))}
             </div>
           </div>
+          
+          {/* V1 Parity: Access Management Actions for Existing Employees */}
+          {formMode === 'edit' && (
+            <div className="mt-4 pt-4 border-t border-indigo-200/50">
+              <h5 className="text-[11px] font-black text-indigo-900 mb-3">
+                {isRtl ? 'إدارة وصول التطبيق' : 'Access Management'}
+              </h5>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleSendAppInvite}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition-colors shadow-sm"
+                >
+                  <Mail size={14} />
+                  {isRtl ? 'إرسال دعوة التطبيق' : 'Send app invite'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetAppPassword}
+                  className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-lg text-[11px] font-bold transition-colors shadow-sm"
+                >
+                  <KeyRound size={14} />
+                  {isRtl ? 'إعادة تعيين كلمة المرور' : 'Reset app password'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Detailed Permission Grid (All 20 keys) */}
           <div className="space-y-1.5">

@@ -1136,6 +1136,14 @@ class TenantApiAdapter {
     return this.put(`/tenant/employees/${id}`, data);
   }
 
+  async sendEmployeeAppInvite(id: string): Promise<any> {
+    return this.post(`/tenant/employees/${id}/send-invite`, {});
+  }
+
+  async resetEmployeePassword(id: string): Promise<any> {
+    return this.post(`/tenant/employees/${id}/reset-password`, {});
+  }
+
   async deleteEmployee(id: string): Promise<any> {
     return this.delete(`/tenant/employees/${id}`);
   }
