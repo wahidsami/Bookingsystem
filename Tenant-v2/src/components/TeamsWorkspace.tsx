@@ -668,34 +668,36 @@ export default function TeamsWorkspace({
         return;
       }
 
-      const { startTime, endTime } = parseScheduleRange(day.hours);
-      if (!startTime || !endTime) {
-        return;
+      const hasSubShifts = day.subShifts && day.subShifts.length > 0;
+
+      if (hasSubShifts) {
+        day.subShifts!.forEach((subShift) => {
+          saveTasks.push(tenantApiAdapter.createEmployeeShift(employeeId, {
+            dayOfWeek: WEEKDAY_ROWS[index]?.dayOfWeek ?? null,
+            specificDate: null,
+            startTime: to24HourTime(subShift.startTime),
+            endTime: to24HourTime(subShift.endTime),
+            isRecurring: true,
+            startDate: recurringStart,
+            endDate: recurringEnd,
+            label: subShift.label || 'Sub Shift'
+          }));
+        });
+      } else {
+        const { startTime, endTime } = parseScheduleRange(day.hours);
+        if (startTime && endTime) {
+          saveTasks.push(tenantApiAdapter.createEmployeeShift(employeeId, {
+            dayOfWeek: WEEKDAY_ROWS[index]?.dayOfWeek ?? null,
+            specificDate: null,
+            startTime,
+            endTime,
+            isRecurring: true,
+            startDate: recurringStart,
+            endDate: recurringEnd,
+            label: `${day.dayEn} Shift`
+          }));
+        }
       }
-
-      saveTasks.push(tenantApiAdapter.createEmployeeShift(employeeId, {
-        dayOfWeek: WEEKDAY_ROWS[index]?.dayOfWeek ?? null,
-        specificDate: null,
-        startTime,
-        endTime,
-        isRecurring: true,
-        startDate: recurringStart,
-        endDate: recurringEnd,
-        label: `${day.dayEn} Shift`
-      }));
-
-      (day.subShifts || []).forEach((subShift) => {
-        saveTasks.push(tenantApiAdapter.createEmployeeShift(employeeId, {
-          dayOfWeek: WEEKDAY_ROWS[index]?.dayOfWeek ?? null,
-          specificDate: null,
-          startTime: to24HourTime(subShift.startTime),
-          endTime: to24HourTime(subShift.endTime),
-          isRecurring: true,
-          startDate: recurringStart,
-          endDate: recurringEnd,
-          label: subShift.label
-        }));
-      });
     });
 
     await Promise.all(saveTasks);
