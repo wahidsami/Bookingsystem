@@ -119,7 +119,9 @@ export function BookingDateTimeSelectionScreen() {
 
     useEffect(() => {
         if (!tenantId || items.length === 0) {
-            navigation.goBack();
+            if (navigation.isFocused()) {
+                navigation.goBack();
+            }
             return;
         }
 
