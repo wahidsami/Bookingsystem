@@ -1,7 +1,6 @@
 'use strict';
 
 const { sendEmail } = require('../utils/emailService');
-const { getTenantDashboardLoginUrl } = require('../utils/url');
 
 const normalizeText = (value, fallback = '') => {
     const candidate = `${value || ''}`.trim();
@@ -22,11 +21,21 @@ const sendCustomerNotificationEmail = async ({
         return { success: false, skipped: true, reason: 'customer_email_missing' };
     }
 
-    const dashboardUrl = getTenantDashboardLoginUrl(locale);
     const customerName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || (locale === 'ar' ? 'عميلنا العزيز' : 'Dear customer');
     const tenantName = locale === 'ar'
         ? (tenant.name_ar || tenant.name || tenant.name_en || 'رفاه')
         : (tenant.name_en || tenant.name || tenant.name_ar || 'Refah');
+
+    const safeActionUrl = normalizeText(actionUrl, '');
+    const safeActionText = normalizeText(actionText, '');
+    let actionHtml = '';
+
+    if (safeActionUrl && safeActionText) {
+        actionHtml = `
+              <p style="margin:0 0 20px 0;">
+                <a href="${safeActionUrl}" style="display:inline-block;background:#7f50d2;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:700;">${safeActionText}</a>
+              </p>`;
+    }
 
     return sendEmail({
         to: email,
@@ -37,8 +46,7 @@ const sendCustomerNotificationEmail = async ({
             tenantName,
             title: normalizeText(title, locale === 'ar' ? 'إشعار من رفاه' : 'A new update from Refah'),
             body: normalizeText(body, locale === 'ar' ? 'لديك تحديث جديد في حسابك.' : 'You have a new update in your account.'),
-            actionUrl: normalizeText(actionUrl, dashboardUrl),
-            actionText: normalizeText(actionText, locale === 'ar' ? 'فتح لوحة التحكم' : 'Open dashboard')
+            actionHtml
         }
     });
 };
