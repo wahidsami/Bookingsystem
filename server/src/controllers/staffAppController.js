@@ -5,6 +5,7 @@ const pushNotificationService = require('../services/pushNotificationService');
 const notificationOrchestrator = require('../services/notificationOrchestratorService');
 const { getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const appointmentLifecycleService = require('../services/appointmentLifecycleService');
+const availabilityService = require('../services/availabilityService');
 const { normalizePackageEntitlements, isFeatureEnabled } = require('../utils/packageEntitlements');
 const {
     STAFF_APPOINTMENT_TRANSITIONS,
@@ -371,8 +372,14 @@ const getMe = async (req, res) => {
 const getAppointments = async (req, res) => {
     try {
         const { date } = req.query;
-        const dayStart = buildStartOfDay(date);
-        const dayEnd = buildEndOfDay(date);
+        const tenantSettings = await db.TenantSettings.findOne({
+            where: { tenantId: req.tenantId },
+            attributes: ['timezone']
+        });
+        const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+        const { startOfDay: dayStart, endOfDay: dayEnd } = availabilityService._getTimeZoneDayRange(date, timezone);
+        const dateKey = dayStart.toISOString().split('T')[0];
+        const dayOfWeek = dayStart.getUTCDay();
 
         const appointments = await db.Appointment.findAll({
             where: {
@@ -409,10 +416,40 @@ const getAppointments = async (req, res) => {
             return appointmentData;
         });
 
+        const breaks = await db.StaffBreak.findAll({
+            where: {
+                staffId: req.staffId,
+                isActive: true,
+                [Op.or]: [
+                    { specificDate: dateKey },
+                    {
+                        isRecurring: true,
+                        dayOfWeek,
+                        [Op.and]: [
+                            {
+                                [Op.or]: [
+                                    { startDate: null },
+                                    { startDate: { [Op.lte]: dateKey } }
+                                ]
+                            },
+                            {
+                                [Op.or]: [
+                                    { endDate: null },
+                                    { endDate: { [Op.gte]: dateKey } }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            order: [['startTime', 'ASC']]
+        });
+
         res.json({
             success: true,
             appointments: processedAppointments,
-            date: dayStart.toISOString().split('T')[0]
+            breaks,
+            date: dateKey
         });
     } catch (error) {
         res.status(500).json({
