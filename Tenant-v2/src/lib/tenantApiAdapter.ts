@@ -647,6 +647,7 @@ function normalizeResponseForPath(pathname: string, method: string, payload: any
 
 class TenantApiAdapter {
   private fetchImpl: FetchLike;
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor(fetchImpl?: FetchLike) {
     this.fetchImpl = fetchImpl || window.fetch.bind(window);
@@ -701,22 +702,34 @@ class TenantApiAdapter {
   }
 
   private async refreshAccessToken(): Promise<boolean> {
-    const refreshToken = this.getRefreshToken();
-    if (!refreshToken) return false;
-
-    const response = await this.fetchImpl(`${API_BASE_URL}/auth/tenant/refresh-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken })
-    });
-
-    const data = await response.json().catch(() => null);
-    if (data?.success && data?.accessToken) {
-      this.setTokens(data.accessToken, data.refreshToken || refreshToken);
-      return true;
+    if (this.refreshPromise) {
+      return this.refreshPromise;
     }
 
-    return false;
+    this.refreshPromise = (async () => {
+      try {
+        const refreshToken = this.getRefreshToken();
+        if (!refreshToken) return false;
+
+        const response = await this.fetchImpl(`${API_BASE_URL}/auth/tenant/refresh-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+
+        const data = await response.json().catch(() => null);
+        if (data?.success && data?.accessToken) {
+          this.setTokens(data.accessToken, data.refreshToken || refreshToken);
+          return true;
+        }
+
+        return false;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   async ensureFreshAuthSession(): Promise<boolean> {
