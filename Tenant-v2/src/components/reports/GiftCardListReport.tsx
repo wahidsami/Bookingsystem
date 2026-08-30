@@ -260,6 +260,157 @@ function buildGiftCardBackendGaps(rows: GiftCardListTableRow[]) {
   return Array.from(gaps);
 }
 
+function GiftCardActivityViewer({ rowId, lang, copy }: { rowId: string; lang: Language; copy: any }) {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchActivity = async () => {
+      setLoading(true);
+      try {
+        const res = await tenantApiAdapter.get(`/tenant/gift-cards/reports/transactions/${rowId}/activity`);
+        if (active && res.success) setData(res.activity);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    if (rowId) fetchActivity();
+    return () => { active = false; };
+  }, [rowId]);
+
+  if (loading) return <div className="p-8 text-center text-sm text-slate-500">{lang === 'ar' ? 'جاري التحميل...' : 'Loading...'}</div>;
+  if (!data || !data.transaction) return <div className="p-8 text-center text-sm text-red-500">{lang === 'ar' ? 'فشل تحميل بيانات النشاط' : 'Failed to load activity'}</div>;
+
+  const { transaction, walletCreditLedgerEntry, subsequentWalletActivity } = data;
+  const isAutoWallet = transaction.sourceTransaction?.status === 'sent_completed_auto_wallet';
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.general}</div>
+        <div className="mt-3 space-y-2 text-sm">
+          <Field label={copy.giftCardCode} value={transaction.giftCardCode} emptyLabel={copy.unavailable} />
+          <Field label={copy.status} value={humanizeStatus(transaction.status, lang)} emptyLabel={copy.unavailable} />
+          <Field label={copy.issueDate} value={formatDate(transaction.issueDate, lang)} emptyLabel={copy.unavailable} />
+          <Field label={copy.expiryDate} value={formatDate(transaction.expiryDate, lang)} emptyLabel={copy.unavailable} />
+          <Field label={copy.originalAmountField} value={formatMoney(transaction.originalAmount, lang)} emptyLabel={copy.unavailable} />
+          <Field label={copy.remainingBalanceField} value={formatMoney(transaction.remainingBalance, lang)} emptyLabel={copy.unavailable} />
+          <Field label={lang === 'ar' ? 'المدفوع من العميل' : 'Paid by Customer'} value={formatMoney(transaction.sourceTransaction?.purchaseAmount, lang)} emptyLabel={copy.unavailable} />
+          <Field label={copy.purchasedFor} value={transaction.customer} emptyLabel={copy.unavailable} />
+        </div>
+      </div>
+
+      {!isAutoWallet ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.redemption}</div>
+          <div className="mt-3 space-y-4 text-sm">
+            <Field label={copy.redeemedAmountField} value={formatMoney(transaction.redeemedAmount, lang)} emptyLabel={copy.unavailable} />
+            <Field label={copy.redemptionsCount} value={String(transaction.redemptions?.length || 0)} emptyLabel={copy.unavailable} />
+
+            {transaction.redemptions && transaction.redemptions.length > 0 && (
+              <div className="mt-4 border-t border-slate-200 pt-4">
+                <div className="mb-2 font-semibold text-slate-900">{lang === 'ar' ? 'سجل الاسترداد' : 'Redemption History'}</div>
+                <div className="space-y-3">
+                  {transaction.redemptions.map((red: any, idx: number) => (
+                    <div key={idx} className="rounded-lg bg-white p-3 shadow-sm border border-slate-100">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-semibold text-slate-900">{formatMoney(red.redeemedAmount, lang)}</span>
+                        <span className="text-xs text-slate-500">{formatDate(red.redeemedAt, lang)}</span>
+                      </div>
+                      {red.appointment && (
+                        <div className="text-xs text-slate-600 mt-1">
+                          {lang === 'ar' ? 'موعد' : 'Appointment'}: {red.appointment.bookingNumber}
+                          {red.appointment.service && ` - ${lang === 'ar' ? red.appointment.service.name_ar : red.appointment.service.name_en}`}
+                        </div>
+                      )}
+                      {red.order && (
+                        <div className="text-xs text-slate-600 mt-1">
+                          {lang === 'ar' ? 'طلب' : 'Order'}: {red.order.orderNumber}
+                        </div>
+                      )}
+                      <div className="text-xs text-slate-500 mt-1">
+                        {lang === 'ar' ? 'بواسطة' : 'By'}: {red.redeemedBy}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{lang === 'ar' ? 'نشاط المحفظة' : 'Wallet Activity'}</div>
+
+          <div className="mt-3 space-y-4 text-sm">
+            {walletCreditLedgerEntry && (
+              <div className="rounded-lg bg-green-50 p-3 shadow-sm border border-green-100">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-semibold text-green-900">{lang === 'ar' ? 'تم الشحن' : 'Credited'}: {formatMoney(walletCreditLedgerEntry.amount, lang)}</span>
+                  <span className="text-xs text-green-700">{formatDate(walletCreditLedgerEntry.createdAt, lang)}</span>
+                </div>
+                <div className="text-xs text-green-800">
+                  {lang === 'ar' ? 'رصيد المحفظة قبل' : 'Balance Before'}: {formatMoney(walletCreditLedgerEntry.balanceBefore, lang)}<br/>
+                  {lang === 'ar' ? 'رصيد المحفظة بعد' : 'Balance After'}: {formatMoney(walletCreditLedgerEntry.balanceAfter, lang)}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <div className="mb-2 font-semibold text-slate-900">
+                {lang === 'ar' ? 'نشاط المحفظة بعد شحن هذه البطاقة' : 'Wallet activity after this gift card was credited'}
+              </div>
+
+              {!subsequentWalletActivity || subsequentWalletActivity.length === 0 ? (
+                <div className="text-xs text-slate-500 italic">
+                  {lang === 'ar' ? 'لا يوجد نشاط مسجل' : 'No activity recorded yet'}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {subsequentWalletActivity.map((debit: any, idx: number) => (
+                    <div key={idx} className="rounded-lg bg-white p-3 shadow-sm border border-slate-100">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-semibold text-red-600">-{formatMoney(debit.amount, lang)}</span>
+                        <span className="text-xs text-slate-500">{formatDate(debit.createdAt, lang)}</span>
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {lang === 'ar' ? 'النوع' : 'Type'}: {debit.referenceType}
+                      </div>
+                      {debit.appointment && (
+                        <div className="text-xs text-slate-600 mt-1">
+                          {lang === 'ar' ? 'موعد' : 'Appointment'}: {debit.appointment.bookingNumber}
+                          {debit.appointment.service && ` - ${lang === 'ar' ? debit.appointment.service.name_ar : debit.appointment.service.name_en}`}
+                        </div>
+                      )}
+                      {debit.order && (
+                        <div className="text-xs text-slate-600 mt-1">
+                          {lang === 'ar' ? 'طلب' : 'Order'}: {debit.order.orderNumber}
+                        </div>
+                      )}
+                      <div className="text-xs text-slate-400 mt-1 flex justify-between">
+                        <span>{lang === 'ar' ? 'المرجع' : 'Ref'}: {debit.id.split('-')[0]}</span>
+                        <span>{lang === 'ar' ? 'الرصيد' : 'Balance'}: {formatMoney(debit.balanceAfter, lang)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.backendSnapshot}</div>
+        <pre className="mt-3 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">{JSON.stringify(transaction.sourceTransaction || transaction, null, 2)}</pre>
+      </div>
+    </div>
+  );
+}
+
 export default function GiftCardListReport({ lang }: { lang: Language }) {
   const isRtl = lang === 'ar';
   const reportId = 'gift-card-list';
@@ -736,70 +887,7 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
         row={drawerRow}
         onClose={() => setDrawerRow(null)}
         renderContent={(row) => (
-          <div className="space-y-4">
-            <div className="grid gap-4 xl:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.general}</div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <Field label={copy.giftCardCode} value={row.giftCardCode} emptyLabel={copy.unavailable} />
-                  <Field label={copy.status} value={row.status} emptyLabel={copy.unavailable} />
-                  <Field label={copy.issueDate} value={formatDate(row.issueDate, lang)} emptyLabel={copy.unavailable} />
-                  <Field label={copy.expiryDate} value={formatDate(row.expiryDate, lang)} emptyLabel={copy.unavailable} />
-                  <Field label={copy.originalAmountField} value={formatMoney(row.originalAmount, lang)} emptyLabel={copy.unavailable} />
-                  <Field label={copy.remainingBalanceField} value={formatMoney(row.remainingBalance, lang)} emptyLabel={copy.unavailable} />
-                </div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.purchase}</div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <Field label={copy.saleNumber} value={row.saleNumber} emptyLabel={copy.unavailable} />
-                  <Field label={copy.purchasedBy} value={row.purchasedBy} emptyLabel={copy.unavailable} />
-                  <Field label={copy.paymentMethod} value={row.paymentMethod} emptyLabel={copy.unavailable} />
-                  <Field label={copy.location} value={row.location} emptyLabel={copy.unavailable} />
-                  <Field label={copy.employee} value={row.employee} emptyLabel={copy.unavailable} />
-                </div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.redemption}</div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <Field label={copy.redeemedBy} value={row.redeemedBy} emptyLabel={copy.unavailable} />
-                  <Field label={copy.redeemedAmountField} value={formatMoney(row.redeemedAmount, lang)} emptyLabel={copy.unavailable} />
-                  <Field label={copy.redemptionsCount} value={String(row.redemptions?.length || 0)} emptyLabel={copy.unavailable} />
-                  <Field label={copy.latestRedemption} value={formatDate(row.latestRedemption?.redeemedAt || row.latestRedemption?.createdAt, lang)} emptyLabel={copy.unavailable} />
-                </div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.customer}</div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <Field label={copy.customer} value={row.customer} emptyLabel={copy.unavailable} />
-                  <Field label={copy.purchasedFor} value={row.customer} emptyLabel={copy.unavailable} />
-                  <Field label={copy.redeemedFor} value={row.customer} emptyLabel={copy.unavailable} />
-                </div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.invoice}</div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <Field label={copy.invoiceNumber} value={row.invoiceNumber} emptyLabel={copy.unavailable} />
-                  <Field label={copy.sourceTransaction} value={row.sourceTransaction?.id || copy.unavailable} emptyLabel={copy.unavailable} />
-                  <Field label={copy.paymentMethod} value={row.paymentMethod} emptyLabel={copy.unavailable} />
-                </div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.timeline}</div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <Field label={copy.issuedAt} value={formatDate(row.issueDate, lang)} emptyLabel={copy.unavailable} />
-                  <Field label={copy.latestRedemptionAt} value={formatDate(row.latestRedemption?.redeemedAt || row.latestRedemption?.createdAt, lang)} emptyLabel={copy.unavailable} />
-                  <Field label={copy.lastUpdated} value={formatDate(row.sourceTransaction?.updatedAt || row.sourceTransaction?.createdAt, lang)} emptyLabel={copy.unavailable} />
-                  <Field label={copy.backendUpdated} value={formatDate(row.sourceTransaction?.updatedAt || row.sourceTransaction?.createdAt, lang)} emptyLabel={copy.unavailable} />
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.backendSnapshot}</div>
-              <pre className="mt-3 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">{JSON.stringify(row.sourceTransaction || row, null, 2)}</pre>
-            </div>
-          </div>
+          <GiftCardActivityViewer rowId={row.saleNumber} lang={lang} copy={copy} />
         )}
       />
     </BIReportShell>

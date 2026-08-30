@@ -2227,8 +2227,12 @@ export default function InteractiveDrawers({
       }
 
       const completedReceiptItems = cartItems.map(it => {
-        if (it.type === 'giftcard' && collectedRedeemCodes[it.id] && collectedRedeemCodes[it.id].length > 0) {
-          return { ...it, skuOrCode: collectedRedeemCodes[it.id].join(', ') };
+        if (it.type === 'giftcard') {
+          if (collectedRedeemCodes[it.id] && collectedRedeemCodes[it.id].length > 0) {
+            return { ...it, skuOrCode: collectedRedeemCodes[it.id].join(', ') };
+          } else {
+            return { ...it, skuOrCode: 'تم إضافة الرصيد للمحفظة / Wallet credited' };
+          }
         }
         return it;
       });
