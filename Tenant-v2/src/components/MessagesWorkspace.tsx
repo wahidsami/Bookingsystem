@@ -637,8 +637,10 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
       unread: false, // Sent is automatically read
       unreadCount: 0,
       recipientType: resolvedRecipientType,
+      recipientId: composeRecipientType === 'all' ? null : composeEmployeeId,
       recipientNameAr: resolvedRecipientNameAr,
       recipientNameEn: resolvedRecipientNameEn,
+      subject: subjectText,
       replies: [],
       recipientStatuses: resolvedStatuses
     };
