@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { differenceInCalendarDays } from 'date-fns';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { canMarkNoShow, canRequestTimeOff, canStartService, canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
 import { Appointment, getAppointmentsForDate, updateAppointmentStatus } from '../../src/services/appointments';
 import { BreakWindow, cancelTimeOffRequest, getSchedule, Shift, TimeOff } from '../../src/services/schedule';
@@ -133,6 +134,7 @@ const getDateSpanDays = (startDate: string, endDate: string) => {
 
 export default function ScheduleScreen() {
     const { user } = useAuth();
+    const { t } = useTranslation();
     const { width: viewportWidth } = useWindowDimensions();
     const weekGridScrollRef = useRef<ScrollView | null>(null);
     const { alert: appointmentAlert, clearAlert, syncAppointments } = useAppointmentArrivalAlert();
@@ -149,7 +151,7 @@ export default function ScheduleScreen() {
     const [weekAppointmentsLoading, setWeekAppointmentsLoading] = useState(false);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
     const [scheduleViewMode, setScheduleViewMode] = useState<'grid' | 'cards'>('grid');
-    const [dayScopeMode, setDayScopeMode] = useState<'day' | 'week'>('week');
+    const [dayScopeMode, setDayScopeMode] = useState<'day' | 'week'>('day');
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [visibleWeeks, setVisibleWeeks] = useState(1);
     const [gridScalePercent, setGridScalePercent] = useState(42);
@@ -591,9 +593,9 @@ export default function ScheduleScreen() {
         return (
             <View style={styles.gridCard}>
                 <View style={styles.gridHeaderRow}>
-                    <Text style={styles.sectionTitle}>{dayScopeMode === 'week' ? 'Week Grid' : 'Day Grid'}</Text>
+                    <Text style={styles.sectionTitle}>{dayScopeMode === 'week' ? t('schedule.weekGrid') : t('schedule.dayGrid')}</Text>
                     <Text style={styles.gridHint}>
-                        {totalAppointmentsInScope} appointment{totalAppointmentsInScope === 1 ? '' : 's'}
+                        {t('schedule.appointmentsCount', { count: totalAppointmentsInScope })}
                     </Text>
                 </View>
 
@@ -814,7 +816,7 @@ export default function ScheduleScreen() {
                     {!hasTimelineItems ? (
                         <View style={styles.gridInlineEmptyState}>
                             <Ionicons name="calendar-outline" size={18} color="#6b7280" />
-                            <Text style={styles.gridInlineEmptyText}>No appointments, blocked time, or leave in this scope.</Text>
+                            <Text style={styles.gridInlineEmptyText}>{t('schedule.emptyGridScope')}</Text>
                         </View>
                     ) : null}
                 </View>
@@ -1280,24 +1282,6 @@ export default function ScheduleScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <LinearGradient colors={['#8B5ADF', '#683AB7']} style={styles.header}>
-                <View style={styles.headerTopRow}>
-                    <View>
-                        <Text style={styles.headerGreeting}>{greeting}</Text>
-                        <Text style={styles.headerStaffName}>{user?.name?.split(' ')[0] || 'Staff'} {currentHour < 17 ? '☀️' : '🌙'}</Text>
-                    </View>
-                    <View style={styles.headerAvatarWrap}>
-                        {user?.photo ? (
-                            <Image source={{ uri: getImageUrl(user.photo) }} style={styles.headerAvatar} />
-                        ) : (
-                            <View style={styles.headerAvatarFallback}>
-                                <Text style={styles.headerAvatarInitial}>{user?.name?.charAt(0)?.toUpperCase() || 'S'}</Text>
-                            </View>
-                        )}
-                    </View>
-                </View>
-            </LinearGradient>
-
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8B5ADF']} />}
@@ -2142,15 +2126,17 @@ const styles = StyleSheet.create({
     },
     gridBreakBlock: {
         position: 'absolute',
-        left: 10,
-        right: 10,
+        left: 0,
+        right: 0,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
         backgroundColor: 'rgba(245, 158, 11, 0.16)',
         borderWidth: 1,
         borderColor: '#fbbf24',
-        borderRadius: 14,
+        borderLeftWidth: 0,
+        borderRightWidth: 0,
+        borderRadius: 0,
         paddingHorizontal: 10,
         paddingVertical: 8,
         zIndex: 1,

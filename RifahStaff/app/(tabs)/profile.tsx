@@ -43,12 +43,6 @@ export default function ProfileScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <LinearGradient
-                colors={['#8B5ADF', '#683AB7']}
-                style={styles.header}
-            >
-                <Text style={styles.headerTitle}>{t('profile.title')}</Text>
-            </LinearGradient>
 
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.profileCard}>
@@ -182,18 +176,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f3f4f6',
     },
-    header: {
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#ffffff',
-    },
     content: {
         padding: 20,
     },
@@ -208,7 +190,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 5,
         elevation: 2,
-        marginTop: -40, // Pull up into the header slightly
     },
     avatarContainer: {
         width: 80,

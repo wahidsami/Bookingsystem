@@ -9,7 +9,8 @@ import {
     RefreshControl,
     Platform,
     TextInput,
-    ScrollView
+    ScrollView,
+    AppState
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,6 +52,25 @@ export default function MessagesScreen() {
             else setLoading(false);
         }, [user, loadMessages])
     );
+
+    React.useEffect(() => {
+        if (!user) return;
+
+        const subscription = AppState.addEventListener('change', (state) => {
+            if (state === 'active') {
+                loadMessages();
+            }
+        });
+
+        const interval = setInterval(() => {
+            loadMessages();
+        }, 45000);
+
+        return () => {
+            subscription.remove();
+            clearInterval(interval);
+        };
+    }, [user, loadMessages]);
 
     // Also reload if a new notification arrives while staring at the screen
     const onRefresh = () => {
@@ -102,10 +122,10 @@ export default function MessagesScreen() {
     const pinnedCount = adminMessages.filter((msg) => msg.isPinned).length;
     const recentCount = adminMessages.filter((msg) => Date.now() - getTimeMsSafe(msg.createdAt) <= 1000 * 60 * 60 * 24 * 3).length;
     const filterOptions: { key: 'all' | 'unread' | 'pinned' | 'recent'; label: string; count: number }[] = [
-        { key: 'all', label: 'All', count: adminMessages.length },
-        { key: 'unread', label: 'Unread', count: unreadCount },
-        { key: 'pinned', label: 'Pinned', count: pinnedCount },
-        { key: 'recent', label: 'Recent', count: recentCount },
+        { key: 'all', label: t('messages.filterAll'), count: adminMessages.length },
+        { key: 'unread', label: t('messages.filterUnread'), count: unreadCount },
+        { key: 'pinned', label: t('messages.filterPinned'), count: pinnedCount },
+        { key: 'recent', label: t('messages.filterRecent'), count: recentCount },
     ];
 
     const handlePressMessage = async (msg: StaffMessage) => {
@@ -154,7 +174,7 @@ export default function MessagesScreen() {
                             <Ionicons name="pin" size={16} color="#f59e0b" style={{ marginRight: 6 }} />
                         )}
                         <Text style={[styles.subject, unread && styles.subjectUnread]} numberOfLines={1}>
-                            {item.subject || 'Admin Update'}
+                            {item.subject || t('messages.defaultSubject')}
                         </Text>
                     </View>
 
@@ -179,15 +199,12 @@ export default function MessagesScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <LinearGradient colors={['#8B5ADF', '#683AB7']} style={styles.header}>
-                <Text style={styles.headerTitle}>{t('messages.title')}</Text>
-            </LinearGradient>
 
             {!messagesAllowed ? (
                 <View style={styles.centerContainer}>
                     <Ionicons name="lock-closed-outline" size={64} color="#d1d5db" />
-                    <Text style={styles.emptyTitle}>Messages are not enabled for this account</Text>
-                    <Text style={styles.emptySubtitle}>Messaging will appear here when your tenant enables the feature.</Text>
+                    <Text style={styles.emptyTitle}>{t('messages.notEnabledTitle')}</Text>
+                    <Text style={styles.emptySubtitle}>{t('messages.notEnabledSubtitle')}</Text>
                 </View>
             ) : loading ? (
                 <View style={styles.centerContainer}>
@@ -205,31 +222,12 @@ export default function MessagesScreen() {
                     renderItem={renderItem}
                     ListHeaderComponent={(
                         <View>
-                            <View style={styles.statsGrid}>
-                                <View style={styles.statCard}>
-                                    <Text style={styles.statValue}>{adminMessages.length}</Text>
-                                    <Text style={styles.statLabel}>Total</Text>
-                                </View>
-                                <View style={styles.statCard}>
-                                    <Text style={styles.statValue}>{unreadCount}</Text>
-                                    <Text style={styles.statLabel}>Unread</Text>
-                                </View>
-                                <View style={styles.statCard}>
-                                    <Text style={styles.statValue}>{pinnedCount}</Text>
-                                    <Text style={styles.statLabel}>Pinned</Text>
-                                </View>
-                                <View style={styles.statCard}>
-                                    <Text style={styles.statValue}>{recentCount}</Text>
-                                    <Text style={styles.statLabel}>Recent</Text>
-                                </View>
-                            </View>
-
                             <View style={styles.searchBox}>
                                 <Ionicons name="search-outline" size={18} color="#6b7280" style={styles.searchIcon} />
                                 <TextInput
                                     value={searchQuery}
                                     onChangeText={setSearchQuery}
-                                    placeholder="Search subject or message..."
+                                    placeholder={t('messages.searchPlaceholder')}
                                     placeholderTextColor="#9ca3af"
                                     style={styles.searchInput}
                                 />
@@ -262,15 +260,15 @@ export default function MessagesScreen() {
                             </ScrollView>
 
                             <Text style={styles.resultsLabel}>
-                                Showing {filteredMessages.length} of {adminMessages.length} messages
+                                {t('messages.showingCount', { filtered: filteredMessages.length, total: adminMessages.length })}
                             </Text>
                         </View>
                     )}
                     ListEmptyComponent={(
                         <View style={styles.emptyFilterState}>
                             <Ionicons name="search-outline" size={48} color="#d1d5db" />
-                            <Text style={styles.emptyTitle}>No messages match these filters</Text>
-                            <Text style={styles.emptySubtitle}>Try a different search or switch the selected inbox filter.</Text>
+                            <Text style={styles.emptyTitle}>{t('messages.emptyFilterTitle')}</Text>
+                            <Text style={styles.emptySubtitle}>{t('messages.emptyFilterSubtitle')}</Text>
                         </View>
                     )}
                     contentContainerStyle={styles.listContent}
@@ -286,51 +284,9 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f3f4f6',
     },
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'android' ? 20 : 10,
-        paddingBottom: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-    },
-    headerTitle: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#ffffff',
-        textAlign: 'center',
-    },
     listContent: {
         padding: 16,
         paddingBottom: 40,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-        gap: 10,
-    },
-    statCard: {
-        width: '48%',
-        backgroundColor: '#ffffff',
-        borderRadius: 14,
-        padding: 14,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-        elevation: 1,
-    },
-    statValue: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#6d28d9',
-        marginBottom: 4,
-    },
-    statLabel: {
-        fontSize: 12,
-        color: '#6b7280',
-        textTransform: 'uppercase',
     },
     searchBox: {
         flexDirection: 'row',

@@ -130,22 +130,21 @@ export default function ReviewsScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <LinearGradient colors={['#8B5ADF', '#683AB7']} style={styles.header}>
-                <Text style={styles.headerTitle}>{t('reviews.title')}</Text>
-                {data?.avgRating && (
+            {data?.avgRating && (
+                <View style={styles.header}>
                     <View style={styles.avgRow}>
-                        <Text style={styles.avgNumber}>{data.avgRating}</Text>
-                        <Ionicons name="star" size={24} color="#fbbf24" />
-                        <Text style={styles.avgTotal}> ({data.total} {t('reviews.reviewsLabel')})</Text>
+                        <Text style={styles.avgNumberDark}>{data.avgRating}</Text>
+                        <Ionicons name="star" size={24} color="#f59e0b" />
+                        <Text style={styles.avgTotalDark}> ({data.total} {t('reviews.reviewsLabel')})</Text>
                     </View>
-                )}
-            </LinearGradient>
+                </View>
+            )}
 
             {!reviewsAllowed ? (
                 <View style={styles.center}>
                     <Ionicons name="lock-closed-outline" size={64} color="#d1d5db" />
-                    <Text style={styles.emptyTitle}>Reviews are not enabled for this account</Text>
-                    <Text style={styles.emptySub}>Ask your salon manager to enable review access for your employee account.</Text>
+                    <Text style={styles.emptyTitle}>{t('reviews.notEnabledTitle')}</Text>
+                    <Text style={styles.emptySub}>{t('reviews.notEnabledSubtitle')}</Text>
                 </View>
             ) : loading ? (
                 <View style={styles.center}><ActivityIndicator size="large" color="#8B5ADF" /></View>
@@ -165,19 +164,19 @@ export default function ReviewsScreen() {
                             <View style={styles.statsGrid}>
                                 <View style={styles.statCard}>
                                     <Text style={styles.statValue}>{data.total}</Text>
-                                    <Text style={styles.statLabel}>Total Reviews</Text>
+                                    <Text style={styles.statLabel}>{t('reviews.totalReviews')}</Text>
                                 </View>
                                 <View style={styles.statCard}>
                                     <Text style={styles.statValue}>{pendingReplies}</Text>
-                                    <Text style={styles.statLabel}>Need Reply</Text>
+                                    <Text style={styles.statLabel}>{t('reviews.needReply')}</Text>
                                 </View>
                                 <View style={styles.statCard}>
                                     <Text style={styles.statValue}>{fiveStarCount}</Text>
-                                    <Text style={styles.statLabel}>5 Star</Text>
+                                    <Text style={styles.statLabel}>{t('reviews.fiveStar')}</Text>
                                 </View>
                                 <View style={styles.statCard}>
                                     <Text style={styles.statValue}>{lowRatedCount}</Text>
-                                    <Text style={styles.statLabel}>3 Star or Less</Text>
+                                    <Text style={styles.statLabel}>{t('reviews.lowRated')}</Text>
                                 </View>
                             </View>
 
@@ -195,7 +194,7 @@ export default function ReviewsScreen() {
                                 <TextInput
                                     value={searchQuery}
                                     onChangeText={setSearchQuery}
-                                    placeholder="Search customer, comment, or reply..."
+                                    placeholder={t('reviews.searchPlaceholder')}
                                     placeholderTextColor="#9ca3af"
                                     style={styles.searchInput}
                                 />
@@ -235,8 +234,8 @@ export default function ReviewsScreen() {
                     ListEmptyComponent={(
                         <View style={styles.emptyFilterState}>
                             <Ionicons name="search-outline" size={48} color="#d1d5db" />
-                            <Text style={styles.emptyTitle}>No reviews match these filters</Text>
-                            <Text style={styles.emptySub}>Try a different search or switch the selected review filter.</Text>
+                            <Text style={styles.emptyTitle}>{t('reviews.emptyFilterTitle')}</Text>
+                            <Text style={styles.emptySub}>{t('reviews.emptyFilterSubtitle')}</Text>
                         </View>
                     )}
                     contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
@@ -283,14 +282,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: Platform.OS === 'android' ? 20 : 10,
         paddingBottom: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
         alignItems: 'center',
     },
-    headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
     avgRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    avgNumber: { fontSize: 36, fontWeight: 'bold', color: '#fff' },
-    avgTotal: { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
+    avgNumberDark: { fontSize: 36, fontWeight: 'bold', color: '#1f2937' },
+    avgTotalDark: { fontSize: 14, color: '#6b7280' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
     statsGrid: {
         flexDirection: 'row',

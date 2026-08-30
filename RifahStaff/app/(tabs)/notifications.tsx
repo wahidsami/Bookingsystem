@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { getMessages, markMessageAsRead, StaffMessage } from '../../src/services/messages';
 import { formatDistanceToNowSafe } from '../../src/utils/safeDate';
 import { canViewNotifications } from '../../src/utils/capabilities';
@@ -12,6 +13,7 @@ import { canViewNotifications } from '../../src/utils/capabilities';
 export default function NotificationsScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
   const [items, setItems] = useState<StaffMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,6 +48,25 @@ export default function NotificationsScreen() {
     }, [user, loadNotifications])
   );
 
+  React.useEffect(() => {
+      if (!user) return;
+
+      const subscription = AppState.addEventListener('change', (state) => {
+          if (state === 'active') {
+              loadNotifications();
+          }
+      });
+
+      const interval = setInterval(() => {
+          loadNotifications();
+      }, 45000);
+
+      return () => {
+          subscription.remove();
+          clearInterval(interval);
+      };
+  }, [user, loadNotifications]);
+
   const onRefresh = () => {
     setRefreshing(true);
     loadNotifications();
@@ -72,14 +93,10 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <LinearGradient colors={['#8B5ADF', '#683AB7']} style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-      </LinearGradient>
-
       {!notificationsAllowed ? (
         <View style={styles.centerContainer}>
           <Ionicons name="notifications-off-outline" size={64} color="#d1d5db" />
-          <Text style={styles.emptyTitle}>Notifications are disabled for this account</Text>
+          <Text style={styles.emptyTitle}>{t('notifications.notEnabledTitle')}</Text>
         </View>
       ) : loading ? (
         <View style={styles.centerContainer}>
@@ -88,7 +105,7 @@ export default function NotificationsScreen() {
       ) : items.length === 0 ? (
         <View style={styles.centerContainer}>
           <Ionicons name="notifications-outline" size={64} color="#d1d5db" />
-          <Text style={styles.emptyTitle}>No notifications yet</Text>
+          <Text style={styles.emptyTitle}>{t('notifications.empty')}</Text>
         </View>
       ) : (
         <FlatList
@@ -102,7 +119,7 @@ export default function NotificationsScreen() {
               <TouchableOpacity style={[styles.card, unread && styles.cardUnread]} onPress={() => handleOpen(item)} activeOpacity={0.8}>
                 <View style={styles.cardHeader}>
                   <Text style={[styles.subject, unread && styles.subjectUnread]} numberOfLines={1}>
-                    {item.subject || 'Notification'}
+                    {item.subject || t('notifications.defaultSubject')}
                   </Text>
                   <Text style={styles.timestamp}>{formatDistanceToNowSafe(item.createdAt)}</Text>
                 </View>
@@ -118,8 +135,6 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 18 },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '700' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   emptyTitle: { marginTop: 12, fontSize: 16, color: '#6b7280', textAlign: 'center' },
   card: {

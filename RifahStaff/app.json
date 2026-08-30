@@ -51,9 +51,9 @@
           "image": "./assets/images/LogoColor.png",
           "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#8B5ADF",
           "dark": {
-            "backgroundColor": "#ffffff"
+            "backgroundColor": "#8B5ADF"
           }
         }
       ],

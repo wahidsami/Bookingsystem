@@ -58,15 +58,11 @@ export default function EarningsScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <LinearGradient colors={['#8B5ADF', '#683AB7']} style={styles.header}>
-                <Text style={styles.headerTitle}>{t('earnings.title')}</Text>
-            </LinearGradient>
-
             {!earningsAllowed ? (
                 <View style={styles.center}>
                     <Ionicons name="lock-closed-outline" size={64} color="#d1d5db" />
-                    <Text style={styles.emptyTitle}>Earnings are not enabled for this account</Text>
-                    <Text style={styles.emptySub}>Your salon manager can grant earnings visibility for your employee account.</Text>
+                    <Text style={styles.emptyTitle}>{t('earnings.notEnabledTitle')}</Text>
+                    <Text style={styles.emptySub}>{t('earnings.notEnabledSubtitle')}</Text>
                 </View>
             ) : loading ? (
                 <View style={styles.center}><ActivityIndicator size="large" color="#8B5ADF" /></View>
@@ -84,7 +80,7 @@ export default function EarningsScreen() {
                     {data.currentMonth ? (
                         <View style={styles.heroCard}>
                             <View style={styles.heroHeader}>
-                                <Text style={styles.heroLabel}>Current Cycle</Text>
+                                <Text style={styles.heroLabel}>{t('earnings.currentCycle')}</Text>
                                 <View style={[styles.heroStatusBadge, { backgroundColor: `${statusColor(data.currentMonth.status)}20` }]}>
                                     <Text style={[styles.heroStatusText, { color: statusColor(data.currentMonth.status) }]}>
                                         {t(`earnings.${data.currentMonth.status}`).toUpperCase()}
@@ -146,8 +142,8 @@ export default function EarningsScreen() {
                     {filteredPayrolls.length === 0 ? (
                         <View style={styles.emptyFilterState}>
                             <Ionicons name="funnel-outline" size={48} color="#d1d5db" />
-                            <Text style={styles.emptyTitle}>No payroll matches this filter</Text>
-                            <Text style={styles.emptySub}>Try another payroll status to see more records.</Text>
+                            <Text style={styles.emptyTitle}>{t('earnings.emptyFilterTitle')}</Text>
+                            <Text style={styles.emptySub}>{t('earnings.emptyFilterSubtitle')}</Text>
                         </View>
                     ) : filteredPayrolls.map(p => {
                         const expanded = expandedPayrollId === p.id;
@@ -230,14 +226,6 @@ export default function EarningsScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f3f4f6' },
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'android' ? 20 : 10,
-        paddingBottom: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-    },
-    headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
     content: { padding: 16, paddingBottom: 40 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
     emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#4b5563', marginTop: 16 },
