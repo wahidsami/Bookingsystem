@@ -244,9 +244,13 @@ export default function ScheduleScreen() {
         try {
             setAppointmentsLoading(true);
             const data = await getAppointmentsForDate(selectedDateKey);
-            await syncAppointments(data, shouldNotify);
-            setAppointments(data);
-            setAppointmentsByDate((current) => ({ ...current, [selectedDateKey]: data }));
+            await syncAppointments(data.appointments, shouldNotify);
+            setAppointments(data.appointments);
+            setAppointmentsByDate((current) => ({ ...current, [selectedDateKey]: data.appointments }));
+            setBreaks((currentBreaks) => {
+                const filtered = currentBreaks.filter(b => b.date !== selectedDateKey);
+                return [...filtered, ...(data.breaks || [])];
+            });
         } catch (error) {
             console.error('Failed to load appointments for selected day', error);
             setAppointments([]);
@@ -261,10 +265,14 @@ export default function ScheduleScreen() {
         try {
             setWeekAppointmentsLoading(true);
             const responses = await Promise.all(
-                weekDays.map(async (dayKey) => ({
-                    dayKey,
-                    appointments: await getAppointmentsForDate(dayKey),
-                }))
+                weekDays.map(async (dayKey) => {
+                    const data = await getAppointmentsForDate(dayKey);
+                    return {
+                        dayKey,
+                        appointments: data.appointments,
+                        breaks: data.breaks || []
+                    };
+                })
             );
 
             setAppointmentsByDate((current) => {
@@ -273,6 +281,12 @@ export default function ScheduleScreen() {
                     next[dayKey] = dayAppointments;
                 });
                 return next;
+            });
+
+            setBreaks((currentBreaks) => {
+                const currentFiltered = currentBreaks.filter(b => !weekDays.includes(b.date));
+                const newBreaks = responses.flatMap(r => r.breaks);
+                return [...currentFiltered, ...newBreaks];
             });
         } catch (error) {
             console.error('Failed to load appointments for visible week', error);
