@@ -495,7 +495,13 @@ const getPaymentHistory = async (req, res) => {
 const getWalletBalance = async (req, res) => {
     try {
         const platformUserId = req.userId;
-        const balance = await walletService.getBalance(platformUserId);
+        const tenantId = req.query.tenantId || req.tenantId;
+
+        if (!tenantId) {
+            return res.status(400).json({ success: false, message: 'tenantId is required' });
+        }
+
+        const balance = await walletService.getBalance(platformUserId, tenantId);
 
         res.json({
             success: true,

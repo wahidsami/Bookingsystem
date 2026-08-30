@@ -211,7 +211,13 @@ export function BookingFlow({ route, navigation }: BookingProps) {
     const bookingFeeAmount = paymentSettings.serviceDepositMode === 'percentage'
         ? Math.min(servicePrice, parseFloat((servicePrice * (paymentSettings.serviceDepositPercentage / 100)).toFixed(2)))
         : Math.min(servicePrice, paymentSettings.serviceDepositFixedAmount);
-    const payableNowAmount = selectedPaymentMethod === 'booking-fee' ? bookingFeeAmount : servicePrice;
+
+    let payableNowAmount = 0;
+    if (selectedPaymentMethod === 'online-full') {
+        payableNowAmount = servicePrice;
+    } else if (selectedPaymentMethod === 'booking-fee') {
+        payableNowAmount = bookingFeeAmount;
+    }
 
     const paymentOptions = [
         paymentSettings.allowServicePayAtCenter && allowedServicePaymentMethods.has('at-center') ? {
