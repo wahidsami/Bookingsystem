@@ -68,6 +68,11 @@ export function usePushNotifications() {
                 return;
             }
 
+            if (type === 'new_message') {
+                router.push('/messages' as never);
+                return;
+            }
+
             // Route non-appointment events to the dedicated notifications tab.
             router.push('/notifications' as never);
         });

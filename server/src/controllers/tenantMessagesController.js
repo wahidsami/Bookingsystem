@@ -1,4 +1,6 @@
 const db = require('../models');
+const pushNotificationService = require('../services/pushNotificationService');
+const logger = require('../utils/productionLogger');
 
 exports.getMessages = async (req, res) => {
     try {
@@ -68,6 +70,42 @@ exports.sendMessage = async (req, res) => {
             message: 'Message sent successfully',
             data: message
         });
+
+        // Non-blocking push delivery
+        (async () => {
+            try {
+                const payload = {
+                    title: subject || 'Admin Update',
+                    body: body,
+                    data: {
+                        type: 'new_message',
+                        messageId: message.id
+                    }
+                };
+
+                if (recipientId) {
+                    await pushNotificationService.sendToStaff(recipientId, payload);
+                } else {
+                    const devices = await db.MobilePushToken.findAll({
+                        where: {
+                            appType: 'staff',
+                            tenantId: tenantId,
+                            isActive: true
+                        }
+                    });
+                    if (devices.length > 0) {
+                        await pushNotificationService._sendToDevices(devices, payload);
+                    }
+                }
+            } catch (pushError) {
+                logger.warn('Failed to send push notification for staff message', {
+                    error: pushError.message,
+                    tenantId,
+                    recipientId: recipientId || 'broadcast',
+                    messageId: message.id
+                });
+            }
+        })();
     } catch (error) {
         console.error('Error sending message:', error);
         res.status(500).json({
