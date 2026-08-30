@@ -235,6 +235,7 @@ router.patch('/gift-cards/packages/:id/active', tenantGiftCardController.toggleP
 router.post('/gift-cards/packages/:id/image', tenantGiftCardController.uploadGiftCardImage, tenantGiftCardController.uploadPackageImage);
 router.get('/gift-cards/reports/summary', tenantGiftCardController.getSummaryReport);
 router.get('/gift-cards/reports/transactions', tenantGiftCardController.getTransactionsReport);
+router.get('/gift-cards/reports/transactions/:id/activity', tenantGiftCardController.getTransactionActivity);
 router.get('/gift-cards/reports/transactions.csv', tenantGiftCardController.exportTransactionsReportCsv);
 router.get('/gift-cards/reports/redemptions', tenantGiftCardController.getRedemptionsReport);
 

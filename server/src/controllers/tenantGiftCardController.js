@@ -671,6 +671,116 @@ exports.getSummaryReport = async (req, res) => {
   }
 };
 
+exports.getTransactionActivity = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const { id } = req.params;
+
+    if (!tenantId || !id) {
+      return res.status(400).json({ success: false, message: 'Missing tenantId or transaction ID' });
+    }
+
+    // 1. Fetch exact transaction (verifies tenant ownership natively via buildGiftCardRows)
+    const rows = await buildGiftCardRows({
+      tenantId,
+      where: { id },
+      limit: 1
+    });
+
+    const row = rows[0];
+
+    if (!row) {
+      return res.status(404).json({ success: false, message: 'Gift card transaction not found for this tenant.' });
+    }
+
+    let walletCreditLedgerEntry = null;
+    let subsequentWalletActivity = [];
+
+    // 2. Auto-wallet specifics
+    if (row.sourceTransaction?.status === 'sent_completed_auto_wallet') {
+      const platformUserId = row.sourceTransaction.recipientPlatformUserId;
+      if (platformUserId) {
+        walletCreditLedgerEntry = await db.TenantWalletLedgerEntry.findOne({
+          where: {
+            tenantId,
+            referenceType: 'tenant_gift_card_transaction',
+            referenceId: row.sourceTransaction.id,
+            platformUserId
+          }
+        });
+
+        if (walletCreditLedgerEntry) {
+          const debits = await db.TenantWalletLedgerEntry.findAll({
+            where: {
+              tenantId,
+              platformUserId,
+              direction: 'debit',
+              createdAt: { [Op.gte]: walletCreditLedgerEntry.createdAt }
+            },
+            order: [['createdAt', 'ASC']]
+          });
+
+          subsequentWalletActivity = await Promise.all(debits.map(async (debit) => {
+             const debitObj = debit.toJSON();
+             if (debitObj.referenceType === 'appointment' && debitObj.referenceId) {
+                 const appointment = await db.Appointment.findOne({
+                   where: { id: debitObj.referenceId },
+                   include: [
+                     { model: db.Service, as: 'service', attributes: ['id', 'name_en', 'name_ar'] }
+                   ],
+                   attributes: ['id', 'bookingNumber', 'status', 'startTime']
+                 });
+                 if (appointment) debitObj.appointment = appointment;
+             } else if (debitObj.referenceType === 'order' && debitObj.referenceId) {
+                 const order = await db.Order.findOne({
+                   where: { id: debitObj.referenceId },
+                   attributes: ['id', 'orderNumber', 'status', 'createdAt']
+                 });
+                 if (order) debitObj.order = order;
+             }
+             return debitObj;
+          }));
+        }
+      }
+    } else {
+      // 3. For external-code cards, resolve Appointment/Order details for the redemptions.
+      if (row.redemptions && row.redemptions.length > 0) {
+        for (const redemption of row.redemptions) {
+          if (redemption.appointmentId) {
+             const appointment = await db.Appointment.findOne({
+               where: { id: redemption.appointmentId },
+               include: [
+                 { model: db.Service, as: 'service', attributes: ['id', 'name_en', 'name_ar'] }
+               ],
+               attributes: ['id', 'bookingNumber', 'status', 'startTime']
+             });
+             if (appointment) redemption.appointment = appointment;
+          }
+          if (redemption.orderId) {
+             const order = await db.Order.findOne({
+               where: { id: redemption.orderId },
+               attributes: ['id', 'orderNumber', 'status', 'createdAt']
+             });
+             if (order) redemption.order = order;
+          }
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      activity: {
+        transaction: row,
+        walletCreditLedgerEntry,
+        subsequentWalletActivity
+      }
+    });
+  } catch (error) {
+    console.error('tenant getTransactionActivity error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load gift card activity' });
+  }
+};
+
 exports.exportTransactionsReportCsv = async (req, res) => {
   try {
     const tenantId = ensureTenantId(req);
