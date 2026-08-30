@@ -48,12 +48,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/LogoColor.png",
+          "image": "./assets/images/RifahNewLogoWhite.png",
           "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#1E3A8A",
           "dark": {
-            "backgroundColor": "#ffffff"
+            "backgroundColor": "#1E3A8A"
           }
         }
       ],
