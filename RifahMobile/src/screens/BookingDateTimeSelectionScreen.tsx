@@ -56,7 +56,7 @@ export function BookingDateTimeSelectionScreen() {
     const { items, updateItem, totalPrice } = useServiceBookingCart();
     
     const { isRTL } = useLanguage();
-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [baseDate, setBaseDate] = useState<Date>(startOfToday());
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
@@ -541,8 +541,8 @@ export function BookingDateTimeSelectionScreen() {
                 </View>
             </ScrollView>
 
-            {/* Bottom Fixed Basket */}
-            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(scrollBottomPadding, spacing.md) }]}>
+            {/* Bottom Fixed Button */}
+            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(bottomInset, spacing.md) }]}>
                 <View style={styles.bottomBasketLeft}>
                     <Text style={styles.bottomBasketPrice}>
                         {formatRiyal(totalPrice, isRTL ? 'ar' : 'en')}

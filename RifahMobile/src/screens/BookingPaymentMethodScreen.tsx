@@ -37,7 +37,7 @@ export function BookingPaymentMethodScreen() {
     const { items, totalPrice, cartTenant, clearCart } = useServiceBookingCart();
     
     const { isRTL } = useLanguage();
-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<ServiceBookingPaymentMethod | null>(null);
     const [loading, setLoading] = useState(false);
@@ -234,7 +234,7 @@ export function BookingPaymentMethodScreen() {
             </ScrollView>
 
             {/* Bottom Fixed Action */}
-            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(scrollBottomPadding, spacing.md) }]}>
+            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(bottomInset, spacing.md) }]}>
                 <TouchableOpacity 
                     style={[styles.bottomBasketButton, loading && styles.bottomBasketButtonDisabled]} 
                     onPress={handleContinue}

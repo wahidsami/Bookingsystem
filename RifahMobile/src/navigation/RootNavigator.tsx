@@ -26,6 +26,7 @@ import { ProductDetailsScreen } from '../screens/ProductDetailsScreen';
 import { WalletBalanceDetailsScreen } from '../screens/WalletBalanceDetailsScreen';
 import { CentersBalanceScreen } from '../screens/CentersBalanceScreen';
 import { AppointmentDetailsScreen } from '../screens/AppointmentDetailsScreen';
+import { PurchaseDetailsScreen } from '../screens/PurchaseDetailsScreen';
 import { BookingStaffSelectionScreen } from '../screens/BookingStaffSelectionScreen';
 import { BookingStaffPerServiceScreen } from '../screens/BookingStaffPerServiceScreen';
 import { BookingDateTimeSelectionScreen } from '../screens/BookingDateTimeSelectionScreen';
@@ -66,6 +67,7 @@ export function RootNavigator() {
             <Stack.Screen name="Review" component={ReviewScreen} />
             <Stack.Screen name="Gifts" component={GiftsScreen} />
             <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
+            <Stack.Screen name="PurchaseDetails" component={PurchaseDetailsScreen} />
             <Stack.Screen name="BookingStaffSelection" component={BookingStaffSelectionScreen} />
             <Stack.Screen name="BookingStaffPerServiceScreen" component={BookingStaffPerServiceScreen} />
             <Stack.Screen name="BookingDateTimeSelection" component={BookingDateTimeSelectionScreen} />

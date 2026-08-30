@@ -30,7 +30,7 @@ type PaymentSuccessSummary = {
 
 export function PaymentSuccessScreen({ route, navigation }: any) {
     const { isRTL } = useLanguage();
-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
     const { clearCart } = useServiceBookingCart();
 
     useEffect(() => {
@@ -152,15 +152,14 @@ export function PaymentSuccessScreen({ route, navigation }: any) {
                 </View>
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, spacing.lg) }]}>
                 <TouchableOpacity
                     style={styles.secondaryButton}
                     onPress={() => {
-                        if (appointmentId) {
-                            navigation.navigate('Tabs', { screen: 'Appointments' });
-                            return;
-                        }
-                        navigation.navigate('Tabs', { screen: 'Appointments' });
+                        navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Tabs', params: { screen: 'Appointments' } }],
+                        });
                     }}
                 >
                     <Text style={styles.secondaryButtonText}>
@@ -169,7 +168,12 @@ export function PaymentSuccessScreen({ route, navigation }: any) {
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.primaryButton}
-                    onPress={() => navigation.navigate('Tabs', { screen: 'Home' })}
+                    onPress={() => {
+                        navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Tabs', params: { screen: 'Home' } }],
+                        });
+                    }}
                 >
                     <Text style={styles.primaryButtonText}>{isRTL ? 'العودة للرئيسية' : 'Return Home'}</Text>
                 </TouchableOpacity>

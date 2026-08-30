@@ -19,7 +19,7 @@ export function BookingStaffSelectionScreen() {
     const { tenantId } = route.params || {};
     const { items, updateItem } = useServiceBookingCart();
     const { isRTL } = useLanguage();
-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [loading, setLoading] = useState(true);
     const [selectedMode, setSelectedMode] = useState<SelectionMode>(null);
@@ -312,7 +312,7 @@ export function BookingStaffSelectionScreen() {
             )}
 
             {/* Bottom Fixed Button */}
-            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(scrollBottomPadding, spacing.md) }]}>
+            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(bottomInset, spacing.md) }]}>
                 {!isContinueEnabled && selectedMode === 'choose' && (
                     <Text style={[styles.validationMessage, isRTL ? { textAlign: 'right' } : null]}>
                         {isRTL ? 'يرجى اختيار مختص لكل خدمة.' : 'Please choose a professional for each service.'}

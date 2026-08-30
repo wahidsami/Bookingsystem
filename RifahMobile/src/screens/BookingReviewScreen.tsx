@@ -40,7 +40,7 @@ export function BookingReviewScreen() {
     const { items, updateItem, totalPrice, cartTenant, clearCart } = useServiceBookingCart();
     
     const { isRTL } = useLanguage();
-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [fullTenant, setFullTenant] = useState<Tenant | null>(null);
     const [loading, setLoading] = useState(true);
@@ -427,8 +427,7 @@ export function BookingReviewScreen() {
                 </KeyboardAvoidingView>
             )}
 
-            {/* Bottom Fixed Action */}
-            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(scrollBottomPadding, spacing.md) }]}>
+            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(bottomInset, spacing.md) }]}>
                 <View style={styles.bottomBasketLeft}>
                     <Text style={styles.bottomBasketPriceLabel}>{isRTL ? 'الإجمالي' : 'Total'}</Text>
                     <Text style={styles.bottomBasketPrice}>

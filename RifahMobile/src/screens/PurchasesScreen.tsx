@@ -117,11 +117,11 @@ export function PurchasesScreen({ navigation, route }: any) {
         return (
             <TouchableOpacity
                 activeOpacity={0.95}
-                style={[styles.card, !isExpanded && styles.compactCard]}
-                onPress={() => setExpandedOrderId((prev) => (prev === item.id ? null : item.id))}
+                style={[styles.card, styles.compactCard]}
+                onPress={() => navigation.navigate('PurchaseDetails', { purchaseId: item.id })}
             >
                 {/* Header: Tenant Info & Status (Compact for both) */}
-                <View style={[styles.cardHeader, !isExpanded && styles.compactCardHeader]}>
+                <View style={[styles.cardHeader, styles.compactCardHeader]}>
                     <View style={styles.salonInfo}>
                         {item.tenant?.logo ? (
                             <Image
@@ -150,78 +150,20 @@ export function PurchasesScreen({ navigation, route }: any) {
                     </View>
                 </View>
 
-                {isExpanded ? (
-                    /* EXPANDED VIEW: Preserve all existing layout */
-                    <>
-                        <View style={styles.cardBody}>
-                            <Text style={styles.orderId}>#{(item.orderNumber || item.id.slice(0, 8)).toUpperCase()}</Text>
-                            <View style={styles.dateTimeRow}>
-                                <AppIcon name="bookings" size={16} color={colors.primary} />
-                                <Text style={styles.dateTimeText}>
-                                    {format(dateDate, 'eeee, d MMMM yyyy', { locale: isArabic ? ar : enUS })}
-                                </Text>
-                            </View>
-
-                            <View style={styles.itemsContainer}>
-                                {visibleItems.map((orderItem, index) => (
-                                    <Text key={index} style={styles.itemText}>
-                                        • {isArabic ? orderItem.Product?.name_ar || orderItem.product?.name_ar : orderItem.Product?.name_en || orderItem.product?.name_en} (x{orderItem.quantity})
-                                    </Text>
-                                ))}
-                                <Text style={styles.viewDetailsText}>
-                                    {isArabic ? 'إخفاء التفاصيل' : 'Hide details'}
-                                </Text>
-                            </View>
+                {/* COMPACT VIEW */}
+                <View style={styles.compactBody}>
+                    <Text style={styles.compactTitle} numberOfLines={2}>{titleStr}</Text>
+                    <View style={styles.compactFooterRow}>
+                        <View style={styles.compactDateTimeRow}>
+                            <AppIcon name="clock" size={14} color={colors.primary} />
+                            <Text style={styles.dateTimeText}>{dateStr}</Text>
                         </View>
-
-                        <View style={styles.cardFooter}>
-                            <View style={styles.priceBlock}>
-                                <Text style={styles.price}>{formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
-                                <Text style={styles.totalHint}>{language === 'ar' ? 'إجمالي الطلب' : 'Order total'}</Text>
-                            </View>
-                            <View style={styles.actions}>
-                                {orderNeedsPayment(item) && (
-                                    <TouchableOpacity
-                                        style={styles.payButton}
-                                        onPress={(e) => {
-                                            e.stopPropagation && e.stopPropagation();
-                                            navigation.navigate('Payment', {
-                                                orderId: item.id,
-                                                amount: Number(item.totalAmount),
-                                                tenantId: item.tenantId,
-                                            });
-                                        }}
-                                    >
-                                        <Text style={styles.payButtonText}>{t('payNow')}</Text>
-                                    </TouchableOpacity>
-                                )}
-                                {['pending', 'confirmed'].includes(item.status) && (
-                                    <TouchableOpacity
-                                        style={styles.cancelButton}
-                                        onPress={(e) => {
-                                            e.stopPropagation && e.stopPropagation();
-                                            handleCancel(item.id);
-                                        }}
-                                    >
-                                        <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
-                    </>
-                ) : (
-                    /* COMPACT VIEW */
-                    <View style={styles.compactBody}>
-                        <Text style={styles.compactTitle} numberOfLines={2}>{titleStr}</Text>
-                        <View style={styles.compactFooterRow}>
-                            <View style={styles.compactDateTimeRow}>
-                                <AppIcon name="clock" size={14} color={colors.primary} />
-                                <Text style={styles.dateTimeText}>{dateStr}</Text>
-                            </View>
-                            <Text style={styles.compactPrice}>{formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
-                        </View>
+                        <Text style={styles.compactPrice}>{formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
                     </View>
-                )}
+                    <Text style={[styles.viewDetailsText, { marginTop: spacing.md }]}>
+                        {isArabic ? 'عرض التفاصيل' : 'View Details'}
+                    </Text>
+                </View>
             </TouchableOpacity>
         );
     };

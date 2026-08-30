@@ -17,7 +17,7 @@ export function BookingStaffPerServiceScreen() {
     const { tenantId } = route.params || {};
     const { items, updateItem, totalPrice } = useServiceBookingCart();
     const { isRTL } = useLanguage();
-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
     const [serviceStaffMap, setServiceStaffMap] = useState<Record<string, Staff[]>>({});
     const [loading, setLoading] = useState(true);
@@ -241,7 +241,7 @@ export function BookingStaffPerServiceScreen() {
             )}
 
             {/* Bottom Fixed Basket */}
-            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(scrollBottomPadding, spacing.md) }]}>
+            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(bottomInset, spacing.md) }]}>
                 <View style={styles.bottomBasketLeft}>
                     <Text style={styles.bottomBasketPrice}>
                         {formatRiyal(totalPrice, isRTL ? 'ar' : 'en')}

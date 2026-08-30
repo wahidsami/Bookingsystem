@@ -37,8 +37,8 @@ const sendCustomerNotificationEmail = async ({
             tenantName,
             title: normalizeText(title, locale === 'ar' ? 'إشعار من رفاه' : 'A new update from Refah'),
             body: normalizeText(body, locale === 'ar' ? 'لديك تحديث جديد في حسابك.' : 'You have a new update in your account.'),
-            actionUrl: normalizeText(actionUrl, dashboardUrl),
-            actionText: normalizeText(actionText, locale === 'ar' ? 'فتح لوحة التحكم' : 'Open dashboard')
+            actionUrl: normalizeText(actionUrl, ''),
+            actionText: normalizeText(actionText, '')
         }
     });
 };
