@@ -18,6 +18,12 @@ const generalLimiter = rateLimit({
     max: parseLimit(process.env.RATE_LIMIT_GENERAL_MAX, 300),
     skip: (req) => {
         const path = `${req.originalUrl || req.url || ''}`;
+
+        // Let auth endpoints be governed purely by the dedicated authLimiter
+        if (path.startsWith('/api/v1/auth/')) {
+            return true;
+        }
+
         const hasAuthHeader = typeof req.headers?.authorization === 'string' && req.headers.authorization.startsWith('Bearer ');
 
         // Tenant dashboard and subscription widgets can burst many small requests.
