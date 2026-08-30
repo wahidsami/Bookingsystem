@@ -82,10 +82,18 @@ export async function processBookingCheckout({
                 paymentSummary: paymentSummary
             });
         } else {
-            navigation.navigate('PaymentSuccess', {
-                bookingSessionId: newBookingSessionId,
-                bookingReference: newBookingReference,
-                paymentSummary: paymentSummary
+            navigation.reset({
+                index: 0,
+                routes: [
+                    {
+                        name: 'PaymentSuccess',
+                        params: {
+                            bookingSessionId: newBookingSessionId,
+                            bookingReference: newBookingReference,
+                            paymentSummary: paymentSummary
+                        }
+                    }
+                ]
             });
         }
     } catch (error: any) {

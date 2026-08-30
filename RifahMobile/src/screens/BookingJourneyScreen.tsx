@@ -598,7 +598,6 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
 
             const newBookingReference = response.bookingSession?.bookingReference || response.bookingSession?.id || '';
             const newBookingSessionId = response.bookingSession?.id;
-            clearCart();
 
             const bookingTaxAmount = items.reduce((acc, item) => acc + (item.payableNowAmount || 0), 0); // fallback or correct computation
             const bookingDepositAmount = payableNowAmount;
