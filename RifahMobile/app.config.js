@@ -35,6 +35,11 @@ module.exports = {
       versionCode: 1,
       edgeToEdgeEnabled: false,
       predictiveBackGestureEnabled: false,
+      config: {
+        googleMaps: {
+          apiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY || ''
+        }
+      }
     },
     web: {
       favicon: './assets/favicon.png',
@@ -63,14 +68,6 @@ module.exports = {
       'expo-font',
       'expo-notifications',
       'expo-web-browser',
-      [
-        'react-native-maps',
-        {
-          android: {
-            googleMapsApiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY || ''
-          }
-        }
-      ]
     ],
   },
 };
