@@ -7106,7 +7106,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           </div>
                         </div>
                         <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                          {isRtl ? 'يرتبط بالموعد الحالي' : 'Scoped to current appointment'}
+                          {isRtl ? 'ملف العميل الشامل' : 'Lifetime Customer Profile'}
                         </span>
                       </header>
 
@@ -7182,7 +7182,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   },
                                   {
                                     label: isRtl ? 'نسخ' : 'Copy',
-                                    action: async () => {
+                                    action: async (e: any) => {
                                       const payload = [
                                         activeCustomerName,
                                         activeCustomerPhone,
@@ -7191,6 +7191,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       ].filter(Boolean).join(' | ');
                                       if (navigator.clipboard?.writeText && payload) {
                                         await navigator.clipboard.writeText(payload);
+                                        const btn = e.currentTarget;
+                                        const originalText = btn.innerText;
+                                        btn.innerText = isRtl ? 'تم النسخ' : 'Copied';
+                                        setTimeout(() => { if (btn) btn.innerText = originalText; }, 2000);
                                       }
                                     },
                                     disabled: false,
@@ -7216,52 +7220,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                               </div>
                             </section>
 
-                            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
-                              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                {isRtl ? 'مخزون المحفظة' : 'Wallet Summary'}
-                              </h4>
-                              <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                                <div className="rounded-xl bg-amber-50/70 border border-amber-100 p-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'الرصيد' : 'Wallet'}</p>
-                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{activeCustomerWallet.toFixed(2)} {t.riyal}</p>
-                                </div>
-                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'إجمالي الإنفاق' : 'Total Spent'}</p>
-                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{Number(customerProfile?.totalSpent || 0).toFixed(2)} {t.riyal}</p>
-                                </div>
-                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'المواعيد' : 'Appointments'}</p>
-                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{customerAppointmentHistory.length}</p>
-                                </div>
-                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'المعاملات' : 'Transactions'}</p>
-                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{customerRecentTransactions.length}</p>
-                                </div>
-                              </div>
-                            </section>
 
-                            <section id="customer-notes-section" className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
-                              <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                  {isRtl ? 'الملاحظات الداخلية' : 'Internal Notes'}
-                                </h4>
-                                <button
-                                  type="button"
-                                  onClick={() => setCustomerDrawerTab('notes')}
-                                  className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-700"
-                                >
-                                  {isRtl ? 'فتح القسم' : 'Open section'}
-                                </button>
-                              </div>
-                              <div className="grid grid-cols-1 gap-2">
-                                {customerInternalNotes.map((note, idx) => (
-                                  <div key={`${note.label}-${idx}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{note.label}</p>
-                                    <p className="leading-relaxed">{note.value || '—'}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </section>
                           </div>
 
                           <div className="xl:col-span-7 space-y-4">
@@ -7273,7 +7232,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       {isRtl ? 'سجل التفاعل والنشاط' : 'Customer Interaction Workspace'}
                                     </h4>
                                     <p className="text-[10px] text-slate-400 mt-1">
-                                      {isRtl ? 'عرض سياقي مرتبط بالموعد الحالي فقط.' : 'Contextually scoped to the currently opened appointment.'}
+                                      {isRtl ? 'بيانات العميل التاريخية الشاملة.' : 'Lifetime customer intelligence and history.'}
                                     </p>
                                   </div>
                                   <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
