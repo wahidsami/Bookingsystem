@@ -2199,8 +2199,11 @@ export default function InteractiveDrawers({
         if (prodRes.orderId || prodRes.transactionRef) orderId = prodRes.orderId || prodRes.transactionRef;
       }
 
+      const collectedRedeemCodes: Record<string, string[]> = {};
+
       if (giftCardItems.length > 0) {
         for (const gc of giftCardItems) {
+          collectedRedeemCodes[gc.id] = [];
           for (let q = 0; q < (gc.quantity || 1); q++) {
             const gcRes = await tenantApiAdapter.checkoutGiftCards({
               packageId: gc.packageId || gc.id,
@@ -2216,15 +2219,25 @@ export default function InteractiveDrawers({
             if (gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id) {
               orderId = gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id;
             }
+            if (gcRes.externalRedeemCode) {
+              collectedRedeemCodes[gc.id].push(gcRes.externalRedeemCode);
+            }
           }
         }
       }
+
+      const completedReceiptItems = cartItems.map(it => {
+        if (it.type === 'giftcard' && collectedRedeemCodes[it.id] && collectedRedeemCodes[it.id].length > 0) {
+          return { ...it, skuOrCode: collectedRedeemCodes[it.id].join(', ') };
+        }
+        return it;
+      });
 
       const completedReceipt = {
         orderId: orderId,
         date: new Date().toISOString().replace('T', ' ').substring(0, 16),
         customerName: buyerName,
-        items: [...cartItems],
+        items: completedReceiptItems,
         subtotal,
         vat,
         total,
