@@ -154,19 +154,6 @@ export function PaymentSuccessScreen({ route, navigation }: any) {
 
             <View style={styles.footer}>
                 <TouchableOpacity
-                    style={styles.secondaryButton}
-                    onPress={() => {
-                        navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'Tabs', params: { screen: 'Appointments' } }],
-                        });
-                    }}
-                >
-                    <Text style={styles.secondaryButtonText}>
-                        {isRTL ? 'عرض الموعد' : 'View Appointment'}
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
                     style={styles.primaryButton}
                     onPress={() => {
                         navigation.reset({
@@ -175,7 +162,7 @@ export function PaymentSuccessScreen({ route, navigation }: any) {
                         });
                     }}
                 >
-                    <Text style={styles.primaryButtonText}>{isRTL ? 'العودة للرئيسية' : 'Return Home'}</Text>
+                    <Text style={styles.primaryButtonText}>{isRTL ? 'العودة للرئيسية' : 'Go Home'}</Text>
                 </TouchableOpacity>
             </View>
         </View>

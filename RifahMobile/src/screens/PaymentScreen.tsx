@@ -173,15 +173,23 @@ export function PaymentScreen({ route, navigation }: any) {
                     setWalletBalance(latest);
                 }
 
-                navigation.replace('PaymentSuccess', {
-                    appointmentId,
-                    orderId,
-                    bookingSessionId,
-                    paymentSummary: {
-                        ...paymentSummary,
-                        total: paymentSummary.total ?? amountValue,
-                        primaryCustomer: paymentSummary.primaryCustomer,
-                    },
+                navigation.reset({
+                    index: 0,
+                    routes: [
+                        {
+                            name: 'PaymentSuccess',
+                            params: {
+                                appointmentId,
+                                orderId,
+                                bookingSessionId,
+                                paymentSummary: {
+                                    ...paymentSummary,
+                                    total: paymentSummary.total ?? amountValue,
+                                    primaryCustomer: paymentSummary.primaryCustomer,
+                                },
+                            },
+                        },
+                    ],
                 });
             }
         } catch (error: any) {

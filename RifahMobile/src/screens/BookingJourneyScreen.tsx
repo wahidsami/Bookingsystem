@@ -630,10 +630,18 @@ export function BookingJourneyScreen({ route, navigation }: BookingJourneyProps)
                     paymentSummary,
                 });
             } else {
-                navigation.navigate('PaymentSuccess', {
-                    bookingSessionId: newBookingSessionId,
-                    bookingReference: newBookingReference,
-                    summary: paymentSummary,
+                navigation.reset({
+                    index: 0,
+                    routes: [
+                        {
+                            name: 'PaymentSuccess',
+                            params: {
+                                bookingSessionId: newBookingSessionId,
+                                bookingReference: newBookingReference,
+                                summary: paymentSummary,
+                            },
+                        },
+                    ],
                 });
             }
         } catch (error: any) {
