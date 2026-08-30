@@ -20,7 +20,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { processBookingCheckout } from '../utils/bookingOrchestration';
 
@@ -41,6 +41,7 @@ export function BookingReviewScreen() {
     
     const { isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const isFocused = useIsFocused();
 
     const [fullTenant, setFullTenant] = useState<Tenant | null>(null);
     const [loading, setLoading] = useState(true);
@@ -52,8 +53,13 @@ export function BookingReviewScreen() {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        if (!tenantId || items.length === 0) {
+        if ((!tenantId || items.length === 0) && isFocused) {
             navigation.goBack();
+        }
+    }, [tenantId, items.length, isFocused, navigation]);
+
+    useEffect(() => {
+        if (!tenantId || items.length === 0) {
             return;
         }
 

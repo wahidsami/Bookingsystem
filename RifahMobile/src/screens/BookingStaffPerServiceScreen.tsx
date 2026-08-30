@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useServiceBookingCart, ServiceBookingCartItem } from '../contexts/ServiceBookingCartContext';
 import { api, Staff, getImageUrl, normalizeStaff } from '../api/client';
@@ -18,6 +18,7 @@ export function BookingStaffPerServiceScreen() {
     const { items, updateItem, totalPrice } = useServiceBookingCart();
     const { isRTL } = useLanguage();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const isFocused = useIsFocused();
 
     const [serviceStaffMap, setServiceStaffMap] = useState<Record<string, Staff[]>>({});
     const [loading, setLoading] = useState(true);
@@ -41,8 +42,13 @@ export function BookingStaffPerServiceScreen() {
     };
 
     useEffect(() => {
-        if (!tenantId || items.length === 0) {
+        if ((!tenantId || items.length === 0) && isFocused) {
             navigation.goBack();
+        }
+    }, [tenantId, items.length, isFocused, navigation]);
+
+    useEffect(() => {
+        if (!tenantId || items.length === 0) {
             return;
         }
 
