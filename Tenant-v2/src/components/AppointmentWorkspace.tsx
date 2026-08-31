@@ -1122,7 +1122,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
   const [customerProfileError, setCustomerProfileError] = useState<string | null>(null);
   const [customerProfileRefreshToken, setCustomerProfileRefreshToken] = useState(0);
-  const [customerTransactionsExpanded, setCustomerTransactionsExpanded] = useState(false);
+  const [customerInvoicesExpanded, setCustomerInvoicesExpanded] = useState(false);
+  const [simulatedPaymentAmount, setSimulatedPaymentAmount] = useState<string>('');
   const [customerTransactionDetail, setCustomerTransactionDetail] = useState<any | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const selectedDateKey = getLocalDateKey(selectedDate);
@@ -1749,7 +1750,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       })
       .slice()
       .sort((a: any, b: any) => new Date(b.date || b.createdAt || b.time || 0).getTime() - new Date(a.date || a.createdAt || a.time || 0).getTime())
-      .slice(0, customerTransactionsExpanded ? 12 : 4);
+      .slice(0, 50);
   })();
   
   // Custom Drag State & Interactive Preview
@@ -1861,7 +1862,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [isSplitActive, setIsSplitActive] = useState(false);
 
   // Wallet simulation state
-  const [simulatedWalletTopUp, setSimulatedWalletTopUp] = useState<string>('');
 
   // Checkout combined products & gift cards state for active appointment
   const [checkoutProducts, setCheckoutProducts] = useState<{ id: string; nameAr: string; nameEn: string; price: number; quantity: number; sku: string }[]>([]);
@@ -2615,7 +2615,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setRefundSubmitting(false);
     setAppointmentDetailsReadOnly(Boolean(options.readOnly) || !isBoardEditable);
     setIsCustomerProfileOpen(false);
-    setCustomerTransactionsExpanded(false);
     setCustomerTransactionDetail(null);
     setCustomerProfile(null);
     setCustomerHistoryData(null);
@@ -2631,7 +2630,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setAppointmentDetailsReadOnly(true);
     setDrawerOpen(false);
     setIsCustomerProfileOpen(false);
-    setCustomerTransactionsExpanded(false);
     setCustomerTransactionDetail(null);
     setCustomerProfile(null);
     setCustomerHistoryData(null);
@@ -2748,7 +2746,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setDrawerTab('overview');
     setAppointmentDetailsReadOnly(true);
     setIsCustomerProfileOpen(false);
-    setCustomerTransactionsExpanded(false);
     setCustomerDrawerTab('overview');
     setCustomerTransactionDetail(null);
     setCustomerProfileError(null);
@@ -3120,49 +3117,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setCustomerProfileRefreshToken(token => token + 1);
       } catch (bgErr) {
         console.error("[STATUS BACKGROUND REFRESH FAILED]", bgErr);
-      }
-    }
-  };
-
-  const handleAddWalletBalance = async () => {
-    const amount = parseFloat(simulatedWalletTopUp);
-    if (!isNaN(amount) && amount > 0 && activeAppointment) {
-      if (appointmentDetailsReadOnly) {
-        addLocalToast(
-          isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-          isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-          'info'
-        );
-        return;
-      }
-      try {
-        if (!activeAppointment.customerId) {
-          throw new Error('Missing customer id for wallet top-up');
-        }
-
-        const response = await tenantApiAdapter.topUpCustomerWallet(activeAppointment.customerId, {
-          amount,
-          appointmentId: activeAppointment.id,
-          note: 'Appointment drawer wallet recharge'
-        });
-        const nextBalance = Number(response?.walletBalance ?? response?.newBalance ?? response?.customer?.walletBalance ?? activeAppointment.walletBalance ?? 0);
-        setSimulatedWalletTopUp('');
-        setActiveAppointment(prev => prev ? { ...prev, walletBalance: nextBalance } : null);
-        setCustomerProfile(prev => prev ? { ...prev, walletBalance: nextBalance } : prev);
-        setCustomerProfileRefreshToken(token => token + 1);
-        await loadBoardData();
-        addLocalToast(
-          `تم شحن محفظة العميل بقيمة ${amount} ر.س بنجاح!`,
-          `Successfully recharged customer wallet with ${amount} SAR!`,
-          'success'
-        );
-      } catch (err) {
-        console.error('Customer wallet top-up failed', err);
-        addLocalToast(
-          isRtl ? 'تعذر شحن المحفظة.' : 'Unable to recharge the wallet.',
-          isRtl ? 'Unable to recharge the wallet.' : 'تعذر شحن المحفظة.',
-          'warning'
-        );
       }
     }
   };
@@ -6478,80 +6432,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         </button>
                       </div>
 
-                      {/* CLIENT WALLET INTERACTIVE COMPONENT */}
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                        <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                          <div className="flex items-center gap-2">
-                            <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-md">
-                              <Wallet size={14} />
-                            </span>
-                            <span className="text-xs font-bold text-slate-800">{t.walletText}</span>
-                          </div>
-                          <span className="text-xs font-black text-emerald-600 font-mono">
-                            {activeAppointment.walletBalance || 0} {t.riyal}
-                          </span>
-                        </div>
-
-                        {/* Simulate Wallet Top-up */}
-                        <div className="space-y-2">
-                          <p className="text-[10px] text-slate-400 font-semibold uppercase">{isRtl ? 'شحن رصيد إضافي للمحفظة' : 'CREDIT / TOP-UP SIMULATOR'}</p>
-                          <div className="flex gap-1.5">
-                            <input
-                              type="number"
-                              value={simulatedWalletTopUp}
-                              disabled={appointmentDetailsReadOnly}
-                              onChange={(e) => setSimulatedWalletTopUp(e.target.value)}
-                              placeholder={isRtl ? 'المبلغ ر.س...' : 'Amount SAR...'}
-                              className={`flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-amber-500 ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : ''}`}
-                            />
-                            <button
-                              onClick={handleAddWalletBalance}
-                              disabled={appointmentDetailsReadOnly}
-                              className={`px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                            >
-                              {isRtl ? 'شحن فوري' : 'Top Up'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* CLIENT ACTIVE TRANSACTION HISTORY */}
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'سجل العمليات المالية الأخيرة' : 'RECENT TRANSACTIONS'}</h4>
-                          <button
-                            type="button"
-                            onClick={() => setCustomerTransactionsExpanded(prev => !prev)}
-                            className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700"
-                          >
-                            {isRtl ? 'عرض الكل' : 'View All'}
-                          </button>
-                        </div>
-                        <div className="space-y-2">
-                          {customerRecentTransactions.length === 0 ? (
-                            <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 text-[10px] text-slate-500">
-                              {isRtl ? 'لا توجد عمليات مالية حديثة مسجلة.' : 'No recent financial activity found.'}
-                            </div>
-                          ) : customerRecentTransactions.slice(0, customerTransactionsExpanded ? customerRecentTransactions.length : 3).map((item: any, idx: number) => {
-                            const amount = Number(item.amount ?? item.totalAmount ?? item.value ?? item.price ?? 0);
-                            const label = item.invoiceNumber || item.orderNumber || item.type || item.method || item.paymentMethod || `TX-${idx + 1}`;
-                            const dateLabel = item.date || item.createdAt || item.time || '';
-                            return (
-                              <div key={`${label}-${idx}`} className="flex justify-between gap-2 text-xs p-2 bg-slate-50 rounded-lg">
-                                <div className="min-w-0">
-                                  <p className="font-bold text-slate-800 truncate">{label}</p>
-                                  <p className="text-[9px] text-slate-400 truncate">
-                                    {dateLabel ? new Date(dateLabel).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
-                                  </p>
-                                </div>
-                                <span className={`font-mono font-bold ${amount >= 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
-                                  {amount >= 0 ? '+' : '-'}{Math.abs(amount).toFixed(2)} {t.riyal}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
 
                     </div>
                   )}
@@ -7068,7 +6948,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       className="absolute inset-0 bg-zinc-950/10"
                       onClick={() => {
                         setIsCustomerProfileOpen(false);
-                        setCustomerTransactionsExpanded(false);
                         setCustomerTransactionDetail(null);
                       }}
                     />
@@ -7088,7 +6967,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             type="button"
                             onClick={() => {
                               setIsCustomerProfileOpen(false);
-                              setCustomerTransactionsExpanded(false);
                               setCustomerTransactionDetail(null);
                             }}
                             className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all shrink-0 cursor-pointer"
@@ -7482,7 +7360,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                         </div>
                                         <button
                                           type="button"
-                                          onClick={() => setCustomerTransactionsExpanded(prev => !prev)}
                                           className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-700"
                                         >
                                           {isRtl ? 'عرض الكل' : 'View All'}
