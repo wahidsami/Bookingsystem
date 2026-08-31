@@ -7179,32 +7179,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                     },
                                     disabled: !activeCustomerPhone,
                                     tone: 'bg-slate-100 text-slate-700'
-                                  },
-                                  {
-                                    label: isRtl ? 'نسخ' : 'Copy',
-                                    action: async (e: any) => {
-                                      const payload = [
-                                        activeCustomerName,
-                                        activeCustomerPhone,
-                                        activeCustomerEmail,
-                                        activeAppointment?.id ? `Appointment: ${activeAppointment.id}` : ''
-                                      ].filter(Boolean).join(' | ');
-                                      if (navigator.clipboard?.writeText && payload) {
-                                        await navigator.clipboard.writeText(payload);
-                                        const btn = e.currentTarget;
-                                        const originalText = btn.innerText;
-                                        btn.innerText = isRtl ? 'تم النسخ' : 'Copied';
-                                        setTimeout(() => { if (btn) btn.innerText = originalText; }, 2000);
-                                      }
-                                    },
-                                    disabled: false,
-                                    tone: 'bg-slate-100 text-slate-700'
-                                  },
-                                  {
-                                    label: isRtl ? 'ملاحظات' : 'Notes',
-                                    action: () => setCustomerDrawerTab('notes'),
-                                    disabled: false,
-                                    tone: 'bg-slate-100 text-slate-700'
                                   }
                                 ].map((item, idx) => (
                                   <button
