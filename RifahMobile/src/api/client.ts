@@ -707,9 +707,9 @@ export const normalizeProduct = (product: Partial<Product> | null | undefined): 
     brand: toOptionalString(product?.brand),
     price: toNumber(product?.price),
     rawPrice: toNumber(product?.rawPrice ?? product?.price),
-    images: Array.isArray(product?.images)
+    images: Array.isArray(product?.images) && product.images.length > 0
         ? product.images.map((image) => toStringValue(image)).filter(Boolean)
-        : [],
+        : (product as any)?.image ? [toStringValue((product as any).image)] : [],
     stock: toNumber(product?.stock),
     isAvailable: toBoolean(product?.isAvailable, true),
 });
