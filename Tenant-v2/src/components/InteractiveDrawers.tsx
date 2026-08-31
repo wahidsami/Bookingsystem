@@ -33,7 +33,7 @@ import {
 import {
   buildTenantIsoFromMinutes,
   resolveTenantTimezone
-} from '../lib/tenantTime';
+, getDatePartsInTimeZone } from '../lib/tenantTime';
 import {
   buildAdvanceBookingDialog,
   buildExtendedHoursBookingDialog,
@@ -2239,7 +2239,10 @@ export default function InteractiveDrawers({
 
       const completedReceipt = {
         orderId: orderId,
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        date: (() => {
+          const tzParts = getDatePartsInTimeZone(new Date(), resolvedTenantTimezone);
+          return `${tzParts.year}-${tzParts.month}-${tzParts.day} ${tzParts.hour}:${tzParts.minute}`;
+        })(),
         customerName: buyerName,
         items: completedReceiptItems,
         subtotal,

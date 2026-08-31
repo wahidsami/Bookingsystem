@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
+import {
   Calendar as CalendarIcon, Clock, Plus, Search, User, Users, Check, X, 
   ChevronLeft, ChevronRight, CreditCard, Tag, MessageSquare, MapPin, 
   Activity, Wallet, ChevronDown, Trash, Undo2, AlertCircle, Filter, 
@@ -38,7 +38,7 @@ import {
 import {
   buildTenantIsoFromMinutes,
   resolveTenantTimezone
-} from '../lib/tenantTime';
+, getDatePartsInTimeZone } from '../lib/tenantTime';
 import {
   buildConflictCard,
   formatConflictTime,
@@ -2993,7 +2993,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
       const receipt = {
         orderId: `REF-APT-${activeAppointment.id.substring(0, 8).toUpperCase()}`,
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        date: (() => {
+          const tzParts = getDatePartsInTimeZone(new Date(), tenantTimezone);
+          return `${tzParts.year}-${tzParts.month}-${tzParts.day} ${tzParts.hour}:${tzParts.minute}`;
+        })(),
         customerName: isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn,
         serviceName: isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn,
         servicePrice: serviceSubtotal,
@@ -3898,7 +3901,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
       setCompletedOrder({
         orderId: orderId,
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        date: (() => {
+          const tzParts = getDatePartsInTimeZone(new Date(), tenantTimezone);
+          return `${tzParts.year}-${tzParts.month}-${tzParts.day} ${tzParts.hour}:${tzParts.minute}`;
+        })(),
         customerName: buyerName,
         items: [...cartItems],
         subtotal,
