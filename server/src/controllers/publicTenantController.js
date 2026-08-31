@@ -856,6 +856,7 @@ exports.getPublicProducts = async (req, res) => {
                 'price',
                 'rawPrice',
                 'images',
+                'image',
                 'stock',
                 'isAvailable',
                 'brand'
