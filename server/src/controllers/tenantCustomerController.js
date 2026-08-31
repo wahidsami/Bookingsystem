@@ -1823,9 +1823,13 @@ exports.getCustomerHistory = async (req, res) => {
             limit: type === 'appointment' ? 0 : parseInt(limit)
         });
 
-        const walletTransactions = await db.WalletLedgerEntry.findAll({
+        // FIX: Use TenantWalletLedgerEntry (tenant-scoped) instead of the global
+        // WalletLedgerEntry. This ensures Recent Transactions in the Appointment drawer
+        // reflects the same wallet used by the Top Up flow and Customer Profile Wallet tab.
+        const walletTransactions = await db.TenantWalletLedgerEntry.findAll({
             where: {
-                platformUserId: id
+                platformUserId: id,
+                tenantId
             },
             order: [['createdAt', 'DESC']],
             limit: parseInt(limit)
