@@ -188,20 +188,6 @@ const getAppointmentStatusTheme = (status?: string | null, kind?: SchedulerEvent
       };
     case 'confirmed':
       return {
-        shell: 'bg-amber-50 border-amber-200 text-amber-950',
-        accent: 'bg-amber-500',
-        primaryText: 'text-amber-950',
-        secondaryText: 'text-amber-800/90',
-        mutedText: 'text-amber-700/70',
-        serviceBadge: 'border-amber-200 bg-amber-100 text-amber-800',
-        statusBadge: 'border-amber-200 bg-amber-100 text-amber-800',
-        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
-        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
-        staffAvatar: 'border-amber-200 bg-white text-amber-800',
-      };
-    case 'arrived':
-      return {
         shell: 'bg-emerald-50 border-emerald-200 text-emerald-950',
         accent: 'bg-emerald-500',
         primaryText: 'text-emerald-950',
@@ -214,19 +200,33 @@ const getAppointmentStatusTheme = (status?: string | null, kind?: SchedulerEvent
         paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
         staffAvatar: 'border-emerald-200 bg-white text-emerald-800',
       };
-    case 'started':
+    case 'arrived':
       return {
-        shell: 'bg-indigo-50 border-indigo-200 text-indigo-950',
-        accent: 'bg-indigo-500',
-        primaryText: 'text-indigo-950',
-        secondaryText: 'text-indigo-800/90',
-        mutedText: 'text-indigo-700/70',
-        serviceBadge: 'border-indigo-200 bg-indigo-100 text-indigo-800',
-        statusBadge: 'border-indigo-200 bg-indigo-100 text-indigo-800',
+        shell: 'bg-blue-50 border-blue-200 text-blue-950',
+        accent: 'bg-blue-500',
+        primaryText: 'text-blue-950',
+        secondaryText: 'text-blue-800/90',
+        mutedText: 'text-blue-700/70',
+        serviceBadge: 'border-blue-200 bg-blue-100 text-blue-800',
+        statusBadge: 'border-blue-200 bg-blue-100 text-blue-800',
         paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
         paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
         paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
-        staffAvatar: 'border-indigo-200 bg-white text-indigo-800',
+        staffAvatar: 'border-blue-200 bg-white text-blue-800',
+      };
+    case 'started':
+      return {
+        shell: 'bg-purple-50 border-purple-200 text-purple-950',
+        accent: 'bg-purple-500',
+        primaryText: 'text-purple-950',
+        secondaryText: 'text-purple-800/90',
+        mutedText: 'text-purple-700/70',
+        serviceBadge: 'border-purple-200 bg-purple-100 text-purple-800',
+        statusBadge: 'border-purple-200 bg-purple-100 text-purple-800',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
+        staffAvatar: 'border-purple-200 bg-white text-purple-800',
       };
     case 'completed':
       return {
@@ -258,17 +258,17 @@ const getAppointmentStatusTheme = (status?: string | null, kind?: SchedulerEvent
       };
     case 'no_show':
       return {
-        shell: 'bg-slate-800 border-slate-700 text-slate-50',
-        accent: 'bg-slate-300',
-        primaryText: 'text-white',
-        secondaryText: 'text-slate-200',
-        mutedText: 'text-slate-300',
-        serviceBadge: 'border-white/15 bg-white/10 text-white',
-        statusBadge: 'border-white/15 bg-white/10 text-white',
-        paymentBadgePaid: 'border-white/15 bg-white/10 text-white',
-        paymentBadgePartial: 'border-white/15 bg-white/10 text-white',
-        paymentBadgeUnpaid: 'border-white/15 bg-white/10 text-white',
-        staffAvatar: 'border-white/20 bg-white/10 text-white',
+        shell: 'bg-red-50 border-red-200 text-red-950',
+        accent: 'bg-red-500',
+        primaryText: 'text-red-950',
+        secondaryText: 'text-red-800/90',
+        mutedText: 'text-red-700/70',
+        serviceBadge: 'border-red-200 bg-red-100 text-red-800',
+        statusBadge: 'border-red-200 bg-red-100 text-red-800',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
+        staffAvatar: 'border-red-200 bg-white text-red-800',
       };
     case 'booked':
     default:
