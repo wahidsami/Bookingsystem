@@ -508,8 +508,8 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* LEFT: CONTENT MANAGEMENT CONTROLS (7 cols) */}
-          <div className="lg:col-span-7 space-y-6">
+          {/* LEFT: CONTENT MANAGEMENT CONTROLS (12 cols full width) */}
+          <div className="lg:col-span-12 space-y-6">
             <div className={`rounded-2xl border p-2 ${darkMode ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white border-neutral-200 shadow-xs'}`}>
               <div className="flex flex-wrap gap-2">
                 {PAGE_SETUP_TABS.map((tab) => {
@@ -1191,8 +1191,8 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
 
           </div>
 
-          {/* RIGHT: INTERACTIVE LIVE PUBLIC PAGE PREVIEW (5 cols) */}
-          <div className="lg:col-span-5 lg:sticky lg:top-6 space-y-4">
+          {/* RIGHT: INTERACTIVE LIVE PUBLIC PAGE PREVIEW (Hidden for now) */}
+          <div className="hidden">
             
             <div className={`p-4 rounded-2xl border text-start space-y-4 ${
               darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-150 shadow-xs'
