@@ -1109,6 +1109,25 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // Selection / Detail Drawer State
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [rescheduleForm, setRescheduleForm] = useState<{
+    staffId: string;
+    startTime: number;
+    date: string;
+    status: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (activeAppointment) {
+      setRescheduleForm({
+        staffId: activeAppointment.staffId || '',
+        startTime: activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0,
+        date: activeAppointment.date || getSelectedDateKey() || '',
+        status: activeAppointment.status || 'booked'
+      });
+    } else {
+      setRescheduleForm(null);
+    }
+  }, [activeAppointment, getSelectedDateKey]);
   const [activeBlockedTime, setActiveBlockedTime] = useState<any | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<'overview' | 'financials' | 'timeline' | 'reviews'>('overview');
@@ -6259,45 +6278,37 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           <span className="text-xs font-black text-slate-800">{isRtl ? 'إعادة التعيين والجدولة الفورية' : 'REASSIGN & RESCHEDULE WORKSPACE'}</span>
                         </div>
 
+                        {/* Status Dropdown */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'حالة الموعد' : 'Appointment Status'}</label>
+                          <select
+                            value={rescheduleForm?.status || ''}
+                            disabled={appointmentDetailsReadOnly}
+                            onChange={(e) => {
+                              if (appointmentDetailsReadOnly) return;
+                              setRescheduleForm(prev => prev ? { ...prev, status: e.target.value } : null);
+                            }}
+                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                          >
+                            <option value="pending">{isRtl ? 'قيد الانتظار' : 'Pending'}</option>
+                            <option value="confirmed">{isRtl ? 'مؤكد' : 'Confirmed'}</option>
+                            <option value="checked_in">{isRtl ? 'وصلت الزبونة' : 'Arrived / Checked In'}</option>
+                            <option value="in_service">{isRtl ? 'بدأت الجلسة' : 'In Service'}</option>
+                            <option value="completed">{isRtl ? 'مكتمل' : 'Completed'}</option>
+                            <option value="no_show">{isRtl ? 'عدم حضور' : 'No Show'}</option>
+                            <option value="cancelled">{isRtl ? 'ملغى' : 'Cancelled'}</option>
+                          </select>
+                        </div>
+
                         {/* Dropdown for Reassignment */}
                         <div className="space-y-1">
                           <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
                           <select
-                            value={activeAppointment.staffId || ''}
+                            value={rescheduleForm?.staffId || ''}
                             disabled={appointmentDetailsReadOnly}
-                            onChange={async (e) => {
-                              if (appointmentDetailsReadOnly) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-                              const newStaffId = e.target.value;
-                              try {
-                                const response = await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, newStaffId);
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setActiveAppointment(prev => prev ? { ...prev, staffId: newStaffId } : null);
-                                  setCustomerProfileRefreshToken(token => token + 1);
-                                  addLocalToast(
-                                    'تمت إعادة تعيين أخصائية التجميل بنجاح!',
-                                    'Stylist successfully reassigned for this session!',
-                                    'success'
-                                  );
-                                } else {
-                                  throw new Error(response?.message || 'Failed to reassign stylist');
-                                }
-                              } catch (err) {
-                                console.error('Failed to reassign stylist', err);
-                                const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر إعادة تعيين الموظفة.' : 'Unable to reassign stylist.', isRtl ? 'Unable to reassign stylist.' : 'تعذر إعادة تعيين الموظفة.');
-                                addLocalToast(
-                                  toast.ar,
-                                  toast.en,
-                                  'warning'
-                                );
-                              }
+                            onChange={(e) => {
+                              if (appointmentDetailsReadOnly) return;
+                              setRescheduleForm(prev => prev ? { ...prev, staffId: e.target.value } : null);
                             }}
                             className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                           >
@@ -6311,49 +6322,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-1">
                             <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
-                          <select
-                            value={activeAppointment.startTime || ''}
-                            disabled={appointmentDetailsReadOnly}
-                            onChange={async (e) => {
-                              if (appointmentDetailsReadOnly) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-                              const newTime = parseInt(e.target.value);
-                              try {
-                                const response = await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
-                                  staffId: activeAppointment.staffId,
-                                  startTime: buildIsoFromMinutes(activeAppointment.date || getSelectedDateKey(), newTime),
-                                  notifyCustomer: true
-                                });
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setActiveAppointment(prev => prev ? { ...prev, startTime: newTime } : null);
-                                  setCustomerProfileRefreshToken(token => token + 1);
-                                  addLocalToast(
-                                    'تم تغيير موعد البدء بنجاح!',
-                                    'Appointment start time successfully updated!',
-                                    'success'
-                                  );
-                                } else {
-                                  throw new Error(response?.message || 'Failed to reschedule appointment');
-                                }
-                              } catch (err) {
-                                console.error('Failed to reschedule appointment', err);
-                                const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر تعديل التوقيت.' : 'Unable to reschedule appointment.', isRtl ? 'Unable to reschedule appointment.' : 'تعذر تعديل التوقيت.');
-                                addLocalToast(
-                                  toast.ar,
-                                  toast.en,
-                                  'warning'
-                                );
-                              }
-                            }}
-                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                          >
+                            <select
+                              value={rescheduleForm?.startTime ?? ''}
+                              disabled={appointmentDetailsReadOnly}
+                              onChange={(e) => {
+                                if (appointmentDetailsReadOnly) return;
+                                setRescheduleForm(prev => prev ? { ...prev, startTime: parseInt(e.target.value) } : null);
+                              }}
+                              className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                            >
                               {Array.from({ length: TOTAL_HOURS * (60 / SLOT_MINUTES) }).map((_, idx) => {
                                 const totalMins = idx * SLOT_MINUTES;
                                 return (
@@ -6367,47 +6344,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                           <div className="space-y-1">
                             <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
-                          <input
+                            <input
                               type="date"
-                              value={activeAppointment.date || getSelectedDateKey() || ''}
+                              value={rescheduleForm?.date || ''}
                               disabled={appointmentDetailsReadOnly}
-                              onChange={async (e) => {
-                                if (appointmentDetailsReadOnly) {
-                                  addLocalToast(
-                                    isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                    isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                    'info'
-                                  );
-                                  return;
-                                }
-                                const newDateStr = e.target.value;
-                                try {
-                                  const response = await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
-                                    staffId: activeAppointment.staffId,
-                                    startTime: buildIsoFromMinutes(newDateStr, activeAppointment.startTime),
-                                    notifyCustomer: true
-                                  });
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setActiveAppointment(prev => prev ? { ...prev, date: newDateStr } : null);
-                                  setCustomerProfileRefreshToken(token => token + 1);
-                                  addLocalToast(
-                                    'تم تحديث تاريخ الحجز بنجاح!',
-                                    'Booking session date successfully updated!',
-                                    'success'
-                                    );
-                                  } else {
-                                    throw new Error(response?.message || 'Failed to update booking date');
-                                  }
-                                } catch (err) {
-                                  console.error('Failed to update booking date', err);
-                                  const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر تحديث تاريخ الحجز.' : 'Unable to update booking date.', isRtl ? 'Unable to update booking date.' : 'تعذر تحديث تاريخ الحجز.');
-                                  addLocalToast(
-                                    toast.ar,
-                                    toast.en,
-                                    'warning'
-                                  );
-                                }
+                              onChange={(e) => {
+                                if (appointmentDetailsReadOnly) return;
+                                setRescheduleForm(prev => prev ? { ...prev, date: e.target.value } : null);
                               }}
                               className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                             />
@@ -6416,8 +6359,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                         {/* Combined Action Reassign + Reschedule */}
                         <button
-                          onClick={() => {
-                            if (appointmentDetailsReadOnly) {
+                          onClick={async () => {
+                            if (appointmentDetailsReadOnly || !rescheduleForm || !activeAppointment) {
                               addLocalToast(
                                 isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
                                 isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
@@ -6425,11 +6368,66 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                               );
                               return;
                             }
-                            addLocalToast(
-                              'تم حفظ الموعد بالتعديل الجديد، وجاري إرسال إشعار فوري للزبونة! 💬',
-                              'Session schedule updated. Dynamic operations push alert successfully dispatched! 💬',
-                              'success'
-                            );
+
+                            let statusChanged = false;
+                            let staffChanged = false;
+                            let timeChanged = false;
+                            let hasError = false;
+
+                            try {
+                              if (rescheduleForm.status !== (activeAppointment.status || 'booked')) {
+                                await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, rescheduleForm.status);
+                                statusChanged = true;
+                              }
+
+                              if (rescheduleForm.staffId !== activeAppointment.staffId) {
+                                await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, rescheduleForm.staffId);
+                                staffChanged = true;
+                              }
+
+                              const originalStartTime = activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0;
+                              const originalDate = activeAppointment.date || getSelectedDateKey() || '';
+                              if (rescheduleForm.startTime !== originalStartTime || rescheduleForm.date !== originalDate) {
+                                await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
+                                  staffId: rescheduleForm.staffId,
+                                  startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
+                                  notifyCustomer: true
+                                });
+                                timeChanged = true;
+                              }
+                            } catch (err) {
+                              console.error('Failed to commit workspace changes', err);
+                              hasError = true;
+                              const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر إكمال التعديلات.' : 'Unable to complete changes.', isRtl ? 'Unable to complete changes.' : 'تعذر إكمال التعديلات.');
+                              addLocalToast(toast.ar, toast.en, 'warning');
+                            } finally {
+                              if (statusChanged || staffChanged || timeChanged) {
+                                await loadBoardData();
+                                setActiveAppointment(prev => prev ? {
+                                  ...prev,
+                                  status: statusChanged ? rescheduleForm.status : prev.status,
+                                  staffId: (staffChanged || timeChanged) ? rescheduleForm.staffId : prev.staffId,
+                                  startTime: timeChanged ? rescheduleForm.startTime : (prev.startMinutes ?? prev.startTime ?? 0),
+                                  startMinutes: timeChanged ? rescheduleForm.startTime : (prev.startMinutes ?? prev.startTime ?? 0),
+                                  date: timeChanged ? rescheduleForm.date : (prev.date || getSelectedDateKey() || '')
+                                } : null);
+                                setCustomerProfileRefreshToken(token => token + 1);
+
+                                if (!hasError) {
+                                  addLocalToast(
+                                    'تم حفظ التعديلات وإرسال الإشعار للعميلة بنجاح! 💬',
+                                    'Workspace changes committed and notification sent successfully! 💬',
+                                    'success'
+                                  );
+                                }
+                              } else if (!hasError) {
+                                addLocalToast(
+                                  'لم يتم إجراء أي تعديلات للحفظ.',
+                                  'No changes to commit.',
+                                  'info'
+                                );
+                              }
+                            }
                           }}
                           className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                         >
