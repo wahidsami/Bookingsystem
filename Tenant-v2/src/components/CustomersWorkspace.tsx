@@ -2500,7 +2500,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                                         </div>
                                       ) : (
                                         walletHistoryData.walletLedger.map((row: any) => {
-                                          const isCredit = row.type === 'credit';
+                                          const isCredit = row.direction === 'credit';
                                           return (
                                             <div key={row.id} className="p-4 hover:bg-neutral-50/50 transition-colors flex items-center justify-between gap-4 text-xs">
                                               <div className="space-y-1 min-w-0">

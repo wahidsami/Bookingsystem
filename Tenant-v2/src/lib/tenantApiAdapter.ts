@@ -423,11 +423,11 @@ function normalizeCustomerProfileResponse(payload: any): CanonicalCustomerProfil
   const avatar = customer?.avatar || customer?.photo || customer?.profileImage || null;
   const walletLedgerEntries = toArray(customer?.walletLedgerEntries).map((entry: any) => ({
     ...entry,
-    timestamp: entry.createdAt || entry.date || ''
+    timestamp: entry.processedAt || entry.createdAt || entry.date || ''
   }));
   const giftCardTransactions = toArray(customer?.giftCardTransactions).map((tx: any) => ({
     ...tx,
-    createdDate: tx.createdAt || tx.date || ''
+    createdDate: tx.processedAt || tx.createdAt || tx.date || ''
   }));
   const favorites = toArray(customer?.favoriteServices);
   const preferredStaff = toArray(customer?.preferredStaff);
