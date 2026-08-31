@@ -7,6 +7,7 @@ const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { buildPublicAssetUrl } = require('../utils/url');
 const walletService = require('../services/walletService');
+const tenantWalletService = require('../services/tenantWalletService');
 const TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED = process.env.TENANT_APPOINTMENT_AUDIT_LOGS === '1';
 
 function createRuntimeTraceLogger(req, res, label, details = {}) {
@@ -2009,15 +2010,15 @@ exports.topUpCustomerWallet = async (req, res) => {
             });
         }
 
-        const walletResult = await walletService.creditWallet({
+                const walletResult = await tenantWalletService.creditTenantWallet({
             platformUserId: id,
+            tenantId: tenantId,
             amount,
-            type: 'topup',
+            type: 'tenant_manual_topup_credit',
             referenceType: 'tenant_customer_wallet_topup',
             referenceId: appointmentId || null,
             metadata: {
                 source: 'tenant_appointment_drawer',
-                tenantId: tenantId || null,
                 actorUserId,
                 appointmentId,
                 note: note || null

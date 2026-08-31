@@ -1499,8 +1499,12 @@ class ApiClient {
         return this.post<{ success: boolean; transaction: any }>('/payments/process', data);
     }
 
-    async getWalletBalance(): Promise<number> {
-        const response = await this.get<{ success: boolean; walletBalance: number }>('/payments/wallet/balance');
+    async getWalletBalance(tenantId?: string): Promise<number> {
+        let url = '/payments/wallet/balance';
+        if (tenantId) {
+            url += `?tenantId=${tenantId}`;
+        }
+        const response = await this.get<{ success: boolean; walletBalance: number }>(url);
         return toNumber(response.walletBalance, 0);
     }
 

@@ -709,7 +709,7 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
     });
 
     if (response?.accessToken) {
-      tenantApiAdapter.setAuthTokens(response.accessToken, response.refreshToken || null);
+      tenantApiAdapter.setTokens(response.accessToken, response.refreshToken || null);
     }
     await refreshUser();
     return response;

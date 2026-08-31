@@ -61,7 +61,7 @@ export function PaymentScreen({ route, navigation }: any) {
 
     React.useEffect(() => {
         let mounted = true;
-        api.getWalletBalance()
+        api.getWalletBalance(tenantId)
             .then((balance) => {
                 if (mounted) setWalletBalance(balance);
             })
@@ -169,7 +169,7 @@ export function PaymentScreen({ route, navigation }: any) {
 
             if (response.success) {
                 if (paymentMethod === 'wallet') {
-                    const latest = await api.getWalletBalance().catch(() => walletBalance);
+                    const latest = await api.getWalletBalance(tenantId).catch(() => walletBalance);
                     setWalletBalance(latest);
                 }
 

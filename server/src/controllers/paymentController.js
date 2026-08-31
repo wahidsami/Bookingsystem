@@ -495,7 +495,14 @@ const getPaymentHistory = async (req, res) => {
 const getWalletBalance = async (req, res) => {
     try {
         const platformUserId = req.userId;
-        const balance = await walletService.getBalance(platformUserId);
+        const tenantId = req.query.tenantId || req.tenantId;
+
+        let balance = 0;
+        if (tenantId) {
+            balance = await tenantWalletService.getTenantBalance(platformUserId, tenantId);
+        } else {
+            balance = await walletService.getBalance(platformUserId);
+        }
 
         res.json({
             success: true,
@@ -509,7 +516,6 @@ const getWalletBalance = async (req, res) => {
         });
     }
 };
-
 /**
  * Get wallet ledger history
  * GET /api/v1/payments/wallet/ledger

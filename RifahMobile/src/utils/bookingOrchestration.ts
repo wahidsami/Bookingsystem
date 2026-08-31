@@ -73,19 +73,31 @@ export async function processBookingCheckout({
         };
 
         if (payableNowAmount > 0 && newBookingSessionId) {
-            navigation.navigate('Payment', {
-                bookingSessionId: newBookingSessionId,
-                bookingReference: newBookingReference,
-                amount: payableNowAmount,
-                tenantId: tenant.id,
-                paymentChoice: selectedPaymentMethod,
-                paymentSummary: paymentSummary
+            navigation.reset({
+                index: 0,
+                routes: [{
+                    name: 'Payment',
+                    params: {
+                        bookingSessionId: newBookingSessionId,
+                        bookingReference: newBookingReference,
+                        amount: payableNowAmount,
+                        tenantId: tenant.id,
+                        paymentChoice: selectedPaymentMethod,
+                        paymentSummary: paymentSummary
+                    }
+                }]
             });
         } else {
-            navigation.navigate('PaymentSuccess', {
-                bookingSessionId: newBookingSessionId,
-                bookingReference: newBookingReference,
-                paymentSummary: paymentSummary
+            navigation.reset({
+                index: 0,
+                routes: [{
+                    name: 'PaymentSuccess',
+                    params: {
+                        bookingSessionId: newBookingSessionId,
+                        bookingReference: newBookingReference,
+                        paymentSummary: paymentSummary
+                    }
+                }]
             });
         }
     } catch (error: any) {
