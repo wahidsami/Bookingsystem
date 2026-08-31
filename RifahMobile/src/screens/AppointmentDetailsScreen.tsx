@@ -542,13 +542,9 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                       employee: getStaffName(representative),
                       salon: group.tenant?.name || representative.tenant?.name || representative.tenantName || (language === 'ar' ? 'الصالون' : 'Salon'),
                       subtotal: subtotalAmount,
-                      tax: null,
-                      deposit: representative.paymentMethod === 'booking-fee'
-                        ? Number(group.payableNowTotal || 0)
-                        : null,
-                      remaining: representative.paymentMethod === 'booking-fee'
-                        ? Math.max(0, subtotalAmount - Number(group.payableNowTotal || 0))
-                        : 0,
+                      tax: representative.taxAmount ?? representative.tax ?? null,
+                      deposit: representative.depositAmount ?? null,
+                      remaining: representative.remainderAmount ?? null,
                       total: subtotalAmount,
                     },
                   })

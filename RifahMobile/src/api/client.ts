@@ -309,6 +309,8 @@ export interface Booking {
     endTime: string;
     status: 'pending' | 'confirmed' | 'checked_in' | 'in_service' | 'cancelled' | 'completed' | 'no_show';
     price: number;
+    tax?: number | null;
+    taxAmount?: number | null;
     customerName?: string | null;
     customer?: {
         id?: string;
@@ -792,6 +794,8 @@ const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Boo
         endTime: toStringValue(appointment?.endTime),
         status: normalizeBookingStatus(appointment?.status),
         price: toNumber(appointment?.price),
+        tax: toNumber(appointment?.taxAmount ?? appointment?.tax),
+        taxAmount: toNumber(appointment?.taxAmount ?? appointment?.tax),
         paymentStatus: toOptionalString(appointment?.paymentStatus),
         paymentMethod: toOptionalString(appointment?.paymentMethod),
         paidAt: toOptionalString(appointment?.paidAt),
