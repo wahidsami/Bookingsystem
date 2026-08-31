@@ -38,6 +38,7 @@ type BookingSettingsForm = {
   bufferTime: number;
   maxAdvanceBookingDays: number;
   cancellationHours: number;
+  rescheduleHours: number;
   cancellationPolicy: string;
   slotInterval: number;
   defaultBufferBefore: number;
@@ -246,6 +247,7 @@ function createBookingForm(settings: Record<string, any> | null | undefined): Bo
     bufferTime: Number(source.bufferTime ?? 15),
     maxAdvanceBookingDays: Number(source.maxAdvanceBookingDays ?? 30),
     cancellationHours: Number(source.cancellationHours ?? 24),
+    rescheduleHours: Number(source.rescheduleHours ?? 24),
     cancellationPolicy: source.cancellationPolicy || '',
     slotInterval: [5, 10, 15].includes(Number(source.slotInterval)) ? Number(source.slotInterval) : 15,
     defaultBufferBefore: Number(source.defaultBufferBefore ?? 5),
@@ -1099,6 +1101,16 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
               min={0}
               value={bookingForm.cancellationHours}
               onChange={(event) => setBookingForm((current) => ({ ...current, cancellationHours: Number(event.target.value || 0) }))}
+              className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-brand-500 ${darkMode ? 'border-zinc-800 bg-zinc-950 text-zinc-100' : 'border-neutral-200 bg-white text-slate-800'}`}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'ساعات إعادة الجدولة للعملاء' : 'Customer reschedule hours'}</span>
+            <input
+              type="number"
+              min={0}
+              value={bookingForm.rescheduleHours}
+              onChange={(event) => setBookingForm((current) => ({ ...current, rescheduleHours: Number(event.target.value || 0) }))}
               className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-brand-500 ${darkMode ? 'border-zinc-800 bg-zinc-950 text-zinc-100' : 'border-neutral-200 bg-white text-slate-800'}`}
             />
           </label>

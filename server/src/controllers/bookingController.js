@@ -712,12 +712,18 @@ const rescheduleBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Reschedule is not enabled for this service' });
         }
 
+        const tenantSettings = await db.TenantSettings.findOne({
+            where: { tenantId: appointment.tenantId },
+            transaction
+        });
+        const rescheduleWindow = tenantSettings?.bookingSettings?.rescheduleHours !== undefined ? Number(tenantSettings.bookingSettings.rescheduleHours) : 24;
+
         const hoursUntilCurrentStart = (new Date(appointment.startTime).getTime() - Date.now()) / (60 * 60 * 1000);
-        if (hoursUntilCurrentStart <= 24) {
+        if (hoursUntilCurrentStart <= rescheduleWindow) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
-                message: 'Bookings can only be rescheduled more than 24 hours before the original start time'
+                message: `Bookings can only be rescheduled more than ${rescheduleWindow} hours before the original start time`
             });
         }
 
