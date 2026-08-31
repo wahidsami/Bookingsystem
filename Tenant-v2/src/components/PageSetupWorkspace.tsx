@@ -15,6 +15,7 @@ interface PageSetupWorkspaceProps {
 interface SectionsVisibility {
   services: boolean;
   products: boolean;
+  gifts: boolean;
   reviews: boolean;
   about: boolean;
 }
@@ -53,6 +54,7 @@ const normalizeSectionsVisibility = (value: any): SectionsVisibility => {
   return {
     services: sections.services !== false,
     products: sections.products !== false,
+    gifts: sections.gifts !== false,
     reviews: sections.reviews === true,
     about: sections.about !== false && sections.callToAction !== false
   };
@@ -380,6 +382,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
         sections: {
           services: sectionsVisibility.services,
           products: sectionsVisibility.products,
+          gifts: sectionsVisibility.gifts,
           reviews: sectionsVisibility.reviews,
           about: sectionsVisibility.about,
           callToAction: sectionsVisibility.about
@@ -695,6 +698,25 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     <span className="text-[10px] text-zinc-400 block mt-0.5">{isRtl ? 'عرض مستحضرات التجميل الراقية' : 'Displays purchaseable skin & hair inventory'}</span>
                   </div>
                   {sectionsVisibility.products ? <Check className="text-brand-500" size={16} /> : <EyeOff size={16} />}
+                </button>
+
+                {/* Gift Cards Toggle */}
+                <button
+                  type="button"
+                  onClick={() => handleSectionToggle('gifts')}
+                  className={`p-4 rounded-xl border flex items-center justify-between text-start transition-all cursor-pointer ${
+                    sectionsVisibility.gifts
+                      ? 'bg-brand-500/5 border-brand-500/30 text-white'
+                      : 'bg-zinc-950/20 border-zinc-800 text-zinc-500'
+                  }`}
+                >
+                  <div>
+                    <span className={`font-black text-xs block ${sectionsVisibility.gifts ? 'text-brand-400' : 'text-zinc-500'}`}>
+                      {isRtl ? 'قسم بطاقات الهدايا' : 'Gift Cards Block'}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block mt-0.5">{isRtl ? 'عرض وشراء بطاقات الهدايا' : 'Displays purchaseable gift cards'}</span>
+                  </div>
+                  {sectionsVisibility.gifts ? <Check className="text-brand-500" size={16} /> : <EyeOff size={16} />}
                 </button>
 
                 {/* Reviews Toggle */}
