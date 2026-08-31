@@ -618,30 +618,30 @@ export default function SchedulerGrid({
         if (!groups.has(sid)) groups.set(sid, []);
         groups.get(sid)!.push(ev);
     }
-    
+
     const lines: Array<{
       key: string;
       x1: number; y1: number;
       x2: number; y2: number;
       isSameColumn: boolean;
     }> = [];
-    
+
     Array.from(groups.values()).forEach(group => {
         if (group.length <= 1) return;
-        
+
         // Sort chronologically
         group.sort((a,b) => a.startMinutes - b.startMinutes);
-        
+
         for (let i = 0; i < group.length - 1; i++) {
             const ev1 = group[i];
             const ev2 = group[i+1];
-            
+
             const colIdx1 = getColumnIndex(ev1.columnId);
             const colIdx2 = getColumnIndex(ev2.columnId);
             if (colIdx1 === -1 || colIdx2 === -1) continue;
-            
+
             const cellWidth = Math.max(50, staffColumnWidth);
-            
+
             // Calc x1, y1
             const top1 = (Math.max(0, ev1.startMinutes) / slotMinutes) * slotHeight;
             const height1 = Math.max(slotHeight, (Math.max(ev1.durationMinutes, slotMinutes) / slotMinutes) * slotHeight);
@@ -650,7 +650,7 @@ export default function SchedulerGrid({
             const inlineStart1 = (colIdx1 * cellWidth) + (ev1.laneIndex * laneWidthPx1);
             const cx1 = inlineStart1 + (eventCardWidth1 / 2);
             const y1 = top1 + height1;
-            
+
             // Calc x2, y2
             const top2 = (Math.max(0, ev2.startMinutes) / slotMinutes) * slotHeight;
             const laneWidthPx2 = cellWidth / Math.max(1, ev2.laneCount);
@@ -658,7 +658,7 @@ export default function SchedulerGrid({
             const inlineStart2 = (colIdx2 * cellWidth) + (ev2.laneIndex * laneWidthPx2);
             const cx2 = inlineStart2 + (eventCardWidth2 / 2);
             const y2 = top2;
-            
+
             lines.push({
                 key: `chain-${ev1.id}-${ev2.id}`,
                 x1: cx1,
@@ -669,7 +669,7 @@ export default function SchedulerGrid({
             });
         }
     });
-    
+
     return lines;
   }, [positionedEvents, slotMinutes, slotHeight, staffColumnWidth, getColumnIndex]);
 
@@ -922,7 +922,7 @@ export default function SchedulerGrid({
             const isCompact = height < 42;
             const isMedium = height >= 42 && height < 64;
             const showStatusMeta = showAppointmentStatusBadges;
-            
+
             const chainColor = (event.kind === 'appointment' && event.raw?.bookingSessionId) ? chainedSessionColors.get(event.raw.bookingSessionId) : null;
 
             return (
@@ -966,126 +966,140 @@ export default function SchedulerGrid({
                 >
                   <div className={`absolute inset-x-0 top-0 h-1 ${statusTheme.accent}`} />
 
-                  <div className="flex min-w-0 items-start justify-between gap-2">
-                    <div className="flex min-w-0 flex-1 items-start gap-2">
-                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border text-[10px] font-black ${statusTheme.staffAvatar}`}>
-                        {customerAvatar ? (
-                          <img src={customerAvatar} alt={event.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span>{getInitials(event.title)}</span>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
-                          {event.title}
-                        </p>
-                        {!isCompact && (
-                          <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                            <span className={`max-w-full truncate rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide ${statusTheme.serviceBadge}`}>
-                              {event.subtitle || 'Service'}
-                            </span>
-                            {variantLabel && (
-                              <span className={`truncate text-[9px] font-semibold ${statusTheme.secondaryText}`}>
-                                {variantLabel}
+                  {event.kind === 'blocked' ? (
+                    <>
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 items-start gap-2">
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border text-[10px] font-black ${statusTheme.staffAvatar}`}>
+                          {customerAvatar ? (
+                            <img src={customerAvatar} alt={event.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span>{getInitials(event.title)}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
+                            {event.title}
+                          </p>
+                          {!isCompact && (
+                            <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
+                              <span className={`max-w-full truncate rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide ${statusTheme.serviceBadge}`}>
+                                {event.subtitle || 'Service'}
                               </span>
-                            )}
-                          </div>
+                              {variantLabel && (
+                                <span className={`truncate text-[9px] font-semibold ${statusTheme.secondaryText}`}>
+                                  {variantLabel}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tight ${statusTheme.statusBadge}`}>
+                          {formatSlotTime(event.startMinutes, startHour, isRtl)}
+                        </span>
+                        {!isCompact && showStatusMeta && (
+                          <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${statusTheme.statusBadge}`}>
+                            {formatAppointmentStatusLabel(event.status, event.kind)}
+                          </span>
+                        )}
+                        {!isCompact && event.kind !== 'blocked' && showStatusMeta && (
+                          <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${
+                            event.paymentStatus === 'paid'
+                              ? statusTheme.paymentBadgePaid
+                              : event.paymentStatus === 'partial'
+                                ? statusTheme.paymentBadgePartial
+                                : statusTheme.paymentBadgeUnpaid
+                          }`}>
+                            {event.paymentStatus === 'paid' ? 'Paid' : event.paymentStatus === 'partial' ? 'Partial' : 'Unpaid'}
+                          </span>
                         )}
                       </div>
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tight ${statusTheme.statusBadge}`}>
-                        {formatSlotTime(event.startMinutes, startHour, isRtl)}
-                      </span>
-                      {!isCompact && showStatusMeta && (
-                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${statusTheme.statusBadge}`}>
-                          {formatAppointmentStatusLabel(event.status, event.kind)}
-                        </span>
-                      )}
-                      {!isCompact && event.kind !== 'blocked' && showStatusMeta && (
-                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${
-                          event.paymentStatus === 'paid'
-                            ? statusTheme.paymentBadgePaid
-                            : event.paymentStatus === 'partial'
-                              ? statusTheme.paymentBadgePartial
-                              : statusTheme.paymentBadgeUnpaid
-                        }`}>
-                          {event.paymentStatus === 'paid' ? 'Paid' : event.paymentStatus === 'partial' ? 'Partial' : 'Unpaid'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
 
-                  {!isCompact && (showStaffPhotos || assignedStaffName || assignedStaffRole) && (
-                    <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[9px]">
-                      <div className="flex min-w-0 items-center gap-1.5">
+                    {!isCompact && (showStaffPhotos || assignedStaffName || assignedStaffRole) && (
+                      <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[9px]">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          {showStaffPhotos && staffAvatar ? (
+                            <div className={`h-4 w-4 shrink-0 overflow-hidden rounded-full border shadow-sm ${statusTheme.staffAvatar}`}>
+                              <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                            </div>
+                          ) : assignedStaffName ? (
+                            <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[7px] font-black ${statusTheme.staffAvatar}`}>
+                              {getInitials(assignedStaffName)}
+                            </div>
+                          ) : null}
+                          <span className={`truncate font-bold ${statusTheme.secondaryText}`}>
+                            {assignedStaffName || (event.kind === 'blocked' ? (event.blockedType || 'Blocked') : 'Unassigned')}
+                          </span>
+                          {assignedStaffRole && (
+                            <span className={`truncate ${statusTheme.mutedText}`}>
+                              · {assignedStaffRole}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {event.isGroupBooking && (
+                            <span className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[8px] font-bold ${statusTheme.secondaryText}`}>
+                              <Users size={9} />
+                              <span>{event.guestCount || 2}</span>
+                            </span>
+                          )}
+                          {typeof event.price === 'number' && (
+                            <span className={`font-black font-mono ${statusTheme.secondaryText}`}>
+                              {event.price}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {isCompact && showAssignedStaffIdentity && assignedStaffName && (
+                      <div className={`mt-1 flex min-w-0 items-center gap-1.5 text-[8px] font-bold ${statusTheme.secondaryText}`}>
                         {showStaffPhotos && staffAvatar ? (
-                          <div className={`h-4 w-4 shrink-0 overflow-hidden rounded-full border shadow-sm ${statusTheme.staffAvatar}`}>
+                          <div className={`h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full border shadow-sm ${statusTheme.staffAvatar}`}>
                             <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                           </div>
-                        ) : assignedStaffName ? (
-                          <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[7px] font-black ${statusTheme.staffAvatar}`}>
+                        ) : (
+                          <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[6px] font-black ${statusTheme.staffAvatar}`}>
                             {getInitials(assignedStaffName)}
                           </div>
-                        ) : null}
-                        <span className={`truncate font-bold ${statusTheme.secondaryText}`}>
-                          {assignedStaffName || (event.kind === 'blocked' ? (event.blockedType || 'Blocked') : 'Unassigned')}
+                        )}
+                        <span className="truncate">{assignedStaffName}</span>
+                      </div>
+                    )}
+
+                    {isMedium && variantDescription && (
+                      <p className={`mt-1 truncate text-[8px] italic ${statusTheme.mutedText}`}>
+                        {variantDescription}
+                      </p>
+                    )}
+
+                    {!isCompact && event.notes && (
+                      <p className={`mt-1 truncate text-[9px] italic ${statusTheme.mutedText}`}>
+                        "{event.notes}"
+                      </p>
+                    )}
+
+                    {isCompact && (
+                      <div className={`mt-1 flex items-center justify-between gap-1 text-[8px] font-bold ${statusTheme.secondaryText}`}>
+                        <span className="truncate">
+                          {event.subtitle || variantLabel || formatAppointmentStatusLabel(event.status, event.kind)}
                         </span>
-                        {assignedStaffRole && (
-                          <span className={`truncate ${statusTheme.mutedText}`}>
-                            · {assignedStaffRole}
-                          </span>
-                        )}
+                        {typeof event.price === 'number' && <span className={`font-mono ${statusTheme.secondaryText}`}>{event.price}</span>}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        {event.isGroupBooking && (
-                          <span className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[8px] font-bold ${statusTheme.secondaryText}`}>
-                            <Users size={9} />
-                            <span>{event.guestCount || 2}</span>
-                          </span>
-                        )}
-                        {typeof event.price === 'number' && (
-                          <span className={`font-black font-mono ${statusTheme.secondaryText}`}>
-                            {event.price}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {isCompact && showAssignedStaffIdentity && assignedStaffName && (
-                    <div className={`mt-1 flex min-w-0 items-center gap-1.5 text-[8px] font-bold ${statusTheme.secondaryText}`}>
-                      {showStaffPhotos && staffAvatar ? (
-                        <div className={`h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full border shadow-sm ${statusTheme.staffAvatar}`}>
-                          <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                        </div>
-                      ) : (
-                        <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[6px] font-black ${statusTheme.staffAvatar}`}>
-                          {getInitials(assignedStaffName)}
-                        </div>
-                      )}
-                      <span className="truncate">{assignedStaffName}</span>
-                    </div>
-                  )}
-
-                  {isMedium && variantDescription && (
-                    <p className={`mt-1 truncate text-[8px] italic ${statusTheme.mutedText}`}>
-                      {variantDescription}
-                    </p>
-                  )}
-
-                  {!isCompact && event.notes && (
-                    <p className={`mt-1 truncate text-[9px] italic ${statusTheme.mutedText}`}>
-                      "{event.notes}"
-                    </p>
-                  )}
-
-                  {isCompact && (
-                    <div className={`mt-1 flex items-center justify-between gap-1 text-[8px] font-bold ${statusTheme.secondaryText}`}>
-                      <span className="truncate">
-                        {event.subtitle || variantLabel || formatAppointmentStatusLabel(event.status, event.kind)}
-                      </span>
-                      {typeof event.price === 'number' && <span className={`font-mono ${statusTheme.secondaryText}`}>{event.price}</span>}
+                    </>
+                  ) : (
+                    <div className="flex min-w-0 flex-col gap-1 p-0.5 overflow-hidden">
+                      <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
+                        {event.subtitle || 'Service'}
+                      </p>
+                      <p className={`truncate text-[11px] font-bold ${statusTheme.secondaryText}`}>
+                        {event.title}
+                      </p>
                     </div>
                   )}
 
