@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Service, ServiceVariant, Staff, Tenant } from '../api/client';
 import { GroupGuestPayload } from '../utils/groupGuest';
@@ -71,13 +71,13 @@ export const ServiceBookingCartProvider: React.FC<{ children: React.ReactNode }>
         }
     };
 
-    const saveCart = async (nextItems: ServiceBookingCartItem[]) => {
+    const saveCart = useCallback(async (nextItems: ServiceBookingCartItem[]) => {
         try {
             await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextItems));
         } catch (error) {
             console.error('Failed to save service booking cart:', error);
         }
-    };
+    }, []);
 
     const addItem = (item: ServiceBookingCartItem): CartAddResult => {
         const currentTenantId = items[0]?.tenantId || null;
@@ -119,10 +119,10 @@ export const ServiceBookingCartProvider: React.FC<{ children: React.ReactNode }>
         });
     };
 
-    const clearCart = () => {
+    const clearCart = useCallback(() => {
         setItems([]);
         void saveCart([]);
-    };
+    }, [saveCart]);
 
     const totalPrice = useMemo(
         () => items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0),
