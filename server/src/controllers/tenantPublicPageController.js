@@ -86,6 +86,7 @@ const normalizeGeneralSettings = (generalSettings = {}) => {
             products: sections.products !== false,
             about: aboutFallback !== false,
             reviews: sections.reviews === true,
+            gifts: sections.gifts !== false,
             // keep legacy key for compatibility
             callToAction: sections.callToAction !== false
         },

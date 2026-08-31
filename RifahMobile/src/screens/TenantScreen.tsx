@@ -119,6 +119,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     const [showReviewsTab, setShowReviewsTab] = useState(true);
     const [showAboutTab, setShowAboutTab] = useState(true);
     const [showGiftsTab, setShowGiftsTab] = useState(false);
+    const [isGiftsSectionEnabled, setIsGiftsSectionEnabled] = useState(true);
     const [giftPackages, setGiftPackages] = useState<TenantGiftPackage[]>([]);
     const [giftImageErrors, setGiftImageErrors] = useState<Record<string, boolean>>({});
     const [serviceImageErrors, setServiceImageErrors] = useState<Record<string, boolean>>({});
@@ -215,14 +216,14 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         const availableTabs: Array<'services' | 'products' | 'gifts' | 'reviews' | 'about'> = [];
         if (showServicesTab) availableTabs.push('services');
         if (showProductsTab) availableTabs.push('products');
-        if (showGiftsTab) availableTabs.push('gifts');
+        if (showGiftsTab && isGiftsSectionEnabled) availableTabs.push('gifts');
         if (showReviewsTab) availableTabs.push('reviews');
         if (showAboutTab) availableTabs.push('about');
         if (!availableTabs.length) return;
         if (!availableTabs.includes(activeTab)) {
             setActiveTab(availableTabs[0]);
         }
-    }, [activeTab, showServicesTab, showProductsTab, showGiftsTab, showReviewsTab, showAboutTab]);
+    }, [activeTab, showServicesTab, showProductsTab, showGiftsTab, showReviewsTab, showAboutTab, isGiftsSectionEnabled]);
 
     const loadTenantDetails = async () => {
         try {
@@ -259,6 +260,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
             let isServicesEnabled = true;
             let isReviewsEnabled = false;
             let isAboutEnabled = true;
+            let isGiftsEnabled = true;
 
             if (pageDataRes.success && pageDataRes.data) {
                 setPageData(pageDataRes.data);
@@ -270,23 +272,26 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 isServicesEnabled = sections.services !== false;
                 isAboutEnabled = sections.about !== false && sections.callToAction !== false;
                 isReviewsEnabled = sections.reviews === true;
+                isGiftsEnabled = sections.gifts !== false;
 
                 setShowProductsTab(isProductsEnabled);
                 setShowServicesTab(isServicesEnabled);
                 setShowReviewsTab(isReviewsEnabled);
                 setShowAboutTab(isAboutEnabled);
+                setIsGiftsSectionEnabled(isGiftsEnabled);
             } else {
                 setShowProductsTab(true); // Fallback to true if no settings found
                 isProductsEnabled = true;
                 setShowReviewsTab(false);
                 setShowAboutTab(true);
+                setIsGiftsSectionEnabled(true);
             }
 
             const normalizedInitialTab = typeof initialTab === 'string' ? initialTab.trim() : '';
             const availableTabs: Array<'services' | 'products' | 'gifts' | 'reviews' | 'about'> = [];
             if (isServicesEnabled) availableTabs.push('services');
             if (isProductsEnabled) availableTabs.push('products');
-            if (showGiftsTab) availableTabs.push('gifts');
+            if (showGiftsTab && isGiftsEnabled) availableTabs.push('gifts');
             if (isReviewsEnabled) availableTabs.push('reviews');
             if (isAboutEnabled) availableTabs.push('about');
 
@@ -753,6 +758,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         if (showAboutTab) availableTabs.push('about');
         if (showServicesTab) availableTabs.push('services');
         if (showProductsTab) availableTabs.push('products');
+        if (showGiftsTab && isGiftsSectionEnabled) availableTabs.push('gifts');
         if (showReviewsTab) availableTabs.push('reviews');
 
         if (availableTabs.length === 0) return null;
@@ -1573,7 +1579,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         );
     }
 
-    const hasVisibleTabs = showServicesTab || showGiftsTab || showReviewsTab || showAboutTab;
+    const hasVisibleTabs = showServicesTab || (showGiftsTab && isGiftsSectionEnabled) || showReviewsTab || showAboutTab;
 
     return (
         <View style={styles.container}>
@@ -1603,6 +1609,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     {activeTab === 'about' && renderAbout()}
                     {activeTab === 'services' && renderServices()}
                     {activeTab === 'products' && renderProducts()}
+                    {activeTab === 'gifts' && renderGifts()}
                     {activeTab === 'reviews' && renderReviews()}
                 </Animated.View>
             </ScrollView>

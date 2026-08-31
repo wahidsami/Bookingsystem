@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { getImageUrl, tenantApi } from '@/lib/api';
-import { SwatchIcon, PaintBrushIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { SwatchIcon, PaintBrushIcon, EyeIcon, EyeSlashIcon, GiftIcon } from '@heroicons/react/24/outline';
 
 interface GeneralSettings {
   template: 'template1' | 'template2' | 'template3';
@@ -16,6 +16,7 @@ interface GeneralSettings {
     heroSlider: boolean;
     services: boolean;
     products: boolean;
+    gifts: boolean;
     callToAction: boolean;
   };
   logo?: string;
@@ -50,6 +51,7 @@ export function GeneralSettingsTab() {
       heroSlider: true,
       services: true,
       products: true,
+      gifts: true,
       callToAction: true,
     },
   });
@@ -76,6 +78,7 @@ export function GeneralSettingsTab() {
             heroSlider: generalSettings.sections?.heroSlider !== false, // Default true
             services: generalSettings.sections?.services !== false, // Default true
             products: generalSettings.sections?.products !== false, // Default true
+            gifts: generalSettings.sections?.gifts !== false, // Default true
             callToAction: generalSettings.sections?.callToAction !== false, // Default true
           },
           logo: generalSettings.logo,
@@ -482,6 +485,31 @@ export function GeneralSettingsTab() {
               <span
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                   settings.sections.products ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Gift Cards Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-3" style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <div className="w-10 h-10 rounded-lg bg-pink-100 flex items-center justify-center">
+                <GiftIcon className="w-5 h-5 text-pink-600" />
+              </div>
+              <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                <h4 className="font-medium text-gray-900">{isRTL ? 'بطاقات الهدايا' : 'Gift Cards'}</h4>
+                <p className="text-sm text-gray-600">{isRTL ? 'عرض بطاقات الهدايا في الصفحة العامة' : 'Display gift cards section on your public page'}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleSectionToggle('gifts')}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                settings.sections.gifts ? 'bg-primary-600' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  settings.sections.gifts ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>
