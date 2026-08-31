@@ -17,6 +17,7 @@ const { APPOINTMENT_PAYMENT_STATUS } = require('../utils/appointmentPaymentStatu
 const notificationOrchestrator = require('./notificationOrchestratorService');
 const { createAppointmentTransaction } = require('./paymentTransactionLedgerService');
 const walletService = require('./walletService');
+const tenantWalletService = require('./tenantWalletService');
 const {
     ensureAppointmentInvoice,
     syncOrderInvoiceStatus
@@ -128,15 +129,16 @@ class PaymentService {
                 }
             }, { transaction });
 
-            await walletService.debitWallet({
+            await tenantWalletService.debitTenantWallet({
                 platformUserId,
+                tenantId: resolvedTenantId,
                 amount: chargeAmount,
-                type: 'service_payment_debit',
-                referenceType: 'transaction',
-                referenceId: tx.id,
+                type: 'tenant_gift_redeem_debit',
+                referenceType: 'appointment',
+                referenceId: appointmentId,
                 metadata: {
                     source: 'appointment_payment',
-                    appointmentId
+                    transactionId: tx.id
                 },
                 transaction
             });
@@ -226,15 +228,16 @@ class PaymentService {
                 }
             }, { transaction });
 
-            await walletService.debitWallet({
+            await tenantWalletService.debitTenantWallet({
                 platformUserId,
+                tenantId,
                 amount: totalAmount,
-                type: 'product_payment_debit',
-                referenceType: 'transaction',
-                referenceId: tx.id,
+                type: 'tenant_gift_redeem_debit',
+                referenceType: 'order',
+                referenceId: orderId,
                 metadata: {
                     source: 'order_payment',
-                    orderId
+                    transactionId: tx.id
                 },
                 transaction
             });

@@ -72,7 +72,7 @@ export function BookingReviewScreen() {
                     const hasWallet = sourcesResponse.sources.some((s) => s.source === 'wallet' && s.eligible !== false);
                     setWalletEnabled(hasWallet);
                     if (hasWallet) {
-                        const balance = await api.getWalletBalance().catch(() => 0);
+                        const balance = await api.getWalletBalance(tenantId).catch(() => 0);
                         setWalletBalance(balance);
                     }
                 }
