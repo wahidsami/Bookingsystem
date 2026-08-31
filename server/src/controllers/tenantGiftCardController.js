@@ -838,3 +838,155 @@ exports.getRedemptionsReport = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to load gift card redemptions report' });
   }
 };
+
+exports.getTransactionActivity = async (req, res) => {
+  try {
+    const tenantId = ensureTenantId(req);
+    const transactionId = req.params.id;
+
+    // 1. Fetch TenantGiftCardTransaction
+    const tx = await db.TenantGiftCardTransaction.findOne({
+      where: { id: transactionId, tenantId },
+      include: [
+        { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email'] },
+        { model: db.PlatformUser, as: 'recipient', attributes: ['id', 'firstName', 'lastName', 'email'] },
+        { model: db.TenantGiftCardPackage, as: 'package', attributes: ['id', 'title_en', 'title_ar'] },
+        {
+          model: db.GiftCardCode,
+          as: 'giftCode'
+        }
+      ]
+    });
+
+    if (!tx) {
+      return res.status(404).json({ success: false, message: 'Transaction not found' });
+    }
+
+    if (tx.giftCode) {
+      // EXTERNAL CODE PATH
+      const redemptions = await db.GiftCardCodeRedemption.findAll({
+        where: { giftCardCodeId: tx.giftCode.id, tenantId },
+        order: [['createdAt', 'DESC']]
+      });
+
+      const enrichedRedemptions = await Promise.all(redemptions.map(async (red) => {
+        let appointment = null;
+        let order = null;
+
+        if (red.appointmentId) {
+          appointment = await db.Appointment.findOne({
+            where: { id: red.appointmentId },
+            attributes: ['id', 'status', 'startTime', 'endTime'],
+            include: [{ model: db.Service, as: 'service', attributes: ['id', 'title', 'title_en', 'title_ar'] }]
+          });
+        }
+
+        if (red.orderId) {
+          order = await db.Order.findOne({
+            where: { id: red.orderId },
+            attributes: ['id', 'status', 'totalAmount', 'createdAt']
+          });
+        }
+
+        return {
+          id: red.id,
+          redeemedAmount: Number(red.redeemedAmount),
+          createdAt: red.createdAt,
+          referenceType: red.appointmentId ? 'appointment' : (red.orderId ? 'order' : 'other'),
+          referenceId: red.appointmentId || red.orderId || null,
+          appointment,
+          order
+        };
+      }));
+
+      return res.json({
+        success: true,
+        sourceType: 'external_code',
+        transaction: tx,
+        giftCardCode: {
+          code: tx.giftCode.code,
+          initialAmount: tx.giftCode.initialAmount,
+          remainingAmount: tx.giftCode.remainingAmount
+        },
+        redemptions: enrichedRedemptions
+      });
+
+    } else {
+      // AUTO-WALLET PATH
+      const walletCredit = await db.TenantWalletLedgerEntry.findOne({
+        where: {
+          tenantId,
+          referenceType: 'tenant_gift_card_transaction',
+          referenceId: transactionId,
+          type: 'tenant_gift_credit'
+        }
+      });
+
+      if (!walletCredit) {
+        return res.status(404).json({ success: false, message: 'Wallet credit not found for this transaction' });
+      }
+
+      let subsequentWalletActivity = [];
+      if (tx.recipientPlatformUserId) {
+        const debits = await db.TenantWalletLedgerEntry.findAll({
+          where: {
+            tenantId,
+            platformUserId: tx.recipientPlatformUserId,
+            direction: 'debit',
+            createdAt: {
+              [Op.gte]: walletCredit.createdAt
+            }
+          },
+          order: [['createdAt', 'ASC']]
+        });
+
+        subsequentWalletActivity = await Promise.all(debits.map(async (d) => {
+          let appointment = null;
+          let order = null;
+
+          if (d.referenceType === 'appointment' && d.referenceId) {
+            appointment = await db.Appointment.findOne({
+              where: { id: d.referenceId },
+              attributes: ['id', 'status', 'startTime', 'endTime'],
+              include: [{ model: db.Service, as: 'service', attributes: ['id', 'title', 'title_en', 'title_ar'] }]
+            });
+          }
+
+          if (d.referenceType === 'order' && d.referenceId) {
+            order = await db.Order.findOne({
+              where: { id: d.referenceId },
+              attributes: ['id', 'status', 'totalAmount', 'createdAt']
+            });
+          }
+
+          return {
+            id: d.id,
+            amount: Number(d.amount),
+            createdAt: d.createdAt,
+            referenceType: d.referenceType,
+            referenceId: d.referenceId,
+            appointment,
+            order
+          };
+        }));
+      }
+
+      return res.json({
+        success: true,
+        sourceType: 'auto_wallet',
+        transaction: tx,
+        walletCredit: {
+          id: walletCredit.id,
+          amount: Number(walletCredit.amount),
+          balanceBefore: Number(walletCredit.balanceBefore),
+          balanceAfter: Number(walletCredit.balanceAfter),
+          createdAt: walletCredit.createdAt
+        },
+        subsequentWalletActivity
+      });
+    }
+  } catch (error) {
+    console.error('getTransactionActivity error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch transaction activity' });
+  }
+};
