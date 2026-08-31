@@ -1383,7 +1383,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     <Text style={styles.aboutCardTitleCompact}>{isRTL ? 'فريق العمل' : 'Team'}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamRow}>
                         {staff.map((member) => (
-                            <View key={member.id} style={styles.teamMemberCard}>
+                            <TouchableOpacity key={member.id} style={styles.teamMemberCard} onPress={() => openProviderProfile(member)}>
                                 {member.avatar || member.image ? (
                                     <Image source={{ uri: getImageUrl(member.avatar || member.image || '') }} style={styles.teamMemberAvatar} />
                                 ) : (
@@ -1400,7 +1400,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                     <AppIcon name="star" size={12} color="#F59E0B" />
                                     <Text style={styles.teamMemberRatingText}>{(member as any).rating || '5.0'}</Text>
                                 </View>
-                            </View>
+                            </TouchableOpacity>
                         ))}
                     </ScrollView>
                 </View>
