@@ -421,8 +421,14 @@ function normalizeCustomerProfileResponse(payload: any): CanonicalCustomerProfil
   const lastName = toStringValue(customer?.lastName || customer?.last_name || '');
   const name = normalizePersonName(customer, 'Guest');
   const avatar = customer?.avatar || customer?.photo || customer?.profileImage || null;
-  const walletLedgerEntries = toArray(customer?.walletLedgerEntries);
-  const giftCardTransactions = toArray(customer?.giftCardTransactions);
+  const walletLedgerEntries = toArray(customer?.walletLedgerEntries).map((entry: any) => ({
+    ...entry,
+    timestamp: entry.createdAt || entry.date || ''
+  }));
+  const giftCardTransactions = toArray(customer?.giftCardTransactions).map((tx: any) => ({
+    ...tx,
+    createdDate: tx.createdAt || tx.date || ''
+  }));
   const favorites = toArray(customer?.favoriteServices);
   const preferredStaff = toArray(customer?.preferredStaff);
   const recentAppointments = toArray(customer?.recentAppointments);
