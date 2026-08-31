@@ -5,7 +5,13 @@ import {
   Instagram, Twitter, Youtube, Linkedin, Sparkles, Upload, Map, ExternalLink,
   ChevronLeft, ChevronRight, FileText, CheckCircle, Smartphone, HelpCircle
 } from 'lucide-react';
-import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { tenantApiAdapter, API_ORIGIN } from '../lib/tenantApiAdapter';
+
+const getFullImageUrl = (path: string) => {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) return path;
+  return `${API_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
+};
 
 interface PageSetupWorkspaceProps {
   lang: 'ar' | 'en';
@@ -549,7 +555,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
               {/* Cover Preview */}
               {coverImage ? (
                 <div className="relative h-44 rounded-xl overflow-hidden border border-zinc-800 group">
-                  <img src={coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                  <img src={getFullImageUrl(coverImage)} alt="Cover Preview" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                     <button
                       type="button"
@@ -865,7 +871,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   {gallery.map((img, idx) => (
                     <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-800 group bg-zinc-950">
-                      <img src={img} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                      <img src={getFullImageUrl(img)} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <button
                           type="button"
