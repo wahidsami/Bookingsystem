@@ -350,6 +350,90 @@ const decrementCustomerWalletBalance = async (appointment, amount, transaction, 
     });
 };
 
+const decrementGiftCardBalance = async (tenantId, appointmentId, amount, code, transaction) => {
+    if (!code) {
+        throw new Error('Gift card code is required');
+    }
+    const safeAmount = parseFloat(amount);
+    if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
+        throw new Error('Invalid gift card redeem amount');
+    }
+
+    const normalizedCode = `${code || ''}`.trim().toUpperCase();
+
+    // Lock the authoritative row
+    const giftCode = await db.GiftCardCode.findOne({
+        where: { code: normalizedCode },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+    });
+
+    if (!giftCode) {
+        throw new Error('Gift card code not found');
+    }
+    if (giftCode.scopeType === 'tenant_scoped' && giftCode.tenantId !== tenantId) {
+        throw new Error('This gift card can only be used in the issuing center');
+    }
+    if (giftCode.status === 'cancelled') {
+        throw new Error('Gift card is cancelled');
+    }
+    if (giftCode.status === 'redeemed') {
+        throw new Error('Gift card is already redeemed');
+    }
+    if (giftCode.status === 'expired') {
+        throw new Error('Gift card is expired');
+    }
+    if (giftCode.expiresAt && new Date(giftCode.expiresAt).getTime() < Date.now()) {
+        throw new Error('Gift card is expired');
+    }
+
+    const remainingAmount = parseFloat(giftCode.remainingAmount || 0);
+    if (!Number.isFinite(remainingAmount) || remainingAmount <= 0) {
+        throw new Error('Gift card has no remaining balance');
+    }
+
+    const redeemAmount = parseFloat(Math.min(safeAmount, remainingAmount).toFixed(2));
+    if (redeemAmount < safeAmount) {
+        throw new Error(`Insufficient gift card balance. Requested: ${safeAmount}, Available: ${remainingAmount}`);
+    }
+
+    const nextRemainingAmount = parseFloat((remainingAmount - redeemAmount).toFixed(2));
+    giftCode.remainingAmount = nextRemainingAmount;
+    giftCode.status = nextRemainingAmount <= 0 ? 'redeemed' : 'partially_redeemed';
+    await giftCode.save({ transaction });
+
+    if (giftCode.sourceGiftCardTransactionId) {
+        const sourceTx = await db.GiftCardTransaction.findByPk(giftCode.sourceGiftCardTransactionId, { transaction });
+        if (sourceTx) {
+            sourceTx.status = nextRemainingAmount <= 0 ? 'redeemed' : 'partially_redeemed';
+            await sourceTx.save({ transaction });
+        }
+    }
+
+    if (giftCode.sourceTenantGiftCardTransactionId) {
+        const sourceTx = await db.TenantGiftCardTransaction.findByPk(giftCode.sourceTenantGiftCardTransactionId, { transaction });
+        if (sourceTx) {
+            sourceTx.status = nextRemainingAmount <= 0 ? 'redeemed' : 'partially_redeemed';
+            await sourceTx.save({ transaction });
+        }
+    }
+
+    await db.GiftCardCodeRedemption.create({
+        giftCardCodeId: giftCode.id,
+        tenantId,
+        appointmentId,
+        orderId: null,
+        posInvoiceId: null,
+        redeemedAmount: redeemAmount,
+        remainingAfter: nextRemainingAmount,
+        redeemedByStaffId: null,
+        metadata: {
+            source: 'tenant_dashboard_checkout',
+            code: giftCode.code
+        }
+    }, { transaction });
+};
+
 const createAppointmentPaymentTransactions = async ({
     appointment,
     type,
@@ -384,6 +468,8 @@ const createAppointmentPaymentTransactions = async ({
         const allocation = allocations[index];
         if (allocation.paymentMethod === 'wallet') {
             await decrementCustomerWalletBalance(appointment, allocation.amount, transaction, forensicTrace);
+        } else if (allocation.paymentMethod === 'gift_card_code') {
+            await decrementGiftCardBalance(appointment.tenantId, appointment.id, allocation.amount, allocation.giftCardCode || notes, transaction);
         }
         const created = await createAppointmentTransaction({
             appointmentId: appointment.id,
