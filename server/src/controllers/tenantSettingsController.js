@@ -386,7 +386,8 @@ exports.updateBookingSettings = async (req, res) => {
             maxBookingsPerCustomerPerDay,
             allowWalkInBooking,
             minimumAdvanceBookingMinutes,
-            schedulerBoard
+            schedulerBoard,
+            rescheduleHours
         } = req.body;
 
         let [settings] = await db.TenantSettings.findOrCreate({
@@ -442,6 +443,17 @@ exports.updateBookingSettings = async (req, res) => {
                 });
             }
             newBookingSettings.minimumAdvanceBookingMinutes = parsedAdvance;
+        }
+
+        if (rescheduleHours !== undefined) {
+            const parsedReschedule = Math.max(0, parseInt(rescheduleHours, 10));
+            if (!Number.isFinite(parsedReschedule)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'rescheduleHours must be a valid number'
+                });
+            }
+            newBookingSettings.rescheduleHours = parsedReschedule;
         }
 
         if (schedulerBoard !== undefined) {
