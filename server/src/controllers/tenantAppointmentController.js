@@ -10,7 +10,6 @@ const crypto = require('crypto');
 const { APPOINTMENT_PAYMENT_STATUS, isAppointmentFullyPaid } = require('../utils/appointmentPaymentStatus');
 const pushNotificationService = require('../services/pushNotificationService');
 const customerNotificationService = require('../services/customerNotificationService');
-const notificationOrchestrator = require('../services/notificationOrchestratorService');
 const bookingService = require('../services/bookingService');
 const appointmentLifecycleService = require('../services/appointmentLifecycleService');
 const { createStaffAppointmentMessage } = require('../services/staffNotificationService');
@@ -1329,59 +1328,53 @@ exports.createAppointment = async (req, res) => {
                 minute: '2-digit'
             });
 
-            try {
-                if (customerUser?.id) {
-                    await pushNotificationService.sendToUser(customerUser.id, {
-                        title: 'New appointment from your center',
-                        body: `Your ${serviceName} appointment for ${appointmentDate} needs your confirmation.`,
-                        data: {
-                            type: 'booking_confirmation_required',
-                            appointmentId: appointment.id,
-                            tenantId,
-                            staffId: appointment.staffId,
-                            inviteToken
-                        }
-                    });
-
-                    await customerNotificationService.sendCustomerInboxNotification(
-                        tenantId,
-                        customerUser.id,
-                        'New appointment booked',
-                        `Your ${serviceName} appointment for ${appointmentDate} has been scheduled.`,
-                        {
-                            type: 'appointment_created',
-                            appointmentId: appointment.id,
-                            bookingReference: appointment.bookingReference || fullAppointment?.bookingNumber || null,
-                            serviceId: appointment.serviceId,
-                            staffId: appointment.staffId,
-                            imageUrl: fullAppointment?.service?.image || '',
-                            linkType: 'tenant'
-                        }
-                    );
+            await pushNotificationService.sendToUser(customerUser.id, {
+                title: 'New appointment from your center',
+                body: `Your ${serviceName} appointment for ${appointmentDate} needs your confirmation.`,
+                data: {
+                    type: 'booking_confirmation_required',
+                    appointmentId: appointment.id,
+                    tenantId,
+                    staffId: appointment.staffId,
+                    inviteToken
                 }
-            } catch (customerNotificationError) {
-                console.warn('Customer notification failed:', customerNotificationError.message);
-            }
+            });
 
-            try {
-                if (appointment.staffId) {
-                    await notificationOrchestrator.notifyStaff({
-                        tenantId,
-                        staffId: appointment.staffId,
-                        eventType: 'staff_appointment_assigned',
-                        title: 'New appointment assigned',
-                        body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
-                        data: {
-                            type: 'staff_appointment_assigned',
-                            appointmentId: appointment.id,
-                            tenantId,
-                            platformUserId: customerUser?.id || null
-                        }
-                    });
+            await customerNotificationService.sendCustomerInboxNotification(
+                tenantId,
+                customerUser.id,
+                'New appointment booked',
+                `Your ${serviceName} appointment for ${appointmentDate} has been scheduled.`,
+                {
+                    type: 'appointment_created',
+                    appointmentId: appointment.id,
+                    bookingReference: appointment.bookingReference || fullAppointment?.bookingNumber || null,
+                    serviceId: appointment.serviceId,
+                    staffId: appointment.staffId,
+                    imageUrl: fullAppointment?.service?.image || '',
+                    linkType: 'tenant'
                 }
-            } catch (staffNotificationError) {
-                console.warn('Staff notification failed:', staffNotificationError.message);
-            }
+            );
+
+            await pushNotificationService.sendToStaff(appointment.staffId, {
+                title: 'New appointment assigned',
+                body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
+                data: {
+                    type: 'staff_appointment_assigned',
+                    appointmentId: appointment.id,
+                    tenantId,
+                    platformUserId: customerUser.id
+                }
+            });
+
+            await createStaffAppointmentMessage({
+                tenantId,
+                staffId: appointment.staffId,
+                customerName,
+                serviceName,
+                appointmentDate,
+                action: 'assigned'
+            });
 
             await sendAppointmentInviteEmail({
                 to: customerUser.email,
@@ -2343,17 +2336,10 @@ exports.updateAppointmentStatus = async (req, res) => {
             : null;
         const shouldChargeCancellationFee = normalizedStatus === 'cancelled'
             ? Boolean(lateCancelWindowStart && nowTime >= lateCancelWindowStart)
-            : false; // Temporarily disabled for 'no_show' per current business rules
+            : normalizedStatus === 'no_show';
 
-        if (shouldChargeCancellationFee && outstandingAmount > 0.01) {
-            await collectAppointmentStatusCharge({
-                appointmentId: appointment.id,
-                amount: outstandingAmount,
-                reason: 'Late cancellation fee',
-                source: 'tenant_late_cancellation_fee',
-                transaction
-            });
-        }
+        // Fix: Do not automatically collect the outstanding amount for late cancellations or no shows.
+        // Financial status should not mutate simply because the appointment was cancelled or no-showed.
 
         await transaction.commit();
 

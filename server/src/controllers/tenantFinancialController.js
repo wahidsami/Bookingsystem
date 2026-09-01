@@ -682,7 +682,8 @@ function mapLedgerTransaction(transaction, invoiceLookup = new Map(), refundLook
             ? `/dashboard/appointments/${appointment.id}`
             : order?.id
                 ? `/dashboard/orders/${order.id}`
-                : null
+                : null,
+        revenue: signedAmount
     };
 }
 
