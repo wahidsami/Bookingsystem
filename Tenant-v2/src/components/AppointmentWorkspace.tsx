@@ -1878,7 +1878,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   } | null>(null);
 
   // Split payments demo state
-  const [splitAmounts, setSplitAmounts] = useState<{ card: number; cash: number; wallet: number }>({ card: 0, cash: 0, wallet: 0 });
+  const [splitAmounts, setSplitAmounts] = useState<{ card: number; cash: number; wallet: number; gift: number }>({ card: 0, cash: 0, wallet: 0, gift: 0 });
   const [isSplitActive, setIsSplitActive] = useState(false);
 
   // Wallet simulation state
@@ -2936,10 +2936,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 ? 'card_pos'
                 : paymentMethod === 'bank'
                   ? 'bank_transfer'
+              : paymentMethod === 'gift'
+                ? 'gift_card_code'
               : paymentMethod,
-            amount: Number(amount)
+            amount: Number(amount),
+            ...(paymentMethod === 'gift' ? { giftCardCode: giftCardCodeInput } : {})
           }))
-      : undefined;
+      : selectedPaymentMethod === 'gift_card_code'
+        ? [{ paymentMethod: 'gift_card_code', amount: total, giftCardCode: giftCardCodeInput }]
+        : undefined;
     const selectedMethodOption = paymentMethodOptions.find((option) => option.value === paymentMethodApi);
     let paymentMethodSummary = selectedMethodOption
       ? (isRtl ? selectedMethodOption.labelAr : selectedMethodOption.labelEn)
@@ -2949,6 +2954,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       if (splitAmounts.card > 0) parts.push(`${isRtl ? 'بطاقة عند المركز' : 'Card POS'}: ${splitAmounts.card} ${t.riyal}`);
       if (splitAmounts.cash > 0) parts.push(`${isRtl ? 'كاش' : 'Cash'}: ${splitAmounts.cash} ${t.riyal}`);
       if (splitAmounts.wallet > 0) parts.push(`${isRtl ? 'المحفظة' : 'Wallet'}: ${splitAmounts.wallet} ${t.riyal}`);
+      if (splitAmounts.gift > 0) parts.push(`${isRtl ? 'بطاقة هدية' : 'Gift Card'}: ${splitAmounts.gift} ${t.riyal}`);
       if (parts.length === 0 && paymentMethodSummary) {
         parts.push(paymentMethodSummary);
       }
@@ -6707,6 +6713,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             </option>
                           ))}
                         </select>
+                        {selectedPaymentMethod === 'gift_card_code' && !isSplitActive && (
+                          <div className="pt-2">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                              {isRtl ? 'رمز بطاقة الهدية' : 'Gift Card Code'}
+                            </label>
+                            <input
+                              type="text"
+                              value={giftCardCodeInput}
+                              onChange={(e) => setGiftCardCodeInput(e.target.value)}
+                              placeholder="XXXX-XXXX-XXXX"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 uppercase"
+                            />
+                          </div>
+                        )}
                         <p className="text-[10px] text-slate-400 leading-relaxed">
                           {isRtl
                             ? 'اختر طريقة الدفع قبل المتابعة.'
@@ -6731,7 +6751,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <div className="space-y-3 animate-fadeIn mt-2">
                           {(() => {
                             const totalDue = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
-                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0);
+                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0);
                             const remaining = Math.max(0, totalDue - splitSum);
                             const isSplitValid = totalDue > 0 && Math.abs(splitSum - totalDue) < 0.01;
                             const isSplitComplete = totalDue > 0 && remaining === 0 && isSplitValid;
@@ -6756,7 +6776,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-2 text-[10px]">
+                                <div className="grid grid-cols-4 gap-2 text-[10px]">
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Mada</label>
                                     <button 
@@ -6802,7 +6822,36 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                     </button>
                                     <input type="number" placeholder="0" value={splitAmounts.wallet || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
                                   </div>
+                                  <div>
+                                    <label className="text-slate-400 block text-center mb-1">Gift</label>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!splitAmounts.gift && remaining > 0) {
+                                          setSplitAmounts(prev => ({ ...prev, gift: parseFloat((remaining + (prev.gift || 0)).toFixed(2)) }));
+                                        }
+                                      }}
+                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                    >
+                                      {isRtl ? '+ إضافة' : '+ Add'}
+                                    </button>
+                                    <input type="number" placeholder="0" value={splitAmounts.gift || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, gift: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
+                                  </div>
                                 </div>
+                                {splitAmounts.gift > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-slate-100">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                                      {isRtl ? 'رمز بطاقة الهدية' : 'Gift Card Code'}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={giftCardCodeInput}
+                                      onChange={(e) => setGiftCardCodeInput(e.target.value)}
+                                      placeholder="XXXX-XXXX-XXXX"
+                                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 uppercase"
+                                    />
+                                  </div>
+                                )}
                               </>
                             );
                           })()}
@@ -6819,12 +6868,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <button
                           disabled={
                             isSplitActive 
-                              ? !(Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) > 0 && Math.max(0, Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) - ((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0))) === 0 && Math.abs(((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0)) - Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0))) < 0.01)
+                              ? !(Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) > 0 && Math.max(0, Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) - ((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0))) === 0 && Math.abs(((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0)) - Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0))) < 0.01)
                               : !selectedPaymentMethod.trim()
                           }
                           onClick={() => {
                             const totalDue = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
-                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0);
+                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0);
                             const remaining = Math.max(0, totalDue - splitSum);
                             const isSplitValid = totalDue > 0 && Math.abs(splitSum - totalDue) < 0.01;
                             const isSplitComplete = totalDue > 0 && remaining === 0 && isSplitValid;
