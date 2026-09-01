@@ -176,7 +176,7 @@ exports.getCustomerReviews = async (req, res) => {
                 {
                     model: db.Appointment,
                     as: 'appointment',
-                    attributes: ['id', 'status', 'startTime', 'serviceName', 'serviceVariantName'],
+                    attributes: ['id', 'status', 'startTime', 'serviceVariantName'],
                     required: false
                 }
             ],

@@ -27,8 +27,8 @@ const getFeaturedTenants = async (req, res) => {
                     where: { status: 'active' },
                     attributes: [
                         'id',
-                        'businessNameEn',
-                        'businessNameAr',
+                        'name_en',
+                        'name_ar',
                         'slug',
                         'logo',
                         'bannerImage',
