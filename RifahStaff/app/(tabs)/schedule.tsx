@@ -117,6 +117,31 @@ const getAppointmentStatusLabel = (status?: string) => {
     }
 };
 
+const getAppointmentStatusColors = (status?: string) => {
+    const normalized = `${status || ''}`.trim().toLowerCase();
+    switch (normalized) {
+        case 'pending':
+        case 'booked':
+            return { bg: '#fffbeb', text: '#d97706' };
+        case 'confirmed':
+            return { bg: '#ecfdf5', text: '#059669' };
+        case 'arrived':
+        case 'checked_in':
+            return { bg: '#eff6ff', text: '#2563eb' };
+        case 'in_service':
+        case 'started':
+            return { bg: '#faf5ff', text: '#9333ea' };
+        case 'completed':
+            return { bg: '#f4f4f5', text: '#52525b' };
+        case 'cancelled':
+            return { bg: '#fff1f2', text: '#e11d48' };
+        case 'no_show':
+            return { bg: '#fef2f2', text: '#dc2626' };
+        default:
+            return { bg: '#f3f4f6', text: '#6b7280' };
+    }
+};
+
 const getDateSpanDays = (startDate: string, endDate: string) => {
     const start = parseRiyadhDateKey(startDate);
     const end = parseRiyadhDateKey(endDate);
@@ -758,9 +783,6 @@ export default function ScheduleScreen() {
 
                                                                     {!compactGridCards ? (
                                                                         <View style={styles.gridAppointmentFooter}>
-                                                                            <Text style={[styles.gridAppointmentPrice, compactGridCards && styles.gridAppointmentPriceCompact]}>
-                                                                                SAR {getAppointmentPrice(appointment).toFixed(2)}
-                                                                            </Text>
                                                                             <Text style={[styles.gridAppointmentAction, compactGridCards && styles.gridAppointmentActionCompact, isStarted && { color: '#047857' }]} numberOfLines={1}>
                                                                                 {groupCount > 1 ? `${groupCount} services` : (isStarted ? 'In Service' : 'Upcoming')}
                                                                             </Text>
@@ -947,15 +969,15 @@ export default function ScheduleScreen() {
                                                 {formatTime(appointment.startTime)} to {formatTime(appointment.endTime)}
                                             </Text>
                                             <Text style={styles.appointmentDuration}>
-                                                {appointment.service?.duration || 0} min
+                                                {appointment.duration || appointment.service?.duration || 0} min
                                             </Text>
                                         </View>
                                         <View style={styles.appointmentCardBadges}>
                                             <View style={[styles.urgencyBadge, { backgroundColor: urgency.background }]}>
                                                 <Text style={[styles.urgencyText, { color: urgency.color }]}>{urgency.label}</Text>
                                             </View>
-                                            <View style={styles.statusBadge}>
-                                                <Text style={[styles.appointmentStatusText, appointment.status === 'started' && { color: '#fbbf24' }, appointment.status === 'completed' && { color: '#10b981' }, appointment.status === 'cancelled' && { color: '#ef4444' }]}>
+                                            <View style={[styles.statusBadge, { backgroundColor: getAppointmentStatusColors(appointment.status).bg }]}>
+                                                <Text style={[styles.appointmentStatusText, { color: getAppointmentStatusColors(appointment.status).text }]}>
                                                     {getAppointmentStatusLabel(appointment.status)}
                                                 </Text>
                                             </View>
@@ -978,9 +1000,6 @@ export default function ScheduleScreen() {
                                                 <Text style={styles.appointmentBookingMeta}>
                                                     Booking #{appointment.bookingNumber?.slice(0, 8) || appointment.id.slice(0, 8)}
                                                 </Text>
-                                            </View>
-                                            <View style={styles.appointmentAmountBox}>
-                                                <Text style={styles.appointmentAmountText}>SAR {amount.toFixed(2)}</Text>
                                             </View>
                                         </View>
 
@@ -1146,7 +1165,7 @@ export default function ScheduleScreen() {
                                     {formatTime(appointment.startTime)} to {formatTime(appointment.endTime)}
                                 </Text>
                                 <Text style={styles.appointmentDuration}>
-                                    {appointment.service?.duration || 0} min
+                                    {appointment.duration || appointment.service?.duration || 0} min
                                 </Text>
                             </View>
                             <View style={styles.appointmentCardBadges}>
@@ -1171,9 +1190,6 @@ export default function ScheduleScreen() {
                                 <Text style={styles.appointmentBookingMeta}>
                                     Booking #{appointment.bookingNumber?.slice(0, 8) || appointment.id.slice(0, 8)}
                                 </Text>
-                            </View>
-                            <View style={styles.appointmentAmountBox}>
-                                <Text style={styles.appointmentAmountText}>SAR {amount.toFixed(2)}</Text>
                             </View>
                         </View>
 

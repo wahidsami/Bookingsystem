@@ -9,6 +9,7 @@ export interface Appointment {
     bookingItemIndex?: number | null;
     startTime: string;
     endTime: string;
+    duration?: number;
     status: 'pending' | 'confirmed' | 'started' | 'completed' | 'cancelled' | 'no_show';
     notes?: string;
     paymentStatus?: string;
