@@ -548,6 +548,12 @@ export default function ScheduleScreen() {
     };
 
     const getRiyadhMinutes = (value: string) => {
+        if (!value) return null;
+
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value)) {
+            return getMinutesFromClock(value);
+        }
+
         const parsed = new Date(value);
         if (Number.isNaN(parsed.getTime())) {
             return null;
