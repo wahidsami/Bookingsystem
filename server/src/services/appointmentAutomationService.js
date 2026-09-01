@@ -149,6 +149,9 @@ const autoMarkNoShowForAppointment = async (appointment, settings, now = new Dat
         noShowMarkedAt: now
     });
 
+    // The automatic no-show charge is temporarily disabled per current business rules.
+    // If future business requirements demand automatic no-show fee collection, uncomment the block below.
+    /*
     const totalPrice = Number(appointment.price ?? 0);
     const totalPaid = Number(appointment.totalPaid ?? 0);
     const outstandingAmount = Math.max(0, Number((totalPrice - totalPaid).toFixed(2)));
@@ -160,6 +163,7 @@ const autoMarkNoShowForAppointment = async (appointment, settings, now = new Dat
             source: 'tenant_automation_no_show_charge'
         });
     }
+    */
 
     if (appointment.platformUserId) {
         const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'your appointment';

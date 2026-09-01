@@ -2343,18 +2343,14 @@ exports.updateAppointmentStatus = async (req, res) => {
             : null;
         const shouldChargeCancellationFee = normalizedStatus === 'cancelled'
             ? Boolean(lateCancelWindowStart && nowTime >= lateCancelWindowStart)
-            : normalizedStatus === 'no_show';
+            : false; // Temporarily disabled for 'no_show' per current business rules
 
         if (shouldChargeCancellationFee && outstandingAmount > 0.01) {
             await collectAppointmentStatusCharge({
                 appointmentId: appointment.id,
                 amount: outstandingAmount,
-                reason: normalizedStatus === 'no_show'
-                    ? 'No-show charge'
-                    : 'Late cancellation fee',
-                source: normalizedStatus === 'no_show'
-                    ? 'tenant_no_show_charge'
-                    : 'tenant_late_cancellation_fee',
+                reason: 'Late cancellation fee',
+                source: 'tenant_late_cancellation_fee',
                 transaction
             });
         }
