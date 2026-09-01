@@ -1121,13 +1121,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       setRescheduleForm({
         staffId: activeAppointment.staffId || '',
         startTime: activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0,
-        date: activeAppointment.date || getSelectedDateKey() || '',
+        // Calculate the fallback directly without depending on variables defined later or functions that recreate every render
+        date: activeAppointment.date || (selectedDate ? getLocalDateKey(selectedDate) : '') || '',
         status: activeAppointment.status || 'booked'
       });
     } else {
       setRescheduleForm(null);
     }
-  }, [activeAppointment, getSelectedDateKey]);
+  }, [activeAppointment]); // selectedDateKey removed to prevent infinite reset loops
   const [activeBlockedTime, setActiveBlockedTime] = useState<any | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<'overview' | 'financials' | 'timeline' | 'reviews'>('overview');
