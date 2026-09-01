@@ -14,6 +14,7 @@ import {
     Modal,
     Pressable,
     useWindowDimensions,
+    DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -387,6 +388,21 @@ export default function ScheduleScreen() {
                 } else {
                     loadAppointmentsForSelectedDate(true);
                 }
+            }
+        });
+
+        return () => subscription.remove();
+    }, [user, loadData, dayScopeMode, loadAppointmentsForVisibleWeek, loadAppointmentsForSelectedDate]);
+
+    useEffect(() => {
+        if (!user) return;
+        const subscription = DeviceEventEmitter.addListener('staff_appointment_assigned', () => {
+            console.log('Push notification received: refreshing schedule');
+            loadData();
+            if (dayScopeMode === 'week') {
+                loadAppointmentsForVisibleWeek();
+            } else {
+                loadAppointmentsForSelectedDate(true);
             }
         });
 
