@@ -6073,57 +6073,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
                           <button 
                             onClick={async () => {
-                              if (appointmentDetailsReadOnly) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-                              const serviceId = activeAppointment.serviceId;
-                              if (!serviceId) {
-                                addLocalToast(
-                                  isRtl ? 'تعذر تكرار الموعد لأن الخدمة الأصلية غير متاحة.' : 'Unable to duplicate appointment because the source service is missing.',
-                                  isRtl ? 'Unable to duplicate appointment because the source service is missing.' : 'تعذر تكرار الموعد لأن الخدمة الأصلية غير متاحة.',
-                                  'warning'
-                                );
-                                return;
-                              }
-
-                              const baseDate = activeAppointment.date || getSelectedDateKey();
-                              const duplicateStart = buildIsoFromMinutes(baseDate, activeAppointment.startTime + 120);
-                              try {
-                                const response = await tenantApiAdapter.createAppointment({
-                                  serviceId,
-                                  staffId: activeAppointment.staffId,
-                                  startTime: duplicateStart,
-                                  notes: activeAppointment.notes,
-                                  notifyCustomer: false,
-                                  assignmentMode: 'tenant_reassigned',
-                                  customer: activeAppointment.customerId ? null : undefined,
-                                  platformUserId: activeAppointment.customerId || undefined,
-                                  skipAdvanceValidation: shouldSkipAdvanceValidation(baseDate, activeAppointment.startTime + 120)
-                                });
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setCustomerProfileRefreshToken(token => token + 1);
-                                  addLocalToast(
-                                    isRtl ? 'تمت إضافة نسخة جديدة من الموعد بعد ساعتين.' : 'Duplicate appointment created two hours later.',
-                                    isRtl ? 'Duplicate appointment created two hours later.' : 'تمت إضافة نسخة جديدة من الموعد بعد ساعتين.',
-                                    'success'
-                                  );
-                                } else {
-                                  throw new Error(response?.message || 'Failed to duplicate appointment');
-                                }
-                              } catch (err: any) {
-                                console.error('Failed to duplicate appointment', err);
-                                addLocalToast(
-                                  isRtl ? 'تعذر إنشاء النسخة المكررة.' : 'Unable to create duplicate appointment.',
-                                  isRtl ? 'Unable to create duplicate appointment.' : 'تعذر إنشاء النسخة المكررة.',
-                                  'warning'
-                                );
-                              }
+                              if (!appointmentDetailsReadOnly) return;
+                              setAppointmentDetailsReadOnly(false);
+                              addLocalToast(
+                                isRtl ? 'الآن يمكنك إعادة جدولة هذا الموعد.' : 'You can now reschedule this appointment.',
+                                isRtl ? 'You can now reschedule this appointment.' : 'الآن يمكنك إعادة جدولة هذا الموعد.',
+                                'info'
+                              );
                             }}
                             className="py-2 border border-slate-200 hover:border-zinc-900 hover:bg-zinc-900 hover:text-white bg-white rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
@@ -6407,7 +6363,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   ...prev,
                                   status: statusChanged ? rescheduleForm.status : prev.status,
                                   staffId: (staffChanged || timeChanged) ? rescheduleForm.staffId : prev.staffId,
-                                  startTime: timeChanged ? rescheduleForm.startTime : (prev.startMinutes ?? prev.startTime ?? 0),
+                                  startTime: timeChanged ? buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime) : prev.startTime,
                                   startMinutes: timeChanged ? rescheduleForm.startTime : (prev.startMinutes ?? prev.startTime ?? 0),
                                   date: timeChanged ? rescheduleForm.date : (prev.date || getSelectedDateKey() || '')
                                 } : null);
