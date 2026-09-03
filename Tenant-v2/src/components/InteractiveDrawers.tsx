@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { calculateNearestValidChain, calculateAllValidChains } from '../utils/bookingChains';
+import { isAutoDerivedFromPreviousChain } from '../lib/chainedServiceTiming';
 import { useAppointmentSubmission } from '../hooks/useAppointmentSubmission';
 import { useSmartConflictResolver } from '../hooks/useSmartConflictResolver';
 import { SmartConflictModal } from './appointment/SmartConflictModal';
@@ -1438,7 +1439,9 @@ export default function InteractiveDrawers({
         return next;
       });
 
-      // 2. Cascade start times for subsequent items
+      // 2. Cascade only when later services are still in the auto-derived chain state.
+      // If a user explicitly adjusted a later service time, preserve that value and do not
+      // overwrite it when an earlier service changes.
       const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
       if (!shouldChainServiceTimes) {
         return updatedList;
@@ -1447,6 +1450,23 @@ export default function InteractiveDrawers({
       for (let i = 1; i < updatedList.length; i++) {
         const prevItem = updatedList[i - 1];
         const currentItem = updatedList[i];
+        const priorItem = prev[i - 1];
+        const priorCurrentItem = prev[i];
+
+        const previousExpectedStart = priorItem ? priorItem.startTime + priorItem.duration : null;
+        const previousExpectedStartIso = priorItem
+          ? addMinutesToIso(getSyncedStagedStartIso(priorItem), priorItem.duration)
+          : null;
+
+        const isAutoDerived = isAutoDerivedFromPreviousChain({
+          priorItem,
+          currentItem: priorCurrentItem,
+          expectedStartIso: previousExpectedStartIso || buildIsoFromMinutes(selectedDate, previousExpectedStart || 0)
+        });
+
+        if (!isAutoDerived) {
+          continue;
+        }
 
         const nextStartTime = prevItem.startTime + prevItem.duration;
         const nextStartTimeIso = addMinutesToIso(
@@ -1454,7 +1474,6 @@ export default function InteractiveDrawers({
           prevItem.duration
         );
 
-        // Always enforce the cascading chain rule if chain mode is active
         currentItem.startTime = nextStartTime;
         currentItem.startTimeIso = nextStartTimeIso;
       }
@@ -1726,6 +1745,10 @@ export default function InteractiveDrawers({
         paymentMethod: 'at-center',
         assignmentMode: 'tenant_reassigned',
         variantId: variant?.id || undefined,
+        overtimeApproval: allowExtendedHours
+          && (boardStartHour * 60) + item.startTime + Number(variant?.duration || item.duration || 0) > normalClosingMinutes
+          ? { approved: true }
+          : undefined,
         serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined,
         variantName: variant ? (isRtl ? variant.nameAr : variant.nameEn) : undefined
       };
@@ -1766,6 +1789,7 @@ export default function InteractiveDrawers({
   const executeFinalSubmission = async (itemsToSubmit: any[]) => {
     const payload: any = {
       items: itemsToSubmit,
+      overtimeApproval: allowExtendedHours ? { approved: true } : undefined,
       staffId: resolvedPrimaryStaffId,
       startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
       notes: sessionNotes || [
@@ -1899,7 +1923,7 @@ export default function InteractiveDrawers({
 
   void (async () => {
     executeFinalSubmissionRef.current = executeFinalSubmission;
-    if (items.length > 1) {
+    if (items.length > 1 && !allowExtendedHours) {
       if (bookingRecoveryMode === 'separate_services') {
         await preflightSeparateServices(items, stagedServices, getLocalDateKey(selectedDate));
       } else {

@@ -95,6 +95,12 @@ interface Appointment {
   paymentMethod?: string | null;
   invoiceNumber?: string | null;
   paymentTransactions?: any[];
+  overtimeApproval?: {
+    approved: boolean;
+    authorizedBy: string;
+    authorizedAt: string;
+    reason?: string | null;
+  } | null;
   isGroupBooking: boolean;
   guestCount?: number;
   hasNotes: boolean;
@@ -950,6 +956,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       internalNotes: a.internalNotes || '',
       paymentTransactions: Array.isArray(a.paymentTransactions) ? a.paymentTransactions : [],
       invoice: a.invoice || null,
+      overtimeApproval: a.overtimeApproval || null,
       type: 'appointment',
       serviceCategory: a.service?.category || a.serviceCategory || 'hair',
       date: getLocalDateKey(a.startTime || a.date || dateKey)
@@ -2359,6 +2366,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const SLOT_HEIGHT = 100; // 100px per hour
   const START_HOUR = schedulerConfig.startHour;
   const END_HOUR = schedulerConfig.endHour;
+  const BOARD_END_HOUR = Math.min(24, Math.max(
+    END_HOUR,
+    Math.ceil(((boardStartHour * 60) + appointments.reduce((latestEnd: number, appointment: Appointment) => (
+      appointment.type === 'appointment'
+        ? Math.max(latestEnd, Number(appointment.startTime || 0) + Number(appointment.duration || 0))
+        : latestEnd
+    ), 0)) / 60)
+ ));
   const SLOT_MINUTES = schedulerConfig.slotMinutes;
   const TOTAL_HOURS = Math.max(1, END_HOUR - START_HOUR);
 
@@ -3364,6 +3379,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           duration: item.duration || srv?.duration || 60,
           discountType: item.discountType,
           discountValue: item.discountValue,
+          overtimeApproval: allowExtendedHours
+            && (boardStartHour * 60) + item.startTime + Number(item.duration || srv?.duration || 0) > normalClosingMinutes
+            ? { approved: true }
+            : undefined,
           serviceName: isRtl ? (srv?.nameAr || srv?.name || '') : (srv?.nameEn || srv?.name || '')
         };
       });
@@ -3405,6 +3424,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
           const response = await tenantApiAdapter.createAppointment({
             items: itemsToSubmit,
+            overtimeApproval: allowExtendedHours ? { approved: true } : undefined,
             staffId: itemsToSubmit[0]?.staffId || currentStaffId,
             startTime: itemsToSubmit[0]?.startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime),
             notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
@@ -3640,7 +3660,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         }
       };
 
-      if (payloadItems.length > 1) {
+      if (payloadItems.length > 1 && !allowExtendedHours) {
         await preflightMultiServiceChain(payloadItems, false);
       } else {
         await executeFinalSubmission(payloadItems);
@@ -5310,7 +5330,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   events={schedulerEvents}
                   slotMinutes={SLOT_MINUTES}
                   startHour={START_HOUR}
-                  endHour={END_HOUR}
+                  endHour={BOARD_END_HOUR}
                   normalEndHour={schedulerConfig.normalEndHour}
                   timeColumnWidth={84}
                   slotHeight={activeSchedulerSettings.timeSlotHeight}
