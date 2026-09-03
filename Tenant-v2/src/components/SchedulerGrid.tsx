@@ -924,6 +924,7 @@ export default function SchedulerGrid({
             const showStatusMeta = showAppointmentStatusBadges;
 
             const chainColor = (event.kind === 'appointment' && event.raw?.bookingSessionId) ? chainedSessionColors.get(event.raw.bookingSessionId) : null;
+            const showChainIndicator = Boolean(event.kind === 'appointment' && event.raw?.bookingSessionId && chainColor);
 
             return (
               <div
@@ -974,11 +975,18 @@ export default function SchedulerGrid({
                     </div>
                   ) : (
                     <div className="flex min-w-0 flex-col gap-1 p-0.5 overflow-hidden">
-                      <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
-                        {event.subtitle || 'Service'}
-                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
+                          {event.title || 'Customer'}
+                        </p>
+                        {showChainIndicator && (
+                          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${chainColor ? `${chainColor.border} bg-white/90` : 'border-slate-200 bg-white/90'} shadow-sm`}>
+                            <Link2 size={10} className={chainColor ? chainColor.text : 'text-slate-500'} />
+                          </span>
+                        )}
+                      </div>
                       <p className={`truncate text-[11px] font-bold ${statusTheme.secondaryText}`}>
-                        {event.title}
+                        {event.subtitle || 'Service'}
                       </p>
                     </div>
                   )}
