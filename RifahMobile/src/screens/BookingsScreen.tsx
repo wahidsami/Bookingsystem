@@ -12,7 +12,7 @@ import {
     TextInput,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
+import { colors, spacing, fontSize, borderRadius, shadows } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
 import { api, Booking, getBookingOutstandingAmount, getImageUrl } from '../api/client';
@@ -222,13 +222,13 @@ export function BookingsScreen({ navigation }: any) {
         const canLeaveReview = item.status === 'completed' && !hasCompletedReview;
 
         const isRescheduled = item.items.some((booking) => hasRescheduleAudit(booking));
-        
+        const customerNameStr = (representative.customerName || '').trim()
+            || [representative.customer?.firstName, representative.customer?.lastName].filter(Boolean).join(' ').trim()
+            || representative.customer?.fullName?.trim()
+            || (language === 'ar' ? 'العميل' : 'Customer');
         const serviceNameStr = serviceCount > 1
             ? (language === 'ar' ? `${serviceCount} خدمات` : `${serviceCount} services`)
             : getServiceName(representative);
-            
-        const dateStr = format(dateDate, 'd MMM yyyy', { locale: isArabic ? ar : enUS });
-        const timeStr = format(dateDate, 'h:mm a', { locale: isArabic ? ar : enUS });
 
         return (
             <TouchableOpacity
@@ -241,56 +241,21 @@ export function BookingsScreen({ navigation }: any) {
                         <Text style={styles.rescheduledRibbonText}>{language === 'ar' ? 'أعيد جدولته' : 'Rescheduled'}</Text>
                     </View>
                 ) : null}
-                {/* Header: Salon Info & Status */}
-                <View style={styles.cardHeader}>
-                    <View style={styles.salonInfo}>
-                        {item.tenant?.logo ? (
-                            <Image
-                                source={{ uri: getImageUrl(item.tenant.logo) }}
-                                style={styles.salonLogo}
-                            />
-                        ) : (
-                            <View style={[styles.salonLogo, styles.placeholderLogo]}>
-                                <Text style={styles.placeholderText}>
-                                    {item.tenant?.name?.charAt(0) || 'S'}
-                                </Text>
-                            </View>
-                        )}
-                        <Text style={styles.salonName} numberOfLines={1}>{item.tenant?.name || 'Salon Name'}</Text>
-                    </View>
-                    <View style={[
-                        styles.statusBadge,
-                        { backgroundColor: getStatusColor(item.status) + '20' }
-                    ]}>
-                        <Text style={[
-                            styles.statusText,
-                            { color: getStatusColor(item.status) }
-                        ]}>
-                            {getStatusText(item.status, t, language)}
-                        </Text>
-                    </View>
-                </View>
 
-                {/* Body: Service & Time Info */}
-                <View style={styles.cardBody}>
-                    <Text style={styles.serviceName} numberOfLines={2}>
+                <View style={[styles.cardBody, isArabic ? styles.cardBodyRTL : null]}>
+                    <Text style={[styles.customerName, isArabic ? styles.customerNameRTL : null]} numberOfLines={1}>
+                        {customerNameStr}
+                    </Text>
+                    <Text style={[styles.serviceName, isArabic ? styles.serviceNameRTL : null]} numberOfLines={2}>
                         {serviceNameStr}
                     </Text>
-                    <View style={styles.dateTimeRow}>
-                        <AppIcon name="clock" size={14} color={colors.primary} />
-                        <Text style={styles.dateTimeText}>
-                            {dateStr} • {timeStr}
-                        </Text>
-                    </View>
-                    {representative.Staff && (
-                        <View style={styles.staffRow}>
-                            <Text style={styles.staffLabel}>{t('specialist')}: </Text>
-                            <Text style={styles.staffName} numberOfLines={1}>{representative.Staff.name}</Text>
+                    {serviceCount > 1 ? (
+                        <View style={[styles.chainIndicator, isArabic ? styles.chainIndicatorRTL : null]}>
+                            <AppIcon name="link" size={12} color={colors.primary} />
                         </View>
-                    )}
+                    ) : null}
                 </View>
 
-                {/* Footer: Contextual Actions Only */}
                 {(canLeaveReview || hasCompletedReview) && (
                     <View style={styles.cardFooter}>
                         <View style={styles.actions}>
@@ -298,7 +263,7 @@ export function BookingsScreen({ navigation }: any) {
                                 <TouchableOpacity
                                     style={styles.reviewButton}
                                     onPress={(e) => {
-                                        e.stopPropagation(); // prevent navigation
+                                        e.stopPropagation();
                                         setReviewBooking(representative);
                                     }}
                                 >
@@ -322,7 +287,7 @@ export function BookingsScreen({ navigation }: any) {
         return (
             <>
                 <LinearGradient
-                    colors={['#F5F0FF', '#FFFFFF']}
+                    colors={['#F6F2FF', '#FFFFFF']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={[styles.header, { paddingTop: spacing.xl + topInset }]}
@@ -340,7 +305,7 @@ export function BookingsScreen({ navigation }: any) {
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={['#F5F0FF', '#FFFFFF']}
+                colors={['#F6F2FF', '#FFFFFF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.header, { paddingTop: spacing.xl + topInset }]}
@@ -517,38 +482,42 @@ const getStatusText = (status: string, _t: any, language?: string) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F6FB',
+        backgroundColor: colors.backgroundMuted,
     },
     header: {
-        padding: spacing.xl,
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.lg,
+        paddingTop: spacing.xl,
         backgroundColor: colors.background,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderSubtle,
     },
     headerTitle: {
-        fontSize: 32,
+        fontSize: fontSize.xl,
         fontWeight: '800',
-        color: '#14153C',
+        color: colors.textPrimary,
     },
     tabsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         paddingHorizontal: spacing.md,
-        paddingBottom: 8,
-        backgroundColor: colors.background,
-        marginBottom: 6,
-        gap: 6,
+        paddingVertical: spacing.sm,
+        backgroundColor: colors.surface,
+        marginBottom: spacing.sm,
+        gap: spacing.xs,
     },
     tab: {
         flex: 1,
         paddingVertical: spacing.sm,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E7DFFA',
-        borderRadius: 999,
-        backgroundColor: '#FFFFFF',
+        borderColor: colors.borderSubtle,
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.surface,
     },
     activeTab: {
-        borderColor: '#C4ABFB',
-        backgroundColor: '#F5EEFF',
+        borderColor: colors.primaryLight,
+        backgroundColor: '#F7F2FF',
     },
     tabText: {
         fontSize: fontSize.sm,
@@ -560,37 +529,35 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     listContent: {
-        padding: 12,
-        gap: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.xl,
+        gap: spacing.sm,
     },
     card: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 12,
-        shadowColor: '#1A1440',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 2,
-        marginBottom: 8,
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.xl,
+        padding: spacing.lg,
+        marginBottom: spacing.sm,
         borderWidth: 1,
-        borderColor: '#ECE7FA',
+        borderColor: colors.borderSubtle,
         position: 'relative',
+        ...shadows.sm,
     },
     rescheduledRibbon: {
         position: 'absolute',
-        top: 12,
-        right: 12,
+        top: spacing.md,
+        right: spacing.md,
         zIndex: 10,
-        borderRadius: 999,
-        paddingHorizontal: 10,
+        borderRadius: borderRadius.full,
+        paddingHorizontal: spacing.sm,
         paddingVertical: 4,
-        backgroundColor: '#E8F1FF',
+        backgroundColor: '#EAF2FF',
         borderWidth: 1,
         borderColor: '#C8DDFE',
     },
     rescheduledRibbonText: {
-        fontSize: 9,
+        fontSize: fontSize.xs,
         color: '#2E5FA8',
         fontWeight: '700',
     },
@@ -598,20 +565,24 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
-        paddingBottom: 8,
+        marginBottom: spacing.sm,
+        paddingBottom: spacing.sm,
         borderBottomWidth: 1,
-        borderBottomColor: '#EDE8FA',
+        borderBottomColor: colors.borderSubtle,
+    },
+    cardHeaderRTL: {
+        flexDirection: 'row-reverse',
     },
     salonInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: spacing.xs,
+        flex: 1,
     },
     salonLogo: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
     },
     placeholderLogo: {
         backgroundColor: colors.primary + '20',
@@ -623,73 +594,117 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     salonName: {
-        fontSize: 12,
+        fontSize: fontSize.sm,
         fontWeight: '700',
-        color: '#1A1A44',
+        color: colors.textPrimary,
     },
     statusBadge: {
         paddingHorizontal: spacing.sm,
-        paddingVertical: 4,
-        borderRadius: 12,
+        paddingVertical: 6,
+        borderRadius: borderRadius.full,
+        borderWidth: 1,
+        borderColor: colors.borderSubtle,
     },
     statusText: {
-        fontSize: 9,
+        fontSize: fontSize.xs,
         fontWeight: '700',
     },
     cardBody: {
-        marginBottom: 8,
+        minHeight: 92,
+        justifyContent: 'center',
+        paddingBottom: spacing.xs,
     },
-    bookingNumberLabel: {
-        fontSize: fontSize.xs,
-        color: colors.primary,
+    cardBodyRTL: {
+        alignItems: 'flex-end',
+    },
+    customerName: {
+        fontSize: fontSize.md,
         fontWeight: '700',
+        color: colors.textPrimary,
         marginBottom: spacing.xs,
-        letterSpacing: 0.8,
+    },
+    customerNameRTL: {
+        textAlign: 'right',
     },
     serviceName: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#171840',
-        marginBottom: 6,
+        fontSize: fontSize.md,
+        fontWeight: '600',
+        color: colors.textSecondary,
+        lineHeight: 20,
+    },
+    serviceNameRTL: {
+        textAlign: 'right',
+    },
+    chainIndicator: {
+        position: 'absolute',
+        bottom: spacing.xs,
+        left: 0,
+        padding: 4,
+        borderRadius: borderRadius.full,
+        borderWidth: 1,
+        borderColor: colors.primaryLight,
+        backgroundColor: `${colors.primary}0D`,
+    },
+    chainIndicatorRTL: {
+        left: 'auto',
+        right: 0,
     },
     variantLabel: {
         fontSize: fontSize.sm,
         fontWeight: '600',
         color: colors.primary,
-        marginBottom: 6,
+        marginBottom: spacing.xs,
     },
     dateTimeRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: spacing.xs,
         marginBottom: 2,
+    },
+    dateTimeRowRTL: {
+        flexDirection: 'row-reverse',
     },
     dateIcon: {
         fontSize: 16,
     },
     dateTimeText: {
-        fontSize: 12,
-        color: '#6E7596',
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        fontWeight: '600',
+    },
+    dateTimeTextRTL: {
+        textAlign: 'right',
     },
     staffRow: {
         flexDirection: 'row',
         marginTop: spacing.sm,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+    },
+    staffRowRTL: {
+        flexDirection: 'row-reverse',
     },
     staffLabel: {
-        fontSize: 12,
-        color: '#6E7596',
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+    },
+    staffLabelRTL: {
+        textAlign: 'right',
     },
     staffName: {
-        fontSize: 12,
-        color: '#1F204D',
+        fontSize: fontSize.sm,
+        color: colors.textPrimary,
         fontWeight: '700',
+    },
+    staffNameRTL: {
+        textAlign: 'right',
     },
     cardFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-end',
         marginTop: spacing.sm,
-        gap: 6,
+        gap: spacing.xs,
     },
     priceBlock: {
         flex: 1,
@@ -752,9 +767,9 @@ const styles = StyleSheet.create({
     reviewButton: {
         marginTop: spacing.sm,
         backgroundColor: colors.primary,
-        borderRadius: 12,
+        borderRadius: borderRadius.md,
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
+        paddingVertical: spacing.sm,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
@@ -778,16 +793,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         padding: spacing.xl,
+        backgroundColor: colors.surface,
     },
     emptyIcon: {
         fontSize: 64,
         marginBottom: spacing.lg,
     },
     emptyText: {
-        fontSize: 18,
+        fontSize: fontSize.lg,
         fontWeight: '700',
-        color: '#1A1A44',
+        color: colors.textPrimary,
         marginBottom: spacing.xs,
+        textAlign: 'center',
     },
     bookButton: {
         marginTop: spacing.lg,
@@ -795,6 +812,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.md,
         backgroundColor: colors.primary,
         borderRadius: borderRadius.md,
+        ...shadows.sm,
     },
     bookButtonText: {
         color: colors.textInverse,
@@ -859,37 +877,33 @@ const styles = StyleSheet.create({
     modalTitle: {
         fontSize: fontSize.xl,
         fontWeight: '700',
-        color: colors.text,
+        color: colors.textPrimary,
     },
     rescheduleModalCard: {
         width: '90%',
         alignSelf: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.xl,
         borderWidth: 1,
-        borderColor: '#E9DDFD',
-        padding: 12,
+        borderColor: colors.borderSubtle,
+        padding: spacing.lg,
         marginBottom: spacing.xl,
-        shadowColor: '#1F123F',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.18,
-        shadowRadius: 18,
-        elevation: 8,
+        ...shadows.md,
     },
     rescheduleHint: {
         fontSize: fontSize.sm,
         color: colors.textSecondary,
-        marginBottom: 8,
+        marginBottom: spacing.sm,
     },
     rescheduleInput: {
         borderWidth: 1,
-        borderColor: '#E9DDFD',
-        borderRadius: 12,
+        borderColor: colors.borderSubtle,
+        borderRadius: borderRadius.md,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: '#FAFAFF',
-        color: colors.text,
-        marginBottom: 6,
+        backgroundColor: colors.backgroundMuted,
+        color: colors.textPrimary,
+        marginBottom: spacing.sm,
     },
     rescheduleActions: {
         flexDirection: 'row',
