@@ -840,6 +840,7 @@ exports.createAppointment = async (req, res) => {
             assignmentMode,
             groupGuest,
             items,
+            overtimeApproval,
             bookingSessionId,
             bookingReference,
             bookingItemIndex
@@ -861,6 +862,15 @@ exports.createAppointment = async (req, res) => {
         });
 
         const bookingItems = Array.isArray(items) ? items : [];
+        const dashboardRole = `${req.tenantAccount?.roleKey || 'owner'}`.trim().toLowerCase();
+        const canAuthorizeOvertime = !req.tenantAccount || ['owner', 'manager'].includes(dashboardRole);
+        if (overtimeApproval?.approved === true && !canAuthorizeOvertime) {
+            await transaction.rollback();
+            return res.status(403).json({
+                success: false,
+                message: 'Only an authorized administrator can approve overtime bookings'
+            });
+        }
         if (bookingItems.length > 0) {
             const normalizedItems = bookingItems.map((item, index) => {
                 const itemServiceId = `${item?.serviceId || ''}`.trim();
@@ -888,7 +898,15 @@ exports.createAppointment = async (req, res) => {
                     assignmentMode: item?.assignmentMode || (item?.staffId ? 'tenant_reassigned' : 'auto_assigned'),
                     duration: item?.duration,
                     discountType: item?.discountType,
-                    discountValue: item?.discountValue
+                    discountValue: item?.discountValue,
+                    overtimeApproval: overtimeApproval?.approved === true && item?.overtimeApproval?.approved === true
+                        ? {
+                            approved: true,
+                            authorizedBy: req.tenantAccountId || req.userId || tenantId,
+                            authorizedAt: new Date().toISOString(),
+                            reason: item?.overtimeApproval?.reason || overtimeApproval?.reason || null
+                        }
+                        : null
                 };
             });
 
@@ -2338,8 +2356,19 @@ exports.updateAppointmentStatus = async (req, res) => {
             ? Boolean(lateCancelWindowStart && nowTime >= lateCancelWindowStart)
             : normalizedStatus === 'no_show';
 
-        // Fix: Do not automatically collect the outstanding amount for late cancellations or no shows.
-        // Financial status should not mutate simply because the appointment was cancelled or no-showed.
+        if (shouldChargeCancellationFee && outstandingAmount > 0.01) {
+            await collectAppointmentStatusCharge({
+                appointmentId: appointment.id,
+                amount: outstandingAmount,
+                reason: normalizedStatus === 'no_show'
+                    ? 'No-show charge'
+                    : 'Late cancellation fee',
+                source: normalizedStatus === 'no_show'
+                    ? 'tenant_no_show_charge'
+                    : 'tenant_late_cancellation_fee',
+                transaction
+            });
+        }
 
         await transaction.commit();
 

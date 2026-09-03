@@ -185,7 +185,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue, skipServicePaymentOptionValidation } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue, skipServicePaymentOptionValidation, overtimeApproval } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -351,9 +351,17 @@ class BookingService {
         }
 
         // ========== CONFLICT DETECTION ==========
-        const hasConflict = await this.hasConflict(finalStaffId, start, end, null, finalTransaction);
-        if (hasConflict) {
-            throw new Error('Time slot not available - conflict detected');
+        const availabilityFailure = await this.getStaffAvailabilityFailureReason(
+            finalStaffId,
+            start,
+            end,
+            null,
+            finalTransaction
+        );
+        const approvedOvertime = this._buildOvertimeApproval(overtimeApproval);
+        const canOverrideAvailabilityFailure = this._canOverrideAvailabilityFailure(availabilityFailure, approvedOvertime);
+        if (availabilityFailure && !canOverrideAvailabilityFailure) {
+            throw new Error(availabilityFailure.message);
         }
 
         // ========== PRICING CALCULATION ==========
@@ -401,9 +409,16 @@ class BookingService {
         try {
             // ========== FINAL CONFLICT CHECK (Transaction-level protection) ==========
             // Re-check conflict right before creation to prevent race conditions
-            const finalConflictCheck = await this.hasConflict(finalStaffId, start, end, null, finalTransaction);
-            if (finalConflictCheck) {
-                throw new Error('Time slot is no longer available. Please select another time.');
+            const finalConflictCheck = await this.getStaffAvailabilityFailureReason(
+                finalStaffId,
+                start,
+                end,
+                null,
+                finalTransaction
+            );
+            const finalHasAuthorizedOvertime = this._canOverrideAvailabilityFailure(finalConflictCheck, approvedOvertime);
+            if (finalConflictCheck && !finalHasAuthorizedOvertime) {
+                throw new Error(finalConflictCheck.message);
             }
 
             // ========== CREATE APPOINTMENT ==========
@@ -418,6 +433,7 @@ class BookingService {
                 tenantId, // Store tenantId for faster queries
                 startTime: start,
                 endTime: end,
+                overtimeApproval: approvedOvertime,
                 assignmentMode: finalAssignmentMode,
                 price: pricing.price,
                 rawPrice: pricing.rawPrice,
@@ -697,6 +713,7 @@ class BookingService {
                     duration: item.duration,
                     discountType: item.discountType,
                     discountValue: item.discountValue,
+                    overtimeApproval: item.overtimeApproval,
                     skipAdvanceValidation: Boolean(skipAdvanceValidation),
                     skipServicePaymentOptionValidation: Boolean(skipServicePaymentOptionValidation),
                     bookingSessionId: session.id,
@@ -942,6 +959,208 @@ class BookingService {
      * @param {Object} transaction - Database transaction
      * @returns {Promise<boolean>} - true if conflict exists
      */
+    async getStaffAvailabilityFailureReason(staffId, startTime, endTime, excludeAppointmentId = null, transaction = null) {
+        const start = startTime instanceof Date ? startTime : new Date(startTime);
+        const end = endTime instanceof Date ? endTime : new Date(endTime);
+
+        if (!staffId || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+            return null;
+        }
+
+        const staff = await db.Staff.findByPk(staffId, { transaction });
+        if (!staff) {
+            return null;
+        }
+
+        const completionWindow = await db.Appointment.findOne({
+            where: {
+                staffId,
+                status: { [Op.notIn]: ['cancelled', 'no_show'] },
+                [Op.or]: [
+                    {
+                        [Op.and]: [
+                            { startTime: { [Op.lte]: start } },
+                            { endTime: { [Op.gt]: start } }
+                        ]
+                    },
+                    {
+                        [Op.and]: [
+                            { startTime: { [Op.lt]: end } },
+                            { endTime: { [Op.gte]: end } }
+                        ]
+                    },
+                    {
+                        [Op.and]: [
+                            { startTime: { [Op.gte]: start } },
+                            { endTime: { [Op.lte]: end } }
+                        ]
+                    },
+                    {
+                        [Op.and]: [
+                            { startTime: { [Op.lte]: start } },
+                            { endTime: { [Op.gte]: end } }
+                        ]
+                    }
+                ]
+            },
+            transaction
+        });
+
+        if (completionWindow && (!excludeAppointmentId || String(completionWindow.id) !== String(excludeAppointmentId))) {
+            return {
+                type: 'existing_booking',
+                message: `${staff.name || 'This employee'} is already booked for that time. Please select a different time or employee.`
+            };
+        }
+
+        try {
+            const tenantSettings = await db.TenantSettings.findOne({
+                where: { tenantId: staff.tenantId },
+                transaction
+            });
+            const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+
+            const availabilityService = require('./availabilityService');
+            const dateKey = this._getLocalDateKey(start, timezone);
+            const availabilityContext = await availabilityService._buildAvailabilityContext(
+                staff.tenantId,
+                staffId,
+                dateKey,
+                timezone
+            );
+            const validWindows = availabilityContext.finalWindows || [];
+            const dutyWindows = availabilityContext.rawWindows || [];
+            const breakWindows = availabilityContext.breaks || [];
+            const timeOffWindows = availabilityContext.timeOff || [];
+
+            if (dutyWindows.length === 0) {
+                const workingHoursEnd = await this._getStaffWorkingHoursEnd(staff.tenantId, staffId, dateKey, transaction, timezone);
+                const workingHoursEndLabel = this._formatClockLabel(workingHoursEnd || end, timezone);
+                const requestEndLabel = this._formatClockLabel(end, timezone);
+                const employeeLabel = staff.name || 'This employee';
+                return {
+                    type: 'outside_working_hours',
+                    message: `${employeeLabel}'s working hours end at ${workingHoursEndLabel}, but this service would finish at ${requestEndLabel}.`
+                };
+            }
+
+            const reqStart = start.getTime();
+            const reqEnd = end.getTime();
+            const earliestDutyStart = Math.min(...dutyWindows.map((window) => new Date(window.startTime).getTime()));
+            const latestDutyEnd = Math.max(...dutyWindows.map((window) => new Date(window.endTime).getTime()));
+
+            if (reqStart < earliestDutyStart) {
+                const employeeLabel = staff.name || 'This employee';
+                const startLabel = this._formatClockLabel(new Date(earliestDutyStart), timezone);
+                return {
+                    type: 'outside_working_hours',
+                    message: `${employeeLabel} starts at ${startLabel}. Please select a different time or employee.`
+                };
+            }
+
+            for (const window of breakWindows) {
+                const winStart = new Date(window.startTime).getTime();
+                const winEnd = new Date(window.endTime).getTime();
+                if (reqStart < winEnd && reqEnd > winStart) {
+                    return {
+                        type: 'staff_break',
+                        message: `${staff.name || 'This employee'} is on break during this time. Please select a different time or employee.`
+                    };
+                }
+            }
+
+            for (const window of timeOffWindows) {
+                const winStart = new Date(window.startTime).getTime();
+                const winEnd = new Date(window.endTime).getTime();
+                if (reqStart < winEnd && reqEnd > winStart) {
+                    return {
+                        type: 'time_off',
+                        message: `${staff.name || 'This employee'} has time off during this period. Please select a different time or employee.`
+                    };
+                }
+            }
+
+            const isInsideValidWindow = validWindows.some((window) => {
+                const winStart = new Date(window.startTime).getTime();
+                const winEnd = new Date(window.endTime).getTime();
+                return reqStart >= winStart && reqEnd <= winEnd;
+            });
+
+            if (!isInsideValidWindow) {
+                const employeeLabel = staff.name || 'This employee';
+                const workingHoursEndLabel = this._formatClockLabel(new Date(latestDutyEnd), timezone);
+                const requestEndLabel = this._formatClockLabel(end, timezone);
+                return {
+                    type: 'outside_working_hours',
+                    message: `${employeeLabel}'s working hours end at ${workingHoursEndLabel}, but this service would finish at ${requestEndLabel}.`
+                };
+            }
+
+        } catch (error) {
+            console.error('getStaffAvailabilityFailureReason: Failed to calculate availability window', error.message);
+        }
+
+        return null;
+    }
+
+    _getLocalDateKey(date, timezone = 'Asia/Riyadh') {
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+        const parts = formatter.formatToParts(date instanceof Date ? date : new Date(date));
+        const map = {};
+        parts.forEach((part) => {
+            if (part.type !== 'literal') {
+                map[part.type] = part.value;
+            }
+        });
+        return `${map.year}-${map.month}-${map.day}`;
+    }
+
+    _formatClockLabel(value, timezone = 'Asia/Riyadh') {
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return 'the selected time';
+        }
+        return new Intl.DateTimeFormat('en-US', {
+            timeZone: timezone,
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        }).format(date);
+    }
+
+    _buildOvertimeApproval(overtimeApproval) {
+        if (overtimeApproval?.approved !== true || !overtimeApproval.authorizedBy) {
+            return null;
+        }
+
+        return {
+            approved: true,
+            authorizedBy: overtimeApproval.authorizedBy,
+            authorizedAt: overtimeApproval.authorizedAt || new Date().toISOString(),
+            reason: `${overtimeApproval.reason || ''}`.trim() || null
+        };
+    }
+
+    _canOverrideAvailabilityFailure(availabilityFailure, overtimeApproval) {
+        return availabilityFailure?.type === 'outside_working_hours' && overtimeApproval?.approved === true;
+    }
+
+    async _getStaffWorkingHoursEnd(tenantId, staffId, dateKey, transaction = null, timezone = 'Asia/Riyadh') {
+        const availabilityService = require('./availabilityService');
+        const context = await availabilityService._buildAvailabilityContext(tenantId, staffId, dateKey, timezone);
+        if (!context || !Array.isArray(context.finalWindows) || context.finalWindows.length === 0) {
+            return null;
+        }
+
+        const endTimes = context.finalWindows.map((window) => new Date(window.endTime).getTime());
+        return new Date(Math.max(...endTimes));
+    }
+
     async hasConflict(staffId, startTime, endTime, excludeAppointmentId = null, transaction = null) {
         const where = {
             staffId,
@@ -991,45 +1210,15 @@ class BookingService {
             return true;
         }
 
-        // Check against blocked periods, breaks, time-offs, and shift hours
-        try {
-            const staff = await db.Staff.findByPk(staffId, { transaction });
-            if (staff && staff.tenantId) {
-                const tenantSettings = await db.TenantSettings.findOne({
-                    where: { tenantId: staff.tenantId },
-                    transaction
-                });
-                const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+        const failureReason = await this.getStaffAvailabilityFailureReason(
+            staffId,
+            startTime,
+            endTime,
+            excludeAppointmentId,
+            transaction
+        );
 
-                const availabilityService = require('./availabilityService');
-                const dateObj = typeof startTime === 'string' ? new Date(startTime) : startTime;
-
-                const validWindows = await availabilityService._calculateAvailabilityWindow(
-                    staff.tenantId,
-                    staffId,
-                    dateObj,
-                    timezone
-                );
-
-                const reqStart = new Date(startTime).getTime();
-                const reqEnd = new Date(endTime).getTime();
-
-                // Slot is valid only if it fits completely within at least one valid window
-                const isInsideValidWindow = validWindows.some(window => {
-                    const winStart = new Date(window.startTime).getTime();
-                    const winEnd = new Date(window.endTime).getTime();
-                    return reqStart >= winStart && reqEnd <= winEnd;
-                });
-
-                if (!isInsideValidWindow) {
-                    return true;
-                }
-            }
-        } catch (error) {
-            console.error('hasConflict: Failed to calculate availability window, falling back to basic check', error.message);
-        }
-
-        return false;
+        return Boolean(failureReason);
     }
 
     /**

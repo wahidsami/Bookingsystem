@@ -215,6 +215,12 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DATE,
             allowNull: false
         },
+        overtimeApproval: {
+            type: DataTypes.JSONB,
+            allowNull: true,
+            field: 'overtime_approval',
+            comment: 'Booking-scoped authorized overtime approval; does not alter the staff schedule'
+        },
         status: {
             type: DataTypes.ENUM(
                 'pending',
