@@ -3,8 +3,11 @@ import { AvailabilityDiagnostic } from '../lib/bookingConflictDiagnostics';
 import { buildTenantIsoFromMinutes } from '../lib/tenantTime';
 
 export interface EarlyValidationResult {
-  status: 'idle' | 'loading' | 'available' | 'unavailable';
+  status: 'idle' | 'loading' | 'available' | 'unavailable' | 'needs_overtime';
   diagnostic?: AvailabilityDiagnostic;
+  overtimeRequired?: boolean;
+  workingHoursEnd?: string;
+  reasonType?: string;
 }
 
 export function useEarlyAvailabilityValidation({
@@ -55,9 +58,16 @@ export function useEarlyAvailabilityValidation({
         if (response?.success && response?.decision?.valid) {
           setResult({ status: 'available' });
         } else {
+          const decision = response?.decision || {};
+          const isOvertimeCandidate = decision.overtimeRequired || 
+            ['after_tenant_close', 'after_employee_duty'].includes(decision.reasonType);
+
           setResult({
-            status: 'unavailable',
-            diagnostic: response?.decision || { reasonType: 'unknown' }
+            status: isOvertimeCandidate && !decision.hardConflict ? 'needs_overtime' : 'unavailable',
+            diagnostic: decision,
+            overtimeRequired: decision.overtimeRequired,
+            reasonType: decision.reasonType,
+            workingHoursEnd: decision.workingHoursEnd
           });
         }
       } catch (err) {

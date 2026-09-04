@@ -16,6 +16,7 @@ export interface StagedService {
   basePrice?: number;
   finalPrice?: number;
   timingMode?: 'auto' | 'manual';
+  overtimeApproval?: { approved: boolean };
 }
 interface AppointmentServicesStepProps {
   tenantId: string;

@@ -163,6 +163,8 @@ interface StagedService {
   notes: string;
   basePrice?: number;
   finalPrice?: number;
+  timingMode?: 'auto' | 'manual';
+  overtimeApproval?: { approved: boolean };
 }
 
 interface QueuedServiceEditDraft {
@@ -1465,6 +1467,14 @@ export default function InteractiveDrawers({
         });
 
         if (!isAutoDerived) {
+          const newPrevEnd = prevItem.startTime + prevItem.duration;
+          if (newPrevEnd > priorCurrentItem.startTime) {
+            addLocalToast(
+              isRtl ? 'تحذير: وقت الخدمة السابقة يتداخل مع هذه الخدمة' : 'Warning: Previous service overlaps with this service',
+              isRtl ? 'Warning: Previous service overlaps with this service' : 'تحذير: وقت الخدمة السابقة يتداخل مع هذه الخدمة',
+              'warning'
+            );
+          }
           continue;
         }
 
@@ -1748,10 +1758,10 @@ export default function InteractiveDrawers({
         paymentMethod: 'at-center',
         assignmentMode: 'tenant_reassigned',
         variantId: variant?.id || undefined,
-        overtimeApproval: allowExtendedHours
+        overtimeApproval: item.overtimeApproval || (allowExtendedHours
           && (boardStartHour * 60) + item.startTime + Number(variant?.duration || item.duration || 0) > normalClosingMinutes
           ? { approved: true }
-          : undefined,
+          : undefined),
         serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined,
         variantName: variant ? (isRtl ? variant.nameAr : variant.nameEn) : undefined
       };
@@ -1791,7 +1801,7 @@ export default function InteractiveDrawers({
   const executeFinalSubmission = async (itemsToSubmit: any[]) => {
     const payload: any = {
       items: itemsToSubmit,
-      overtimeApproval: allowExtendedHours ? { approved: true } : undefined,
+      overtimeApproval: allowExtendedHours || itemsToSubmit.some(i => i.overtimeApproval?.approved) ? { approved: true } : undefined,
       staffId: resolvedPrimaryStaffId,
       startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
       notes: sessionNotes || [

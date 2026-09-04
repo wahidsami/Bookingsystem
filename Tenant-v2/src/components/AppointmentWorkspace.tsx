@@ -6375,20 +6375,49 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             let timeChanged = false;
                             let hasError = false;
 
+                            const originalStartTime = activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0;
+                            const originalDate = activeAppointment.date || getSelectedDateKey() || '';
+                            const isTimeChanged = rescheduleForm.startTime !== originalStartTime || rescheduleForm.date !== originalDate;
+                            const isStaffChanged = rescheduleForm.staffId !== activeAppointment.staffId;
+
+                            if (isTimeChanged || isStaffChanged) {
+                              try {
+                                const evalResponse = await tenantApiAdapter.evaluateScheduling({
+                                  tenantId: activeAppointment.tenantId || activeAppointment.tenant_id,
+                                  serviceId: activeAppointment.serviceId,
+                                  staffId: rescheduleForm.staffId,
+                                  startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
+                                  duration: activeAppointment.duration || 60,
+                                  variantId: activeAppointment.variantId,
+                                  excludeAppointmentId: activeAppointment.id
+                                });
+
+                                if (!evalResponse?.success || !evalResponse?.decision?.valid) {
+                                  const errObj = { response: { data: { decision: evalResponse?.decision } } };
+                                  const toast = getSchedulingErrorToast(errObj, isRtl ? 'تعذر الحفظ بسبب تعارض في المواعيد.' : 'Cannot save due to a scheduling conflict.', isRtl ? 'Cannot save due to a scheduling conflict.' : 'تعذر الحفظ بسبب تعارض في المواعيد.');
+                                  addLocalToast(toast.ar, toast.en, 'warning');
+                                  return;
+                                }
+                              } catch (err) {
+                                console.error('Failed to pre-validate reschedule', err);
+                                const toast = getSchedulingErrorToast(err, isRtl ? 'فشل التحقق من الموعد.' : 'Failed to validate appointment.', isRtl ? 'Failed to validate appointment.' : 'فشل التحقق من الموعد.');
+                                addLocalToast(toast.ar, toast.en, 'warning');
+                                return;
+                              }
+                            }
+
                             try {
                               if (rescheduleForm.status !== (activeAppointment.status || 'booked')) {
                                 await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, rescheduleForm.status);
                                 statusChanged = true;
                               }
 
-                              if (rescheduleForm.staffId !== activeAppointment.staffId) {
+                              if (isStaffChanged) {
                                 await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, rescheduleForm.staffId);
                                 staffChanged = true;
                               }
 
-                              const originalStartTime = activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0;
-                              const originalDate = activeAppointment.date || getSelectedDateKey() || '';
-                              if (rescheduleForm.startTime !== originalStartTime || rescheduleForm.date !== originalDate) {
+                              if (isTimeChanged) {
                                 await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
                                   staffId: rescheduleForm.staffId,
                                   startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
