@@ -182,7 +182,7 @@ const searchAvailability = async (req, res) => {
 
 const evaluateScheduling = async (req, res) => {
     try {
-        const { tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval } = req.body || {};
+        const { tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId } = req.body || {};
         if (!tenantId || !serviceId || !staffId || !startTime) {
             return res.status(400).json({
                 success: false,
@@ -203,7 +203,8 @@ const evaluateScheduling = async (req, res) => {
             staffId,
             startTime,
             duration: resolvedDuration,
-            overtimeApproval
+            overtimeApproval,
+            excludeAppointmentId
         });
 
         return res.status(decision.valid ? 200 : 409).json({

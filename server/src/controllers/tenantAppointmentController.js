@@ -2178,10 +2178,15 @@ exports.updateAppointmentStatus = async (req, res) => {
             ? appointment.bookingSession.appointments.filter(a => a.id !== appointment.id)
             : [];
 
+        let originalSessionIdToSync = null;
+
         if (linkedAppointments.length > 0) {
             if (normalizedStatus === 'cancelled') {
                 if (cancelScope === 'chain') {
                     appointmentsToUpdate = [...appointmentsToUpdate, ...linkedAppointments];
+                } else {
+                    originalSessionIdToSync = appointment.bookingSessionId;
+                    appointment.bookingSessionId = null;
                 }
             } else {
                 appointmentsToUpdate = [...appointmentsToUpdate, ...linkedAppointments];
@@ -2283,6 +2288,10 @@ exports.updateAppointmentStatus = async (req, res) => {
                     transaction
                 });
             }
+        }
+
+        if (originalSessionIdToSync) {
+            await syncBookingSessionTotals(originalSessionIdToSync, transaction);
         }
 
         await transaction.commit();
@@ -2600,8 +2609,20 @@ exports.updatePaymentStatus = async (req, res) => {
             transaction
         });
 
+        // Ensure the explicitly requested paymentStatus is applied if processAppointmentPayment didn't handle it
+        if (req.body.paymentStatus && req.body.paymentStatus !== updatedAppt.paymentStatus) {
+            updatedAppt.paymentStatus = req.body.paymentStatus;
+            if (req.body.paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) {
+                updatedAppt.totalPaid = updatedAppt.price;
+                updatedAppt.paidAt = updatedAppt.paidAt || new Date();
+            } else if (req.body.paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING || req.body.paymentStatus === APPOINTMENT_PAYMENT_STATUS.REFUNDED) {
+                updatedAppt.totalPaid = 0;
+            }
+        }
+
         Object.assign(appointment, updatedAppt.dataValues || updatedAppt);
         attachCanonicalFinancialState(appointment);
+        await appointment.save({ transaction });
 
         const linkedAppointments = appointment.bookingSessionId && appointment.bookingSession?.appointments
             ? appointment.bookingSession.appointments.filter(a => a.id !== appointment.id)
@@ -2609,6 +2630,16 @@ exports.updatePaymentStatus = async (req, res) => {
 
         for (const linked of linkedAppointments) {
             linked.paymentStatus = appointment.paymentStatus;
+            
+            // Sync canonical payment fields across the chain to preserve data integrity
+            if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) {
+                linked.totalPaid = linked.price;
+                linked.paidAt = appointment.paidAt || linked.paidAt || new Date();
+                if (appointment.paymentMethod) linked.paymentMethod = appointment.paymentMethod;
+            } else if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING || appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.REFUNDED) {
+                linked.totalPaid = 0;
+            }
+            
             await linked.save({ transaction });
         }
 
