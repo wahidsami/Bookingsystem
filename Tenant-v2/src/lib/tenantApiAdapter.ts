@@ -1292,8 +1292,12 @@ class TenantApiAdapter {
 
   async createPackage(data: FormData | Record<string, any>): Promise<any> {
     if (data instanceof FormData) {
-      const response = await this.client.post('/tenant/packages', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const response = await this.fetchImpl(`${this.baseUrl}/tenant/packages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
       });
       return this.handleResponse(response);
     }
@@ -1302,8 +1306,12 @@ class TenantApiAdapter {
 
   async updatePackage(id: string, data: FormData | Record<string, any>): Promise<any> {
     if (data instanceof FormData) {
-      const response = await this.client.put(`/tenant/packages/${id}`, data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const response = await this.fetchImpl(`${this.baseUrl}/tenant/packages/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
       });
       return this.handleResponse(response);
     }

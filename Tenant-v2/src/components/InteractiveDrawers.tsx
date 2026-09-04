@@ -154,6 +154,8 @@ interface StagedService {
   id: string;
   serviceId: string;
   variantId?: string;
+  packageId?: string;
+  packageItemId?: string;
   serviceCategory?: string;
   staffId: string;
   startTime: number;
@@ -361,6 +363,7 @@ export default function InteractiveDrawers({
   selectedDate,
   customers,
   services,
+  servicePackages = [],
   products,
   giftCardPackages = [],
   stylists,
@@ -1562,11 +1565,11 @@ export default function InteractiveDrawers({
 
   const handleAddPackageToStaged = (pkgId: string) => {
     const pkg = servicePackages?.find(p => p.id === pkgId);
-    if (!pkg || !pkg.items || !pkg.items.length) {
+    if (!pkg || !pkg.items || pkg.items.length === 0) {
       addLocalToast(
-        isRtl ? 'تعذر العثور على الباقة أو أنها فارغة.' : 'Package not found or empty.',
-        isRtl ? 'Package not found or empty.' : 'تعذر العثور على الباقة أو أنها فارغة.',
-        'error'
+        `لم يتم العثور على خدمات في الباقة "${isRtl ? pkg?.name_ar : pkg?.name_en}".`,
+        `The package "${isRtl ? pkg?.name_ar : pkg?.name_en}" contains no services.`,
+        'warning'
       );
       return;
     }
