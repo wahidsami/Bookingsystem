@@ -10,6 +10,7 @@ const tenantDashboardController = require('../controllers/tenantDashboardControl
 const tenantEmployeeController = require('../controllers/tenantEmployeeController');
 const tenantProductController = require('../controllers/tenantProductController');
 const tenantServiceController = require('../controllers/tenantServiceController');
+const tenantPackageController = require('../controllers/tenantPackageController');
 const tenantAppointmentController = require('../controllers/tenantAppointmentController');
 const tenantFinancialController = require('../controllers/tenantFinancialController');
 const tenantCustomerController = require('../controllers/tenantCustomerController');
@@ -140,6 +141,18 @@ router.post(
 );
 router.put('/services/:id', tenantServiceController.uploadImage, tenantServiceController.updateService);
 router.delete('/services/:id', tenantServiceController.deleteService);
+
+// Package management
+router.get('/packages', tenantPackageController.getPackages);
+router.get('/packages/:id', tenantPackageController.getPackage);
+router.post(
+    '/packages',
+    requireActiveSubscription,
+    tenantPackageController.uploadImage,
+    tenantPackageController.createPackage
+);
+router.put('/packages/:id', tenantPackageController.uploadImage, tenantPackageController.updatePackage);
+router.delete('/packages/:id', tenantPackageController.deletePackage);
 
 // Appointment management
 router.get('/appointments', tenantAppointmentController.getAppointments);

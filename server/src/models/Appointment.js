@@ -40,6 +40,16 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'appointmentId',
                 as: 'events'
             });
+            Appointment.belongsTo(models.ServicePackage, {
+                foreignKey: 'packageId',
+                as: 'package',
+                required: false
+            });
+            Appointment.belongsTo(models.ServicePackageItem, {
+                foreignKey: 'packageItemId',
+                as: 'packageItem',
+                required: false
+            });
         }
 
         /**
@@ -195,6 +205,24 @@ module.exports = (sequelize, DataTypes) => {
                 key: 'id'
             },
             comment: 'Shared booking session for multi-service checkouts'
+        },
+        packageId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'service_packages',
+                key: 'id'
+            },
+            comment: 'Source package template identifier if booked via a package'
+        },
+        packageItemId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'service_package_items',
+                key: 'id'
+            },
+            comment: 'Source package item identifier if booked via a package'
         },
         bookingReference: {
             type: DataTypes.STRING(40),

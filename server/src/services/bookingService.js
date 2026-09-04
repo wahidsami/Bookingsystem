@@ -185,7 +185,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue, skipServicePaymentOptionValidation, overtimeApproval } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue, skipServicePaymentOptionValidation, overtimeApproval, packageId, packageItemId } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -447,6 +447,8 @@ class BookingService {
                 employeeRevenue: pricing.employeeRevenue,
                 employeeCommissionRate: pricing.employeeCommissionRate,
                 employeeCommission: pricing.employeeCommission,
+                packageId: packageId || null,
+                packageItemId: packageItemId || null,
                 notes: normalizedNotes || null,
                 serviceVariantId: serviceVariant?.id || null,
                 serviceVariantName: serviceVariant?.description || null,
@@ -723,6 +725,8 @@ class BookingService {
                     bookingSessionId: session.id,
                     bookingReference: session.bookingReference,
                     bookingItemIndex: Number.isInteger(bookingItemIndex) ? bookingItemIndex + index : (Number(session.itemCount || 0) + index),
+                    packageId: item.packageId || null,
+                    packageItemId: item.packageItemId || null,
                     skipBookingSessionSync: true
                 }, { transaction: finalTransaction });
 

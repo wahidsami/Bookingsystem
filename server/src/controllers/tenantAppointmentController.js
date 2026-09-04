@@ -816,6 +816,8 @@ exports.createAppointment = async (req, res) => {
                     requestedStaffId: item?.requestedStaffId || item?.staffId || null,
                     startTime: parsedStartTime.toISOString(),
                     notes: item?.notes || notes || null,
+                    packageId: item?.packageId || null,
+                    packageItemId: item?.packageItemId || null,
                     paymentMethod: itemPaymentMethod,
                     assignmentMode: item?.assignmentMode || (item?.staffId ? 'tenant_reassigned' : 'auto_assigned'),
                     duration: item?.duration,
