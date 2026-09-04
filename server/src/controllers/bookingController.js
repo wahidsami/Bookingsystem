@@ -180,6 +180,42 @@ const searchAvailability = async (req, res) => {
     }
 };
 
+const evaluateScheduling = async (req, res) => {
+    try {
+        const { tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval } = req.body || {};
+        if (!tenantId || !serviceId || !staffId || !startTime) {
+            return res.status(400).json({
+                success: false,
+                message: 'tenantId, serviceId, staffId, and startTime are required'
+            });
+        }
+
+        const service = await db.Service.findByPk(serviceId);
+        if (!service || service.tenantId !== tenantId) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
+
+        const resolvedDuration = Number(duration) > 0 ? Number(duration) : Number(service.duration || 30);
+        const decision = await bookingService.evaluateSchedulingRequest({
+            tenantId,
+            serviceId,
+            variantId,
+            staffId,
+            startTime,
+            duration: resolvedDuration,
+            overtimeApproval
+        });
+
+        return res.status(decision.valid ? 200 : 409).json({
+            success: decision.valid,
+            decision
+        });
+    } catch (error) {
+        console.error('Evaluate scheduling error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 /**
  * Get staff recommendations with AI scoring
  * GET /api/v1/bookings/recommendations
@@ -1241,6 +1277,7 @@ const respondToInviteByToken = async (req, res) => {
 };
 
 module.exports = {
+    evaluateScheduling,
     searchAvailability,
     getRecommendations,
     createBooking,

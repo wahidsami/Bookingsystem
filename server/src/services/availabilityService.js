@@ -595,6 +595,8 @@ class AvailabilityService {
             }));
         }
 
+        const employeeDutyWindows = rawWindows.map((window) => ({ ...window }));
+
         if (tenantHours) {
             const tenantStart = this._combineDateAndTime(dateKey, tenantHours.start, timezone);
             const tenantEnd = this._combineDateAndTime(dateKey, tenantHours.end, timezone);
@@ -622,6 +624,7 @@ class AvailabilityService {
             recurringShifts,
             allShifts,
             legacySchedule,
+            employeeDutyWindows,
             rawWindows,
             finalWindows,
             breaks,

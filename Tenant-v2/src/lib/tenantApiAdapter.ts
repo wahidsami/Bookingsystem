@@ -1299,6 +1299,10 @@ class TenantApiAdapter {
     return this.post('/api/v1/bookings/search', data);
   }
 
+  async evaluateScheduling(data: Record<string, any>): Promise<any> {
+    return this.post('/api/v1/bookings/evaluate', data);
+  }
+
   async createAppointment(data: Record<string, any>): Promise<any> {
     return this.post('/tenant/appointments', data);
   }
