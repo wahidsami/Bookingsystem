@@ -180,7 +180,7 @@ export default function AppointmentServiceConfiguration({
             </span>
             <select
               value={formatOffsetToClockValue(draftConfig.startTime)}
-              onChange={(e) => setDraftConfig((c) => ({ ...c, startTime: convertClockToOffset(e.target.value) }))}
+              onChange={(e) => setDraftConfig((c) => ({ ...c, startTime: convertClockToOffset(e.target.value), timingMode: 'manual' }))}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary shadow-sm"
             >
               {timeOptions.map((option) => (

@@ -275,7 +275,8 @@ export const useSmartConflictResolver = ({
            ...item,
            startTime: slot.startTime,
            staffId: slot.staffId,
-           assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
+           assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned',
+           timingMode: idx === 0 ? item.timingMode : 'auto'
          };
       });
       closeDialog();

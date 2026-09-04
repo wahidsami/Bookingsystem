@@ -1531,7 +1531,8 @@ export default function InteractiveDrawers({
         discountValue: 0,
         notes: '',
         basePrice,
-        finalPrice: basePrice
+        finalPrice: basePrice,
+        timingMode: 'auto'
       };
 
       setStagedServices(prev => [...prev, newItem]);

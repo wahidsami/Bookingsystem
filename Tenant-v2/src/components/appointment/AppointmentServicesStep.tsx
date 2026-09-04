@@ -15,6 +15,7 @@ export interface StagedService {
   notes: string;
   basePrice?: number;
   finalPrice?: number;
+  timingMode?: 'auto' | 'manual';
 }
 interface AppointmentServicesStepProps {
   tenantId: string;

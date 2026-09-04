@@ -1315,8 +1315,8 @@ class TenantApiAdapter {
     return this.patch(`/tenant/appointments/${id}`, data);
   }
 
-  async updateAppointmentStatus(id: string, status: string, notes?: string): Promise<any> {
-    return this.patch(`/tenant/appointments/${id}/status`, { status, notes, notifyCustomer: true });
+  async updateAppointmentStatus(id: string, status: string, notes?: string, cancelScope?: 'single' | 'chain'): Promise<any> {
+    return this.patch(`/tenant/appointments/${id}/status`, { status, notes, cancelScope, notifyCustomer: true });
   }
 
   async reassignAppointmentStaff(id: string, staffId: string): Promise<any> {
