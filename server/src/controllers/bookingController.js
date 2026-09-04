@@ -167,16 +167,52 @@ const searchAvailability = async (req, res) => {
 
     } catch (error) {
         console.error('Search availability error:', error);
-        
+
         let statusCode = 500;
         if (error.message.includes('required') || error.message.includes('not found')) {
             statusCode = 400;
         }
-        
-        res.status(statusCode).json({ 
+
+        res.status(statusCode).json({
             success: false,
-            message: error.message 
+            message: error.message
         });
+    }
+};
+
+const evaluateScheduling = async (req, res) => {
+    try {
+        const { tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval } = req.body || {};
+        if (!tenantId || !serviceId || !staffId || !startTime) {
+            return res.status(400).json({
+                success: false,
+                message: 'tenantId, serviceId, staffId, and startTime are required'
+            });
+        }
+
+        const service = await db.Service.findByPk(serviceId);
+        if (!service || service.tenantId !== tenantId) {
+            return res.status(404).json({ success: false, message: 'Service not found' });
+        }
+
+        const resolvedDuration = Number(duration) > 0 ? Number(duration) : Number(service.duration || 30);
+        const decision = await bookingService.evaluateSchedulingRequest({
+            tenantId,
+            serviceId,
+            variantId,
+            staffId,
+            startTime,
+            duration: resolvedDuration,
+            overtimeApproval
+        });
+
+        return res.status(decision.valid ? 200 : 409).json({
+            success: decision.valid,
+            decision
+        });
+    } catch (error) {
+        console.error('Evaluate scheduling error:', error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -237,7 +273,7 @@ const createBooking = async (req, res) => {
         const bookingItems = Array.isArray(req.body.items) ? req.body.items : [];
 
         let finalTenantId = tenantId || req.tenantId;
-        
+
         if (!finalTenantId) {
             const firstBookingServiceId = bookingItems[0]?.serviceId || serviceId;
             if (firstBookingServiceId) {
@@ -377,7 +413,7 @@ const createBooking = async (req, res) => {
             include: [
                 { model: db.Service, as: 'service' },
                 { model: db.Staff, as: 'staff' },
-                { 
+                {
                     model: db.PlatformUser,
                     as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
@@ -393,7 +429,7 @@ const createBooking = async (req, res) => {
 
     } catch (error) {
         console.error('Create booking error:', error);
-        
+
         // Determine appropriate status code
         let statusCode = 500;
         if (error.message.includes('required')
@@ -408,10 +444,10 @@ const createBooking = async (req, res) => {
         } else if (error.message.includes('inactive') || error.message.includes('banned')) {
             statusCode = 403; // Forbidden
         }
-        
-        res.status(statusCode).json({ 
+
+        res.status(statusCode).json({
             success: false,
-            message: error.message 
+            message: error.message
         });
     }
 };
@@ -430,14 +466,14 @@ const getBooking = async (req, res) => {
             include: [
                 { model: db.Service, as: 'service' },
                 { model: db.Staff, as: 'staff' },
-                { model: db.Tenant, as: 'tenant', required: false, attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsapp'] },
-                { 
+                { model: db.Tenant, as: 'tenant', required: false, attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsappNumber'] },
+                {
                     model: db.PlatformUser,
                     as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'phone']
                 },
                 // Keep legacy customer for backward compatibility
-                { 
+                {
                     model: db.Customer,
                     as: 'legacyCustomer',
                     required: false
@@ -446,18 +482,18 @@ const getBooking = async (req, res) => {
         });
 
         if (!appointment) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
-                message: 'Booking not found' 
+                message: 'Booking not found'
             });
         }
 
         // If user is authenticated and owns the booking, return full details
         // Otherwise, return limited details
         if (platformUserId && appointment.platformUserId === platformUserId) {
-            res.json({ 
+            res.json({
                 success: true,
-                appointment 
+                appointment
             });
         } else {
             // Return limited details for non-owners
@@ -474,17 +510,17 @@ const getBooking = async (req, res) => {
                 status: appointment.status,
                 price: appointment.price
             };
-            res.json({ 
+            res.json({
                 success: true,
-                appointment: limitedAppointment 
+                appointment: limitedAppointment
             });
         }
 
     } catch (error) {
         console.error('Get booking error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: error.message 
+            message: error.message
         });
     }
 };
@@ -539,11 +575,11 @@ const cancelBooking = async (req, res) => {
 
     } catch (error) {
         console.error('Cancel booking error:', error);
-        const statusCode = error.message.includes('Unauthorized') ? 403 : 
+        const statusCode = error.message.includes('Unauthorized') ? 403 :
                           error.message.includes('not found') ? 404 : 500;
-        res.status(statusCode).json({ 
+        res.status(statusCode).json({
             success: false,
-            message: error.message 
+            message: error.message
         });
     }
 };
@@ -599,16 +635,16 @@ const listBookings = async (req, res) => {
                     model: db.Tenant,
                     as: 'tenant',
                     required: false,
-                    attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsapp']
+                    attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsappNumber']
                 },
-                { 
+                {
                     model: db.PlatformUser,
                     as: 'user',
                     attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
                     required: false
                 },
                 // Legacy customer support
-                { 
+                {
                     model: db.Customer,
                     as: 'legacyCustomer',
                     required: false
@@ -625,9 +661,9 @@ const listBookings = async (req, res) => {
 
     } catch (error) {
         console.error('List bookings error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: error.message 
+            message: error.message
         });
     }
 };
@@ -755,17 +791,22 @@ const rescheduleBooking = async (req, res) => {
             Math.max(15, Math.round((new Date(appointment.endTime).getTime() - new Date(appointment.startTime).getTime()) / 60000));
         const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
 
-        const hasConflict = await bookingService.hasConflict(
-            requestedStaffId,
-            requestedStart,
-            requestedEnd,
-            appointment.id,
-            transaction
-        );
+        const schedulingDecision = await bookingService.evaluateSchedulingRequest({
+            tenantId: appointment.tenantId,
+            serviceId: appointment.serviceId,
+            staffId: requestedStaffId,
+            startTime: requestedStart,
+            duration: durationMinutes,
+            excludeAppointmentId: appointment.id
+        }, transaction);
 
-        if (hasConflict) {
+        if (!schedulingDecision.valid) {
             await transaction.rollback();
-            return res.status(409).json({ success: false, message: 'Selected time slot is no longer available' });
+            return res.status(409).json({
+                success: false,
+                code: schedulingDecision.reasonType || 'CONFLICT',
+                message: schedulingDecision.message || 'Selected time slot is no longer available'
+            });
         }
 
         appointment.staffId = requestedStaffId;
@@ -808,7 +849,7 @@ const rescheduleBooking = async (req, res) => {
             include: [
                 { model: db.Service, as: 'service' },
                 { model: db.Staff, as: 'staff' },
-                { model: db.Tenant, as: 'tenant', required: false, attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsapp'] }
+                { model: db.Tenant, as: 'tenant', required: false, attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsappNumber'] }
             ]
         });
 
@@ -842,7 +883,7 @@ const getInviteDetails = async (req, res) => {
             include: [
                 { model: db.Service, as: 'service', attributes: ['id', 'name_en', 'name_ar', 'duration'] },
                 { model: db.Staff, as: 'staff', attributes: ['id', 'name'] },
-                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsapp'], required: false },
+                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsappNumber'], required: false },
                 { model: db.PlatformUser, as: 'user', attributes: ['id', 'email'], required: false }
             ]
         });
@@ -1241,6 +1282,7 @@ const respondToInviteByToken = async (req, res) => {
 };
 
 module.exports = {
+    evaluateScheduling,
     searchAvailability,
     getRecommendations,
     createBooking,

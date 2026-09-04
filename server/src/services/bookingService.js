@@ -351,16 +351,18 @@ class BookingService {
         }
 
         // ========== CONFLICT DETECTION ==========
-        const availabilityFailure = await this.getStaffAvailabilityFailureReason(
-            finalStaffId,
-            start,
-            end,
-            null,
-            finalTransaction
-        );
+        const schedulingDecision = await this.evaluateSchedulingRequest({
+            tenantId,
+            serviceId,
+            variantId,
+            staffId: finalStaffId,
+            startTime: start,
+            duration: resolvedDuration,
+            overtimeApproval
+        }, finalTransaction);
+        const availabilityFailure = schedulingDecision.valid ? null : schedulingDecision;
         const approvedOvertime = this._buildOvertimeApproval(overtimeApproval);
-        const canOverrideAvailabilityFailure = this._canOverrideAvailabilityFailure(availabilityFailure, approvedOvertime);
-        if (availabilityFailure && !canOverrideAvailabilityFailure) {
+        if (availabilityFailure) {
             throw new Error(availabilityFailure.message);
         }
 
@@ -409,15 +411,17 @@ class BookingService {
         try {
             // ========== FINAL CONFLICT CHECK (Transaction-level protection) ==========
             // Re-check conflict right before creation to prevent race conditions
-            const finalConflictCheck = await this.getStaffAvailabilityFailureReason(
-                finalStaffId,
-                start,
-                end,
-                null,
-                finalTransaction
-            );
-            const finalHasAuthorizedOvertime = this._canOverrideAvailabilityFailure(finalConflictCheck, approvedOvertime);
-            if (finalConflictCheck && !finalHasAuthorizedOvertime) {
+            const finalSchedulingDecision = await this.evaluateSchedulingRequest({
+                tenantId,
+                serviceId,
+                variantId,
+                staffId: finalStaffId,
+                startTime: start,
+                duration: resolvedDuration,
+                overtimeApproval
+            }, finalTransaction);
+            const finalConflictCheck = finalSchedulingDecision.valid ? null : finalSchedulingDecision;
+            if (finalConflictCheck) {
                 throw new Error(finalConflictCheck.message);
             }
 
@@ -959,17 +963,94 @@ class BookingService {
      * @param {Object} transaction - Database transaction
      * @returns {Promise<boolean>} - true if conflict exists
      */
-    async getStaffAvailabilityFailureReason(staffId, startTime, endTime, excludeAppointmentId = null, transaction = null) {
+    async evaluateSchedulingRequest({ tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId = null }, transaction = null) {
         const start = startTime instanceof Date ? startTime : new Date(startTime);
-        const end = endTime instanceof Date ? endTime : new Date(endTime);
+        const durationMinutes = normalizeNumber(duration, 0);
+        const end = new Date(start.getTime() + durationMinutes * 60000);
 
-        if (!staffId || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-            return null;
+        if (!tenantId || !staffId || !serviceId || Number.isNaN(start.getTime()) || durationMinutes <= 0) {
+            return {
+                valid: false,
+                reasonType: 'invalid_request',
+                message: 'A valid staff member, service, start time, and duration are required.'
+            };
         }
 
         const staff = await db.Staff.findByPk(staffId, { transaction });
         if (!staff) {
-            return null;
+            return { valid: false, reasonType: 'invalid_staff', message: 'Staff not found.' };
+        }
+
+        if (staff.tenantId !== tenantId) {
+            return { valid: false, reasonType: 'invalid_staff', message: 'Staff does not belong to this tenant.' };
+        }
+
+        const tenantSettings = await db.TenantSettings.findOne({
+            where: { tenantId },
+            transaction
+        });
+        const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+        const availabilityService = require('./availabilityService');
+        const dateKey = this._getLocalDateKey(start, timezone);
+        const availabilityContext = await availabilityService._buildAvailabilityContext(
+            tenantId,
+            staffId,
+            dateKey,
+            timezone
+        );
+        const requestStart = start.getTime();
+        const requestEnd = end.getTime();
+        const employeeDutyWindows = availabilityContext.employeeDutyWindows || [];
+        const tenantHours = availabilityContext.tenantHours;
+        const tenantDutyStart = tenantHours
+            ? availabilityService._combineDateAndTime(dateKey, tenantHours.start, timezone)
+            : null;
+        const tenantDutyEnd = tenantHours
+            ? availabilityService._combineDateAndTime(dateKey, tenantHours.end, timezone)
+            : null;
+        const fitsWindow = (windows) => windows.some((window) => {
+            const windowStart = new Date(window.startTime).getTime();
+            const windowEnd = new Date(window.endTime).getTime();
+            return requestStart >= windowStart && requestEnd <= windowEnd;
+        });
+
+        const hoursFailures = [];
+        if (!tenantDutyStart || !tenantDutyEnd) {
+            hoursFailures.push({
+                reasonType: 'tenant_closed',
+                message: 'The center is closed on the selected date.'
+            });
+        } else if (requestStart < tenantDutyStart.getTime()) {
+            hoursFailures.push({
+                reasonType: 'before_tenant_open',
+                message: `The center opens at ${this._formatClockLabel(tenantDutyStart, timezone)}. Please select a different time.`
+            });
+        } else if (requestEnd > tenantDutyEnd.getTime()) {
+            hoursFailures.push({
+                reasonType: 'after_tenant_close',
+                message: `The booking would extend beyond the center's operating hours, which end at ${this._formatClockLabel(tenantDutyEnd, timezone)}.`
+            });
+        }
+
+        if (employeeDutyWindows.length === 0) {
+            hoursFailures.push({
+                reasonType: 'no_employee_duty',
+                message: `${staff.name || 'This employee'} has no scheduled duty on the selected date. Please select a different time or employee.`
+            });
+        } else if (!fitsWindow(employeeDutyWindows)) {
+            const earliestDutyStart = Math.min(...employeeDutyWindows.map((window) => new Date(window.startTime).getTime()));
+            const latestDutyEnd = Math.max(...employeeDutyWindows.map((window) => new Date(window.endTime).getTime()));
+            if (requestStart < earliestDutyStart) {
+                hoursFailures.push({
+                    reasonType: 'before_employee_duty',
+                    message: `${staff.name || 'This employee'} starts at ${this._formatClockLabel(new Date(earliestDutyStart), timezone)}. Please select a different time or employee.`
+                });
+            } else {
+                hoursFailures.push({
+                    reasonType: 'after_employee_duty',
+                    message: `${staff.name || 'This employee'}'s working hours end at ${this._formatClockLabel(new Date(latestDutyEnd), timezone)}, but this service would finish at ${this._formatClockLabel(end, timezone)}.`
+                });
+            }
         }
 
         const completionWindow = await db.Appointment.findOne({
@@ -1006,101 +1087,87 @@ class BookingService {
             transaction
         });
 
+        const hardConflicts = [];
+
         if (completionWindow && (!excludeAppointmentId || String(completionWindow.id) !== String(excludeAppointmentId))) {
-            return {
-                type: 'existing_booking',
+            hardConflicts.push({
+                reasonType: 'existing_booking',
+                requestedStartTime: start.toISOString(),
+                requestedEndTime: end.toISOString(),
                 message: `${staff.name || 'This employee'} is already booked for that time. Please select a different time or employee.`
+            });
+        }
+
+        for (const [reasonType, windows] of [['staff_break', availabilityContext.breaks || []], ['time_off', availabilityContext.timeOff || []]]) {
+            const blocker = windows.find((window) => requestStart < new Date(window.endTime).getTime() && requestEnd > new Date(window.startTime).getTime());
+            if (blocker) {
+                hardConflicts.push({
+                    reasonType,
+                    blockingStartTime: new Date(blocker.startTime).toISOString(),
+                    blockingEndTime: new Date(blocker.endTime).toISOString(),
+                    requestedStartTime: start.toISOString(),
+                    requestedEndTime: end.toISOString(),
+                    message: `${staff.name || 'This employee'} has ${reasonType === 'staff_break' ? 'a break' : 'approved time off'} from ${this._formatClockLabel(blocker.startTime, timezone)} to ${this._formatClockLabel(blocker.endTime, timezone)}. Please select a different time or employee.`
+                });
+            }
+        }
+
+        const allConflicts = [...hardConflicts, ...hoursFailures];
+
+        if (hardConflicts.length > 0) {
+            return {
+                valid: false,
+                ...hardConflicts[0],
+                conflicts: allConflicts,
             };
         }
 
-        try {
-            const tenantSettings = await db.TenantSettings.findOne({
-                where: { tenantId: staff.tenantId },
-                transaction
-            });
-            const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
-
-            const availabilityService = require('./availabilityService');
-            const dateKey = this._getLocalDateKey(start, timezone);
-            const availabilityContext = await availabilityService._buildAvailabilityContext(
-                staff.tenantId,
-                staffId,
-                dateKey,
-                timezone
-            );
-            const validWindows = availabilityContext.finalWindows || [];
-            const dutyWindows = availabilityContext.rawWindows || [];
-            const breakWindows = availabilityContext.breaks || [];
-            const timeOffWindows = availabilityContext.timeOff || [];
-
-            if (dutyWindows.length === 0) {
-                const workingHoursEnd = await this._getStaffWorkingHoursEnd(staff.tenantId, staffId, dateKey, transaction, timezone);
-                const workingHoursEndLabel = this._formatClockLabel(workingHoursEnd || end, timezone);
-                const requestEndLabel = this._formatClockLabel(end, timezone);
-                const employeeLabel = staff.name || 'This employee';
-                return {
-                    type: 'outside_working_hours',
-                    message: `${employeeLabel}'s working hours end at ${workingHoursEndLabel}, but this service would finish at ${requestEndLabel}.`
-                };
-            }
-
-            const reqStart = start.getTime();
-            const reqEnd = end.getTime();
-            const earliestDutyStart = Math.min(...dutyWindows.map((window) => new Date(window.startTime).getTime()));
-            const latestDutyEnd = Math.max(...dutyWindows.map((window) => new Date(window.endTime).getTime()));
-
-            if (reqStart < earliestDutyStart) {
-                const employeeLabel = staff.name || 'This employee';
-                const startLabel = this._formatClockLabel(new Date(earliestDutyStart), timezone);
-                return {
-                    type: 'outside_working_hours',
-                    message: `${employeeLabel} starts at ${startLabel}. Please select a different time or employee.`
-                };
-            }
-
-            for (const window of breakWindows) {
-                const winStart = new Date(window.startTime).getTime();
-                const winEnd = new Date(window.endTime).getTime();
-                if (reqStart < winEnd && reqEnd > winStart) {
-                    return {
-                        type: 'staff_break',
-                        message: `${staff.name || 'This employee'} is on break during this time. Please select a different time or employee.`
-                    };
-                }
-            }
-
-            for (const window of timeOffWindows) {
-                const winStart = new Date(window.startTime).getTime();
-                const winEnd = new Date(window.endTime).getTime();
-                if (reqStart < winEnd && reqEnd > winStart) {
-                    return {
-                        type: 'time_off',
-                        message: `${staff.name || 'This employee'} has time off during this period. Please select a different time or employee.`
-                    };
-                }
-            }
-
-            const isInsideValidWindow = validWindows.some((window) => {
-                const winStart = new Date(window.startTime).getTime();
-                const winEnd = new Date(window.endTime).getTime();
-                return reqStart >= winStart && reqEnd <= winEnd;
-            });
-
-            if (!isInsideValidWindow) {
-                const employeeLabel = staff.name || 'This employee';
-                const workingHoursEndLabel = this._formatClockLabel(new Date(latestDutyEnd), timezone);
-                const requestEndLabel = this._formatClockLabel(end, timezone);
-                return {
-                    type: 'outside_working_hours',
-                    message: `${employeeLabel}'s working hours end at ${workingHoursEndLabel}, but this service would finish at ${requestEndLabel}.`
-                };
-            }
-
-        } catch (error) {
-            console.error('getStaffAvailabilityFailureReason: Failed to calculate availability window', error.message);
+        const approvedOvertime = this._buildOvertimeApproval(overtimeApproval);
+        if (hoursFailures.length > 0 && !approvedOvertime) {
+            return {
+                valid: false,
+                ...hoursFailures[0],
+                conflicts: allConflicts,
+                requestedStartTime: start.toISOString(),
+                requestedEndTime: end.toISOString(),
+                tenantDutyStart: tenantDutyStart?.toISOString() || null,
+                tenantDutyEnd: tenantDutyEnd?.toISOString() || null
+            };
         }
 
-        return null;
+        return {
+            valid: true,
+            reasonType: hoursFailures.length > 0 ? 'valid_with_overtime' : 'available',
+            requestedStartTime: start.toISOString(),
+            requestedEndTime: end.toISOString(),
+            tenantDutyStart: tenantDutyStart?.toISOString() || null,
+            tenantDutyEnd: tenantDutyEnd?.toISOString() || null,
+            employeeDutyWindows: employeeDutyWindows.map((window) => ({
+                startTime: new Date(window.startTime).toISOString(),
+                endTime: new Date(window.endTime).toISOString()
+            })),
+            conflicts: allConflicts,
+            overtimeRequired: hoursFailures.length > 0,
+            overtimeApproval: approvedOvertime
+        };
+    }
+
+    async getStaffAvailabilityFailureReason(staffId, startTime, endTime, excludeAppointmentId = null, transaction = null) {
+        const staff = await db.Staff.findByPk(staffId, { transaction });
+        if (!staff) return null;
+        const duration = (new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000;
+        const decision = await this.evaluateSchedulingRequest({
+            tenantId: staff.tenantId,
+            serviceId: 'legacy-validation',
+            staffId,
+            startTime,
+            duration,
+            excludeAppointmentId
+        }, transaction);
+        return decision.valid ? null : {
+            type: decision.reasonType,
+            message: decision.message
+        };
     }
 
     _getLocalDateKey(date, timezone = 'Asia/Riyadh') {
@@ -1147,7 +1214,9 @@ class BookingService {
     }
 
     _canOverrideAvailabilityFailure(availabilityFailure, overtimeApproval) {
-        return availabilityFailure?.type === 'outside_working_hours' && overtimeApproval?.approved === true;
+        return ['outside_working_hours', 'before_tenant_open', 'after_tenant_close', 'before_employee_duty', 'after_employee_duty']
+            .includes(availabilityFailure?.reasonType || availabilityFailure?.type)
+            && overtimeApproval?.approved === true;
     }
 
     async _getStaffWorkingHoursEnd(tenantId, staffId, dateKey, transaction = null, timezone = 'Asia/Riyadh') {

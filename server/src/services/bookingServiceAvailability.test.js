@@ -1,11 +1,17 @@
 jest.mock('../models', () => ({
     Staff: { findByPk: jest.fn() },
-    Appointment: { findOne: jest.fn() },
+    Service: { findByPk: jest.fn() },
+    Appointment: { findOne: jest.fn(), findAll: jest.fn() },
     TenantSettings: { findOne: jest.fn() }
 }));
 
 jest.mock('./availabilityService', () => ({
-    _buildAvailabilityContext: jest.fn()
+    _buildAvailabilityContext: jest.fn(),
+    _combineDateAndTime: jest.fn((dateKey, time) => {
+        const [year, month, day] = dateKey.split('-').map(Number);
+        const [hour, minute] = time.split(':').map(Number);
+        return new Date(Date.UTC(year, month - 1, day, hour - 3, minute));
+    })
 }));
 
 const db = require('../models');
@@ -31,6 +37,8 @@ const setAvailabilityContext = ({
     timeOff = []
 } = {}) => {
     availabilityService._buildAvailabilityContext.mockResolvedValue({
+        tenantHours: { start: '09:00', end: '23:00' },
+        employeeDutyWindows: [{ startTime: dutyStart, endTime: dutyEnd }],
         rawWindows: [{ startTime: dutyStart, endTime: dutyEnd }],
         finalWindows: [{ startTime: dutyStart, endTime: dutyEnd }],
         breaks,
@@ -52,7 +60,7 @@ describe('BookingService staff availability failures', () => {
 
         await expect(bookingService.getStaffAvailabilityFailureReason('staff-1', start, end))
             .resolves.toEqual({
-                type: 'outside_working_hours',
+                type: 'before_employee_duty',
                 message: 'Sally starts at 2:00 PM. Please select a different time or employee.'
             });
     });
@@ -62,7 +70,7 @@ describe('BookingService staff availability failures', () => {
 
         await expect(bookingService.getStaffAvailabilityFailureReason('staff-1', start, end))
             .resolves.toEqual({
-                type: 'outside_working_hours',
+                type: 'after_employee_duty',
                 message: "Sally's working hours end at 9:00 PM, but this service would finish at 9:30 PM."
             });
     });
@@ -97,7 +105,7 @@ describe('BookingService staff availability failures', () => {
         await expect(bookingService.getStaffAvailabilityFailureReason('staff-1', start, end))
             .resolves.toEqual({
                 type: 'staff_break',
-                message: 'Sally is on break during this time. Please select a different time or employee.'
+                message: 'Sally has a break from 4:00 PM to 4:30 PM. Please select a different time or employee.'
             });
     });
 
@@ -110,5 +118,42 @@ describe('BookingService staff availability failures', () => {
                 type: 'existing_booking',
                 message: 'Sally is already booked for that time. Please select a different time or employee.'
             });
+    });
+});
+
+describe('BookingService evaluateSchedulingRequest aggregate failures', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        db.Staff.findByPk.mockResolvedValue(STAFF);
+        db.Service.findByPk.mockResolvedValue({ id: 'service-1', duration: 60 });
+        db.TenantSettings.findOne.mockResolvedValue({ timezone: 'Asia/Riyadh' });
+        setAvailabilityContext();
+    });
+
+    test('collects both hard conflicts and soft conflicts into a conflicts array', async () => {
+        // Set duty end at 21:00
+        setAvailabilityContext({ dutyEnd: makeWindow(21, 0) });
+        // Mock an existing appointment at the same time
+        db.Appointment.findAll.mockResolvedValue([{ id: 'existing-appointment' }]);
+
+        // Request exceeds duty end AND conflicts with existing appointment
+        const { start, end } = request(20, 30, 21, 30);
+
+        const result = await bookingService.evaluateSchedulingRequest({
+            tenantId: 'tenant-1',
+            serviceId: 'service-1',
+            staffId: 'staff-1',
+            date: '2026-09-03',
+            startTime: start,
+            duration: 60
+        });
+
+
+        expect(result.valid).toBe(false);
+        expect(result.conflicts.length).toBe(2);
+
+        const types = result.conflicts.map(c => c.reasonType);
+        expect(types).toContain('existing_booking');
+        expect(types).toContain('after_employee_duty');
     });
 });
