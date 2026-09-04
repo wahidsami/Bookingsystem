@@ -65,6 +65,13 @@ export const navigationItems: NavigationItem[] = [
     category: 'operations',
   },
   {
+    id: 'packages',
+    labelAr: 'الباقات',
+    labelEn: 'Packages',
+    iconName: 'PackagePlus',
+    category: 'operations',
+  },
+  {
     id: 'products',
     labelAr: 'المنتجات',
     labelEn: 'Products',

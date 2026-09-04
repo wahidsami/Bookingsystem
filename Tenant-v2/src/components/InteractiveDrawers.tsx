@@ -107,6 +107,7 @@ interface InteractiveDrawersProps {
   selectedDate: Date;
   customers: any[];
   services: any[];
+  servicePackages?: any[];
   products: any[];
   giftCardPackages?: GiftCardPackage[];
   stylists: any[];
@@ -1559,6 +1560,85 @@ export default function InteractiveDrawers({
     }
   };
 
+  const handleAddPackageToStaged = (pkgId: string) => {
+    const pkg = servicePackages?.find(p => p.id === pkgId);
+    if (!pkg || !pkg.items || !pkg.items.length) {
+      addLocalToast(
+        isRtl ? 'تعذر العثور على الباقة أو أنها فارغة.' : 'Package not found or empty.',
+        isRtl ? 'Package not found or empty.' : 'تعذر العثور على الباقة أو أنها فارغة.',
+        'error'
+      );
+      return;
+    }
+
+    setStagedServices(prev => {
+      let nextStartTime = currentStartTime;
+      const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
+      if (shouldChainServiceTimes && prev.length > 0) {
+        const lastItem = prev[prev.length - 1];
+        nextStartTime = lastItem.startTime + lastItem.duration;
+      }
+
+      const newItems: StagedService[] = [];
+      let runningStartTime = nextStartTime;
+
+      const sortedItems = [...pkg.items].sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
+
+      for (const item of sortedItems) {
+        const service = canonicalServices.find(s => s.id === item.serviceId);
+        if (!service) continue;
+
+        const resolvedVariant = item.variantId 
+          ? (service.variants || []).find((v: any) => v.id === item.variantId) 
+          : null;
+
+        const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
+        const duration = resolvedVariant?.duration || service.duration || 60;
+
+        let staffId = item.defaultStaffId || currentStaffId || '';
+        const normalizedAssignments = (service.employeeAssignments || []).map(id => String(id));
+        if (staffId && normalizedAssignments.length > 0 && !normalizedAssignments.includes(String(staffId))) {
+          staffId = ''; // default staff not assigned to this service
+        }
+
+        const nextStartTimeIso = shouldChainServiceTimes && (prev.length > 0 || newItems.length > 0)
+          ? buildIsoFromMinutes(selectedDate, runningStartTime)
+          : buildIsoFromMinutes(selectedDate, runningStartTime);
+
+        newItems.push({
+          id: `stg-pkg-${pkg.id}-${item.id}-${Date.now()}-${Math.random()}`,
+          packageId: pkg.id,
+          packageItemId: item.id,
+          serviceId: service.id,
+          variantId: resolvedVariant?.id || undefined,
+          serviceCategory: service.category,
+          staffId,
+          startTime: runningStartTime,
+          startTimeIso: nextStartTimeIso,
+          duration,
+          discountType: 'none',
+          discountValue: 0,
+          notes: '',
+          basePrice,
+          finalPrice: basePrice,
+          timingMode: 'auto'
+        });
+
+        if (shouldChainServiceTimes) {
+          runningStartTime += duration;
+        }
+      }
+
+      return [...prev, ...newItems];
+    });
+
+    addLocalToast(
+      `تمت إضافة الباقة "${isRtl ? pkg.name_ar : pkg.name_en}" بنجاح.`,
+      `Package "${isRtl ? pkg.name_ar : pkg.name_en}" added successfully.`,
+      'success'
+    );
+  };
+
   const showBookingErrorDialog = (dialog: {
     titleAr: string;
     titleEn: string;
@@ -1757,6 +1837,8 @@ export default function InteractiveDrawers({
         discountValue: item.discountValue,
         paymentMethod: 'at-center',
         assignmentMode: 'tenant_reassigned',
+        packageId: (item as any).packageId || undefined,
+        packageItemId: (item as any).packageItemId || undefined,
         variantId: variant?.id || undefined,
         overtimeApproval: item.overtimeApproval || (allowExtendedHours
           && (boardStartHour * 60) + item.startTime + Number(variant?.duration || item.duration || 0) > normalClosingMinutes
@@ -3037,6 +3119,7 @@ export default function InteractiveDrawers({
                         bookingRecoveryMode={bookingRecoveryMode}
                         forceExpandAll={bookingRecoveryMode !== 'chain'}
                         canonicalServices={canonicalServices}
+                        servicePackages={servicePackages}
                         stagedServices={stagedServices as any[]}
                         availableStylists={availableStylists}
                         serviceCategoryTabs={serviceCategoryTabs}
@@ -3045,6 +3128,7 @@ export default function InteractiveDrawers({
                         serviceSearch={serviceSearch}
                         setServiceSearch={setServiceSearch}
                         onAddService={handleToggleServiceSelection}
+                        onAddPackage={handleAddPackageToStaged}
                         onUpdateService={handleUpdateStagedService}
                         onRemoveService={(index) => setStagedServices(prev => prev.filter((_, i) => i !== index))}
                         formatMinutesToTime={formatMinutesToTime}

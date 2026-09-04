@@ -1281,6 +1281,39 @@ class TenantApiAdapter {
     return this.delete(`/tenant/services/${id}`);
   }
 
+  // --- Service Packages ---
+  async getPackages(): Promise<any> {
+    return this.get('/tenant/packages');
+  }
+
+  async getPackage(id: string): Promise<any> {
+    return this.get(`/tenant/packages/${id}`);
+  }
+
+  async createPackage(data: FormData | Record<string, any>): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await this.client.post('/tenant/packages', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return this.handleResponse(response);
+    }
+    return this.post('/tenant/packages', data);
+  }
+
+  async updatePackage(id: string, data: FormData | Record<string, any>): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await this.client.put(`/tenant/packages/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return this.handleResponse(response);
+    }
+    return this.put(`/tenant/packages/${id}`, data);
+  }
+
+  async deletePackage(id: string): Promise<any> {
+    return this.delete(`/tenant/packages/${id}`);
+  }
+
   async getAppointmentsBoard(date: string, params?: Record<string, string | number | undefined>): Promise<any> {
     const query = this.buildQueryString({ date, ...(params || {}) });
     return this.get(`/tenant/appointments/board${query ? `?${query}` : ''}`);

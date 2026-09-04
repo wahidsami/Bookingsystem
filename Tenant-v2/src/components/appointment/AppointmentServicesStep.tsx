@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Search } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Search, Package as PackageIcon, Clock, DollarSign } from 'lucide-react';
 import { type ServiceRecord, type ServiceVariantRecord } from '../../lib/serviceContract';
 import AppointmentServiceRow from './AppointmentServiceRow';
 export interface StagedService {
@@ -27,6 +27,7 @@ interface AppointmentServicesStepProps {
   bookingRecoveryMode?: 'chain' | 'modify_professionals' | 'separate_services';
   forceExpandAll?: boolean;
   canonicalServices: ServiceRecord[];
+  servicePackages?: any[];
   stagedServices: StagedService[];
   availableStylists: any[];
   serviceCategoryTabs: { key: string; labelAr: string; labelEn: string }[];
@@ -35,6 +36,7 @@ interface AppointmentServicesStepProps {
   serviceSearch: string;
   setServiceSearch: (val: string) => void;
   onAddService: (service: ServiceRecord, variant?: ServiceVariantRecord | null) => void;
+  onAddPackage?: (packageId: string) => void;
   onUpdateService: (id: string, updates: Partial<StagedService>) => void;
   onRemoveService: (index: number) => void;
   formatMinutesToTime: (mins: number) => string;
@@ -51,6 +53,7 @@ export default function AppointmentServicesStep({
   bookingRecoveryMode = 'chain',
   forceExpandAll = false,
   canonicalServices,
+  servicePackages = [],
   stagedServices,
   availableStylists,
   serviceCategoryTabs,
@@ -59,9 +62,12 @@ export default function AppointmentServicesStep({
   serviceSearch,
   setServiceSearch,
   onAddService,
+  onAddPackage,
   onUpdateService,
   onRemoveService,
 }: AppointmentServicesStepProps) {
+
+  const [activeTab, setActiveTab] = useState<'services' | 'packages'>('services');
 
   const filteredServices = useMemo(() => {
     let filtered = canonicalServices;
@@ -161,7 +167,31 @@ export default function AppointmentServicesStep({
             />
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex bg-slate-100 rounded-xl p-1 shrink-0 mb-4">
+            <button
+              onClick={() => setActiveTab('services')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${
+                activeTab === 'services'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {isRtl ? 'الخدمات' : 'Services'}
+            </button>
+            <button
+              onClick={() => setActiveTab('packages')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${
+                activeTab === 'packages'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {isRtl ? 'الباقات' : 'Packages'}
+            </button>
+          </div>
+
+          {activeTab === 'services' && (
+            <div className="flex flex-wrap gap-2">
             {serviceCategoryTabs.map((tab) => {
               const active = currentServiceCategory === tab.key || (!currentServiceCategory && tab.key === 'all');
               return (
@@ -180,8 +210,49 @@ export default function AppointmentServicesStep({
               );
             })}
           </div>
+          )}
 
-          <div className="space-y-6 pb-4">
+          {activeTab === 'packages' && (
+            <div className="space-y-4 pb-4">
+              {servicePackages.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {servicePackages.map(pkg => (
+                    <div key={pkg.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <PackageIcon className="w-5 h-5 text-primary" />
+                          <h4 className="font-bold text-slate-900">{isRtl ? pkg.name_ar : pkg.name_en}</h4>
+                        </div>
+                        <div className="flex gap-4 text-xs font-semibold text-slate-500 mb-4">
+                          <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> {pkg.totalPrice} {isRtl ? 'ر.س' : 'SAR'}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {pkg.totalDuration} {isRtl ? 'دقيقة' : 'min'}</span>
+                        </div>
+                        <ul className="text-xs text-slate-500 space-y-1 list-disc list-inside mb-4 pl-1">
+                          {(pkg.items || []).map((item: any) => {
+                            const srv = canonicalServices.find(s => s.id === item.serviceId);
+                            return srv ? <li key={item.id} className="truncate">{isRtl ? srv.nameAr || srv.name_ar : srv.nameEn || srv.name_en}</li> : null;
+                          })}
+                        </ul>
+                      </div>
+                      <button
+                        onClick={() => onAddPackage && onAddPackage(pkg.id)}
+                        className="w-full py-2 bg-primary/10 text-primary hover:bg-primary/20 font-bold text-sm rounded-xl transition"
+                      >
+                        {isRtl ? 'إضافة الباقة' : 'Add Package'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
+                  {isRtl ? 'لا توجد باقات متاحة.' : 'No packages available.'}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'services' && (
+            <div className="space-y-6 pb-4">
             {Object.keys(groupedServices).length > 0 ? (
               Object.keys(groupedServices).map((categoryName) => (
                 <div key={categoryName} className="space-y-3">
@@ -227,6 +298,7 @@ export default function AppointmentServicesStep({
               </div>
             )}
           </div>
+          )}
         </div>
       </section>
     </div>

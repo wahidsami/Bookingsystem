@@ -517,6 +517,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [liveServices, setLiveServices] = useState<any[]>([]);
   const [liveCustomers, setLiveCustomers] = useState<any[]>([]);
   const [liveProducts, setLiveProducts] = useState<any[]>([]);
+  const [servicePackages, setServicePackages] = useState<any[]>([]);
   const [giftCardPackages, setGiftCardPackages] = useState<GiftCardPackage[]>([]);
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -736,11 +737,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
-        const [empRes, srvRes, custRes, prodRes] = await Promise.all([
+        const [empRes, srvRes, custRes, prodRes, pkgRes] = await Promise.all([
           tenantApiAdapter.getEmployees(),
           tenantApiAdapter.getServices(),
           tenantApiAdapter.getCustomers({ limit: 1000 }),
-          tenantApiAdapter.getProducts()
+          tenantApiAdapter.getProducts(),
+          tenantApiAdapter.getPackages()
         ]);
 
         const employees = (empRes?.employees || []).filter((emp: any) => `${emp?.status || ''}`.toLowerCase() !== 'off' && emp?.isActive !== false);
@@ -7716,6 +7718,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         selectedDate={selectedDate}
         customers={liveCustomers}
         services={liveServices}
+        servicePackages={servicePackages}
         products={liveProducts}
         giftCardPackages={giftCardPackages}
         onBoardChanged={loadBoardData}

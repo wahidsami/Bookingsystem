@@ -20,6 +20,7 @@ import OperationsIntelligenceReport from './reports/OperationsIntelligenceReport
 import CustomersWorkspace from './CustomersWorkspace';
 import TeamsWorkspace from './TeamsWorkspace';
 import ServicesWorkspace from './ServicesWorkspace';
+import PackagesWorkspace from './PackagesWorkspace';
 import ProductsWorkspace from './ProductsWorkspace';
 import HotDealsWorkspace from './HotDealsWorkspace';
 import CustomerPushNotificationsWorkspace from './CustomerPushNotificationsWorkspace';
@@ -672,6 +673,11 @@ export default function Workspace({
       {/* 5. SERVICES */}
       {view === 'services' && (
         <ServicesWorkspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
+      )}
+
+      {/* 5.1 PACKAGES */}
+      {view === 'packages' && (
+        <PackagesWorkspace lang={lang} />
       )}
 
       {/* 6. PRODUCTS */}
