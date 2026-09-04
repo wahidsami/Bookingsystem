@@ -1728,6 +1728,8 @@ export default function InteractiveDrawers({
 
     const finalPrice = Math.max(0, totalRawPrice + guestAddonsPrice);
 
+    const normalClosingMinutes = Math.max(0, Math.round(Number(normalEndHour ?? (boardStartHour + 8)))) * 60;
+
     const items = finalStaged.map((item) => {
       const resolvedServiceId = `${item.serviceId || ''}`.trim();
       const service = canonicalServices.find(s => s.id === resolvedServiceId);
@@ -1767,7 +1769,6 @@ export default function InteractiveDrawers({
       return;
     }
 
-    const normalClosingMinutes = Math.max(0, Math.round(Number(normalEndHour ?? (boardStartHour + 8)))) * 60;
     const finalChainEndMinutes = (boardStartHour * 60) + getBookingChainFinalEndMinutes(finalStaged);
     const extensionMinutes = finalChainEndMinutes - normalClosingMinutes;
 
