@@ -538,11 +538,17 @@ export default function App() {
       return;
     }
 
+    if (type === 'navigate' && action?.viewId) {
+      handleSelectView(action.viewId);
+      return;
+    }
+
     const targetView =
       type === 'appointment' ? 'appointments' :
       type === 'customer' ? 'customers' :
       type === 'service' ? 'services' :
       type === 'product' ? 'products' :
+      type === 'packages' ? 'packages' :
       'dashboard';
 
     handleSelectView(targetView);
