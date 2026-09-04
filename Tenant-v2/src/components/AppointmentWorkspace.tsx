@@ -2545,7 +2545,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   }, []);
 
   // Quick action from Context Menu
-  const triggerContextAction = async (actionType: 'new' | 'block' | 'shift' | 'break' | 'paste' | 'refresh' | 'giftcards' | 'products') => {
+  const triggerContextAction = async (actionType: 'new' | 'block' | 'shift' | 'break' | 'paste' | 'refresh' | 'giftcards' | 'products' | 'packages') => {
     const isMutationAction = ['new', 'block', 'shift', 'break', 'paste', 'giftcards', 'products'].includes(actionType);
     if (!isBoardEditable && isMutationAction) {
       addLocalToast(
@@ -2621,6 +2621,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       }
       setInitialCartTab('products');
       setIsCartDrawerOpen(true);
+    } else if (actionType === 'packages') {
+      onQuickAction({ type: 'navigate', viewId: 'packages' });
     } else if (actionType === 'shift') {
       if (contextMenu) {
         setSelectedShiftStaffId(contextMenu.staffId);
@@ -5830,6 +5832,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             >
               <ShoppingBag size={13} className="text-teal-400" />
               <span>{isRtl ? 'المنتجات والمستحضرات' : 'Products'}</span>
+            </button>
+
+            <button
+              onClick={() => void triggerContextAction('packages')}
+              className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
+            >
+              <ShoppingBag size={13} className="text-rose-400" />
+              <span>{isRtl ? 'الباقات' : 'Packages'}</span>
             </button>
 
             <button
