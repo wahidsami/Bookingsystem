@@ -5,6 +5,7 @@ const { authenticateUser, optionalAuth } = require('../middleware/authUser');
 
 // Search for available slots (public - no auth required)
 router.post('/search', bookingController.searchAvailability);
+router.post('/evaluate', bookingController.evaluateScheduling);
 
 // Get AI-powered staff recommendations (optional auth - better recommendations if logged in)
 router.get('/recommendations', optionalAuth, bookingController.getRecommendations);
