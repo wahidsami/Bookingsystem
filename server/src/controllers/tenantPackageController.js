@@ -2,12 +2,17 @@ const db = require('../models');
 const { ServicePackage, ServicePackageItem, Service, Staff } = db;
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 
 // Setup multer for image upload (using standard pattern)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/services/');
+        const uploadPath = path.join(__dirname, '../../uploads/tenants/services');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
