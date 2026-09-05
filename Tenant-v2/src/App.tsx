@@ -381,22 +381,22 @@ export default function App() {
   const handleToggleLang = () => {
     setLang(prev => {
       const next = prev === 'ar' ? 'en' : 'ar';
-      
+
       // Update tenant name translation counterpart automatically
       if (next === 'en') {
-        setCurrentTenant(c => 
-          c.includes('العليا') 
-            ? 'La Colline Luxury Spa - Olaya Riyadh' 
-            : c.includes('الكورنيش') 
-            ? 'REFAH Beauty & Spa - Corniche Jeddah' 
+        setCurrentTenant(c =>
+          c.includes('العليا')
+            ? 'La Colline Luxury Spa - Olaya Riyadh'
+            : c.includes('الكورنيش')
+            ? 'REFAH Beauty & Spa - Corniche Jeddah'
             : 'Royal Bridal Salon - Khobar Branch'
         );
       } else {
-        setCurrentTenant(c => 
-          c.includes('Olaya') 
-            ? 'سبا لا كولين الفاخر - فرع العليا الرياض' 
-            : c.includes('Corniche') 
-            ? 'مركز تجميل واستجمام رفاه - فرع الكورنيش جدة' 
+        setCurrentTenant(c =>
+          c.includes('Olaya')
+            ? 'سبا لا كولين الفاخر - فرع العليا الرياض'
+            : c.includes('Corniche')
+            ? 'مركز تجميل واستجمام رفاه - فرع الكورنيش جدة'
             : 'صالون العروس الملكي - فرع الخبر'
         );
       }
@@ -458,7 +458,7 @@ export default function App() {
       else if (path === '/dashboard/messages') targetView = 'messages';
       else if (path === '/dashboard/appointments') targetView = 'appointments';
       else if (path === '/dashboard/customers' || path.startsWith('/dashboard/customers/')) targetView = 'customers';
-      
+
       if (targetView) {
         handleSelectView(targetView);
       }
@@ -487,7 +487,7 @@ export default function App() {
         path = '/dashboard/customers';
       }
     }
-    
+
     if (path && window.location.pathname !== path) {
       window.history.pushState(null, '', path);
     }
@@ -636,6 +636,33 @@ export default function App() {
       />
     );
   }
+  return (
+    <div
+      dir={isRtl ? 'rtl' : 'ltr'}
+      className={`min-h-screen flex overflow-hidden font-sans relative transition-colors duration-200 ${
+        darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-800'
+      }`}
+      id="refah-app-shell"
+    >
+
+      {/* Sidebar (dark luxury layout with favoritePages) */}
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        lang={lang}
+        activeView={activeView}
+        onSelectView={handleSelectView}
+        favoritePages={favoritePages}
+        accessibleMarketingModules={accessibleMarketingModules}
+        entitlements={entitlements}
+      />
+
+      {/* Main Workspace Frame */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" id="main-content-panel">
+
+        {/* Sticky Header with integrated tab navigator */}
+        <Topbar
+          lang={lang}
           onToggleLang={handleToggleLang}
           activeView={activeView}
           onOpenSearch={() => setIsSearchOpen(true)}
