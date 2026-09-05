@@ -390,22 +390,76 @@ async function ensureAppointmentInvoice(appointmentId, options = {}) {
     const discountAmount = getAppointmentInvoiceDiscountAmount(invoiceAppointments);
     const paidAmount = formatAmount(invoiceAppointments.reduce((sum, current) => sum + Number(current.totalPaid ?? 0), 0));
     const dueAmount = formatAmount(Math.max(0, totalAmount - paidAmount));
-    const invoiceItems = invoiceAppointments.map((sourceAppointment, index) => ({
-        itemType: 'service',
-        itemRefId: sourceAppointment.serviceId || null,
-        nameEn: sourceAppointment.service?.name_en || 'Service',
-        nameAr: sourceAppointment.service?.name_ar || sourceAppointment.service?.name_en || 'Service',
-        quantity: 1,
-        unitPrice: formatAmount(Number(sourceAppointment.price ?? 0) - Number(sourceAppointment.taxAmount ?? 0)),
-        lineTotal: formatAmount(Number(sourceAppointment.price ?? 0) - Number(sourceAppointment.taxAmount ?? 0)),
-        taxAmount: formatAmount(sourceAppointment.taxAmount),
-        metadata: {
-            bookingNumber: sourceAppointment.bookingNumber || null,
-            bookingSessionId: sourceAppointment.bookingSessionId || null,
-            bookingReference: appointment.bookingSession?.bookingReference || sourceAppointment.bookingReference || null,
-            bookingItemIndex: sourceAppointment.bookingItemIndex ?? index
+    const invoiceItems = [];
+    const groupedPackages = new Map();
+
+    invoiceAppointments.forEach((sourceAppointment, index) => {
+        const packageKey = sourceAppointment.packageSnapshot?.packageId || sourceAppointment.packageId;
+        
+        if (packageKey) {
+            // Group package items
+            if (!groupedPackages.has(packageKey)) {
+                groupedPackages.set(packageKey, {
+                    items: [],
+                    firstIndex: index
+                });
+            }
+            groupedPackages.get(packageKey).items.push(sourceAppointment);
+        } else {
+            // Regular service
+            invoiceItems.push({
+                itemType: 'service',
+                itemRefId: sourceAppointment.serviceId || null,
+                nameEn: sourceAppointment.service?.name_en || 'Service',
+                nameAr: sourceAppointment.service?.name_ar || sourceAppointment.service?.name_en || 'Service',
+                quantity: 1,
+                unitPrice: formatAmount(Number(sourceAppointment.price ?? 0) - Number(sourceAppointment.taxAmount ?? 0)),
+                lineTotal: formatAmount(Number(sourceAppointment.price ?? 0) - Number(sourceAppointment.taxAmount ?? 0)),
+                taxAmount: formatAmount(sourceAppointment.taxAmount),
+                metadata: {
+                    bookingNumber: sourceAppointment.bookingNumber || null,
+                    bookingSessionId: sourceAppointment.bookingSessionId || null,
+                    bookingReference: appointment.bookingSession?.bookingReference || sourceAppointment.bookingReference || null,
+                    bookingItemIndex: sourceAppointment.bookingItemIndex ?? index
+                },
+                _originalIndex: index
+            });
         }
-    }));
+    });
+
+    // Add grouped packages
+    for (const [packageKey, group] of groupedPackages.entries()) {
+        const { items, firstIndex } = group;
+        const firstItem = items[0];
+        const snapshot = firstItem.packageSnapshot || {};
+        
+        const sumPrice = items.reduce((sum, curr) => sum + Number(curr.price ?? 0), 0);
+        const sumTax = items.reduce((sum, curr) => sum + Number(curr.taxAmount ?? 0), 0);
+        
+        invoiceItems.push({
+            itemType: 'package',
+            itemRefId: packageKey,
+            nameEn: snapshot.packageNameEn || 'Package',
+            nameAr: snapshot.packageNameAr || snapshot.packageNameEn || 'Package',
+            quantity: 1,
+            unitPrice: formatAmount(sumPrice - sumTax),
+            lineTotal: formatAmount(sumPrice - sumTax),
+            taxAmount: formatAmount(sumTax),
+            metadata: {
+                bookingNumber: firstItem.bookingNumber || null,
+                bookingSessionId: firstItem.bookingSessionId || null,
+                bookingReference: appointment.bookingSession?.bookingReference || firstItem.bookingReference || null,
+                bookingItemIndex: firstItem.bookingItemIndex ?? firstIndex,
+                isGroupedPackage: true,
+                childCount: items.length
+            },
+            _originalIndex: firstIndex
+        });
+    }
+
+    // Sort items to preserve order
+    invoiceItems.sort((a, b) => a._originalIndex - b._originalIndex);
+    invoiceItems.forEach(item => delete item._originalIndex);
     const invoiceMetadata = {
         source: isSessionInvoice ? 'booking_session' : 'appointment',
         bookingNumber: appointment.bookingNumber || null,

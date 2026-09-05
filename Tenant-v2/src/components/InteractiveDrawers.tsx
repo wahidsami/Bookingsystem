@@ -1823,33 +1823,69 @@ export default function InteractiveDrawers({
 
     const normalClosingMinutes = Math.max(0, Math.round(Number(normalEndHour ?? (boardStartHour + 8)))) * 60;
 
-    const items = finalStaged.map((item) => {
+    const items: any[] = [];
+    const groupedPackages = new Map<string, any>();
+
+    finalStaged.forEach((item) => {
       const resolvedServiceId = `${item.serviceId || ''}`.trim();
       const service = canonicalServices.find(s => s.id === resolvedServiceId);
       const variant = service?.variants.find((entry) => entry.id === item.variantId) || service?.variants[0] || null;
       const requestStartIso = getSyncedStagedStartIso(item);
-      return {
-        serviceId: resolvedServiceId,
-        staffId: item.staffId,
-        requestedStaffId: item.staffId,
-        startTime: requestStartIso,
-        notes: item.notes || undefined,
-        duration: variant?.duration || item.duration,
-        price: variant ? toMoney(variant.finalPrice ?? variant.price) : (service ? toMoney(service.price) : 0),
-        discountType: item.discountType,
-        discountValue: item.discountValue,
-        paymentMethod: 'at-center',
-        assignmentMode: 'tenant_reassigned',
-        packageId: (item as any).packageId || undefined,
-        packageItemId: (item as any).packageItemId || undefined,
-        variantId: variant?.id || undefined,
-        overtimeApproval: item.overtimeApproval || (allowExtendedHours
-          && (boardStartHour * 60) + item.startTime + Number(variant?.duration || item.duration || 0) > normalClosingMinutes
-          ? { approved: true }
-          : undefined),
-        serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined,
-        variantName: variant ? (isRtl ? variant.nameAr : variant.nameEn) : undefined
-      };
+      const packageId = (item as any).packageId;
+
+      if (packageId) {
+        if (!groupedPackages.has(packageId)) {
+          groupedPackages.set(packageId, {
+            itemType: 'package',
+            packageId,
+            packageItems: [],
+            notes: []
+          });
+        }
+        const pkgGroup = groupedPackages.get(packageId);
+        if (item.notes) pkgGroup.notes.push(item.notes);
+
+        pkgGroup.packageItems.push({
+          serviceId: resolvedServiceId,
+          variantId: variant?.id || undefined,
+          staffId: item.staffId,
+          requestedStaffId: item.staffId,
+          startTime: requestStartIso,
+          duration: variant?.duration || item.duration,
+          assignmentMode: 'tenant_reassigned',
+          packageItemId: (item as any).packageItemId || undefined,
+          overtimeApproval: item.overtimeApproval || (allowExtendedHours
+            && (boardStartHour * 60) + item.startTime + Number(variant?.duration || item.duration || 0) > normalClosingMinutes
+            ? { approved: true }
+            : undefined)
+        });
+      } else {
+        items.push({
+          serviceId: resolvedServiceId,
+          staffId: item.staffId,
+          requestedStaffId: item.staffId,
+          startTime: requestStartIso,
+          notes: item.notes || undefined,
+          duration: variant?.duration || item.duration,
+          price: variant ? toMoney(variant.finalPrice ?? variant.price) : (service ? toMoney(service.price) : 0),
+          discountType: item.discountType,
+          discountValue: item.discountValue,
+          paymentMethod: 'at-center',
+          assignmentMode: 'tenant_reassigned',
+          variantId: variant?.id || undefined,
+          overtimeApproval: item.overtimeApproval || (allowExtendedHours
+            && (boardStartHour * 60) + item.startTime + Number(variant?.duration || item.duration || 0) > normalClosingMinutes
+            ? { approved: true }
+            : undefined),
+          serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined,
+          variantName: variant ? (isRtl ? variant.nameAr : variant.nameEn) : undefined
+        });
+      }
+    });
+
+    groupedPackages.forEach((pkgGroup) => {
+      pkgGroup.notes = pkgGroup.notes.join(' | ') || undefined;
+      items.push(pkgGroup);
     });
 
     const resolvedPrimaryServiceId = `${items[0]?.serviceId || ''}`.trim();

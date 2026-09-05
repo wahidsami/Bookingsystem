@@ -3379,27 +3379,64 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         return;
       }
 
-      const payloadItems = finalStaged.map((item) => {
+      const payloadItems: any[] = [];
+      const groupedPackages = new Map<string, any>();
+
+      finalStaged.forEach((item) => {
         const resolvedServiceId = `${item.serviceId || ''}`.trim();
         const srv = liveServices.find((s) => s.id === resolvedServiceId);
         const requestStartIso = item.startTimeIso || buildIsoFromMinutes(getSelectedDateKey(), item.startTime);
-        return {
-          serviceId: resolvedServiceId,
-          staffId: item.staffId,
-          requestedStaffId: item.staffId,
-          startTime: requestStartIso,
-          notes: item.notes || sessionNotes || null,
-          paymentMethod: 'at-center',
-          assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
-          duration: item.duration || srv?.duration || 60,
-          discountType: item.discountType,
-          discountValue: item.discountValue,
-          overtimeApproval: allowExtendedHours
-            && (boardStartHour * 60) + item.startTime + Number(item.duration || srv?.duration || 0) > normalClosingMinutes
-            ? { approved: true }
-            : undefined,
-          serviceName: isRtl ? (srv?.nameAr || srv?.name || '') : (srv?.nameEn || srv?.name || '')
-        };
+        const packageId = (item as any).packageId;
+
+        if (packageId) {
+          if (!groupedPackages.has(packageId)) {
+            groupedPackages.set(packageId, {
+              itemType: 'package',
+              packageId,
+              packageItems: [],
+              notes: []
+            });
+          }
+          const pkgGroup = groupedPackages.get(packageId);
+          if (item.notes || sessionNotes) pkgGroup.notes.push(item.notes || sessionNotes);
+
+          pkgGroup.packageItems.push({
+            serviceId: resolvedServiceId,
+            staffId: item.staffId,
+            requestedStaffId: item.staffId,
+            startTime: requestStartIso,
+            duration: item.duration || srv?.duration || 60,
+            assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
+            packageItemId: (item as any).packageItemId || undefined,
+            overtimeApproval: allowExtendedHours
+              && (boardStartHour * 60) + item.startTime + Number(item.duration || srv?.duration || 0) > normalClosingMinutes
+              ? { approved: true }
+              : undefined
+          });
+        } else {
+          payloadItems.push({
+            serviceId: resolvedServiceId,
+            staffId: item.staffId,
+            requestedStaffId: item.staffId,
+            startTime: requestStartIso,
+            notes: item.notes || sessionNotes || null,
+            paymentMethod: 'at-center',
+            assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
+            duration: item.duration || srv?.duration || 60,
+            discountType: item.discountType,
+            discountValue: item.discountValue,
+            overtimeApproval: allowExtendedHours
+              && (boardStartHour * 60) + item.startTime + Number(item.duration || srv?.duration || 0) > normalClosingMinutes
+              ? { approved: true }
+              : undefined,
+            serviceName: isRtl ? (srv?.nameAr || srv?.name || '') : (srv?.nameEn || srv?.name || '')
+          });
+        }
+      });
+
+      groupedPackages.forEach((pkgGroup) => {
+        pkgGroup.notes = pkgGroup.notes.join(' | ') || undefined;
+        payloadItems.push(pkgGroup);
       });
 
       const resolvedPrimaryServiceId = `${payloadItems[0]?.serviceId || currentServiceId || ''}`.trim();

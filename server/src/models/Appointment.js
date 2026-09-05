@@ -40,6 +40,16 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'appointmentId',
                 as: 'events'
             });
+            Appointment.belongsTo(models.ServicePackage, {
+                foreignKey: 'packageId',
+                as: 'servicePackage',
+                required: false
+            });
+            Appointment.belongsTo(models.ServicePackageItem, {
+                foreignKey: 'packageItemId',
+                as: 'servicePackageItem',
+                required: false
+            });
         }
 
         /**
@@ -206,6 +216,34 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: 0,
             comment: 'Zero-based index of the item within a booking session'
+        },
+        packageId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'service_packages',
+                key: 'id'
+            }
+        },
+        packageItemId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'service_package_items',
+                key: 'id'
+            }
+        },
+        packageSequenceOrder: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        },
+        packageSnapshot: {
+            type: DataTypes.JSONB,
+            allowNull: true
+        },
+        packageItemSnapshot: {
+            type: DataTypes.JSONB,
+            allowNull: true
         },
         startTime: {
             type: DataTypes.DATE,

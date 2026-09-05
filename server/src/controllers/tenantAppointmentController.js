@@ -873,6 +873,36 @@ exports.createAppointment = async (req, res) => {
         }
         if (bookingItems.length > 0) {
             const normalizedItems = bookingItems.map((item, index) => {
+                const itemPaymentMethod = dashboardOverridePaymentMethod;
+
+                if (item.itemType === 'package') {
+                    if (!item.packageId) {
+                        throw new Error(`packageId is required for package booking item ${index + 1}`);
+                    }
+                    if (!Array.isArray(item.packageItems) || item.packageItems.length === 0) {
+                        throw new Error(`packageItems is required for package booking item ${index + 1}`);
+                    }
+                    
+                    return {
+                        itemType: 'package',
+                        packageId: item.packageId,
+                        packageItems: item.packageItems.map(pItem => {
+                            const rawStartTime = pItem?.startTime || null;
+                            const parsedStartTime = rawStartTime ? new Date(rawStartTime) : null;
+                            if (!parsedStartTime || Number.isNaN(parsedStartTime.getTime())) {
+                                throw new Error(`Invalid start time for package step in item ${index + 1}`);
+                            }
+                            return {
+                                ...pItem,
+                                startTime: parsedStartTime.toISOString(),
+                                assignmentMode: pItem.assignmentMode || (pItem.staffId ? 'tenant_reassigned' : 'auto_assigned')
+                            };
+                        }),
+                        notes: item?.notes || notes || null,
+                        paymentMethod: itemPaymentMethod
+                    };
+                }
+
                 const itemServiceId = `${item?.serviceId || ''}`.trim();
                 const rawStartTime = item?.startTime || null;
                 const parsedStartTime = rawStartTime ? new Date(rawStartTime) : null;
@@ -884,8 +914,6 @@ exports.createAppointment = async (req, res) => {
                 if (!parsedStartTime || Number.isNaN(parsedStartTime.getTime())) {
                     throw new Error(`Invalid start time for booking item ${index + 1}`);
                 }
-
-                const itemPaymentMethod = dashboardOverridePaymentMethod;
 
                 return {
                     serviceId: itemServiceId,
