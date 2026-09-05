@@ -541,7 +541,15 @@ async function settleBillPayment({
         const metadata = bill.metadata || {};
         const targetPackageId = metadata.requestedPackageId || subscription.packageId;
         const targetBillingCycle = metadata.requestedBillingCycle || subscription.billingCycle || 'monthly';
-        const periodEnd = getPeriodEnd(now, targetBillingCycle);
+        
+        let periodStart = now;
+        if (bill.type === 'renewal' && subscription.currentPeriodEnd) {
+            const subEnd = new Date(subscription.currentPeriodEnd);
+            if (subEnd > now) {
+                periodStart = subEnd;
+            }
+        }
+        const periodEnd = getPeriodEnd(periodStart, targetBillingCycle);
 
         await bill.update({
             status: BILL_STATUS.PAID,
@@ -571,7 +579,7 @@ async function settleBillPayment({
             billingCycle: targetBillingCycle,
             amount: requestedAmount,
             status: 'active',
-            currentPeriodStart: now,
+            currentPeriodStart: bill.type === 'renewal' ? periodStart : now,
             currentPeriodEnd: periodEnd,
             nextBillingDate: periodEnd,
             gracePeriodEnds: null,
@@ -708,7 +716,7 @@ async function settleBillPayment({
                     bill: pdfBillPayload,
                     packageName: bill.subscription?.package?.name,
                     billingCycle: targetBillingCycle,
-                    periodStart: now,
+                    periodStart: bill.type === 'renewal' ? periodStart : now,
                     periodEnd
                 }
             };
