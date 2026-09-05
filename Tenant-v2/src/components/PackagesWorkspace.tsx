@@ -24,6 +24,8 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
   const [employees, setEmployees] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  console.log("[ENTITLEMENT TRACE] PackagesWorkspace is rendering!");
+
   // Form State
   const [currentPackageId, setCurrentPackageId] = useState<string | null>(null);
   const [nameEn, setNameEn] = useState('');
@@ -392,7 +394,9 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                               // Clear staff if they are not valid for the new service
                               const newService = services.find(s => s.id === newServiceId);
                               if (newService && item.defaultStaffId) {
-                                const allowedStaff = (newService.employeeAssignments || []).map((id: any) => String(id));
+                                const allowedStaff = newService.employees
+                                  ? newService.employees.map((e: any) => String(e.id))
+                                  : (newService.employeeAssignments || []).map((id: any) => String(id));
                                 if (!allowedStaff.includes(String(item.defaultStaffId))) {
                                   updateItem(index, 'defaultStaffId', '');
                                 }
@@ -433,8 +437,11 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                           >
                             <option className="bg-white text-slate-900" value="">{isRtl ? '-- أي موظف --' : '-- Any Staff --'}</option>
                             {employees.filter(emp => {
-                              if (!selectedService || !selectedService.employeeAssignments) return false;
-                              return selectedService.employeeAssignments.map((id: any) => String(id)).includes(String(emp.id));
+                              if (!selectedService) return false;
+                              const allowedStaff = selectedService.employees
+                                ? selectedService.employees.map((e: any) => String(e.id))
+                                : (selectedService.employeeAssignments || []).map((id: any) => String(id));
+                              return allowedStaff.includes(String(emp.id));
                             }).map(emp => (
                               <option className="bg-white text-slate-900" key={emp.id} value={emp.id}>{isRtl ? emp.name_ar : emp.name_en}</option>
                             ))}
