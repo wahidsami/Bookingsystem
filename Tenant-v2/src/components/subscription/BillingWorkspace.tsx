@@ -34,6 +34,16 @@ function fmtAmount(amount: number | null | undefined, currency: string, lang: La
   return lang === "ar" ? `${formatted} ${currency || "SAR"}` : `${currency || "SAR"} ${formatted}`;
 }
 
+function getLocalized(val: any, lang: Lang): string {
+  if (!val) return "—";
+  if (typeof val === "string") return val;
+  if (typeof val === "object") {
+    if (lang === "ar") return val.ar || val.name_ar || val.en || val.name_en || val.name || "—";
+    if (lang === "en") return val.en || val.name_en || val.name || val.ar || val.name_ar || "—";
+  }
+  return String(val);
+}
+
 function StatusPill({ status, lang }: { status: BillStatus; lang: Lang }) {
   const isRtl = lang === "ar";
   const map: Record<string, { cls: string; ar: string; en: string }> = {
@@ -58,12 +68,12 @@ function InvoiceDetailModal({ bill, lang, darkMode, onClose }: { bill: any; lang
   const totalAmount = bill.totalAmount ?? bill.amount ?? 0;
   const subtotal = bill.subtotalAmount ?? bill.amount ?? 0;
   const vat = bill.vatAmount ?? 0;
-  const sellerName = bill.sellerSnapshot?.name || bill.sellerSnapshot?.name_en || "Refah";
-  const buyerName = bill.buyerSnapshot?.name || bill.tenant?.name_en || bill.tenant?.name || "—";
-  const buyerEmail = bill.buyerSnapshot?.email || bill.tenant?.email || "—";
+  const sellerName = getLocalized(bill.sellerSnapshot?.name || "Refah", lang);
+  const buyerName = getLocalized(bill.buyerSnapshot?.name || bill.tenant?.name, lang);
+  const buyerEmail = getLocalized(bill.buyerSnapshot?.email || bill.tenant?.email, lang);
   const lineItems: any[] = bill.lineItemsSnapshot || [];
   const planSnap = bill.planSnapshot || {};
-  const billingPeriod = planSnap.billingCycleLabel || (bill.subscription?.billingCycle ?? "—");
+  const billingPeriod = getLocalized(planSnap.billingCycleLabel || bill.subscription?.billingCycle, lang);
   const periodStart = planSnap.currentPeriodStart || bill.subscription?.currentPeriodStart || null;
   const periodEnd = planSnap.currentPeriodEnd || bill.subscription?.currentPeriodEnd || null;
 
@@ -105,7 +115,7 @@ function InvoiceDetailModal({ bill, lang, darkMode, onClose }: { bill: any; lang
             <div className="space-y-1.5">
               {lineItems.map((item: any, idx: number) => (
                 <div key={idx} className="flex justify-between text-xs py-1.5 border-b border-neutral-50 dark:border-zinc-800">
-                  <span className="text-neutral-600 dark:text-zinc-400">{isRtl ? (item.description_ar || item.description) : (item.description || item.description_ar)}</span>
+                  <span className="text-neutral-600 dark:text-zinc-400">{getLocalized(item.description || item.description_ar, lang)}</span>
                   <span className="font-semibold">{fmtAmount(item.amount, currency, lang)}</span>
                 </div>
               ))}
@@ -184,16 +194,25 @@ export default function BillingWorkspace({ lang, darkMode }: BillingWorkspacePro
     }
   }, [lang]);
 
-  const handleDownload = useCallback((bill: any) => {
+  const handleDownload = useCallback(async (bill: any) => {
     setDownloadingId(bill.id);
-    const url = tenantApiAdapter.getInvoicePdfUrl(bill.id);
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.download = `invoice-${bill.billNumber || bill.id}.pdf`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => setDownloadingId(null), 1000);
+    try {
+      const blob = await tenantApiAdapter.downloadInvoicePdf(bill.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.download = `invoice-${bill.billNumber || bill.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      console.error("Failed to download PDF", e);
+    } finally {
+      setDownloadingId(null);
+    }
   }, []);
 
   const unpaid = bills.filter((b) => isPayable(b.status));
@@ -203,10 +222,7 @@ export default function BillingWorkspace({ lang, darkMode }: BillingWorkspacePro
 
   const renderBillRow = (bill: any) => {
     const currency = bill.currency || "SAR";
-    const billingPeriod = bill.planSnapshot?.billingCycleLabel || bill.subscription?.billingCycle || bill.billingCycle || "—";
-    const planName = isRtl
-      ? (bill.planSnapshot?.packageName_ar || bill.planSnapshot?.packageName || bill.subscription?.package?.name_ar || bill.subscription?.package?.name || "—")
-      : (bill.planSnapshot?.packageName || bill.subscription?.package?.name || "—");
+    const planName = getLocalized(bill.planSnapshot?.packageName || bill.subscription?.package?.name, lang);
     const periodStart = bill.planSnapshot?.currentPeriodStart || bill.subscription?.currentPeriodStart || null;
     const periodEnd   = bill.planSnapshot?.currentPeriodEnd   || bill.subscription?.currentPeriodEnd   || null;
     const canPay = isPayable(bill.status);

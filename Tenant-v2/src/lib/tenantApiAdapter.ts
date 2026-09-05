@@ -800,6 +800,12 @@ class TenantApiAdapter {
     return url.toString();
   }
 
+  async downloadInvoicePdf(billId: string | number): Promise<Blob> {
+    const response = await this.request(`/tenant/bills/${billId}/invoice-pdf`);
+    if (!response.ok) throw new Error('Failed to download invoice PDF');
+    return response.blob();
+  }
+
   getReceiptPdfUrl(billId: string | number): string {
     const url = this.buildUrl(`/tenant/bills/${billId}/receipt-pdf`);
     return url.toString();
