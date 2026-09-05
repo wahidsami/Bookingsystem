@@ -185,7 +185,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue, skipServicePaymentOptionValidation, overtimeApproval, packageId, packageItemId } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue, skipServicePaymentOptionValidation, overtimeApproval, overrideRawPrice, packageId, packageItemId, packageSequenceOrder, packageSnapshot, packageItemSnapshot } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -367,13 +367,15 @@ class BookingService {
         }
 
         // ========== PRICING CALCULATION ==========
-        const baseRawPrice = serviceVariant
-            ? calculateRawPriceFromFinalPrice(
-                serviceVariant.finalPrice,
-                service.taxRate,
-                service.commissionRate
-            )
-            : normalizeNumber(service.rawPrice ?? service.basePrice, 0);
+        const baseRawPrice = typeof overrideRawPrice === 'number' 
+            ? overrideRawPrice
+            : (serviceVariant
+                ? calculateRawPriceFromFinalPrice(
+                    serviceVariant.finalPrice,
+                    service.taxRate,
+                    service.commissionRate
+                )
+                : normalizeNumber(service.rawPrice ?? service.basePrice, 0));
         const discountAmount = resolveDiscountAmount(baseRawPrice, discountType, discountValue);
         const discountedRawPrice = Math.max(0, baseRawPrice - discountAmount);
         const pricingSource = {
@@ -447,8 +449,6 @@ class BookingService {
                 employeeRevenue: pricing.employeeRevenue,
                 employeeCommissionRate: pricing.employeeCommissionRate,
                 employeeCommission: pricing.employeeCommission,
-                packageId: packageId || null,
-                packageItemId: packageItemId || null,
                 notes: normalizedNotes || null,
                 serviceVariantId: serviceVariant?.id || null,
                 serviceVariantName: serviceVariant?.description || null,
@@ -457,6 +457,11 @@ class BookingService {
                 bookingSessionId: existingSession?.id || bookingSessionId || null,
                 bookingReference: resolvedBookingReference || null,
                 bookingItemIndex: resolvedBookingItemIndex,
+                packageId: packageId || null,
+                packageItemId: packageItemId || null,
+                packageSequenceOrder: packageSequenceOrder !== undefined ? packageSequenceOrder : null,
+                packageSnapshot: packageSnapshot || null,
+                packageItemSnapshot: packageItemSnapshot || null,
                 status: initialAppointmentStatus,
                 paymentStatus: APPOINTMENT_PAYMENT_STATUS.PENDING,
                 paymentMethod: normalizedPaymentMethod,
@@ -705,44 +710,157 @@ class BookingService {
 
             for (let index = 0; index < items.length; index += 1) {
                 const item = items[index] || {};
-                const appointment = await this.createBooking({
-                    serviceId: item.serviceId,
-                    variantId: item.variantId || null,
-                    staffId: item.staffId || null,
-                    requestedStaffId: item.requestedStaffId || null,
-                    platformUserId,
-                    tenantId,
-                    startTime: item.startTime,
-                    notes: item.notes || normalizedNotes || null,
-                    paymentMethod: item.paymentMethod || paymentMethod || 'at-center',
-                    assignmentMode: item.assignmentMode,
-                    duration: item.duration,
-                    discountType: item.discountType,
-                    discountValue: item.discountValue,
-                    overtimeApproval: item.overtimeApproval,
-                    skipAdvanceValidation: Boolean(skipAdvanceValidation),
-                    skipServicePaymentOptionValidation: Boolean(skipServicePaymentOptionValidation),
-                    bookingSessionId: session.id,
-                    bookingReference: session.bookingReference,
-                    bookingItemIndex: Number.isInteger(bookingItemIndex) ? bookingItemIndex + index : (Number(session.itemCount || 0) + index),
-                    packageId: item.packageId || null,
-                    packageItemId: item.packageItemId || null,
-                    skipBookingSessionSync: true
-                }, { transaction: finalTransaction });
-
-                appointments.push(appointment);
-                subtotal += parseFloat(appointment.rawPrice ?? 0);
-                taxAmount += parseFloat(appointment.taxAmount ?? 0);
-                platformFee += parseFloat(appointment.platformFee ?? 0);
-                totalAmount += parseFloat(appointment.price ?? 0);
-
+                const currentItemIndex = Number.isInteger(bookingItemIndex) ? bookingItemIndex + index : (Number(session.itemCount || 0) + index);
                 const itemPaymentMethod = `${item.paymentMethod || paymentMethod || 'at-center'}`.trim().toLowerCase();
-                if (itemPaymentMethod === 'online-full') {
-                    onlineFullAmount += parseFloat(appointment.price ?? 0);
-                } else if (itemPaymentMethod === 'booking-fee') {
-                    bookingFeeAmount += parseFloat(appointment.depositAmount ?? 0);
+
+                if (item.itemType === 'package') {
+                    const { packageId, packageItems } = item;
+                    if (!packageId) throw new Error('Package ID is required for package bookings');
+                    if (!Array.isArray(packageItems) || packageItems.length === 0) throw new Error('Package must have at least one service step');
+
+                    const servicePackage = await db.ServicePackage.findOne({
+                        where: { id: packageId, tenantId },
+                        transaction: finalTransaction
+                    });
+                    if (!servicePackage) throw new Error('Package not found or unauthorized');
+                    if (!servicePackage.isActive) throw new Error('Package is not active');
+
+                    const packageTotalPrice = Number(servicePackage.totalPrice || 0);
+
+                    // Fetch services for pro-rata calculation
+                    let totalBasePrice = 0;
+                    const packageSteps = [];
+                    for (let i = 0; i < packageItems.length; i++) {
+                        const pItem = packageItems[i];
+                        const service = await db.Service.findByPk(pItem.serviceId, { transaction: finalTransaction });
+                        if (!service) throw new Error(`Service ${pItem.serviceId} not found`);
+
+                        const basePrice = Number(service.rawPrice ?? service.basePrice ?? 0);
+                        totalBasePrice += basePrice;
+                        packageSteps.push({ pItem, service, basePrice });
+                    }
+
+                    if (totalBasePrice <= 0) {
+                        throw new Error('Total base price of package services must be greater than zero for pro-rata allocation');
+                    }
+
+                    // Deterministic pro-rata pricing
+                    let sumAllocated = 0;
+                    packageSteps.forEach(step => {
+                        const ratio = step.basePrice / totalBasePrice;
+                        step.allocatedPrice = Math.round(ratio * packageTotalPrice * 100) / 100;
+                        sumAllocated += step.allocatedPrice;
+                    });
+
+                    const remainder = Math.round((packageTotalPrice - sumAllocated) * 100) / 100;
+                    if (remainder !== 0) {
+                        // Allocate remainder to highest base price item
+                        let maxIndex = 0;
+                        let maxPrice = packageSteps[0].basePrice;
+                        for (let i = 1; i < packageSteps.length; i++) {
+                            if (packageSteps[i].basePrice > maxPrice) {
+                                maxPrice = packageSteps[i].basePrice;
+                                maxIndex = i;
+                            }
+                        }
+                        packageSteps[maxIndex].allocatedPrice = Math.round((packageSteps[maxIndex].allocatedPrice + remainder) * 100) / 100;
+                    }
+
+                    const packageSnapshot = {
+                        packageId: servicePackage.id,
+                        packageNameEn: servicePackage.name_en || servicePackage.nameEn,
+                        packageNameAr: servicePackage.name_ar || servicePackage.nameAr,
+                        packagePrice: packageTotalPrice,
+                        packageDuration: servicePackage.duration
+                    };
+
+                    for (let i = 0; i < packageSteps.length; i++) {
+                        const step = packageSteps[i];
+                        const appointment = await this.createBooking({
+                            serviceId: step.pItem.serviceId,
+                            staffId: step.pItem.staffId || null,
+                            requestedStaffId: step.pItem.requestedStaffId || step.pItem.staffId || null,
+                            platformUserId,
+                            tenantId,
+                            startTime: step.pItem.startTime,
+                            notes: item.notes || normalizedNotes || null,
+                            paymentMethod: item.paymentMethod || paymentMethod || 'at-center',
+                            assignmentMode: step.pItem.assignmentMode || 'customer_selected',
+                            duration: step.pItem.duration || step.service.duration,
+                            skipAdvanceValidation: Boolean(skipAdvanceValidation),
+                            skipServicePaymentOptionValidation: Boolean(skipServicePaymentOptionValidation),
+                            bookingSessionId: session.id,
+                            bookingReference: session.bookingReference,
+                            bookingItemIndex: currentItemIndex,
+                            skipBookingSessionSync: true,
+                            overrideRawPrice: step.allocatedPrice,
+                            packageId: servicePackage.id,
+                            packageItemId: step.pItem.packageItemId || null,
+                            packageSequenceOrder: step.pItem.sequenceOrder || (i + 1),
+                            packageSnapshot,
+                            packageItemSnapshot: {
+                                packageItemId: step.pItem.packageItemId || null,
+                                serviceId: step.service.id,
+                                serviceNameEn: step.service.name_en || step.service.nameEn,
+                                serviceNameAr: step.service.name_ar || step.service.nameAr,
+                                sequenceOrder: step.pItem.sequenceOrder || (i + 1),
+                                allocatedPrice: step.allocatedPrice,
+                                duration: step.pItem.duration || step.service.duration
+                            }
+                        }, { transaction: finalTransaction });
+
+                        appointments.push(appointment);
+                        subtotal += parseFloat(appointment.rawPrice ?? 0);
+                        taxAmount += parseFloat(appointment.taxAmount ?? 0);
+                        platformFee += parseFloat(appointment.platformFee ?? 0);
+                        totalAmount += parseFloat(appointment.price ?? 0);
+
+                        if (itemPaymentMethod === 'online-full') {
+                            onlineFullAmount += parseFloat(appointment.price ?? 0);
+                        } else if (itemPaymentMethod === 'booking-fee') {
+                            bookingFeeAmount += parseFloat(appointment.depositAmount ?? 0);
+                        } else {
+                            atCenterAmount += parseFloat(appointment.price ?? 0);
+                        }
+                    }
+
                 } else {
-                    atCenterAmount += parseFloat(appointment.price ?? 0);
+                    const appointment = await this.createBooking({
+                        serviceId: item.serviceId,
+                        variantId: item.variantId || null,
+                        staffId: item.staffId || null,
+                        requestedStaffId: item.requestedStaffId || null,
+                        platformUserId,
+                        tenantId,
+                        startTime: item.startTime,
+                        notes: item.notes || normalizedNotes || null,
+                        paymentMethod: item.paymentMethod || paymentMethod || 'at-center',
+                        assignmentMode: item.assignmentMode,
+                        duration: item.duration,
+                        discountType: item.discountType,
+                        discountValue: item.discountValue,
+                        overtimeApproval: item.overtimeApproval,
+                        skipAdvanceValidation: Boolean(skipAdvanceValidation),
+                        skipServicePaymentOptionValidation: Boolean(skipServicePaymentOptionValidation),
+                        bookingSessionId: session.id,
+                        bookingReference: session.bookingReference,
+                        bookingItemIndex: currentItemIndex,
+                        skipBookingSessionSync: true
+                    }, { transaction: finalTransaction });
+
+                    appointments.push(appointment);
+                    subtotal += parseFloat(appointment.rawPrice ?? 0);
+                    taxAmount += parseFloat(appointment.taxAmount ?? 0);
+                    platformFee += parseFloat(appointment.platformFee ?? 0);
+                    totalAmount += parseFloat(appointment.price ?? 0);
+
+                    if (itemPaymentMethod === 'online-full') {
+                        onlineFullAmount += parseFloat(appointment.price ?? 0);
+                    } else if (itemPaymentMethod === 'booking-fee') {
+                        bookingFeeAmount += parseFloat(appointment.depositAmount ?? 0);
+                    } else {
+                        atCenterAmount += parseFloat(appointment.price ?? 0);
+                    }
                 }
             }
 
@@ -1091,39 +1209,29 @@ class BookingService {
             transaction
         });
 
-        const hardConflicts = [];
-
         if (completionWindow && (!excludeAppointmentId || String(completionWindow.id) !== String(excludeAppointmentId))) {
-            hardConflicts.push({
+            return {
+                valid: false,
                 reasonType: 'existing_booking',
                 requestedStartTime: start.toISOString(),
                 requestedEndTime: end.toISOString(),
                 message: `${staff.name || 'This employee'} is already booked for that time. Please select a different time or employee.`
-            });
+            };
         }
 
         for (const [reasonType, windows] of [['staff_break', availabilityContext.breaks || []], ['time_off', availabilityContext.timeOff || []]]) {
             const blocker = windows.find((window) => requestStart < new Date(window.endTime).getTime() && requestEnd > new Date(window.startTime).getTime());
             if (blocker) {
-                hardConflicts.push({
+                return {
+                    valid: false,
                     reasonType,
                     blockingStartTime: new Date(blocker.startTime).toISOString(),
                     blockingEndTime: new Date(blocker.endTime).toISOString(),
                     requestedStartTime: start.toISOString(),
                     requestedEndTime: end.toISOString(),
                     message: `${staff.name || 'This employee'} has ${reasonType === 'staff_break' ? 'a break' : 'approved time off'} from ${this._formatClockLabel(blocker.startTime, timezone)} to ${this._formatClockLabel(blocker.endTime, timezone)}. Please select a different time or employee.`
-                });
+                };
             }
-        }
-
-        const allConflicts = [...hardConflicts, ...hoursFailures];
-
-        if (hardConflicts.length > 0) {
-            return {
-                valid: false,
-                ...hardConflicts[0],
-                conflicts: allConflicts,
-            };
         }
 
         const approvedOvertime = this._buildOvertimeApproval(overtimeApproval);
@@ -1131,7 +1239,6 @@ class BookingService {
             return {
                 valid: false,
                 ...hoursFailures[0],
-                conflicts: allConflicts,
                 requestedStartTime: start.toISOString(),
                 requestedEndTime: end.toISOString(),
                 tenantDutyStart: tenantDutyStart?.toISOString() || null,
@@ -1150,7 +1257,6 @@ class BookingService {
                 startTime: new Date(window.startTime).toISOString(),
                 endTime: new Date(window.endTime).toISOString()
             })),
-            conflicts: allConflicts,
             overtimeRequired: hoursFailures.length > 0,
             overtimeApproval: approvedOvertime
         };

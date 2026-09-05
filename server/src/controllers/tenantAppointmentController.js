@@ -278,6 +278,84 @@ function getDatePartsInTimeZone(date, timeZone = 'Asia/Riyadh') {
     };
 }
 
+async function ensureStaffSlotAvailable({ tenantId, serviceId, staffId, startTime }) {
+    if (!tenantId || !serviceId || !staffId || !startTime) return false;
+    const requestedStart = new Date(startTime);
+    if (Number.isNaN(requestedStart.getTime())) return false;
+    const tenantSettings = await db.TenantSettings.findOne({
+        where: { tenantId },
+        attributes: ['timezone']
+    });
+    const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+    const requestedParts = getDatePartsInTimeZone(requestedStart, timezone);
+
+    const availability = await availabilityService.getAvailableSlots(tenantId, {
+        serviceId,
+        staffId,
+        date: requestedParts.dateKey
+    });
+
+    return (availability?.slots || []).some((slot) => {
+        if (slot.available !== true) return false;
+        const slotParts = getDatePartsInTimeZone(new Date(slot.startTime), timezone);
+        return slotParts.dateKey === requestedParts.dateKey && slotParts.timeKey === requestedParts.timeKey;
+    });
+}
+
+async function inspectStaffSlotAvailability({ tenantId, serviceId, staffId, startTime }) {
+    const requestedStart = new Date(startTime);
+    if (Number.isNaN(requestedStart.getTime())) {
+        return {
+            valid: false,
+            reason: 'invalid_start_time'
+        };
+    }
+
+    const tenantSettings = await db.TenantSettings.findOne({
+        where: { tenantId },
+        attributes: ['timezone']
+    });
+    const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+    const requestedParts = getDatePartsInTimeZone(requestedStart, timezone);
+
+    const availability = await availabilityService.getAvailableSlots(tenantId, {
+        serviceId,
+        staffId,
+        date: requestedParts.dateKey
+    });
+
+    const slots = Array.isArray(availability?.slots) ? availability.slots : [];
+    const slotSample = slots.slice(0, 20).map((slot) => {
+        const slotParts = getDatePartsInTimeZone(new Date(slot.startTime), timezone);
+        return {
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            available: slot.available === true,
+            localDate: slotParts.dateKey,
+            localTime: slotParts.timeKey
+        };
+    });
+    const matchingSlot = slotSample.find((slot) => slot.available && slot.localDate === requestedParts.dateKey && slot.localTime === requestedParts.timeKey) || null;
+
+    return {
+        valid: true,
+        timezone,
+        requested: {
+            iso: requestedStart.toISOString(),
+            localDate: requestedParts.dateKey,
+            localTime: requestedParts.timeKey
+        },
+        availability: {
+            totalSlots: availability?.metadata?.totalSlots ?? slots.length,
+            availableSlots: availability?.metadata?.availableSlots ?? slots.filter((slot) => slot.available === true).length,
+            staffName: availability?.metadata?.staffName || null,
+            stepSize: availability?.metadata?.stepSize || null
+        },
+        matchingSlot,
+        slotSample
+    };
+}
+
 async function resolveAppointmentCustomer({ platformUserId, customer, transaction, tenantId }) {
     if (platformUserId) {
         const existingUser = await db.PlatformUser.findByPk(platformUserId, { transaction });
@@ -301,7 +379,7 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
     const lastName = rawLastName || null;
     let email = `${normalizedCustomer.email || ''}`.trim().toLowerCase();
     let phone = `${normalizedCustomer.phone || ''}`.trim();
-
+    
     if (phone) {
         phone = phone.replace(/[\s\-\(\)]/g, '');
         if (/^05\d{8}$/.test(phone)) {
@@ -795,6 +873,36 @@ exports.createAppointment = async (req, res) => {
         }
         if (bookingItems.length > 0) {
             const normalizedItems = bookingItems.map((item, index) => {
+                const itemPaymentMethod = dashboardOverridePaymentMethod;
+
+                if (item.itemType === 'package') {
+                    if (!item.packageId) {
+                        throw new Error(`packageId is required for package booking item ${index + 1}`);
+                    }
+                    if (!Array.isArray(item.packageItems) || item.packageItems.length === 0) {
+                        throw new Error(`packageItems is required for package booking item ${index + 1}`);
+                    }
+                    
+                    return {
+                        itemType: 'package',
+                        packageId: item.packageId,
+                        packageItems: item.packageItems.map(pItem => {
+                            const rawStartTime = pItem?.startTime || null;
+                            const parsedStartTime = rawStartTime ? new Date(rawStartTime) : null;
+                            if (!parsedStartTime || Number.isNaN(parsedStartTime.getTime())) {
+                                throw new Error(`Invalid start time for package step in item ${index + 1}`);
+                            }
+                            return {
+                                ...pItem,
+                                startTime: parsedStartTime.toISOString(),
+                                assignmentMode: pItem.assignmentMode || (pItem.staffId ? 'tenant_reassigned' : 'auto_assigned')
+                            };
+                        }),
+                        notes: item?.notes || notes || null,
+                        paymentMethod: itemPaymentMethod
+                    };
+                }
+
                 const itemServiceId = `${item?.serviceId || ''}`.trim();
                 const rawStartTime = item?.startTime || null;
                 const parsedStartTime = rawStartTime ? new Date(rawStartTime) : null;
@@ -807,8 +915,6 @@ exports.createAppointment = async (req, res) => {
                     throw new Error(`Invalid start time for booking item ${index + 1}`);
                 }
 
-                const itemPaymentMethod = dashboardOverridePaymentMethod;
-
                 return {
                     serviceId: itemServiceId,
                     variantId: item?.variantId || null,
@@ -816,8 +922,6 @@ exports.createAppointment = async (req, res) => {
                     requestedStaffId: item?.requestedStaffId || item?.staffId || null,
                     startTime: parsedStartTime.toISOString(),
                     notes: item?.notes || notes || null,
-                    packageId: item?.packageId || null,
-                    packageItemId: item?.packageItemId || null,
                     paymentMethod: itemPaymentMethod,
                     assignmentMode: item?.assignmentMode || (item?.staffId ? 'tenant_reassigned' : 'auto_assigned'),
                     duration: item?.duration,
@@ -887,8 +991,8 @@ exports.createAppointment = async (req, res) => {
             });
 
             let finalAppointments = fullAppointments;
-            const hasExplicitPayment = paymentStatus === 'paid' ||
-                (amount !== undefined && amount !== null && Number(amount) > 0) ||
+            const hasExplicitPayment = paymentStatus === 'paid' || 
+                (amount !== undefined && amount !== null && Number(amount) > 0) || 
                 (Array.isArray(paymentAllocations) && paymentAllocations.length > 0);
 
             if (hasExplicitPayment) {
@@ -1000,6 +1104,30 @@ exports.createAppointment = async (req, res) => {
             resolvedBookingReference = existingSession.bookingReference;
             if (!Number.isInteger(resolvedBookingItemIndex)) {
                 resolvedBookingItemIndex = Number(existingSession.itemCount || 0);
+            }
+        }
+
+        const explicitStaffId = staffId || requestedStaffId || null;
+        if (explicitStaffId) {
+            const slotAvailable = await ensureStaffSlotAvailable({
+                tenantId,
+                serviceId,
+                staffId: explicitStaffId,
+                startTime
+            });
+            if (!slotAvailable) {
+                const debug = await inspectStaffSlotAvailability({
+                    tenantId,
+                    serviceId,
+                    staffId: explicitStaffId,
+                    startTime
+                });
+                await transaction.rollback();
+                return res.status(409).json({
+                    success: false,
+                    message: 'Selected staff is not available for this time slot',
+                    debug
+                });
             }
         }
 
@@ -1178,8 +1306,8 @@ exports.createAppointment = async (req, res) => {
         });
 
         let finalAppointment = fullAppointment;
-        const hasExplicitPayment = paymentStatus === 'paid' ||
-            (amount !== undefined && amount !== null && Number(amount) > 0) ||
+        const hasExplicitPayment = paymentStatus === 'paid' || 
+            (amount !== undefined && amount !== null && Number(amount) > 0) || 
             (Array.isArray(paymentAllocations) && paymentAllocations.length > 0);
 
         if (hasExplicitPayment) {
@@ -1381,11 +1509,11 @@ exports.getAppointments = async (req, res) => {
             }
         );
 
-        const {
-            startDate,
-            endDate,
-            staffId,
-            serviceId,
+        const { 
+            startDate, 
+            endDate, 
+            staffId, 
+            serviceId, 
             status,
             paymentStatus,
             platformUserId,
@@ -1394,7 +1522,7 @@ exports.getAppointments = async (req, res) => {
         } = req.query;
 
         const where = {};
-
+        
         // Filter by tenant (through service or staff)
         // We need to ensure appointments belong to this tenant
         // Since appointments link to services and staff, we'll filter through those
@@ -1484,7 +1612,7 @@ exports.getCalendarAppointments = async (req, res) => {
         const { startDate, endDate, staffId } = req.query;
 
         const where = {};
-
+        
         // Build date range filter
         Object.assign(where, buildDateRangeWhere('startTime', startDate, endDate));
 
@@ -2091,7 +2219,7 @@ exports.updateAppointmentStatus = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { id } = req.params;
-        const { status, notes, cancelScope } = req.body;
+        const { status, notes } = req.body;
         const normalizedStatus = normalizeAppointmentStatus(status);
 
         console.log('[TRACE] Incoming status update request for appointment:', id);
@@ -2168,273 +2296,245 @@ exports.updateAppointmentStatus = async (req, res) => {
             });
         }
         console.log('[TRACE] Validation passed: appointment exists');
-
+        
         console.log('[TRACE] Current status:', appointment.status);
         console.log('[TRACE] paymentStatus:', appointment.paymentStatus);
         console.log('[TRACE] totalPaid:', appointment.totalPaid);
         console.log('[TRACE] remainingBalance:', appointment.remainingBalance);
         console.log('[TRACE] appointmentId:', appointment.id);
 
-        let appointmentsToUpdate = [appointment];
-        const linkedAppointments = appointment.bookingSessionId && appointment.bookingSession?.appointments
-            ? appointment.bookingSession.appointments.filter(a => a.id !== appointment.id)
-            : [];
+        console.log('[TRACE] Validation currently executing: transition validation');
+        if (
+            appointment.status !== normalizedStatus &&
+            !canTransitionAppointmentStatus(
+                appointment.status,
+                normalizedStatus,
+                TENANT_APPOINTMENT_TRANSITIONS
+            )
+        ) {
+            console.log(`[TRACE] Validation failed: transition validation (Cannot change from ${appointment.status} to ${normalizedStatus})`);
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Cannot change appointment from ${appointment.status} to ${normalizedStatus}`
+            });
+        }
+        console.log('[TRACE] Validation passed: transition validation');
 
-        let originalSessionIdToSync = null;
+        console.log('[TRACE] Validation currently executing: payment status for completion');
+        const isSettledByAmount = (parseFloat(appointment.remainderAmount ?? 0) <= 0.009) && (parseFloat(appointment.outstandingAmount || 0) <= 0.009);
+        const isSettledByStatus = isAppointmentFullyPaid(appointment.paymentStatus) || `${appointment.paymentStatus || ''}`.trim().toLowerCase() === 'paid';
+        const previousStatus = appointment.status;
 
-        if (linkedAppointments.length > 0) {
-            if (normalizedStatus === 'cancelled') {
-                if (cancelScope === 'chain') {
-                    appointmentsToUpdate = [...appointmentsToUpdate, ...linkedAppointments];
-                } else {
-                    originalSessionIdToSync = appointment.bookingSessionId;
-                    appointment.bookingSessionId = null;
-                }
-            } else {
-                appointmentsToUpdate = [...appointmentsToUpdate, ...linkedAppointments];
-            }
+        if (normalizedStatus === 'completed' && appointment.status !== 'completed' && !isSettledByAmount && !isSettledByStatus) {
+            console.log('[TRACE] Validation failed: payment status for completion (Payment required)');
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                code: 'APPOINTMENT_PAYMENT_REQUIRED',
+                message: 'You cannot complete this appointment until payment has been completed.'
+            });
+        }
+        console.log('[TRACE] Validation passed: payment status for completion');
+
+        appointment.status = normalizedStatus;
+        if (notes !== undefined) {
+            appointment.notes = notes;
+        }
+        if (normalizedStatus === 'in_service' && !appointment.serviceStartedAt) {
+            appointment.serviceStartedAt = new Date();
+        }
+        if (normalizedStatus === 'completed' && !appointment.serviceCompletedAt) {
+            appointment.serviceCompletedAt = new Date();
+        }
+        if (normalizedStatus === 'no_show' && !appointment.noShowMarkedAt) {
+            appointment.noShowMarkedAt = new Date();
         }
 
-        const previousStatuses = {};
-        for (const appt of appointmentsToUpdate) {
-            previousStatuses[appt.id] = appt.status;
+        console.log('[TRACE] Validation currently executing: save()');
+        await appointment.save({ transaction });
+        console.log('[TRACE] Validation passed: save()');
 
-            console.log('[TRACE] Validation currently executing: transition validation for', appt.id);
-            if (
-                appt.status !== normalizedStatus &&
-                !canTransitionAppointmentStatus(appt.status, normalizedStatus, TENANT_APPOINTMENT_TRANSITIONS)
-            ) {
-                console.log(`[TRACE] Validation failed: transition validation (Cannot change from ${appt.status} to ${normalizedStatus})`);
-                await transaction.rollback();
-                return res.status(400).json({
-                    success: false,
-                    message: `Cannot change appointment from ${appt.status} to ${normalizedStatus}`
-                });
-            }
-            console.log('[TRACE] Validation passed: transition validation');
+        await createAppointmentEventSafe({
+            appointmentId: appointment.id,
+            tenantId,
+            platformUserId: appointment.platformUserId,
+            actorType: 'tenant',
+            actorId: req.userId || null,
+            eventType: 'tenant_status_changed',
+            payload: {
+                fromStatus: previousStatus,
+                toStatus: normalizedStatus,
+                notes: notes || null
+            },
+            occurredAt: new Date(),
+            transaction
+        });
 
-            console.log('[TRACE] Validation currently executing: payment status for completion for', appt.id);
-            const isSettledByAmount = (parseFloat(appt.remainderAmount ?? 0) <= 0.009) && (parseFloat(appt.outstandingAmount || 0) <= 0.009);
-            const isSettledByStatus = isAppointmentFullyPaid(appt.paymentStatus) || `${appt.paymentStatus || ''}`.trim().toLowerCase() === 'paid';
+        const appointmentTotalPrice = parseFloat(appointment.price ?? 0);
+        const currentPaid = parseFloat(appointment.totalPaid ?? 0);
+        const outstandingAmount = Math.max(0, parseFloat((appointmentTotalPrice - currentPaid).toFixed(2)));
+        const cancellationWindowHours = Number(tenantSettings?.cancellationHours || 24);
+        const appointmentStartTime = appointment.startTime ? new Date(appointment.startTime).getTime() : null;
+        const nowTime = Date.now();
+        const lateCancelWindowStart = appointmentStartTime
+            ? appointmentStartTime - (cancellationWindowHours * 60 * 60 * 1000)
+            : null;
+        const shouldChargeCancellationFee = normalizedStatus === 'cancelled'
+            ? Boolean(lateCancelWindowStart && nowTime >= lateCancelWindowStart)
+            : normalizedStatus === 'no_show';
 
-            if (normalizedStatus === 'completed' && appt.status !== 'completed' && !isSettledByAmount && !isSettledByStatus) {
-                console.log('[TRACE] Validation failed: payment status for completion (Payment required)');
-                await transaction.rollback();
-                return res.status(400).json({
-                    success: false,
-                    code: 'APPOINTMENT_PAYMENT_REQUIRED',
-                    message: 'You cannot complete this appointment until payment has been completed for all services.'
-                });
-            }
-            console.log('[TRACE] Validation passed: payment status for completion');
-        }
-
-        for (const appt of appointmentsToUpdate) {
-            appt.status = normalizedStatus;
-            if (notes !== undefined && appt.id === appointment.id) {
-                appt.notes = notes;
-            }
-            if (normalizedStatus === 'in_service' && !appt.serviceStartedAt) {
-                appt.serviceStartedAt = new Date();
-            }
-            if (normalizedStatus === 'completed' && !appt.serviceCompletedAt) {
-                appt.serviceCompletedAt = new Date();
-            }
-            if (normalizedStatus === 'no_show' && !appt.noShowMarkedAt) {
-                appt.noShowMarkedAt = new Date();
-            }
-
-            console.log('[TRACE] Validation currently executing: save() for', appt.id);
-            await appt.save({ transaction });
-            console.log('[TRACE] Validation passed: save()');
-
-            await createAppointmentEventSafe({
-                appointmentId: appt.id,
-                tenantId,
-                platformUserId: appt.platformUserId,
-                actorType: 'tenant',
-                actorId: req.userId || null,
-                eventType: 'tenant_status_changed',
-                payload: {
-                    fromStatus: previousStatuses[appt.id],
-                    toStatus: normalizedStatus,
-                    notes: appt.id === appointment.id ? (notes || null) : null
-                },
-                occurredAt: new Date(),
+        if (shouldChargeCancellationFee && outstandingAmount > 0.01) {
+            await collectAppointmentStatusCharge({
+                appointmentId: appointment.id,
+                amount: outstandingAmount,
+                reason: normalizedStatus === 'no_show'
+                    ? 'No-show charge'
+                    : 'Late cancellation fee',
+                source: normalizedStatus === 'no_show'
+                    ? 'tenant_no_show_charge'
+                    : 'tenant_late_cancellation_fee',
                 transaction
             });
-
-            const appointmentTotalPrice = parseFloat(appt.price ?? 0);
-            const currentPaid = parseFloat(appt.totalPaid ?? 0);
-            const outstandingAmount = Math.max(0, parseFloat((appointmentTotalPrice - currentPaid).toFixed(2)));
-            const cancellationWindowHours = Number(tenantSettings?.cancellationHours || 24);
-            const appointmentStartTime = appt.startTime ? new Date(appt.startTime).getTime() : null;
-            const nowTime = Date.now();
-            const lateCancelWindowStart = appointmentStartTime
-                ? appointmentStartTime - (cancellationWindowHours * 60 * 60 * 1000)
-                : null;
-            const shouldChargeCancellationFee = normalizedStatus === 'cancelled'
-                ? Boolean(lateCancelWindowStart && nowTime >= lateCancelWindowStart)
-                : normalizedStatus === 'no_show';
-
-            if (shouldChargeCancellationFee && outstandingAmount > 0.01) {
-                await collectAppointmentStatusCharge({
-                    appointmentId: appt.id,
-                    amount: outstandingAmount,
-                    reason: normalizedStatus === 'no_show'
-                        ? 'No-show charge'
-                        : 'Late cancellation fee',
-                    source: normalizedStatus === 'no_show'
-                        ? 'tenant_no_show_charge'
-                        : 'tenant_late_cancellation_fee',
-                    transaction
-                });
-            }
-        }
-
-        if (originalSessionIdToSync) {
-            await syncBookingSessionTotals(originalSessionIdToSync, transaction);
         }
 
         await transaction.commit();
 
         try {
-            for (const appt of appointmentsToUpdate) {
-                const serviceName = appt.service?.name_en || appt.service?.name_ar || 'service';
-                const appointmentDate = new Date(appt.startTime).toLocaleString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit'
+            const serviceName = appointment.service?.name_en || appointment.service?.name_ar || 'service';
+            const appointmentDate = new Date(appointment.startTime).toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+            let customerName = 'A customer';
+            try {
+                if (appointment.platformUserId) {
+                    const customer = await db.PlatformUser.findByPk(appointment.platformUserId, {
+                        attributes: ['firstName', 'lastName']
+                    });
+                    if (customer) {
+                        customerName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customerName;
+                    }
+                }
+            } catch (_lookupError) {
+                // Keep generic fallback name if lookup fails.
+            }
+
+            if (normalizedStatus === 'checked_in') {
+                await pushNotificationService.sendToStaff(appointment.staffId, {
+                    title: 'Customer arrived',
+                    body: `${customerName} arrived for ${serviceName}.`,
+                    data: {
+                        type: 'staff_appointment_arrived',
+                        appointmentId: appointment.id,
+                        tenantId,
+                        status: normalizedStatus
+                    }
                 });
-                let customerName = 'A customer';
+
+                await createStaffAppointmentMessage({
+                    tenantId,
+                    staffId: appointment.staffId,
+                    customerName,
+                    serviceName,
+                    appointmentDate,
+                    action: 'checked_in'
+                });
+
+                await pushNotificationService.sendToUser(appointment.platformUserId, {
+                    title: 'Booking updated',
+                    body: 'Your appointment is now marked as arrived.',
+                    data: {
+                        type: 'booking_status_updated',
+                        appointmentId: appointment.id,
+                        status: normalizedStatus
+                    }
+                });
+            } else if (normalizedStatus === 'in_service') {
+                await appointmentLifecycleService.notifyServiceStarted(appointment);
+            } else if (normalizedStatus === 'completed') {
+                await appointmentLifecycleService.notifyServiceCompleted(appointment);
+            } else if (normalizedStatus === 'cancelled' || normalizedStatus === 'no_show') {
+                await pushNotificationService.sendToStaff(appointment.staffId, {
+                    title: normalizedStatus === 'cancelled' ? 'Appointment cancelled' : 'Marked as no-show',
+                    body: normalizedStatus === 'cancelled'
+                        ? `${customerName} appointment for ${serviceName} was cancelled.`
+                        : `${customerName} was marked as no-show for ${serviceName}.`,
+                    data: {
+                        type: normalizedStatus === 'cancelled' ? 'staff_appointment_cancelled' : 'staff_appointment_no_show',
+                        appointmentId: appointment.id,
+                        tenantId,
+                        status: normalizedStatus
+                    }
+                });
+
+                await createStaffAppointmentMessage({
+                    tenantId,
+                    staffId: appointment.staffId,
+                    customerName,
+                    serviceName,
+                    appointmentDate,
+                    action: normalizedStatus === 'cancelled' ? 'cancelled' : 'no_show'
+                });
+
+                await pushNotificationService.sendToUser(appointment.platformUserId, {
+                    title: 'Booking updated',
+                    body: normalizedStatus === 'cancelled'
+                        ? 'Your appointment has been cancelled.'
+                        : 'Your appointment was marked as no-show.',
+                    data: {
+                        type: 'booking_status_updated',
+                        appointmentId: appointment.id,
+                        status: normalizedStatus
+                    }
+                });
+
+                await customerNotificationService.sendCustomerInboxNotification(
+                    tenantId,
+                    appointment.platformUserId,
+                    normalizedStatus === 'cancelled' ? 'Appointment cancelled' : 'Appointment marked as no-show',
+                    normalizedStatus === 'cancelled'
+                        ? `Your ${serviceName} appointment was cancelled.`
+                        : `Your ${serviceName} appointment was marked as no-show.`,
+                    {
+                        type: normalizedStatus === 'cancelled' ? 'appointment_cancelled' : 'appointment_no_show',
+                        appointmentId: appointment.id,
+                        status: normalizedStatus
+                    }
+                );
+            }
+
+            const handledStatusNotifications = ['checked_in', 'in_service', 'completed', 'cancelled', 'no_show'].includes(normalizedStatus);
+            if (!handledStatusNotifications) {
+                await pushNotificationService.sendToUser(appointment.platformUserId, {
+                    title: 'Booking updated',
+                    body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
+                    data: {
+                        type: 'booking_status_updated',
+                        appointmentId: appointment.id,
+                        status: normalizedStatus
+                    }
+                });
+            }
+
+            if (appointment.user?.email) {
                 try {
-                    if (appt.platformUserId) {
-                        const customer = await db.PlatformUser.findByPk(appt.platformUserId, {
-                            attributes: ['firstName', 'lastName']
-                        });
-                        if (customer) {
-                            customerName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customerName;
-                        }
-                    }
-                } catch (_lookupError) {
-                    // Keep generic fallback name if lookup fails.
-                }
-
-                if (normalizedStatus === 'checked_in') {
-                    await pushNotificationService.sendToStaff(appt.staffId, {
-                        title: 'Customer arrived',
-                        body: `${customerName} arrived for ${serviceName}.`,
-                        data: {
-                            type: 'staff_appointment_arrived',
-                            appointmentId: appt.id,
-                            tenantId,
-                            status: normalizedStatus
-                        }
-                    });
-
-                    await createStaffAppointmentMessage({
-                        tenantId,
-                        staffId: appt.staffId,
+                    await sendAppointmentStatusEmail({
+                        to: appointment.user.email,
                         customerName,
+                        tenantName: appointment.tenant?.name || appointment.tenant?.name_en || appointment.tenant?.name_ar || 'Refah',
                         serviceName,
                         appointmentDate,
-                        action: 'checked_in'
+                        previousStatus,
+                        currentStatus: normalizedStatus,
+                        bookingReference: appointment.bookingNumber || appointment.bookingReference || '',
+                        locale: appointment.user?.preferredLanguage === 'ar' ? 'ar' : 'en'
                     });
-
-                    await pushNotificationService.sendToUser(appt.platformUserId, {
-                        title: 'Booking updated',
-                        body: 'Your appointment is now marked as arrived.',
-                        data: {
-                            type: 'booking_status_updated',
-                            appointmentId: appt.id,
-                            status: normalizedStatus
-                        }
-                    });
-                } else if (normalizedStatus === 'in_service') {
-                    await appointmentLifecycleService.notifyServiceStarted(appt);
-                } else if (normalizedStatus === 'completed') {
-                    await appointmentLifecycleService.notifyServiceCompleted(appt);
-                } else if (normalizedStatus === 'cancelled' || normalizedStatus === 'no_show') {
-                    await pushNotificationService.sendToStaff(appt.staffId, {
-                        title: normalizedStatus === 'cancelled' ? 'Appointment cancelled' : 'Marked as no-show',
-                        body: normalizedStatus === 'cancelled'
-                            ? `${customerName} appointment for ${serviceName} was cancelled.`
-                            : `${customerName} was marked as no-show for ${serviceName}.`,
-                        data: {
-                            type: normalizedStatus === 'cancelled' ? 'staff_appointment_cancelled' : 'staff_appointment_no_show',
-                            appointmentId: appt.id,
-                            tenantId,
-                            status: normalizedStatus
-                        }
-                    });
-
-                    await createStaffAppointmentMessage({
-                        tenantId,
-                        staffId: appt.staffId,
-                        customerName,
-                        serviceName,
-                        appointmentDate,
-                        action: normalizedStatus === 'cancelled' ? 'cancelled' : 'no_show'
-                    });
-
-                    await pushNotificationService.sendToUser(appt.platformUserId, {
-                        title: 'Booking updated',
-                        body: normalizedStatus === 'cancelled'
-                            ? 'Your appointment has been cancelled.'
-                            : 'Your appointment was marked as no-show.',
-                        data: {
-                            type: 'booking_status_updated',
-                            appointmentId: appt.id,
-                            status: normalizedStatus
-                        }
-                    });
-
-                    await customerNotificationService.sendCustomerInboxNotification(
-                        tenantId,
-                        appt.platformUserId,
-                        normalizedStatus === 'cancelled' ? 'Appointment cancelled' : 'Appointment marked as no-show',
-                        normalizedStatus === 'cancelled'
-                            ? `Your ${serviceName} appointment was cancelled.`
-                            : `Your ${serviceName} appointment was marked as no-show.`,
-                        {
-                            type: normalizedStatus === 'cancelled' ? 'appointment_cancelled' : 'appointment_no_show',
-                            appointmentId: appt.id,
-                            status: normalizedStatus
-                        }
-                    );
-                }
-
-                const handledStatusNotifications = ['checked_in', 'in_service', 'completed', 'cancelled', 'no_show'].includes(normalizedStatus);
-                if (!handledStatusNotifications) {
-                    await pushNotificationService.sendToUser(appt.platformUserId, {
-                        title: 'Booking updated',
-                        body: `Your appointment is now ${normalizedStatus.replace(/_/g, ' ')}.`,
-                        data: {
-                            type: 'booking_status_updated',
-                            appointmentId: appt.id,
-                            status: normalizedStatus
-                        }
-                    });
-                }
-
-                if (appt.user?.email) {
-                    try {
-                        await sendAppointmentStatusEmail({
-                            to: appt.user.email,
-                            customerName,
-                            tenantName: appt.tenant?.name || appt.tenant?.name_en || appt.tenant?.name_ar || 'Refah',
-                            serviceName,
-                            appointmentDate,
-                            previousStatus: previousStatuses[appt.id],
-                            currentStatus: normalizedStatus,
-                            bookingReference: appt.bookingNumber || appt.bookingReference || '',
-                            locale: appt.user?.preferredLanguage === 'ar' ? 'ar' : 'en'
-                        });
-                    } catch (emailError) {
-                        console.warn('Tenant booking status email warning:', emailError.message);
-                    }
+                } catch (emailError) {
+                    console.warn('Tenant booking status email warning:', emailError.message);
                 }
             }
         } catch (notificationError) {
@@ -2442,7 +2542,7 @@ exports.updateAppointmentStatus = async (req, res) => {
         }
 
         console.log('[TRACE] returning response successfully');
-
+        
         // Rebuild the response from a fresh canonical database read
         await appointment.reload({
             include: [
@@ -2494,10 +2594,10 @@ exports.updateAppointmentStatus = async (req, res) => {
         });
     } catch (error) {
         try { if (transaction && !transaction.finished) await transaction.rollback(); } catch (_) {}
-
+        
         console.error('Update appointment status error:', error);
         console.log('[TRACE] Exception caught in updateAppointmentStatus:', error.message);
-
+        
         const debugInfo = {
             id: req.params.id,
             currentStatus: appointment ? appointment.status : null,
@@ -2529,7 +2629,7 @@ exports.updatePaymentStatus = async (req, res) => {
         const tenantId = req.tenantId;
         const { id } = req.params;
         const { paymentStatus, paymentMethod, amount, paymentAllocations, transactionRef, notes } = req.body;
-
+        
         const validPaymentStatuses = [
             APPOINTMENT_PAYMENT_STATUS.PENDING,
             APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID,
@@ -2611,39 +2711,8 @@ exports.updatePaymentStatus = async (req, res) => {
             transaction
         });
 
-        // Ensure the explicitly requested paymentStatus is applied if processAppointmentPayment didn't handle it
-        if (req.body.paymentStatus && req.body.paymentStatus !== updatedAppt.paymentStatus) {
-            updatedAppt.paymentStatus = req.body.paymentStatus;
-            if (req.body.paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) {
-                updatedAppt.totalPaid = updatedAppt.price;
-                updatedAppt.paidAt = updatedAppt.paidAt || new Date();
-            } else if (req.body.paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING || req.body.paymentStatus === APPOINTMENT_PAYMENT_STATUS.REFUNDED) {
-                updatedAppt.totalPaid = 0;
-            }
-        }
-
         Object.assign(appointment, updatedAppt.dataValues || updatedAppt);
         attachCanonicalFinancialState(appointment);
-        await appointment.save({ transaction });
-
-        const linkedAppointments = appointment.bookingSessionId && appointment.bookingSession?.appointments
-            ? appointment.bookingSession.appointments.filter(a => a.id !== appointment.id)
-            : [];
-
-        for (const linked of linkedAppointments) {
-            linked.paymentStatus = appointment.paymentStatus;
-            
-            // Sync canonical payment fields across the chain to preserve data integrity
-            if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.FULLY_PAID) {
-                linked.totalPaid = linked.price;
-                linked.paidAt = appointment.paidAt || linked.paidAt || new Date();
-                if (appointment.paymentMethod) linked.paymentMethod = appointment.paymentMethod;
-            } else if (appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.PENDING || appointment.paymentStatus === APPOINTMENT_PAYMENT_STATUS.REFUNDED) {
-                linked.totalPaid = 0;
-            }
-            
-            await linked.save({ transaction });
-        }
 
         await transaction.commit();
 
@@ -2796,23 +2865,33 @@ exports.reassignAppointmentStaff = async (req, res) => {
             });
         }
 
-        const durationMinutes = Math.max(15, Math.round((new Date(appointment.endTime).getTime() - new Date(appointment.startTime).getTime()) / 60000));
+        const hasConflict = await bookingService.hasConflict(
+            staffId,
+            new Date(appointment.startTime),
+            new Date(appointment.endTime),
+            appointment.id,
+            transaction
+        );
 
-        const schedulingDecision = await bookingService.evaluateSchedulingRequest({
-            tenantId,
-            serviceId: appointment.serviceId,
-            staffId: staffId,
-            startTime: appointment.startTime,
-            duration: durationMinutes,
-            excludeAppointmentId: appointment.id
-        }, transaction);
-
-        if (!schedulingDecision.valid) {
+        if (hasConflict) {
             await transaction.rollback();
             return res.status(409).json({
                 success: false,
-                code: schedulingDecision.reasonType || 'CONFLICT',
-                message: schedulingDecision.message || 'Selected slot is not available'
+                message: 'Selected staff is not available for this time slot'
+            });
+        }
+
+        const slotAvailable = await ensureStaffSlotAvailable({
+            tenantId,
+            serviceId: appointment.serviceId,
+            staffId,
+            startTime: appointment.startTime
+        });
+        if (!slotAvailable) {
+            await transaction.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Selected staff is not available for this time slot'
             });
         }
 
@@ -3019,21 +3098,33 @@ exports.rescheduleAppointment = async (req, res) => {
             Math.max(15, Math.round((new Date(appointment.endTime).getTime() - new Date(appointment.startTime).getTime()) / 60000));
         const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
 
-        const schedulingDecision = await bookingService.evaluateSchedulingRequest({
-            tenantId,
-            serviceId: appointment.serviceId,
-            staffId: requestedStaffId,
-            startTime: requestedStart,
-            duration: durationMinutes,
-            excludeAppointmentId: appointment.id
-        }, transaction);
+        const hasConflict = await bookingService.hasConflict(
+            requestedStaffId,
+            requestedStart,
+            requestedEnd,
+            appointment.id,
+            transaction
+        );
 
-        if (!schedulingDecision.valid) {
+        if (hasConflict) {
             await transaction.rollback();
             return res.status(409).json({
                 success: false,
-                code: schedulingDecision.reasonType || 'CONFLICT',
-                message: schedulingDecision.message || 'Selected slot is not available'
+                message: 'Selected time slot is no longer available'
+            });
+        }
+
+        const slotAvailable = await ensureStaffSlotAvailable({
+            tenantId,
+            serviceId: appointment.serviceId,
+            staffId: requestedStaffId,
+            startTime: requestedStart
+        });
+        if (!slotAvailable) {
+            await transaction.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Selected time slot is no longer available'
             });
         }
 
@@ -3288,21 +3379,33 @@ exports.reassignRescheduleAppointment = async (req, res) => {
         const durationMinutes = Math.max(15, Math.round((currentEnd.getTime() - currentStart.getTime()) / 60000));
         const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
 
-        const schedulingDecision = await bookingService.evaluateSchedulingRequest({
-            tenantId,
-            serviceId: appointment.serviceId,
-            staffId: staffId,
-            startTime: requestedStart,
-            duration: durationMinutes,
-            excludeAppointmentId: appointment.id
-        }, transaction);
+        const hasConflict = await bookingService.hasConflict(
+            staffId,
+            requestedStart,
+            requestedEnd,
+            appointment.id,
+            transaction
+        );
 
-        if (!schedulingDecision.valid) {
+        if (hasConflict) {
             await transaction.rollback();
             return res.status(409).json({
                 success: false,
-                code: schedulingDecision.reasonType || 'CONFLICT',
-                message: schedulingDecision.message || 'Selected slot is not available'
+                message: 'Selected slot is not available'
+            });
+        }
+
+        const slotAvailable = await ensureStaffSlotAvailable({
+            tenantId,
+            serviceId: appointment.serviceId,
+            staffId,
+            startTime: requestedStart
+        });
+        if (!slotAvailable) {
+            await transaction.rollback();
+            return res.status(409).json({
+                success: false,
+                message: 'Selected slot is not available'
             });
         }
 
@@ -3418,7 +3521,7 @@ exports.getAppointmentStats = async (req, res) => {
         const { startDate, endDate } = req.query;
 
         const where = {};
-
+        
         Object.assign(where, buildDateRangeWhere('startTime', startDate, endDate));
 
         // Get appointments with service filter

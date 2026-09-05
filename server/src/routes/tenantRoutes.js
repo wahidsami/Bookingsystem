@@ -37,7 +37,8 @@ const { buildTenantSupportContext } = require('../middleware/supportContext');
 const { createLimiter } = require('../middleware/rateLimiter');
 const {
     requireActiveSubscription,
-    checkResourceLimit
+    checkResourceLimit,
+    requireFeature
 } = require('../middleware/checkSubscription');
 const multer = require('multer');
 const path = require('path');
@@ -148,6 +149,8 @@ router.get('/packages/:id', tenantPackageController.getPackage);
 router.post(
     '/packages',
     requireActiveSubscription,
+    requireFeature('hasServicePackages'),
+    checkResourceLimit('package'),
     tenantPackageController.uploadImage,
     tenantPackageController.createPackage
 );

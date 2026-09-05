@@ -42,12 +42,12 @@ module.exports = (sequelize, DataTypes) => {
             });
             Appointment.belongsTo(models.ServicePackage, {
                 foreignKey: 'packageId',
-                as: 'package',
+                as: 'servicePackage',
                 required: false
             });
             Appointment.belongsTo(models.ServicePackageItem, {
                 foreignKey: 'packageItemId',
-                as: 'packageItem',
+                as: 'servicePackageItem',
                 required: false
             });
         }
@@ -206,24 +206,6 @@ module.exports = (sequelize, DataTypes) => {
             },
             comment: 'Shared booking session for multi-service checkouts'
         },
-        packageId: {
-            type: DataTypes.UUID,
-            allowNull: true,
-            references: {
-                model: 'service_packages',
-                key: 'id'
-            },
-            comment: 'Source package template identifier if booked via a package'
-        },
-        packageItemId: {
-            type: DataTypes.UUID,
-            allowNull: true,
-            references: {
-                model: 'service_package_items',
-                key: 'id'
-            },
-            comment: 'Source package item identifier if booked via a package'
-        },
         bookingReference: {
             type: DataTypes.STRING(40),
             allowNull: true,
@@ -234,6 +216,34 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: 0,
             comment: 'Zero-based index of the item within a booking session'
+        },
+        packageId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'service_packages',
+                key: 'id'
+            }
+        },
+        packageItemId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'service_package_items',
+                key: 'id'
+            }
+        },
+        packageSequenceOrder: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        },
+        packageSnapshot: {
+            type: DataTypes.JSONB,
+            allowNull: true
+        },
+        packageItemSnapshot: {
+            type: DataTypes.JSONB,
+            allowNull: true
         },
         startTime: {
             type: DataTypes.DATE,
