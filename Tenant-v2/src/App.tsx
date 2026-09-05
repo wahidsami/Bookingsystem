@@ -654,7 +654,7 @@ export default function App() {
         onSelectView={handleSelectView}
         favoritePages={favoritePages}
         accessibleMarketingModules={accessibleMarketingModules}
-        hasServicePackages={packageEntitlements?.hasServicePackages}
+        hasServicePackages={hasServicePackagesEntitlement(packageEntitlements)}
       />
 
       {/* Main Workspace Frame */}
