@@ -789,6 +789,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           images: Array.isArray(p.images) ? p.images : (p.images ? [p.images] : [])
         })));
 
+        const packages = pkgRes?.packages || (pkgRes as any)?.data?.packages || [];
+        setServicePackages(packages);
+
         if (employees.length > 0) {
           setCurrentStaffId((current) => employees.some((emp: any) => emp.id === current) ? current : employees[0].id);
           setBlockStaffId((current) => employees.some((emp: any) => emp.id === current) ? current : employees[0].id);

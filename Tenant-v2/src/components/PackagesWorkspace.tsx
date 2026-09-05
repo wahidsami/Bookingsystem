@@ -443,7 +443,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                                 : (selectedService.employeeAssignments || []).map((id: any) => String(id));
                               return allowedStaff.includes(String(emp.id));
                             }).map(emp => (
-                              <option className="bg-white text-slate-900" key={emp.id} value={emp.id}>{isRtl ? emp.name_ar : emp.name_en}</option>
+                              <option className="bg-white text-slate-900" key={emp.id} value={emp.id}>{isRtl ? (emp.nameAr || emp.name_ar || emp.name) : (emp.nameEn || emp.name_en || emp.name)}</option>
                             ))}
                           </select>
                         </div>
