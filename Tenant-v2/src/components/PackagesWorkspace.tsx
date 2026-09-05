@@ -214,7 +214,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
             </div>
             <button
               onClick={() => openForm('add')}
-              className="px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/30 hover:shadow-primary/40 hover:-translate-y-0.5 transition flex items-center gap-2"
+              className="px-6 py-3 bg-zinc-950 text-white rounded-2xl font-bold shadow-lg shadow-zinc-950/30 hover:shadow-zinc-950/40 hover:-translate-y-0.5 transition flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
               <span>{isRtl ? 'إضافة باقة' : 'Add Package'}</span>
@@ -293,7 +293,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
               : (isRtl ? 'تعديل الباقة' : 'Edit Package')}
           </h2>
         </div>
-        <button onClick={savePackage} className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition shadow-sm flex items-center gap-2">
+        <button onClick={savePackage} className="px-6 py-2.5 bg-zinc-950 text-white rounded-xl font-bold hover:bg-zinc-900 transition shadow-sm flex items-center gap-2">
           <Save className="w-4 h-4" />
           <span>{isRtl ? 'حفظ' : 'Save'}</span>
         </button>
@@ -386,8 +386,20 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">{isRtl ? 'الخدمة' : 'Service'}</label>
                           <select 
                             value={item.serviceId} 
-                            onChange={e => updateItem(index, 'serviceId', e.target.value)}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                            onChange={e => {
+                              const newServiceId = e.target.value;
+                              updateItem(index, 'serviceId', newServiceId);
+
+                              // Clear staff if they are not valid for the new service
+                              const newService = services.find(s => s.id === newServiceId);
+                              if (newService && item.defaultStaffId) {
+                                const allowedStaff = (newService.employeeAssignments || []).map((id: any) => String(id));
+                                if (!allowedStaff.includes(String(item.defaultStaffId))) {
+                                  updateItem(index, 'defaultStaffId', '');
+                                }
+                              }
+                            }}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-slate-900"
                           >
                             <option value="">{isRtl ? '-- اختر خدمة --' : '-- Select Service --'}</option>
                             {services.map(s => (
@@ -404,7 +416,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                             value={item.variantId} 
                             onChange={e => updateItem(index, 'variantId', e.target.value)}
                             disabled={!hasVariants}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none disabled:bg-slate-100 disabled:opacity-60"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none disabled:bg-slate-100 disabled:opacity-60 text-slate-900"
                           >
                             <option value="">{isRtl ? '-- أساسي --' : '-- Base --'}</option>
                             {hasVariants && selectedService.variants.map((v: any) => (
@@ -418,10 +430,13 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                           <select 
                             value={item.defaultStaffId} 
                             onChange={e => updateItem(index, 'defaultStaffId', e.target.value)}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-slate-900"
                           >
                             <option value="">{isRtl ? '-- أي موظف --' : '-- Any Staff --'}</option>
-                            {employees.map(emp => (
+                            {employees.filter(emp => {
+                              if (!selectedService || !selectedService.employeeAssignments) return false;
+                              return selectedService.employeeAssignments.map((id: any) => String(id)).includes(String(emp.id));
+                            }).map(emp => (
                               <option key={emp.id} value={emp.id}>{isRtl ? emp.name_ar : emp.name_en}</option>
                             ))}
                           </select>
@@ -469,4 +484,4 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
       </div>
     </div>
   );
-}
+}\n
