@@ -484,4 +484,4 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
       </div>
     </div>
   );
-}\n
+}
