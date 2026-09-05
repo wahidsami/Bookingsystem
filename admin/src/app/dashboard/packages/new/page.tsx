@@ -21,6 +21,7 @@ const FEATURES_PRICE_MAP: Record<string, { featureKey: string; isBoolean?: boole
     reports: { featureKey: 'reports', isBoolean: true },
     payroll: { featureKey: 'payroll', isBoolean: true },
     publicPageCustomization: { featureKey: 'publicPageCustomization', isBoolean: true },
+    hasServicePackages: { featureKey: 'hasServicePackages', isBoolean: true },
     aiConsultant: { featureKey: 'aiConsultant', isBoolean: true },
     whatsappNotifications: { featureKey: 'whatsappNotifications' },
     inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
@@ -47,6 +48,8 @@ export default function NewPackagePage() {
         }).catch(() => { });
     }, []);
 
+    const [previousLimits, setPreviousLimits] = useState<Record<string, string>>({});
+
     const [formData, setFormData] = useState({
         name: '',
         name_ar: '',
@@ -63,9 +66,11 @@ export default function NewPackagePage() {
         maxStaff: '5',
         maxServices: '20',
         maxProducts: '10',
+        maxPackages: '-1',
         storageGB: '2',
         // Features
         hasProductsAndOrders: false,
+        hasServicePackages: false,
         hasInternalMessaging: false,
         reports: false,
         payroll: false,
@@ -147,10 +152,12 @@ export default function NewPackagePage() {
                 maxProducts: formData.hasProductsAndOrders
                     ? (formData.maxProducts === '-1' ? -1 : parseInt(formData.maxProducts))
                     : 0,
+                maxPackages: formData.maxPackages === '-1' ? -1 : parseInt(formData.maxPackages),
                 storageGB: parseInt(formData.storageGB),
                 // Feature Booleans
                 hasSubscriptionFee: subscriptionFeeAmount > 0,
                 hasProductsAndOrders: formData.hasProductsAndOrders,
+                hasServicePackages: formData.hasServicePackages,
                 hasInternalMessaging: formData.hasInternalMessaging,
                 reports: formData.reports,
                 payroll: formData.payroll,
@@ -406,27 +413,52 @@ export default function NewPackagePage() {
                                     { key: 'maxStaff', label: 'Max Staff' },
                                     { key: 'maxServices', label: 'Max Services' },
                                     { key: 'maxProducts', label: 'Max Products' },
+                                    { key: 'maxPackages', label: 'Max Packages' },
                                     { key: 'storageGB', label: 'Storage (GB)' },
                                 ].map((field) => {
+                                    const supportsUnlimited = ['maxBookingsPerMonth', 'maxStaff', 'maxServices', 'maxProducts', 'maxPackages'].includes(field.key);
                                     const qty = parseInt((formData as any)[field.key] || '0');
                                     const cost = getFieldCost(field.key);
                                     const isUnlimited = qty === -1;
                                     const isDisabled = field.key === 'maxProducts' && !formData.hasProductsAndOrders;
+
                                     return (
-                                        <div key={field.key}>
-                                            <label className="block text-sm font-medium text-dark-300 mb-1">
-                                                {field.label}
-                                            </label>
+                                        <div key={field.key} className="space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <label className="block text-sm font-medium text-dark-300">
+                                                    {field.label}
+                                                </label>
+                                                {supportsUnlimited && (
+                                                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-dark-300 hover:text-white transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isUnlimited}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setPreviousLimits({ ...previousLimits, [field.key]: (formData as any)[field.key] });
+                                                                    setFormData({ ...formData, [field.key]: '-1' });
+                                                                } else {
+                                                                    setFormData({ ...formData, [field.key]: previousLimits[field.key] || '' });
+                                                                }
+                                                            }}
+                                                            disabled={isDisabled}
+                                                            className="w-3.5 h-3.5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500 bg-dark-700 border-dark-600 disabled:opacity-50"
+                                                        />
+                                                        Unlimited
+                                                    </label>
+                                                )}
+                                            </div>
                                             <input
                                                 type="number"
-                                                value={isDisabled ? '0' : (formData as any)[field.key]}
+                                                value={isDisabled ? '0' : (isUnlimited ? '' : (formData as any)[field.key])}
                                                 onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                                                disabled={isDisabled}
+                                                disabled={isDisabled || isUnlimited}
+                                                placeholder={isUnlimited ? "Unlimited (-1)" : "0"}
                                                 className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                                             />
                                             <div className="mt-1 text-xs">
                                                 {isUnlimited ? (
-                                                    <span className="text-yellow-400">∞ Unlimited</span>
+                                                    <span className="text-yellow-400">∞ Unlimited Included</span>
                                                 ) : cost > 0 ? (
                                                     <span className="text-green-400">SAR {cost.toFixed(2)}</span>
                                                 ) : (
@@ -456,6 +488,7 @@ export default function NewPackagePage() {
                                     { key: 'reports', label: 'Reports & Analytics' },
                                     { key: 'payroll', label: 'Payroll Management' },
                                     { key: 'publicPageCustomization', label: 'Public Page Customization' },
+                                    { key: 'hasServicePackages', label: 'Service Packages' },
                                     { key: 'aiConsultant', label: 'AI Consultant' },
                                 ].map((feature) => {
                                     const cost = getFeatureItemCost(feature.key);
