@@ -21,39 +21,9 @@ const FEATURES_PRICE_MAP: Record<string, { featureKey: string; isBoolean?: boole
     reports: { featureKey: 'reports', isBoolean: true },
     payroll: { featureKey: 'payroll', isBoolean: true },
     publicPageCustomization: { featureKey: 'publicPageCustomization', isBoolean: true },
+    hasServicePackages: { featureKey: 'hasServicePackages', isBoolean: true },
     aiConsultant: { featureKey: 'aiConsultant', isBoolean: true },
     whatsappNotifications: { featureKey: 'whatsappNotifications' },
-    inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
-    aiContentAssistant: { featureKey: 'aiContentAssistant' },
-    promotionalEmails: { featureKey: 'promotionalEmails' },
-    searchRankingBoost: { featureKey: 'searchRankingBoost' },
-    newToRefahDays: { featureKey: 'newToRefah' }, // Paid per day when "hasNewToRefah" is true
-    maxHotDeals: { featureKey: 'hotDeals' },
-};
-
-export default function NewPackagePage() {
-    const router = useRouter();
-    const [loading, setLoading] = useState(false);
-    const [featurePrices, setFeaturePrices] = useState<Record<string, number>>({});
-
-    // Fetch feature prices on mount
-    useEffect(() => {
-        adminApi.getFeaturePricing().then((res) => {
-            if (res.success) {
-                const priceMap: Record<string, number> = {};
-                res.features.forEach((f: any) => { priceMap[f.featureKey] = parseFloat(f.unitPrice); });
-                setFeaturePrices(priceMap);
-            }
-        }).catch(() => { });
-    }, []);
-
-    const [formData, setFormData] = useState({
-        name: '',
-        name_ar: '',
-        slug: '',
-        description: '',
-        description_ar: '',
-        platformCommission: '5.00',
     inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
     aiContentAssistant: { featureKey: 'aiContentAssistant' },
     promotionalEmails: { featureKey: 'promotionalEmails' },
@@ -119,6 +89,7 @@ export default function NewPackagePage() {
         featuredProducts: '0'
     });
 
+    const [previousLimits, setPreviousLimits] = useState<Record<string, string>>({});
     // Calculate cost for a single resource field
     const getFieldCost = (fieldKey: string): number => {
         const mapping = RESOURCE_PRICE_MAP[fieldKey];
@@ -180,8 +151,12 @@ export default function NewPackagePage() {
                 maxProducts: formData.hasProductsAndOrders
                     ? (formData.maxProducts === '-1' ? -1 : parseInt(formData.maxProducts))
                     : 0,
+                maxPackages: formData.hasServicePackages
+                    ? (formData.maxPackages === '-1' ? -1 : parseInt(formData.maxPackages))
+                    : -1, // Technically, if not enabled, limits don't matter, but preserve standard convention
                 storageGB: parseInt(formData.storageGB),
                 // Feature Booleans
+                hasServicePackages: formData.hasServicePackages,
                 hasSubscriptionFee: subscriptionFeeAmount > 0,
                 hasProductsAndOrders: formData.hasProductsAndOrders,
                 hasInternalMessaging: formData.hasInternalMessaging,
@@ -442,25 +417,49 @@ export default function NewPackagePage() {
                                     { key: 'maxPackages', label: 'Max Packages' },
                                     { key: 'storageGB', label: 'Storage (GB)' },
                                 ].map((field) => {
+                                    const supportsUnlimited = ['maxBookingsPerMonth', 'maxStaff', 'maxServices', 'maxProducts', 'maxPackages'].includes(field.key);
                                     const qty = parseInt((formData as any)[field.key] || '0');
                                     const cost = getFieldCost(field.key);
                                     const isUnlimited = qty === -1;
                                     const isDisabled = field.key === 'maxProducts' && !formData.hasProductsAndOrders;
+
                                     return (
-                                        <div key={field.key}>
-                                            <label className="block text-sm font-medium text-dark-300 mb-1">
-                                                {field.label}
-                                            </label>
+                                        <div key={field.key} className="space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <label className="block text-sm font-medium text-dark-300">
+                                                    {field.label}
+                                                </label>
+                                                {supportsUnlimited && (
+                                                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-dark-300 hover:text-white transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isUnlimited}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setPreviousLimits({ ...previousLimits, [field.key]: (formData as any)[field.key] });
+                                                                    setFormData({ ...formData, [field.key]: '-1' });
+                                                                } else {
+                                                                    setFormData({ ...formData, [field.key]: previousLimits[field.key] || '' });
+                                                                }
+                                                            }}
+                                                            disabled={isDisabled}
+                                                            className="w-3.5 h-3.5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500 bg-dark-700 border-dark-600 disabled:opacity-50"
+                                                        />
+                                                        Unlimited
+                                                    </label>
+                                                )}
+                                            </div>
                                             <input
                                                 type="number"
-                                                value={isDisabled ? '0' : (formData as any)[field.key]}
+                                                value={isDisabled ? '0' : (isUnlimited ? '' : (formData as any)[field.key])}
                                                 onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                                                disabled={isDisabled}
+                                                disabled={isDisabled || isUnlimited}
+                                                placeholder={isUnlimited ? "Unlimited (-1)" : "0"}
                                                 className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                                             />
                                             <div className="mt-1 text-xs">
                                                 {isUnlimited ? (
-                                                    <span className="text-yellow-400">∞ Unlimited</span>
+                                                    <span className="text-yellow-400">∞ Unlimited Included</span>
                                                 ) : cost > 0 ? (
                                                     <span className="text-green-400">SAR {cost.toFixed(2)}</span>
                                                 ) : (

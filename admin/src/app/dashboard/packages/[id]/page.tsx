@@ -20,6 +20,7 @@ const FEATURES_PRICE_MAP: Record<string, { featureKey: string; isBoolean?: boole
     reports: { featureKey: 'reports', isBoolean: true },
     payroll: { featureKey: 'payroll', isBoolean: true },
     publicPageCustomization: { featureKey: 'publicPageCustomization', isBoolean: true },
+    hasServicePackages: { featureKey: 'hasServicePackages', isBoolean: true },
     aiConsultant: { featureKey: 'aiConsultant', isBoolean: true },
     whatsappNotifications: { featureKey: 'whatsappNotifications' },
     inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
@@ -30,19 +31,6 @@ const FEATURES_PRICE_MAP: Record<string, { featureKey: string; isBoolean?: boole
     maxHotDeals: { featureKey: 'hotDeals' },
 };
 
-const defaultFormData = {
-    name: '',
-    name_ar: '',
-    slug: '',
-    description: '',
-    description_ar: '',
-    inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
-    aiContentAssistant: { featureKey: 'aiContentAssistant' },
-    promotionalEmails: { featureKey: 'promotionalEmails' },
-    searchRankingBoost: { featureKey: 'searchRankingBoost' },
-    newToRefahDays: { featureKey: 'newToRefah' },
-    maxHotDeals: { featureKey: 'hotDeals' },
-};
 
 const defaultFormData = {
     name: '',
@@ -91,6 +79,7 @@ export default function EditPackagePage() {
     const [fetching, setFetching] = useState(true);
     const [featurePrices, setFeaturePrices] = useState<Record<string, number>>({});
     const [formData, setFormData] = useState(defaultFormData);
+    const [previousLimits, setPreviousLimits] = useState<Record<string, string>>({});
 
     useEffect(() => {
         adminApi.getFeaturePricing().then((res) => {
@@ -211,7 +200,11 @@ export default function EditPackagePage() {
                 maxProducts: formData.hasProductsAndOrders
                     ? (formData.maxProducts === '-1' ? -1 : parseInt(formData.maxProducts))
                     : 0,
+                maxPackages: formData.hasServicePackages
+                    ? (formData.maxPackages === '-1' ? -1 : parseInt(formData.maxPackages))
+                    : -1, // Technically, if not enabled, limits don't matter, but preserve standard convention
                 storageGB: parseInt(formData.storageGB),
+                hasServicePackages: formData.hasServicePackages,
                 hasSubscriptionFee: subscriptionFeeAmount > 0,
                 hasProductsAndOrders: formData.hasProductsAndOrders,
                 hasInternalMessaging: formData.hasInternalMessaging,
@@ -453,21 +446,33 @@ export default function EditPackagePage() {
                                     { key: 'maxPackages', label: 'Max Packages' },
                                     { key: 'storageGB', label: 'Storage (GB)' },
                                 ].map((field) => {
+                                    const supportsUnlimited = ['maxBookingsPerMonth', 'maxStaff', 'maxServices', 'maxProducts', 'maxPackages'].includes(field.key);
                                     const qty = parseInt((formData as any)[field.key] || '0');
                                     const cost = getFieldCost(field.key);
                                     const isUnlimited = qty === -1;
                                     const isDisabled = field.key === 'maxProducts' && !formData.hasProductsAndOrders;
+
                                     return (
-                                        <div key={field.key}>
-                                            <div className="flex justify-between items-end mb-1">
-                                                <label className="block text-sm font-medium text-dark-300">{field.label}</label>
-                                                {field.key !== 'storageGB' && (
-                                                    <label className="flex items-center text-xs text-dark-400 cursor-pointer">
+                                        <div key={field.key} className="space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <label className="block text-sm font-medium text-dark-300">
+                                                    {field.label}
+                                                </label>
+                                                {supportsUnlimited && (
+                                                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-dark-300 hover:text-white transition-colors">
                                                         <input
                                                             type="checkbox"
                                                             checked={isUnlimited}
-                                                            onChange={(e) => setFormData({ ...formData, [field.key]: e.target.checked ? '-1' : '0' })}
-                                                            className="mr-1 rounded bg-dark-700 border-dark-600 text-purple-500 focus:ring-purple-500"
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setPreviousLimits({ ...previousLimits, [field.key]: (formData as any)[field.key] });
+                                                                    setFormData({ ...formData, [field.key]: '-1' });
+                                                                } else {
+                                                                    setFormData({ ...formData, [field.key]: previousLimits[field.key] || '' });
+                                                                }
+                                                            }}
+                                                            disabled={isDisabled}
+                                                            className="w-3.5 h-3.5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500 bg-dark-700 border-dark-600 disabled:opacity-50"
                                                         />
                                                         Unlimited
                                                     </label>
@@ -475,13 +480,20 @@ export default function EditPackagePage() {
                                             </div>
                                             <input
                                                 type="number"
-                                                value={isDisabled ? '0' : (isUnlimited ? '-1' : (formData as any)[field.key])}
+                                                value={isDisabled ? '0' : (isUnlimited ? '' : (formData as any)[field.key])}
                                                 onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
                                                 disabled={isDisabled || isUnlimited}
+                                                placeholder={isUnlimited ? "Unlimited (-1)" : "0"}
                                                 className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                                             />
                                             <div className="mt-1 text-xs">
-                                                {isUnlimited ? <span className="text-yellow-400">∞ Unlimited</span> : cost > 0 ? <span className="text-green-400">SAR {cost.toFixed(2)}</span> : <span className="text-dark-500">SAR 0.00</span>}
+                                                {isUnlimited ? (
+                                                    <span className="text-yellow-400">∞ Unlimited Included</span>
+                                                ) : cost > 0 ? (
+                                                    <span className="text-green-400">SAR {cost.toFixed(2)}</span>
+                                                ) : (
+                                                    <span className="text-dark-500">SAR 0.00</span>
+                                                )}
                                             </div>
                                         </div>
                                     );
