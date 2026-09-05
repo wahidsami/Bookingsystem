@@ -281,8 +281,8 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
   // FORM VIEW
   // ----------------------------------------------------
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative">
-      <div className="border-b border-slate-200 bg-white px-6 py-4 flex items-center justify-between sticky top-0 z-20">
+    <div className="pb-24">
+      <div className="bg-white border-b border-slate-200 px-6 py-6 flex flex-wrap items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-4">
           <button onClick={closeForm} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
             <ArrowLeft className={`w-5 h-5 ${isRtl ? 'rotate-180' : ''}`} />
@@ -299,8 +299,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 sm:p-10">
-        <div className="max-w-4xl mx-auto space-y-8">
+      <div className="px-6 sm:px-10 max-w-5xl mx-auto space-y-8">
           
           {/* Header Info */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
@@ -401,9 +400,9 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                             }}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-slate-900"
                           >
-                            <option value="">{isRtl ? '-- اختر خدمة --' : '-- Select Service --'}</option>
+                            <option className="bg-white text-slate-900" value="">{isRtl ? '-- اختر خدمة --' : '-- Select Service --'}</option>
                             {services.map(s => (
-                              <option key={s.id} value={s.id}>{isRtl ? s.name_ar : s.name_en}</option>
+                              <option className="bg-white text-slate-900" key={s.id} value={s.id}>{isRtl ? s.name_ar : s.name_en}</option>
                             ))}
                           </select>
                         </div>
@@ -418,9 +417,9 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                             disabled={!hasVariants}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none disabled:bg-slate-100 disabled:opacity-60 text-slate-900"
                           >
-                            <option value="">{isRtl ? '-- أساسي --' : '-- Base --'}</option>
+                            <option className="bg-white text-slate-900" value="">{isRtl ? '-- أساسي --' : '-- Base --'}</option>
                             {hasVariants && selectedService.variants.map((v: any) => (
-                              <option key={v.id} value={v.id}>{isRtl ? v.name_ar : v.name_en}</option>
+                              <option className="bg-white text-slate-900" key={v.id} value={v.id}>{isRtl ? v.name_ar : v.name_en}</option>
                             ))}
                           </select>
                         </div>
@@ -432,12 +431,12 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                             onChange={e => updateItem(index, 'defaultStaffId', e.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-slate-900"
                           >
-                            <option value="">{isRtl ? '-- أي موظف --' : '-- Any Staff --'}</option>
+                            <option className="bg-white text-slate-900" value="">{isRtl ? '-- أي موظف --' : '-- Any Staff --'}</option>
                             {employees.filter(emp => {
                               if (!selectedService || !selectedService.employeeAssignments) return false;
                               return selectedService.employeeAssignments.map((id: any) => String(id)).includes(String(emp.id));
                             }).map(emp => (
-                              <option key={emp.id} value={emp.id}>{isRtl ? emp.name_ar : emp.name_en}</option>
+                              <option className="bg-white text-slate-900" key={emp.id} value={emp.id}>{isRtl ? emp.name_ar : emp.name_en}</option>
                             ))}
                           </select>
                         </div>
@@ -461,7 +460,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
             </div>
           </div>
         </div>
-      </div>
+
 
       {/* Toasts */}
       <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">
