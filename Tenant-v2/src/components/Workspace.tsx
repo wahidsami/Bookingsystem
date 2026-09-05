@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import {
-  TrendingUp, Users, Calendar, Sparkles, Plus, Search, MapPin,
-  Clock, Check, X, ShieldAlert, Award, Star, Gift, Package,
-  Receipt, ShoppingBag, CreditCard, ChevronRight, MessageSquare,
+import { 
+  TrendingUp, Users, Calendar, Sparkles, Plus, Search, MapPin, 
+  Clock, Check, X, ShieldAlert, Award, Star, Gift, Package, 
+  Receipt, ShoppingBag, CreditCard, ChevronRight, MessageSquare, 
   AlertCircle, Sparkle, ArrowLeft, ArrowRight, Save, Trash2, ShieldCheck, HelpCircle
 } from 'lucide-react';
 import { Language, ViewType, QuickLaunchRequest } from '../types';
 import { translations, navigationItems } from '../data/translations';
-import {
-  mockCustomers, mockEmployees,
+import { 
+  mockCustomers, mockEmployees, 
   mockServices, mockTransactions, mockCampaigns,
   mockGiftCards, mockLoyalty, mockReviews
 } from '../data/mockData';
@@ -20,7 +20,6 @@ import OperationsIntelligenceReport from './reports/OperationsIntelligenceReport
 import CustomersWorkspace from './CustomersWorkspace';
 import TeamsWorkspace from './TeamsWorkspace';
 import ServicesWorkspace from './ServicesWorkspace';
-import PackagesWorkspace from './PackagesWorkspace';
 import ProductsWorkspace from './ProductsWorkspace';
 import HotDealsWorkspace from './HotDealsWorkspace';
 import CustomerPushNotificationsWorkspace from './CustomerPushNotificationsWorkspace';
@@ -30,6 +29,8 @@ import ReviewsWorkspace from './ReviewsWorkspace';
 import MessagesWorkspace from './MessagesWorkspace';
 import SupportWorkspace from './SupportWorkspace';
 import SettingsWorkspace from './SettingsWorkspace';
+import SubscriptionWorkspace from './subscription/SubscriptionWorkspace';
+import BillingWorkspace from './subscription/BillingWorkspace';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import {
   buildTenantPlanSummary,
@@ -42,7 +43,7 @@ interface WorkspaceProps {
   lang: Language;
   onQuickAction: (type: any) => void;
   quickLaunchRequest?: QuickLaunchRequest | null;
-
+  
   // Personalization props
   darkMode?: boolean;
   favoritePages?: ViewType[];
@@ -58,7 +59,7 @@ interface WorkspaceProps {
   onChangeAccessibleMarketingModules?: (modules: Record<string, boolean>) => void;
 }
 
-export default function Workspace({
+export default function Workspace({ 
   view,
   lang,
   onQuickAction,
@@ -143,7 +144,7 @@ export default function Workspace({
     const pct = ((today - yesterday) / yesterday) * 100;
     return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
   };
-
+  
   const revenueGrowth = dashboardStats ? computeGrowth(dashboardStats.todaysRevenue, dashboardStats.yesterdayRevenue) : '0%';
   const bookingsGrowth = dashboardStats ? computeGrowth(dashboardStats.todaysBookings, dashboardStats.yesterdayBookings) : '0%';
   const planSummary = buildTenantPlanSummary({
@@ -225,8 +226,8 @@ export default function Workspace({
       return;
     }
     setPosSuccess(
-      isRtl
-        ? `تم إتمام عملية الدفع بنجاح بقيمة ${getPosTotal()} ر.س وطباعة الفاتورة والربط مع ZATCA!`
+      isRtl 
+        ? `تم إتمام عملية الدفع بنجاح بقيمة ${getPosTotal()} ر.س وطباعة الفاتورة والربط مع ZATCA!` 
         : `Payment of ${getPosTotal()} SAR completed successfully. e-Invoice cleared with ZATCA!`
     );
     setPosCart([]);
@@ -319,7 +320,7 @@ export default function Workspace({
 
   return (
     <div className="space-y-6" id="workspace-container">
-
+      
       {/* View Header with dynamic favoriting capability (Personalization Hook) */}
       {view !== 'appointments' && (
       <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 rounded-2xl border transition-colors duration-200 shadow-sm ${
@@ -332,12 +333,12 @@ export default function Workspace({
                 {(() => {
                   const navItem = navigationItems.find(item => item.id === view);
                   const viewName = isRtl ? (navItem?.labelAr || view) : (navItem?.labelEn || view);
-                  return isRtl
+                  return isRtl 
                     ? translations.ar.emptyWorkspaceTitle.replace('{name}', viewName)
                     : translations.en.emptyWorkspaceTitle.replace('{name}', viewName);
                 })()}
               </span>
-
+              
               {/* Custom Saved View Indicator Badge */}
               {savedViews.some(sv => sv.view === view) && (
                 <span className="text-[9px] bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-500/10">
@@ -345,7 +346,7 @@ export default function Workspace({
                 </span>
               )}
             </h1>
-
+            
             {/* Star Favorite Button */}
             <button
               onClick={() => onToggleFavoritePage && onToggleFavoritePage(view)}
@@ -361,7 +362,7 @@ export default function Workspace({
 
         {/* Quick buttons */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-
+          
           {/* Save current view button */}
           <button
             onClick={() => setShowSavedViewModal(true)}
@@ -428,7 +429,7 @@ export default function Workspace({
       {/* 1. DASHBOARD WITH PERSONALIZED WIDGET ORDER & SAVED VIEWS */}
       {view === 'dashboard' && (
         <div className="space-y-6">
-
+          
           {/* Personalized widget grid container */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {widgetOrder.map((widgetId, index) => {
@@ -447,7 +448,7 @@ export default function Workspace({
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
                       <span className="p-2.5 bg-brand-50 dark:bg-brand-950/40 rounded-xl text-brand-600 dark:text-brand-400"><TrendingUp size={18} /></span>
-
+                      
                       {/* Widget Reordering buttons */}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0}><ArrowLeft size={10} /></button>
@@ -471,7 +472,7 @@ export default function Workspace({
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
                       <span className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl text-emerald-600 dark:text-emerald-400"><Calendar size={18} /></span>
-
+                      
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0}><ArrowLeft size={10} /></button>
                         <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1}><ArrowRight size={10} /></button>
@@ -494,7 +495,7 @@ export default function Workspace({
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
                       <span className="p-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-xl text-blue-600 dark:text-blue-400"><Users size={18} /></span>
-
+                      
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0}><ArrowLeft size={10} /></button>
                         <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1}><ArrowRight size={10} /></button>
@@ -521,7 +522,7 @@ export default function Workspace({
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
                       <span className="p-2.5 bg-rose-50 dark:bg-rose-950/40 rounded-xl text-rose-600 dark:text-rose-400"><Sparkles size={18} /></span>
-
+                      
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0}><ArrowLeft size={10} /></button>
                         <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1}><ArrowRight size={10} /></button>
@@ -545,17 +546,17 @@ export default function Workspace({
               </h3>
               <div className="flex flex-wrap gap-2.5">
                 {savedViews.map((sv) => (
-                  <div
+                  <div 
                     key={sv.id}
                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all ${
-                      darkMode
-                        ? 'bg-zinc-850 border-zinc-750 text-zinc-200 hover:bg-zinc-800'
+                      darkMode 
+                        ? 'bg-zinc-850 border-zinc-750 text-zinc-200 hover:bg-zinc-800' 
                         : 'bg-amber-50/40 border-amber-100 text-amber-900 hover:bg-amber-50'
                     }`}
                   >
                     <span>{sv.name}</span>
                     <span className="text-[9px] bg-white/50 px-1.5 py-0.5 rounded uppercase font-mono">{sv.view}</span>
-                    <button
+                    <button 
                       onClick={() => onDeleteSavedView && onDeleteSavedView(sv.id)}
                       className="text-neutral-400 hover:text-rose-500 transition-colors ml-1"
                       title={isRtl ? 'حذف هذا المنظر' : 'Delete this saved view'}
@@ -570,7 +571,7 @@ export default function Workspace({
 
           {/* Quick Dashboard Sections */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
+            
             {/* Today's Schedule */}
             <div className={`p-6 rounded-2xl border transition-colors lg:col-span-2 ${
               darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
@@ -645,9 +646,9 @@ export default function Workspace({
 
       {/* 2. APPOINTMENTS */}
       {view === 'appointments' && (
-        <AppointmentWorkspace
-          lang={lang}
-          onQuickAction={onQuickAction}
+        <AppointmentWorkspace 
+          lang={lang} 
+          onQuickAction={onQuickAction} 
           quickLaunchRequest={quickLaunchRequest}
           onToggleFavoritePage={() => onToggleFavoritePage && onToggleFavoritePage('appointments')}
           isFavorited={isFavorited}
@@ -662,8 +663,8 @@ export default function Workspace({
 
       {/* 4. EMPLOYEES */}
       {view === 'employees' && (
-        <TeamsWorkspace
-          lang={lang}
+        <TeamsWorkspace 
+          lang={lang} 
           addEmployeeTrigger={addEmployeeTrigger}
           onAddEmployeeTriggerReset={onAddEmployeeTriggerReset}
           quickLaunchRequest={quickLaunchRequest}
@@ -675,11 +676,6 @@ export default function Workspace({
         <ServicesWorkspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
       )}
 
-      {/* 5.1 PACKAGES */}
-      {view === 'packages' && (
-        <PackagesWorkspace lang={lang} />
-      )}
-
       {/* 6. PRODUCTS */}
       {view === 'products' && (
         <ProductsWorkspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
@@ -688,17 +684,17 @@ export default function Workspace({
       {/* 7. POS (POINT OF SALE) WITH DETAILED STATES */}
       {view === 'pos' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-
+          
           {/* Catalog Selection */}
           <div className={`lg:col-span-2 p-6 rounded-2xl border transition-colors space-y-4 ${
             darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
           }`}>
             <h3 className="font-bold text-base">{isRtl ? 'سلة الخدمات والمنتجات السريعة' : 'Interactive Checkout POS Catalog'}</h3>
-
+            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {mockServices.map(srv => (
-                <div
-                  key={srv.id}
+                <div 
+                  key={srv.id} 
                   onClick={() => handleAddToPosCart({ id: srv.id, nameAr: srv.nameAr, nameEn: srv.nameEn, price: srv.price, type: 'service' })}
                   className={`p-3 border rounded-xl cursor-pointer transition-all flex justify-between items-center group ${
                     darkMode ? 'border-zinc-800 hover:border-brand-500 hover:bg-zinc-800' : 'border-neutral-100 hover:border-brand-300 hover:bg-brand-50/10'
@@ -713,8 +709,8 @@ export default function Workspace({
               ))}
 
               {liveProducts.length > 0 ? liveProducts.map(prd => (
-                <div
-                  key={prd.id}
+                <div 
+                  key={prd.id} 
                   onClick={() => prd.stock > 0 && handleAddToPosCart({ id: prd.id, nameAr: prd.nameAr, nameEn: prd.nameEn, price: prd.price, type: 'product' })}
                   className={`p-3 border rounded-xl cursor-pointer transition-all flex justify-between items-center group ${
                     prd.stock === 0 ? 'opacity-50 pointer-events-none' : ''
@@ -792,7 +788,7 @@ export default function Workspace({
                   <span>{isRtl ? 'المجموع الفرعي' : 'Subtotal'}</span>
                   <span className="font-mono">{getPosSubtotal()} {t.riyal}</span>
                 </div>
-
+                
                 {/* Simulated quick Discount */}
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-neutral-400 font-medium">{isRtl ? 'خصم ترويجي' : 'Promotional Discount'}</span>
@@ -808,7 +804,7 @@ export default function Workspace({
                   <span className="font-mono text-brand-600 dark:text-brand-400">{getPosTotal()} {t.riyal}</span>
                 </div>
 
-                <button
+                <button 
                   onClick={handleCompletePayment}
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-700 to-brand-600 hover:from-brand-800 hover:to-brand-700 text-white font-bold text-xs md:text-sm text-center shadow hover:shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
@@ -918,8 +914,8 @@ export default function Workspace({
                         <LucideIcon name={module.icon} size={22} />
                       </div>
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                        isAccessible
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        isAccessible 
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                           : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
                       }`}>
                         {isAccessible ? (isRtl ? 'متاح للوصول' : 'Accessible') : (isRtl ? 'مغلق' : 'Restricted')}
@@ -1037,134 +1033,12 @@ export default function Workspace({
 
       {/* 15. SUBSCRIPTION */}
       {view === 'subscription' && (
-        <div className={`p-6 rounded-2xl border transition-colors ${
-          darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-md'
-        }`}>
-          <div className="flex justify-between items-start mb-6 pb-4 border-b border-neutral-100 dark:border-zinc-800">
-            <div>
-              <span className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-widest">{isRtl ? 'تفاصيل باقة المنشأة' : 'REFAH SAAS TENANT BILLING PLAN'}</span>
-              <h3 className="text-lg md:text-xl font-extrabold mt-1">{currentTenantDisplay}</h3>
-            </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
-              planSummary.effectiveStatus === 'expired' ? 'bg-rose-50 text-rose-800 border-rose-200' :
-              planSummary.effectiveStatus === 'grace_period' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-              planSummary.effectiveStatus === 'expiring_soon' ? 'bg-orange-50 text-orange-800 border-orange-200' :
-              'bg-brand-50 dark:bg-brand-950/30 text-brand-800 dark:text-brand-300 border-brand-100 dark:border-brand-900'
-            }`}>
-              {isRtl ?
-                (planSummary.effectiveStatus ? `الحالة: ${planSummary.effectiveStatus}` : planSummary.status ? `الحالة: ${planSummary.status}` : 'نشط وتعمل بشكل مثالي')
-                : (planSummary.effectiveStatus ? `Status: ${planSummary.effectiveStatus.replace('_', ' ')}` : planSummary.status ? `Status: ${planSummary.status}` : 'Active & Compliant')}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-            <div className="space-y-3">
-              <div className="flex justify-between py-1.5 border-b border-neutral-50 dark:border-zinc-800">
-                <span className="font-medium text-neutral-400">{isRtl ? 'سعر الاشتراك' : 'Billing Amount'}</span>
-                <span className="font-bold font-mono">
-                  {formatTenantPlanBillingAmount(planSummary.billingAmount, planSummary.currency, planSummary.billingCycle, isRtl ? 'ar' : 'en')}
-                </span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-neutral-50 dark:border-zinc-800">
-                <span className="font-medium text-neutral-400">{isRtl ? 'الحد الأقصى لأعضاء الفريق' : 'Team Seats Allowed'}</span>
-                <span className="font-bold font-mono">{formatTenantPlanLimit(teamSeatLimit, isRtl ? 'ar' : 'en')}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-neutral-50 dark:border-zinc-800">
-                <span className="font-medium text-neutral-400">{isRtl ? 'خدمات الحجز الذاتي المدمجة' : 'Self-booking link'}</span>
-                <span className="font-bold text-emerald-600 font-sans">✓ {isRtl ? 'مفعل ومتاح لصالونك' : 'Active & Live'}</span>
-              </div>
-            </div>
-
-            <div className="bg-brand-50/50 dark:bg-brand-950/10 p-4 rounded-xl border border-brand-100 dark:border-brand-950 flex flex-col justify-between">
-              <div>
-                <p className="font-bold mb-1">{isRtl ? 'رصيد الإشعارات / التسويق' : 'Marketing & Notifications Balance'}</p>
-                <p className="text-xs text-neutral-400">
-                  {isRtl
-                    ? `الخدمات: ${formatTenantPlanLimit(serviceLimit, 'ar')} • المنتجات: ${formatTenantPlanLimit(productLimit, 'ar')} • الرسائل التسويقية: ${formatTenantPlanLimit(marketingSmsLimit, 'ar')}`
-                    : `Services: ${formatTenantPlanLimit(serviceLimit, 'en')} • Products: ${formatTenantPlanLimit(productLimit, 'en')} • Marketing SMS: ${formatTenantPlanLimit(marketingSmsLimit, 'en')}`}
-                </p>
-              </div>
-              <div className="w-full bg-neutral-200 dark:bg-zinc-800 h-2 rounded-full mt-4 overflow-hidden">
-                <div className="bg-brand-600 h-full w-[14%]" />
-              </div>
-            </div>
-          </div>
-        </div>
+        <SubscriptionWorkspace lang={lang} darkMode={darkMode} />
       )}
 
       {/* 16. BILLING */}
       {view === 'billing' && (
-        <div className={`p-6 rounded-2xl border transition-colors ${
-          darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
-        }`}>
-          <h3 className="font-bold text-base mb-4">{isRtl ? 'سجل فواتير اشتراك منصة رفاه' : 'SaaS Subscription Invoices'}</h3>
-          {billingError && (
-            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-              {billingError}
-            </div>
-          )}
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-start text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-neutral-100 dark:border-zinc-800 text-neutral-400 font-bold bg-neutral-50/50 dark:bg-zinc-950/20">
-                  <th className="p-3 text-start">{isRtl ? 'رقم الفاتورة المعتمد' : 'Invoice Reference'}</th>
-                  <th className="p-3 text-start">{isRtl ? 'فترة الفوترة' : 'Billing Cycle'}</th>
-                  <th className="p-3 text-start">{isRtl ? 'تاريخ الإصدار' : 'Issued Date'}</th>
-                  <th className="p-3 text-start">{isRtl ? 'المبلغ المستحق' : 'Amount'}</th>
-                  <th className="p-3 text-start">{isRtl ? 'حالة الدفع' : 'Payment Status'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/30">
-                {billingLoading ? (
-                  <tr>
-                    <td className="p-4 text-center text-neutral-400" colSpan={5}>
-                      {isRtl ? 'جارٍ تحميل الفواتير...' : 'Loading subscription invoices...'}
-                    </td>
-                  </tr>
-                ) : tenantBills.length > 0 ? tenantBills.map((bill) => {
-                  const billStatus = String(bill?.status || '').toLowerCase();
-                  const statusLabel = billStatus === 'paid'
-                    ? (isRtl ? 'مدفوعة' : 'Paid')
-                    : billStatus === 'unpaid'
-                      ? (isRtl ? 'غير مدفوعة' : 'Unpaid')
-                      : billStatus === 'void'
-                        ? (isRtl ? 'ملغاة' : 'Void')
-                        : billStatus || (isRtl ? 'غير معروف' : 'Unknown');
-
-                  const issuedDate = bill?.issueDate || bill?.createdAt || bill?.created_at || bill?.updatedAt || '';
-                  const amountValue = bill?.amount ?? bill?.totalAmount ?? bill?.planSnapshot?.amount ?? null;
-
-                  return (
-                    <tr key={bill.id} className="hover:bg-neutral-50/50 dark:hover:bg-zinc-800/20">
-                      <td className="p-3 font-mono font-bold">{bill.billNumber || bill.id}</td>
-                      <td className="p-3 font-semibold">{bill?.billingCycle || bill?.planSnapshot?.billingCycle || '—'}</td>
-                      <td className="p-3 text-neutral-400 font-mono">
-                        {issuedDate ? new Date(issuedDate).toLocaleDateString(isRtl ? 'ar-SA' : 'en-GB') : '—'}
-                      </td>
-                      <td className="p-3 font-mono font-bold">
-                        {amountValue !== null && amountValue !== undefined
-                          ? `${Number(amountValue).toLocaleString(isRtl ? 'ar-SA' : 'en-GB')} ${bill.currency || planSummary.currency || 'SAR'}`
-                          : '—'}
-                      </td>
-                      <td className="p-3">
-                        <span className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 px-2.5 py-1 rounded font-bold text-[10px]">
-                          {statusLabel}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                }) : (
-                  <tr>
-                    <td className="p-4 text-center text-neutral-400" colSpan={5}>
-                      {isRtl ? 'لا توجد فواتير اشتراك حالياً.' : 'No subscription invoices available.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <BillingWorkspace lang={lang} darkMode={darkMode} />
       )}
 
       {/* 17. SETTINGS */}
@@ -1181,7 +1055,7 @@ export default function Workspace({
           }`}>
             <h4 className="font-extrabold text-sm md:text-base">{isRtl ? '💾 حفظ هذا المنظر المخصص' : '💾 Save Current Filtered View'}</h4>
             <p className="text-[10px] text-neutral-400 mt-1">{isRtl ? 'احفظ الفلاتر النشطة لتبويب لوحة التحكم للوصول السريع إليها لاحقاً.' : 'Pin this view with its operational configuration to your dashboard.'}</p>
-
+            
             <form onSubmit={handleCreateSavedView} className="mt-4 space-y-3">
               <input
                 type="text"

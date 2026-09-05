@@ -779,8 +779,30 @@ class TenantApiAdapter {
     return this.get('/api/v1/subscription/current');
   }
 
+  async requestSubscriptionChange(payload: { packageId: string; billingCycle: string }): Promise<any> {
+    return this.post('/api/v1/subscription/change-request', payload);
+  }
+
   async getTenantBills(): Promise<any> {
     return this.get('/tenant/bills');
+  }
+
+  async getCurrentUnpaidBill(): Promise<any> {
+    return this.get('/tenant/bills/current-unpaid');
+  }
+
+  async getBillDetails(billId: string | number): Promise<any> {
+    return this.get(`/tenant/bills/${billId}`);
+  }
+
+  getInvoicePdfUrl(billId: string | number): string {
+    const url = this.buildUrl(`/tenant/bills/${billId}/invoice-pdf`);
+    return url.toString();
+  }
+
+  getReceiptPdfUrl(billId: string | number): string {
+    const url = this.buildUrl(`/tenant/bills/${billId}/receipt-pdf`);
+    return url.toString();
   }
 
   async registerTenant(formData: FormData): Promise<any> {
