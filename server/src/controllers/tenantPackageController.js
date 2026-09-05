@@ -118,7 +118,11 @@ exports.getPackage = async (req, res) => {
 exports.createPackage = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
-        const { name_en, name_ar, image, items } = req.body;
+        const { name_en, name_ar, items } = req.body;
+        let image = req.body.image;
+        if (req.file) {
+            image = req.file.path.replace(/\\/g, '/').split('uploads/')[1];
+        }
 
         if (!name_en || !name_ar || !Array.isArray(items) || items.length === 0) {
             await transaction.rollback();
