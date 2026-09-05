@@ -58,16 +58,15 @@ exports.requireActiveSubscription = async (req, res, next) => {
 
         const { subscription } = context;
         
-        // Check if subscription has expired
-        if (new Date() > subscription.currentPeriodEnd) {
-            // Check grace period
-            if (!subscription.isInGracePeriod()) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Your subscription has expired. Please renew to continue.',
-                    code: 'SUBSCRIPTION_EXPIRED'
-                });
-            }
+        // Check if subscription has expired based on canonical resolver
+        const effectiveStatus = subscription.getDataValue('effectiveStatus') || 'expired';
+
+        if (effectiveStatus === 'expired') {
+            return res.status(403).json({
+                success: false,
+                message: 'Your subscription has expired. Please renew to continue.',
+                code: 'SUBSCRIPTION_EXPIRED'
+            });
         }
         
         next();

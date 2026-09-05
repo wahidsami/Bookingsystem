@@ -93,6 +93,10 @@ exports.getCurrentSubscription = async (req, res) => {
         if (subscription.package) {
             subscription.package.limits = normalizePackageEntitlements(subscription.package.limits || {});
         }
+
+        // Ensure canonical effective fields are exposed
+        subscription.effectiveStatus = result.effectiveStatus;
+        subscription.daysRemaining = result.daysRemaining;
         
         res.json({
             success: true,

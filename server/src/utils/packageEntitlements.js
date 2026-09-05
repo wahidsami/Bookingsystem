@@ -16,7 +16,9 @@ const FEATURE_ALIASES = {
     whatsappNotifications: ['whatsappNotifications', 'hasWhatsAppNotifications'],
     reports: ['reports', 'hasAdvancedReports', 'advancedAnalytics'],
     payroll: ['payroll', 'hasPayroll'],
-    publicPageCustomization: ['publicPageCustomization', 'hasCustomBranding', 'whiteLabel']
+    publicPageCustomization: ['publicPageCustomization', 'hasCustomBranding', 'whiteLabel'],
+    hasServicePackages: ['hasServicePackages', 'servicePackages'],
+    maxPackages: ['maxPackages', 'packages']
 };
 
 const getFeatureKeys = (feature) => FEATURE_ALIASES[feature] || [feature];
@@ -74,6 +76,8 @@ const normalizePackageEntitlements = (...sources) => {
     const reports = firstDefinedValue(normalized, 'reports');
     const payroll = firstDefinedValue(normalized, 'payroll');
     const publicPageCustomization = firstDefinedValue(normalized, 'publicPageCustomization');
+    const hasServicePackages = firstDefinedValue(normalized, 'hasServicePackages');
+    const maxPackages = firstDefinedValue(normalized, 'maxPackages');
 
     normalized.aiContentAssistant = toNumericEntitlement(aiContentAssistant, 0);
     normalized.hasAIContentAssistant = isFeatureEnabled(aiContentAssistant);
@@ -114,6 +118,14 @@ const normalizePackageEntitlements = (...sources) => {
     if (publicPageCustomization !== undefined) {
         normalized.publicPageCustomization = isFeatureEnabled(publicPageCustomization);
         normalized.hasCustomBranding = normalized.publicPageCustomization;
+    }
+
+    if (hasServicePackages !== undefined) {
+        normalized.hasServicePackages = isFeatureEnabled(hasServicePackages);
+    }
+
+    if (maxPackages !== undefined) {
+        normalized.maxPackages = toNumericEntitlement(maxPackages, -1); // fallback to unlimited or 0? 0 if disabled, but the feature is explicit
     }
 
     return normalized;
