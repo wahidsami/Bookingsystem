@@ -4,7 +4,7 @@ import {
     ActivityIndicator, RefreshControl, Platform, TouchableOpacity
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+
 import { Ionicons } from '@expo/vector-icons';
 import { getEarnings, EarningsSummary } from '../../src/services/financials';
 import { useAuth } from '../../src/context/AuthContext';

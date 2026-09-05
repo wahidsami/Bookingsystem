@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Modal, FlatList, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
-import { LinearGradient } from 'expo-linear-gradient';
+
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../src/context/LanguageContext';
 import { getImageUrl } from '../../src/services/api';

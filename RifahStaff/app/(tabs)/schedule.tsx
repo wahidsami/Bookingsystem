@@ -18,7 +18,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { differenceInCalendarDays } from 'date-fns';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
@@ -469,19 +468,6 @@ export default function ScheduleScreen() {
             setWeekOffset((current) => Math.max(0, current - 1));
         } else if (direction > 0 && candidate > addRiyadhDays(weekStartKey, 6)) {
             setWeekOffset((current) => Math.min(visibleWeeks - 1, current + 1));
-        }
-    };
-
-    const getCurrentRiyadhHour = () => {
-        try {
-            const hour = Number(new Intl.DateTimeFormat('en-US', {
-                timeZone: 'Asia/Riyadh',
-                hour: '2-digit',
-                hour12: true,
-            }).format(new Date()));
-            return Number.isFinite(hour) ? hour : 12;
-        } catch {
-            return 12;
         }
     };
 
@@ -1308,8 +1294,6 @@ export default function ScheduleScreen() {
         );
     };
 
-    const currentHour = getCurrentRiyadhHour();
-    const greeting = currentHour < 12 ? 'Good morning,' : currentHour < 17 ? 'Good afternoon,' : 'Good evening,';
     const controllerTitle = dayScopeMode === 'week'
         ? `${formatRiyadhMonthDay(weekStartKey)} - ${formatRiyadhMonthDay(addRiyadhDays(weekStartKey, 6))}`
         : formatRiyadhLongDate(selectedDateKey);
@@ -1576,51 +1560,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f3f4f6',
-    },
-    header: {
-        paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'android' ? 14 : 8,
-        paddingBottom: 12,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-    },
-    headerTopRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    headerGreeting: {
-        fontSize: 15,
-        color: 'rgba(255,255,255,0.8)',
-        marginBottom: 4,
-    },
-    headerStaffName: {
-        fontSize: 32,
-        fontWeight: '800',
-        color: '#ffffff',
-    },
-    headerAvatarWrap: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 28,
-        padding: 2,
-    },
-    headerAvatar: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
-    },
-    headerAvatarFallback: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerAvatarInitial: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#ffffff',
     },
     content: {
         paddingHorizontal: 12,

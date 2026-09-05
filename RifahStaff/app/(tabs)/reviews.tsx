@@ -4,7 +4,7 @@ import {
     ActivityIndicator, RefreshControl, Modal, TextInput, Platform, Alert, ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+
 import { Ionicons } from '@expo/vector-icons';
 import { getMyReviews, replyToReview, ReviewsSummary, Review } from '../../src/services/financials';
 import { useAuth } from '../../src/context/AuthContext';
