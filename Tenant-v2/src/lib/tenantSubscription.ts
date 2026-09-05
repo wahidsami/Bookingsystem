@@ -11,6 +11,8 @@ export interface TenantPlanSummary {
   planNameEn: string;
   billingCycle: string | null;
   status: string | null;
+  effectiveStatus: string | null;
+  daysRemaining: number | null;
   currency: string;
   billingAmount: number | null;
   currentPeriodStart: string | null;
@@ -133,6 +135,8 @@ export function normalizeTenantSubscriptionSnapshot(response: any): TenantSubscr
 
   return {
     ...subscription,
+    effectiveStatus: subscription.effectiveStatus ?? subscription.status ?? null,
+    daysRemaining: typeof subscription.daysRemaining === 'number' ? subscription.daysRemaining : null,
     package: subscription.package
       ? {
           ...subscription.package,
@@ -206,6 +210,8 @@ export function buildTenantPlanSummary(options: {
     planNameEn: resolvePlanName(subscription, usageSnapshot, 'en'),
     billingCycle,
     status: toText(subscription?.status || options.tenant?.status || null, null as any) || null,
+    effectiveStatus: toText(subscription?.effectiveStatus || null, null as any) || null,
+    daysRemaining: subscription?.daysRemaining ?? null,
     currency,
     billingAmount,
     currentPeriodStart: currentPeriodStart ? String(currentPeriodStart) : null,

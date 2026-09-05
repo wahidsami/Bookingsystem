@@ -131,7 +131,7 @@ async function getTenantHeaderNotifications(tenantId, { readerId, page = 1, limi
         senderType: { [Op.in]: ALLOWED_MESSAGE_SENDER_TYPES }
     };
 
-    const [messages, totalRowsResult, unreadRowsResult] = await Promise.all([
+    const [messages, totalRowsResult, unreadRowsResult, usageAlerts] = await Promise.all([
         db.StaffMessage.findAll({
             where,
             order: [['createdAt', 'DESC']],
@@ -154,15 +154,48 @@ async function getTenantHeaderNotifications(tenantId, { readerId, page = 1, limi
                 },
                 type: QueryTypes.SELECT
             })
-            : Promise.resolve([{ total: 0 }])
+            : Promise.resolve([{ total: 0 }]),
+        db.UsageAlert.findAll({
+            where: { tenantId, acknowledged: false },
+            order: [['sentAt', 'DESC']],
+            limit: safeLimit
+        })
     ]);
 
-    const notifications = messages.map((message) => normalizeNotificationRecord(message, normalizedReaderId));
-    const unreadCount = Number(unreadRowsResult?.[0]?.total || 0);
-    const totalRows = Number(totalRowsResult || 0);
+    const formattedAlerts = usageAlerts.map(alert => ({
+        id: alert.id,
+        titleAr: alert.title_ar || alert.title,
+        titleEn: alert.title,
+        bodyAr: alert.message_ar || alert.message,
+        bodyEn: alert.message,
+        timeAr: formatRelativeTime(alert.sentAt, 'ar'),
+        timeEn: formatRelativeTime(alert.sentAt, 'en'),
+        type: 'system',
+        unread: !alert.acknowledged,
+        sourceType: 'alert',
+        isPinned: false
+    }));
+
+    const notifications = [
+        ...formattedAlerts,
+        ...messages.map((message) => normalizeNotificationRecord(message, normalizedReaderId))
+    ];
+
+    // Sort combined by unread first, then by time DESC
+    notifications.sort((a, b) => {
+        if (a.unread && !b.unread) return -1;
+        if (!a.unread && b.unread) return 1;
+        return 0; // The original SQL sorting already handles time DESC relatively well within their groups
+    });
+
+    // Take only limit
+    const finalNotifications = notifications.slice(0, safeLimit);
+
+    const unreadCount = Number(unreadRowsResult?.[0]?.total || 0) + usageAlerts.length;
+    const totalRows = Number(totalRowsResult || 0) + usageAlerts.length;
 
     return {
-        notifications,
+        notifications: finalNotifications,
         unreadCount,
         pagination: {
             page: safePage,
@@ -175,6 +208,22 @@ async function getTenantHeaderNotifications(tenantId, { readerId, page = 1, limi
 
 async function markTenantHeaderNotificationRead(tenantId, notificationId, readerId) {
     const normalizedReaderId = normalizeReaderId(readerId);
+
+    // Check if it's an alert
+    const alert = await db.UsageAlert.findOne({
+        where: { id: notificationId, tenantId }
+    });
+
+    if (alert) {
+        alert.acknowledged = true;
+        alert.acknowledgedAt = new Date();
+        await alert.save();
+        return {
+            id: alert.id,
+            unread: false
+        };
+    }
+
     const message = await db.StaffMessage.findOne({
         where: {
             id: notificationId,
@@ -198,9 +247,15 @@ async function markTenantHeaderNotificationRead(tenantId, notificationId, reader
 
 async function markAllTenantHeaderNotificationsRead(tenantId, readerId) {
     const normalizedReaderId = normalizeReaderId(readerId);
+
     if (!normalizedReaderId) {
         return { updated: 0 };
     }
+
+    await db.UsageAlert.update(
+        { acknowledged: true, acknowledgedAt: new Date() },
+        { where: { tenantId, acknowledged: false } }
+    );
 
     const messages = await db.StaffMessage.findAll({
         where: {

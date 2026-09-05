@@ -110,9 +110,9 @@ async function initializeTenantSubscription(tenantId, packageSlug = 'free-trial'
 async function resetMonthlyUsage() {
     try {
         const currentPeriod = new Date().toISOString().substring(0, 7);
-        
+
         const allUsage = await db.TenantUsage.findAll();
-        
+
         for (const usage of allUsage) {
             // Store historical data
             const historicalData = usage.historicalUsage || {};
@@ -122,7 +122,7 @@ async function resetMonthlyUsage() {
                 smsCampaigns: usage.smsCampaignsThisMonth,
                 apiCalls: usage.apiCallsThisMonth
             };
-            
+
             await usage.update({
                 currentPeriod,
                 bookingsThisMonth: 0,
@@ -133,7 +133,7 @@ async function resetMonthlyUsage() {
                 historicalUsage: historicalData
             });
         }
-        
+
         console.log(`✅ Reset monthly usage for ${allUsage.length} tenants`);
     } catch (error) {
         console.error('Failed to reset monthly usage:', error);
@@ -150,31 +150,81 @@ async function checkExpiringSubscriptions() {
         const today = new Date();
         const in7Days = new Date(today);
         in7Days.setDate(in7Days.getDate() + 7);
-        const in3Days = new Date(today);
-        in3Days.setDate(in3Days.getDate() + 3);
-        const in1Day = new Date(today);
-        in1Day.setDate(in1Day.getDate() + 1);
 
-        // Find subscriptions expiring soon
-        const expiringSubscriptions = await db.TenantSubscription.findAll({
+        // Find subscriptions expiring soon or in grace period
+        const targetSubscriptions = await db.TenantSubscription.findAll({
             where: {
-                status: { [db.Sequelize.Op.in]: ['active', 'trial'] },
-                currentPeriodEnd: {
-                    [db.Sequelize.Op.between]: [today, in7Days]
-                },
-                autoRenew: false // Only alert if not auto-renewing
+                [db.Sequelize.Op.or]: [
+                    {
+                        status: { [db.Sequelize.Op.in]: ['active', 'trial'] },
+                        currentPeriodEnd: {
+                            [db.Sequelize.Op.between]: [
+                                new Date(today.getTime() - 24 * 60 * 60 * 1000), // Include just expired
+                                in7Days
+                            ]
+                        },
+                        autoRenew: false
+                    },
+                    {
+                        status: 'expired',
+                        gracePeriodEnds: {
+                            [db.Sequelize.Op.gte]: today
+                        }
+                    }
+                ]
             },
             include: [{ model: db.Tenant, as: 'tenant' }]
         });
 
-        for (const subscription of expiringSubscriptions) {
-            const daysLeft = Math.ceil((subscription.currentPeriodEnd - today) / (1000 * 60 * 60 * 24));
+        const { sendEmail } = require('./emailService');
+
+        for (const subscription of targetSubscriptions) {
+            const timeDiff = subscription.currentPeriodEnd - today;
+            const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
             let alertType;
-            
-            if (daysLeft <= 1) alertType = 'renewal_due_1';
-            else if (daysLeft <= 3) alertType = 'renewal_due_3';
-            else if (daysLeft <= 7) alertType = 'renewal_due_7';
-            else continue;
+            let priority;
+            let title, message, titleAr, messageAr;
+
+            if (subscription.status === 'expired' && subscription.gracePeriodEnds && subscription.gracePeriodEnds >= today) {
+                const graceDaysLeft = Math.ceil((subscription.gracePeriodEnds - today) / (1000 * 60 * 60 * 24));
+                alertType = 'grace_period_warning';
+                priority = 'critical';
+                title = `Grace Period Ends in ${graceDaysLeft} Day${graceDaysLeft !== 1 ? 's' : ''}`;
+                message = `Your subscription has expired, but you are in a grace period. It ends on ${subscription.gracePeriodEnds.toLocaleDateString()}.`;
+                titleAr = `فترة السماح تنتهي خلال ${graceDaysLeft} يوم`;
+                messageAr = `لقد انتهى اشتراكك، ولكنك في فترة سماح. تنتهي في ${subscription.gracePeriodEnds.toLocaleDateString()}.`;
+            } else if (daysLeft <= 0) {
+                alertType = 'renewal_due_0';
+                priority = 'critical';
+                title = 'Subscription Expired';
+                message = 'Your subscription expired today. Please renew immediately to avoid service interruption.';
+                titleAr = 'انتهى الاشتراك';
+                messageAr = 'انتهى اشتراكك اليوم. يرجى التجديد فوراً لتجنب انقطاع الخدمة.';
+            } else if (daysLeft <= 1) {
+                alertType = 'renewal_due_1';
+                priority = 'critical';
+                title = 'Subscription Expiring Tomorrow';
+                message = 'Your subscription will expire tomorrow. Please renew to continue using our services.';
+                titleAr = 'الاشتراك ينتهي غداً';
+                messageAr = 'سينتهي اشتراكك غداً. يرجى التجديد لمواصلة استخدام خدماتنا.';
+            } else if (daysLeft <= 3) {
+                alertType = 'renewal_due_3';
+                priority = 'high';
+                title = `Subscription Expiring in ${daysLeft} Days`;
+                message = `Your subscription will expire on ${subscription.currentPeriodEnd.toLocaleDateString()}. Please renew soon.`;
+                titleAr = `الاشتراك ينتهي خلال ${daysLeft} أيام`;
+                messageAr = `سينتهي اشتراكك في ${subscription.currentPeriodEnd.toLocaleDateString()}. يرجى التجديد قريباً.`;
+            } else if (daysLeft <= 7) {
+                alertType = 'renewal_due_7';
+                priority = 'medium';
+                title = `Subscription Expiring in ${daysLeft} Days`;
+                message = `Your subscription will expire on ${subscription.currentPeriodEnd.toLocaleDateString()}.`;
+                titleAr = `الاشتراك ينتهي خلال ${daysLeft} أيام`;
+                messageAr = `سينتهي اشتراكك في ${subscription.currentPeriodEnd.toLocaleDateString()}.`;
+            } else {
+                continue;
+            }
 
             // Check if alert already sent
             const existingAlert = await db.UsageAlert.findOne({
@@ -192,17 +242,40 @@ async function checkExpiringSubscriptions() {
                     tenantId: subscription.tenantId,
                     alertType,
                     resourceType: 'subscription',
-                    title: `Subscription Renewal Due in ${daysLeft} Day${daysLeft > 1 ? 's' : ''}`,
-                    message: `Your subscription will expire on ${subscription.currentPeriodEnd.toLocaleDateString()}. Please renew to continue using our services.`,
-                    title_ar: `تجديد الاشتراك مستحق خلال ${daysLeft} ${daysLeft > 1 ? 'أيام' : 'يوم'}`,
-                    message_ar: `سينتهي اشتراكك في ${subscription.currentPeriodEnd.toLocaleDateString()}. يرجى التجديد لمواصلة استخدام خدماتنا.`,
-                    priority: daysLeft <= 1 ? 'critical' : daysLeft <= 3 ? 'high' : 'medium',
+                    title,
+                    message,
+                    title_ar: titleAr,
+                    message_ar: messageAr,
+                    priority,
                     sentVia: ['in-app', 'email']
                 });
+
+                // Actual email dispatch
+                if (subscription.tenant?.email) {
+                    try {
+                        const isAr = subscription.tenant?.settings?.language === 'ar';
+                        await sendEmail({
+                            to: subscription.tenant.email,
+                            subject: isAr ? titleAr : title,
+                            template: 'tenant_notification',
+                            data: {
+                                lang: isAr ? 'ar' : 'en',
+                                dir: isAr ? 'rtl' : 'ltr',
+                                title: isAr ? titleAr : title,
+                                greeting: isAr ? 'مرحباً' : 'Hello',
+                                tenantName: isAr ? (subscription.tenant.name_ar || subscription.tenant.nameAr || subscription.tenant.name) : (subscription.tenant.name_en || subscription.tenant.name),
+                                message: isAr ? messageAr : message,
+                                footerText: isAr ? 'منصة رفاه' : 'Refah Platform'
+                            }
+                        });
+                    } catch (emailError) {
+                        console.error(`Failed to dispatch expiry email for tenant ${subscription.tenantId}:`, emailError);
+                    }
+                }
             }
         }
 
-        console.log(`✅ Checked ${expiringSubscriptions.length} expiring subscriptions`);
+        console.log(`✅ Checked ${targetSubscriptions.length} subscriptions for expiry/grace period warnings`);
     } catch (error) {
         console.error('Failed to check expiring subscriptions:', error);
         throw error;

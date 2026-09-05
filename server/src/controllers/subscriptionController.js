@@ -61,7 +61,7 @@ exports.getAvailablePackages = async (req, res) => {
             ],
             attributes: { exclude: ['createdBy'] }
         });
-        
+
         res.json({
             success: true,
             packages
@@ -93,7 +93,11 @@ exports.getCurrentSubscription = async (req, res) => {
         if (subscription.package) {
             subscription.package.limits = normalizePackageEntitlements(subscription.package.limits || {});
         }
-        
+
+        // Ensure canonical effective fields are exposed
+        subscription.effectiveStatus = result.effectiveStatus;
+        subscription.daysRemaining = result.daysRemaining;
+
         res.json({
             success: true,
             subscription
@@ -113,10 +117,10 @@ exports.getCurrentSubscription = async (req, res) => {
 exports.getUsageStats = async (req, res) => {
     try {
         const tenantId = getTenantId(req);
-        
+
         // Get usage
         const usage = await db.TenantUsage.findOne({ where: { tenantId } });
-        
+
         const result = await getActiveSubscriptionForTenant(tenantId);
 
         if (!result) {
@@ -127,9 +131,9 @@ exports.getUsageStats = async (req, res) => {
         }
 
         const subscription = result.subscription;
-        
+
         const limits = subscription.package.limits;
-        
+
         // Calculate usage percentages
         const usageStats = {
             bookings: {
@@ -167,7 +171,7 @@ exports.getUsageStats = async (req, res) => {
                 unlimited: false
             }
         };
-        
+
         res.json({
             success: true,
             usage: usageStats,
@@ -195,18 +199,18 @@ exports.getUsageAlerts = async (req, res) => {
     try {
         const tenantId = getTenantId(req);
         const { limit = 10, unacknowledgedOnly } = req.query;
-        
+
         const where = { tenantId };
         if (unacknowledgedOnly === 'true') {
             where.acknowledged = false;
         }
-        
+
         const alerts = await db.UsageAlert.findAll({
             where,
             order: [['sentAt', 'DESC']],
             limit: parseInt(limit)
         });
-        
+
         res.json({
             success: true,
             alerts
@@ -227,23 +231,23 @@ exports.acknowledgeAlert = async (req, res) => {
     try {
         const tenantId = getTenantId(req);
         const { alertId } = req.params;
-        
+
         const alert = await db.UsageAlert.findOne({
             where: { id: alertId, tenantId }
         });
-        
+
         if (!alert) {
             return res.status(404).json({
                 success: false,
                 message: 'Alert not found'
             });
         }
-        
+
         await alert.update({
             acknowledged: true,
             acknowledgedAt: new Date()
         });
-        
+
         res.json({
             success: true,
             message: 'Alert acknowledged'
@@ -265,7 +269,7 @@ exports.requestSubscriptionChange = async (req, res) => {
         const tenantId = getTenantId(req);
         const { packageId, newPackageId, billingCycle } = req.body;
         const requestedPackageId = packageId || newPackageId;
-        
+
         if (!requestedPackageId || !billingCycle) {
             return res.status(400).json({
                 success: false,
@@ -279,7 +283,7 @@ exports.requestSubscriptionChange = async (req, res) => {
                 message: 'Invalid billing cycle'
             });
         }
-        
+
         // Get new package
         const newPackage = await db.SubscriptionPackage.findByPk(requestedPackageId);
         if (!newPackage || !newPackage.isActive) {
@@ -288,7 +292,7 @@ exports.requestSubscriptionChange = async (req, res) => {
                 message: 'Package not found or inactive'
             });
         }
-        
+
         const currentResult = await getActiveSubscriptionForTenant(tenantId, {
             statuses: ACTIVE_SUBSCRIPTION_STATUSES
         });
@@ -454,7 +458,7 @@ exports.requestSubscriptionChange = async (req, res) => {
         ensureInvoicePdf(bill).catch(err => {
             console.error('[SubscriptionChange] Failed to generate invoice PDF:', err.message);
         });
-        
+
         res.json({
             success: true,
             message: isPendingInitialActivation

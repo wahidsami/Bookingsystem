@@ -76,6 +76,12 @@ export function hasPublicPageCustomizationEntitlement(entitlements: PackageEntit
   );
 }
 
+export function hasServicePackagesEntitlement(entitlements: PackageEntitlements): boolean {
+  return isEntitlementEnabled(
+    firstDefinedEntitlement(entitlements, ['hasServicePackages', 'servicePackages'])
+  );
+}
+
 export function normalizePackageEntitlements(source: Record<string, any> | null | undefined): Record<string, any> | null {
   if (!source) return null;
 

@@ -54,6 +54,37 @@ export default function NewPackagePage() {
         description: '',
         description_ar: '',
         platformCommission: '5.00',
+    inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
+    aiContentAssistant: { featureKey: 'aiContentAssistant' },
+    promotionalEmails: { featureKey: 'promotionalEmails' },
+    searchRankingBoost: { featureKey: 'searchRankingBoost' },
+    newToRefahDays: { featureKey: 'newToRefah' }, // Paid per day when "hasNewToRefah" is true
+    maxHotDeals: { featureKey: 'hotDeals' },
+};
+
+export default function NewPackagePage() {
+    const router = useRouter();
+    const [loading, setLoading] = useState(false);
+    const [featurePrices, setFeaturePrices] = useState<Record<string, number>>({});
+
+    // Fetch feature prices on mount
+    useEffect(() => {
+        adminApi.getFeaturePricing().then((res) => {
+            if (res.success) {
+                const priceMap: Record<string, number> = {};
+                res.features.forEach((f: any) => { priceMap[f.featureKey] = parseFloat(f.unitPrice); });
+                setFeaturePrices(priceMap);
+            }
+        }).catch(() => { });
+    }, []);
+
+    const [formData, setFormData] = useState({
+        name: '',
+        name_ar: '',
+        slug: '',
+        description: '',
+        description_ar: '',
+        platformCommission: '5.00',
         displayOrder: '0',
         isActive: true,
         isFeatured: false,
@@ -63,6 +94,8 @@ export default function NewPackagePage() {
         maxStaff: '5',
         maxServices: '20',
         maxProducts: '10',
+        maxPackages: '-1',
+    hasServicePackages: false,
         storageGB: '2',
         // Features
         hasProductsAndOrders: false,
@@ -406,6 +439,7 @@ export default function NewPackagePage() {
                                     { key: 'maxStaff', label: 'Max Staff' },
                                     { key: 'maxServices', label: 'Max Services' },
                                     { key: 'maxProducts', label: 'Max Products' },
+                                    { key: 'maxPackages', label: 'Max Packages' },
                                     { key: 'storageGB', label: 'Storage (GB)' },
                                 ].map((field) => {
                                     const qty = parseInt((formData as any)[field.key] || '0');
@@ -456,6 +490,7 @@ export default function NewPackagePage() {
                                     { key: 'reports', label: 'Reports & Analytics' },
                                     { key: 'payroll', label: 'Payroll Management' },
                                     { key: 'publicPageCustomization', label: 'Public Page Customization' },
+                                    { key: 'hasServicePackages', label: 'Service Packages' },
                                     { key: 'aiConsultant', label: 'AI Consultant' },
                                 ].map((feature) => {
                                     const cost = getFeatureItemCost(feature.key);
@@ -568,6 +603,7 @@ export default function NewPackagePage() {
                                         )}
                                     </div>
                                 </div>
+
                             </div>
                         </div>
 

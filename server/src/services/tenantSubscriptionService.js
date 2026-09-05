@@ -61,12 +61,44 @@ async function buildCanonicalSubscriptionResult(subscription, tenant) {
         subscription.package = planPackage;
     }
 
+    // Calculate effective status and days remaining
+    const now = new Date();
+    let effectiveStatus = subscription.status;
+    let daysRemaining = null;
+
+    if (subscription.currentPeriodEnd) {
+        const periodEnd = new Date(subscription.currentPeriodEnd);
+        const timeDiff = periodEnd.getTime() - now.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+        if (timeDiff > 0) {
+            daysRemaining = daysDiff;
+            if (['active', 'trial'].includes(effectiveStatus)) {
+                effectiveStatus = daysDiff <= 7 ? 'expiring_soon' : effectiveStatus;
+            }
+        } else {
+            daysRemaining = 0;
+            const graceEnds = subscription.gracePeriodEnds ? new Date(subscription.gracePeriodEnds) : null;
+            if (graceEnds && graceEnds.getTime() > now.getTime()) {
+                effectiveStatus = 'grace_period';
+            } else {
+                effectiveStatus = 'expired';
+            }
+        }
+    }
+
+    // Mutate the subscription instance directly so subsequent middleware sees the effective values
+    subscription.setDataValue('effectiveStatus', effectiveStatus);
+    subscription.setDataValue('daysRemaining', daysRemaining);
+
     return {
         subscription,
         package: subscription.package || planPackage || null,
         limits: resolvedLimits,
         tenantFeatures,
-        planPackage
+        planPackage,
+        effectiveStatus,
+        daysRemaining
     };
 }
 

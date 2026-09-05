@@ -15,7 +15,9 @@ import {
   hasHotDealsEntitlement,
   hasProductsAndOrdersEntitlement,
   hasPublicPageCustomizationEntitlement,
-  hasPushNotificationsEntitlement
+  hasPushNotificationsEntitlement,
+  hasAIConsultantEntitlement,
+  hasServicePackagesEntitlement
 } from './lib/tenantEntitlements';
 import {
   dashboardLandingPageToView,
@@ -634,33 +636,6 @@ export default function App() {
       />
     );
   }
-
-  return (
-    <div
-      dir={isRtl ? 'rtl' : 'ltr'}
-      className={`min-h-screen flex overflow-hidden font-sans relative transition-colors duration-200 ${
-        darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-800'
-      }`}
-      id="refah-app-shell"
-    >
-      
-      {/* Sidebar (dark luxury layout with favoritePages) */}
-      <Sidebar
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        lang={lang}
-        activeView={activeView}
-        onSelectView={handleSelectView}
-        favoritePages={favoritePages}
-        accessibleMarketingModules={accessibleMarketingModules}
-      />
-
-      {/* Main Workspace Frame */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" id="main-content-panel">
-        
-        {/* Sticky Header with integrated tab navigator */}
-        <Topbar
-          lang={lang}
           onToggleLang={handleToggleLang}
           activeView={activeView}
           onOpenSearch={() => setIsSearchOpen(true)}

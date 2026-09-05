@@ -38,14 +38,14 @@ const loadSubscriptionContext = async (req) => {
 exports.requireActiveSubscription = async (req, res, next) => {
     try {
         const { tenantId } = req;
-        
+
         if (!tenantId) {
             return res.status(401).json({
                 success: false,
                 message: 'Authentication required'
             });
         }
-        
+
         const context = await loadSubscriptionContext(req);
 
         if (!context) {
@@ -57,19 +57,18 @@ exports.requireActiveSubscription = async (req, res, next) => {
         }
 
         const { subscription } = context;
-        
-        // Check if subscription has expired
-        if (new Date() > subscription.currentPeriodEnd) {
-            // Check grace period
-            if (!subscription.isInGracePeriod()) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Your subscription has expired. Please renew to continue.',
-                    code: 'SUBSCRIPTION_EXPIRED'
-                });
-            }
+
+        // Check if subscription has expired based on canonical resolver
+        const effectiveStatus = subscription.getDataValue('effectiveStatus') || 'expired';
+
+        if (effectiveStatus === 'expired') {
+            return res.status(403).json({
+                success: false,
+                message: 'Your subscription has expired. Please renew to continue.',
+                code: 'SUBSCRIPTION_EXPIRED'
+            });
         }
-        
+
         next();
     } catch (error) {
         console.error('Subscription check error:', error);
@@ -108,7 +107,7 @@ exports.requireFeature = (featureName) => {
                     upgradeRequired: true
                 });
             }
-            
+
             next();
         } catch (error) {
             console.error('Feature check error:', error);
@@ -167,14 +166,21 @@ exports.checkResourceLimit = (resourceType) => {
                     limitField: 'maxProducts',
                     displayName: 'Products',
                     getCurrentUsage: () => db.Product.count({ where: { tenantId } })
+                },
+                'package': {
+                    limitField: 'maxPackages',
+                    displayName: 'Packages',
+                    getCurrentUsage: () => db.ServicePackage
+                        ? db.ServicePackage.count({ where: { tenantId, isActive: true } })
+                        : Promise.resolve(0)
                 }
             };
-            
+
             const config = limitMap[resourceType];
             if (!config) {
                 return next(); // Unknown resource type, skip check
             }
-            
+
             const limit = packageLimits[config.limitField];
 
             // -1 means unlimited
@@ -191,13 +197,13 @@ exports.checkResourceLimit = (resourceType) => {
                     upgradeRequired: true
                 });
             }
-            
+
             // Check if limit reached
             const currentUsage = await config.getCurrentUsage();
             if (currentUsage >= limit) {
                 // Send alert if not already sent
                 await sendLimitAlert(tenantId, resourceType, currentUsage, limit);
-                
+
                 return res.status(403).json({
                     success: false,
                     message: `You have reached your ${config.displayName.toLowerCase()} limit (${limit}). Please upgrade your plan to add more.`,
@@ -207,13 +213,13 @@ exports.checkResourceLimit = (resourceType) => {
                     limit: limit
                 });
             }
-            
+
             // Check for warning thresholds (80%, 95%)
             const percentage = (currentUsage / limit) * 100;
             if (percentage >= 80) {
                 await sendWarningAlert(tenantId, resourceType, currentUsage, limit, percentage);
             }
-            
+
             next();
         } catch (error) {
             console.error('Resource limit check error:', error);
@@ -241,9 +247,9 @@ async function sendLimitAlert(tenantId, resourceType, current, limit) {
                 }
             }
         });
-        
+
         if (recentAlert) return; // Don't spam alerts
-        
+
         await db.UsageAlert.create({
             tenantId,
             alertType: 'limit_reached',
@@ -269,7 +275,7 @@ async function sendLimitAlert(tenantId, resourceType, current, limit) {
 async function sendWarningAlert(tenantId, resourceType, current, limit, percentage) {
     try {
         const alertType = percentage >= 95 ? 'warning_95' : 'warning_80';
-        
+
         // Check if this level of alert already sent recently
         const recentAlert = await db.UsageAlert.findOne({
             where: {
@@ -281,9 +287,9 @@ async function sendWarningAlert(tenantId, resourceType, current, limit, percenta
                 }
             }
         });
-        
+
         if (recentAlert) return;
-        
+
         await db.UsageAlert.create({
             tenantId,
             alertType,
@@ -309,44 +315,44 @@ async function sendWarningAlert(tenantId, resourceType, current, limit, percenta
 exports.updateUsage = async (tenantId, resourceType, increment = true) => {
     try {
         const currentPeriod = new Date().toISOString().substring(0, 7);
-        
+
         let usage = await db.TenantUsage.findOne({ where: { tenantId } });
-        
+
         if (!usage) {
             usage = await db.TenantUsage.create({
                 tenantId,
                 currentPeriod
             });
         }
-        
+
         // Update appropriate counter
         const updates = {};
         switch (resourceType) {
             case 'booking':
-                updates.bookingsThisMonth = increment ? 
-                    usage.bookingsThisMonth + 1 : 
+                updates.bookingsThisMonth = increment ?
+                    usage.bookingsThisMonth + 1 :
                     Math.max(0, usage.bookingsThisMonth - 1);
-                updates.bookingsTotal = increment ? 
-                    usage.bookingsTotal + 1 : 
+                updates.bookingsTotal = increment ?
+                    usage.bookingsTotal + 1 :
                     usage.bookingsTotal;
                 break;
             case 'staff':
-                updates.activeStaff = increment ? 
-                    usage.activeStaff + 1 : 
+                updates.activeStaff = increment ?
+                    usage.activeStaff + 1 :
                     Math.max(0, usage.activeStaff - 1);
                 break;
             case 'service':
-                updates.activeServices = increment ? 
-                    usage.activeServices + 1 : 
+                updates.activeServices = increment ?
+                    usage.activeServices + 1 :
                     Math.max(0, usage.activeServices - 1);
                 break;
             case 'product':
-                updates.activeProducts = increment ? 
-                    usage.activeProducts + 1 : 
+                updates.activeProducts = increment ?
+                    usage.activeProducts + 1 :
                     Math.max(0, usage.activeProducts - 1);
                 break;
         }
-        
+
         await usage.update(updates);
         return usage;
     } catch (error) {

@@ -36,7 +36,8 @@ const { buildTenantSupportContext } = require('../middleware/supportContext');
 const { createLimiter } = require('../middleware/rateLimiter');
 const {
     requireActiveSubscription,
-    checkResourceLimit
+    checkResourceLimit,
+    requireFeature
 } = require('../middleware/checkSubscription');
 const multer = require('multer');
 const path = require('path');
@@ -140,6 +141,16 @@ router.post(
 );
 router.put('/services/:id', tenantServiceController.uploadImage, tenantServiceController.updateService);
 router.delete('/services/:id', tenantServiceController.deleteService);
+
+// Service Packages
+router.get('/packages', (req, res) => res.status(501).json({ success: false, message: 'Not implemented' }));
+router.post(
+    '/packages',
+    requireActiveSubscription,
+    requireFeature('hasServicePackages'),
+    checkResourceLimit('package'),
+    (req, res) => res.status(501).json({ success: false, message: 'Not implemented' })
+);
 
 // Appointment management
 router.get('/appointments', tenantAppointmentController.getAppointments);

@@ -36,6 +36,20 @@ const defaultFormData = {
     slug: '',
     description: '',
     description_ar: '',
+    inAppMarketingNotifications: { featureKey: 'inAppMarketingNotifications' },
+    aiContentAssistant: { featureKey: 'aiContentAssistant' },
+    promotionalEmails: { featureKey: 'promotionalEmails' },
+    searchRankingBoost: { featureKey: 'searchRankingBoost' },
+    newToRefahDays: { featureKey: 'newToRefah' },
+    maxHotDeals: { featureKey: 'hotDeals' },
+};
+
+const defaultFormData = {
+    name: '',
+    name_ar: '',
+    slug: '',
+    description: '',
+    description_ar: '',
     platformCommission: '5.00',
     displayOrder: '0',
     isActive: true,
@@ -45,6 +59,8 @@ const defaultFormData = {
     maxStaff: '5',
     maxServices: '20',
     maxProducts: '10',
+    maxPackages: '-1',
+    hasServicePackages: false,
     storageGB: '2',
     hasProductsAndOrders: false,
     hasInternalMessaging: false,
@@ -115,7 +131,9 @@ export default function EditPackagePage() {
                 maxStaff: toStr(limits.maxStaff, '5'),
                 maxServices: toStr(limits.maxServices, '20'),
                 maxProducts: toStr(limits.maxProducts, '10'),
-                storageGB: toStr(limits.storageGB, '2'),
+                maxPackages: toStr(limits.maxPackages, '-1'),
+                hasServicePackages: toBool(limits.hasServicePackages, false),
+                storageGB: limits.storageMB ? String(Math.floor(limits.storageMB / 1024)) : '2',
                 hasProductsAndOrders: toBool(limits.hasProductsAndOrders, false),
                 hasInternalMessaging: toBool(limits.hasInternalMessaging, false),
                 reports: toBool(limits.reports ?? limits.hasAdvancedReports ?? limits.advancedAnalytics, false),
@@ -432,6 +450,7 @@ export default function EditPackagePage() {
                                     { key: 'maxStaff', label: 'Max Staff' },
                                     { key: 'maxServices', label: 'Max Services' },
                                     { key: 'maxProducts', label: 'Max Products' },
+                                    { key: 'maxPackages', label: 'Max Packages' },
                                     { key: 'storageGB', label: 'Storage (GB)' },
                                 ].map((field) => {
                                     const qty = parseInt((formData as any)[field.key] || '0');
@@ -440,12 +459,25 @@ export default function EditPackagePage() {
                                     const isDisabled = field.key === 'maxProducts' && !formData.hasProductsAndOrders;
                                     return (
                                         <div key={field.key}>
-                                            <label className="block text-sm font-medium text-dark-300 mb-1">{field.label}</label>
+                                            <div className="flex justify-between items-end mb-1">
+                                                <label className="block text-sm font-medium text-dark-300">{field.label}</label>
+                                                {field.key !== 'storageGB' && (
+                                                    <label className="flex items-center text-xs text-dark-400 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isUnlimited}
+                                                            onChange={(e) => setFormData({ ...formData, [field.key]: e.target.checked ? '-1' : '0' })}
+                                                            className="mr-1 rounded bg-dark-700 border-dark-600 text-purple-500 focus:ring-purple-500"
+                                                        />
+                                                        Unlimited
+                                                    </label>
+                                                )}
+                                            </div>
                                             <input
                                                 type="number"
-                                                value={isDisabled ? '0' : (formData as any)[field.key]}
+                                                value={isDisabled ? '0' : (isUnlimited ? '-1' : (formData as any)[field.key])}
                                                 onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                                                disabled={isDisabled}
+                                                disabled={isDisabled || isUnlimited}
                                                 className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                                             />
                                             <div className="mt-1 text-xs">
@@ -471,6 +503,7 @@ export default function EditPackagePage() {
                                     { key: 'reports', label: 'Reports & Analytics' },
                                     { key: 'payroll', label: 'Payroll Management' },
                                     { key: 'publicPageCustomization', label: 'Public Page Customization' },
+                                    { key: 'hasServicePackages', label: 'Service Packages' },
                                     { key: 'aiConsultant', label: 'AI Consultant' },
                                 ].map((feature) => {
                                     const cost = getFeatureItemCost(feature.key);
@@ -567,6 +600,7 @@ export default function EditPackagePage() {
                                         )}
                                     </div>
                                 </div>
+
                             </div>
                         </div>
 
