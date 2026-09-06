@@ -2379,7 +2379,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   }, [onQuickAction]);
 
   // Conversions for layout
-  const SLOT_HEIGHT = 100; // 100px per hour
+  const SLOT_HEIGHT = (60 / SLOT_MINUTES) * activeSchedulerSettings.timeSlotHeight; // Exact pixels per hour based on settings
   const START_HOUR = schedulerConfig.startHour;
   const END_HOUR = schedulerConfig.endHour;
   const BOARD_END_HOUR = Math.min(24, Math.max(
@@ -2390,7 +2390,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         : latestEnd
     ), 0)) / 60)
  ));
-  const SLOT_MINUTES = schedulerConfig.slotMinutes;
+  const SLOT_MINUTES = 5;
   const TOTAL_HOURS = Math.max(1, END_HOUR - START_HOUR);
 
   const minutesToTop = (mins: number) => {
