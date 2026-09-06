@@ -22,6 +22,7 @@ export interface SchedulerEvent {
   columnId: string;
   dateKey: string;
   startMinutes: number;
+  endMinutes: number;
   durationMinutes: number;
   title: string;
   subtitle?: string;
@@ -529,7 +530,7 @@ export default function SchedulerGrid({
     groupedByColumn.forEach((columnEvents, columnId) => {
       const sortedEvents = [...columnEvents].sort((a, b) => {
         if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
-        return (b.startMinutes + b.durationMinutes) - (a.startMinutes + a.durationMinutes);
+        return b.endMinutes - a.endMinutes;
       });
 
       const clusters: SchedulerEvent[][] = [];
@@ -537,7 +538,7 @@ export default function SchedulerGrid({
       let clusterEnd = -1;
 
       sortedEvents.forEach((event) => {
-        const eventEnd = event.startMinutes + event.durationMinutes;
+        const eventEnd = event.endMinutes;
         if (activeCluster.length === 0) {
           activeCluster = [event];
           clusterEnd = eventEnd;
@@ -566,10 +567,10 @@ export default function SchedulerGrid({
           .slice()
           .sort((a, b) => {
             if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
-            return (b.startMinutes + b.durationMinutes) - (a.startMinutes + a.durationMinutes);
+            return b.endMinutes - a.endMinutes;
           })
           .map((event) => {
-            const eventEnd = event.startMinutes + event.durationMinutes;
+            const eventEnd = event.endMinutes;
             let laneIndex = lanes.findIndex((lane) => lane.lastEnd <= event.startMinutes);
             if (laneIndex === -1) {
               laneIndex = lanes.length;
@@ -645,7 +646,8 @@ export default function SchedulerGrid({
 
             // Calc x1, y1
             const top1 = (Math.max(0, ev1.startMinutes) / slotMinutes) * slotHeight;
-            const height1 = (ev1.durationMinutes / slotMinutes) * slotHeight;
+            const bottom1 = (Math.max(0, ev1.endMinutes) / slotMinutes) * slotHeight;
+            const height1 = Math.max(0, bottom1 - top1);
             const laneWidthPx1 = cellWidth / Math.max(1, ev1.laneCount);
             const eventCardWidth1 = laneWidthPx1 - 8;
             const inlineStart1 = (colIdx1 * cellWidth) + (ev1.laneIndex * laneWidthPx1);
@@ -909,7 +911,8 @@ export default function SchedulerGrid({
             if (columnIndex === -1) return null;
 
             const top = (Math.max(0, event.startMinutes) / slotMinutes) * slotHeight;
-            const height = (event.durationMinutes / slotMinutes) * slotHeight;
+            const bottom = (Math.max(0, event.endMinutes) / slotMinutes) * slotHeight;
+            const height = Math.max(0, bottom - top);
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
             const inlineStart = `calc(${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;

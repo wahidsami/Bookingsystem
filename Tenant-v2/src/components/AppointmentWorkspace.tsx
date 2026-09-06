@@ -4227,7 +4227,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       columnId,
       dateKey: apt.date || getSelectedDateKey(),
       startMinutes: Math.max(0, apt.startTime),
-      durationMinutes: Math.max(5, apt.duration),
+        endMinutes: Math.max(0, apt.startTime) + (Number(apt.duration) || 0),
+        durationMinutes: (Number(apt.duration) || 0),
       title,
       subtitle,
       variantLabel: isRtl ? (apt.serviceVariantDescription || apt.serviceVariantName || '') : (apt.serviceVariantName || apt.serviceVariantDescription || ''),
@@ -8838,3 +8839,4 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     </div>
   );
 }
+
