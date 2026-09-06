@@ -357,6 +357,8 @@ exports.getServices = async (req, res) => {
                 {
                     model: db.Staff,
                     as: 'employees',
+                    where: { isActive: true },
+                    required: false,
                     through: {
                         attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     },
@@ -399,6 +401,8 @@ exports.getService = async (req, res) => {
                 {
                     model: db.Staff,
                     as: 'employees',
+                    where: { isActive: true },
+                    required: false,
                     through: {
                         attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     },
@@ -601,6 +605,8 @@ exports.createService = async (req, res) => {
                 {
                     model: db.Staff,
                     as: 'employees',
+                    where: { isActive: true },
+                    required: false,
                     through: {
                         attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     }
@@ -836,6 +842,8 @@ exports.updateService = async (req, res) => {
                 {
                     model: db.Staff,
                     as: 'employees',
+                    where: { isActive: true },
+                    required: false,
                     through: {
                         attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     }
