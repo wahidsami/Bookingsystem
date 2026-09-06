@@ -9,14 +9,18 @@ export function getSchedulerEventBoxMetrics({
   endMinutes,
   slotMinutes,
   slotHeight,
+  timelineStartMinutes = 0,
 }: {
   startMinutes: number;
   endMinutes: number;
   slotMinutes: number;
   slotHeight: number;
+  timelineStartMinutes?: number;
 }): SchedulerEventBoxMetrics {
-  const top = (Math.max(0, startMinutes) / slotMinutes) * slotHeight;
-  const bottom = (Math.max(0, endMinutes) / slotMinutes) * slotHeight;
+  const relativeStartMinutes = Math.max(0, startMinutes - timelineStartMinutes);
+  const relativeEndMinutes = Math.max(0, endMinutes - timelineStartMinutes);
+  const top = (relativeStartMinutes / slotMinutes) * slotHeight;
+  const bottom = (relativeEndMinutes / slotMinutes) * slotHeight;
   const height = Math.max(0, bottom - top);
 
   return { top, bottom, height };

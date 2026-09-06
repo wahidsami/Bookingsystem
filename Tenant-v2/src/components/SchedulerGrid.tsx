@@ -924,6 +924,7 @@ export default function SchedulerGrid({
               endMinutes: event.endMinutes,
               slotMinutes,
               slotHeight,
+              timelineStartMinutes: startHour * 60,
             });
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
