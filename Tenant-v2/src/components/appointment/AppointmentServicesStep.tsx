@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Search, Package as PackageIcon, Clock, DollarSign } from 'lucide-react';
+import { Search, Package as PackageIcon, Clock, DollarSign, Trash } from 'lucide-react';
 import { type ServiceRecord, type ServiceVariantRecord } from '../../lib/serviceContract';
 import AppointmentServiceRow from './AppointmentServiceRow';
 export interface StagedService {
   id: string;
   itemType?: 'service' | 'package';
   packageId?: string;
+  packageInstanceId?: string;
   serviceId: string;
   variantId?: string;
   serviceCategory?: string;
@@ -222,8 +223,9 @@ export default function AppointmentServicesStep({
                 if (pkgCartItems.length === 0) return null;
                 
                 const pkgGroups = pkgCartItems.reduce((acc, curr) => {
-                   if (!acc[curr.packageId!]) acc[curr.packageId!] = [];
-                   acc[curr.packageId!].push(curr);
+                   const groupKey = curr.packageInstanceId || curr.packageId!;
+                   if (!acc[groupKey]) acc[groupKey] = [];
+                   acc[groupKey].push(curr);
                    return acc;
                 }, {} as Record<string, typeof stagedServices>);
 
@@ -232,17 +234,32 @@ export default function AppointmentServicesStep({
                     <h3 className="text-xl font-medium tracking-tight text-slate-900 px-1 border-b border-slate-100 pb-2">
                       {isRtl ? 'الباقات المختارة' : 'Selected Packages'}
                     </h3>
-                    {Object.entries(pkgGroups).map(([pkgId, items]) => {
+                    {Object.entries(pkgGroups).map(([instanceId, items]) => {
+                      const pkgId = items[0].packageId;
                       const pkg = servicePackages?.find(p => p.id === pkgId);
                       if (!pkg) return null;
                       return (
-                        <div key={pkgId} className="bg-slate-50 border border-primary/20 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+                        <div key={instanceId} className="bg-slate-50 border border-primary/20 rounded-2xl p-4 shadow-sm relative overflow-hidden">
                           <div className="absolute top-0 right-0 w-full h-1 bg-primary"></div>
                           <div className="flex justify-between items-start mb-4">
                             <div>
                               <h4 className="font-bold text-slate-900 text-lg">{isRtl ? pkg.name_ar : pkg.name_en}</h4>
                               <p className="text-sm text-slate-500 mt-1">{pkg.totalPrice} {isRtl ? 'ر.س' : 'SAR'} • {pkg.totalDuration} {isRtl ? 'دقيقة' : 'min'}</p>
                             </div>
+                            <button 
+                              onClick={() => {
+                                if (onRemoveService) {
+                                  const indicesToRemove: number[] = [];
+                                  stagedServices.forEach((s, idx) => {
+                                    if ((s.packageInstanceId || s.packageId) === instanceId) indicesToRemove.push(idx);
+                                  });
+                                  indicesToRemove.reverse().forEach(idx => onRemoveService(idx));
+                                }
+                              }}
+                              className="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition"
+                            >
+                              <Trash className="w-5 h-5" />
+                            </button>
                           </div>
                           
                           <div className="space-y-3 mt-4 border-t border-slate-200 pt-4">

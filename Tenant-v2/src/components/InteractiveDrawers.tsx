@@ -157,6 +157,7 @@ interface StagedService {
   variantId?: string;
   packageId?: string;
   packageItemId?: string;
+  packageInstanceId?: string;
   serviceCategory?: string;
   staffId: string;
   startTime: number;
@@ -1587,6 +1588,7 @@ export default function InteractiveDrawers({
       let runningStartTime = nextStartTime;
 
       const sortedItems = [...pkg.items].sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
+      const packageInstanceId = `pkg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       for (const item of sortedItems) {
         const service = canonicalServices.find(s => s.id === item.serviceId);
@@ -1611,6 +1613,8 @@ export default function InteractiveDrawers({
 
         newItems.push({
           id: `stg-pkg-${pkg.id}-${item.id}-${Date.now()}-${Math.random()}`,
+          itemType: 'package',
+          packageInstanceId,
           packageId: pkg.id,
           packageItemId: item.id,
           serviceId: service.id,
@@ -1920,14 +1924,15 @@ export default function InteractiveDrawers({
       return;
     }
 
-  const executeFinalSubmission = async (itemsToSubmit: any[]) => {
+    const executeFinalSubmission = async (itemsToSubmit: any[]) => {
     // Group package items for the backend
     const standaloneItems = itemsToSubmit.filter(i => i.itemType !== 'package');
     const pkgItems = itemsToSubmit.filter(i => i.itemType === 'package');
     const groupedPackages: Record<string, any[]> = {};
     pkgItems.forEach(i => {
-      if (!groupedPackages[i.packageId]) groupedPackages[i.packageId] = [];
-      groupedPackages[i.packageId].push(i);
+      const groupKey = i.packageInstanceId || i.packageId;
+      if (!groupedPackages[groupKey]) groupedPackages[groupKey] = [];
+      groupedPackages[groupKey].push(i);
     });
 
     const formattedItems = [
@@ -1935,9 +1940,9 @@ export default function InteractiveDrawers({
         ...i,
         itemType: 'service'
       })),
-      ...Object.entries(groupedPackages).map(([pkgId, children]) => ({
+      ...Object.entries(groupedPackages).map(([_instanceId, children]) => ({
         itemType: 'package',
-        packageId: pkgId,
+        packageId: children[0].packageId,
         packageItems: children.map(c => ({
           packageItemId: c.packageItemId,
           serviceId: c.serviceId,
@@ -3253,15 +3258,17 @@ export default function InteractiveDrawers({
 
                           const pkgCartItems = stagedServices.filter(s => s.itemType === 'package');
                           const pkgGroups = pkgCartItems.reduce((acc, curr) => {
-                             if (!acc[curr.packageId!]) acc[curr.packageId!] = [];
-                             acc[curr.packageId!].push(curr);
+                             const groupKey = curr.packageInstanceId || curr.packageId!;
+                             if (!acc[groupKey]) acc[groupKey] = [];
+                             acc[groupKey].push(curr);
                              return acc;
                           }, {} as Record<string, typeof stagedServices>);
                           
-                          const packageCartItems = Object.entries(pkgGroups).map(([pkgId, items]) => {
+                          const packageCartItems = Object.entries(pkgGroups).map(([instanceId, items]: [string, any[]]) => {
+                             const pkgId = items[0].packageId;
                              const pkg = servicePackages?.find(p => p.id === pkgId);
                              return {
-                               id: pkgId,
+                               id: instanceId,
                                itemType: 'package',
                                serviceName: pkg ? (isRtl ? pkg.name_ar : pkg.name_en) : 'Package',
                                staffName: items.length + (isRtl ? ' خدمات' : ' services'),
