@@ -408,7 +408,7 @@ export default function SchedulerGrid({
   const currentMinutesSinceMidnight = getRiyadhMinutesSinceMidnight(boardCurrentTime);
   const isDayBoardMode = viewMode === 'day' || viewMode === 'team-day' || viewMode === 'employee-day';
   const normalizedNormalEndHour = Math.max(startHour + 1, Math.min(endHour, normalEndHour ?? endHour));
-  const pixelsPerHour = (slotHeight * 60) / slotMinutes;
+  const pixelsPerHour = 100;
   const currentTimeLinePosition = showCurrentTimeIndicator && isDayBoardMode && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
     ? ((currentMinutesSinceMidnight - (startHour * 60)) / 60) * pixelsPerHour
     : null;

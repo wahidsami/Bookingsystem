@@ -2383,7 +2383,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // Keep one authoritative physical hour scale and let slot resolution only subdivide it.
   const SLOT_MINUTES = 5;
-  const PIXELS_PER_HOUR = activeSchedulerSettings.timeSlotHeight * (60 / 5);
+  const PIXELS_PER_HOUR = 100;
   const SLOT_HEIGHT = (PIXELS_PER_HOUR * SLOT_MINUTES) / 60;
   const SLOT_HEIGHT_FOR_GRID = SLOT_HEIGHT;
   const START_HOUR = schedulerConfig.startHour;
