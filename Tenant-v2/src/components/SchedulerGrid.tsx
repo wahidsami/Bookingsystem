@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Users, ChevronDown, Link2, Package } from 'lucide-react';
-import { getSchedulerEventBoxMetrics } from './schedulerGeometry';
 
 export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
 
@@ -513,9 +512,8 @@ export default function SchedulerGrid({
   }, [selectionAnchor, selectionFocus]);
 
   const slotCellClassName = (isHourBoundary: boolean, isActiveHover: boolean) => [
-    'relative outline-none transition-colors border-r last:border-r-0 border-b border-slate-100/80',
-    // The hour separator sits at the row's own top edge, matching the hour label anchor.
-    isHourBoundary ? 'border-t border-t-slate-300' : '',
+    'relative outline-none transition-colors border-r last:border-r-0',
+    isHourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80',
     isActiveHover ? 'bg-amber-500/10' : 'bg-white hover:bg-slate-50/80',
     isEditable ? 'cursor-pointer' : 'cursor-default',
   ].join(' ');
@@ -810,7 +808,7 @@ export default function SchedulerGrid({
                 style={{ gridTemplateColumns, height: `${slotHeight}px`, minWidth: 'min-content' }}
               >
                 <div
-                  className={`relative flex items-start justify-center pr-2 text-[10px] font-black font-mono tracking-tight text-slate-400 ${isExtendedHourRow ? 'bg-slate-100/80' : 'bg-slate-50/60'} border-r border-slate-200 border-b border-slate-100/80 ${hourBoundary ? 'border-t border-t-slate-300' : ''}`}
+                  className={`relative flex items-start justify-center pr-2 text-[10px] font-black font-mono tracking-tight text-slate-400 ${isExtendedHourRow ? 'bg-slate-100/80' : 'bg-slate-50/60'} border-r border-slate-200 ${hourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80'}`}
                   style={{ width: timeColumnWidth }}
                 >
                   {hourBoundary && <span className="mt-[-1px]">{rowLabel}</span>}
@@ -919,13 +917,9 @@ export default function SchedulerGrid({
             const columnIndex = getColumnIndex(event.columnId);
             if (columnIndex === -1) return null;
 
-            const { top, bottom, height } = getSchedulerEventBoxMetrics({
-              startMinutes: event.startMinutes,
-              endMinutes: event.endMinutes,
-              slotMinutes,
-              slotHeight,
-              timelineStartMinutes: startHour * 60,
-            });
+            const top = minutesToPixels(event.startMinutes, slotMinutes, slotHeight);
+            const bottom = minutesToPixels(event.endMinutes, slotMinutes, slotHeight);
+            const height = Math.max(0, bottom - top);
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
             const inlineStart = `calc(${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;
