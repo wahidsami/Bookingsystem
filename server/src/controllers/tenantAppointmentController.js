@@ -3052,28 +3052,11 @@ exports.rescheduleAppointment = async (req, res) => {
             });
         }
 
-        if (!['pending', 'confirmed'].includes(appointment.status)) {
+        if (!['pending', 'confirmed', 'checked_in', 'in_service', 'no_show'].includes(appointment.status)) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
-                message: 'Only pending or confirmed appointments can be rescheduled'
-            });
-        }
-
-        const hoursUntilCurrentStart = (new Date(appointment.startTime).getTime() - Date.now()) / (60 * 60 * 1000);
-        if (hoursUntilCurrentStart <= 24) {
-            await transaction.rollback();
-            return res.status(400).json({
-                success: false,
-                message: 'Appointments can only be rescheduled more than 24 hours before the original start time'
-            });
-        }
-
-        if (requestedStart.getTime() <= Date.now()) {
-            await transaction.rollback();
-            return res.status(400).json({
-                success: false,
-                message: 'New appointment time must be in the future'
+                message: 'Only active or no-show appointments can be rescheduled'
             });
         }
 
@@ -3120,7 +3103,8 @@ exports.rescheduleAppointment = async (req, res) => {
             tenantId,
             serviceId: appointment.serviceId,
             staffId: requestedStaffId,
-            startTime: requestedStart
+            startTime: requestedStart,
+            excludeAppointmentId: appointment.id
         });
         if (!slotAvailable) {
             await transaction.rollback();
@@ -3295,14 +3279,6 @@ exports.reassignRescheduleAppointment = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid startTime'
-            });
-        }
-
-        if (requestedStart.getTime() <= Date.now()) {
-            await transaction.rollback();
-            return res.status(400).json({
-                success: false,
-                message: 'New appointment time must be in the future'
             });
         }
 

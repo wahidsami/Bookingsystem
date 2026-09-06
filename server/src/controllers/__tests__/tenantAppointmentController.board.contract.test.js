@@ -299,6 +299,131 @@ describe('tenantAppointmentController.reassignRescheduleAppointment', () => {
         }));
     });
 
+    it('allows rescheduling an arrived (checked_in) appointment even if past its original time', async () => {
+        const appointment = {
+            id: 'appt-arrived-1',
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            requestedStaffId: 'staff-1',
+            assignmentMode: 'unknown',
+            serviceId: 'service-1',
+            status: 'checked_in',
+            paymentStatus: 'unpaid',
+            platformUserId: null,
+            bookingNumber: 'B-000003',
+            startTime: new Date(Date.now() - 3600000), // 1 hour ago
+            endTime: new Date(Date.now() - 1800000),
+            service: { id: 'service-1', tenantId: 'tenant-1', name_en: 'Massage', name_ar: 'مساج' },
+            staff: { id: 'staff-1', tenantId: 'tenant-1', name: 'Staff 1' },
+            user: null,
+            save: jest.fn().mockResolvedValue(undefined)
+        };
+        mockDb.Appointment.findOne.mockResolvedValue(appointment);
+
+        const req = {
+            tenantId: 'tenant-1',
+            params: { id: 'appt-arrived-1' },
+            body: {
+                staffId: 'staff-2',
+                startTime: '2026-10-02T09:00:00.000Z',
+                notifyCustomer: false
+            }
+        };
+        const res = createRes();
+
+        await controller.reassignRescheduleAppointment(req, res);
+
+        expect(res.status).not.toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            success: true
+        }));
+        expect(appointment.save).toHaveBeenCalled();
+    });
+
+    it('allows rescheduling an in_service appointment even if past its original time', async () => {
+        const appointment = {
+            id: 'appt-in-service-1',
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            requestedStaffId: 'staff-1',
+            assignmentMode: 'unknown',
+            serviceId: 'service-1',
+            status: 'in_service',
+            paymentStatus: 'unpaid',
+            platformUserId: null,
+            bookingNumber: 'B-000004',
+            startTime: new Date(Date.now() - 3600000),
+            endTime: new Date(Date.now() - 1800000),
+            service: { id: 'service-1', tenantId: 'tenant-1', name_en: 'Massage', name_ar: 'مساج' },
+            staff: { id: 'staff-1', tenantId: 'tenant-1', name: 'Staff 1' },
+            user: null,
+            save: jest.fn().mockResolvedValue(undefined)
+        };
+        mockDb.Appointment.findOne.mockResolvedValue(appointment);
+
+        const req = {
+            tenantId: 'tenant-1',
+            params: { id: 'appt-in-service-1' },
+            body: {
+                staffId: 'staff-2',
+                startTime: '2026-10-02T09:00:00.000Z',
+                notifyCustomer: false
+            }
+        };
+        const res = createRes();
+
+        await controller.reassignRescheduleAppointment(req, res);
+
+        expect(res.status).not.toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            success: true
+        }));
+        expect(appointment.save).toHaveBeenCalled();
+    });
+
+    it('passes excludeAppointmentId during drag and drop reassign-reschedule', async () => {
+        const appointment = {
+            id: 'appt-self-conflict-1',
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            requestedStaffId: 'staff-1',
+            assignmentMode: 'unknown',
+            serviceId: 'service-1',
+            status: 'pending',
+            paymentStatus: 'unpaid',
+            platformUserId: null,
+            bookingNumber: 'B-000005',
+            startTime: new Date(Date.now() - 3600000),
+            endTime: new Date(Date.now() - 1800000),
+            service: { id: 'service-1', tenantId: 'tenant-1', name_en: 'Massage', name_ar: 'مساج' },
+            staff: { id: 'staff-1', tenantId: 'tenant-1', name: 'Staff 1' },
+            user: null,
+            save: jest.fn().mockResolvedValue(undefined)
+        };
+        mockDb.Appointment.findOne.mockResolvedValue(appointment);
+
+        const req = {
+            tenantId: 'tenant-1',
+            params: { id: 'appt-self-conflict-1' },
+            body: {
+                staffId: 'staff-1',
+                startTime: '2026-10-02T09:00:00.000Z',
+                notifyCustomer: false
+            }
+        };
+        const res = createRes();
+
+        await controller.reassignRescheduleAppointment(req, res);
+
+        expect(bookingService.hasConflict).toHaveBeenCalledWith(
+            'staff-1',
+            expect.any(Date),
+            expect.any(Date),
+            'appt-self-conflict-1',
+            expect.anything()
+        );
+    });
+
     it('Test 1 - self-overlap allowed: reschedule to a slightly overlapping time succeeds if no other conflict', async () => {
         const appointment = {
             id: 'appt-self-overlap',

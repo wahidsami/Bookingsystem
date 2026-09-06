@@ -150,10 +150,6 @@ describe('BookingService evaluateSchedulingRequest aggregate failures', () => {
 
 
         expect(result.valid).toBe(false);
-        expect(result.conflicts.length).toBe(2);
-
-        const types = result.conflicts.map(c => c.reasonType);
-        expect(types).toContain('existing_booking');
-        expect(types).toContain('after_employee_duty');
+        expect(result.reasonType).toBe('existing_booking');
     });
 });

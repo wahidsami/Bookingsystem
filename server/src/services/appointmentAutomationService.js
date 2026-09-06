@@ -130,7 +130,7 @@ const autoMarkNoShowForAppointment = async (appointment, settings, now = new Dat
         return { updated: false, reason: 'disabled' };
     }
 
-    if (!ACTIVE_APPOINTMENT_STATUSES.includes(appointment.status)) {
+    if (![APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED].includes(appointment.status)) {
         return { updated: false, reason: 'inactive' };
     }
 
@@ -190,7 +190,7 @@ const processAppointmentAutomation = async ({ now = new Date(), windowHours = 24
 
     const appointments = await db.Appointment.findAll({
         where: {
-            status: { [Op.in]: ACTIVE_APPOINTMENT_STATUSES },
+            status: { [Op.in]: [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED] },
             startTime: { [Op.between]: [windowStart, windowEnd] }
         },
         attributes: [
