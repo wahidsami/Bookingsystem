@@ -35,6 +35,7 @@ import {
   buildTenantIsoFromMinutes,
   resolveTenantTimezone
 , getDatePartsInTimeZone } from '../lib/tenantTime';
+import { resolveBookingDuration } from '../lib/bookingDuration';
 import {
   buildAdvanceBookingDialog,
   buildExtendedHoursBookingDialog,
@@ -1545,7 +1546,7 @@ export default function InteractiveDrawers({
         staffId: defaultStaffId,
         startTime: nextStartTime,
         startTimeIso: nextStartTimeIso,
-        duration: resolvedVariant?.duration || service.duration || 60,
+        duration: resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration),
         discountType: 'none',
         discountValue: 0,
         notes: '',
@@ -1602,7 +1603,7 @@ export default function InteractiveDrawers({
           : null;
 
         const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
-        const duration = resolvedVariant?.duration || service.duration || 60;
+        const duration = resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration);
 
         let staffId = item.defaultStaffId || currentStaffId || '';
         const normalizedAssignments = (service.employeeAssignments || []).map(id => String(id));
@@ -1808,7 +1809,7 @@ export default function InteractiveDrawers({
         totalRawPrice += priceAfterDisc;
         serviceNamesEn.push(variant ? `${srv.nameEn} / ${variant.nameEn}` : srv.nameEn);
         serviceNamesAr.push(variant ? `${srv.nameAr} / ${variant.nameAr}` : srv.nameAr);
-        totalDuration += variant?.duration || item.duration;
+        totalDuration += resolveBookingDuration(item.duration, variant?.duration, srv.duration);
       }
     });
 
@@ -1840,6 +1841,7 @@ export default function InteractiveDrawers({
       const variant = service?.variants.find((entry) => entry.id === item.variantId) || service?.variants[0] || null;
       const requestStartIso = getSyncedStagedStartIso(item);
       const packageId = (item as any).packageId;
+      const resolvedDuration = resolveBookingDuration(item.duration, variant?.duration, service?.duration);
 
       if (packageId) {
         if (!groupedPackages.has(packageId)) {
@@ -1859,11 +1861,11 @@ export default function InteractiveDrawers({
           staffId: item.staffId,
           requestedStaffId: item.staffId,
           startTime: requestStartIso,
-          duration: variant?.duration || item.duration,
+          duration: resolvedDuration,
           assignmentMode: 'tenant_reassigned',
           packageItemId: (item as any).packageItemId || undefined,
           overtimeApproval: item.overtimeApproval || (allowExtendedHours
-            && (boardStartHour * 60) + item.startTime + Number(variant?.duration || item.duration || 0) > normalClosingMinutes
+            && (boardStartHour * 60) + item.startTime + Number(resolvedDuration || 0) > normalClosingMinutes
             ? { approved: true }
             : undefined)
         });
@@ -1874,7 +1876,7 @@ export default function InteractiveDrawers({
           requestedStaffId: item.staffId,
           startTime: requestStartIso,
           notes: item.notes || undefined,
-          duration: variant?.duration || item.duration,
+          duration: resolvedDuration,
           price: variant ? toMoney(variant.finalPrice ?? variant.price) : (service ? toMoney(service.price) : 0),
           discountType: item.discountType,
           discountValue: item.discountValue,
@@ -1882,7 +1884,7 @@ export default function InteractiveDrawers({
           assignmentMode: 'tenant_reassigned',
           variantId: variant?.id || undefined,
           overtimeApproval: item.overtimeApproval || (allowExtendedHours
-            && (boardStartHour * 60) + item.startTime + Number(variant?.duration || item.duration || 0) > normalClosingMinutes
+            && (boardStartHour * 60) + item.startTime + Number(resolvedDuration || 0) > normalClosingMinutes
             ? { approved: true }
             : undefined),
           serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined,
@@ -3246,13 +3248,15 @@ export default function InteractiveDrawers({
                               finalPrice = Math.max(0, basePrice - (basePrice * item.discountValue) / 100);
                             }
 
+                            const resolvedDuration = resolveBookingDuration(item.duration, variant?.duration, srv?.duration);
+
                             return {
                               id: item.id,
                               index,
                               itemType: 'service',
                               serviceName: srv ? `${isRtl ? srv.nameAr : srv.nameEn}${variant ? ` / ${isRtl ? variant.nameAr : variant.nameEn}` : ''}` : item.serviceId,
                               staffName: isRtl ? staff?.nameAr : staff?.nameEn,
-                              duration: variant?.duration || item.duration,
+                              duration: resolvedDuration,
                               startTime: item.startTime,
                               price: finalPrice,
                               basePrice,
