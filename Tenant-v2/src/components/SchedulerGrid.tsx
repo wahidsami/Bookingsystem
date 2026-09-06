@@ -537,7 +537,7 @@ export default function SchedulerGrid({
       let clusterEnd = -1;
 
       sortedEvents.forEach((event) => {
-        const eventEnd = event.startMinutes + Math.max(slotMinutes, event.durationMinutes);
+        const eventEnd = event.startMinutes + event.durationMinutes;
         if (activeCluster.length === 0) {
           activeCluster = [event];
           clusterEnd = eventEnd;
@@ -569,7 +569,7 @@ export default function SchedulerGrid({
             return (b.startMinutes + b.durationMinutes) - (a.startMinutes + a.durationMinutes);
           })
           .map((event) => {
-            const eventEnd = event.startMinutes + Math.max(slotMinutes, event.durationMinutes);
+            const eventEnd = event.startMinutes + event.durationMinutes;
             let laneIndex = lanes.findIndex((lane) => lane.lastEnd <= event.startMinutes);
             if (laneIndex === -1) {
               laneIndex = lanes.length;
@@ -645,7 +645,7 @@ export default function SchedulerGrid({
 
             // Calc x1, y1
             const top1 = (Math.max(0, ev1.startMinutes) / slotMinutes) * slotHeight;
-            const height1 = Math.max(slotHeight, (Math.max(ev1.durationMinutes, slotMinutes) / slotMinutes) * slotHeight);
+            const height1 = (ev1.durationMinutes / slotMinutes) * slotHeight;
             const laneWidthPx1 = cellWidth / Math.max(1, ev1.laneCount);
             const eventCardWidth1 = laneWidthPx1 - 8;
             const inlineStart1 = (colIdx1 * cellWidth) + (ev1.laneIndex * laneWidthPx1);
@@ -909,7 +909,7 @@ export default function SchedulerGrid({
             if (columnIndex === -1) return null;
 
             const top = (Math.max(0, event.startMinutes) / slotMinutes) * slotHeight;
-            const height = Math.max(slotHeight, (Math.max(event.durationMinutes, slotMinutes) / slotMinutes) * slotHeight);
+            const height = (event.durationMinutes / slotMinutes) * slotHeight;
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
             const inlineStart = `calc(${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;
