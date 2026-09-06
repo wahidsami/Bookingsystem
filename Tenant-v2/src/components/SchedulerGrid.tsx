@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Users, ChevronDown, Link2, Package } from 'lucide-react';
+import { getSchedulerEventBoxMetrics } from './schedulerGeometry';
 
 export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
 
@@ -918,9 +919,12 @@ export default function SchedulerGrid({
             const columnIndex = getColumnIndex(event.columnId);
             if (columnIndex === -1) return null;
 
-            const top = minutesToPixels(event.startMinutes, slotMinutes, slotHeight);
-            const bottom = minutesToPixels(event.endMinutes, slotMinutes, slotHeight);
-            const height = Math.max(0, bottom - top);
+            const { top, bottom, height } = getSchedulerEventBoxMetrics({
+              startMinutes: event.startMinutes,
+              endMinutes: event.endMinutes,
+              slotMinutes,
+              slotHeight,
+            });
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
             const inlineStart = `calc(${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;
