@@ -1506,7 +1506,7 @@ exports.getAppointments = async (req, res) => {
                 where: {
                     tenantId,
                     endTime: { [db.Sequelize.Op.lt]: now },
-                    status: { [db.Sequelize.Op.notIn]: ['completed', 'cancelled', 'no_show'] }
+                    status: { [db.Sequelize.Op.in]: ['pending', 'confirmed'] }
                 }
             }
         );
@@ -2070,7 +2070,7 @@ exports.getAppointment = async (req, res) => {
                     id,
                     tenantId,
                     endTime: { [db.Sequelize.Op.lt]: now },
-                    status: { [db.Sequelize.Op.notIn]: ['completed', 'cancelled', 'no_show'] }
+                    status: { [db.Sequelize.Op.in]: ['pending', 'confirmed'] }
                 }
             }
         );
@@ -2351,6 +2351,8 @@ exports.updateAppointmentStatus = async (req, res) => {
         }
         if (normalizedStatus === 'no_show' && !appointment.noShowMarkedAt) {
             appointment.noShowMarkedAt = new Date();
+        } else if (normalizedStatus !== 'no_show' && appointment.noShowMarkedAt) {
+            appointment.noShowMarkedAt = null;
         }
 
         console.log('[TRACE] Validation currently executing: save()');
