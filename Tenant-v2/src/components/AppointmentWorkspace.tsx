@@ -4232,44 +4232,46 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         };
       });
 
-  const schedulerEvents: SchedulerEvent[] = schedulerAppointments.map((apt) => {
-    const staff = liveStylists.find((stylist) => stylist.id === apt.staffId);
-    const columnId = getSchedulerColumnId(viewMode, isDayBoardMode(viewMode) ? apt.staffId : (apt.date || getSelectedDateKey()));
-    const title = isRtl ? apt.customerNameAr : apt.customerNameEn;
-    const subtitle = isRtl ? apt.serviceNameAr : apt.serviceNameEn;
+  const schedulerEvents: SchedulerEvent[] = useMemo(() => {
+    return schedulerAppointments.map((apt) => {
+      const staff = liveStylists.find((stylist) => stylist.id === apt.staffId);
+      const columnId = getSchedulerColumnId(viewMode, isDayBoardMode(viewMode) ? apt.staffId : (apt.date || getSelectedDateKey()));
+      const title = isRtl ? apt.customerNameAr : apt.customerNameEn;
+      const subtitle = isRtl ? apt.serviceNameAr : apt.serviceNameEn;
 
-    return {
-      id: apt.id,
-      appointmentId: apt.appointmentId || apt.id,
-      columnId,
-      dateKey: apt.date || getSelectedDateKey(),
-      // Real timeline coordinates only: never clamp/shift start before deriving end.
-      // Off-window clipping is handled independently by SchedulerGrid's own top/bottom math.
-      startMinutes: apt.startTime,
-      endMinutes: apt.startTime + (Number(apt.duration) || 0),
-      durationMinutes: (Number(apt.duration) || 0),
-      title,
-      subtitle,
-      variantLabel: isRtl ? (apt.serviceVariantDescription || apt.serviceVariantName || '') : (apt.serviceVariantName || apt.serviceVariantDescription || ''),
-      variantDescription: apt.serviceVariantDescription || apt.serviceVariantName || '',
-      notes: apt.notes,
-      price: apt.price,
-      paymentStatus: apt.paymentStatus,
-      status: apt.status,
-      kind: apt.type || 'appointment',
-      blockedType: apt.blockedType,
-      isGroupBooking: apt.isGroupBooking,
-      guestCount: apt.guestCount,
-      hasNotes: apt.hasNotes,
-      avatar: apt.avatar || undefined,
-      staffAvatar: apt.staffAvatar || staff?.avatar,
-      assignedStaffName: apt.assignedStaffName || staff?.nameEn || staff?.name || '',
-      assignedStaffRole: staff ? (isRtl ? staff.roleAr : staff.roleEn) : '',
-      role: isRtl ? staff?.roleAr : staff?.roleEn,
-      raw: apt,
-      isPackage: Boolean(apt.packageId || apt.packageSnapshot),
-    };
-  });
+      return {
+        id: apt.id,
+        appointmentId: apt.appointmentId || apt.id,
+        columnId,
+        dateKey: apt.date || getSelectedDateKey(),
+        // Real timeline coordinates only: never clamp/shift start before deriving end.
+        // Off-window clipping is handled independently by SchedulerGrid's own top/bottom math.
+        startMinutes: apt.startTime,
+        endMinutes: apt.startTime + (Number(apt.duration) || 0),
+        durationMinutes: (Number(apt.duration) || 0),
+        title,
+        subtitle,
+        variantLabel: isRtl ? (apt.serviceVariantDescription || apt.serviceVariantName || '') : (apt.serviceVariantName || apt.serviceVariantDescription || ''),
+        variantDescription: apt.serviceVariantDescription || apt.serviceVariantName || '',
+        notes: apt.notes,
+        price: apt.price,
+        paymentStatus: apt.paymentStatus,
+        status: apt.status,
+        kind: apt.type || 'appointment',
+        blockedType: apt.blockedType,
+        isGroupBooking: apt.isGroupBooking,
+        guestCount: apt.guestCount,
+        hasNotes: apt.hasNotes,
+        avatar: apt.avatar || undefined,
+        staffAvatar: apt.staffAvatar || staff?.avatar,
+        assignedStaffName: apt.assignedStaffName || staff?.nameEn || staff?.name || '',
+        assignedStaffRole: staff ? (isRtl ? staff.roleAr : staff.roleEn) : '',
+        role: isRtl ? staff?.roleAr : staff?.roleEn,
+        raw: apt,
+        isPackage: Boolean(apt.packageId || apt.packageSnapshot),
+      };
+    });
+  }, [schedulerAppointments, liveStylists, viewMode, isRtl, selectedDateKey]);
 
   const focusedEmployee = isEmployeeBoardMode(viewMode) && focusedEmployeeId
     ? liveStylists.find((stylist) => stylist.id === focusedEmployeeId) || null
