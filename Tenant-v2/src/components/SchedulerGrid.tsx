@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Users, ChevronDown, Link2 } from 'lucide-react';
+import { Users, ChevronDown, Link2, Package } from 'lucide-react';
 
 export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
 
@@ -43,6 +43,7 @@ export interface SchedulerEvent {
   serviceCategory?: string;
   role?: string;
   raw?: any;
+  isPackage?: boolean;
 }
 
 export interface SchedulerSlot {
@@ -977,6 +978,7 @@ export default function SchedulerGrid({
                     <div className="flex min-w-0 flex-col gap-1 p-0.5 overflow-hidden">
                       <div className="flex items-center justify-between gap-2">
                         <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
+                          {event.isPackage ? <Package size={10} className="inline mr-1 text-amber-600" /> : null}
                           {event.title || 'Customer'}
                         </p>
                         {showChainIndicator && (
