@@ -162,9 +162,10 @@ class AvailabilityService {
      * @param {string} serviceId - Service ID (required)
      * @param {string} staffId - Staff ID (optional, null = any staff)
      * @param {string} date - Date in YYYY-MM-DD format
+     * @param {string} excludeAppointmentId - Appointment ID to exclude from availability calculation
      * @returns {Promise<Object>} Available slots with metadata
      */
-    async getAvailableSlots(tenantId, { serviceId, staffId, date, variantId }) {
+    async getAvailableSlots(tenantId, { serviceId, staffId, date, variantId, excludeAppointmentId }) {
         if (!serviceId || !date) {
             throw new Error('serviceId and date are required');
         }
@@ -209,7 +210,8 @@ class AvailabilityService {
                 totalSlotLength,
                 stepSize,
                 timezone,
-                serviceVariant?.id || null
+                serviceVariant?.id || null,
+                excludeAppointmentId
             );
         }
 
@@ -224,7 +226,8 @@ class AvailabilityService {
             totalSlotLength,
             stepSize,
             timezone,
-            serviceVariant?.id || null
+            serviceVariant?.id || null,
+            excludeAppointmentId
         );
     }
 
@@ -232,7 +235,7 @@ class AvailabilityService {
      * Get available slots for a specific staff member
      * @private
      */
-    async _getSlotsForStaff(tenantId, serviceId, staffId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null) {
+    async _getSlotsForStaff(tenantId, serviceId, staffId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null, excludeAppointmentId = null) {
         // Validate staff exists and can perform service
         const staff = await db.Staff.findByPk(staffId);
         if (!staff) throw new Error('Staff not found');
@@ -299,7 +302,7 @@ class AvailabilityService {
         }
 
         // Get existing appointments for the day
-        const existingAppointments = await this._getExistingAppointments(staffId, date, timezone);
+        const existingAppointments = await this._getExistingAppointments(staffId, date, excludeAppointmentId);
         const diagnostics = this._buildAvailabilityDiagnostics({
             staffId,
             staffName: staff.name,
@@ -363,7 +366,7 @@ class AvailabilityService {
      * Get available slots for any eligible staff (for "Any Staff" selection)
      * @private
      */
-    async _getSlotsForAnyStaff(tenantId, serviceId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null) {
+    async _getSlotsForAnyStaff(tenantId, serviceId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null, excludeAppointmentId = null) {
         // Get all staff who can perform this service
         const serviceEmployees = await db.ServiceEmployee.findAll({
             where: { serviceId }
@@ -406,7 +409,7 @@ class AvailabilityService {
         for (const staff of staffMembers) {
             try {
                 // Calculate workload for deterministic tie-breaking
-                const appointments = await this._getExistingAppointments(staff.id, date);
+                const appointments = await this._getExistingAppointments(staff.id, date, excludeAppointmentId);
                 staffWorkloads.set(staff.id, appointments.length);
 
                 const result = await this._getSlotsForStaff(
@@ -420,7 +423,8 @@ class AvailabilityService {
                 totalSlotLength,
                 stepSize,
                 timezone,
-                variantId
+                variantId,
+                excludeAppointmentId
             );
                 
                 // Add staff info to each slot
@@ -918,18 +922,24 @@ class AvailabilityService {
      * Get existing appointments for a staff member on a date
      * @private
      */
-    async _getExistingAppointments(staffId, date) {
+    async _getExistingAppointments(staffId, date, excludeAppointmentId = null) {
         const startOfDay = new Date(date);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
 
+        const where = {
+            staffId,
+            startTime: { [Op.between]: [startOfDay, endOfDay] },
+            status: { [Op.notIn]: ['cancelled', 'no_show'] }
+        };
+
+        if (excludeAppointmentId) {
+            where.id = { [Op.ne]: excludeAppointmentId };
+        }
+
         return await db.Appointment.findAll({
-            where: {
-                staffId,
-                startTime: { [Op.between]: [startOfDay, endOfDay] },
-                status: { [Op.notIn]: ['cancelled', 'no_show'] }
-            },
+            where,
             order: [['startTime', 'ASC']]
         });
     }

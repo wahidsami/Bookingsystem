@@ -298,6 +298,144 @@ describe('tenantAppointmentController.reassignRescheduleAppointment', () => {
             message: 'Closed appointments cannot be changed'
         }));
     });
+
+    it('Test 1 - self-overlap allowed: reschedule to a slightly overlapping time succeeds if no other conflict', async () => {
+        const appointment = {
+            id: 'appt-self-overlap',
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            requestedStaffId: 'staff-1',
+            assignmentMode: 'unknown',
+            serviceId: 'service-1',
+            status: 'pending',
+            paymentStatus: 'unpaid',
+            platformUserId: null,
+            bookingNumber: 'B-000005',
+            startTime: new Date('2026-10-01T15:30:00.000Z'),
+            endTime: new Date('2026-10-01T16:30:00.000Z'),
+            service: { id: 'service-1', tenantId: 'tenant-1', name_en: 'Massage', name_ar: 'مساج' },
+            staff: { id: 'staff-1', tenantId: 'tenant-1', name: 'Staff 1' },
+            user: null,
+            save: jest.fn().mockResolvedValue(undefined)
+        };
+        mockDb.Appointment.findOne.mockResolvedValue(appointment);
+        bookingService.hasConflict.mockResolvedValue(false);
+        // The slot is marked available because the secondary check also correctly excludes the self-conflict
+        availabilityService.getAvailableSlots.mockResolvedValue({ slots: [{ available: true, startTime: '2026-10-01T15:50:00.000Z', endTime: '2026-10-01T16:50:00.000Z' }] });
+
+        const req = {
+            tenantId: 'tenant-1',
+            params: { id: 'appt-self-overlap' },
+            body: {
+                staffId: 'staff-1',
+                startTime: '2026-10-01T15:50:00.000Z',
+                notifyCustomer: false
+            }
+        };
+        const res = createRes();
+
+        await controller.reassignRescheduleAppointment(req, res);
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(appointment.save).toHaveBeenCalled();
+        
+        // Test 4 - same appointment ID is excluded
+        expect(availabilityService.getAvailableSlots).toHaveBeenCalledWith(
+            'tenant-1',
+            expect.objectContaining({
+                serviceId: 'service-1',
+                staffId: 'staff-1',
+                excludeAppointmentId: 'appt-self-overlap'
+            })
+        );
+    });
+
+    it('Test 3 - genuine conflict still blocks', async () => {
+        const appointment = {
+            id: 'appt-conflict',
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            requestedStaffId: 'staff-1',
+            assignmentMode: 'unknown',
+            serviceId: 'service-1',
+            status: 'pending',
+            paymentStatus: 'unpaid',
+            platformUserId: null,
+            bookingNumber: 'B-000006',
+            startTime: new Date('2026-10-01T15:30:00.000Z'),
+            endTime: new Date('2026-10-01T16:30:00.000Z'),
+            service: { id: 'service-1', tenantId: 'tenant-1', name_en: 'Massage', name_ar: 'مساج' },
+            staff: { id: 'staff-1', tenantId: 'tenant-1', name: 'Staff 1' },
+            user: null,
+            save: jest.fn()
+        };
+        mockDb.Appointment.findOne.mockResolvedValue(appointment);
+        bookingService.hasConflict.mockResolvedValue(true); // genuine conflict from primary check
+
+        const req = {
+            tenantId: 'tenant-1',
+            params: { id: 'appt-conflict' },
+            body: {
+                staffId: 'staff-1',
+                startTime: '2026-10-01T16:00:00.000Z',
+                notifyCustomer: false
+            }
+        };
+        const res = createRes();
+
+        await controller.reassignRescheduleAppointment(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false, message: 'Selected slot is not available' }));
+    });
+
+    it('Test 5 - status policy remains intact (NO_SHOW / ARRIVED reschedulable, CANCELLED rejected)', async () => {
+        const baseAppointment = {
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            requestedStaffId: 'staff-1',
+            assignmentMode: 'unknown',
+            serviceId: 'service-1',
+            paymentStatus: 'unpaid',
+            platformUserId: null,
+            startTime: new Date('2026-10-01T09:00:00.000Z'),
+            endTime: new Date('2026-10-01T10:00:00.000Z'),
+            service: { id: 'service-1', tenantId: 'tenant-1', name_en: 'Massage', name_ar: 'مساج' },
+            staff: { id: 'staff-1', tenantId: 'tenant-1', name: 'Staff 1' },
+            user: null,
+            save: jest.fn().mockResolvedValue(undefined)
+        };
+
+        bookingService.hasConflict.mockResolvedValue(false);
+        availabilityService.getAvailableSlots.mockResolvedValue({ slots: [{ available: true, startTime: '2026-10-02T09:00:00.000Z', endTime: '2026-10-02T10:00:00.000Z' }] });
+
+        const req = {
+            tenantId: 'tenant-1',
+            body: { staffId: 'staff-2', startTime: '2026-10-02T09:00:00.000Z', notifyCustomer: false }
+        };
+        const res = createRes();
+
+        // NO_SHOW -> Allowed
+        mockDb.Appointment.findOne.mockResolvedValue({ ...baseAppointment, id: 'appt-ns', status: 'no_show', bookingNumber: 'B-NS' });
+        req.params = { id: 'appt-ns' };
+        await controller.reassignRescheduleAppointment(req, res);
+        expect(baseAppointment.save).toHaveBeenCalled();
+
+        // ARRIVED -> Allowed
+        jest.clearAllMocks();
+        mockDb.Appointment.findOne.mockResolvedValue({ ...baseAppointment, id: 'appt-ar', status: 'arrived', bookingNumber: 'B-AR' });
+        req.params = { id: 'appt-ar' };
+        await controller.reassignRescheduleAppointment(req, res);
+        expect(baseAppointment.save).toHaveBeenCalled();
+
+        // CANCELLED -> Rejected
+        jest.clearAllMocks();
+        mockDb.Appointment.findOne.mockResolvedValue({ ...baseAppointment, id: 'appt-cx', status: 'cancelled', bookingNumber: 'B-CX' });
+        req.params = { id: 'appt-cx' };
+        await controller.reassignRescheduleAppointment(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Closed appointments cannot be changed' }));
+    });
 });
 
 describe('tenantAppointmentController.getAppointmentsBoard', () => {

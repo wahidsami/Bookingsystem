@@ -279,7 +279,7 @@ function getDatePartsInTimeZone(date, timeZone = 'Asia/Riyadh') {
     };
 }
 
-async function ensureStaffSlotAvailable({ tenantId, serviceId, staffId, startTime }) {
+async function ensureStaffSlotAvailable({ tenantId, serviceId, staffId, startTime, excludeAppointmentId = null }) {
     if (!tenantId || !serviceId || !staffId || !startTime) return false;
     const requestedStart = new Date(startTime);
     if (Number.isNaN(requestedStart.getTime())) return false;
@@ -293,7 +293,8 @@ async function ensureStaffSlotAvailable({ tenantId, serviceId, staffId, startTim
     const availability = await availabilityService.getAvailableSlots(tenantId, {
         serviceId,
         staffId,
-        date: requestedParts.dateKey
+        date: requestedParts.dateKey,
+        excludeAppointmentId
     });
 
     return (availability?.slots || []).some((slot) => {
@@ -3406,7 +3407,8 @@ exports.reassignRescheduleAppointment = async (req, res) => {
             tenantId,
             serviceId: appointment.serviceId,
             staffId,
-            startTime: requestedStart
+            startTime: requestedStart,
+            excludeAppointmentId: appointment.id
         });
         if (!slotAvailable) {
             await transaction.rollback();
