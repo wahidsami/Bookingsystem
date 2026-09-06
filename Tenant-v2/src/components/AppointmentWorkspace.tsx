@@ -4383,6 +4383,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   };
 
   const handleSchedulerSlotDrop = (slot: SchedulerSlot, draggedEventId: string) => {
+    console.log('[DRAG_DROP_TRACE] 3. drop received - draggedEventId:', draggedEventId);
     if (!isBoardEditable) {
       return;
     }
@@ -4392,6 +4393,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
+    console.log('[DRAG_DROP_TRACE] 4. source appointment id:', movedAppointment.id);
+    console.log('[DRAG_DROP_TRACE] 5. source status:', movedAppointment.status);
+    console.log('[DRAG_DROP_TRACE] 6. source start/end:', movedAppointment.startTime, movedAppointment.startTime + movedAppointment.duration);
+
     const targetDateKey = slot.dateKey || getSelectedDateKey();
     const targetStaffId = isDayBoardMode(viewMode)
       ? (slot.employeeId || parseSchedulerColumnResourceId(slot.columnId))
@@ -4399,7 +4404,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const serviceName = isRtl ? movedAppointment.serviceNameAr : movedAppointment.serviceNameEn;
     const targetStaff = liveStylists.find((staff) => staff.id === targetStaffId);
     const sourceStaff = liveStylists.find((staff) => staff.id === movedAppointment.staffId);
+    
+    console.log('[DRAG_DROP_TRACE] 7. destination date/time:', targetDateKey, slot.startMinutes);
+    console.log('[DRAG_DROP_TRACE] 8. destination staff:', targetStaffId);
+    console.log('[DRAG_DROP_TRACE] 9. validation started');
+    
     const canMove = canAssignServiceToStaff(movedAppointment.serviceId, targetStaffId);
+    
+    console.log('[DRAG_DROP_TRACE] 10. validation finished - canMove:', canMove);
 
     if (!canMove) {
       setDragConflictDialog({
@@ -4437,11 +4449,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     try {
-      await tenantApiAdapter.reassignRescheduleAppointment(dragMoveDialog.appointmentId, {
+      console.log('[DRAG_DROP_TRACE] 11. API request started');
+      const res = await tenantApiAdapter.reassignRescheduleAppointment(dragMoveDialog.appointmentId, {
         staffId: dragMoveDialog.targetStaffId,
         startTime: buildIsoFromMinutes(dragMoveDialog.targetDateKey, dragMoveDialog.targetStartMinutes),
         notifyCustomer: dragMoveDialog.notifyCustomer
       });
+      console.log('[DRAG_DROP_TRACE] 12. API request completed');
+      console.log('[DRAG_DROP_TRACE] 13. response status:', res);
+
+      console.log('[DRAG_DROP_TRACE] 14. state update started');
       setActiveAppointment((current) => current && current.id === movedAppointment.id
         ? {
             ...current,
@@ -4453,7 +4470,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         : current
       );
       setDragMoveDialog(null);
+      
+      console.log('[DRAG_DROP_TRACE] 15. board refresh started');
       await loadBoardData();
+      console.log('[DRAG_DROP_TRACE] 16. board refresh completed');
+      
       emitBIReportRefresh({
         source: 'appointment-workspace',
         kind: 'appointment-moved',
@@ -5413,8 +5434,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   onSlotRangeSelect={handleSchedulerSlotRangeSelect}
                   onEventClick={handleSchedulerEventClick}
                   onEventContextMenu={handleSchedulerEventContextMenu}
-                  onEventDragStart={(eventItem) => setDraggedAptId(eventItem.id)}
+                  onEventDragStart={(eventItem) => {
+                    console.log('[DRAG_DROP_TRACE] 1. dragStart - eventItem:', eventItem.id);
+                    setDraggedAptId(eventItem.id);
+                  }}
                   onEventDragEnd={() => {
+                    console.log('[DRAG_DROP_TRACE] 2. dragEnd');
                     setDraggedAptId(null);
                   }}
                   onEventResizeStart={(eventItem, mouseEvent) => {
