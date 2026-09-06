@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Users, ChevronDown, Link2, Package } from 'lucide-react';
+import { getSchedulerEventBoxMetrics } from './schedulerGeometry';
 
 export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
 
@@ -108,12 +109,13 @@ const DEFAULT_END_HOUR = 21;
 const DEFAULT_TIME_COLUMN_WIDTH = 84;
 const DEFAULT_SLOT_HEIGHT = 10;
 
-// Single authoritative minutes -> pixels conversion. The grid rows and every
-// timed card (appointment, chain, package child, blocked time) must use this
-// same function so the timeline is the only source of truth for geometry.
-export const minutesToPixels = (minutes: number, slotMinutes: number, slotHeight: number): number => (
-  (Math.max(0, minutes) / slotMinutes) * slotHeight
-);
+// Derive the physical hours scale from the current slot resolution and row height.
+// The actual placement logic now uses the shared helper in schedulerGeometry.ts,
+// but this local helper remains available for any fallback or external use.
+export const minutesToPixels = (minutes: number, slotMinutes: number, slotHeight: number): number => {
+  const pixelsPerHour = (slotHeight * 60) / Math.max(1, slotMinutes);
+  return (Math.max(0, minutes) / 60) * pixelsPerHour;
+};
 
 const toneClasses: Record<NonNullable<SchedulerColumn['statusTone']>, string> = {
   active: 'bg-emerald-500',
@@ -406,8 +408,9 @@ export default function SchedulerGrid({
   const currentMinutesSinceMidnight = getRiyadhMinutesSinceMidnight(boardCurrentTime);
   const isDayBoardMode = viewMode === 'day' || viewMode === 'team-day' || viewMode === 'employee-day';
   const normalizedNormalEndHour = Math.max(startHour + 1, Math.min(endHour, normalEndHour ?? endHour));
+  const pixelsPerHour = (slotHeight * 60) / slotMinutes;
   const currentTimeLinePosition = showCurrentTimeIndicator && isDayBoardMode && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
-    ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
+    ? ((currentMinutesSinceMidnight - (startHour * 60)) / 60) * pixelsPerHour
     : null;
   const pastAreaHeight = currentTimeLinePosition !== null ? Math.max(0, currentTimeLinePosition) : null;
   const showAssignedStaffIdentity = !isDayBoardMode;
@@ -652,9 +655,11 @@ export default function SchedulerGrid({
             const cellWidth = Math.max(50, staffColumnWidth);
 
             // Calc x1, y1
-            const top1 = minutesToPixels(ev1.startMinutes, slotMinutes, slotHeight);
-            const bottom1 = minutesToPixels(ev1.endMinutes, slotMinutes, slotHeight);
-            const height1 = Math.max(0, bottom1 - top1);
+            const { top: top1, height: height1 } = getSchedulerEventBoxMetrics({
+              startMinutes: ev1.startMinutes,
+              endMinutes: ev1.endMinutes,
+              pixelsPerHour,
+            });
             const laneWidthPx1 = cellWidth / Math.max(1, ev1.laneCount);
             const eventCardWidth1 = laneWidthPx1 - 8;
             const inlineStart1 = (colIdx1 * cellWidth) + (ev1.laneIndex * laneWidthPx1);
@@ -662,7 +667,11 @@ export default function SchedulerGrid({
             const y1 = top1 + height1;
 
             // Calc x2, y2
-            const top2 = minutesToPixels(ev2.startMinutes, slotMinutes, slotHeight);
+            const { top: top2 } = getSchedulerEventBoxMetrics({
+              startMinutes: ev2.startMinutes,
+              endMinutes: ev2.endMinutes,
+              pixelsPerHour,
+            });
             const laneWidthPx2 = cellWidth / Math.max(1, ev2.laneCount);
             const eventCardWidth2 = laneWidthPx2 - 8;
             const inlineStart2 = (colIdx2 * cellWidth) + (ev2.laneIndex * laneWidthPx2);
@@ -917,9 +926,11 @@ export default function SchedulerGrid({
             const columnIndex = getColumnIndex(event.columnId);
             if (columnIndex === -1) return null;
 
-            const top = minutesToPixels(event.startMinutes, slotMinutes, slotHeight);
-            const bottom = minutesToPixels(event.endMinutes, slotMinutes, slotHeight);
-            const height = Math.max(0, bottom - top);
+            const { top, bottom, height } = getSchedulerEventBoxMetrics({
+              startMinutes: event.startMinutes,
+              endMinutes: event.endMinutes,
+              pixelsPerHour,
+            });
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
             const inlineStart = `calc(${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;

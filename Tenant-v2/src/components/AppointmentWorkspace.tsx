@@ -2381,9 +2381,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     });
   }, [onQuickAction]);
 
-  // Conversions for layout
+  // Keep one authoritative physical hour scale and let slot resolution only subdivide it.
   const SLOT_MINUTES = 5;
-  const SLOT_HEIGHT = (60 / SLOT_MINUTES) * activeSchedulerSettings.timeSlotHeight; // Exact pixels per hour based on settings
+  const PIXELS_PER_HOUR = activeSchedulerSettings.timeSlotHeight * (60 / 5);
+  const SLOT_HEIGHT = (PIXELS_PER_HOUR * SLOT_MINUTES) / 60;
+  const SLOT_HEIGHT_FOR_GRID = SLOT_HEIGHT;
   const START_HOUR = schedulerConfig.startHour;
   const END_HOUR = schedulerConfig.endHour;
   const BOARD_END_HOUR = Math.min(24, Math.max(
@@ -2397,11 +2399,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const TOTAL_HOURS = Math.max(1, END_HOUR - START_HOUR);
 
   const minutesToTop = (mins: number) => {
-    return (mins / 60) * SLOT_HEIGHT;
+    return (mins / 60) * PIXELS_PER_HOUR;
   };
 
   const minutesToHeight = (duration: number) => {
-    return (duration / 60) * SLOT_HEIGHT;
+    return (duration / 60) * PIXELS_PER_HOUR;
   };
 
   const TOTAL_STAFF_LANES = 4;
@@ -2442,7 +2444,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return null;
     }
 
-    return ((currentMinutes - visibleStart) / 60) * SLOT_HEIGHT;
+    return ((currentMinutes - visibleStart) / 60) * PIXELS_PER_HOUR;
   };
 
   const handleDayShift = (days: number) => {
@@ -2478,8 +2480,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     if (!dragState) return;
 
     const deltaY = e.clientY - dragState.startMouseY;
-    // Each 1 hour is SLOT_HEIGHT (100px). So deltaMinutes = (deltaY / 100) * 60
-    const deltaMinutes = Math.round(((deltaY / SLOT_HEIGHT) * 60) / SLOT_MINUTES) * SLOT_MINUTES;
+    // Use the physical hour scale, then snap to the current slot resolution.
+    const deltaMinutes = Math.round(((deltaY / PIXELS_PER_HOUR) * 60) / SLOT_MINUTES) * SLOT_MINUTES;
 
     if (dragState.isResizing) {
       // Handle resizing duration
@@ -5395,7 +5397,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   endHour={BOARD_END_HOUR}
                   normalEndHour={schedulerConfig.normalEndHour}
                   timeColumnWidth={84}
-                  slotHeight={activeSchedulerSettings.timeSlotHeight}
+                  slotHeight={SLOT_HEIGHT_FOR_GRID}
                   staffColumnWidth={activeSchedulerSettings.staffColumnWidth}
                   showCurrentTimeIndicator={activeSchedulerSettings.showCurrentTimeIndicator}
                   showLunchBreaks={activeSchedulerSettings.showLunchBreaks}
@@ -8845,4 +8847,5 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     </div>
   );
 }
+
 

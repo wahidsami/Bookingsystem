@@ -1,26 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getSchedulerEventBoxMetrics } from './schedulerGeometry';
+import { getSchedulerEventBoxMetrics, getSlotHeightForResolution } from './schedulerGeometry';
 
-test('hour-long event uses the full 12-row span and 30-min uses half the height', () => {
-  const sixty = getSchedulerEventBoxMetrics({
+test('keeps one physical hour identical across slot resolutions', () => {
+  const pixelsPerHour = 120;
+  const fiveMinuteHeight = getSlotHeightForResolution({ pixelsPerHour, slotMinutes: 5 });
+  const fifteenMinuteHeight = getSlotHeightForResolution({ pixelsPerHour, slotMinutes: 15 });
+
+  const sixtyFiveMinute = getSchedulerEventBoxMetrics({
     startMinutes: 600,
     endMinutes: 660,
-    slotMinutes: 5,
-    slotHeight: 10,
+    pixelsPerHour,
     timelineStartMinutes: 540,
   });
-  const thirty = getSchedulerEventBoxMetrics({
+  const sixtyFifteenMinute = getSchedulerEventBoxMetrics({
+    startMinutes: 600,
+    endMinutes: 660,
+    pixelsPerHour,
+    timelineStartMinutes: 540,
+  });
+  const thirtyFifteenMinute = getSchedulerEventBoxMetrics({
     startMinutes: 600,
     endMinutes: 630,
-    slotMinutes: 5,
-    slotHeight: 10,
+    pixelsPerHour,
     timelineStartMinutes: 540,
   });
 
-  assert.equal(sixty.top, 120);
-  assert.equal(sixty.height, 120);
-  assert.equal(thirty.top, 120);
-  assert.equal(thirty.height, 60);
-  assert.equal(thirty.height, sixty.height / 2);
+  assert.equal(fiveMinuteHeight, 10);
+  assert.equal(fifteenMinuteHeight, 30);
+  assert.equal(sixtyFiveMinute.height, 120);
+  assert.equal(sixtyFifteenMinute.height, 120);
+  assert.equal(thirtyFifteenMinute.height, 60);
+  assert.equal(thirtyFifteenMinute.height, sixtyFifteenMinute.height / 2);
 });
