@@ -1,9 +1,36 @@
 const { Op: mockOp } = require('sequelize');
 
-jest.mock('../../services/pushNotificationService', () => ({}));
+jest.mock('../../services/pushNotificationService', () => ({
+    sendToUser: jest.fn()
+}));
 jest.mock('../../services/customerNotificationService', () => ({}));
-jest.mock('../../services/bookingService', () => ({}));
+jest.mock('../../services/bookingService', () => ({
+    hasConflict: jest.fn()
+}));
 jest.mock('../../services/appointmentLifecycleService', () => ({}));
+jest.mock('../../services/availabilityService', () => ({
+    getAvailableSlots: jest.fn(),
+    _getTimeZoneDayRange: jest.fn((dateKey, timezone) => {
+        if (dateKey === '2026-08-16') {
+            return {
+                startOfDay: new Date('2026-08-15T21:00:00.000Z'),
+                endOfDay: new Date('2026-08-16T20:59:59.999Z')
+            };
+        }
+
+        if (dateKey === '2026-08-17') {
+            return {
+                startOfDay: new Date('2026-08-16T21:00:00.000Z'),
+                endOfDay: new Date('2026-08-17T20:59:59.999Z')
+            };
+        }
+
+        return {
+            startOfDay: new Date(`${dateKey}T00:00:00.000Z`),
+            endOfDay: new Date(`${dateKey}T23:59:59.999Z`)
+        };
+    })
+}));
 jest.mock('../../services/staffNotificationService', () => ({
     createStaffAppointmentMessage: jest.fn()
 }));
@@ -27,12 +54,17 @@ jest.mock('../../utils/emailService', () => ({
 
 const mockDb = {
     Sequelize: { Op: mockOp },
+    sequelize: {
+        transaction: jest.fn()
+    },
     Appointment: {
         update: jest.fn(),
-        findAll: jest.fn()
+        findAll: jest.fn(),
+        findOne: jest.fn()
     },
     Staff: {
-        findAll: jest.fn()
+        findAll: jest.fn(),
+        findOne: jest.fn()
     },
     StaffBreak: {
         findAll: jest.fn()
@@ -41,12 +73,20 @@ const mockDb = {
         findOne: jest.fn()
     },
     Service: {},
-    PlatformUser: {}
+    ServiceEmployee: {
+        findOne: jest.fn()
+    },
+    PlatformUser: {},
+    AppointmentEvent: {
+        create: jest.fn()
+    }
 };
 
 jest.mock('../../models', () => mockDb);
 
 const controller = require('../tenantAppointmentController');
+const bookingService = require('../../services/bookingService');
+const availabilityService = require('../../services/availabilityService');
 
 const createRes = () => ({
     status: jest.fn().mockReturnThis(),
@@ -157,13 +197,122 @@ const applyBreakBoardFilter = (where, breakRecord) => {
     return true;
 };
 
+describe('tenantAppointmentController.reassignRescheduleAppointment', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+
+        mockDb.Appointment.findOne.mockResolvedValue(null);
+        mockDb.Staff.findOne.mockResolvedValue({ id: 'staff-2', tenantId: 'tenant-1', isActive: true, name: 'Staff 2' });
+        mockDb.ServiceEmployee.findOne.mockResolvedValue({ serviceId: 'service-1', staffId: 'staff-2' });
+        mockDb.TenantSettings.findOne.mockResolvedValue({ timezone: 'Asia/Riyadh' });
+        mockDb.AppointmentEvent.create.mockResolvedValue({});
+        bookingService.hasConflict.mockResolvedValue(false);
+        availabilityService.getAvailableSlots.mockResolvedValue({
+            slots: [{ available: true, startTime: '2026-10-02T09:00:00.000Z', endTime: '2026-10-02T10:00:00.000Z' }]
+        });
+        mockDb.sequelize.transaction.mockResolvedValue({
+            commit: jest.fn().mockResolvedValue(undefined),
+            rollback: jest.fn().mockResolvedValue(undefined)
+        });
+    });
+
+    it('allows rescheduling a no-show appointment to a future slot', async () => {
+        const appointment = {
+            id: 'appt-1',
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            requestedStaffId: 'staff-1',
+            assignmentMode: 'unknown',
+            serviceId: 'service-1',
+            status: 'no_show',
+            paymentStatus: 'unpaid',
+            platformUserId: null,
+            bookingNumber: 'B-000001',
+            startTime: new Date('2026-10-01T09:00:00.000Z'),
+            endTime: new Date('2026-10-01T10:00:00.000Z'),
+            service: { id: 'service-1', tenantId: 'tenant-1', name_en: 'Massage', name_ar: 'مساج' },
+            staff: { id: 'staff-1', tenantId: 'tenant-1', name: 'Staff 1' },
+            user: null,
+            save: jest.fn().mockResolvedValue(undefined)
+        };
+        mockDb.Appointment.findOne.mockResolvedValue(appointment);
+
+        const req = {
+            tenantId: 'tenant-1',
+            params: { id: 'appt-1' },
+            body: {
+                staffId: 'staff-2',
+                startTime: '2026-10-02T09:00:00.000Z',
+                notifyCustomer: false
+            }
+        };
+        const res = createRes();
+
+        await controller.reassignRescheduleAppointment(req, res);
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(appointment.save).toHaveBeenCalled();
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            success: true,
+            message: 'Appointment updated successfully'
+        }));
+    });
+
+    it('keeps completed appointments blocked from reassign-reschedule', async () => {
+        const appointment = {
+            id: 'appt-2',
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            requestedStaffId: 'staff-1',
+            assignmentMode: 'unknown',
+            serviceId: 'service-1',
+            status: 'completed',
+            paymentStatus: 'unpaid',
+            platformUserId: null,
+            bookingNumber: 'B-000002',
+            startTime: new Date('2026-10-01T09:00:00.000Z'),
+            endTime: new Date('2026-10-01T10:00:00.000Z'),
+            service: { id: 'service-1', tenantId: 'tenant-1', name_en: 'Massage', name_ar: 'مساج' },
+            staff: { id: 'staff-1', tenantId: 'tenant-1', name: 'Staff 1' },
+            user: null,
+            save: jest.fn()
+        };
+        mockDb.Appointment.findOne.mockResolvedValue(appointment);
+
+        const req = {
+            tenantId: 'tenant-1',
+            params: { id: 'appt-2' },
+            body: {
+                staffId: 'staff-2',
+                startTime: '2026-10-02T09:00:00.000Z',
+                notifyCustomer: false
+            }
+        };
+        const res = createRes();
+
+        await controller.reassignRescheduleAppointment(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            success: false,
+            message: 'Closed appointments cannot be changed'
+        }));
+    });
+});
+
 describe('tenantAppointmentController.getAppointmentsBoard', () => {
     beforeEach(() => {
         jest.clearAllMocks();
 
         mockDb.Appointment.update.mockResolvedValue([0]);
+        mockDb.Appointment.findOne.mockResolvedValue(null);
         mockDb.TenantSettings.findOne.mockResolvedValue({ timezone: 'Asia/Riyadh' });
         mockDb.Staff.findAll.mockResolvedValue([{ id: 'staff-1' }]);
+        mockDb.Staff.findOne.mockResolvedValue({ id: 'staff-1', tenantId: 'tenant-1', isActive: true });
+        mockDb.ServiceEmployee.findOne.mockResolvedValue({ serviceId: 'service-1', staffId: 'staff-1' });
+        mockDb.AppointmentEvent.create.mockResolvedValue({});
+        bookingService.hasConflict.mockResolvedValue(false);
+        availabilityService.getAvailableSlots.mockResolvedValue({ slots: [] });
     });
 
     it('uses the exact tenant-local day range and excludes next-day appointments from Aug 16', async () => {

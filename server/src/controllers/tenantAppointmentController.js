@@ -29,6 +29,7 @@ const {
 const { sendCustomerInvoiceLifecycleEmail } = require('../services/customerInvoiceEmailService');
 const { createForensicTrace } = require('../utils/forensicTrace');
 const {
+    APPOINTMENT_STATUS,
     TENANT_APPOINTMENT_TRANSITIONS,
     canTransitionAppointmentStatus,
     isValidAppointmentStatus,
@@ -3337,7 +3338,13 @@ exports.reassignRescheduleAppointment = async (req, res) => {
             });
         }
 
-        if (['completed', 'cancelled', 'no_show'].includes(appointment.status)) {
+        const normalizedStatus = normalizeAppointmentStatus(appointment.status);
+        const isFinalizedAppointment = [
+            APPOINTMENT_STATUS.COMPLETED,
+            APPOINTMENT_STATUS.CANCELLED
+        ].includes(normalizedStatus);
+
+        if (isFinalizedAppointment) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
