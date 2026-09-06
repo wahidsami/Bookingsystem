@@ -50,6 +50,9 @@ import {
   type ConflictCard
 } from '../lib/bookingConflictDiagnostics';
 
+const TEMP_HIDE_REASSIGN_UI = true;
+const SHOW_LATE_CANCEL_BUTTON = false;
+
 interface AppointmentWorkspaceProps {
   lang: Language;
   onQuickAction: (type: any) => void;
@@ -6232,54 +6235,56 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             <span>{isRtl ? 'إلغاء الموعد' : 'Cancel Booking'}</span>
                           </button>
 
-                          <button
-                            onClick={async () => {
-                              if (appointmentDetailsReadOnly) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-                              const lateCancelNotes = `${activeAppointment.notes || ''}${activeAppointment.notes ? ' | ' : ''}${isRtl ? 'إلغاء متأخر' : 'Late cancel'}`;
-                              if (activeAppointment.bookingSessionId) {
-                                setShowCancelScopeModal({ id: activeAppointment.id, notes: lateCancelNotes, isLateCancel: true });
-                              } else {
-                                try {
-                                  const response = await tenantApiAdapter.updateAppointmentStatus(
-                                    activeAppointment.id,
-                                    'cancelled',
-                                    lateCancelNotes,
-                                    'single'
-                                  );
-                                  if (response?.success) {
-                                    await loadBoardData();
-                                    setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
-                                    setCustomerProfileRefreshToken(token => token + 1);
-                                    addLocalToast(
-                                      isRtl ? 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.' : 'Late cancel recorded and synced to the server.',
-                                      isRtl ? 'Late cancel recorded and synced to the server.' : 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.',
-                                      'success'
-                                    );
-                                  } else {
-                                    throw new Error(response?.message || 'Failed to mark late cancel');
-                                  }
-                                } catch (err) {
-                                  console.error('Failed to mark late cancel', err);
+                          {SHOW_LATE_CANCEL_BUTTON && (
+                            <button
+                              onClick={async () => {
+                                if (appointmentDetailsReadOnly) {
                                   addLocalToast(
-                                    isRtl ? 'تعذر تسجيل الإلغاء المتأخر.' : 'Unable to mark late cancel.',
-                                    isRtl ? 'Unable to mark late cancel.' : 'تعذر تسجيل الإلغاء المتأخر.',
-                                    'warning'
+                                    isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                    isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                    'info'
                                   );
+                                  return;
                                 }
-                              }
-                            }}
-                            className="py-2 border border-amber-200 hover:border-amber-500 hover:bg-amber-50 bg-white rounded-lg text-xs font-bold text-amber-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <AlertTriangle size={13} />
-                            <span>{isRtl ? 'إلغاء متأخر' : 'Late Cancel'}</span>
-                          </button>
+                                const lateCancelNotes = `${activeAppointment.notes || ''}${activeAppointment.notes ? ' | ' : ''}${isRtl ? 'إلغاء متأخر' : 'Late cancel'}`;
+                                if (activeAppointment.bookingSessionId) {
+                                  setShowCancelScopeModal({ id: activeAppointment.id, notes: lateCancelNotes, isLateCancel: true });
+                                } else {
+                                  try {
+                                    const response = await tenantApiAdapter.updateAppointmentStatus(
+                                      activeAppointment.id,
+                                      'cancelled',
+                                      lateCancelNotes,
+                                      'single'
+                                    );
+                                    if (response?.success) {
+                                      await loadBoardData();
+                                      setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                                      setCustomerProfileRefreshToken(token => token + 1);
+                                      addLocalToast(
+                                        isRtl ? 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.' : 'Late cancel recorded and synced to the server.',
+                                        isRtl ? 'Late cancel recorded and synced to the server.' : 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.',
+                                        'success'
+                                      );
+                                    } else {
+                                      throw new Error(response?.message || 'Failed to mark late cancel');
+                                    }
+                                  } catch (err) {
+                                    console.error('Failed to mark late cancel', err);
+                                    addLocalToast(
+                                      isRtl ? 'تعذر تسجيل الإلغاء المتأخر.' : 'Unable to mark late cancel.',
+                                      isRtl ? 'Unable to mark late cancel.' : 'تعذر تسجيل الإلغاء المتأخر.',
+                                      'warning'
+                                    );
+                                  }
+                                }
+                              }}
+                              className="py-2 border border-amber-200 hover:border-amber-500 hover:bg-amber-50 bg-white rounded-lg text-xs font-bold text-amber-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <AlertTriangle size={13} />
+                              <span>{isRtl ? 'إلغاء متأخر' : 'Late Cancel'}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -6337,201 +6342,202 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         </div>
                       )}
 
-                      {/* INTERACTIVE REASSIGN & RESCHEDULE WORKSPACE CONTROLS */}
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                          <span className="p-1.5 bg-amber-50 text-amber-600 rounded-md">
-                            <CalendarIcon size={14} />
-                          </span>
-                          <span className="text-xs font-black text-slate-800">{isRtl ? 'إعادة التعيين والجدولة الفورية' : 'REASSIGN & RESCHEDULE WORKSPACE'}</span>
-                        </div>
+{!TEMP_HIDE_REASSIGN_UI && (
+                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+                          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                            <span className="p-1.5 bg-amber-50 text-amber-600 rounded-md">
+                              <CalendarIcon size={14} />
+                            </span>
+                            <span className="text-xs font-black text-slate-800">{isRtl ? 'إعادة التعيين والجدولة الفورية' : 'REASSIGN & RESCHEDULE WORKSPACE'}</span>
+                          </div>
 
-                        {/* Status Dropdown */}
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'حالة الموعد' : 'Appointment Status'}</label>
-                          <select
-                            value={rescheduleForm?.status || ''}
-                            disabled={appointmentDetailsReadOnly}
-                            onChange={(e) => {
-                              if (appointmentDetailsReadOnly) return;
-                              setRescheduleForm(prev => prev ? { ...prev, status: e.target.value } : null);
-                            }}
-                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                          >
-                            <option value="pending">{isRtl ? 'قيد الانتظار' : 'Pending'}</option>
-                            <option value="confirmed">{isRtl ? 'مؤكد' : 'Confirmed'}</option>
-                            <option value="checked_in">{isRtl ? 'وصلت الزبونة' : 'Arrived / Checked In'}</option>
-                            <option value="in_service">{isRtl ? 'بدأت الجلسة' : 'In Service'}</option>
-                            <option value="completed">{isRtl ? 'مكتمل' : 'Completed'}</option>
-                            <option value="no_show">{isRtl ? 'عدم حضور' : 'No Show'}</option>
-                            <option value="cancelled">{isRtl ? 'ملغى' : 'Cancelled'}</option>
-                          </select>
-                        </div>
-
-                        {/* Dropdown for Reassignment */}
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
-                          <select
-                            value={rescheduleForm?.staffId || ''}
-                            disabled={appointmentDetailsReadOnly}
-                            onChange={(e) => {
-                              if (appointmentDetailsReadOnly) return;
-                              setRescheduleForm(prev => prev ? { ...prev, staffId: e.target.value } : null);
-                            }}
-                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                          >
-                            {liveStylists.map(s => (
-                              <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Reschedule Time Selection */}
-                        <div className="grid grid-cols-2 gap-2">
+                          {/* Status Dropdown */}
                           <div className="space-y-1">
-                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
+                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'حالة الموعد' : 'Appointment Status'}</label>
                             <select
-                              value={rescheduleForm?.startTime ?? ''}
+                              value={rescheduleForm?.status || ''}
                               disabled={appointmentDetailsReadOnly}
                               onChange={(e) => {
                                 if (appointmentDetailsReadOnly) return;
-                                setRescheduleForm(prev => prev ? { ...prev, startTime: parseInt(e.target.value) } : null);
+                                setRescheduleForm(prev => prev ? { ...prev, status: e.target.value } : null);
                               }}
-                              className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                              className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                             >
-                              {Array.from({ length: TOTAL_HOURS * (60 / SLOT_MINUTES) }).map((_, idx) => {
-                                const totalMins = idx * SLOT_MINUTES;
-                                return (
-                                  <option key={idx} value={totalMins}>
-                                    {formatMinutesToTime(totalMins)}
-                                  </option>
-                                );
-                              })}
+                              <option value="pending">{isRtl ? 'قيد الانتظار' : 'Pending'}</option>
+                              <option value="confirmed">{isRtl ? 'مؤكد' : 'Confirmed'}</option>
+                              <option value="checked_in">{isRtl ? 'وصلت الزبونة' : 'Arrived / Checked In'}</option>
+                              <option value="in_service">{isRtl ? 'بدأت الجلسة' : 'In Service'}</option>
+                              <option value="completed">{isRtl ? 'مكتمل' : 'Completed'}</option>
+                              <option value="no_show">{isRtl ? 'عدم حضور' : 'No Show'}</option>
+                              <option value="cancelled">{isRtl ? 'ملغى' : 'Cancelled'}</option>
                             </select>
                           </div>
 
+                          {/* Dropdown for Reassignment */}
                           <div className="space-y-1">
-                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
-                            <input
-                              type="date"
-                              value={rescheduleForm?.date || ''}
+                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
+                            <select
+                              value={rescheduleForm?.staffId || ''}
                               disabled={appointmentDetailsReadOnly}
                               onChange={(e) => {
                                 if (appointmentDetailsReadOnly) return;
-                                setRescheduleForm(prev => prev ? { ...prev, date: e.target.value } : null);
+                                setRescheduleForm(prev => prev ? { ...prev, staffId: e.target.value } : null);
                               }}
                               className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                            />
+                            >
+                              {liveStylists.map(s => (
+                                <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
+                              ))}
+                            </select>
                           </div>
-                        </div>
 
-                        {/* Combined Action Reassign + Reschedule */}
-                        <button
-                          onClick={async () => {
-                            if (appointmentDetailsReadOnly || !rescheduleForm || !activeAppointment) {
-                              addLocalToast(
-                                isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                'info'
-                              );
-                              return;
-                            }
+                          {/* Reschedule Time Selection */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
+                              <select
+                                value={rescheduleForm?.startTime ?? ''}
+                                disabled={appointmentDetailsReadOnly}
+                                onChange={(e) => {
+                                  if (appointmentDetailsReadOnly) return;
+                                  setRescheduleForm(prev => prev ? { ...prev, startTime: parseInt(e.target.value) } : null);
+                                }}
+                                className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                              >
+                                {Array.from({ length: TOTAL_HOURS * (60 / SLOT_MINUTES) }).map((_, idx) => {
+                                  const totalMins = idx * SLOT_MINUTES;
+                                  return (
+                                    <option key={idx} value={totalMins}>
+                                      {formatMinutesToTime(totalMins)}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
 
-                            let statusChanged = false;
-                            let staffChanged = false;
-                            let timeChanged = false;
-                            let hasError = false;
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
+                              <input
+                                type="date"
+                                value={rescheduleForm?.date || ''}
+                                disabled={appointmentDetailsReadOnly}
+                                onChange={(e) => {
+                                  if (appointmentDetailsReadOnly) return;
+                                  setRescheduleForm(prev => prev ? { ...prev, date: e.target.value } : null);
+                                }}
+                                className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                              />
+                            </div>
+                          </div>
 
-                            const originalStartTime = activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0;
-                            const originalDate = activeAppointment.date || getSelectedDateKey() || '';
-                            const isTimeChanged = rescheduleForm.startTime !== originalStartTime || rescheduleForm.date !== originalDate;
-                            const isStaffChanged = rescheduleForm.staffId !== activeAppointment.staffId;
+                          {/* Combined Action Reassign + Reschedule */}
+                          <button
+                            onClick={async () => {
+                              if (appointmentDetailsReadOnly || !rescheduleForm || !activeAppointment) {
+                                addLocalToast(
+                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                  'info'
+                                );
+                                return;
+                              }
 
-                            if (isTimeChanged || isStaffChanged) {
-                              try {
-                                const evalResponse = await tenantApiAdapter.evaluateScheduling({
-                                  tenantId: activeAppointment.tenantId || activeAppointment.tenant_id,
-                                  serviceId: activeAppointment.serviceId,
-                                  staffId: rescheduleForm.staffId,
-                                  startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
-                                  duration: activeAppointment.duration || 60,
-                                  variantId: activeAppointment.variantId,
-                                  excludeAppointmentId: activeAppointment.id
-                                });
+                              let statusChanged = false;
+                              let staffChanged = false;
+                              let timeChanged = false;
+                              let hasError = false;
 
-                                if (!evalResponse?.success || !evalResponse?.decision?.valid) {
-                                  const errObj = { response: { data: { decision: evalResponse?.decision } } };
-                                  const toast = getSchedulingErrorToast(errObj, isRtl ? 'تعذر الحفظ بسبب تعارض في المواعيد.' : 'Cannot save due to a scheduling conflict.', isRtl ? 'Cannot save due to a scheduling conflict.' : 'تعذر الحفظ بسبب تعارض في المواعيد.');
+                              const originalStartTime = activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0;
+                              const originalDate = activeAppointment.date || getSelectedDateKey() || '';
+                              const isTimeChanged = rescheduleForm.startTime !== originalStartTime || rescheduleForm.date !== originalDate;
+                              const isStaffChanged = rescheduleForm.staffId !== activeAppointment.staffId;
+
+                              if (isTimeChanged || isStaffChanged) {
+                                try {
+                                  const evalResponse = await tenantApiAdapter.evaluateScheduling({
+                                    tenantId: activeAppointment.tenantId || activeAppointment.tenant_id,
+                                    serviceId: activeAppointment.serviceId,
+                                    staffId: rescheduleForm.staffId,
+                                    startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
+                                    duration: activeAppointment.duration || 60,
+                                    variantId: activeAppointment.variantId,
+                                    excludeAppointmentId: activeAppointment.id
+                                  });
+
+                                  if (!evalResponse?.success || !evalResponse?.decision?.valid) {
+                                    const errObj = { response: { data: { decision: evalResponse?.decision } } };
+                                    const toast = getSchedulingErrorToast(errObj, isRtl ? 'تعذر الحفظ بسبب تعارض في المواعيد.' : 'Cannot save due to a scheduling conflict.', isRtl ? 'Cannot save due to a scheduling conflict.' : 'تعذر الحفظ بسبب تعارض في المواعيد.');
+                                    addLocalToast(toast.ar, toast.en, 'warning');
+                                    return;
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to pre-validate reschedule', err);
+                                  const toast = getSchedulingErrorToast(err, isRtl ? 'فشل التحقق من الموعد.' : 'Failed to validate appointment.', isRtl ? 'Failed to validate appointment.' : 'فشل التحقق من الموعد.');
                                   addLocalToast(toast.ar, toast.en, 'warning');
                                   return;
                                 }
+                              }
+
+                              try {
+                                if (rescheduleForm.status !== (activeAppointment.status || 'booked')) {
+                                  await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, rescheduleForm.status);
+                                  statusChanged = true;
+                                }
+
+                                if (isStaffChanged) {
+                                  await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, rescheduleForm.staffId);
+                                  staffChanged = true;
+                                }
+
+                                if (isTimeChanged) {
+                                  await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
+                                    staffId: rescheduleForm.staffId,
+                                    startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
+                                    notifyCustomer: true
+                                  });
+                                  timeChanged = true;
+                                }
                               } catch (err) {
-                                console.error('Failed to pre-validate reschedule', err);
-                                const toast = getSchedulingErrorToast(err, isRtl ? 'فشل التحقق من الموعد.' : 'Failed to validate appointment.', isRtl ? 'Failed to validate appointment.' : 'فشل التحقق من الموعد.');
+                                console.error('Failed to commit workspace changes', err);
+                                hasError = true;
+                                const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر إكمال التعديلات.' : 'Unable to complete changes.', isRtl ? 'Unable to complete changes.' : 'تعذر إكمال التعديلات.');
                                 addLocalToast(toast.ar, toast.en, 'warning');
-                                return;
-                              }
-                            }
+                              } finally {
+                                if (statusChanged || staffChanged || timeChanged) {
+                                  await loadBoardData();
+                                  setActiveAppointment(prev => prev ? {
+                                    ...prev,
+                                    status: statusChanged ? rescheduleForm.status : prev.status,
+                                    staffId: (staffChanged || timeChanged) ? rescheduleForm.staffId : prev.staffId,
+                                    startTime: timeChanged ? buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime) : prev.startTime,
+                                    startMinutes: timeChanged ? rescheduleForm.startTime : (prev.startMinutes ?? prev.startTime ?? 0),
+                                    date: timeChanged ? rescheduleForm.date : (prev.date || getSelectedDateKey() || '')
+                                  } : null);
+                                  setCustomerProfileRefreshToken(token => token + 1);
 
-                            try {
-                              if (rescheduleForm.status !== (activeAppointment.status || 'booked')) {
-                                await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, rescheduleForm.status);
-                                statusChanged = true;
-                              }
-
-                              if (isStaffChanged) {
-                                await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, rescheduleForm.staffId);
-                                staffChanged = true;
-                              }
-
-                              if (isTimeChanged) {
-                                await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
-                                  staffId: rescheduleForm.staffId,
-                                  startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
-                                  notifyCustomer: true
-                                });
-                                timeChanged = true;
-                              }
-                            } catch (err) {
-                              console.error('Failed to commit workspace changes', err);
-                              hasError = true;
-                              const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر إكمال التعديلات.' : 'Unable to complete changes.', isRtl ? 'Unable to complete changes.' : 'تعذر إكمال التعديلات.');
-                              addLocalToast(toast.ar, toast.en, 'warning');
-                            } finally {
-                              if (statusChanged || staffChanged || timeChanged) {
-                                await loadBoardData();
-                                setActiveAppointment(prev => prev ? {
-                                  ...prev,
-                                  status: statusChanged ? rescheduleForm.status : prev.status,
-                                  staffId: (staffChanged || timeChanged) ? rescheduleForm.staffId : prev.staffId,
-                                  startTime: timeChanged ? buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime) : prev.startTime,
-                                  startMinutes: timeChanged ? rescheduleForm.startTime : (prev.startMinutes ?? prev.startTime ?? 0),
-                                  date: timeChanged ? rescheduleForm.date : (prev.date || getSelectedDateKey() || '')
-                                } : null);
-                                setCustomerProfileRefreshToken(token => token + 1);
-
-                                if (!hasError) {
+                                  if (!hasError) {
+                                    addLocalToast(
+                                      'تم حفظ التعديلات وإرسال الإشعار للعميلة بنجاح! 💬',
+                                      'Workspace changes committed and notification sent successfully! 💬',
+                                      'success'
+                                    );
+                                  }
+                                } else if (!hasError) {
                                   addLocalToast(
-                                    'تم حفظ التعديلات وإرسال الإشعار للعميلة بنجاح! 💬',
-                                    'Workspace changes committed and notification sent successfully! 💬',
-                                    'success'
+                                    'لم يتم إجراء أي تعديلات للحفظ.',
+                                    'No changes to commit.',
+                                    'info'
                                   );
                                 }
-                              } else if (!hasError) {
-                                addLocalToast(
-                                  'لم يتم إجراء أي تعديلات للحفظ.',
-                                  'No changes to commit.',
-                                  'info'
-                                );
                               }
-                            }
-                          }}
-                          className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Sparkles size={13} className="text-amber-400" />
-                          <span>{isRtl ? 'حفظ وإرسال إشعار فوري 💬' : 'Commit Roster & Send Notification 💬'}</span>
-                        </button>
-                      </div>
+                            }}
+                            className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Sparkles size={13} className="text-amber-400" />
+                            <span>{isRtl ? 'حفظ وإرسال إشعار فوري 💬' : 'Commit Roster & Send Notification 💬'}</span>
+                          </button>
+                        </div>
+                      )}
 
 
                     </div>
