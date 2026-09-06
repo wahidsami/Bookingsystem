@@ -465,6 +465,8 @@ const writeSchedulerTeamVisibilityOverride = (storageKey: string, value: string[
 };
 
 export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchRequest, onToggleFavoritePage, isFavorited, setShowSavedViewModal }: AppointmentWorkspaceProps) {
+  console.log('[DD_STEP] AppointmentWorkspace render start');
+  const dd_t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const isRtl = lang === 'ar';
   const { tenant, tenantSettings, user } = useTenantAuth();
   const tenantTimezone = useMemo(
@@ -1686,6 +1688,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   })();
 
   const activeVisitProductEntries = (() => {
+    console.log('[DD_STEP] activeVisitProductEntries start, elapsed:', typeof performance !== 'undefined' ? performance.now() - dd_t0 : 0);
     const sources = [
       ...(Array.isArray(activeAppointment?.products) ? activeAppointment.products : []),
       ...(Array.isArray(activeAppointment?.productItems) ? activeAppointment.productItems : []),
@@ -1727,6 +1730,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   ];
 
   const customerTimelineEntries = (() => {
+    console.log('[DD_STEP] customerTimelineEntries start, elapsed:', typeof performance !== 'undefined' ? performance.now() - dd_t0 : 0);
     const rows = [
       ...customerAppointmentHistory.map((item: any) => ({
         id: `apt-${item.id || item.bookingNumber || Math.random().toString(36).slice(2)}`,
@@ -1803,6 +1807,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // Custom Drag State & Interactive Preview
   const [draggedAptId, setDraggedAptId] = useState<string | null>(null);
+  console.log('[DD_STEP] draggedAptId is:', draggedAptId);
 
   useEffect(() => {
     let cancelled = false;
@@ -4154,7 +4159,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   });
 
   // Calculate coordinates of the dragged element's ghost card
+  console.log('[DD_STEP] before draggedApt calc, elapsed:', typeof performance !== 'undefined' ? performance.now() - dd_t0 : 0);
   const draggedApt = draggedAptId ? appointments.find(a => a.id === draggedAptId) : null;
+  console.log('[DD_STEP] after draggedApt calc, elapsed:', typeof performance !== 'undefined' ? performance.now() - dd_t0 : 0);
   const schedulerAppointments = filteredAppointments.filter((appointment) => {
     if (appointment.kind !== 'blocked') {
       return true;
@@ -4167,7 +4174,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     return `${appointment.blockedType || ''}`.trim().toLowerCase() !== 'lunch';
   });
   const monthCalendarDays = useMemo(() => getMonthCalendarDays(selectedDate), [selectedDate]);
+  console.log('[DD_STEP] before appointmentsByDate memo, elapsed:', typeof performance !== 'undefined' ? performance.now() - dd_t0 : 0);
   const appointmentsByDate = useMemo(() => {
+    console.log('[DD_STEP] appointmentsByDate useMemo running');
     const grouped = new Map<string, Appointment[]>();
     filteredAppointments.forEach((appointment) => {
       const dateKey = appointment.date || getSelectedDateKey();
@@ -4382,6 +4391,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     handleContextMenu(event, targetStaffId, slot.startMinutes, undefined, slot.dateKey);
   };
 
+  console.log('[DD_STEP] handleSchedulerSlotDrop defined, elapsed:', typeof performance !== 'undefined' ? performance.now() - dd_t0 : 0);
   const handleSchedulerSlotDrop = (slot: SchedulerSlot, draggedEventId: string) => {
     console.log('[DRAG_DROP_TRACE] 3. drop received - draggedEventId:', draggedEventId);
     if (!isBoardEditable) {
