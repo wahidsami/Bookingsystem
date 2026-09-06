@@ -1893,7 +1893,7 @@ export default function InteractiveDrawers({
       items.push(pkgGroup);
     });
 
-    const resolvedPrimaryServiceId = `${items[0]?.serviceId || ''}`.trim();
+    const resolvedPrimaryServiceId = `${items[0]?.serviceId || items[0]?.packageId || ''}`.trim();
     const resolvedPrimaryStaffId = `${firstStaffId || currentStaffId || ''}`.trim();
     if (!resolvedPrimaryServiceId) {
       showBookingErrorDialog({
