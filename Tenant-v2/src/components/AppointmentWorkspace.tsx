@@ -1807,7 +1807,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // Custom Drag State & Interactive Preview
   const [draggedAptId, setDraggedAptId] = useState<string | null>(null);
-  console.log('[DD_STEP] draggedAptId is:', draggedAptId);
+  console.log('[DD_TRACE] 6. React render cycle running in AppointmentWorkspace.tsx - draggedAptId:', draggedAptId, 'elapsed:', typeof window !== 'undefined' && (window as any).__dd_drag_start_time ? Date.now() - (window as any).__dd_drag_start_time : 0, 'ms');
 
   useEffect(() => {
     let cancelled = false;
@@ -4159,9 +4159,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   });
 
   // Calculate coordinates of the dragged element's ghost card
-  console.log('[DD_STEP] before draggedApt calc, elapsed:', typeof performance !== 'undefined' ? performance.now() - dd_t0 : 0);
+  console.log('[DD_TRACE] 8.7 BEFORE draggedApt calculation/find in AppointmentWorkspace.tsx', Date.now());
   const draggedApt = draggedAptId ? appointments.find(a => a.id === draggedAptId) : null;
-  console.log('[DD_STEP] after draggedApt calc, elapsed:', typeof performance !== 'undefined' ? performance.now() - dd_t0 : 0);
+  console.log('[DD_TRACE] 8.8 AFTER draggedApt calculation/find in AppointmentWorkspace.tsx', Date.now());
   const schedulerAppointments = filteredAppointments.filter((appointment) => {
     if (appointment.kind !== 'blocked') {
       return true;
@@ -5445,12 +5445,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   onEventClick={handleSchedulerEventClick}
                   onEventContextMenu={handleSchedulerEventContextMenu}
                   onEventDragStart={(eventItem) => {
-                    console.log('[DRAG_DROP_TRACE] 1. dragStart - eventItem:', eventItem.id);
+                    const tStart = Date.now();
+                    console.log('[DRAG_DROP_TRACE] 1. dragStart - eventItem:', eventItem.id, tStart);
+                    console.log('[DD_TRACE] 3.1 BEFORE setDraggedAptId in AppointmentWorkspace.tsx', Date.now());
                     setDraggedAptId(eventItem.id);
+                    console.log('[DD_TRACE] 3.2 AFTER setDraggedAptId in AppointmentWorkspace.tsx', Date.now());
+                    console.log('[DD_TRACE] 3.3 EXIT onEventDragStart callback in AppointmentWorkspace.tsx', Date.now());
                   }}
                   onEventDragEnd={() => {
-                    console.log('[DRAG_DROP_TRACE] 2. dragEnd');
+                    console.log('[DRAG_DROP_TRACE] 2. dragEnd', Date.now());
+                    console.log('[DD_TRACE] 3.4 BEFORE setDraggedAptId(null) in AppointmentWorkspace.tsx', Date.now());
                     setDraggedAptId(null);
+                    console.log('[DD_TRACE] 3.5 AFTER setDraggedAptId(null) in AppointmentWorkspace.tsx', Date.now());
                   }}
                   onEventResizeStart={(eventItem, mouseEvent) => {
                     if (isDayBoardMode(viewMode) && isBoardEditable && eventItem.kind !== 'blocked') {

@@ -2,6 +2,53 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Users, ChevronDown, Link2, Package } from 'lucide-react';
 import { getSchedulerEventBoxMetrics } from './schedulerGeometry';
 
+if (typeof window !== 'undefined') {
+  if (!(window as any).__dd_tracer_installed) {
+    (window as any).__dd_tracer_installed = true;
+    (window as any).__dd_drag_active = false;
+    (window as any).__dd_drag_start_time = 0;
+    (window as any).__dd_first_event_logged = false;
+    (window as any).__dd_first_raf_logged = false;
+
+    let lastHeartbeat = 0;
+    const logHeartbeat = () => {
+      const now = Date.now();
+      if (now - lastHeartbeat >= 500) {
+        lastHeartbeat = now;
+        console.log('[DD_HEARTBEAT]', now);
+      }
+    };
+
+    setInterval(logHeartbeat, 500);
+
+    const handleGlobalDragOrPointerEvent = (e: Event) => {
+      logHeartbeat();
+      if ((window as any).__dd_drag_active && !(window as any).__dd_first_event_logged) {
+        (window as any).__dd_first_event_logged = true;
+        console.log(
+          `[DD_TRACE] 4. FIRST ${e.type} event after dragStart:`,
+          e.type,
+          'elapsed:',
+          Date.now() - (window as any).__dd_drag_start_time,
+          'ms'
+        );
+      }
+    };
+
+    ['drag', 'dragover', 'dragenter', 'dragleave', 'mousemove', 'pointermove', 'mouseup', 'dragend'].forEach((evtName) => {
+      window.addEventListener(evtName, handleGlobalDragOrPointerEvent, { capture: true, passive: true });
+    });
+
+    window.addEventListener('error', (e) => {
+      console.log('[DD_TRACE] GLOBAL ERROR DETECTED:', e.error || e.message);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      console.log('[DD_TRACE] UNHANDLED REJECTION DETECTED:', e.reason);
+    });
+  }
+}
+
+
 export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
 
 export interface SchedulerColumn {
@@ -522,6 +569,9 @@ export default function SchedulerGrid({
   ].join(' ');
 
   const positionedEvents = useMemo(() => {
+    if ((window as any).__dd_drag_active) {
+      console.log('[DD_TRACE] 8.3 ENTER positionedEvents calculation in SchedulerGrid.tsx', Date.now());
+    }
     const groupedByColumn = new Map<string, SchedulerEvent[]>();
     columns.forEach((column) => {
       groupedByColumn.set(column.id, []);
@@ -603,6 +653,9 @@ export default function SchedulerGrid({
       });
     });
 
+    if ((window as any).__dd_drag_active) {
+      console.log('[DD_TRACE] 8.4 EXIT positionedEvents calculation in SchedulerGrid.tsx', Date.now());
+    }
     return positioned;
   }, [columns, events, slotMinutes]);
 
@@ -896,11 +949,24 @@ export default function SchedulerGrid({
                         onSlotContextMenu?.(event, slot);
                       }}
                       onDragOver={(event) => {
+                        const isTracingActive = (window as any).__dd_drag_active;
+                        if (isTracingActive) {
+                          console.log('[DD_TRACE] 9.1 ENTER slot onDragOver in SchedulerGrid.tsx, elapsed:', Date.now() - (window as any).__dd_drag_start_time, 'ms');
+                        }
                         if (!isEditable) return;
                         event.preventDefault();
                         event.dataTransfer.dropEffect = 'move';
+                        if (isTracingActive) {
+                          console.log('[DD_TRACE] 8.1 BEFORE setHoveredSlot in onDragOver', Date.now());
+                        }
                         setHoveredSlot(slot);
+                        if (isTracingActive) {
+                          console.log('[DD_TRACE] 8.2 AFTER setHoveredSlot in onDragOver', Date.now());
+                        }
                         onAddSlotHover?.(slot);
+                        if (isTracingActive) {
+                          console.log('[DD_TRACE] 9.2 EXIT slot onDragOver in SchedulerGrid.tsx', Date.now());
+                        }
                       }}
                       onDrop={(event) => {
                         if (!isEditable) return;
@@ -967,13 +1033,39 @@ export default function SchedulerGrid({
                   tabIndex={0}
                   draggable={isEditable && event.kind !== 'blocked'}
                   onDragStart={(dragEvent) => {
-                    if (!isEditable || event.kind === 'blocked') return;
+                    const t0 = Date.now();
+                    (window as any).__dd_drag_active = true;
+                    (window as any).__dd_drag_start_time = t0;
+                    (window as any).__dd_first_event_logged = false;
+                    (window as any).__dd_first_raf_logged = false;
+
+                    console.log('[DD_TRACE] 1.1 ENTER native onDragStart in SchedulerGrid.tsx', t0);
+                    console.log('[DD_TRACE] 2.1 BEFORE checking isEditable/event.kind in SchedulerGrid.tsx', Date.now());
+                    if (!isEditable || event.kind === 'blocked') {
+                      console.log('[DD_TRACE] 2.1a BAILED in SchedulerGrid onDragStart because not editable or blocked', Date.now());
+                      return;
+                    }
+                    console.log('[DD_TRACE] 2.2 AFTER checking isEditable/event.kind, BEFORE dataTransfer.setData', Date.now());
                     dragEvent.dataTransfer.setData('text/plain', event.id);
+                    console.log('[DD_TRACE] 2.3 AFTER dataTransfer.setData, BEFORE calling onEventDragStart callback', Date.now());
                     onEventDragStart?.(event);
+                    console.log('[DD_TRACE] 2.4 AFTER onEventDragStart callback in SchedulerGrid.tsx', Date.now());
+
+                    requestAnimationFrame(() => {
+                      if (!(window as any).__dd_first_raf_logged) {
+                        (window as any).__dd_first_raf_logged = true;
+                        console.log('[DD_TRACE] 5. FIRST requestAnimationFrame after dragStart, elapsed:', Date.now() - t0, 'ms');
+                      }
+                    });
+
+                    console.log('[DD_TRACE] 1.9 EXIT native onDragStart in SchedulerGrid.tsx', Date.now());
                   }}
                   onDragEnd={() => {
+                    console.log('[DD_TRACE] 9.3 ENTER native onDragEnd in SchedulerGrid.tsx', Date.now());
                     if (!isEditable || event.kind === 'blocked') return;
                     onEventDragEnd?.(event);
+                    (window as any).__dd_drag_active = false;
+                    console.log('[DD_TRACE] 9.4 EXIT native onDragEnd in SchedulerGrid.tsx', Date.now());
                   }}
                   onClick={(clickEvent) => {
                     clickEvent.stopPropagation();
