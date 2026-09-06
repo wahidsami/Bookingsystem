@@ -4116,58 +4116,72 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   }, [serviceCategoryFilter, serviceCategoryOptions]);
 
   // Filters application
-  const filteredAppointments = appointments.filter(apt => {
-    const boardVisibleStaffIds = isEmployeeBoardMode(viewMode)
-      ? (focusedEmployeeId ? [focusedEmployeeId] : [])
-      : resolvedVisibleEmployeeIds;
-    const customerNameEn = String(apt.customerNameEn || '');
-    const customerNameAr = String(apt.customerNameAr || '');
-    const serviceNameEn = String(apt.serviceNameEn || '');
-    const serviceNameAr = String(apt.serviceNameAr || '');
-    const matchesStaff = boardVisibleStaffIds.length === 0 || boardVisibleStaffIds.includes(apt.staffId);
-    const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
-    const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter(apt => {
+      const boardVisibleStaffIds = isEmployeeBoardMode(viewMode)
+        ? (focusedEmployeeId ? [focusedEmployeeId] : [])
+        : resolvedVisibleEmployeeIds;
+      const customerNameEn = String(apt.customerNameEn || '');
+      const customerNameAr = String(apt.customerNameAr || '');
+      const serviceNameEn = String(apt.serviceNameEn || '');
+      const serviceNameAr = String(apt.serviceNameAr || '');
+      const matchesStaff = boardVisibleStaffIds.length === 0 || boardVisibleStaffIds.includes(apt.staffId);
+      const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
+      const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
       const matchesSearch = searchQuery === '' ||
-      customerNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customerNameAr.includes(searchQuery) ||
-      serviceNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      serviceNameAr.includes(searchQuery) ||
-      `${apt.customerPhone || ''}`.includes(searchQuery) ||
-      `${apt.id || ''}`.toLowerCase().includes(searchQuery.toLowerCase());
+        customerNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        customerNameAr.includes(searchQuery) ||
+        serviceNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        serviceNameAr.includes(searchQuery) ||
+        `${apt.customerPhone || ''}`.includes(searchQuery) ||
+        `${apt.id || ''}`.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const dateStr = apt.date || getSelectedDateKey();
-    let matchesDate = false;
+      const dateStr = apt.date || getSelectedDateKey();
+      let matchesDate = false;
 
-    if (isDayBoardMode(viewMode)) {
-      matchesDate = dateStr === getSelectedDateKey();
-    } else if (isWeekBoardMode(viewMode)) {
-      const activeBlock = getDaysOfActiveWeek(selectedDate);
-      matchesDate = activeBlock.includes(dateStr);
-    } else if (isMonthBoardMode(viewMode)) {
-      const currentMonth = selectedDate.getMonth();
-      const currentYear = selectedDate.getFullYear();
-      const dateValue = parseLocalDateKey(dateStr);
-      matchesDate = dateValue.getFullYear() === currentYear && dateValue.getMonth() === currentMonth;
-    } else {
-      // Agenda view shows all appointments starting from selected date
-      const targetDateStr = getSelectedDateKey();
-      matchesDate = dateStr >= targetDateStr;
-    }
+      if (isDayBoardMode(viewMode)) {
+        matchesDate = dateStr === getSelectedDateKey();
+      } else if (isWeekBoardMode(viewMode)) {
+        const activeBlock = getDaysOfActiveWeek(selectedDate);
+        matchesDate = activeBlock.includes(dateStr);
+      } else if (isMonthBoardMode(viewMode)) {
+        const currentMonth = selectedDate.getMonth();
+        const currentYear = selectedDate.getFullYear();
+        const dateValue = parseLocalDateKey(dateStr);
+        matchesDate = dateValue.getFullYear() === currentYear && dateValue.getMonth() === currentMonth;
+      } else {
+        // Agenda view shows all appointments starting from selected date
+        const targetDateStr = getSelectedDateKey();
+        matchesDate = dateStr >= targetDateStr;
+      }
 
-    return matchesStaff && matchesStatus && matchesCategory && matchesSearch && matchesDate;
-  });
+      return matchesStaff && matchesStatus && matchesCategory && matchesSearch && matchesDate;
+    });
+  }, [
+    appointments,
+    viewMode,
+    focusedEmployeeId,
+    resolvedVisibleEmployeeIds,
+    statusFilter,
+    serviceCategoryFilter,
+    searchQuery,
+    selectedDateKey,
+    selectedDate,
+  ]);
 
-  const schedulerAppointments = filteredAppointments.filter((appointment) => {
-    if (appointment.kind !== 'blocked') {
-      return true;
-    }
+  const schedulerAppointments = useMemo(() => {
+    return filteredAppointments.filter((appointment) => {
+      if (appointment.kind !== 'blocked') {
+        return true;
+      }
 
-    if (activeSchedulerSettings.showLunchBreaks) {
-      return true;
-    }
+      if (activeSchedulerSettings.showLunchBreaks) {
+        return true;
+      }
 
-    return `${appointment.blockedType || ''}`.trim().toLowerCase() !== 'lunch';
-  });
+      return `${appointment.blockedType || ''}`.trim().toLowerCase() !== 'lunch';
+    });
+  }, [filteredAppointments, activeSchedulerSettings.showLunchBreaks]);
   const monthCalendarDays = useMemo(() => getMonthCalendarDays(selectedDate), [selectedDate]);
   const appointmentsByDate = useMemo(() => {
     const grouped = new Map<string, Appointment[]>();
