@@ -108,6 +108,13 @@ const DEFAULT_END_HOUR = 21;
 const DEFAULT_TIME_COLUMN_WIDTH = 84;
 const DEFAULT_SLOT_HEIGHT = 10;
 
+// Single authoritative minutes -> pixels conversion. The grid rows and every
+// timed card (appointment, chain, package child, blocked time) must use this
+// same function so the timeline is the only source of truth for geometry.
+export const minutesToPixels = (minutes: number, slotMinutes: number, slotHeight: number): number => (
+  (Math.max(0, minutes) / slotMinutes) * slotHeight
+);
+
 const toneClasses: Record<NonNullable<SchedulerColumn['statusTone']>, string> = {
   active: 'bg-emerald-500',
   break: 'bg-amber-500',
@@ -645,8 +652,8 @@ export default function SchedulerGrid({
             const cellWidth = Math.max(50, staffColumnWidth);
 
             // Calc x1, y1
-            const top1 = (Math.max(0, ev1.startMinutes) / slotMinutes) * slotHeight;
-            const bottom1 = (Math.max(0, ev1.endMinutes) / slotMinutes) * slotHeight;
+            const top1 = minutesToPixels(ev1.startMinutes, slotMinutes, slotHeight);
+            const bottom1 = minutesToPixels(ev1.endMinutes, slotMinutes, slotHeight);
             const height1 = Math.max(0, bottom1 - top1);
             const laneWidthPx1 = cellWidth / Math.max(1, ev1.laneCount);
             const eventCardWidth1 = laneWidthPx1 - 8;
@@ -655,7 +662,7 @@ export default function SchedulerGrid({
             const y1 = top1 + height1;
 
             // Calc x2, y2
-            const top2 = (Math.max(0, ev2.startMinutes) / slotMinutes) * slotHeight;
+            const top2 = minutesToPixels(ev2.startMinutes, slotMinutes, slotHeight);
             const laneWidthPx2 = cellWidth / Math.max(1, ev2.laneCount);
             const eventCardWidth2 = laneWidthPx2 - 8;
             const inlineStart2 = (colIdx2 * cellWidth) + (ev2.laneIndex * laneWidthPx2);
@@ -910,8 +917,8 @@ export default function SchedulerGrid({
             const columnIndex = getColumnIndex(event.columnId);
             if (columnIndex === -1) return null;
 
-            const top = (Math.max(0, event.startMinutes) / slotMinutes) * slotHeight;
-            const bottom = (Math.max(0, event.endMinutes) / slotMinutes) * slotHeight;
+            const top = minutesToPixels(event.startMinutes, slotMinutes, slotHeight);
+            const bottom = minutesToPixels(event.endMinutes, slotMinutes, slotHeight);
             const height = Math.max(0, bottom - top);
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);

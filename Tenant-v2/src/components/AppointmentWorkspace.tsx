@@ -896,16 +896,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const serviceNameAr = services.length > 1
       ? services.map((item: any) => normalizeServiceName(item, 'ar')).filter(Boolean).join(' + ')
       : primaryServiceNameAr;
-    let duration = sessionAppointments.length > 0
-      ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.duration || item?.service?.duration || 0), 0)
-      : (a.service?.duration || a.duration || 60);
-
-    if (a.startTime && a.endTime) {
-      const endMins = (new Date(a.endTime).getTime() - new Date(a.startTime).getTime()) / 60000;
-      if (!Number.isNaN(endMins) && endMins > 0) {
-        duration = endMins;
-      }
-    }
+    const ownIntervalMinutes = (a.startTime && a.endTime)
+      ? (new Date(a.endTime).getTime() - new Date(a.startTime).getTime()) / 60000
+      : NaN;
+    const hasValidOwnInterval = !Number.isNaN(ownIntervalMinutes) && ownIntervalMinutes > 0;
+    // This appointment's own start/end interval is the single source of truth for its
+    // geometry duration. It must never be replaced by an aggregate across chain/session siblings.
+    const duration = hasValidOwnInterval
+      ? ownIntervalMinutes
+      : (sessionAppointments.length > 0
+        ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.duration || item?.service?.duration || 0), 0)
+        : (a.service?.duration || a.duration || 60));
     return {
       id: a.id,
       customerId: a.user?.id || a.customerId,
@@ -4226,9 +4227,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       appointmentId: apt.appointmentId || apt.id,
       columnId,
       dateKey: apt.date || getSelectedDateKey(),
-      startMinutes: Math.max(0, apt.startTime),
-        endMinutes: Math.max(0, apt.startTime) + (Number(apt.duration) || 0),
-        durationMinutes: (Number(apt.duration) || 0),
+      // Real timeline coordinates only: never clamp/shift start before deriving end.
+      // Off-window clipping is handled independently by SchedulerGrid's own top/bottom math.
+      startMinutes: apt.startTime,
+      endMinutes: apt.startTime + (Number(apt.duration) || 0),
+      durationMinutes: (Number(apt.duration) || 0),
       title,
       subtitle,
       variantLabel: isRtl ? (apt.serviceVariantDescription || apt.serviceVariantName || '') : (apt.serviceVariantName || apt.serviceVariantDescription || ''),
