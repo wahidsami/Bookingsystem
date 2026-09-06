@@ -37,8 +37,10 @@ import {
 } from '../lib/bookingUiDialogs';
 import {
   buildTenantIsoFromMinutes,
-  resolveTenantTimezone
-, getDatePartsInTimeZone } from '../lib/tenantTime';
+  getBoardMinutesFromTimestamp,
+  resolveTenantTimezone,
+  getDatePartsInTimeZone
+} from '../lib/tenantTime';
 import {
   buildConflictCard,
   formatConflictTime,
@@ -822,8 +824,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   }, []);
 
   const mapBoardAppointment = (a: any, dateKey: string): Appointment => {
-    const startDate = new Date(a.startTime);
-    const startMins = startDate.getHours() * 60 + startDate.getMinutes() - (boardStartHour * 60);
+    const startMinutes = getBoardMinutesFromTimestamp(a.startTime, tenantTimezone, boardStartHour);
+    const startMins = startMinutes ?? 0;
     const sessionAppointments = Array.isArray(a.bookingSession?.appointments) ? a.bookingSession.appointments : [];
     const services = sessionAppointments.length > 0
       ? sessionAppointments
