@@ -4,15 +4,17 @@ import { type ServiceRecord, type ServiceVariantRecord } from '../../lib/service
 import AppointmentServiceRow from './AppointmentServiceRow';
 export interface StagedService {
   id: string;
+  itemType?: 'service' | 'package';
+  packageId?: string;
   serviceId: string;
   variantId?: string;
   serviceCategory?: string;
   staffId: string;
   startTime: number;
   duration: number;
-  discountType: 'none' | 'flat' | 'percent';
-  discountValue: number;
-  notes: string;
+  discountType?: 'none' | 'flat' | 'percent';
+  discountValue?: number;
+  notes?: string;
   basePrice?: number;
   finalPrice?: number;
   timingMode?: 'auto' | 'manual';
@@ -213,11 +215,75 @@ export default function AppointmentServicesStep({
           )}
 
           {activeTab === 'packages' && (
-            <div className="space-y-4 pb-4">
+            <div className="space-y-6 pb-4">
+              {/* Selected Packages Block */}
+              {(() => {
+                const pkgCartItems = stagedServices.filter(s => s.itemType === 'package');
+                if (pkgCartItems.length === 0) return null;
+                
+                const pkgGroups = pkgCartItems.reduce((acc, curr) => {
+                   if (!acc[curr.packageId!]) acc[curr.packageId!] = [];
+                   acc[curr.packageId!].push(curr);
+                   return acc;
+                }, {} as Record<string, typeof stagedServices>);
+
+                return (
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-medium tracking-tight text-slate-900 px-1 border-b border-slate-100 pb-2">
+                      {isRtl ? 'الباقات المختارة' : 'Selected Packages'}
+                    </h3>
+                    {Object.entries(pkgGroups).map(([pkgId, items]) => {
+                      const pkg = servicePackages?.find(p => p.id === pkgId);
+                      if (!pkg) return null;
+                      return (
+                        <div key={pkgId} className="bg-slate-50 border border-primary/20 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-full h-1 bg-primary"></div>
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h4 className="font-bold text-slate-900 text-lg">{isRtl ? pkg.name_ar : pkg.name_en}</h4>
+                              <p className="text-sm text-slate-500 mt-1">{pkg.totalPrice} {isRtl ? 'ر.س' : 'SAR'} • {pkg.totalDuration} {isRtl ? 'دقيقة' : 'min'}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3 mt-4 border-t border-slate-200 pt-4">
+                            <h5 className="font-semibold text-slate-700 text-sm">{isRtl ? 'خطوات التنفيذ' : 'Execution Steps'}</h5>
+                            {items.map((item) => {
+                              const srv = canonicalServices.find(s => s.id === item.serviceId);
+                              if (!srv) return null;
+                              return (
+                                <AppointmentServiceRow
+                                  tenantId={tenantId}
+                                  tenantTimezone={tenantTimezone}
+                                  selectedDate={selectedDate}
+                                  key={item.id}
+                                  service={srv}
+                                  variant={srv.variants?.find((v: any) => v.id === item.variantId) || null}
+                                  isRtl={isRtl}
+                                  boardStartHour={boardStartHour}
+                                  forceExpanded={true}
+                                  availableStylists={availableStylists}
+                                  stagedItem={item}
+                                  onAddService={() => {}} 
+                                  onUpdateService={onUpdateService}
+                                  onRemoveService={() => {}} 
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              <h3 className="text-xl font-medium tracking-tight text-slate-900 px-1 border-b border-slate-100 pb-2 mt-6">
+                {isRtl ? 'الباقات المتاحة' : 'Available Packages'}
+              </h3>
               {servicePackages.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {servicePackages.map(pkg => (
-                    <div key={pkg.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                    <div key={pkg.id} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
                       <div className="flex gap-3 mb-4">
                         <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200 shadow-sm overflow-hidden">
                           {pkg.image ? (
@@ -242,7 +308,7 @@ export default function AppointmentServicesStep({
                       <div className="px-1 mb-4">
                         <ul className="text-xs text-slate-500 space-y-1 list-disc list-inside">
                           {(pkg.items || []).map((item: any) => {
-                            const srv = canonicalServices.find(s => s.id === item.serviceId);
+                            const srv = canonicalServices.find((s: any) => s.id === item.serviceId);
                             return srv ? <li key={item.id} className="truncate">{isRtl ? srv.nameAr || srv.name_ar : srv.nameEn || srv.name_en}</li> : null;
                           })}
                         </ul>
@@ -275,8 +341,8 @@ export default function AppointmentServicesStep({
                   <div className="space-y-3">
                     {groupedServices[categoryName].map(({ service, variant }) => {
                       const stagedItem = variant
-                        ? stagedServices.find((s) => s.serviceId === service.id && s.variantId === variant.id)
-                        : stagedServices.find((s) => s.serviceId === service.id && !s.variantId);
+                        ? stagedServices.find((s) => s.serviceId === service.id && s.variantId === variant.id && s.itemType !== 'package')
+                        : stagedServices.find((s) => s.serviceId === service.id && !s.variantId && s.itemType !== 'package');
 
                       return (
                         <AppointmentServiceRow

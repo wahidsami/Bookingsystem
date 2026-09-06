@@ -152,6 +152,7 @@ export interface GuestProfile {
 
 interface StagedService {
   id: string;
+  itemType?: "service" | "package";
   serviceId: string;
   variantId?: string;
   packageId?: string;
@@ -1920,8 +1921,36 @@ export default function InteractiveDrawers({
     }
 
   const executeFinalSubmission = async (itemsToSubmit: any[]) => {
+    // Group package items for the backend
+    const standaloneItems = itemsToSubmit.filter(i => i.itemType !== 'package');
+    const pkgItems = itemsToSubmit.filter(i => i.itemType === 'package');
+    const groupedPackages: Record<string, any[]> = {};
+    pkgItems.forEach(i => {
+      if (!groupedPackages[i.packageId]) groupedPackages[i.packageId] = [];
+      groupedPackages[i.packageId].push(i);
+    });
+
+    const formattedItems = [
+      ...standaloneItems.map(i => ({
+        ...i,
+        itemType: 'service'
+      })),
+      ...Object.entries(groupedPackages).map(([pkgId, children]) => ({
+        itemType: 'package',
+        packageId: pkgId,
+        packageItems: children.map(c => ({
+          packageItemId: c.packageItemId,
+          serviceId: c.serviceId,
+          staffId: c.staffId,
+          startTime: c.startTime,
+          duration: c.duration,
+          sequenceOrder: c.sequenceOrder || 0
+        }))
+      }))
+    ];
+
     const payload: any = {
-      items: itemsToSubmit,
+      items: formattedItems,
       overtimeApproval: allowExtendedHours || itemsToSubmit.some(i => i.overtimeApproval?.approved) ? { approved: true } : undefined,
       staffId: resolvedPrimaryStaffId,
       startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
@@ -3196,7 +3225,7 @@ export default function InteractiveDrawers({
                           </div>
                         )}
                         {(() => {
-                          const queuedLineItems = stagedServices.map((item, index) => {
+                          const standaloneCartItems = stagedServices.filter(s => s.itemType !== 'package').map((item, index) => {
                             const srv = canonicalServices.find((service) => service.id === item.serviceId);
                             const variant = srv?.variants.find((entry) => entry.id === item.variantId) || srv?.variants[0] || null;
                             const staff = availableStylists.find((stylist) => stylist.id === item.staffId);
@@ -3211,6 +3240,7 @@ export default function InteractiveDrawers({
                             return {
                               id: item.id,
                               index,
+                              itemType: 'service',
                               serviceName: srv ? `${isRtl ? srv.nameAr : srv.nameEn}${variant ? ` / ${isRtl ? variant.nameAr : variant.nameEn}` : ''}` : item.serviceId,
                               staffName: isRtl ? staff?.nameAr : staff?.nameEn,
                               duration: variant?.duration || item.duration,
@@ -3220,6 +3250,30 @@ export default function InteractiveDrawers({
                               hasDiscount: item.discountType !== 'none' && item.discountValue > 0
                             };
                           });
+
+                          const pkgCartItems = stagedServices.filter(s => s.itemType === 'package');
+                          const pkgGroups = pkgCartItems.reduce((acc, curr) => {
+                             if (!acc[curr.packageId!]) acc[curr.packageId!] = [];
+                             acc[curr.packageId!].push(curr);
+                             return acc;
+                          }, {} as Record<string, typeof stagedServices>);
+                          
+                          const packageCartItems = Object.entries(pkgGroups).map(([pkgId, items]) => {
+                             const pkg = servicePackages?.find(p => p.id === pkgId);
+                             return {
+                               id: pkgId,
+                               itemType: 'package',
+                               serviceName: pkg ? (isRtl ? pkg.name_ar : pkg.name_en) : 'Package',
+                               staffName: items.length + (isRtl ? ' خدمات' : ' services'),
+                               duration: pkg?.totalDuration || 0,
+                               startTime: items[0]?.startTime || 0,
+                               price: pkg?.totalPrice || 0,
+                               basePrice: pkg?.totalPrice || 0,
+                               hasDiscount: false
+                             };
+                          });
+
+                          const queuedLineItems = [...packageCartItems, ...standaloneCartItems];
                           const primarySubtotal = queuedLineItems.reduce((sum, item) => sum + item.price, 0);
                           const guestsSubtotal = includeGroupGuests
                             ? guestsList.reduce((acc, g) => acc + (g.isFree ? 0 : (g.services || []).reduce((sum, gs) => sum + (gs.isFree ? 0 : toMoney(gs.finalPrice)), 0)), 0)

@@ -790,7 +790,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         })));
 
         const packages = pkgRes?.packages || (pkgRes as any)?.data?.packages || [];
-        setServicePackages(packages);
+        setServicePackages(packages.map((pkg: any) => ({
+          ...pkg,
+          image: resolveProductImageUrl(pkg.image || pkg.imageUrl || '')
+        })));
 
         if (employees.length > 0) {
           setCurrentStaffId((current) => employees.some((emp: any) => emp.id === current) ? current : employees[0].id);
