@@ -3267,6 +3267,7 @@ export default function InteractiveDrawers({
                           const packageCartItems = Object.entries(pkgGroups).map(([instanceId, items]: [string, any[]]) => {
                              const pkgId = items[0].packageId;
                              const pkg = servicePackages?.find(p => p.id === pkgId);
+                             const packagePrice = Number(pkg?.totalPrice ?? 0);
                              return {
                                id: instanceId,
                                itemType: 'package',
@@ -3274,8 +3275,8 @@ export default function InteractiveDrawers({
                                staffName: items.length + (isRtl ? ' خدمات' : ' services'),
                                duration: pkg?.totalDuration || 0,
                                startTime: items[0]?.startTime || 0,
-                               price: pkg?.totalPrice || 0,
-                               basePrice: pkg?.totalPrice || 0,
+                               price: packagePrice,
+                               basePrice: packagePrice,
                                hasDiscount: false
                              };
                           });
