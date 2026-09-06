@@ -46,6 +46,7 @@ import {
   isBookingTooSoonError,
   type BookingDialogCopy
 } from '../lib/bookingUiDialogs';
+import { buildEmptyAppointmentDraftSnapshot, isAppointmentDraftContent } from '../lib/appointmentDraftState';
 
 const toMoney = (value: any) => {
   const numeric = Number(value);
@@ -816,6 +817,7 @@ export default function InteractiveDrawers({
   const [cartDraftPending, setCartDraftPending] = useState<boolean>(() => Boolean(readDraftStorage<CartDraftSnapshot>(CART_DRAFT_STORAGE_KEY)));
   const [showAppointmentDraftPrompt, setShowAppointmentDraftPrompt] = useState(false);
   const [showCartDraftPrompt, setShowCartDraftPrompt] = useState(false);
+  const suppressAppointmentDraftPersistenceRef = useRef(false);
   const previousCreateDrawerOpenRef = useRef(isCreateDrawerOpen);
   const previousCartDrawerOpenRef = useRef(isCartDrawerOpen);
 
@@ -1007,44 +1009,7 @@ export default function InteractiveDrawers({
     blockEndDate
   ]);
 
-  const appointmentDraftHasContent = useMemo(() => (
-    createMode !== 'appointment'
-    || createStep !== 1
-    || custMode !== 'existing'
-    || Boolean(
-      selectedCustId
-      || customerSearch.trim()
-      || walkinFullName.trim()
-      || walkinPhone.trim()
-      || walkinEmail.trim()
-      || walkinDob.trim()
-      || walkinIsVip
-      || includeGroupGuests
-      || guestCount !== 1
-      || guestNames.trim()
-      || currentServiceId
-      || currentStaffId
-      || currentStartTime !== 120
-      || currentDuration !== 60
-      || currentDiscountType !== 'none'
-      || currentDiscountValue !== 0
-      || currentServiceNotes.trim()
-      || stagedServices.length > 0
-      || sessionNotes.trim()
-      || !notifyWhatsApp
-      || createSplitActive
-      || Object.values(createSplitAmounts).some((amount) => Number(amount) > 0)
-      || giftCardCodeInput.trim()
-      || blockTitleAr.trim() !== 'استراحة قهوة الموظفين'
-      || blockTitleEn.trim() !== 'Staff Espresso Recess'
-      || blockStaffId
-      || blockStartTime !== 180
-      || blockDuration !== 45
-      || blockType !== 'Break'
-      || blockIsRecurring
-      || blockEndDate.trim()
-    )
-  ), [
+  const appointmentDraftHasContent = useMemo(() => isAppointmentDraftContent({
     createMode,
     createStep,
     custMode,
@@ -1065,7 +1030,42 @@ export default function InteractiveDrawers({
     currentDiscountType,
     currentDiscountValue,
     currentServiceNotes,
-    stagedServices.length,
+    stagedServices,
+    sessionNotes,
+    notifyWhatsApp,
+    createSplitActive,
+    createSplitAmounts,
+    giftCardCodeInput,
+    blockTitleAr,
+    blockTitleEn,
+    blockStaffId,
+    blockStartTime,
+    blockDuration,
+    blockType,
+    blockIsRecurring,
+    blockEndDate
+  }), [
+    createMode,
+    createStep,
+    custMode,
+    selectedCustId,
+    customerSearch,
+    walkinFullName,
+    walkinPhone,
+    walkinEmail,
+    walkinDob,
+    walkinIsVip,
+    includeGroupGuests,
+    guestCount,
+    guestNames,
+    currentServiceId,
+    currentStaffId,
+    currentStartTime,
+    currentDuration,
+    currentDiscountType,
+    currentDiscountValue,
+    currentServiceNotes,
+    stagedServices,
     sessionNotes,
     notifyWhatsApp,
     createSplitActive,
@@ -1200,21 +1200,21 @@ export default function InteractiveDrawers({
   };
 
   const resetAppointmentDraft = () => {
-    const boardSeedStartTime = preserveBoardStartTime ? currentStartTime : null;
+    const emptyDraft = buildEmptyAppointmentDraftSnapshot();
 
-    setCreateMode('appointment');
-    setCreateStep(1);
-    setCustMode('existing');
-    setSelectedCustId('');
-    setCustomerSearch('');
-    setWalkinFullName('');
-    setWalkinPhone('');
-    setWalkinEmail('');
-    setWalkinDob('');
-    setWalkinIsVip(false);
-    setIncludeGroupGuests(false);
-    setGuestCount(1);
-    setGuestNames('');
+    setCreateMode(emptyDraft.createMode as 'appointment' | 'blocked');
+    setCreateStep(emptyDraft.createStep as number);
+    setCustMode(emptyDraft.custMode as 'existing' | 'walkin');
+    setSelectedCustId(emptyDraft.selectedCustId as string);
+    setCustomerSearch(emptyDraft.customerSearch as string);
+    setWalkinFullName(emptyDraft.walkinFullName as string);
+    setWalkinPhone(emptyDraft.walkinPhone as string);
+    setWalkinEmail(emptyDraft.walkinEmail as string);
+    setWalkinDob(emptyDraft.walkinDob as string);
+    setWalkinIsVip(Boolean(emptyDraft.walkinIsVip));
+    setIncludeGroupGuests(Boolean(emptyDraft.includeGroupGuests));
+    setGuestCount(Number(emptyDraft.guestCount || 1));
+    setGuestNames(emptyDraft.guestNames as string);
     setGuestsList([
       {
         id: 'g-1',
@@ -1227,35 +1227,27 @@ export default function InteractiveDrawers({
         services: [createEmptyGuestService()]
       }
     ]);
-    setCurrentServiceId('');
-    setCurrentStaffId('');
-    if (boardSeedStartTime !== null) {
-      setCurrentStartTime(boardSeedStartTime);
-    } else {
-      setCurrentStartTime(120);
-    }
-    setCurrentDuration(60);
-    setCurrentDiscountType('none');
-    setCurrentDiscountValue(0);
-    setCurrentServiceNotes('');
+    setCurrentServiceId(emptyDraft.currentServiceId as string);
+    setCurrentStaffId(emptyDraft.currentStaffId as string);
+    setCurrentStartTime(Number(emptyDraft.currentStartTime || 120));
+    setCurrentDuration(Number(emptyDraft.currentDuration || 60));
+    setCurrentDiscountType(emptyDraft.currentDiscountType as 'none' | 'flat' | 'percent');
+    setCurrentDiscountValue(Number(emptyDraft.currentDiscountValue || 0));
+    setCurrentServiceNotes(emptyDraft.currentServiceNotes as string);
     setStagedServices([]);
-    setSessionNotes('');
-    setNotifyWhatsApp(true);
-    setCreateSplitActive(false);
-    setCreateSplitAmounts({ card: 0, cash: 0, online: 0, bank_transfer: 0, wallet: 0, gift_card: 0 });
-    setGiftCardCodeInput('');
-    setBlockTitleAr('استراحة قهوة الموظفين');
-    setBlockTitleEn('Staff Espresso Recess');
-    setBlockStaffId('');
-    if (boardSeedStartTime !== null) {
-      setBlockStartTime(boardSeedStartTime);
-    } else {
-      setBlockStartTime(180);
-    }
-    setBlockDuration(45);
-    setBlockType('Break');
-    setBlockIsRecurring(false);
-    setBlockEndDate('');
+    setSessionNotes(emptyDraft.sessionNotes as string);
+    setNotifyWhatsApp(Boolean(emptyDraft.notifyWhatsApp));
+    setCreateSplitActive(Boolean(emptyDraft.createSplitActive));
+    setCreateSplitAmounts(emptyDraft.createSplitAmounts as { card: number; cash: number; online: number; bank_transfer: number; wallet: number; gift_card: number });
+    setGiftCardCodeInput(emptyDraft.giftCardCodeInput as string);
+    setBlockTitleAr(emptyDraft.blockTitleAr as string);
+    setBlockTitleEn(emptyDraft.blockTitleEn as string);
+    setBlockStaffId(emptyDraft.blockStaffId as string);
+    setBlockStartTime(Number(emptyDraft.blockStartTime || 180));
+    setBlockDuration(Number(emptyDraft.blockDuration || 45));
+    setBlockType(emptyDraft.blockType as 'Break' | 'Lunch' | 'Meeting');
+    setBlockIsRecurring(Boolean(emptyDraft.blockIsRecurring));
+    setBlockEndDate(emptyDraft.blockEndDate as string);
   };
 
   const restoreCartDraft = (snapshot: CartDraftSnapshot | null) => {
@@ -1344,6 +1336,12 @@ export default function InteractiveDrawers({
   };
 
   useEffect(() => {
+    if (suppressAppointmentDraftPersistenceRef.current) {
+      suppressAppointmentDraftPersistenceRef.current = false;
+      removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+      return;
+    }
+
     if (appointmentDraftHasContent) {
       writeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY, appointmentDraftSnapshot);
     } else {
@@ -2047,6 +2045,7 @@ export default function InteractiveDrawers({
 
       await sharedExecuteSubmission(itemsToSubmit, payload, {
         onSuccess: async () => {
+          suppressAppointmentDraftPersistenceRef.current = true;
           resetAppointmentDraft();
           removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
           setAppointmentDraftPending(false);
