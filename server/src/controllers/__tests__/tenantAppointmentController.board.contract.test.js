@@ -611,4 +611,32 @@ describe('tenantAppointmentController.getAppointmentsBoard', () => {
             specificDate: '2026-08-16'
         }));
     });
+
+    it('only auto-marks pending and confirmed appointments as no-show when past endTime', async () => {
+        const req = {
+            tenantId: 'tenant-1',
+            query: { date: '2026-08-16' }
+        };
+        const res = createRes();
+
+        // Ensure we capture the exact where clause passed to db.Appointment.update
+        await controller.getAppointmentsBoard(req, res);
+
+        expect(mockDb.Appointment.update).toHaveBeenCalledTimes(1);
+        const updateCall = mockDb.Appointment.update.mock.calls[0];
+        const updatePayload = updateCall[0];
+        const updateOptions = updateCall[1];
+
+        // Should set status to no_show
+        expect(updatePayload).toEqual(expect.objectContaining({ status: 'no_show' }));
+
+        // Ensure the filter targets ONLY pending and confirmed statuses
+        expect(updateOptions.where.status).toEqual({
+            [mockOp.in]: ['pending', 'confirmed']
+        });
+
+        // Ensure it targets past appointments
+        expect(updateOptions.where.endTime[mockOp.lt]).toBeInstanceOf(Date);
+        expect(updateOptions.where.tenantId).toBe('tenant-1');
+    });
 });

@@ -1696,7 +1696,7 @@ exports.getAppointmentsBoard = async (req, res) => {
                 where: {
                     tenantId,
                     endTime: { [db.Sequelize.Op.lt]: now },
-                    status: { [db.Sequelize.Op.notIn]: ['completed', 'cancelled', 'no_show'] }
+                    status: { [db.Sequelize.Op.in]: ['pending', 'confirmed'] }
                 }
             }
         );
