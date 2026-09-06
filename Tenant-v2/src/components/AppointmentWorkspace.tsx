@@ -1805,9 +1805,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       .slice(0, 50);
   })();
 
-  // Custom Drag State & Interactive Preview
-  const [draggedAptId, setDraggedAptId] = useState<string | null>(null);
-  console.log('[DD_TRACE] 6. React render cycle running in AppointmentWorkspace.tsx - draggedAptId:', draggedAptId, 'elapsed:', typeof window !== 'undefined' && (window as any).__dd_drag_start_time ? Date.now() - (window as any).__dd_drag_start_time : 0, 'ms');
+  // Custom Drag State & Interactive Preview (drag is handled natively by SchedulerGrid via DataTransfer)
+
 
   useEffect(() => {
     let cancelled = false;
@@ -4158,10 +4157,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     return matchesStaff && matchesStatus && matchesCategory && matchesSearch && matchesDate;
   });
 
-  // Calculate coordinates of the dragged element's ghost card
-  console.log('[DD_TRACE] 8.7 BEFORE draggedApt calculation/find in AppointmentWorkspace.tsx', Date.now());
-  const draggedApt = draggedAptId ? appointments.find(a => a.id === draggedAptId) : null;
-  console.log('[DD_TRACE] 8.8 AFTER draggedApt calculation/find in AppointmentWorkspace.tsx', Date.now());
   const schedulerAppointments = filteredAppointments.filter((appointment) => {
     if (appointment.kind !== 'blocked') {
       return true;
@@ -4174,9 +4169,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     return `${appointment.blockedType || ''}`.trim().toLowerCase() !== 'lunch';
   });
   const monthCalendarDays = useMemo(() => getMonthCalendarDays(selectedDate), [selectedDate]);
-  console.log('[DD_STEP] before appointmentsByDate memo, elapsed:', typeof performance !== 'undefined' ? performance.now() - dd_t0 : 0);
   const appointmentsByDate = useMemo(() => {
-    console.log('[DD_STEP] appointmentsByDate useMemo running');
     const grouped = new Map<string, Appointment[]>();
     filteredAppointments.forEach((appointment) => {
       const dateKey = appointment.date || getSelectedDateKey();
@@ -4187,50 +4180,52 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     return grouped;
   }, [filteredAppointments]);
 
-  const schedulerColumns: SchedulerColumn[] = isDayBoardMode(viewMode)
-    ? liveStylists
-        .filter((stylist) => {
-          if (focusedEmployeeId) {
-            return stylist.id === focusedEmployeeId;
-          }
+  const schedulerColumns: SchedulerColumn[] = useMemo(() => {
+    return isDayBoardMode(viewMode)
+      ? liveStylists
+          .filter((stylist) => {
+            if (focusedEmployeeId) {
+              return stylist.id === focusedEmployeeId;
+            }
 
-          const selectedTeamCount = visibleEmployeeIds.length > 0 ? visibleEmployeeIds.length : liveStylists.length;
-          if (selectedTeamCount === liveStylists.length) {
-            return true;
-          }
+            const selectedTeamCount = visibleEmployeeIds.length > 0 ? visibleEmployeeIds.length : liveStylists.length;
+            if (selectedTeamCount === liveStylists.length) {
+              return true;
+            }
 
-          return visibleEmployeeIds.includes(stylist.id);
-        })
-        .map((stylist) => ({
-          id: getSchedulerColumnId(viewMode, stylist.id),
-          kind: 'employee',
-          resourceId: stylist.id,
-          title: String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim() || stylist.nameEn || stylist.nameAr || stylist.id || '—',
-          subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
-          avatar: stylist.avatar,
-          statusLabel: stylistStatuses[stylist.id]
-            ? (stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active') : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break') : (isRtl ? 'خارج' : 'Off'))
-            : undefined,
-          statusTone: stylistStatuses[stylist.id] || 'neutral',
-          isToday: false,
-        }))
-    : getDaysOfActiveWeek(selectedDate).map((dayStr) => {
-        const dateValue = parseLocalDateKey(dayStr);
-        const dayName = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
-        const dateLabel = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
-        const isTodayDate = getLocalDateKey(new Date()) === dayStr;
-        return {
-          id: getSchedulerColumnId(viewMode, dayStr),
-          kind: 'day',
-          resourceId: dayStr,
-          title: `${dayName}`,
-          subtitle: dateLabel,
-          statusLabel: isTodayDate ? (isRtl ? 'اليوم' : 'Today') : undefined,
-          statusTone: isTodayDate ? 'today' : 'neutral',
-          dateKey: dayStr,
-          isToday: isTodayDate,
-        };
-      });
+            return visibleEmployeeIds.includes(stylist.id);
+          })
+          .map((stylist) => ({
+            id: getSchedulerColumnId(viewMode, stylist.id),
+            kind: 'employee',
+            resourceId: stylist.id,
+            title: String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim() || stylist.nameEn || stylist.nameAr || stylist.id || '—',
+            subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
+            avatar: stylist.avatar,
+            statusLabel: stylistStatuses[stylist.id]
+              ? (stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active') : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break') : (isRtl ? 'خارج' : 'Off'))
+              : undefined,
+            statusTone: stylistStatuses[stylist.id] || 'neutral',
+            isToday: false,
+          }))
+      : getDaysOfActiveWeek(selectedDate).map((dayStr) => {
+          const dateValue = parseLocalDateKey(dayStr);
+          const dayName = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
+          const dateLabel = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
+          const isTodayDate = getLocalDateKey(new Date()) === dayStr;
+          return {
+            id: getSchedulerColumnId(viewMode, dayStr),
+            kind: 'day',
+            resourceId: dayStr,
+            title: `${dayName}`,
+            subtitle: dateLabel,
+            statusLabel: isTodayDate ? (isRtl ? 'اليوم' : 'Today') : undefined,
+            statusTone: isTodayDate ? 'today' : 'neutral',
+            dateKey: dayStr,
+            isToday: isTodayDate,
+          };
+        });
+  }, [viewMode, liveStylists, focusedEmployeeId, visibleEmployeeIds, isRtl, stylistStatuses, selectedDate]);
 
   const schedulerEvents: SchedulerEvent[] = useMemo(() => {
     return schedulerAppointments.map((apt) => {
@@ -5447,18 +5442,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   onEventClick={handleSchedulerEventClick}
                   onEventContextMenu={handleSchedulerEventContextMenu}
                   onEventDragStart={(eventItem) => {
-                    const tStart = Date.now();
-                    console.log('[DRAG_DROP_TRACE] 1. dragStart - eventItem:', eventItem.id, tStart);
-                    console.log('[DD_TRACE] 3.1 BEFORE setDraggedAptId in AppointmentWorkspace.tsx', Date.now());
-                    setDraggedAptId(eventItem.id);
-                    console.log('[DD_TRACE] 3.2 AFTER setDraggedAptId in AppointmentWorkspace.tsx', Date.now());
-                    console.log('[DD_TRACE] 3.3 EXIT onEventDragStart callback in AppointmentWorkspace.tsx', Date.now());
+                    console.log('[DRAG_DROP_TRACE] 1. dragStart - eventItem:', eventItem.id, Date.now());
                   }}
                   onEventDragEnd={() => {
                     console.log('[DRAG_DROP_TRACE] 2. dragEnd', Date.now());
-                    console.log('[DD_TRACE] 3.4 BEFORE setDraggedAptId(null) in AppointmentWorkspace.tsx', Date.now());
-                    setDraggedAptId(null);
-                    console.log('[DD_TRACE] 3.5 AFTER setDraggedAptId(null) in AppointmentWorkspace.tsx', Date.now());
                   }}
                   onEventResizeStart={(eventItem, mouseEvent) => {
                     if (isDayBoardMode(viewMode) && isBoardEditable && eventItem.kind !== 'blocked') {

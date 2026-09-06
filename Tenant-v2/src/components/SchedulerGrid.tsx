@@ -956,13 +956,7 @@ export default function SchedulerGrid({
                         if (!isEditable) return;
                         event.preventDefault();
                         event.dataTransfer.dropEffect = 'move';
-                        if (isTracingActive) {
-                          console.log('[DD_TRACE] 8.1 BEFORE setHoveredSlot in onDragOver', Date.now());
-                        }
-                        setHoveredSlot(slot);
-                        if (isTracingActive) {
-                          console.log('[DD_TRACE] 8.2 AFTER setHoveredSlot in onDragOver', Date.now());
-                        }
+                        setHoveredSlot((current) => (current?.columnId === slot.columnId && current?.slotIndex === slot.slotIndex ? current : slot));
                         onAddSlotHover?.(slot);
                         if (isTracingActive) {
                           console.log('[DD_TRACE] 9.2 EXIT slot onDragOver in SchedulerGrid.tsx', Date.now());
@@ -1045,8 +1039,8 @@ export default function SchedulerGrid({
                       console.log('[DD_TRACE] 2.1a BAILED in SchedulerGrid onDragStart because not editable or blocked', Date.now());
                       return;
                     }
-                    console.log('[DD_TRACE] 2.2 AFTER checking isEditable/event.kind, BEFORE dataTransfer.setData', Date.now());
                     dragEvent.dataTransfer.setData('text/plain', event.id);
+                    dragEvent.dataTransfer.effectAllowed = 'move';
                     console.log('[DD_TRACE] 2.3 AFTER dataTransfer.setData, BEFORE calling onEventDragStart callback', Date.now());
                     onEventDragStart?.(event);
                     console.log('[DD_TRACE] 2.4 AFTER onEventDragStart callback in SchedulerGrid.tsx', Date.now());
@@ -1071,11 +1065,20 @@ export default function SchedulerGrid({
                     clickEvent.stopPropagation();
                     onEventClick?.(event);
                   }}
-                  onContextMenu={(contextEvent) => {
+                  onDragOver={(dragOverEvent) => {
                     if (!isEditable) return;
-                    contextEvent.preventDefault();
-                    contextEvent.stopPropagation();
-                    onEventContextMenu?.(contextEvent, event);
+                    dragOverEvent.preventDefault();
+                    dragOverEvent.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(dropEvent) => {
+                    if (!isEditable) return;
+                    dropEvent.preventDefault();
+                    dropEvent.stopPropagation();
+                    const draggedEventId = dropEvent.dataTransfer.getData('text/plain');
+                    if (draggedEventId) {
+                      const targetSlot = resolveSlot(columns[columnIndex], columnIndex, Math.floor(event.startMinutes / slotMinutes));
+                      onSlotDrop?.(targetSlot, draggedEventId);
+                    }
                   }}
                   className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${chainColor ? `ring-2 ${chainColor.ring} ${chainColor.shadow}` : ''}`}
                 >
