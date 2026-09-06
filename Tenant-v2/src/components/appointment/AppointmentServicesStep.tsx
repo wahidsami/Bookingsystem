@@ -27,6 +27,7 @@ interface AppointmentServicesStepProps {
   selectedDate: string;
   isRtl: boolean;
   boardStartHour?: number;
+  slotMinutes?: number;
   bookingRecoveryMode?: 'chain' | 'modify_professionals' | 'separate_services';
   forceExpandAll?: boolean;
   canonicalServices: ServiceRecord[];
@@ -53,6 +54,7 @@ export default function AppointmentServicesStep({
   selectedDate,
   isRtl,
   boardStartHour = 9,
+  slotMinutes = 5,
   bookingRecoveryMode = 'chain',
   forceExpandAll = false,
   canonicalServices,
@@ -277,6 +279,7 @@ export default function AppointmentServicesStep({
                                   variant={srv.variants?.find((v: any) => v.id === item.variantId) || null}
                                   isRtl={isRtl}
                                   boardStartHour={boardStartHour}
+                                  slotMinutes={slotMinutes}
                                   forceExpanded={true}
                                   availableStylists={availableStylists}
                                   stagedItem={item}
@@ -371,6 +374,7 @@ export default function AppointmentServicesStep({
                           variant={variant}
                           isRtl={isRtl}
                           boardStartHour={boardStartHour}
+                          slotMinutes={slotMinutes}
                           forceExpanded={forceExpandAll}
                           availableStylists={availableStylists}
                           stagedItem={stagedItem || null}

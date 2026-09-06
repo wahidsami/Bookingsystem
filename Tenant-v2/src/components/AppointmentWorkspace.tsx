@@ -7769,6 +7769,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setCurrentStartTime={setCurrentStartTime}
         preserveBoardStartTime={preserveBoardStartTime}
         boardStartHour={START_HOUR}
+        slotMinutes={SLOT_MINUTES}
         normalEndHour={schedulerConfig.normalEndHour}
         currentStaffId={currentStaffId}
         setCurrentStaffId={setCurrentStaffId}

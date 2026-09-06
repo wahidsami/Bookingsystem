@@ -12,6 +12,7 @@ interface AppointmentServiceConfigurationProps {
   variantId?: string;
   isRtl: boolean;
   boardStartHour?: number;
+  slotMinutes?: number;
   draftConfig: Partial<StagedService>;
   setDraftConfig: React.Dispatch<React.SetStateAction<Partial<StagedService>>>;
   validStylists: any[];
@@ -27,6 +28,7 @@ export default function AppointmentServiceConfiguration({
   variantId,
   isRtl,
   boardStartHour = 9,
+  slotMinutes = 5,
   draftConfig,
   setDraftConfig,
   validStylists,
@@ -66,7 +68,8 @@ export default function AppointmentServiceConfiguration({
 
   const timeOptions = useMemo(() => {
     const options: Array<{ value: string; label: string }> = [];
-    for (let absoluteMinutes = offsetBaseMinutes; absoluteMinutes < (24 * 60); absoluteMinutes += 15) {
+    const step = Math.max(1, slotMinutes);
+    for (let absoluteMinutes = offsetBaseMinutes; absoluteMinutes < (24 * 60); absoluteMinutes += step) {
       const hours = Math.floor(absoluteMinutes / 60);
       const minutes = absoluteMinutes % 60;
       const value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
@@ -76,7 +79,7 @@ export default function AppointmentServiceConfiguration({
       });
     }
     return options;
-  }, [offsetBaseMinutes]);
+  }, [offsetBaseMinutes, slotMinutes]);
 
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">

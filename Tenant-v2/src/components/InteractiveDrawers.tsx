@@ -91,6 +91,7 @@ interface InteractiveDrawersProps {
   setIsCreateDrawerOpen: (open: boolean) => void;
   preserveBoardStartTime?: boolean;
   boardStartHour?: number;
+  slotMinutes?: number;
   isCartDrawerOpen: boolean;
   setIsCartDrawerOpen: (open: boolean) => void;
   appointments: any[];
@@ -349,6 +350,7 @@ export default function InteractiveDrawers({
   setIsCreateDrawerOpen,
   preserveBoardStartTime = false,
   boardStartHour = 9,
+  slotMinutes = 5,
   isCartDrawerOpen,
   setIsCartDrawerOpen,
   appointments,
@@ -901,14 +903,15 @@ export default function InteractiveDrawers({
 
   const blockStartTimeOptions = useMemo(() => {
     const options: Array<{ value: string; label: string }> = [];
-    for (let absoluteMinutes = boardStartHour * 60; absoluteMinutes < (24 * 60); absoluteMinutes += 15) {
+    const step = Math.max(1, slotMinutes);
+    for (let absoluteMinutes = boardStartHour * 60; absoluteMinutes < (24 * 60); absoluteMinutes += step) {
       const hours = Math.floor(absoluteMinutes / 60);
       const minutes = absoluteMinutes % 60;
       const value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
       options.push({ value, label: to12HourTime(value) });
     }
     return options;
-  }, [boardStartHour]);
+  }, [boardStartHour, slotMinutes]);
 
   const formatBlockStartClockValue = (minutesFromNine?: number | null) => {
     const safeOffset = Math.max(0, Math.round(Number(minutesFromNine || 0)));
@@ -3189,6 +3192,7 @@ export default function InteractiveDrawers({
                         selectedDate={getLocalDateKey(selectedDate)}
                         isRtl={isRtl}
                         boardStartHour={boardStartHour}
+                        slotMinutes={slotMinutes}
                         bookingRecoveryMode={bookingRecoveryMode}
                         forceExpandAll={bookingRecoveryMode !== 'chain'}
                         canonicalServices={canonicalServices}

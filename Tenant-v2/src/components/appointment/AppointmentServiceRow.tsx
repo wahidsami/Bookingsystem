@@ -20,6 +20,7 @@ interface AppointmentServiceRowProps {
   variant?: ServiceVariantRecord | null;
   depth?: number;
   boardStartHour?: number;
+  slotMinutes?: number;
   forceExpanded?: boolean;
   availableStylists: any[];
   stagedItem: StagedService | null;
@@ -38,6 +39,7 @@ export default function AppointmentServiceRow({
   variant = null,
   depth = 0,
   boardStartHour = 9,
+  slotMinutes = 5,
   forceExpanded = false,
   availableStylists,
   stagedItem,
@@ -213,6 +215,7 @@ export default function AppointmentServiceRow({
           variantId={variant?.id || stagedItem?.variantId}
           isRtl={isRtl}
           boardStartHour={boardStartHour}
+          slotMinutes={slotMinutes}
           draftConfig={draftConfig}
           setDraftConfig={setDraftConfig}
           validStylists={validStylists}
