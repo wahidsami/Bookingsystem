@@ -9,7 +9,7 @@ import {
   Lock, Scissors, Sparkles, Smile, ShieldCheck, Mail, Phone,
   TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy, Settings2,
   PlusCircle, Coffee, Heart, ShoppingBag, Receipt, Gift, Banknote,
-  CalendarDays, Ban, Save, Maximize2, Minimize2, Loader2
+  CalendarDays, Ban, Save, Maximize2, Minimize2, Loader2, Package
 } from 'lucide-react';
 import { Language, Product, QuickLaunchRequest } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
@@ -4178,6 +4178,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       assignedStaffRole: staff ? (isRtl ? staff.roleAr : staff.roleEn) : '',
       role: isRtl ? staff?.roleAr : staff?.roleEn,
       raw: apt,
+      isPackage: Boolean(apt.packageId || apt.packageSnapshot),
     };
   });
 
@@ -6069,8 +6070,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/40 px-2.5 py-0.5 rounded-full uppercase">
                               {isRtl ? 'الخدمة الرئيسية النشطة' : 'ACTIVE SERVICE LINE'}
                             </span>
-                            <h4 className="font-bold text-slate-800 text-base mt-2.5">
-                              {isRtl ? activeServiceSummary.nameAr : activeServiceSummary.nameEn}
+                            <h4 className="font-bold text-slate-800 text-base mt-2.5 flex items-center gap-1.5">
+                              {(activeAppointment?.packageId || activeAppointment?.packageSnapshot) && (
+                                <Package size={16} className="text-amber-600 shrink-0" />
+                              )}
+                              <span>{isRtl ? activeServiceSummary.nameAr : activeServiceSummary.nameEn}</span>
                             </h4>
                             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                               <Clock size={12} />
