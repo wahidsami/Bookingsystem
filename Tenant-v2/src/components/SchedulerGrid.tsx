@@ -746,13 +746,13 @@ export default function SchedulerGrid({
 
     return lines;
   }, [positionedEvents, slotMinutes, slotHeight, staffColumnWidth, getColumnIndex]);
-  const handleGridDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleColumnDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     if (!isEditable) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   };
 
-  const handleGridDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleColumnDrop = (event: React.DragEvent<HTMLDivElement>, column: SchedulerColumn, columnIndex: number) => {
     if (!isEditable) return;
     event.preventDefault();
     
@@ -760,21 +760,6 @@ export default function SchedulerGrid({
     if (!draggedEventId) return;
 
     const rect = event.currentTarget.getBoundingClientRect();
-    const cellWidth = Math.max(50, staffColumnWidth);
-    
-    let relativeX = event.clientX - rect.left;
-    if (isRtl) {
-      relativeX = rect.width - relativeX;
-    }
-    
-    const columnAreaX = relativeX - timeColumnWidth;
-    if (columnAreaX < 0) return; 
-    
-    const columnIndex = Math.floor(columnAreaX / cellWidth);
-    if (columnIndex < 0 || columnIndex >= columns.length) return; 
-    
-    const column = columns[columnIndex];
-    
     const relativeY = Math.max(0, event.clientY - rect.top);
     const droppedMinutes = (relativeY / pixelsPerHour) * 60;
     const slotIndex = Math.floor(droppedMinutes / slotMinutes);
@@ -783,7 +768,7 @@ export default function SchedulerGrid({
     
     const targetSlot = resolveSlot(column, columnIndex, slotIndex);
     
-    console.log('[DD_TARGET] geometric drop → target=slot', targetSlot.columnId, targetSlot.slotIndex, 'eventId:', draggedEventId);
+    console.log('[DD_TARGET] structural column drop → target=slot', targetSlot.columnId, targetSlot.slotIndex, 'eventId:', draggedEventId);
     onSlotDrop?.(targetSlot, draggedEventId);
   };
 
@@ -855,10 +840,8 @@ export default function SchedulerGrid({
       </div>
 
       <div 
-        className="relative isolate" 
-        style={{ minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}
-        onDragOver={handleGridDragOver}
-        onDrop={handleGridDrop}
+        className="relative isolate grid"
+        style={{ gridTemplateColumns, minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}
       >
         {pastAreaHeight !== null && (
           <div
@@ -910,7 +893,8 @@ export default function SchedulerGrid({
           </div>
         )}
 
-        <div className="relative z-10">
+        {/* Time Column */}
+        <div className="relative flex flex-col border-r border-slate-200" style={{ width: timeColumnWidth }}>
           {rows.map((row) => {
             const hourBoundary = row.slotIndex % slotsPerHour === 0;
             const rowLabel = hourBoundary ? formatSlotTime(row.startMinutes, startHour, isRtl) : '';
@@ -918,200 +902,203 @@ export default function SchedulerGrid({
             return (
               <div
                 key={row.slotIndex}
-                className="grid"
-                style={{ gridTemplateColumns, height: `${slotHeight}px`, minWidth: 'min-content' }}
+                className={`relative flex items-start justify-center pr-2 text-[10px] font-black font-mono tracking-tight text-slate-400 ${isExtendedHourRow ? 'bg-slate-100/80' : 'bg-slate-50/60'} ${hourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80'}`}
+                style={{ height: `${slotHeight}px` }}
               >
-                <div
-                  className={`relative flex items-start justify-center pr-2 text-[10px] font-black font-mono tracking-tight text-slate-400 ${isExtendedHourRow ? 'bg-slate-100/80' : 'bg-slate-50/60'} border-r border-slate-200 ${hourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80'}`}
-                  style={{ width: timeColumnWidth }}
-                >
-                  {hourBoundary && <span className="mt-[-1px]">{rowLabel}</span>}
-                </div>
-
-                {columns.map((column, columnIndex) => {
-                  const slot = resolveSlot(column, columnIndex, row.slotIndex);
-                  const isHovered = hoveredSlot?.columnId === slot.columnId && hoveredSlot.slotIndex === slot.slotIndex;
-                  const isSelected = isSlotInsideSelection(slot);
-                  const laneShade = isExtendedHourRow
-                    ? (columnIndex % 2 === 0 ? 'bg-slate-100/80' : 'bg-slate-50/80')
-                    : (columnIndex % 2 === 0 ? 'bg-slate-50/70' : 'bg-white');
-                  return (
-                    <button
-                      key={`${column.id}-${row.slotIndex}`}
-                      type="button"
-                      data-slot-index={slot.slotIndex}
-                      data-column-id={slot.columnId}
-                      data-date-key={slot.dateKey}
-                      data-start-minutes={slot.startMinutes}
-                      data-end-minutes={slot.endMinutes}
-                      className={`${slotCellClassName(hourBoundary, isHovered || isSelected)} ${laneShade} ${isHovered ? 'ring-1 ring-inset ring-amber-400/50 bg-amber-500/10' : ''} ${isSelected ? 'bg-amber-500/12' : ''}`}
-                      style={{ height: `${slotHeight}px` }}
-                      aria-label={`${column.title} ${formatSlotTime(slot.startMinutes, startHour, isRtl)}`}
-                      onMouseDown={(event) => {
-                        if (!isEditable || event.button !== 0) return;
-                        setSelectionAnchor(slot);
-                        setSelectionFocus(slot);
-                        onAddSlotHover?.(slot);
-                      }}
-                      onMouseEnter={(event) => {
-                        if (selectionAnchor && isSameAxis(selectionAnchor, slot)) {
-                          setSelectionFocus(slot);
-                        }
-                        setHoveredSlot(slot);
-                        setHoverTooltip({
-                          x: event.clientX,
-                          y: event.clientY,
-                          label: formatSlotTime(slot.startMinutes, startHour, isRtl),
-                        });
-                        onAddSlotHover?.(slot);
-                      }}
-                      onMouseMove={(event) => {
-                        setHoverTooltip({
-                          x: event.clientX,
-                          y: event.clientY,
-                          label: formatSlotTime(slot.startMinutes, startHour, isRtl),
-                        });
-                      }}
-                      onMouseUp={() => {
-                        if (!isEditable) return;
-                        commitSelection();
-                      }}
-                      onMouseLeave={() => {
-                        setHoveredSlot((current) => (current?.columnId === slot.columnId && current.slotIndex === slot.slotIndex ? null : current));
-                        setHoverTooltip(null);
-                        onAddSlotHover?.(null);
-                      }}
-                      onClick={(event) => {
-                        if (!isEditable) return;
-                        if (suppressNextClickRef.current) {
-                          suppressNextClickRef.current = false;
-                          event.preventDefault();
-                          event.stopPropagation();
-                          return;
-                        }
-                        event.preventDefault();
-                        event.stopPropagation();
-                        // Unify click behavior: left click opens the context menu
-                        onSlotContextMenu?.(event, slot);
-                      }}
-                      onContextMenu={(event) => {
-                        if (!isEditable) return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onSlotContextMenu?.(event, slot);
-                      }}
-                    />
-                  );
-                })}
+                {hourBoundary && <span className="mt-[-1px]">{rowLabel}</span>}
               </div>
             );
           })}
         </div>
 
-          {positionedEvents.map((event) => {
-            const columnIndex = getColumnIndex(event.columnId);
-            if (columnIndex === -1) return null;
+        {/* Staff Columns */}
+        {columns.map((column, columnIndex) => {
+          return (
+            <div
+              key={column.id}
+              className="relative flex flex-col min-w-0"
+              onDragOver={(event) => handleColumnDragOver(event)}
+              onDrop={(event) => handleColumnDrop(event, column, columnIndex)}
+            >
+              {rows.map((row) => {
+                const hourBoundary = row.slotIndex % slotsPerHour === 0;
+                const isExtendedHourRow = normalEndHour !== undefined && row.startMinutes >= (normalizedNormalEndHour - startHour) * 60;
+                const slot = resolveSlot(column, columnIndex, row.slotIndex);
+                const isHovered = hoveredSlot?.columnId === slot.columnId && hoveredSlot.slotIndex === slot.slotIndex;
+                const isSelected = isSlotInsideSelection(slot);
+                const laneShade = isExtendedHourRow
+                  ? (columnIndex % 2 === 0 ? 'bg-slate-100/80' : 'bg-slate-50/80')
+                  : (columnIndex % 2 === 0 ? 'bg-slate-50/70' : 'bg-white');
+                return (
+                  <button
+                    key={`${column.id}-${row.slotIndex}`}
+                    type="button"
+                    data-slot-index={slot.slotIndex}
+                    data-column-id={slot.columnId}
+                    data-date-key={slot.dateKey}
+                    data-start-minutes={slot.startMinutes}
+                    data-end-minutes={slot.endMinutes}
+                    className={`${slotCellClassName(hourBoundary, isHovered || isSelected)} ${laneShade} ${isHovered ? 'ring-1 ring-inset ring-amber-400/50 bg-amber-500/10' : ''} ${isSelected ? 'bg-amber-500/12' : ''}`}
+                    style={{ height: `${slotHeight}px` }}
+                    aria-label={`${column.title} ${formatSlotTime(slot.startMinutes, startHour, isRtl)}`}
+                    onMouseDown={(event) => {
+                      if (!isEditable || event.button !== 0) return;
+                      setSelectionAnchor(slot);
+                      setSelectionFocus(slot);
+                      onAddSlotHover?.(slot);
+                    }}
+                    onMouseEnter={(event) => {
+                      if (selectionAnchor && isSameAxis(selectionAnchor, slot)) {
+                        setSelectionFocus(slot);
+                      }
+                      setHoveredSlot(slot);
+                      setHoverTooltip({
+                        x: event.clientX,
+                        y: event.clientY,
+                        label: formatSlotTime(slot.startMinutes, startHour, isRtl),
+                      });
+                      onAddSlotHover?.(slot);
+                    }}
+                    onMouseMove={(event) => {
+                      setHoverTooltip({
+                        x: event.clientX,
+                        y: event.clientY,
+                        label: formatSlotTime(slot.startMinutes, startHour, isRtl),
+                      });
+                    }}
+                    onMouseUp={() => {
+                      if (!isEditable) return;
+                      commitSelection();
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredSlot((current) => (current?.columnId === slot.columnId && current.slotIndex === slot.slotIndex ? null : current));
+                      setHoverTooltip(null);
+                      onAddSlotHover?.(null);
+                    }}
+                    onClick={(event) => {
+                      if (!isEditable) return;
+                      if (suppressNextClickRef.current) {
+                        suppressNextClickRef.current = false;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSlotContextMenu?.(event, slot);
+                    }}
+                    onContextMenu={(event) => {
+                      if (!isEditable) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSlotContextMenu?.(event, slot);
+                    }}
+                  />
+                );
+              })}
 
-            const { top, bottom, height } = getSchedulerEventBoxMetrics({
-              startMinutes: event.startMinutes,
-              endMinutes: event.endMinutes,
-              pixelsPerHour,
-            });
-            const cellWidth = Math.max(50, staffColumnWidth);
-            const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
-            const inlineStart = `calc(${timeColumnWidth}px + ${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;
-            const statusTheme = getAppointmentStatusTheme(event.status, event.kind);
-            const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
-            const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
-            const assignedStaffName = event.assignedStaffName || event.raw?.staff?.name || event.role || '';
-            const assignedStaffRole = event.assignedStaffRole || event.role || '';
-            const variantLabel = event.variantLabel || event.raw?.serviceVariantName || event.raw?.serviceVariantDescription || '';
-            const variantDescription = event.variantDescription || event.raw?.serviceVariantDescription || '';
-            const isCompact = height < 42;
-            const isMedium = height >= 42 && height < 64;
-            const showStatusMeta = showAppointmentStatusBadges;
+              {positionedEvents.filter(e => e.columnId === column.id).map((event) => {
+                const { top, bottom, height } = getSchedulerEventBoxMetrics({
+                  startMinutes: event.startMinutes,
+                  endMinutes: event.endMinutes,
+                  pixelsPerHour,
+                });
+                const cellWidth = Math.max(50, staffColumnWidth);
+                const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
+                const inlineStart = `calc(${event.laneIndex * laneWidthPx}px)`;
+                const statusTheme = getAppointmentStatusTheme(event.status, event.kind);
+                const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
+                const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
+                const assignedStaffName = event.assignedStaffName || event.raw?.staff?.name || event.role || '';
+                const assignedStaffRole = event.assignedStaffRole || event.role || '';
+                const variantLabel = event.variantLabel || event.raw?.serviceVariantName || event.raw?.serviceVariantDescription || '';
+                const variantDescription = event.variantDescription || event.raw?.serviceVariantDescription || '';
+                const isCompact = height < 42;
+                const isMedium = height >= 42 && height < 64;
+                const showStatusMeta = showAppointmentStatusBadges;
 
-            const chainColor = (event.kind === 'appointment' && event.raw?.bookingSessionId) ? chainedSessionColors.get(event.raw.bookingSessionId) : null;
-            const showChainIndicator = Boolean(event.kind === 'appointment' && event.raw?.bookingSessionId && chainColor);
+                const chainColor = (event.kind === 'appointment' && event.raw?.bookingSessionId) ? chainedSessionColors.get(event.raw.bookingSessionId) : null;
+                const showChainIndicator = Boolean(event.kind === 'appointment' && event.raw?.bookingSessionId && chainColor);
 
-            return (
-              <div
-                key={event.id}
-              className="absolute z-20"
-              style={{
-                  ...(isRtl ? { right: inlineStart } : { left: inlineStart }),
-                  width: `calc(${laneWidthPx}px - 8px)`,
-                  maxWidth: `calc(${laneWidthPx}px - 8px)`,
-                  top: `${top}px`,
-                  height: `${height}px`,
-                  maxHeight: '100%',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <div
-                  role="button"
-                  tabIndex={0}
-                  data-appointment-card="true"
-                  draggable={isEditable && event.kind !== 'blocked'}
-                  onDragStart={(dragEvent) => {
-                    if (!isEditable || event.kind === 'blocked') {
-                      return;
-                    }
-                    dragEvent.dataTransfer.setData('text/plain', event.id);
-                    dragEvent.dataTransfer.effectAllowed = 'move';
-                    onEventDragStart?.(event);
-                    dragEvent.currentTarget.setAttribute('data-is-dragging', 'true');
-                  }}
-                  onDragEnd={(dragEvent) => {
-                    dragEvent.currentTarget.removeAttribute('data-is-dragging');
-                    if (!isEditable || event.kind === 'blocked') return;
-                    onEventDragEnd?.(event);
-                  }}
-                  onClick={(clickEvent) => {
-                    clickEvent.stopPropagation();
-                    onEventClick?.(event);
-                  }}
-                  className={`relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${chainColor ? `ring-2 ${chainColor.ring} ${chainColor.shadow}` : ''}`}
-                >
-                  <div className={`absolute inset-x-0 top-0 h-1 ${statusTheme.accent}`} />
+                return (
+                  <div
+                    key={event.id}
+                    className="absolute z-20"
+                    style={{
+                      ...(isRtl ? { right: inlineStart } : { left: inlineStart }),
+                      width: `calc(${laneWidthPx}px - 8px)`,
+                      maxWidth: `calc(${laneWidthPx}px - 8px)`,
+                      top: `${top}px`,
+                      height: `${height}px`,
+                      maxHeight: '100%',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      data-appointment-card="true"
+                      draggable={isEditable && event.kind !== 'blocked'}
+                      onDragStart={(dragEvent) => {
+                        if (!isEditable || event.kind === 'blocked') {
+                          return;
+                        }
+                        dragEvent.dataTransfer.setData('text/plain', event.id);
+                        dragEvent.dataTransfer.effectAllowed = 'move';
+                        onEventDragStart?.(event);
+                      }}
+                      onDragEnd={(dragEvent) => {
+                        if (!isEditable || event.kind === 'blocked') return;
+                        onEventDragEnd?.(event);
+                      }}
+                      onClick={(clickEvent) => {
+                        clickEvent.stopPropagation();
+                        onEventClick?.(event);
+                      }}
+                      className={`relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${chainColor ? `ring-2 ${chainColor.ring} ${chainColor.shadow}` : ''}`}
+                    >
+                      <div className={`absolute inset-x-0 top-0 h-1 ${statusTheme.accent}`} />
 
-                  {event.kind === 'blocked' ? (
-                    <div className="flex h-full min-w-0 flex-col items-center justify-center overflow-hidden p-1">
-                      <p className={`truncate text-center text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
-                        {event.title || event.blockedType || 'Blocked'}
-                      </p>
+                      {event.kind === 'blocked' ? (
+                        <div className="flex h-full min-w-0 flex-col items-center justify-center overflow-hidden p-1">
+                          <p className={`truncate text-center text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
+                            {event.title || event.blockedType || 'Blocked'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex min-w-0 flex-col gap-1 p-0.5 overflow-hidden">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
+                              {event.isPackage ? <Package size={10} className="inline mr-1 text-amber-600" /> : null}
+                              {event.title || 'Customer'}
+                            </p>
+                            {showChainIndicator && (
+                              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${chainColor ? `${chainColor.border} bg-white/90` : 'border-slate-200 bg-white/90'} shadow-sm`}>
+                                <Link2 size={10} className={chainColor ? chainColor.text : 'text-slate-500'} />
+                              </span>
+                            )}
+                          </div>
+                          <p className={`truncate text-[11px] font-bold ${statusTheme.secondaryText}`}>
+                            {event.subtitle || 'Service'}
+                          </p>
+                        </div>
+                      )}
+
+                      {isEditable && event.kind !== 'blocked' && (
+                        <button
+                          type="button"
+                          className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-black/5 hover:bg-black/15"
+                          onMouseDown={(mouseEvent) => onEventResizeStart?.(event, mouseEvent)}
+                          aria-label="Resize appointment"
+                        />
+                      )}
                     </div>
-                  ) : (
-                    <div className="flex min-w-0 flex-col gap-1 p-0.5 overflow-hidden">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
-                          {event.isPackage ? <Package size={10} className="inline mr-1 text-amber-600" /> : null}
-                          {event.title || 'Customer'}
-                        </p>
-                        {showChainIndicator && (
-                          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${chainColor ? `${chainColor.border} bg-white/90` : 'border-slate-200 bg-white/90'} shadow-sm`}>
-                            <Link2 size={10} className={chainColor ? chainColor.text : 'text-slate-500'} />
-                          </span>
-                        )}
-                      </div>
-                      <p className={`truncate text-[11px] font-bold ${statusTheme.secondaryText}`}>
-                        {event.subtitle || 'Service'}
-                      </p>
-                    </div>
-                  )}
-
-                  {isEditable && event.kind !== 'blocked' && (
-                    <button
-                      type="button"
-                      className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-black/5 hover:bg-black/15"
-                      onMouseDown={(mouseEvent) => onEventResizeStart?.(event, mouseEvent)}
-                      aria-label="Resize appointment"
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
 
         {hoverTooltip && (
           <div
