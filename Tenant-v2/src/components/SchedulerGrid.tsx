@@ -445,6 +445,33 @@ export default function SchedulerGrid({
   const [selectionAnchor, setSelectionAnchor] = useState<SchedulerSlot | null>(null);
   const [selectionFocus, setSelectionFocus] = useState<SchedulerSlot | null>(null);
   const suppressNextClickRef = useRef(false);
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+
+  const enableActiveDrag = () => {
+    gridContainerRef.current?.setAttribute('data-drag-active', 'true');
+    console.log('[DD_TARGET] dragstart → active drag enabled');
+  };
+
+  const disableActiveDrag = () => {
+    if (gridContainerRef.current?.hasAttribute('data-drag-active')) {
+      gridContainerRef.current?.removeAttribute('data-drag-active');
+      const draggingCards = gridContainerRef.current?.querySelectorAll('[data-is-dragging="true"]');
+      draggingCards?.forEach(card => card.removeAttribute('data-is-dragging'));
+      console.log('[DD_TARGET] dragend → active drag disabled');
+    }
+  };
+
+  useEffect(() => {
+    const handleGlobalDragEnd = () => {
+      disableActiveDrag();
+    };
+    window.addEventListener('dragend', handleGlobalDragEnd);
+    window.addEventListener('drop', handleGlobalDragEnd);
+    return () => {
+      window.removeEventListener('dragend', handleGlobalDragEnd);
+      window.removeEventListener('drop', handleGlobalDragEnd);
+    };
+  }, []);
   const slotsPerHour = 60 / slotMinutes;
   const slotCount = Math.max(1, Math.round(((endHour - startHour) * 60) / slotMinutes));
   const gridTemplateColumns = useMemo(
@@ -746,7 +773,17 @@ export default function SchedulerGrid({
   }, [positionedEvents, slotMinutes, slotHeight, staffColumnWidth, getColumnIndex]);
 
   return (
-    <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-visible" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div
+      ref={gridContainerRef}
+      data-scheduler-grid="true"
+      className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-visible"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
+      <style>{`
+        [data-scheduler-grid][data-drag-active="true"] [data-appointment-card="true"]:not([data-is-dragging="true"]) {
+          pointer-events: none !important;
+        }
+      `}</style>
       <div className="sticky top-0 z-50 grid border-b border-slate-200 bg-slate-50/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
         <div
           className="flex items-center justify-center border-r border-slate-200 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 bg-slate-50"
@@ -956,6 +993,10 @@ export default function SchedulerGrid({
                         if (!isEditable) return;
                         event.preventDefault();
                         event.dataTransfer.dropEffect = 'move';
+                        if (isTracingActive && !(window as any).__dd_slot_dragover_logged) {
+                          (window as any).__dd_slot_dragover_logged = true;
+                          console.log('[DD_TARGET] dragover → target=slot', slot.columnId, slot.slotIndex);
+                        }
                         setHoveredSlot((current) => (current?.columnId === slot.columnId && current?.slotIndex === slot.slotIndex ? current : slot));
                         onAddSlotHover?.(slot);
                         if (isTracingActive) {
@@ -963,9 +1004,11 @@ export default function SchedulerGrid({
                         }
                       }}
                       onDrop={(event) => {
+                        disableActiveDrag();
                         if (!isEditable) return;
                         event.preventDefault();
                         const draggedEventId = event.dataTransfer.getData('text/plain');
+                        console.log('[DD_TARGET] drop → target=slot', slot.columnId, slot.slotIndex, 'eventId:', draggedEventId);
                         if (draggedEventId) {
                           onSlotDrop?.(slot, draggedEventId);
                         }
@@ -1025,6 +1068,7 @@ export default function SchedulerGrid({
                 <div
                   role="button"
                   tabIndex={0}
+                  data-appointment-card="true"
                   draggable={isEditable && event.kind !== 'blocked'}
                   onDragStart={(dragEvent) => {
                     const t0 = Date.now();
@@ -1032,6 +1076,8 @@ export default function SchedulerGrid({
                     (window as any).__dd_drag_start_time = t0;
                     (window as any).__dd_first_event_logged = false;
                     (window as any).__dd_first_raf_logged = false;
+                    (window as any).__dd_slot_dragover_logged = false;
+                    (window as any).__dd_card_dragover_logged = false;
 
                     console.log('[DD_TRACE] 1.1 ENTER native onDragStart in SchedulerGrid.tsx', t0);
                     console.log('[DD_TRACE] 2.1 BEFORE checking isEditable/event.kind in SchedulerGrid.tsx', Date.now());
@@ -1044,6 +1090,8 @@ export default function SchedulerGrid({
                     console.log('[DD_TRACE] 2.3 AFTER dataTransfer.setData, BEFORE calling onEventDragStart callback', Date.now());
                     onEventDragStart?.(event);
                     console.log('[DD_TRACE] 2.4 AFTER onEventDragStart callback in SchedulerGrid.tsx', Date.now());
+                    dragEvent.currentTarget.setAttribute('data-is-dragging', 'true');
+                    enableActiveDrag();
 
                     requestAnimationFrame(() => {
                       if (!(window as any).__dd_first_raf_logged) {
@@ -1054,8 +1102,10 @@ export default function SchedulerGrid({
 
                     console.log('[DD_TRACE] 1.9 EXIT native onDragStart in SchedulerGrid.tsx', Date.now());
                   }}
-                  onDragEnd={() => {
+                  onDragEnd={(dragEvent) => {
                     console.log('[DD_TRACE] 9.3 ENTER native onDragEnd in SchedulerGrid.tsx', Date.now());
+                    dragEvent.currentTarget.removeAttribute('data-is-dragging');
+                    disableActiveDrag();
                     if (!isEditable || event.kind === 'blocked') return;
                     onEventDragEnd?.(event);
                     (window as any).__dd_drag_active = false;
@@ -1069,12 +1119,18 @@ export default function SchedulerGrid({
                     if (!isEditable) return;
                     dragOverEvent.preventDefault();
                     dragOverEvent.dataTransfer.dropEffect = 'move';
+                    if ((window as any).__dd_drag_active && !(window as any).__dd_card_dragover_logged) {
+                      (window as any).__dd_card_dragover_logged = true;
+                      console.log('[DD_TARGET] dragover → target=card', event.id);
+                    }
                   }}
                   onDrop={(dropEvent) => {
+                    disableActiveDrag();
                     if (!isEditable) return;
                     dropEvent.preventDefault();
                     dropEvent.stopPropagation();
                     const draggedEventId = dropEvent.dataTransfer.getData('text/plain');
+                    console.log('[DD_TARGET] drop → target=card', event.id, 'eventId:', draggedEventId);
                     if (draggedEventId) {
                       const targetSlot = resolveSlot(columns[columnIndex], columnIndex, Math.floor(event.startMinutes / slotMinutes));
                       onSlotDrop?.(targetSlot, draggedEventId);
