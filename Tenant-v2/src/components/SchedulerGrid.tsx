@@ -1008,10 +1008,6 @@ export default function SchedulerGrid({
           })}
         </div>
 
-        <div
-          className="pointer-events-none absolute inset-y-0 z-20 overflow-hidden"
-          style={eventLayerInsetStyle}
-        >
           {positionedEvents.map((event) => {
             const columnIndex = getColumnIndex(event.columnId);
             if (columnIndex === -1) return null;
@@ -1023,7 +1019,7 @@ export default function SchedulerGrid({
             });
             const cellWidth = Math.max(50, staffColumnWidth);
             const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
-            const inlineStart = `calc(${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;
+            const inlineStart = `calc(${timeColumnWidth}px + ${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;
             const statusTheme = getAppointmentStatusTheme(event.status, event.kind);
             const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
             const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
@@ -1041,7 +1037,7 @@ export default function SchedulerGrid({
             return (
               <div
                 key={event.id}
-              className="absolute"
+              className="absolute z-20"
               style={{
                   ...(isRtl ? { right: inlineStart } : { left: inlineStart }),
                   width: `calc(${laneWidthPx}px - 8px)`,
@@ -1075,7 +1071,7 @@ export default function SchedulerGrid({
                     clickEvent.stopPropagation();
                     onEventClick?.(event);
                   }}
-                  className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${chainColor ? `ring-2 ${chainColor.ring} ${chainColor.shadow}` : ''}`}
+                  className={`relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${chainColor ? `ring-2 ${chainColor.ring} ${chainColor.shadow}` : ''}`}
                 >
                   <div className={`absolute inset-x-0 top-0 h-1 ${statusTheme.accent}`} />
 
@@ -1107,7 +1103,7 @@ export default function SchedulerGrid({
                   {isEditable && event.kind !== 'blocked' && (
                     <button
                       type="button"
-                      className="pointer-events-auto absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-black/5 hover:bg-black/15"
+                      className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-black/5 hover:bg-black/15"
                       onMouseDown={(mouseEvent) => onEventResizeStart?.(event, mouseEvent)}
                       aria-label="Resize appointment"
                     />
@@ -1116,7 +1112,6 @@ export default function SchedulerGrid({
               </div>
             );
           })}
-        </div>
 
         {hoverTooltip && (
           <div
