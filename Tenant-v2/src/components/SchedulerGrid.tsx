@@ -446,13 +446,27 @@ export default function SchedulerGrid({
   const [selectionFocus, setSelectionFocus] = useState<SchedulerSlot | null>(null);
   const suppressNextClickRef = useRef(false);
   const gridContainerRef = useRef<HTMLDivElement>(null);
+  const activeDragRafId = useRef<number | null>(null);
+  const isDragActive = useRef<boolean>(false);
 
   const enableActiveDrag = () => {
-    gridContainerRef.current?.setAttribute('data-drag-active', 'true');
-    console.log('[DD_TARGET] dragstart → active drag enabled');
+    isDragActive.current = true;
+    if (activeDragRafId.current !== null) {
+      cancelAnimationFrame(activeDragRafId.current);
+    }
+    activeDragRafId.current = requestAnimationFrame(() => {
+      if (!isDragActive.current) return;
+      gridContainerRef.current?.setAttribute('data-drag-active', 'true');
+      console.log('[DD_TARGET] dragstart → active drag enabled');
+    });
   };
 
   const disableActiveDrag = () => {
+    isDragActive.current = false;
+    if (activeDragRafId.current !== null) {
+      cancelAnimationFrame(activeDragRafId.current);
+      activeDragRafId.current = null;
+    }
     if (gridContainerRef.current?.hasAttribute('data-drag-active')) {
       gridContainerRef.current?.removeAttribute('data-drag-active');
       const draggingCards = gridContainerRef.current?.querySelectorAll('[data-is-dragging="true"]');
@@ -465,11 +479,24 @@ export default function SchedulerGrid({
     const handleGlobalDragEnd = () => {
       disableActiveDrag();
     };
+    
+    // Primary native drag lifecycle
     window.addEventListener('dragend', handleGlobalDragEnd);
     window.addEventListener('drop', handleGlobalDragEnd);
+    
+    // Fallback cleanup if native drag aborts/stalls
+    window.addEventListener('blur', handleGlobalDragEnd);
+    window.addEventListener('pointerup', handleGlobalDragEnd);
+    window.addEventListener('mouseup', handleGlobalDragEnd);
+    document.addEventListener('visibilitychange', handleGlobalDragEnd);
+    
     return () => {
       window.removeEventListener('dragend', handleGlobalDragEnd);
       window.removeEventListener('drop', handleGlobalDragEnd);
+      window.removeEventListener('blur', handleGlobalDragEnd);
+      window.removeEventListener('pointerup', handleGlobalDragEnd);
+      window.removeEventListener('mouseup', handleGlobalDragEnd);
+      document.removeEventListener('visibilitychange', handleGlobalDragEnd);
     };
   }, []);
   const slotsPerHour = 60 / slotMinutes;
