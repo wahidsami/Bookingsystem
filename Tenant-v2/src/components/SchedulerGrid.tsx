@@ -2,52 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Users, ChevronDown, Link2, Package } from 'lucide-react';
 import { getSchedulerEventBoxMetrics } from './schedulerGeometry';
 
-if (typeof window !== 'undefined') {
-  if (!(window as any).__dd_tracer_installed) {
-    (window as any).__dd_tracer_installed = true;
-    (window as any).__dd_drag_active = false;
-    (window as any).__dd_drag_start_time = 0;
-    (window as any).__dd_first_event_logged = false;
-    (window as any).__dd_first_raf_logged = false;
-
-    let lastHeartbeat = 0;
-    const logHeartbeat = () => {
-      const now = Date.now();
-      if (now - lastHeartbeat >= 500) {
-        lastHeartbeat = now;
-        console.log('[DD_HEARTBEAT]', now);
-      }
-    };
-
-    setInterval(logHeartbeat, 500);
-
-    const handleGlobalDragOrPointerEvent = (e: Event) => {
-      logHeartbeat();
-      if ((window as any).__dd_drag_active && !(window as any).__dd_first_event_logged) {
-        (window as any).__dd_first_event_logged = true;
-        console.log(
-          `[DD_TRACE] 4. FIRST ${e.type} event after dragStart:`,
-          e.type,
-          'elapsed:',
-          Date.now() - (window as any).__dd_drag_start_time,
-          'ms'
-        );
-      }
-    };
-
-    ['drag', 'dragover', 'dragenter', 'dragleave', 'mousemove', 'pointermove', 'mouseup', 'dragend'].forEach((evtName) => {
-      window.addEventListener(evtName, handleGlobalDragOrPointerEvent, { capture: true, passive: true });
-    });
-
-    window.addEventListener('error', (e) => {
-      console.log('[DD_TRACE] GLOBAL ERROR DETECTED:', e.error || e.message);
-    });
-    window.addEventListener('unhandledrejection', (e) => {
-      console.log('[DD_TRACE] UNHANDLED REJECTION DETECTED:', e.reason);
-    });
-  }
-}
-
 
 export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
 
@@ -768,7 +722,7 @@ export default function SchedulerGrid({
     
     const targetSlot = resolveSlot(column, columnIndex, slotIndex);
     
-    console.log('[DD_TARGET] structural column drop → target=slot', targetSlot.columnId, targetSlot.slotIndex, 'eventId:', draggedEventId);
+
     onSlotDrop?.(targetSlot, draggedEventId);
   };
 
@@ -917,8 +871,8 @@ export default function SchedulerGrid({
             <div
               key={column.id}
               className="relative flex flex-col min-w-0"
-              onDragOver={(event) => { console.log('[NATIVE_TEST] column dragover', column.id); return handleColumnDragOver(event); } }
-              onDrop={(event) => { console.log('[NATIVE_TEST] column drop', column.id); return handleColumnDrop(event, column, columnIndex); } }
+              onDragOver={handleColumnDragOver}
+              onDrop={(event) => handleColumnDrop(event, column, columnIndex)}
             >
               {rows.map((row) => {
                 const hourBoundary = row.slotIndex % slotsPerHour === 0;
@@ -1096,28 +1050,7 @@ export default function SchedulerGrid({
                   </div>
                 );
               })}
-            <div
-  data-native-diagnostic="true"
-  draggable={true}
-  onDragStart={(e) => {
-    console.log('[NATIVE_TEST] dragstart');
-    e.dataTransfer.setData('text/plain', 'native-test');
-    e.dataTransfer.effectAllowed = 'move';
-  }}
-  onDragEnd={(e) => {
-    console.log('[NATIVE_TEST] dragend');
-  }}
-  style={{
-    position: 'absolute',
-    top: '20px',
-    left: '20px',
-    width: '40px',
-    height: '40px',
-    background: 'rgba(255,0,0,0.2)',
-    border: '2px dashed red',
-    zIndex: 100,
-  }}
-/>
+
 </div>
           );
         })}
