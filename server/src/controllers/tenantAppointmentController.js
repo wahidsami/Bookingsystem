@@ -3381,20 +3381,7 @@ exports.reassignRescheduleAppointment = async (req, res) => {
             });
         }
 
-        const slotAvailable = await ensureStaffSlotAvailable({
-            tenantId,
-            serviceId: appointment.serviceId,
-            staffId,
-            startTime: requestedStart,
-            excludeAppointmentId: appointment.id
-        });
-        if (!slotAvailable) {
-            await transaction.rollback();
-            return res.status(409).json({
-                success: false,
-                message: 'Selected slot is not available'
-            });
-        }
+
 
         const previousStaffId = appointment.staffId;
         const previousStartTime = currentStart;
