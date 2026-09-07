@@ -917,8 +917,8 @@ export default function SchedulerGrid({
             <div
               key={column.id}
               className="relative flex flex-col min-w-0"
-              onDragOver={(event) => handleColumnDragOver(event)}
-              onDrop={(event) => handleColumnDrop(event, column, columnIndex)}
+              onDragOver={(event) => { console.log('[NATIVE_TEST] column dragover', column.id); return handleColumnDragOver(event); } }
+              onDrop={(event) => { console.log('[NATIVE_TEST] column drop', column.id); return handleColumnDrop(event, column, columnIndex); } }
             >
               {rows.map((row) => {
                 const hourBoundary = row.slotIndex % slotsPerHour === 0;
@@ -1096,7 +1096,29 @@ export default function SchedulerGrid({
                   </div>
                 );
               })}
-            </div>
+            <div
+  data-native-diagnostic="true"
+  draggable={true}
+  onDragStart={(e) => {
+    console.log('[NATIVE_TEST] dragstart');
+    e.dataTransfer.setData('text/plain', 'native-test');
+    e.dataTransfer.effectAllowed = 'move';
+  }}
+  onDragEnd={(e) => {
+    console.log('[NATIVE_TEST] dragend');
+  }}
+  style={{
+    position: 'absolute',
+    top: '20px',
+    left: '20px',
+    width: '40px',
+    height: '40px',
+    background: 'rgba(255,0,0,0.2)',
+    border: '2px dashed red',
+    zIndex: 100,
+  }}
+/>
+</div>
           );
         })}
 
