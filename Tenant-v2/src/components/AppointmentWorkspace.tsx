@@ -700,6 +700,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     updateMenuPosition();
 
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+  // Guard: ignore native draggable elements
+  const targetEl = event.target as HTMLElement | null;
+  if (targetEl?.closest?.('[draggable="true"]')) {
+    console.log('[DD_POINTER_GUARD] bypassed global mousedown for draggable target');
+    return;
+  }
+  // Existing logic follows
+
       const target = event.target;
       if (!(target instanceof Node)) {
         return;
