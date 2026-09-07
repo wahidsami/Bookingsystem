@@ -446,59 +446,7 @@ export default function SchedulerGrid({
   const [selectionFocus, setSelectionFocus] = useState<SchedulerSlot | null>(null);
   const suppressNextClickRef = useRef(false);
   const gridContainerRef = useRef<HTMLDivElement>(null);
-  const activeDragRafId = useRef<number | null>(null);
-  const isDragActive = useRef<boolean>(false);
-
-  const enableActiveDrag = () => {
-    isDragActive.current = true;
-    if (activeDragRafId.current !== null) {
-      cancelAnimationFrame(activeDragRafId.current);
-    }
-    activeDragRafId.current = requestAnimationFrame(() => {
-      if (!isDragActive.current) return;
-      gridContainerRef.current?.setAttribute('data-drag-active', 'true');
-      console.log('[DD_TARGET] dragstart → active drag enabled');
-    });
-  };
-
-  const disableActiveDrag = () => {
-    isDragActive.current = false;
-    if (activeDragRafId.current !== null) {
-      cancelAnimationFrame(activeDragRafId.current);
-      activeDragRafId.current = null;
-    }
-    if (gridContainerRef.current?.hasAttribute('data-drag-active')) {
-      gridContainerRef.current?.removeAttribute('data-drag-active');
-      const draggingCards = gridContainerRef.current?.querySelectorAll('[data-is-dragging="true"]');
-      draggingCards?.forEach(card => card.removeAttribute('data-is-dragging'));
-      console.log('[DD_TARGET] dragend → active drag disabled');
-    }
-  };
-
-  useEffect(() => {
-    const handleGlobalDragEnd = () => {
-      disableActiveDrag();
-    };
-    
-    // Primary native drag lifecycle
-    window.addEventListener('dragend', handleGlobalDragEnd);
-    window.addEventListener('drop', handleGlobalDragEnd);
-    
-    // Fallback cleanup if native drag aborts/stalls
-    window.addEventListener('blur', handleGlobalDragEnd);
-    window.addEventListener('pointerup', handleGlobalDragEnd);
-    window.addEventListener('mouseup', handleGlobalDragEnd);
-    document.addEventListener('visibilitychange', handleGlobalDragEnd);
-    
-    return () => {
-      window.removeEventListener('dragend', handleGlobalDragEnd);
-      window.removeEventListener('drop', handleGlobalDragEnd);
-      window.removeEventListener('blur', handleGlobalDragEnd);
-      window.removeEventListener('pointerup', handleGlobalDragEnd);
-      window.removeEventListener('mouseup', handleGlobalDragEnd);
-      document.removeEventListener('visibilitychange', handleGlobalDragEnd);
-    };
-  }, []);
+  // The old pointer-events data-drag-active workaround is removed.
   const slotsPerHour = 60 / slotMinutes;
   const slotCount = Math.max(1, Math.round(((endHour - startHour) * 60) / slotMinutes));
   const gridTemplateColumns = useMemo(
@@ -798,6 +746,46 @@ export default function SchedulerGrid({
 
     return lines;
   }, [positionedEvents, slotMinutes, slotHeight, staffColumnWidth, getColumnIndex]);
+  const handleGridDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isEditable) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleGridDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isEditable) return;
+    event.preventDefault();
+    
+    const draggedEventId = event.dataTransfer.getData('text/plain');
+    if (!draggedEventId) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const cellWidth = Math.max(50, staffColumnWidth);
+    
+    let relativeX = event.clientX - rect.left;
+    if (isRtl) {
+      relativeX = rect.width - relativeX;
+    }
+    
+    const columnAreaX = relativeX - timeColumnWidth;
+    if (columnAreaX < 0) return; 
+    
+    const columnIndex = Math.floor(columnAreaX / cellWidth);
+    if (columnIndex < 0 || columnIndex >= columns.length) return; 
+    
+    const column = columns[columnIndex];
+    
+    const relativeY = Math.max(0, event.clientY - rect.top);
+    const droppedMinutes = (relativeY / pixelsPerHour) * 60;
+    const slotIndex = Math.floor(droppedMinutes / slotMinutes);
+    
+    if (slotIndex < 0 || slotIndex >= slotCount) return; 
+    
+    const targetSlot = resolveSlot(column, columnIndex, slotIndex);
+    
+    console.log('[DD_TARGET] geometric drop → target=slot', targetSlot.columnId, targetSlot.slotIndex, 'eventId:', draggedEventId);
+    onSlotDrop?.(targetSlot, draggedEventId);
+  };
 
   return (
     <div
@@ -806,11 +794,6 @@ export default function SchedulerGrid({
       className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-visible"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
-      <style>{`
-        [data-scheduler-grid][data-drag-active="true"] [data-appointment-card="true"]:not([data-is-dragging="true"]) {
-          pointer-events: none !important;
-        }
-      `}</style>
       <div className="sticky top-0 z-50 grid border-b border-slate-200 bg-slate-50/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
         <div
           className="flex items-center justify-center border-r border-slate-200 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 bg-slate-50"
@@ -871,7 +854,12 @@ export default function SchedulerGrid({
         );})}
       </div>
 
-      <div className="relative isolate" style={{ minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}>
+      <div 
+        className="relative isolate" 
+        style={{ minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}
+        onDragOver={handleGridDragOver}
+        onDrop={handleGridDrop}
+      >
         {pastAreaHeight !== null && (
           <div
             className="pointer-events-none absolute inset-x-0 top-0 z-[5]"
@@ -1012,34 +1000,6 @@ export default function SchedulerGrid({
                         event.stopPropagation();
                         onSlotContextMenu?.(event, slot);
                       }}
-                      onDragOver={(event) => {
-                        const isTracingActive = (window as any).__dd_drag_active;
-                        if (isTracingActive) {
-                          console.log('[DD_TRACE] 9.1 ENTER slot onDragOver in SchedulerGrid.tsx, elapsed:', Date.now() - (window as any).__dd_drag_start_time, 'ms');
-                        }
-                        if (!isEditable) return;
-                        event.preventDefault();
-                        event.dataTransfer.dropEffect = 'move';
-                        if (isTracingActive && !(window as any).__dd_slot_dragover_logged) {
-                          (window as any).__dd_slot_dragover_logged = true;
-                          console.log('[DD_TARGET] dragover → target=slot', slot.columnId, slot.slotIndex);
-                        }
-                        setHoveredSlot((current) => (current?.columnId === slot.columnId && current?.slotIndex === slot.slotIndex ? current : slot));
-                        onAddSlotHover?.(slot);
-                        if (isTracingActive) {
-                          console.log('[DD_TRACE] 9.2 EXIT slot onDragOver in SchedulerGrid.tsx', Date.now());
-                        }
-                      }}
-                      onDrop={(event) => {
-                        disableActiveDrag();
-                        if (!isEditable) return;
-                        event.preventDefault();
-                        const draggedEventId = event.dataTransfer.getData('text/plain');
-                        console.log('[DD_TARGET] drop → target=slot', slot.columnId, slot.slotIndex, 'eventId:', draggedEventId);
-                        if (draggedEventId) {
-                          onSlotDrop?.(slot, draggedEventId);
-                        }
-                      }}
                     />
                   );
                 })}
@@ -1098,70 +1058,22 @@ export default function SchedulerGrid({
                   data-appointment-card="true"
                   draggable={isEditable && event.kind !== 'blocked'}
                   onDragStart={(dragEvent) => {
-                    const t0 = Date.now();
-                    (window as any).__dd_drag_active = true;
-                    (window as any).__dd_drag_start_time = t0;
-                    (window as any).__dd_first_event_logged = false;
-                    (window as any).__dd_first_raf_logged = false;
-                    (window as any).__dd_slot_dragover_logged = false;
-                    (window as any).__dd_card_dragover_logged = false;
-
-                    console.log('[DD_TRACE] 1.1 ENTER native onDragStart in SchedulerGrid.tsx', t0);
-                    console.log('[DD_TRACE] 2.1 BEFORE checking isEditable/event.kind in SchedulerGrid.tsx', Date.now());
                     if (!isEditable || event.kind === 'blocked') {
-                      console.log('[DD_TRACE] 2.1a BAILED in SchedulerGrid onDragStart because not editable or blocked', Date.now());
                       return;
                     }
                     dragEvent.dataTransfer.setData('text/plain', event.id);
                     dragEvent.dataTransfer.effectAllowed = 'move';
-                    console.log('[DD_TRACE] 2.3 AFTER dataTransfer.setData, BEFORE calling onEventDragStart callback', Date.now());
                     onEventDragStart?.(event);
-                    console.log('[DD_TRACE] 2.4 AFTER onEventDragStart callback in SchedulerGrid.tsx', Date.now());
                     dragEvent.currentTarget.setAttribute('data-is-dragging', 'true');
-                    enableActiveDrag();
-
-                    requestAnimationFrame(() => {
-                      if (!(window as any).__dd_first_raf_logged) {
-                        (window as any).__dd_first_raf_logged = true;
-                        console.log('[DD_TRACE] 5. FIRST requestAnimationFrame after dragStart, elapsed:', Date.now() - t0, 'ms');
-                      }
-                    });
-
-                    console.log('[DD_TRACE] 1.9 EXIT native onDragStart in SchedulerGrid.tsx', Date.now());
                   }}
                   onDragEnd={(dragEvent) => {
-                    console.log('[DD_TRACE] 9.3 ENTER native onDragEnd in SchedulerGrid.tsx', Date.now());
                     dragEvent.currentTarget.removeAttribute('data-is-dragging');
-                    disableActiveDrag();
                     if (!isEditable || event.kind === 'blocked') return;
                     onEventDragEnd?.(event);
-                    (window as any).__dd_drag_active = false;
-                    console.log('[DD_TRACE] 9.4 EXIT native onDragEnd in SchedulerGrid.tsx', Date.now());
                   }}
                   onClick={(clickEvent) => {
                     clickEvent.stopPropagation();
                     onEventClick?.(event);
-                  }}
-                  onDragOver={(dragOverEvent) => {
-                    if (!isEditable) return;
-                    dragOverEvent.preventDefault();
-                    dragOverEvent.dataTransfer.dropEffect = 'move';
-                    if ((window as any).__dd_drag_active && !(window as any).__dd_card_dragover_logged) {
-                      (window as any).__dd_card_dragover_logged = true;
-                      console.log('[DD_TARGET] dragover → target=card', event.id);
-                    }
-                  }}
-                  onDrop={(dropEvent) => {
-                    disableActiveDrag();
-                    if (!isEditable) return;
-                    dropEvent.preventDefault();
-                    dropEvent.stopPropagation();
-                    const draggedEventId = dropEvent.dataTransfer.getData('text/plain');
-                    console.log('[DD_TARGET] drop → target=card', event.id, 'eventId:', draggedEventId);
-                    if (draggedEventId) {
-                      const targetSlot = resolveSlot(columns[columnIndex], columnIndex, Math.floor(event.startMinutes / slotMinutes));
-                      onSlotDrop?.(targetSlot, draggedEventId);
-                    }
                   }}
                   className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${chainColor ? `ring-2 ${chainColor.ring} ${chainColor.shadow}` : ''}`}
                 >
