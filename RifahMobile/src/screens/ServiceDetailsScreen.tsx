@@ -20,6 +20,9 @@ import { formatRiyal } from '../utils/currency';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
 import { Alert } from 'react-native';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
+import { SectionTitle } from '../components/ui/SectionTitle';
 
 type FullService = Service & { employees?: Staff[]; variants?: ServiceVariant[] };
 
@@ -186,26 +189,26 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
 
     return (
         <View style={styles.root}>
+            <PageHeader
+                variant="transparent"
+                onBack={() => navigation.goBack()}
+                rightAction={
+                    <View style={styles.heroActions}>
+                        <TouchableOpacity style={styles.glassButton} onPress={handleShare}>
+                            <AppIcon name="share" size={18} color={colors.text} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.glassButton} onPress={handleToggleFavorite}>
+                            <AppIcon name="star" size={18} color={favorite ? colors.primary : colors.text} />
+                        </TouchableOpacity>
+                    </View>
+                }
+            />
             <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: Math.max(scrollBottomPadding, 120) }}>
                 <ImageBackground source={{ uri: heroUri }} style={styles.hero}>
-                    <LinearGradient colors={['rgba(0,0,0,0.12)', 'rgba(0,0,0,0.52)']} style={styles.heroShade}>
-                        <View style={[styles.heroTopRow, { marginTop: topInset + 6 }]}>
-                            <TouchableOpacity style={styles.glassButton} onPress={() => navigation.goBack()}>
-                                <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
-                            </TouchableOpacity>
-                            <View style={styles.heroActions}>
-                                <TouchableOpacity style={styles.glassButton} onPress={handleShare}>
-                                    <AppIcon name="share" size={18} color={colors.text} />
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.glassButton} onPress={handleToggleFavorite}>
-                                    <AppIcon name="star" size={18} color={favorite ? colors.primary : colors.text} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </LinearGradient>
+                    <LinearGradient colors={['rgba(0,0,0,0.12)', 'rgba(0,0,0,0.52)']} style={styles.heroShade} />
                 </ImageBackground>
 
-                <View style={styles.contentCard}>
+                <AppCard style={styles.contentCard} padding="none">
                     {loading ? (
                         <View style={styles.loaderWrap}>
                             <ActivityIndicator color={colors.primary} />
@@ -232,14 +235,16 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
 
                             {activeVariants.length > 0 ? (
                                 <View style={styles.section}>
-                                    <Text style={styles.sectionTitle}>{isRTL ? 'اختر النسخة' : 'Choose a variant'}</Text>
+                                    <SectionTitle title={isRTL ? 'اختر النسخة' : 'Choose a variant'} />
                                     {activeVariants.map((variant: ServiceVariant) => {
                                         const isSelected = variant.id === selectedVariant?.id;
                                         return (
-                                            <TouchableOpacity
+                                            <AppCard
+                                                variant="outlined"
                                                 key={variant.id}
                                                 style={[styles.variantCard, isSelected ? styles.variantCardSelected : null]}
                                                 onPress={() => setSelectedVariantId(variant.id)}
+                                                padding="none"
                                             >
                                                 <View style={styles.variantMain}>
                                                     <Text style={styles.variantName}>{variant.description || (isRTL ? 'نسخة' : 'Variant')}</Text>
@@ -250,7 +255,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                                                 <TouchableOpacity style={styles.variantBtn} onPress={() => handleToggleService(undefined, variant)}>
                                                     <Text style={styles.variantBtnText}>{isRTL ? 'إضافة' : 'Add'}</Text>
                                                 </TouchableOpacity>
-                                            </TouchableOpacity>
+                                            </AppCard>
                                         );
                                     })}
                                 </View>
@@ -258,12 +263,12 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
 
                             {(resolvedService.employees || []).length > 0 ? (
                                 <View style={styles.section}>
-                                    <Text style={styles.sectionTitle}>{isRTL ? 'مقدمو الخدمة' : 'Providers'}</Text>
+                                    <SectionTitle title={isRTL ? 'مقدمو الخدمة' : 'Providers'} />
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providersRow}>
                                         {(resolvedService.employees || []).map((provider: Staff) => {
                                             const avatar = getImageUrl(provider.avatar || provider.image);
                                             return (
-                                                <View key={provider.id} style={styles.providerCard}>
+                                                <AppCard variant="outlined" key={provider.id} style={styles.providerCard} padding="none">
                                                     {avatar ? (
                                                         <Image source={{ uri: avatar }} style={styles.providerAvatar} />
                                                     ) : (
@@ -279,7 +284,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                                                     <TouchableOpacity style={styles.providerBookBtn} onPress={() => handleToggleService(provider, null)}>
                                                         <Text style={styles.providerBookBtnText}>{isRTL ? 'اختيار' : 'Select'}</Text>
                                                     </TouchableOpacity>
-                                                </View>
+                                                </AppCard>
                                             );
                                         })}
                                     </ScrollView>
@@ -287,7 +292,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                             ) : null}
                         </>
                     )}
-                </View>
+                </AppCard>
             </ScrollView>
 
             <View style={[styles.stickyBar, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>
@@ -307,8 +312,7 @@ const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#F7F6FB' },
     hero: { height: 320, justifyContent: 'space-between' },
     heroShade: { flex: 1, paddingHorizontal: 16 },
-    heroTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    heroActions: { flexDirection: 'row', gap: 10 },
+    heroActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
     glassButton: {
         width: 44,
         height: 44,
@@ -318,12 +322,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     contentCard: {
-        backgroundColor: '#FFF',
         marginTop: -24,
         borderTopLeftRadius: 28,
         borderTopRightRadius: 28,
         padding: 18,
         gap: 16,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
     },
     loaderWrap: { paddingVertical: 40, alignItems: 'center' },
     title: { fontSize: 32, fontWeight: '800', color: '#131333' },
@@ -340,16 +345,11 @@ const styles = StyleSheet.create({
     },
     chipText: { color: '#3F3F65', fontSize: 14, fontWeight: '700' },
     section: { gap: 12 },
-    sectionTitle: { fontSize: 28, fontWeight: '800', color: '#19193E' },
     variantCard: {
-        borderWidth: 1,
-        borderColor: '#E6DFFE',
-        borderRadius: 18,
         padding: 14,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#FFF',
     },
     variantCardSelected: { borderColor: colors.primary, backgroundColor: '#FAF7FF' },
     variantMain: { flex: 1, gap: 4 },
@@ -366,10 +366,6 @@ const styles = StyleSheet.create({
     providersRow: { gap: 12, paddingRight: 4 },
     providerCard: {
         width: 168,
-        borderRadius: 22,
-        backgroundColor: '#FFF',
-        borderWidth: 1,
-        borderColor: '#F0EBFF',
         padding: 12,
         gap: 8,
     },

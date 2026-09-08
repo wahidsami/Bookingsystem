@@ -15,6 +15,9 @@ import { HotDeal, getImageUrl } from '../api/client';
 import { AppIcon } from '../components/AppIcon';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useScreenSafeArea } from '../utils/safeArea';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
+import { AppBadge } from '../components/ui/AppBadge';
 
 type HotDealDetailRouteProp = RouteProp<{ HotDealDetail: { deal: HotDeal } }, 'HotDealDetail'>;
 
@@ -51,14 +54,7 @@ export function HotDealDetailScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('hotDeals')}</Text>
-                <View style={{ width: 40 }} />
-            </View>
+            <PageHeader title={t('hotDeals')} onBack={() => navigation.goBack()} />
 
             <ScrollView
                 contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}
@@ -78,7 +74,7 @@ export function HotDealDetailScreen() {
 
                 {/* Tenant Card */}
                 {deal.tenant && (
-                    <View style={styles.tenantCard}>
+                    <AppCard variant="outlined" style={styles.tenantCard}>
                         {logoUrl ? (
                             <Image source={{ uri: logoUrl }} style={styles.tenantLogo} resizeMode="contain" />
                         ) : (
@@ -87,31 +83,29 @@ export function HotDealDetailScreen() {
                             </View>
                         )}
                         <Text style={styles.tenantName}>{tenantName}</Text>
-                    </View>
+                    </AppCard>
                 )}
 
                 {/* Pricing */}
-                <View style={styles.pricingCard}>
+                <AppCard style={styles.pricingCard}>
                     <View style={styles.priceRow}>
                         <View>
                             <Text style={styles.priceLabel}>{t('discountedPriceLabel')}</Text>
                             <Text style={styles.discountedPrice}>{formatRiyal(deal.discountedPrice, isRTL ? 'ar' : 'en')}</Text>
                         </View>
-                        <View style={styles.savingsBadge}>
-                            <Text style={styles.savingsText}>
-                                {deal.discountType === 'percentage'
-                                    ? `-${deal.discountValue}%`
-                                    : `-${formatRiyal(deal.discountValue, isRTL ? 'ar' : 'en')}`}
-                            </Text>
-                        </View>
+                        <AppBadge variant="error" label={
+                            deal.discountType === 'percentage'
+                                ? `-${deal.discountValue}%`
+                                : `-${formatRiyal(deal.discountValue, isRTL ? 'ar' : 'en')}`
+                        } />
                     </View>
                     <Text style={styles.originalPrice}>
                         {t('originalPriceLabel')} {formatRiyal(deal.originalPrice, isRTL ? 'ar' : 'en')}
                     </Text>
-                </View>
+                </AppCard>
 
                 {/* Details */}
-                <View style={styles.detailsCard}>
+                <AppCard style={styles.detailsCard}>
                     {validUntil && (
                         <View style={styles.detailRow}>
                             <AppIcon name="bookings" size={20} color={colors.textSecondary} />
@@ -130,14 +124,14 @@ export function HotDealDetailScreen() {
                             <Text style={styles.detailText}>{deal.service.duration} {t('minSessionLabel')}</Text>
                         </View>
                     )}
-                </View>
+                </AppCard>
 
                 {/* Description */}
                 {description ? (
-                    <View style={styles.descCard}>
+                    <AppCard style={styles.descCard}>
                         <Text style={styles.descTitle}>{t('aboutThisDealLabel')}</Text>
                         <Text style={styles.descText}>{description}</Text>
-                    </View>
+                    </AppCard>
                 ) : null}
 
                 {/* CTA */}
@@ -168,22 +162,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingBottom: spacing.md,
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-    },
-    backBtn: { padding: spacing.sm },
-    headerTitle: {
-        fontSize: fontSize.lg,
-        fontWeight: 'bold',
-        color: colors.text,
     },
     content: { padding: spacing.lg },
     heroImage: {
@@ -225,13 +203,8 @@ const styles = StyleSheet.create({
     tenantCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
         marginBottom: spacing.md,
         gap: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.border,
     },
     tenantLogo: { width: 48, height: 48, borderRadius: 8 },
     tenantLogoPlaceholder: {
@@ -245,12 +218,7 @@ const styles = StyleSheet.create({
     tenantLogoLetter: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
     tenantName: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
     pricingCard: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: spacing.lg,
         marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.border,
     },
     priceRow: {
         flexDirection: 'row',
@@ -260,36 +228,19 @@ const styles = StyleSheet.create({
     },
     priceLabel: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 2 },
     discountedPrice: { fontSize: 28, fontWeight: '800', color: colors.success },
-    savingsBadge: {
-        backgroundColor: '#FEE2E2',
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderRadius: borderRadius.md,
-    },
-    savingsText: { fontSize: fontSize.md, fontWeight: '700', color: colors.error },
     originalPrice: {
         fontSize: fontSize.sm,
         color: colors.textSecondary,
         textDecorationLine: 'line-through',
     },
     detailsCard: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: spacing.lg,
         marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.border,
         gap: spacing.md,
     },
     detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     detailText: { fontSize: fontSize.md, color: colors.text },
     descCard: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: spacing.lg,
         marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.border,
     },
     descTitle: {
         fontSize: fontSize.md,

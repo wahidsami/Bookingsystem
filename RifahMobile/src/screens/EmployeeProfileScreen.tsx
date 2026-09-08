@@ -8,6 +8,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
 import { useAppSession } from '../contexts/AppSessionContext';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
+import { SectionTitle } from '../components/ui/SectionTitle';
 
 type StaffReview = {
   id: string;
@@ -119,19 +122,18 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.heroHeader, { paddingTop: topInset + 8 }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.glassButton}>
-          <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={22} color={colors.text} />
-        </TouchableOpacity>
-        <View style={styles.heroActions}>
-          <TouchableOpacity style={styles.glassButton}>
-            <AppIcon name="share" size={18} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <PageHeader
+          variant="standard"
+          onBack={() => navigation.goBack()}
+          rightAction={
+              <TouchableOpacity style={styles.glassButton}>
+                  <AppIcon name="share" size={18} color={colors.text} />
+              </TouchableOpacity>
+          }
+      />
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding + 120 }]}>
-        <View style={styles.profileHeroCard}>
+        <AppCard style={styles.profileHeroCard}>
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           ) : (
@@ -147,9 +149,9 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
               <Text style={styles.experienceText}>{isRTL ? `الخبرة: ${provider.experience}` : `Experience: ${provider.experience}`}</Text>
             </View>
           ) : null}
-        </View>
+        </AppCard>
 
-        <View style={styles.statsCard}>
+        <AppCard style={styles.statsCard}>
           <View style={styles.statBlock}>
             <Text style={styles.statValue}>{displayRating}</Text>
             <View style={styles.starsRow}>
@@ -164,18 +166,18 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
             <Text style={styles.statValue}>{summary.total}</Text>
             <Text style={styles.statLabel}>{isRTL ? 'إجمالي التقييمات' : 'Total reviews'}</Text>
           </View>
-        </View>
+        </AppCard>
 
         {provider.bio ? (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>{isRTL ? 'نبذة' : 'About'}</Text>
+          <AppCard style={styles.sectionCard}>
+            <SectionTitle title={isRTL ? 'نبذة' : 'About'} />
             <Text style={styles.bioText}>{provider.bio}</Text>
-          </View>
+          </AppCard>
         ) : null}
 
         {Array.isArray(provider.skills) && provider.skills.length > 0 ? (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>{isRTL ? 'المهارات' : 'Skills'}</Text>
+          <AppCard style={styles.sectionCard}>
+            <SectionTitle title={isRTL ? 'المهارات' : 'Skills'} />
             <View style={styles.skillsWrap}>
               {provider.skills.map((skill: string, index: number) => (
                 <View key={`${skill}-${index}`} style={styles.skillChip}>
@@ -183,12 +185,12 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
                 </View>
               ))}
             </View>
-          </View>
+          </AppCard>
         ) : null}
 
-        <View style={styles.sectionCard}>
+        <AppCard style={styles.sectionCard}>
           <View style={styles.reviewsHeaderRow}>
-            <Text style={styles.sectionTitle}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
+            <SectionTitle title={isRTL ? 'تقييمات العملاء' : 'Customer Reviews'} />
             {hasEligibleBookingForReview ? (
               <TouchableOpacity style={styles.writeReviewButton} onPress={openProviderReviewPrompt}>
                 <AppIcon name="star" size={14} color="#FFFFFF" />
@@ -230,7 +232,7 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
               </View>
             ))
           )}
-        </View>
+        </AppCard>
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>
@@ -274,13 +276,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F6FB'
   },
-  heroHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm
-  },
   heroActions: {
     flexDirection: 'row',
     gap: 10
@@ -297,11 +292,6 @@ const styles = StyleSheet.create({
     padding: spacing.md
   },
   profileHeroCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#ECE6FA',
-    padding: spacing.lg,
     alignItems: 'center',
     marginBottom: spacing.md
   },
@@ -352,11 +342,6 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   statsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#ECE6FA',
-    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.md
@@ -382,11 +367,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 10
   },
   sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#ECE6FA',
-    padding: spacing.md,
     marginBottom: spacing.md
   },
   bioText: {
@@ -399,12 +379,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#171840',
-    marginBottom: spacing.sm
   },
   reviewsHeaderRow: {
     flexDirection: 'row',
