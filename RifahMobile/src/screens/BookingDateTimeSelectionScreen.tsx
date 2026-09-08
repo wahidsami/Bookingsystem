@@ -22,6 +22,9 @@ import { useScreenSafeArea } from '../utils/safeArea';
 import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
+import { SectionTitle } from '../components/ui/SectionTitle';
 
 type DateAvailability = {
     available: boolean;
@@ -433,25 +436,23 @@ export function BookingDateTimeSelectionScreen() {
     return (
         <View style={[styles.container, { paddingTop: topInset }]}>
             {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>
-                    {isRTL ? 'حدد التاريخ والوقت' : 'Select date and time'}
-                </Text>
-                <TouchableOpacity style={styles.closeButton} onPress={() => navigation.navigate('TenantScreen', { tenantId })}>
-                    <AppIcon name="close" size={24} color={colors.text} />
-                </TouchableOpacity>
-            </View>
+            <PageHeader
+                title={isRTL ? 'حدد التاريخ والوقت' : 'Select date and time'}
+                onBack={() => navigation.goBack()}
+                rightAction={
+                    <TouchableOpacity onPress={() => navigation.navigate('TenantScreen', { tenantId })}>
+                        <AppIcon name="close" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                }
+            />
 
             <ScrollView contentContainerStyle={[styles.contentScroll, { paddingBottom: scrollBottomPadding + 100 }]}>
                 {/* Global Professional Selector */}
-                {renderProfessionalIndicator()}
+                <AppCard>{renderProfessionalIndicator()}</AppCard>
 
                 {/* Date Header with Calendar Icon */}
                 <View style={styles.dateHeaderContainer}>
-                    <Text style={styles.sectionTitle}>{isRTL ? 'حدد يوماً' : 'Select a date'}</Text>
+                    <SectionTitle title={isRTL ? 'حدد يوماً' : 'Select a date'} />
                     <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.calendarIconBtn}>
                         <AppIcon name="event" size={24} color={colors.primary} />
                     </TouchableOpacity>
@@ -504,7 +505,7 @@ export function BookingDateTimeSelectionScreen() {
 
                 {/* Time Selection */}
                 <View style={styles.timeSection}>
-                    <Text style={styles.timeSectionTitle}>{isRTL ? 'اختر وقتاً' : 'Pick a time'}</Text>
+                    <SectionTitle title={isRTL ? 'اختر وقتاً' : 'Pick a time'} />
                     
                     {slotsLoading ? (
                         <View style={styles.loadingContainer}>
