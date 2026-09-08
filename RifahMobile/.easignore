@@ -16,6 +16,7 @@ tests/
 
 # 3. Exclude all fonts by default
 assets/fonts/*
+!assets/
 
 # 4. Whitelist only the explicitly required fonts
 !assets/fonts/Montserrat-Regular.ttf
@@ -27,3 +28,12 @@ assets/fonts/*
 !assets/fonts/Cairo-Medium.ttf
 !assets/fonts/Cairo-SemiBold.ttf
 !assets/fonts/Cairo-Bold.ttf
+
+!assets/barspa_logo.png
+!assets/barspa_app_icon.png
+
+# Exclude internal worktree comparison data
+**/.compare-worktrees/**
+
+# Exclude .git directory
+.git/

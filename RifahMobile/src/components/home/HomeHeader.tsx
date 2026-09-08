@@ -58,7 +58,7 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
         <View style={[styles.container, { paddingTop: spacing.xl + topInset }]}>
             {/* Left: Logo/Avatar */}
             {/* BarSpa Logo */}
-            <Image source={require('../../assets/barspa_logo.png')} style={{ width: 120, height: 32, resizeMode: 'contain', marginRight: spacing.md }} />
+            <Image source={require('../../../assets/barspa_logo.png')} style={{ width: 120, height: 32, resizeMode: 'contain', marginRight: spacing.md }} />
             <TouchableOpacity
                 onPress={() => {
                     if (!isAuthenticated) {

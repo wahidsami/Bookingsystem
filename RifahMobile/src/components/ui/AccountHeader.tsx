@@ -22,7 +22,7 @@ export function AccountHeader({ navigation }: { navigation: any }) {
 
   return (
     <View style={[styles.container, { paddingTop: topInset }] }>
-      <Image source={require('../../assets/barspa_logo.png')} style={styles.logo} resizeMode="contain" />
+      <Image source={require('../../../assets/barspa_logo.png')} style={styles.logo} resizeMode="contain" />
       <TouchableOpacity onPress={onPressProfile} style={styles.avatarTouchable}>
         <UserAvatar
           firstName={user?.firstName}
