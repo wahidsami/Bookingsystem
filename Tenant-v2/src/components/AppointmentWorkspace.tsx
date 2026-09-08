@@ -71,6 +71,8 @@ interface Stylist {
   roleEn: string;
   roleAr: string;
   color: string;
+  status?: string;
+  schedule?: any[];
 }
 
 interface Appointment {
@@ -767,7 +769,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           roleAr: emp.title || 'موظف',
           avatar: resolveEmployeeImageUrl(emp.avatar || emp.photo || emp.profileImage),
           color: API_COLORS[index % API_COLORS.length],
-          status: emp.status || (emp.isActive === false ? 'off' : 'active')
+          status: emp.status || (emp.isActive === false ? 'off' : 'active'),
+          schedule: Array.isArray(emp.schedule) ? emp.schedule : [],
         })));
 
         const services = srvRes?.services || [];
@@ -4215,19 +4218,55 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
             return visibleEmployeeIds.includes(stylist.id);
           })
-          .map((stylist) => ({
-            id: getSchedulerColumnId(viewMode, stylist.id),
-            kind: 'employee',
-            resourceId: stylist.id,
-            title: String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim() || stylist.nameEn || stylist.nameAr || stylist.id || '—',
-            subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
-            avatar: stylist.avatar,
-            statusLabel: stylistStatuses[stylist.id]
-              ? (stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active') : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break') : (isRtl ? 'خارج' : 'Off'))
-              : undefined,
-            statusTone: stylistStatuses[stylist.id] || 'neutral',
-            isToday: false,
-          }))
+          .map((stylist) => {
+            let availability: 'available' | 'break' | 'unavailable' = 'unavailable';
+            const currentMinutes = boardCurrentTime.getHours() * 60 + boardCurrentTime.getMinutes();
+
+            const isCurrentlyOnBreak = appointments.some(appt =>
+              appt.staffId === stylist.id &&
+              (appt.type === 'blocked' || appt.kind === 'blocked' || appt.tags?.includes('Blocked') || appt.serviceNameEn === 'Staff Break') &&
+              currentMinutes >= (appt.startTime + (boardStartHour * 60)) &&
+              currentMinutes < (appt.startTime + (boardStartHour * 60) + appt.duration)
+            );
+
+            if (isCurrentlyOnBreak) {
+              availability = 'break';
+            } else if (stylist.schedule && stylist.schedule.length > 0) {
+              const currentBoardDate = parseLocalDateKey(selectedDateKey);
+              const DAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              const dayOfWeekStr = DAYS_EN[currentBoardDate.getDay()];
+
+              const daySchedule = stylist.schedule.find((s: any) => s.dayEn === dayOfWeekStr);
+              if (daySchedule && daySchedule.status === 'working' && daySchedule.subShifts && daySchedule.subShifts.length > 0) {
+                const isWorking = daySchedule.subShifts.some((shift: any) => {
+                  const [startH, startM] = (shift.startTime || '00:00').split(':').map(Number);
+                  const [endH, endM] = (shift.endTime || '00:00').split(':').map(Number);
+                  const shiftStart = startH * 60 + startM;
+                  const shiftEnd = endH * 60 + endM;
+                  return currentMinutes >= shiftStart && currentMinutes < shiftEnd;
+                });
+
+                if (isWorking) {
+                  availability = 'available';
+                }
+              }
+            }
+
+            return {
+              id: getSchedulerColumnId(viewMode, stylist.id),
+              kind: 'employee',
+              resourceId: stylist.id,
+              title: String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim() || stylist.nameEn || stylist.nameAr || stylist.id || '—',
+              subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
+              avatar: stylist.avatar,
+              statusLabel: stylistStatuses[stylist.id]
+                ? (stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active') : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break') : (isRtl ? 'خارج' : 'Off'))
+                : undefined,
+              statusTone: stylistStatuses[stylist.id] || 'neutral',
+              isToday: false,
+              availability,
+            };
+          })
       : getDaysOfActiveWeek(selectedDate).map((dayStr) => {
           const dateValue = parseLocalDateKey(dayStr);
           const dayName = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
@@ -4426,9 +4465,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const serviceName = isRtl ? movedAppointment.serviceNameAr : movedAppointment.serviceNameEn;
     const targetStaff = liveStylists.find((staff) => staff.id === targetStaffId);
     const sourceStaff = liveStylists.find((staff) => staff.id === movedAppointment.staffId);
-    
+
     const canMove = canAssignServiceToStaff(movedAppointment.serviceId, targetStaffId);
-    
+
     if (!canMove) {
       setDragConflictDialog({
         serviceName,
@@ -4482,9 +4521,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         : current
       );
       setDragMoveDialog(null);
-      
+
       await loadBoardData();
-      
+
       emitBIReportRefresh({
         source: 'appointment-workspace',
         kind: 'appointment-moved',

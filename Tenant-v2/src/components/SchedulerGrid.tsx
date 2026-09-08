@@ -16,6 +16,10 @@ export interface SchedulerColumn {
   statusTone?: 'active' | 'break' | 'off' | 'today' | 'neutral';
   dateKey?: string;
   isToday?: boolean;
+  /**
+   * Staff availability visual state
+   */
+  availability?: 'available' | 'break' | 'unavailable';
 }
 
 export interface SchedulerEvent {
@@ -751,22 +755,22 @@ export default function SchedulerGrid({
             key={column.id}
             onClick={isEmployeeHeader ? (e) => onColumnHeaderClick?.(e, headerResourceId) : undefined}
             onContextMenu={isEmployeeHeader ? (e) => onColumnHeaderContextMenu?.(e, headerResourceId) : undefined}
-            className={`min-w-0 overflow-hidden border-r last:border-r-0 border-slate-200 px-1.5 py-2 flex items-center justify-between gap-1 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''} ${isEmployeeHeader && (onColumnHeaderClick || onColumnHeaderContextMenu) ? 'cursor-pointer hover:bg-slate-100' : ''}`}
+            className={`min-w-0 overflow-hidden border-r last:border-r-0 border-slate-200 px-1.5 py-2 flex items-center justify-between gap-1 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''} ${isEmployeeHeader && (onColumnHeaderClick || onColumnHeaderContextMenu) ? 'cursor-pointer hover:bg-slate-100' : ''} ${column.availability === 'unavailable' ? 'bg-slate-100/50' : ''}`}
           >
             <div className="min-w-0 flex items-center gap-2">
               {column.avatar ? (
-                <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                <div className={`h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 ${column.availability === 'unavailable' ? 'opacity-[0.65]' : ''}`}>
                   <img src={column.avatar} alt={column.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                 </div>
               ) : (
-                <div className={`h-8 w-8 shrink-0 rounded-full text-[10px] font-black text-white flex items-center justify-center ${toneClasses[column.statusTone || 'neutral']}`}>
+                <div className={`h-8 w-8 shrink-0 rounded-full text-[10px] font-black text-white flex items-center justify-center ${toneClasses[column.statusTone || 'neutral']} ${column.availability === 'unavailable' ? 'opacity-[0.65]' : ''}`}>
                   {String(column.title || '•').charAt(0).toUpperCase()}
                 </div>
               )}
 
               <div className="min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
-                  <p className="truncate text-xs font-black text-slate-800">{column.title}</p>
+                  <p className={`truncate text-xs font-black ${column.availability === 'unavailable' ? 'text-slate-400' : 'text-slate-800'}`}>{column.title}</p>
                   {column.statusLabel && (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-600">
                       {column.statusLabel}
@@ -783,6 +787,11 @@ export default function SchedulerGrid({
               {column.isToday && (
                 <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
                   {isRtl ? 'اليوم' : 'Today'}
+                </span>
+              )}
+              {column.availability === 'unavailable' && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-bold text-gray-600">
+                  {isRtl ? 'غير متاح' : 'Not Available'}
                 </span>
               )}
               {isEmployeeHeader && (onColumnHeaderClick || onColumnHeaderContextMenu) && (
