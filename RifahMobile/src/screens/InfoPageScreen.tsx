@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } fro
 import { ThemedText as Text } from '../components/ThemedText';
 import { api, AppContentEntry, PublicAppContent } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
+import { PageHeader } from '../components/ui/PageHeader';
 import { colors, fontSize, spacing } from '../theme/colors';
 import { useScreenSafeArea } from '../utils/safeArea';
 
@@ -66,13 +67,12 @@ export function InfoPageScreen({ navigation, route }: InfoPageScreenProps) {
 
     return (
         <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.backText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{title}</Text>
-                <View style={styles.headerSpacer} />
-            </View>
+            <PageHeader
+                title={title}
+                showBack
+                onBack={() => navigation.goBack()}
+                variant="standard"
+            />
 
             {loading ? (
                 <View style={styles.loadingWrap}>

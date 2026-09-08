@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { ThemedText as Text } from '../ThemedText';
@@ -56,7 +56,9 @@ export function HomeHeader({ navigation }: HomeHeaderProps) {
 
     return (
         <View style={[styles.container, { paddingTop: spacing.xl + topInset }]}>
-            {/* Left: Avatar */}
+            {/* Left: Logo/Avatar */}
+            {/* BarSpa Logo */}
+            <Image source={require('../../assets/barspa_logo.png')} style={{ width: 120, height: 32, resizeMode: 'contain', marginRight: spacing.md }} />
             <TouchableOpacity
                 onPress={() => {
                     if (!isAuthenticated) {
@@ -126,12 +128,12 @@ const styles = StyleSheet.create({
     },
     welcomeLabel: {
         fontSize: fontSize.xs,
-        color: '#7B82A2',
+        color: colors.textTertiary,
     },
     userName: {
         fontSize: 22,
         fontWeight: '800',
-        color: '#161741',
+        color: colors.textPrimary,
     },
     iconsRow: {
         flexDirection: 'row',
@@ -141,12 +143,12 @@ const styles = StyleSheet.create({
         width: 42,
         height: 42,
         borderRadius: 21,
-        backgroundColor: '#F4EFFF',
+        backgroundColor: colors.brandPrimaryLight,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
         borderWidth: 1,
-        borderColor: '#E7DFFF',
+        borderColor: colors.brandPrimary,
     },
     badge: {
         position: 'absolute',
@@ -163,7 +165,7 @@ const styles = StyleSheet.create({
         borderColor: colors.background,
     },
     badgeText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: 10,
         fontWeight: '700',
         lineHeight: 12,

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { ThemedText as Text } from '../components/ThemedText';
+import { PageHeader } from '../components/ui/PageHeader';
 import { UserAvatar } from '../components/UserAvatar';
 import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -78,9 +79,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
     if (!isAuthenticated) {
         return (
             <View style={styles.container}>
-                <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
-                    <Text style={styles.headerTitle}>{t('profile')}</Text>
-                </View>
+                <PageHeader title={t('profile')} showBack={false} />
                 <ScrollView
                     style={styles.content}
                     contentContainerStyle={[styles.guestContent, { paddingBottom: scrollBottomPadding }]}
@@ -122,9 +121,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
     const fullName = `${currentUser.firstName} ${currentUser.lastName}`;
     return (
         <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
-                <Text style={styles.headerTitle}>{t('profile')}</Text>
-            </View>
+            <PageHeader title={t('profile')} showBack onBack={() => navigation.goBack()} />
             <ScrollView
                 style={styles.content}
                 contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
@@ -193,16 +190,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F7F4FF',
-    },
-    header: {
-        padding: spacing.xl,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 0,
-    },
-    headerTitle: {
-        fontSize: fontSize.xxl,
-        fontWeight: '700',
-        color: colors.text,
     },
     content: {
         flex: 1,

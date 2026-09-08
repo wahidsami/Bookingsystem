@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api, User } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
@@ -101,13 +102,7 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
-                    <Text style={styles.headerBackText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('editProfile')}</Text>
-                <View style={styles.headerSpacer} />
-            </View>
+            <PageHeader title={t('editProfile')} showBack onBack={() => navigation.goBack()} />
 
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}>
                 {error ? (
@@ -230,31 +225,6 @@ const styles = StyleSheet.create({
     centerContent: {
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingBottom: spacing.md,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 0,
-    },
-    headerBack: {
-        width: 40,
-        alignItems: 'flex-start',
-    },
-    headerBackText: {
-        fontSize: fontSize.xl,
-        color: colors.text,
-    },
-    headerTitle: {
-        fontSize: fontSize.lg,
-        fontWeight: '700',
-        color: colors.text,
-    },
-    headerSpacer: {
-        width: 40,
     },
     content: {
         padding: spacing.lg,

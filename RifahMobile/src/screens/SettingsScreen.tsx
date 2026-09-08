@@ -1,7 +1,8 @@
 import React from 'react';
 import { ActivityIndicator, Alert, Modal, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { colors, fontSize, spacing } from '../theme/colors';
+import { colors, spacing, fontSize } from '../theme/colors';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { api } from '../api/client';
@@ -121,13 +122,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
 
     return (
         <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.backText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('settings')}</Text>
-                <View style={styles.headerSpacer} />
-            </View>
+            <PageHeader title={t('settings')} showBack onBack={() => navigation.goBack()} />
 
             <View style={styles.card}>
                 <Text style={styles.cardTitle}>{t('appLanguage')}</Text>
@@ -222,17 +217,9 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F4FF',
+        backgroundColor: colors.background,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingBottom: spacing.lg,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 0,
-    },
+    // header removed, using PageHeader
     backText: {
         fontSize: fontSize.xl,
         color: colors.text,

@@ -9,6 +9,7 @@ import {
     View,
 } from 'react-native';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
 import { ThemedText as Text } from '../components/ThemedText';
 import { CustomerNotification, api, getImageUrl } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
@@ -115,18 +116,12 @@ export function NotificationDetailScreen({ navigation, route }: NotificationDeta
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={['#F5F0FF', '#FFFFFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.header, { paddingTop: spacing.lg + topInset }]}
-            >
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-                    <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{language === 'ar' ? 'تفاصيل الإشعار' : 'Notification Detail'}</Text>
-                <View style={styles.headerButtonSpacer} />
-            </LinearGradient>
+            <PageHeader
+                title={language === 'ar' ? 'تفاصيل الإشعار' : 'Notification Detail'}
+                showBack
+                onBack={() => navigation.goBack()}
+                variant="standard"
+            />
 
             {loading ? (
                 <View style={styles.loadingWrap}>

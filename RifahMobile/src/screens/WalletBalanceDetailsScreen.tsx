@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ImageBackground, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
 import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
@@ -71,12 +72,12 @@ export function WalletBalanceDetailsScreen({ navigation, route }: any) {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.lg }}>
         <ImageBackground source={HERO_IMAGE} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
-          <LinearGradient colors={['rgba(38,12,89,0.85)', 'rgba(93,47,153,0.35)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <AppIcon name="arrow_back" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.heroTitle}>{language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}</Text>
-          <Text style={styles.heroSub}>{language === 'ar' ? 'تفاصيل الرصيد والعمليات الأخيرة' : 'Balance details and recent transactions'}</Text>
+          <PageHeader
+            title={language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}
+            showBack
+            onBack={() => navigation.goBack()}
+            variant="standard"
+          />
         </ImageBackground>
         <View style={styles.content}>
           <View style={styles.balanceCard}>

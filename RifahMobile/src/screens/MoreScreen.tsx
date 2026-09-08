@@ -10,7 +10,7 @@ import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
 import * as Notifications from 'expo-notifications';
-import { LinearGradient } from 'expo-linear-gradient';
+import { AccountHeader } from '../components/ui/AccountHeader';
 
 interface MoreScreenProps {
     navigation?: any;
@@ -124,27 +124,21 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <LinearGradient
-                colors={['#8B5CF6', '#7C3AED']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
-            >
-                <View style={styles.userInfo}>
-                    <UserAvatar
-                        firstName={user?.firstName}
-                        lastName={user?.lastName}
-                        profileImage={user?.profileImage}
-                        size={60}
-                        backgroundColor={colors.textInverse}
-                        textColor={colors.primary}
-                    />
-                    <View>
-                        <Text style={styles.userName}>{user ? `${user.firstName} ${user.lastName}` : t('guestTitle')}</Text>
-                        <Text style={styles.userEmail}>{user?.email || t('welcome')}</Text>
-                    </View>
+            <AccountHeader navigation={navigation} />
+            <View style={styles.userInfo}>
+                <UserAvatar
+                    firstName={user?.firstName}
+                    lastName={user?.lastName}
+                    profileImage={user?.profileImage}
+                    size={60}
+                    backgroundColor={colors.textInverse}
+                    textColor={colors.primary}
+                />
+                <View>
+                    <Text style={styles.userName}>{user ? `${user.firstName} ${user.lastName}` : t('guestTitle')}</Text>
+                    <Text style={styles.userEmail}>{user?.email || t('welcome')}</Text>
                 </View>
-            </LinearGradient>
+            </View>
 
             <ScrollView
                 style={styles.content}
@@ -264,12 +258,9 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F4FF',
+        backgroundColor: colors.background,
     },
-    header: {
-        backgroundColor: colors.primary,
-        padding: spacing.xl,
-    },
+    // Deprecated header style removed; using AccountHeader component
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -290,14 +281,14 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     menuSection: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.surface,
         marginTop: spacing.md,
         marginHorizontal: spacing.md,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: '#E9DDFD',
+        borderColor: colors.borderSubtle,
         overflow: 'hidden',
-        shadowColor: '#2E1065',
+        shadowColor: colors.brandPrimaryDark,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.08,
         shadowRadius: 16,
@@ -310,7 +301,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.lg,
         paddingHorizontal: spacing.lg,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3E8FF',
+        borderBottomColor: colors.borderSubtle,
     },
     menuItemLeft: {
         flexDirection: 'row',
@@ -339,7 +330,7 @@ const styles = StyleSheet.create({
     sectionHeaderText: {
         fontSize: fontSize.sm,
         fontWeight: '700',
-        color: '#6B7280',
+        color: colors.textSecondary,
         textTransform: 'uppercase',
     },
     socialCard: {
@@ -365,24 +356,24 @@ const styles = StyleSheet.create({
         width: 52,
         height: 52,
         borderRadius: 26,
-        backgroundColor: '#F5F3FF',
+        backgroundColor: colors.brandPrimaryLight,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#DDD6FE',
+        borderColor: colors.brandPrimary,
     },
     logoutButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: spacing.sm,
-        backgroundColor: '#FEE2E2',
+        backgroundColor: colors.error + '33',
         marginHorizontal: spacing.lg,
         marginTop: spacing.xl,
         padding: spacing.lg,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#FCA5A5',
+        borderColor: colors.error,
     },
     logoutText: {
         fontSize: fontSize.md,

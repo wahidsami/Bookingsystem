@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ImageBackground, Modal, Pressable, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { api } from '../api/client';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
+import { api } from '../api/client';
 import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
@@ -250,7 +251,7 @@ export function GiftsScreen({ navigation, route }: any) {
         const summaryRes = await api.get<WalletSummaryResponse>('/users/wallet/summary').catch(() => null);
         if (summaryRes?.success && summaryRes.summary) {
           setRefahBalance(Number(summaryRes.summary.wallet?.balance || 0));
-          const tenantBucket = (summaryRes.summary.tenantGiftBalances || []).find((entry) => entry.tenantId === tenantId);
+          const tenantBucket = (summaryRes.summary.tenantGiftBalances || []).find((entry: any) => entry.tenantId === tenantId);
           setTenantCenterBalance(Number(tenantBucket?.balance || 0));
           setTenantCentersSummary((summaryRes.summary.tenantGiftBalances || []).map((entry) => ({
             tenantId: entry.tenantId,
@@ -264,7 +265,7 @@ export function GiftsScreen({ navigation, route }: any) {
           setTenantCentersSummary([]);
         }
         const historyRes = await api.get<{ success: boolean; transactions: GiftHistoryItem[] }>('/users/tenant-gifts/history');
-        if (historyRes.success) setHistory((historyRes.transactions || []).filter((tx) => tx.tenantId === tenantId).slice(0, 10));
+        if (historyRes.success) setHistory((historyRes.transactions || []).filter((tx: any) => tx.tenantId === tenantId).slice(0, 10));
       } else {
         setPackages([]);
         const summaryRes = await api.get<WalletSummaryResponse>('/users/wallet/summary').catch(() => null);
@@ -493,14 +494,17 @@ export function GiftsScreen({ navigation, route }: any) {
       <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.xl }}>
         <ImageBackground source={HERO_IMAGE} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
           <LinearGradient colors={['rgba(38,12,89,0.85)', 'rgba(93,47,153,0.35)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-          <View style={styles.heroTopBar}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.heroGlassBtn}>
-              <AppIcon name="arrow_back" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.heroGlassBtn}>
-              <AppIcon name="card_giftcard" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+          <PageHeader
+            title={language === 'ar' ? 'الهدايا والمحفظة' : 'Gifts & Wallet'}
+            showBack
+            onBack={() => navigation.goBack()}
+            variant="transparent"
+            rightAction={
+              <TouchableOpacity style={styles.heroGlassBtn}>
+                <AppIcon name="card_giftcard" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            }
+          />
           <Text style={styles.heroTitle}>{language === 'ar' ? 'الهدايا والمحفظة' : 'Gifts & Wallet'}</Text>
           <Text style={styles.heroSubTitle}>{language === 'ar' ? 'أرصدة الهدايا ونشاطك في مكان واحد.' : 'Your balances, gifts and activity in one place.'}</Text>
         </ImageBackground>

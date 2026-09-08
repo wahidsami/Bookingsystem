@@ -8,6 +8,7 @@ import {
     View,
 } from 'react-native';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { CustomerNotification, api, getImageUrl } from '../api/client';
@@ -123,25 +124,12 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={['#F5F0FF', '#FFFFFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.header, { paddingTop: spacing.lg + topInset }]}
-            >
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-                    <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
-                </TouchableOpacity>
-                <View style={styles.headerContent}>
-                    <Text style={styles.headerTitle}>{language === 'ar' ? 'الإشعارات' : 'Notifications'}</Text>
-                    <Text style={styles.headerSubtitle}>
-                        {language === 'ar'
-                            ? `غير المقروءة: ${unreadCount}`
-                            : `Unread: ${unreadCount}`}
-                    </Text>
-                </View>
-                <View style={styles.headerButtonSpacer} />
-            </LinearGradient>
+            <PageHeader
+                title={language === 'ar' ? 'الإشعارات' : 'Notifications'}
+                showBack
+                onBack={() => navigation.goBack()}
+                variant="standard"
+            />
 
             {loading ? (
                 <View style={styles.loadingWrap}>

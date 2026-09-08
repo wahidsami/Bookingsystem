@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ImageBackground, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
 import { colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
@@ -109,11 +110,12 @@ export function CentersBalanceScreen({ navigation, route }: any) {
       <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.lg }}>
         <ImageBackground source={HERO_IMAGE} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
           <LinearGradient colors={['rgba(50,28,0,0.75)', 'rgba(120,89,26,0.38)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <AppIcon name="arrow_back" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.heroTitle}>{language === 'ar' ? 'رصيد المراكز' : 'Centers Balance'}</Text>
-          <Text style={styles.heroSub}>{language === 'ar' ? 'رصيدك الموزّع عبر المراكز' : 'Your distributed balances across centers'}</Text>
+          <PageHeader
+            title={language === 'ar' ? 'رصيد المراكز' : 'Centers Balance'}
+            showBack
+            onBack={() => navigation.goBack()}
+            variant="standard"
+          />
         </ImageBackground>
         <View style={styles.content}>
           <View style={styles.balanceCard}>
