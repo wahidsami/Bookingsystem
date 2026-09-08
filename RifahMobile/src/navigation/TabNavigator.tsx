@@ -24,19 +24,20 @@ export function TabNavigator() {
         <Tab.Navigator
             screenOptions={{
                 headerShown: false,
-                tabBarActiveTintColor: colors.primary,
-                tabBarInactiveTintColor: '#9CA3AF',
+                tabBarActiveTintColor: colors.brandPrimary,
+                tabBarInactiveTintColor: colors.textTertiary,
                 tabBarStyle: {
                     borderTopWidth: 1,
-                    borderTopColor: '#E5E7EB',
+                    borderTopColor: colors.borderSubtle,
                     paddingBottom: bottomPadding,
                     paddingTop: 8,
                     height: 58 + bottomPadding,
+                    backgroundColor: colors.surface,
                 },
                 tabBarLabelStyle: {
                     fontSize: 12,
                     fontWeight: '600',
-                    fontFamily: language === 'ar' ? 'Cairo-Regular' : undefined,
+                    fontFamily: language === 'ar' ? 'Cairo-SemiBold' : 'Montserrat-SemiBold',
                 },
             }}
         >

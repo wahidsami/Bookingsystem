@@ -39,6 +39,10 @@ const loadFonts = async () => {
     'Cairo-Medium': require('./assets/fonts/Cairo-Medium.ttf'),
     'Cairo-SemiBold': require('./assets/fonts/Cairo-SemiBold.ttf'),
     'Cairo-Bold': require('./assets/fonts/Cairo-Bold.ttf'),
+    'Montserrat-Regular': require('./assets/fonts/Montserrat-Regular.ttf'),
+    'Montserrat-Medium': require('./assets/fonts/Montserrat-Medium.ttf'),
+    'Montserrat-SemiBold': require('./assets/fonts/Montserrat-SemiBold.ttf'),
+    'Montserrat-Bold': require('./assets/fonts/Montserrat-Bold.ttf'),
   });
 
   // Set Cairo as default font for Text component

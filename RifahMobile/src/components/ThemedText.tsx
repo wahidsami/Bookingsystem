@@ -10,8 +10,26 @@ export function ThemedText({ style, ...props }: TextProps) {
     const { language } = useLanguage();
 
     if (language !== 'ar') {
-        // For English, use default system font
-        return <RNText {...props} style={style} />;
+        // For English, map to Montserrat font variant
+        const flatStyle = (StyleSheet.flatten(style) || {}) as TextStyle;
+        const weight = flatStyle.fontWeight;
+        let fontFamily = 'Montserrat-Regular';
+
+        if (weight === 'bold' || weight === '700' || weight === '800' || weight === '900') {
+            fontFamily = 'Montserrat-Bold';
+        } else if (weight === '600') {
+            fontFamily = 'Montserrat-SemiBold';
+        } else if (weight === '500') {
+            fontFamily = 'Montserrat-Medium';
+        }
+
+        const { fontWeight: _, ...styleWithoutWeight } = flatStyle;
+        return (
+            <RNText
+                {...props}
+                style={[styleWithoutWeight, { fontFamily }]}
+            />
+        );
     }
 
     // For Arabic, handle Cairo font with weight mapping
@@ -48,13 +66,16 @@ export function ThemedText({ style, ...props }: TextProps) {
 export function ThemedTextBold({ style, ...props }: TextProps) {
     const { language } = useLanguage();
 
-    const fontFamily = language === 'ar' ? 'Cairo-Bold' : undefined;
-    const fontWeight: any = language === 'en' ? 'bold' : undefined;
+    const fontFamily = language === 'ar' ? 'Cairo-Bold' : 'Montserrat-Bold';
+
+    // fontWeight is omitted from the style object by default, since the font family handles it
+    const flatStyle = (StyleSheet.flatten(style) || {}) as TextStyle;
+    const { fontWeight: _, ...styleWithoutWeight } = flatStyle;
 
     return (
         <RNText
             {...props}
-            style={[{ fontFamily, fontWeight }, style]}
+            style={[styleWithoutWeight, { fontFamily }]}
         />
     );
 }
