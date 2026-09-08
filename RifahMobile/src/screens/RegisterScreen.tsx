@@ -14,11 +14,13 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
-import GoogleIcon from '../../assets/icons/icon_google_brand.svg';
 import EyeOpenIcon from '../../assets/icons/icon_eye_open.svg';
 import EyeClosedIcon from '../../assets/icons/icon_eye_closed.svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionManager } from '../services/SessionManager';
+import { AppInput } from '../components/ui/AppInput';
+import { AppButton } from '../components/ui/AppButton';
+import { AppCard } from '../components/ui/AppCard';
 
 interface RegisterScreenProps {
     onRegisterSuccess: () => void;
@@ -155,7 +157,7 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                 <View style={styles.header}>
                     <View style={styles.logoContainer}>
                         <Image
-                            source={require('../../assets/refahlogo.png')}
+                            source={require('../../assets/barspa_logo.png')}
                             style={styles.logo}
                             resizeMode="contain"
                         />
@@ -176,58 +178,57 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                 ) : null}
 
                 {/* Form */}
-                <View style={styles.formCard}>
-                <View style={styles.form}>
+                <AppCard style={styles.formCard}>
                     {/* Name Fields */}
                     <View style={styles.row}>
                         <View style={[styles.inputGroup, styles.halfWidth]}>
                             <Text style={styles.label}>{t('firstName')} *</Text>
-                            <TextInput
-                                style={[styles.input, isRTL && styles.rtlInput]}
-                                value={formData.firstName}
-                                onChangeText={(text) => setFormData({ ...formData, firstName: text })}
-                                placeholder="Ahmed"
-                                editable={!loading}
-                            />
+                             <AppInput
+                                 style={[styles.input, isRTL && styles.rtlInput]}
+                                 value={formData.firstName}
+                                 onChangeText={(text) => setFormData({ ...formData, firstName: text })}
+                                 placeholder="Ahmed"
+                                 editable={!loading}
+                             />
                         </View>
                         <View style={[styles.inputGroup, styles.halfWidth]}>
                             <Text style={styles.label}>{t('lastName')} *</Text>
-                            <TextInput
-                                style={[styles.input, isRTL && styles.rtlInput]}
-                                value={formData.lastName}
-                                onChangeText={(text) => setFormData({ ...formData, lastName: text })}
-                                placeholder="Al-Saud"
-                                editable={!loading}
-                            />
+                             <AppInput
+                                 style={[styles.input, isRTL && styles.rtlInput]}
+                                 value={formData.lastName}
+                                 onChangeText={(text) => setFormData({ ...formData, lastName: text })}
+                                 placeholder="Al-Saud"
+                                 editable={!loading}
+                             />
                         </View>
                     </View>
 
                     {/* Email */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('email')} *</Text>
-                        <TextInput
-                            style={[styles.input, isRTL && styles.rtlInput]}
-                            value={formData.email}
-                            onChangeText={(text) => setFormData({ ...formData, email: text })}
-                            placeholder="ahmed@example.com"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!loading}
-                        />
+                             <AppInput
+                                 style={[styles.input, isRTL && styles.rtlInput]}
+                                 value={formData.email}
+                                 onChangeText={(text) => setFormData({ ...formData, email: text })}
+                                 placeholder="ahmed@example.com"
+                                 keyboardType="email-address"
+                                 autoCapitalize="none"
+                                 autoCorrect={false}
+                                 editable={!loading}
+                             />
                     </View>
 
                     {/* Phone */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('phone')} *</Text>
-                        <TextInput
-                            style={[styles.input, isRTL && styles.rtlInput]}
-                            value={formData.phone}
-                            onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                            placeholder="+966 50 123 4567"
-                            keyboardType="phone-pad"
-                            editable={!loading}
-                        />
+                             <AppInput
+                                 style={[styles.input, isRTL && styles.rtlInput]}
+                                 value={formData.phone}
+                                 onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                                 placeholder="+966 50 123 4567"
+                                 keyboardType="phone-pad"
+                                 editable={!loading}
+                             />
                         <Text style={styles.hint}>Saudi format: +966XXXXXXXXX or 05XXXXXXXX</Text>
                     </View>
 
@@ -235,15 +236,15 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('password')} *</Text>
                         <View style={styles.passwordContainer}>
-                            <TextInput
-                                style={[styles.input, styles.passwordInput, isRTL && styles.rtlInput]}
-                                value={formData.password}
-                                onChangeText={(text) => setFormData({ ...formData, password: text })}
-                                placeholder="••••••••"
-                                secureTextEntry={!showPassword}
-                                autoCapitalize="none"
-                                editable={!loading}
-                            />
+                             <AppInput
+                                 style={[styles.input, styles.passwordInput, isRTL && styles.rtlInput]}
+                                 value={formData.password}
+                                 onChangeText={(text) => setFormData({ ...formData, password: text })}
+                                 placeholder="••••••••"
+                                 secureTextEntry={!showPassword}
+                                 autoCapitalize="none"
+                                 editable={!loading}
+                             />
                             <TouchableOpacity
                                 style={styles.eyeButton}
                                 onPress={() => setShowPassword(!showPassword)}
@@ -262,15 +263,15 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('confirmPassword')} *</Text>
                         <View style={styles.passwordContainer}>
-                            <TextInput
-                                style={[styles.input, styles.passwordInput, isRTL && styles.rtlInput]}
-                                value={formData.confirmPassword}
-                                onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
-                                placeholder="••••••••"
-                                secureTextEntry={!showConfirmPassword}
-                                autoCapitalize="none"
-                                editable={!loading}
-                            />
+                             <AppInput
+                                 style={[styles.input, styles.passwordInput, isRTL && styles.rtlInput]}
+                                 value={formData.confirmPassword}
+                                 onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
+                                 placeholder="••••••••"
+                                 secureTextEntry={!showConfirmPassword}
+                                 autoCapitalize="none"
+                                 editable={!loading}
+                             />
                             <TouchableOpacity
                                 style={styles.eyeButton}
                                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -285,26 +286,23 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                     </View>
 
                     {/* Register Button */}
-                    <TouchableOpacity
-                        style={[styles.registerButton, loading && styles.registerButtonDisabled]}
-                        onPress={handleRegister}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color={colors.textInverse} />
-                        ) : (
-                            <Text style={styles.registerButtonText}>{t('createAccountButton')}</Text>
-                        )}
-                    </TouchableOpacity>
+                     <AppButton
+                         label={t('createAccountButton')}
+                         variant="primary"
+                         loading={loading}
+                         disabled={loading}
+                         onPress={handleRegister}
+                         style={[styles.registerButton, loading && styles.registerButtonDisabled]}
+                     />
 
-                    <TouchableOpacity
-                        style={[styles.googleButton, loading && styles.registerButtonDisabled]}
-                        onPress={onGoogleSignIn}
-                        disabled={loading}
-                    >
-                        <GoogleIcon width={20} height={20} style={styles.leadingIcon} />
-                        <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
-                    </TouchableOpacity>
+                     <AppButton
+                         label={t('continueWithGoogle')}
+                         variant="secondary"
+                         loading={loading}
+                         disabled={loading}
+                         onPress={onGoogleSignIn}
+                         style={[styles.googleButton, loading && styles.registerButtonDisabled]}
+                     />
 
                     {/* Login Link */}
                     <View style={styles.loginContainer}>
@@ -312,9 +310,10 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                         <TouchableOpacity onPress={onGoToLogin}>
                             <Text style={styles.loginLink}>{t('signIn')}</Text>
                         </TouchableOpacity>
-                    </View>
+
+
                 </View>
-                </View>
+                </AppCard>
             </ScrollView>
         </KeyboardAvoidingView>
     );

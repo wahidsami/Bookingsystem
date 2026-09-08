@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
     View,
-    TextInput,
     StyleSheet,
     TouchableOpacity,
     ScrollView,
@@ -10,12 +9,14 @@ import {
     ActivityIndicator,
     Image,
 } from 'react-native';
+import { AppInput } from '../components/ui/AppInput';
+import { AppButton } from '../components/ui/AppButton';
 import { ThemedText as Text } from '../components/ThemedText';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
-import GoogleIcon from '../../assets/icons/icon_google_brand.svg';
-import AppleIcon from '../../assets/icons/icon_apple_brand.svg';
+
+
 import EyeOpenIcon from '../../assets/icons/icon_eye_open.svg';
 import EyeClosedIcon from '../../assets/icons/icon_eye_closed.svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -100,7 +101,7 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                 <View style={styles.header}>
                     <View style={styles.logoContainer}>
                         <Image
-                            source={require('../../assets/refahlogo.png')}
+                            source={require('../../assets/barspa_logo.png')}
                             style={styles.logo}
                             resizeMode="contain"
                         />
@@ -126,7 +127,7 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                     {/* Email */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('email')}</Text>
-                        <TextInput
+                        <AppInput
                             style={[styles.input, isRTL && styles.rtlInput]}
                             value={email}
                             onChangeText={setEmail}
@@ -143,7 +144,7 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('password')}</Text>
                         <View style={styles.passwordContainer}>
-                            <TextInput
+                            <AppInput
                                 style={[styles.input, styles.passwordInput, isRTL && styles.rtlInput]}
                                 value={password}
                                 onChangeText={setPassword}
@@ -173,32 +174,33 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                     </TouchableOpacity>
 
                     {/* Login Button */}
-                    <TouchableOpacity
-                        style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+                    <AppButton
+                        label={t('signIn')}
+                        variant="primary"
+                        loading={loading}
+                        disabled={loading}
                         onPress={handleLogin}
-                        disabled={loading}
+                        style={[styles.loginButton, loading && styles.loginButtonDisabled]}
                         accessibilityLabel={t('signIn')}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color={colors.textInverse} />
-                        ) : (
-                            <Text style={styles.loginButtonText}>{t('signIn')}</Text>
-                        )}
-                    </TouchableOpacity>
+                    />
 
-                    <TouchableOpacity
-                        style={[styles.googleButton, loading && styles.loginButtonDisabled]}
-                        onPress={onGoogleSignIn}
+                    {/* Google Sign In Button */}
+                    <AppButton
+                        label={t('continueWithGoogle')}
+                        variant="secondary"
+                        loading={loading}
                         disabled={loading}
-                    >
-                        <GoogleIcon width={20} height={20} style={styles.leadingIcon} />
-                        <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
-                    </TouchableOpacity>
+                        onPress={onGoogleSignIn}
+                        style={[styles.googleButton, loading && styles.loginButtonDisabled]}
+                    />
 
-                    <TouchableOpacity style={styles.appleButton} disabled={true}>
-                        <AppleIcon width={20} height={20} style={styles.leadingIcon} />
-                        <Text style={styles.appleButtonText}>Continue with Apple</Text>
-                    </TouchableOpacity>
+                    {/* Apple Sign In Button (disabled) */}
+                    <AppButton
+                        label="Continue with Apple"
+                        variant="secondary"
+                        disabled={true}
+                        style={styles.appleButton}
+                    />
 
                     {/* Register Link */}
                     <View style={styles.registerContainer}>

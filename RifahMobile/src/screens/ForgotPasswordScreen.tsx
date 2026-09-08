@@ -15,6 +15,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppCard } from '../components/ui/AppCard';
+import { AppInput } from '../components/ui/AppInput';
+import { AppButton } from '../components/ui/AppButton';
 
 interface ForgotPasswordScreenProps {
     onBackToLogin: () => void;
@@ -99,12 +102,11 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
                     </View>
                 ) : null}
 
-                <View style={styles.formCard}>
-                <View style={styles.form}>
+                <AppCard>
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('email')}</Text>
-                        <TextInput
-                            style={[styles.input, isRTL && styles.rtlInput]}
+                        <AppInput
+                            style={[isRTL && styles.rtlInput]}
                             value={email}
                             onChangeText={setEmail}
                             placeholder="ahmed@example.com"
@@ -115,23 +117,20 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
                         />
                     </View>
 
-                    <TouchableOpacity
-                        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                        onPress={handleSubmit}
+                    <AppButton
+                        label={t('sendResetLink')}
+                        loading={loading}
                         disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color={colors.textInverse} />
-                        ) : (
-                            <Text style={styles.submitButtonText}>{t('sendResetLink')}</Text>
-                        )}
-                    </TouchableOpacity>
+                        onPress={handleSubmit}
+                    />
 
-                    <TouchableOpacity style={styles.secondaryButton} onPress={onBackToWelcome}>
-                        <Text style={styles.secondaryButtonText}>{t('backToWelcome')}</Text>
-                    </TouchableOpacity>
-                </View>
-                </View>
+                    <AppButton
+                        label={t('backToWelcome')}
+                        variant="secondary"
+                        onPress={onBackToWelcome}
+                        style={styles.secondaryButton}
+                    />
+                </AppCard>
             </ScrollView>
         </KeyboardAvoidingView>
     );

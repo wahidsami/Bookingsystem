@@ -5,6 +5,7 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { useLanguage } from '../contexts/LanguageContext';
 import { colors } from '../theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppButton } from '../components/ui/AppButton';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -60,7 +61,7 @@ export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenPro
                 {/* 1. Brand Logo */}
                 <View style={styles.logoContainer}>
                     <Image
-                        source={require('../../assets/logo.png')}
+                        source={require('../../assets/barspa_logo.png')}
                         style={styles.logo}
                         resizeMode="contain"
                     />
@@ -82,21 +83,20 @@ export function WelcomeScreen({ onLogin, onRegister, onGuest }: WelcomeScreenPro
 
                 {/* 4 & 5 Button Section */}
                 <Animated.View style={[styles.buttonsContainer, ctaAnimatedStyle]}>
-                    <TouchableOpacity
-                        style={styles.primaryButton}
+                    <AppButton
+                        label={t('loginButton')}
+                        variant="primary"
                         onPress={onLogin}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.primaryButtonText}>{t('loginButton')}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.secondaryButton}
+                        style={styles.primaryButton}
+                        disabled={false}
+                    />
+                    <AppButton
+                        label={t('registerButton')}
+                        variant="outline"
                         onPress={onRegister}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={styles.secondaryButtonText}>{t('registerButton')}</Text>
-                    </TouchableOpacity>
+                        style={styles.secondaryButton}
+                        disabled={false}
+                    />
                 </Animated.View>
 
                 {/* 6. Divider */}

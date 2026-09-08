@@ -20,6 +20,9 @@ import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionManager } from '../services/SessionManager';
+import { AppCard } from '../components/ui/AppCard';
+import { AppInput } from '../components/ui/AppInput';
+import { AppButton } from '../components/ui/AppButton';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -361,26 +364,24 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                 ) : null}
 
                 {step === 'google' ? (
-                    <View style={styles.card}>
+                    <AppCard>
                         <Text style={styles.infoText}>{t('signInWithGoogleFirst')}</Text>
-                        <TouchableOpacity
-                            style={[styles.primaryButton, (loading || !request || !canStartGoogle) && styles.disabledButton]}
+                        <AppButton
+                            label={t('continueWithGoogle')}
+                            loading={loading}
                             disabled={loading || !request || !canStartGoogle}
-                            onPress={() => beginGoogleFlow()}
-                        >
-                            {loading ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.primaryButtonText}>{t('continueWithGoogle')}</Text>}
-                        </TouchableOpacity>
-                    </View>
+                            onPress={beginGoogleFlow}
+                        />
+                    </AppCard>
                 ) : null}
 
                 {step === 'phone' ? (
-                    <View style={styles.card}>
+                    <AppCard>
                         <Text style={styles.label}>{t('googleEmailLabel')}</Text>
-                        <TextInput style={[styles.input, styles.readOnlyInput]} value={email} editable={false} />
+                        <AppInput value={email} editable={false} />
 
                         <Text style={styles.label}>{t('mobileNumberLabel')}</Text>
-                        <TextInput
-                            style={styles.input}
+                        <AppInput
                             value={phone}
                             onChangeText={setPhone}
                             keyboardType="phone-pad"
@@ -388,20 +389,22 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                             editable={!loading}
                         />
 
-                        <TouchableOpacity style={[styles.primaryButton, loading && styles.disabledButton]} disabled={loading} onPress={sendOtp}>
-                            {loading ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.primaryButtonText}>{t('sendOtp')}</Text>}
-                        </TouchableOpacity>
-                    </View>
+                        <AppButton
+                            label={t('sendOtp')}
+                            loading={loading}
+                            disabled={loading}
+                            onPress={sendOtp}
+                        />
+                    </AppCard>
                 ) : null}
 
                 {step === 'otp' ? (
-                    <View style={styles.card}>
+                    <AppCard>
                         <Text style={styles.infoText}>{t('phoneLabel')}: {phone}</Text>
                         {otpHint ? <Text style={styles.hintText}>{otpHint}</Text> : null}
 
                         <Text style={styles.label}>{t('otpCodeLabel')}</Text>
-                        <TextInput
-                            style={styles.input}
+                        <AppInput
                             value={otp}
                             onChangeText={setOtp}
                             keyboardType="number-pad"
@@ -409,22 +412,26 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                             editable={!loading}
                         />
 
-                        <TouchableOpacity style={[styles.primaryButton, loading && styles.disabledButton]} disabled={loading} onPress={() => completeFlow()}>
-                            {loading ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.primaryButtonText}>{t('verifyContinue')}</Text>}
-                        </TouchableOpacity>
-                    </View>
+                        <AppButton
+                            label={t('verifyContinue')}
+                            loading={loading}
+                            disabled={loading}
+                            onPress={() => completeFlow()}
+                        />
+                    </AppCard>
                 ) : null}
 
                 {step === 'name' ? (
-                    <View style={styles.card}>
+                    <AppCard>
                         <Text style={styles.infoText}>{t('completeAccountDetails')}</Text>
                         <Text style={styles.label}>{t('firstName')}</Text>
-                        <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} editable={!loading} />
+                        <AppInput value={firstName} onChangeText={setFirstName} editable={!loading} />
                         <Text style={styles.label}>{t('lastName')}</Text>
-                        <TextInput style={styles.input} value={lastName} onChangeText={setLastName} editable={!loading} />
+                        <AppInput value={lastName} onChangeText={setLastName} editable={!loading} />
 
-                        <TouchableOpacity
-                            style={[styles.primaryButton, loading && styles.disabledButton]}
+                        <AppButton
+                            label={t('finishRegistration')}
+                            loading={loading}
                             disabled={loading}
                             onPress={() => {
                                 if (!firstName.trim() || !lastName.trim()) {
@@ -433,10 +440,8 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                                 }
                                 completeFlow();
                             }}
-                        >
-                            {loading ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.primaryButtonText}>{t('finishRegistration')}</Text>}
-                        </TouchableOpacity>
-                    </View>
+                        />
+                    </AppCard>
                 ) : null}
             </ScrollView>
         </KeyboardAvoidingView>

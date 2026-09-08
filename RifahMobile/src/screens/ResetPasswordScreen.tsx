@@ -15,6 +15,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { api } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppCard } from '../components/ui/AppCard';
+import { AppInput } from '../components/ui/AppInput';
+import { AppButton } from '../components/ui/AppButton';
 
 interface ResetPasswordScreenProps {
     token: string;
@@ -99,11 +102,11 @@ export function ResetPasswordScreen({ token, onBackToLogin }: ResetPasswordScree
                     </View>
                 ) : null}
 
-                <View style={styles.formCard}>
+                <AppCard>
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>{t('newPassword')}</Text>
-                    <TextInput
-                        style={[styles.input, isRTL && styles.rtlInput]}
+                    <AppInput
+                        style={[isRTL && styles.rtlInput]}
                         value={password}
                         onChangeText={setPassword}
                         secureTextEntry
@@ -113,8 +116,8 @@ export function ResetPasswordScreen({ token, onBackToLogin }: ResetPasswordScree
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>{t('confirmPassword')}</Text>
-                    <TextInput
-                        style={[styles.input, isRTL && styles.rtlInput]}
+                    <AppInput
+                        style={[isRTL && styles.rtlInput]}
                         value={confirmPassword}
                         onChangeText={setConfirmPassword}
                         secureTextEntry
@@ -122,14 +125,20 @@ export function ResetPasswordScreen({ token, onBackToLogin }: ResetPasswordScree
                     />
                 </View>
 
-                <TouchableOpacity style={[styles.submitButton, loading && styles.submitButtonDisabled]} onPress={handleSubmit} disabled={loading}>
-                    {loading ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.submitButtonText}>{t('saveNewPassword')}</Text>}
-                </TouchableOpacity>
+                <AppButton
+                    label={t('saveNewPassword')}
+                    loading={loading}
+                    disabled={loading}
+                    onPress={handleSubmit}
+                />
 
-                <TouchableOpacity style={styles.secondaryButton} onPress={onBackToLogin}>
-                    <Text style={styles.secondaryButtonText}>{t('backToLogin')}</Text>
-                </TouchableOpacity>
-                </View>
+                <AppButton
+                    label={t('backToLogin')}
+                    variant="secondary"
+                    onPress={onBackToLogin}
+                    style={styles.secondaryButton}
+                />
+                </AppCard>
             </ScrollView>
         </KeyboardAvoidingView>
     );
