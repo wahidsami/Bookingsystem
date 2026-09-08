@@ -168,7 +168,9 @@ const iconMap = {
   check: CheckIcon,
 } as const;
 
-export function AppIcon({ name, size = 22, color = '#7F50D2' }: Props) {
+import { colors } from '../theme';
+
+export function AppIcon({ name, size = 22, color = colors.brandPrimary }: Props) {
   const Icon = iconMap[name] || WarningIcon;
   return <Icon width={size} height={size} color={color} />;
 }
