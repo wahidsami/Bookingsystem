@@ -11,6 +11,9 @@ import { AppIcon } from '../components/AppIcon';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { ThemedText as Text } from '../components/ThemedText';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
+import { SectionTitle } from '../components/ui/SectionTitle';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
@@ -255,28 +258,19 @@ export function ServiceBookingCartScreen({ navigation }: any) {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
-            <View style={[styles.header, { paddingTop: spacing.md + topInset }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
-                </TouchableOpacity>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle}>
-                        {language === 'ar' ? 'سلة الحجز' : 'Booking Cart'}
-                    </Text>
-                    <Text style={styles.headerSubtitle}>
-                        {itemCount} {language === 'ar' ? 'خدمة محفوظة' : 'service items saved'}
-                    </Text>
-                </View>
-                <TouchableOpacity style={styles.headerAction} onPress={openTenant}>
-                    <AppIcon name="plus" size={20} color={colors.primary} />
-                </TouchableOpacity>
-            </View>
+            <PageHeader
+                title={language === 'ar' ? 'سلة الحجز' : 'Booking Cart'}
+                onBack={() => navigation.goBack()}
+                rightAction={
+                    <TouchableOpacity style={styles.headerAction} onPress={openTenant}>
+                        <AppIcon name="plus" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                }
+            />
 
             <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}>
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryTitle}>
-                        {language === 'ar' ? 'ملخص الدفع' : 'Payment Summary'}
-                    </Text>
+                <AppCard>
+                    <SectionTitle title={language === 'ar' ? 'ملخص الدفع' : 'Payment Summary'} />
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>{language === 'ar' ? 'إجمالي الخدمات' : 'Total services'}</Text>
                         <Text style={styles.summaryValue}>{formatRiyal(totalPrice, isRTL ? 'ar' : 'en')}</Text>
@@ -299,7 +293,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                             <Text style={styles.summaryValue}>{formatRiyal(group.payableNowTotal, isRTL ? 'ar' : 'en')}</Text>
                         </View>
                     ))}
-                </View>
+                </AppCard>
 
                 {items.map((item) => {
                     const serviceName = isRTL ? item.service.name_ar : item.service.name_en;
@@ -312,7 +306,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                             : (language === 'ar' ? 'عربون الحجز' : 'Booking fee');
 
                     return (
-                        <View key={item.id} style={styles.itemCard}>
+                        <AppCard key={item.id}>
                             <View style={styles.itemHeader}>
                                 <View style={styles.itemThumbWrap}>
                                     {item.service.finalPrice ? (
@@ -373,7 +367,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                                     <Text style={styles.detailValue}>{formatRiyal(item.payableNowAmount, isRTL ? 'ar' : 'en')}</Text>
                                 </View>
                             </View>
-                        </View>
+                        </AppCard>
                     );
                 })}
             </ScrollView>
