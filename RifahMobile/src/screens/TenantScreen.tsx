@@ -14,6 +14,10 @@ import { useServiceBookingCart } from '../contexts/ServiceBookingCartContext';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
 import { ServiceDetailsDrawer } from '../components/ServiceDetailsDrawer';
+import { AppCard } from '../components/ui/AppCard';
+import { AppBadge } from '../components/ui/AppBadge';
+import { SectionTitle } from '../components/ui/SectionTitle';
+import { PageHeader } from '../components/ui/PageHeader';
 
 interface TenantDetailsProps {
     route: any;
@@ -699,22 +703,23 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         colors={['rgba(17, 24, 39, 0.4)', 'rgba(17, 24, 39, 0.1)']}
                         style={styles.heroGradient}
                     >
-                        <View style={[styles.heroHeaderRow, { marginTop: topInset }]}>
-                            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.circularHeaderButton}>
-                                <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.textInverse} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.circularHeaderButton}
-                                onPress={() => navigation.navigate('ServiceBookingCart')}
-                            >
-                                <AppIcon name="cart" size={20} color={colors.textInverse} />
-                                {serviceBookingItemCount > 0 && (
-                                    <View style={styles.badgeContainer}>
-                                        <Text style={styles.badgeText}>{serviceBookingItemCount}</Text>
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        </View>
+                        <PageHeader
+                            variant="transparent"
+                            onBack={() => navigation.goBack()}
+                            rightAction={
+                                <TouchableOpacity
+                                    style={styles.circularHeaderButton}
+                                    onPress={() => navigation.navigate('ServiceBookingCart')}
+                                >
+                                    <AppIcon name="cart" size={20} color={colors.textInverse} />
+                                    {serviceBookingItemCount > 0 && (
+                                        <View style={styles.badgeContainer}>
+                                            <Text style={styles.badgeText}>{serviceBookingItemCount}</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            }
+                        />
                     </LinearGradient>
                 </ImageBackground>
 
@@ -726,26 +731,15 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     
                     <Text style={styles.heroIdentityTitle} numberOfLines={1}>{tenant.name}</Text>
                     {businessLabel ? (
-                        <View style={styles.heroIdentityPill}>
-                            <Text style={styles.heroIdentityPillText}>{businessLabel}</Text>
-                        </View>
+                        <AppBadge variant="neutral" label={businessLabel} />
                     ) : null}
 
                     <View style={styles.heroIdentityMetaRow}>
                         {/* Open/Close Pill */}
-                        <View style={styles.heroStatusPill}>
-                            <Text style={styles.heroStatusPillTextBold}>
-                                {tenant.isAvailable ? (isRTL ? 'مفتوح' : 'Open') : (isRTL ? 'مغلق' : 'Closed')}
-                            </Text>
-                            <Text style={styles.heroStatusPillTextSeparator}> • </Text>
-                            <Text style={styles.heroStatusPillTextLight}>{hoursStatus}</Text>
-                        </View>
+                        <AppBadge variant={tenant.isAvailable ? 'success' : 'error'} label={`${tenant.isAvailable ? (isRTL ? 'مفتوح' : 'Open') : (isRTL ? 'مغلق' : 'Closed')} • ${hoursStatus}`} />
                         {/* Rating Pill */}
                         {ratingValue ? (
-                            <View style={styles.heroStatusPill}>
-                                <Text style={styles.heroStatusPillTextBold}>{ratingValue}</Text>
-                                <Text style={styles.heroStatusPillTextLight}> {isRTL ? 'تقييم' : 'Rank'}</Text>
-                            </View>
+                            <AppBadge variant="neutral" label={`${ratingValue} ${isRTL ? 'تقييم' : 'Rank'}`} />
                         ) : null}
                     </View>
                 </View>
@@ -1035,11 +1029,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             };
 
                             return (
-                                <TouchableOpacity
+                                <AppCard
+                                    variant={isInCart ? 'outlined' : 'elevated'}
                                     key={key}
                                     style={[styles.compactServiceCard, isInCart ? styles.compactServiceCardSelected : null]}
                                     onPress={() => setSelectedDrawerService({ service, variant })}
-                                    activeOpacity={0.92}
+                                    padding="none"
                                 >
                                     <View style={[styles.compactServiceMediaRow, isRTL ? styles.compactServiceMediaRowRtl : null]}>
                                         {serviceImage && !serviceImageErrors[service.id] ? (
@@ -1080,7 +1075,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                             <AppIcon name={isInCart ? 'check' : 'plus'} size={20} color={isInCart ? '#FFFFFF' : '#1A1B43'} />
                                         </TouchableOpacity>
                                     </View>
-                                </TouchableOpacity>
+                                </AppCard>
                             );
                         })}
 
@@ -1092,7 +1087,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     </View>
                 )}
                 {products.length > 0 ? (
-                    <View style={styles.productsTeaserCard}>
+                    <AppCard style={styles.productsTeaserCard} padding="none">
                         <View style={styles.productsTeaserHeader}>
                             <View>
                                 <Text style={styles.productsTeaserTitle}>{isRTL ? 'المنتجات' : 'Products'}</Text>
@@ -1142,7 +1137,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                                 );
                             })}
                         </ScrollView>
-                    </View>
+                    </AppCard>
                 ) : null}
             </View>
         );
@@ -1365,8 +1360,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         <View style={styles.contentSection}>
             {/* Section 1: About */}
             {aboutStory ? (
-                <View style={styles.aboutCardCompact}>
-                    <Text style={styles.aboutCardTitleCompact}>{t('about')}</Text>
+                <AppCard style={styles.aboutCardCompact}>
+                    <SectionTitle style={styles.aboutCardTitleCompact} title={t('about')} />
                     <Text
                         style={styles.aboutTextCompact}
                         numberOfLines={aboutExpanded ? undefined : 4}
@@ -1380,13 +1375,13 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             </Text>
                         </TouchableOpacity>
                     )}
-                </View>
+                </AppCard>
             ) : null}
 
             {/* Section 2: Team */}
             {staff && staff.length > 0 ? (
-                <View style={styles.aboutCardCompact}>
-                    <Text style={styles.aboutCardTitleCompact}>{isRTL ? 'فريق العمل' : 'Team'}</Text>
+                <AppCard style={styles.aboutCardCompact}>
+                    <SectionTitle style={styles.aboutCardTitleCompact} title={isRTL ? 'فريق العمل' : 'Team'} />
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamRow}>
                         {staff.map((member) => (
                             <TouchableOpacity key={member.id} style={styles.teamMemberCard} onPress={() => openProviderProfile(member)}>
@@ -1409,12 +1404,12 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
-                </View>
+                </AppCard>
             ) : null}
 
             {/* Section 3: Reviews Preview */}
-            <View style={styles.aboutCardCompact}>
-                <Text style={styles.aboutCardTitleCompact}>{isRTL ? 'التقييمات' : 'Reviews'}</Text>
+            <AppCard style={styles.aboutCardCompact}>
+                <SectionTitle style={styles.aboutCardTitleCompact} title={isRTL ? 'التقييمات' : 'Reviews'} />
                 
                 {reviewsSummary.avgRating ? (
                     <View style={styles.reviewsPreviewSummaryBlock}>
@@ -1472,7 +1467,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                         </Text>
                     </TouchableOpacity>
                 )}
-            </View>
+            </AppCard>
 
             {/* Section 4: Opening Times + Location */}
             {(() => {
@@ -1482,10 +1477,10 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                 
                 if (!hasValidHours && !locationLine && !mapUrl) return null;
                 return (
-                <View style={styles.aboutCardCompact}>
+                <AppCard style={styles.aboutCardCompact}>
                     {hasValidHours ? (
                         <>
-                            <Text style={styles.aboutCardTitleCompact}>{isRTL ? 'أوقات العمل' : 'Opening times'}</Text>
+                            <SectionTitle style={styles.aboutCardTitleCompact} title={isRTL ? 'أوقات العمل' : 'Opening times'} />
                             <View style={styles.hoursContainerCompact}>
                                 {daysList.map((day) => {
                                     const hours = parsedHours[day] || parsedHours[day.charAt(0).toUpperCase() + day.slice(1)] || parsedHours[day.toUpperCase()];
@@ -1562,7 +1557,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                             ) : null}
                         </>
                     ) : null}
-                </View>
+                </AppCard>
                 );
             })()}
 
