@@ -1,0 +1,29 @@
+# 1. Dependency and generated directories
+node_modules/
+.expo/
+dist/
+web-build/
+android/
+ios/
+
+# 2. Workspace and agent cruft
+.agents/
+scratch/
+tests/
+*.md
+*.txt
+.DS_Store
+
+# 3. Exclude all fonts by default
+assets/fonts/*
+
+# 4. Whitelist only the explicitly required fonts
+!assets/fonts/Montserrat-Regular.ttf
+!assets/fonts/Montserrat-Medium.ttf
+!assets/fonts/Montserrat-SemiBold.ttf
+!assets/fonts/Montserrat-Bold.ttf
+!assets/fonts/Cairo-Regular.ttf
+!assets/fonts/Cairo-Light.ttf
+!assets/fonts/Cairo-Medium.ttf
+!assets/fonts/Cairo-SemiBold.ttf
+!assets/fonts/Cairo-Bold.ttf
