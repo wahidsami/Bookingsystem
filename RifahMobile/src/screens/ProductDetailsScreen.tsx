@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
 import { colors } from '../theme/colors';
 import { getImageUrl, Product, Tenant } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -39,16 +41,17 @@ export function ProductDetailsScreen({ route, navigation }: any) {
     return (
         <View style={styles.container}>
             <ScrollView contentContainerStyle={{ paddingBottom: Math.max(scrollBottomPadding, 28) }}>
-                <View style={[styles.topBar, { paddingTop: topInset + 6 }]}>
-                    <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-                        <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
-                    </TouchableOpacity>
-                    <View style={styles.topActions}>
-                        <TouchableOpacity style={styles.iconBtn}>
-                            <AppIcon name="share" size={18} color={colors.text} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                <PageHeader 
+                    variant="transparent" 
+                    onBack={() => navigation.goBack()} 
+                    rightAction={
+                        <View style={styles.topActions}>
+                            <TouchableOpacity style={styles.iconBtn}>
+                                <AppIcon name="share" size={18} color={colors.text} />
+                            </TouchableOpacity>
+                        </View>
+                    } 
+                />
 
                 <Image source={{ uri: images[activeImageIndex] }} style={styles.heroImage} />
                 <Text style={styles.imageCounter}>{activeImageIndex + 1}/{images.length}</Text>
@@ -65,7 +68,7 @@ export function ProductDetailsScreen({ route, navigation }: any) {
                     ))}
                 </ScrollView>
 
-                <View style={styles.contentCard}>
+                <AppCard style={styles.contentCard} padding="none">
                     <Text style={styles.title}>{productName}</Text>
                     <View style={styles.metaRow}>
                         <View style={[styles.chip, product.stock > 0 ? styles.chipSuccess : styles.chipMuted]}>
@@ -102,7 +105,7 @@ export function ProductDetailsScreen({ route, navigation }: any) {
                             </TouchableOpacity>
                         </View>
                     </View>
-                </View>
+                </AppCard>
             </ScrollView>
 
             <View style={[styles.bottomBar, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>

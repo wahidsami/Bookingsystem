@@ -5,6 +5,9 @@ import { Booking, SlotItem, bookingNeedsPayment, getBookingOutstandingAmount } f
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
+import { AppBadge } from '../components/ui/AppBadge';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
@@ -419,50 +422,53 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
       <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.lg }}>
         <ImageBackground source={tenantHeroUri ? { uri: tenantHeroUri } : undefined} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
           <LinearGradient colors={tenantHeroUri ? ['rgba(38,12,89,0.82)', 'rgba(93,47,153,0.35)'] : ['#3B0E74', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-          <View style={styles.heroTopBar}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.heroButton}>
-              <AppIcon name="arrow_back" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.heroButton}>
-              <AppIcon name="share" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.heroTitle}>{language === 'ar' ? 'تفاصيل الموعد' : 'Appointment Details'}</Text>
+          <PageHeader 
+            variant="transparent" 
+            title={language === 'ar' ? 'تفاصيل الموعد' : 'Appointment Details'}
+            onBack={() => navigation.goBack()} 
+            rightAction={
+              <TouchableOpacity style={styles.heroButton}>
+                <AppIcon name="share" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            } 
+          />
+          <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: spacing.sm }}>
           <Text style={styles.heroSubTitle}>{language === 'ar' ? 'تجربتك الصحية القادمة بانتظارك' : 'Your wellness experience awaits'}</Text>
+          </View>
         </ImageBackground>
 
         <View style={styles.contentWrap}>
-          <View style={styles.summaryCard}>
+          <AppCard style={styles.summaryCard} padding="none">
           <Text style={styles.label}>{language === 'ar' ? 'رقم الحجز' : 'Booking No.'}</Text>
           <Text style={styles.bookingNumber} numberOfLines={1}>{getBookingNumber(representative)}</Text>
           <View style={styles.pillsRow}>
-            <View style={[styles.pill, styles.statusPill]}><Text style={styles.statusPillText}>{getStatusText(group.status, language)}</Text></View>
-            <View style={[styles.pill, styles.paymentPill]}><Text style={styles.paymentPillText}>{getPaymentStatusText(representative)}</Text></View>
+            <AppBadge label={getStatusText(group.status, language)} variant={['confirmed', 'checked_in', 'completed'].includes(group.status) ? 'success' : group.status === 'cancelled' ? 'error' : group.status === 'pending' ? 'warning' : 'neutral'} />
+            <AppBadge label={getPaymentStatusText(representative)} variant="brand" />
           </View>
           <Text style={styles.metaText}>{group.tenant?.name || '-'}</Text>
           <Text style={styles.metaText}>
             {format(new Date(group.startTime), 'eeee, d MMMM yyyy, h:mm a', { locale: language === 'ar' ? ar : enUS })}
           </Text>
-          </View>
+          </AppCard>
 
-          <View style={styles.metricsGrid}>
+          <AppCard style={styles.metricsGrid} padding="none">
           <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text><Text style={styles.metricValue} numberOfLines={1}>{group.items.length}</Text></View>
           <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text><Text style={styles.metricValue} numberOfLines={1}>{formatRiyal(group.totalPrice, language)}</Text></View>
           <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text><Text style={styles.metricValue} numberOfLines={1}>{formatRiyal(group.payableNowTotal, language)}</Text></View>
           <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'أول موعد' : 'First Appt.'}</Text><Text style={styles.metricValueSmall} numberOfLines={1}>{format(new Date(group.startTime), 'd MMM, h:mm a', { locale: language === 'ar' ? ar : enUS })}</Text></View>
-          </View>
+          </AppCard>
 
           {guest ? (
-            <View style={styles.guestCard}>
+            <AppCard style={styles.guestCard} padding="none">
               <Text style={styles.sectionTitle}>{language === 'ar' ? 'بيانات الضيف' : 'Guest Information'}</Text>
               <Text style={styles.guestName}>{guest.fullName}</Text>
               {!!guest.phone && <Text style={styles.guestPhone}>{guest.phone}</Text>}
               {!!guest.email && <Text style={styles.guestPhone}>{guest.email}</Text>}
               {!!guest.birthDate && <Text style={styles.guestPhone}>{guest.birthDate}</Text>}
-            </View>
+            </AppCard>
           ) : null}
 
-          <View style={styles.paymentSummaryCard}>
+          <AppCard style={styles.paymentSummaryCard} padding="none">
             <Text style={styles.sectionTitle}>{language === 'ar' ? 'ملخص الدفع' : 'Payment Summary'}</Text>
             <View style={styles.paymentRow}>
               <Text style={styles.paymentLabel}>{language === 'ar' ? 'الإجمالي' : 'Subtotal'}</Text>
@@ -481,11 +487,11 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                 {language === 'ar' ? 'طريقة الدفع' : 'Payment method'}: {getPaymentMethodLabel(representative.paymentMethod)}
               </Text>
             )}
-          </View>
+          </AppCard>
 
           <Text style={styles.sectionTitle}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text>
           {group.items.map((booking, index) => (
-            <View key={booking.id} style={styles.serviceCard}>
+            <AppCard key={booking.id} style={styles.serviceCard} padding="none">
             <Text style={styles.serviceIndex}>{language === 'ar' ? `الخدمة ${index + 1}` : `Service ${index + 1}`}</Text>
             <Text style={styles.serviceName} numberOfLines={2}>{getServiceName(booking)}</Text>
             {!!booking.serviceVariantName && <Text style={styles.serviceVariant} numberOfLines={1}>{booking.serviceVariantName}</Text>}
@@ -494,11 +500,11 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
             <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الحالة' : 'Status'}: {getStatusText(booking.status, language)}</Text>
             <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الدفع' : 'Payment'}: {getPaymentStatusText(booking)}</Text>
             <Text style={styles.priceText} numberOfLines={1}>{formatRiyal(Number(booking.price || 0), language)}</Text>
-            </View>
+            </AppCard>
           ))} 
 
           {appointmentTimeline.length > 0 && (
-            <View style={styles.timelineCard}>
+            <AppCard style={styles.timelineCard} padding="none">
               <Text style={styles.sectionTitle}>{language === 'ar' ? 'سجل التغييرات' : 'Activity Timeline'}</Text>
               {appointmentTimeline.slice(0, 8).map((event) => (
                 <View key={event.id} style={styles.timelineRow}>
@@ -512,10 +518,10 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                   </View>
                 </View>
               ))}
-            </View>
+            </AppCard>
           )}
 
-          <View style={styles.primaryActionCard}>
+          <AppCard style={styles.primaryActionCard} padding="none">
             {Number(group.payableNowTotal || 0) > 0.009 && activeTab === 'upcoming' && (
               <TouchableOpacity
                 style={styles.primaryBtn}
@@ -588,7 +594,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                 {language === 'ar' ? 'واتساب / الاتصال بالمركز' : 'WhatsApp / Call Center'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </AppCard>
 
           <View style={styles.policyNote}>
             <AppIcon name="info" size={16} color={colors.textSecondary} />

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
+import { AppCard } from '../components/ui/AppCard';
 import { api, AppointmentInviteDetails, getImageUrl, SERVER_URL } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -142,11 +143,11 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
                 </Text>
                 <Text style={styles.messageTenant}>{tenantName}</Text>
 
-                <View style={styles.detailsCard}>
+                <AppCard style={styles.detailsCard} padding="none">
                     <Text style={styles.detailsText}>{detailDate}</Text>
                     <Text style={styles.detailsText}>{serviceName}</Text>
                     <Text style={styles.detailsText}>{providerName}</Text>
-                </View>
+                </AppCard>
 
                 <View style={styles.providerAvatar}>
                     <Text style={styles.providerAvatarText}>

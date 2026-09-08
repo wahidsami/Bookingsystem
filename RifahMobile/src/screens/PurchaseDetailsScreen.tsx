@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
 import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
@@ -56,15 +58,9 @@ export function PurchaseDetailsScreen({ route, navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <View style={[styles.header, { paddingTop: topInset + spacing.md }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <AppIcon name={isRTL ? "arrow_forward" : "arrow_back"} size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{isRTL ? 'تفاصيل الطلب' : 'Purchase Details'}</Text>
-                <View style={{ width: 24 }} />
-            </View>
+            <PageHeader title={isRTL ? 'تفاصيل الطلب' : 'Purchase Details'} onBack={() => navigation.goBack()} />
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding + 32 }]}>
-                <View style={styles.heroCard}>
+                <AppCard style={styles.heroCard} padding="none">
                     <View style={styles.heroIcon}>
                         <AppIcon name="purchases" size={30} color={colors.primary} />
                     </View>
@@ -72,9 +68,9 @@ export function PurchaseDetailsScreen({ route, navigation }: any) {
                     <Text style={styles.heroSubtitle}>
                         {dateStr}
                     </Text>
-                </View>
+                </AppCard>
 
-                <View style={styles.summaryCard}>
+                <AppCard style={styles.summaryCard}>
                     <Text style={styles.sectionTitle}>{isRTL ? 'العناصر' : 'Items'}</Text>
                     {order.items?.map((orderItem, index) => {
                         const itemName = isRTL 
@@ -87,15 +83,15 @@ export function PurchaseDetailsScreen({ route, navigation }: any) {
                             </View>
                         );
                     })}
-                </View>
+                </AppCard>
 
-                <View style={styles.summaryCard}>
+                <AppCard style={styles.summaryCard}>
                     <Text style={styles.sectionTitle}>{isRTL ? 'الملخص المالي' : 'Payment summary'}</Text>
                     <View style={styles.amountRow}>
                         <Text style={styles.amountLabel}>{isRTL ? 'المجموع' : 'Total'}</Text>
                         <Text style={styles.amountValue}>{formatRiyal(Number(order.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
                     </View>
-                </View>
+                </AppCard>
             </ScrollView>
         </View>
     );

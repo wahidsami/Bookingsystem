@@ -12,6 +12,7 @@ import {
     TextInput,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
+import { AppCard } from '../components/ui/AppCard';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
@@ -231,9 +232,10 @@ export function BookingsScreen({ navigation }: any) {
             : getServiceName(representative);
 
         return (
-            <TouchableOpacity
+            <AppCard
+                variant="elevated"
                 style={styles.card}
-                activeOpacity={0.9}
+                
                 onPress={() => navigation.navigate('AppointmentDetails', { bookingGroup: item, activeTab })}
             >
                 {isRescheduled && activeTab === 'upcoming' ? (
@@ -279,7 +281,7 @@ export function BookingsScreen({ navigation }: any) {
                         </View>
                     </View>
                 )}
-            </TouchableOpacity>
+            </AppCard>
         );
     };
 

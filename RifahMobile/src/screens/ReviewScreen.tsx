@@ -3,6 +3,8 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, TextInput, TouchableO
 import { ThemedText as Text } from '../components/ThemedText';
 import { api, Booking } from '../api/client';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
 import { borderRadius, colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
@@ -103,7 +105,7 @@ export function ReviewScreen({ route, navigation }: any) {
         ) : !appointment ? (
           <Text style={styles.emptyText}>{isRTL ? 'تعذر تحميل بيانات الموعد.' : 'Unable to load appointment details.'}</Text>
         ) : (
-          <View style={styles.card}>
+          <AppCard style={styles.card} padding="none">
             <Text style={styles.title}>{isRTL ? 'كيف كانت تجربتك؟' : 'How was your experience?'}</Text>
             <Text style={styles.subtitle}>
               {isRTL
@@ -138,7 +140,7 @@ export function ReviewScreen({ route, navigation }: any) {
             <TouchableOpacity style={[styles.submitButton, submitting ? { opacity: 0.7 } : null]} onPress={handleSubmit} disabled={submitting}>
               {submitting ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.submitText}>{isRTL ? 'إرسال التقييم' : 'Submit Review'}</Text>}
             </TouchableOpacity>
-          </View>
+          </AppCard>
         )}
       </ScrollView>
     </View>

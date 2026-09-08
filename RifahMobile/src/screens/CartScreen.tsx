@@ -6,6 +6,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
 import { useCart } from '../contexts/CartContext';
 import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/ui/PageHeader';
+import { AppCard } from '../components/ui/AppCard';
 import { api, getImageUrl, Tenant } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
@@ -193,16 +195,10 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
-            <View style={[styles.header, { paddingTop: spacing.md + topInset }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{labels.cartTitle}</Text>
-                <View style={{ width: 40 }} />
-            </View>
+            <PageHeader title={labels.cartTitle} onBack={() => navigation.goBack()} />
 
             <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}>
-                <View style={styles.section}>
+                <AppCard style={styles.section} padding="none">
                     <Text style={styles.sectionTitle}>{labels.orderItems}</Text>
                     {cartItems.map(item => (
                         <View key={item.product.id} style={styles.cartItem}>
@@ -228,9 +224,9 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                             </TouchableOpacity>
                         </View>
                     ))}
-                </View>
+                </AppCard>
 
-                <View style={styles.section}>
+                <AppCard style={styles.section} padding="none">
                     <Text style={styles.sectionTitle}>{labels.personalInfo}</Text>
                     <Text style={styles.fieldLabel}>{isRTL ? 'الاسم الكامل *' : 'Full Name *'}</Text>
                     <TextInput
@@ -259,9 +255,9 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                         value={customerPhone}
                         onChangeText={setCustomerPhone}
                     />
-                </View>
+                </AppCard>
 
-                <View style={styles.section}>
+                <AppCard style={styles.section} padding="none">
                     <Text style={styles.sectionTitle}>{labels.shippingAddress}</Text>
                     <View style={styles.row}>
                         <View style={[styles.flexField, { marginRight: spacing.sm }]}>
@@ -301,9 +297,9 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                         value={building}
                         onChangeText={setBuilding}
                     />
-                </View>
+                </AppCard>
 
-                <View style={styles.section}>
+                <AppCard style={styles.section} padding="none">
                     <Text style={styles.sectionTitle}>{labels.deliveryMethod}</Text>
                     <View style={styles.methodOptions}>
                         <TouchableOpacity
@@ -323,9 +319,9 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                             <Text style={styles.methodDesc}>(Same day)</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </AppCard>
 
-                <View style={styles.section}>
+                <AppCard style={styles.section} padding="none">
                     <Text style={styles.sectionTitle}>{labels.paymentMethod}</Text>
                     <View style={styles.methodOptions}>
                         <TouchableOpacity
@@ -343,9 +339,9 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                             <Text style={[styles.methodLabel, paymentMethod === 'cash-on-delivery' && styles.methodLabelActive]}>Cash on Delivery</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </AppCard>
 
-                <View style={[styles.section, styles.summarySection]}>
+                <AppCard style={[styles.section, styles.summarySection]} padding="none">
                     <Text style={styles.sectionTitle}>{labels.orderSummary}</Text>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Subtotal</Text>
@@ -363,7 +359,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                         <Text style={styles.totalLabel}>Total</Text>
                         <Text style={styles.totalValue}>{formatRiyal(finalTotal, isRTL ? 'ar' : 'en')}</Text>
                     </View>
-                </View>
+                </AppCard>
             </ScrollView>
 
             <View style={[styles.footer, { paddingBottom: bottomInset }]}>

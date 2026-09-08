@@ -10,6 +10,8 @@ import {
     Alert,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
+import { AppCard } from '../components/ui/AppCard';
+import { AppBadge } from '../components/ui/AppBadge';
 import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
@@ -115,8 +117,8 @@ export function PurchasesScreen({ navigation, route }: any) {
         const dateStr = format(dateDate, 'd MMM yyyy', { locale: isArabic ? ar : enUS });
 
         return (
-            <TouchableOpacity
-                activeOpacity={0.95}
+            <AppCard
+                variant="elevated"
                 style={[styles.card, styles.compactCard]}
                 onPress={() => navigation.navigate('PurchaseDetails', { purchaseId: item.id })}
             >
@@ -137,17 +139,10 @@ export function PurchasesScreen({ navigation, route }: any) {
                         )}
                         <Text style={styles.salonName} numberOfLines={1}>{item.tenant?.name || 'Store Name'}</Text>
                     </View>
-                    <View style={[
-                        styles.statusBadge,
-                        { backgroundColor: getStatusColor(item.status) + '20' }
-                    ]}>
-                        <Text style={[
-                            styles.statusText,
-                            { color: getStatusColor(item.status) }
-                        ]}>
-                            {getStatusText(item.status, language)}
-                        </Text>
-                    </View>
+                    <AppBadge 
+                        label={getStatusText(item.status, language)} 
+                        variant={['delivered', 'completed'].includes(item.status) ? 'success' : ['cancelled', 'refunded'].includes(item.status) ? 'error' : 'neutral'} 
+                    />
                 </View>
 
                 {/* COMPACT VIEW */}
@@ -164,7 +159,7 @@ export function PurchasesScreen({ navigation, route }: any) {
                         {isArabic ? 'عرض التفاصيل' : 'View Details'}
                     </Text>
                 </View>
-            </TouchableOpacity>
+            </AppCard>
         );
     };
 
@@ -177,12 +172,6 @@ export function PurchasesScreen({ navigation, route }: any) {
                     end={{ x: 1, y: 1 }}
                     style={[styles.header, { paddingTop: spacing.xl + topInset }]}
                 >
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => navigation.goBack()}
-                    >
-                        <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
-                    </TouchableOpacity>
                     <Text style={styles.headerTitle}>{t('myPurchases' as any)}</Text>
                 </LinearGradient>
                 <GuestView
@@ -201,13 +190,6 @@ export function PurchasesScreen({ navigation, route }: any) {
                 end={{ x: 1, y: 1 }}
                 style={[styles.header, { paddingTop: spacing.xl + topInset }]}
             >
-                {/* Back Button */}
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
-                </TouchableOpacity>
                 <Text style={styles.headerTitle}>{t('myPurchases')}</Text>
             </LinearGradient>
 
