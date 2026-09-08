@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { useScreenSafeArea } from '../utils/safeArea';
-import { colors } from '../theme/colors';
+import { colors, spacing } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -24,7 +24,7 @@ export function SplashScreen({ onFinish }: { onFinish: () => void }) {
             {/* Refah Logo */}
             <View style={styles.logoContainer}>
                 <Image
-                    source={require('../../assets/logo.png')}
+                    source={require('../../assets/barspa_logo.png')}
                     style={styles.logoImage}
                     resizeMode="contain"
                 />
@@ -68,11 +68,11 @@ const styles = StyleSheet.create({
     },
     logoContainer: {
         alignItems: 'center',
-        marginBottom: 40,
+        marginBottom: spacing.xxl,
         backgroundColor: '#FFFFFF22',
         borderRadius: 24,
-        paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
     },
     logoImage: {
         width: 200,
@@ -81,11 +81,11 @@ const styles = StyleSheet.create({
     tagline: {
         fontSize: 16,
         color: `${colors.textInverse}DD`,
-        marginTop: 8,
+        marginTop: spacing.sm,
         letterSpacing: 1,
     },
     loader: {
-        marginTop: 20,
+        marginTop: spacing.lg,
     },
     version: {
         position: 'absolute',

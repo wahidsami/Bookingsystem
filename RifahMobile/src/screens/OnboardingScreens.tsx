@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { AppCard } from '../components/ui/AppCard';
+import { AppButton } from '../components/ui/AppButton';
 import { View, StyleSheet, Dimensions, TouchableOpacity, Image, Animated, Easing } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText as Text } from '../components/ThemedText';
 import Swiper from 'react-native-swiper';
 import { useLanguage } from '../contexts/LanguageContext';
 import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -96,30 +99,24 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
     // Construct bottom navigation based on strict Arabic specific layout (from design image)
     const renderNav = () => {
         const prevButton = (
-            <TouchableOpacity
+            <AppButton
                 key="prev"
-                style={[styles.navButton, activeIndex === 0 && styles.navButtonHidden]}
+                variant="text"
+                label={activeIndex === 0 ? '' : t('previous')}
                 onPress={handlePrevious}
                 disabled={activeIndex === 0}
-                activeOpacity={0.7}
-            >
-                <Text style={styles.navButtonTextSecondary}>
-                    {activeIndex === 0 ? '' : t('previous')}
-                </Text>
-            </TouchableOpacity>
+                style={[styles.navButton, activeIndex === 0 && styles.navButtonHidden]}
+            />
         );
 
         const nextButton = (
-            <TouchableOpacity
+            <AppButton
                 key="next"
-                style={[styles.navButton, activeIndex === screens.length - 1 && styles.getStartedButton]}
+                variant={activeIndex === screens.length - 1 ? 'primary' : 'text'}
+                label={activeIndex === screens.length - 1 ? t('getStarted') : t('next')}
                 onPress={handleNext}
-                activeOpacity={0.8}
-            >
-                <Text style={[styles.navButtonTextPrimary, activeIndex === screens.length - 1 && styles.getStartedText]}>
-                    {activeIndex === screens.length - 1 ? t('getStarted') : t('next')}
-                </Text>
-            </TouchableOpacity>
+                style={[styles.navButton, activeIndex === screens.length - 1 && styles.getStartedButton]}
+            />
         );
 
         const spacer = <View key="spacer" style={{ flex: 1 }} />;
@@ -182,14 +179,14 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
 
                         {/* 2. Text Block (Safely below image) */}
                         <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
-                            <View style={styles.textCard}>
+                            <AppCard variant="elevated" style={styles.textCard}>
                             <Text style={styles.title}>
                                 {screen.title}
                             </Text>
                             <Text style={styles.subtitle} numberOfLines={3}>
                                 {screen.description}
                             </Text>
-                            </View>
+                            </AppCard>
                         </Animated.View>
 
                         {/* Ensure pagination space doesn't clash with subtitle */}
@@ -265,15 +262,8 @@ const styles = StyleSheet.create({
     },
     textCard: {
         width: '100%',
-        backgroundColor: colors.background,
-        borderRadius: 20,
         paddingHorizontal: clamp(14, SCREEN_WIDTH * 0.05, 22),
         paddingVertical: clamp(12, SCREEN_HEIGHT * 0.016, 18),
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 14,
-        elevation: 4,
     },
     title: {
         fontSize: clamp(20, SCREEN_HEIGHT * 0.024, 26),
@@ -315,19 +305,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: PADDING_HORIZONTAL,
-        paddingTop: 16,
+        paddingTop: spacing.md,
         width: '100%',
         position: 'absolute',
         bottom: 0,
         backgroundColor: colors.background,
-    },
-    navButton: {
-        height: 44,
-        justifyContent: 'center',
-        paddingHorizontal: 8,
-    },
-    navButtonHidden: {
-        opacity: 0,
     },
     navButtonTextSecondary: {
         fontSize: 16,
@@ -338,6 +320,14 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: colors.primary,
+    },
+    navButton: {
+        height: 44,
+        justifyContent: 'center',
+        paddingHorizontal: 8,
+    },
+    navButtonHidden: {
+        opacity: 0,
     },
     getStartedButton: {
         backgroundColor: colors.primary,

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Image, Dimensions, Platform } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { AppButton } from '../components/ui/AppButton';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
 
 interface LanguageSelectionProps {
     onLanguageSelect: (language: 'ar' | 'en') => Promise<void> | void;
@@ -42,7 +43,7 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
             {/* Top Half: Logo Area */}
             <View style={styles.topHalf}>
                 <Image
-                    source={require('../../assets/splash-icon.png')}
+                    source={require('../../assets/barspa_logo.png')}
                     style={styles.logo}
                     resizeMode="contain"
                 />
@@ -60,35 +61,19 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
 
                     {/* Primary Actions (Pill Buttons) */}
                     <View style={styles.actionsContainer}>
-                        <TouchableOpacity
-                            style={[styles.pillButton, styles.englishButtonWrapper]}
+                        <AppButton
+                            variant="primary"
+                            label="English"
                             onPress={() => handleSelect('en')}
-                            activeOpacity={0.8}
-                        >
-                            <LinearGradient
-                                colors={[colors.primary, colors.primaryDark]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.gradientFill}
-                            >
-                                <Text style={styles.buttonText}>English</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
+                            style={[styles.pillButton, styles.englishButtonWrapper]}
+                        />
 
-                        <TouchableOpacity
-                            style={[styles.pillButton, styles.arabicButtonWrapper]}
+                        <AppButton
+                            variant="secondary"
+                            label="العربية"
                             onPress={() => handleSelect('ar')}
-                            activeOpacity={0.8}
-                        >
-                            <LinearGradient
-                                colors={[colors.secondary, colors.secondaryDark]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.gradientFill}
-                            >
-                                <Text style={styles.buttonText}>العربية</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
+                            style={[styles.pillButton, styles.arabicButtonWrapper]}
+                        />
                     </View>
                 </View>
             </View>
@@ -121,7 +106,7 @@ const styles = StyleSheet.create({
     bottomContent: {
         width: '100%',
         maxWidth: 480, // Max width for content capping
-        paddingHorizontal: clamp(16, SCREEN_WIDTH * 0.06, 40),
+        paddingHorizontal: spacing.md,
         alignItems: 'center',
     },
     textContainer: {
