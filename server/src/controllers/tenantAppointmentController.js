@@ -11,6 +11,7 @@ const { APPOINTMENT_PAYMENT_STATUS, isAppointmentFullyPaid } = require('../utils
 const pushNotificationService = require('../services/pushNotificationService');
 const customerNotificationService = require('../services/customerNotificationService');
 const bookingService = require('../services/bookingService');
+const AuditService = require('../services/auditService');
 const appointmentLifecycleService = require('../services/appointmentLifecycleService');
 const { createStaffAppointmentMessage } = require('../services/staffNotificationService');
 const {
@@ -1050,6 +1051,27 @@ exports.createAppointment = async (req, res) => {
             }
 
             finalAppointments.forEach(attachCanonicalFinancialState);
+
+            for (const appt of finalAppointments) {
+                await AuditService.logActivity({
+                    tenantId,
+                    entityType: 'Appointment',
+                    entityId: appt.id,
+                    action: 'create',
+                    performedByType: req.tenantAccount ? 'employee' : (req.userId ? 'tenant_owner' : 'system'),
+                    performedById: req.tenantAccountId || req.userId || null,
+                    performedByName: req.tenantAccount?.name || req.user?.name || null,
+                    details: {
+                        serviceId: appt.serviceId,
+                        status: appt.status,
+                        bookingSessionId: session.id,
+                        bookingNumber: appt.bookingNumber
+                    }
+                }, {
+                    request: req,
+                    transaction
+                });
+            }
 
             await transaction.commit();
             return res.status(201).json({
