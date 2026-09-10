@@ -12,8 +12,9 @@ export interface SchedulerColumn {
   title: string;
   subtitle?: string;
   avatar?: string;
-  statusLabel?: string;
+  statusIndicator?: 'available' | 'unavailable';
   statusTone?: 'active' | 'break' | 'off' | 'today' | 'neutral';
+
   dateKey?: string;
   isToday?: boolean;
   /**
@@ -713,7 +714,7 @@ export default function SchedulerGrid({
   const handleColumnDrop = (event: React.DragEvent<HTMLDivElement>, column: SchedulerColumn, columnIndex: number) => {
     if (!isEditable) return;
     event.preventDefault();
-    
+
     const draggedEventId = event.dataTransfer.getData('text/plain');
     if (!draggedEventId) return;
 
@@ -721,11 +722,11 @@ export default function SchedulerGrid({
     const relativeY = Math.max(0, event.clientY - rect.top);
     const droppedMinutes = (relativeY / pixelsPerHour) * 60;
     const slotIndex = Math.floor(droppedMinutes / slotMinutes);
-    
-    if (slotIndex < 0 || slotIndex >= slotCount) return; 
-    
+
+    if (slotIndex < 0 || slotIndex >= slotCount) return;
+
     const targetSlot = resolveSlot(column, columnIndex, slotIndex);
-    
+
 
     onSlotDrop?.(targetSlot, draggedEventId);
   };
@@ -771,10 +772,12 @@ export default function SchedulerGrid({
               <div className="min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <p className={`truncate text-xs font-black ${column.availability === 'unavailable' ? 'text-slate-400' : 'text-slate-800'}`}>{column.title}</p>
-                  {column.statusLabel && (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-600">
-                      {column.statusLabel}
-                    </span>
+                  {column.statusIndicator && (
+                    <span
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${column.statusIndicator === 'available' ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                      title={column.statusIndicator === 'available' ? 'Available' : 'Not Available'}
+                      aria-label={column.statusIndicator === 'available' ? 'Available' : 'Not Available'}
+                    />
                   )}
                 </div>
                 {column.subtitle && (
@@ -802,7 +805,7 @@ export default function SchedulerGrid({
         );})}
       </div>
 
-      <div 
+      <div
         className="relative isolate grid"
         style={{ gridTemplateColumns, minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}
       >

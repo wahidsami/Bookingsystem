@@ -4253,21 +4253,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               kind: 'employee',
               resourceId: stylist.id,
               title: String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim() || stylist.nameEn || stylist.nameAr || stylist.id || '—',
-              subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
+              subtitle: isRtl ? stylist.roleAr : stylist.roleEn,
               avatar: stylist.avatar,
-              statusLabel: stylistStatuses[stylist.id]
-                ? (
-                    stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active')
-                  : stylistStatuses[stylist.id] === 'busy' ? (isRtl ? 'مشغول' : 'Busy')
-                  : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break')
-                  : stylistStatuses[stylist.id] === 'time_off' ? (isRtl ? 'إجازة' : 'Time Off')
-                  : (isRtl ? 'خارج' : 'Off')
-                  )
-                : undefined,
-              statusTone: (stylistStatuses[stylist.id] === 'active' || stylistStatuses[stylist.id] === 'busy') ? 'active'
-                        : stylistStatuses[stylist.id] === 'break' ? 'break'
-                        : (stylistStatuses[stylist.id] === 'off' || stylistStatuses[stylist.id] === 'time_off') ? 'off'
-                        : 'neutral',
+              statusIndicator: stylistStatuses[stylist.id] === 'active' ? 'available' : 'unavailable',
+              statusTone: 'neutral',
               isToday: false,
               availability,
             };
