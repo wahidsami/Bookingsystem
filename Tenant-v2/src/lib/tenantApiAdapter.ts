@@ -656,7 +656,7 @@ class TenantApiAdapter {
   private refreshPromise: Promise<boolean> | null = null;
 
   constructor(fetchImpl?: FetchLike) {
-    this.fetchImpl = fetchImpl || window.fetch.bind(window);
+    this.fetchImpl = fetchImpl || (typeof window !== 'undefined' ? window.fetch.bind(window) : () => Promise.resolve(new Response()));
   }
 
   private get baseUrl(): string {
@@ -1676,6 +1676,33 @@ class TenantApiAdapter {
     payload: { amount: number; reason?: string; paymentMethod?: string }
   ): Promise<any> {
     return this.post(`/tenant/appointments/${id}/refund`, payload);
+  }
+
+  async getAuditLogs(params: Record<string, any> = {}): Promise<TenantApiResponse<any>> {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, String(value));
+      }
+    });
+    const query = searchParams.toString();
+    return this.get(`/tenant/audit${query ? `?${query}` : ''}`);
+  }
+
+  async getAuditLog(id: string): Promise<TenantApiResponse<any>> {
+    return this.get(`/tenant/audit/${id}`);
+  }
+
+  async getAuditByEntity(entityType: string, entityId: string): Promise<TenantApiResponse<any>> {
+    return this.get(`/tenant/audit/entity/${entityType}/${entityId}`);
+  }
+
+  async getAuditByOperation(operationId: string): Promise<TenantApiResponse<any>> {
+    return this.get(`/tenant/audit/operation/${operationId}`);
+  }
+
+  async getAuditByCorrelation(correlationId: string): Promise<TenantApiResponse<any>> {
+    return this.get(`/tenant/audit/correlation/${correlationId}`);
   }
 
   async topUpCustomerWallet(id: string, payload: any): Promise<any> {

@@ -175,6 +175,13 @@ export const navigationItems: NavigationItem[] = [
     iconName: 'Settings',
     category: 'management',
   },
+  {
+    id: 'audit',
+    labelAr: 'سجل العمليات',
+    labelEn: 'Audit & Operations',
+    iconName: 'History',
+    category: 'management',
+  },
 ];
 
 export const recentItems: RecentItem[] = [

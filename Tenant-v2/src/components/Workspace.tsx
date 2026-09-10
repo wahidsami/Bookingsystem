@@ -32,6 +32,7 @@ import SupportWorkspace from './SupportWorkspace';
 import SettingsWorkspace from './SettingsWorkspace';
 import SubscriptionWorkspace from './subscription/SubscriptionWorkspace';
 import BillingWorkspace from './subscription/BillingWorkspace';
+import AuditWorkspace from './audit/AuditWorkspace';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import {
   buildTenantPlanSummary,
@@ -1072,6 +1073,11 @@ export default function Workspace({
       {/* 17. SETTINGS */}
       {view === 'settings' && (
         <SettingsWorkspace lang={lang} darkMode={darkMode} />
+      )}
+
+      {/* 18. AUDIT & OPERATIONS */}
+      {view === 'audit' && (
+        <AuditWorkspace lang={lang} darkMode={darkMode} />
       )}
 
       {/* 18. PACKAGES */}

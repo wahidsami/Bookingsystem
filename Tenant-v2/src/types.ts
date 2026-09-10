@@ -34,7 +34,8 @@ export type ViewType =
   | 'marketing-gift-cards'
   | 'marketing-notifications'
   | 'marketing-reviews'
-  | 'marketing-page-setup';
+  | 'marketing-page-setup'
+  | 'audit';
 
 export interface NavigationItem {
   id: ViewType;
