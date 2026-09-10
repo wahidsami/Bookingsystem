@@ -792,11 +792,7 @@ export default function SchedulerGrid({
                   {isRtl ? 'اليوم' : 'Today'}
                 </span>
               )}
-              {column.availability === 'unavailable' && (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-bold text-gray-600">
-                  {isRtl ? 'غير متاح' : 'Not Available'}
-                </span>
-              )}
+
               {isEmployeeHeader && (onColumnHeaderClick || onColumnHeaderContextMenu) && (
                 <ChevronDown size={14} className="text-slate-400 opacity-60 shrink-0" />
               )}
