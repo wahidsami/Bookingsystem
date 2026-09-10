@@ -1,4 +1,5 @@
 const db = require('../models');
+const AuditService = require('../services/auditService');
 const { Op, fn, col } = require('sequelize');
 const { getTenantDashboardBaseUrl } = require('../utils/url');
 const { generateBillNumber, generatePaymentToken } = require('../utils/billUtils');
@@ -300,7 +301,15 @@ const getTenantDetails = async (req, res) => {
  * Free packages activate immediately.
  * Paid packages move to payment_pending and receive an initial invoice link.
  */
+const { runWithOperation } = require('../middleware/operationContext');
+
 const approveTenant = async (req, res) => {
+    return await runWithOperation(async () => {
+        return await _approveTenant(req, res);
+    }, 'admin_approve_tenant');
+};
+
+const _approveTenant = async (req, res) => {
     try {
         const { id } = req.params;
         const { notes } = req.body;
@@ -349,7 +358,7 @@ const approveTenant = async (req, res) => {
             const { activateTenantAfterPayment } = require('../utils/initializeTenantSubscription');
             await activateTenantAfterPayment(tenant.id);
 
-            await db.ActivityLog.create({
+            await AuditService.logActivity({
                 entityType: 'tenant',
                 entityId: tenant.id,
                 action: 'approved',
@@ -414,7 +423,7 @@ const approveTenant = async (req, res) => {
                 paymentDueAt,
                 approvedAt: now,
                 approvedBy: req.adminId
-            }, { transaction });
+            }, { request: req, transaction });
 
             const createdBill = await db.Bill.create({
                 tenantId: tenant.id,
@@ -436,7 +445,7 @@ const approveTenant = async (req, res) => {
                 }
             }, { transaction });
 
-            await db.ActivityLog.create({
+            await AuditService.logActivity({
                 entityType: 'tenant',
                 entityId: tenant.id,
                 action: 'created',
@@ -457,9 +466,9 @@ const approveTenant = async (req, res) => {
                 },
                 ipAddress: req.ip,
                 userAgent: req.headers['user-agent']
-            }, { transaction });
+            }, { request: req, transaction });
 
-            await db.ActivityLog.create({
+            await AuditService.logActivity({
                 entityType: 'tenant',
                 entityId: tenant.id,
                 action: 'approved',
@@ -478,7 +487,7 @@ const approveTenant = async (req, res) => {
                 },
                 ipAddress: req.ip,
                 userAgent: req.headers['user-agent']
-            }, { transaction });
+            }, { request: req, transaction });
 
             await notifyTenantApprovedInvoiceCreated({
                 tenant,
@@ -626,7 +635,7 @@ const resendTenantPaymentEmail = async (req, res) => {
                 }, { transaction });
             }
 
-            await db.ActivityLog.create({
+            await AuditService.logActivity({
                 entityType: 'tenant',
                 entityId: tenant.id,
                 action: 'updated',
@@ -645,7 +654,7 @@ const resendTenantPaymentEmail = async (req, res) => {
                 },
                 ipAddress: req.ip,
                 userAgent: req.headers['user-agent']
-            }, { transaction });
+            }, { request: req, transaction });
 
             return [tenant, bill];
         });
@@ -719,7 +728,7 @@ const rejectTenant = async (req, res) => {
         });
 
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'tenant',
             entityId: tenant.id,
             action: 'rejected',
@@ -789,7 +798,7 @@ const requestMoreInfo = async (req, res) => {
             moreInfoMessage: message.trim()
         });
 
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'tenant',
             entityId: tenant.id,
             action: 'more_info_required',
@@ -799,7 +808,7 @@ const requestMoreInfo = async (req, res) => {
             details: { message: message.trim() },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
 
         // Optional: send email to tenant with message and link to resubmit
         const { sendEmail } = require('../utils/emailService');
@@ -863,7 +872,7 @@ const suspendTenant = async (req, res) => {
         });
 
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'tenant',
             entityId: tenant.id,
             action: 'suspended',
@@ -875,7 +884,7 @@ const suspendTenant = async (req, res) => {
             details: { reason },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
 
         res.json({
             success: true,
@@ -917,7 +926,7 @@ const activateTenant = async (req, res) => {
         });
 
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'tenant',
             entityId: tenant.id,
             action: 'activated',
@@ -928,7 +937,7 @@ const activateTenant = async (req, res) => {
             newValue: { status: 'active' },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
 
         res.json({
             success: true,
@@ -1040,22 +1049,14 @@ const deleteTenant = async (req, res) => {
                 transaction
             });
 
-            await db.ActivityLog.destroy({
-                where: {
-                    [Op.or]: [
-                        { entityType: 'tenant', entityId: tenant.id },
-                        { performedByType: 'tenant_user', performedById: tenant.id }
-                    ]
-                },
-                transaction
-            });
+            // ActivityLog records are immutable and retained even if tenant is deleted
 
             await db.Tenant.destroy({
                 where: { id: tenant.id },
                 transaction
             });
 
-            await db.ActivityLog.create({
+            await AuditService.logActivity({
                 entityType: 'tenant',
                 entityId: tenant.id,
                 action: 'deleted',
@@ -1070,7 +1071,7 @@ const deleteTenant = async (req, res) => {
                 },
                 ipAddress: req.ip,
                 userAgent: req.headers['user-agent']
-            }, { transaction });
+            }, { request: req, transaction }, { request: req });
         });
 
         for (const relativeUploadPath of uploadedPaths) {
@@ -1136,7 +1137,7 @@ const updateTenant = async (req, res) => {
         await tenant.update(filteredUpdates);
 
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'tenant',
             entityId: tenant.id,
             action: 'updated',
@@ -1147,7 +1148,7 @@ const updateTenant = async (req, res) => {
             newValue: filteredUpdates,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
 
         res.json({
             success: true,

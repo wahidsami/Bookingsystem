@@ -15,6 +15,7 @@ const adminCategoryController = require('../controllers/adminCategoryController'
 const adminFeaturePricingController = require('../controllers/adminFeaturePricingController');
 const adminGiftCardPackageController = require('../controllers/adminGiftCardPackageController');
 const customerInvoiceController = require('../controllers/customerInvoiceController');
+const auditController = require('../controllers/auditController');
 const supportRoutes = require('./supportRoutes');
 const { buildAdminSupportContext } = require('../middleware/supportContext');
 
@@ -129,6 +130,13 @@ router.get('/gift-transactions', requirePermission('settings', 'view'), adminGif
 router.get('/gift-transactions/report', requirePermission('settings', 'view'), adminGiftCardPackageController.getGiftTransactionsReport);
 router.get('/gift-transactions/report.csv', requirePermission('settings', 'view'), adminGiftCardPackageController.exportGiftTransactionsReportCsv);
 router.get('/gift-redemptions/report', requirePermission('settings', 'view'), adminGiftCardPackageController.getGiftRedemptionsReport);
+
+// ===== AUDIT LOGS =====
+router.get('/audit', requirePermission('settings', 'view'), auditController.listAdminAuditLogs);
+router.get('/audit/:id', requirePermission('settings', 'view'), auditController.getAdminAuditLogDetails);
+router.get('/audit/entity/:entityType/:entityId', requirePermission('settings', 'view'), auditController.getAdminEntityHistory);
+router.get('/audit/operation/:operationId', requirePermission('settings', 'view'), auditController.getAdminOperationHistory);
+router.get('/audit/correlation/:correlationId', requirePermission('settings', 'view'), auditController.getAdminCorrelationHistory);
 
 module.exports = router;
 

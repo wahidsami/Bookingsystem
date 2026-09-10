@@ -1,4 +1,5 @@
 const db = require('../models');
+const AuditService = require('../services/auditService');
 const { Op } = require('sequelize');
 const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
 
@@ -150,7 +151,7 @@ exports.createPackage = async (req, res) => {
         });
         
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'package',
             entityId: package.id,
             action: 'created',
@@ -163,7 +164,7 @@ exports.createPackage = async (req, res) => {
             },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
         
         res.status(201).json({
             success: true,
@@ -241,7 +242,7 @@ exports.updatePackage = async (req, res) => {
         });
         
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'package',
             entityId: package.id,
             action: 'updated',
@@ -254,7 +255,7 @@ exports.updatePackage = async (req, res) => {
             },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
         
         res.json({
             success: true,
@@ -301,7 +302,7 @@ exports.deletePackage = async (req, res) => {
         }
         
         // Log activity before deletion
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'package',
             entityId: package.id,
             action: 'deleted',
@@ -314,7 +315,7 @@ exports.deletePackage = async (req, res) => {
             },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
         
         await package.destroy();
         

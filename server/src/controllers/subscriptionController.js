@@ -1,5 +1,6 @@
 const db = require('../models');
 const { Op } = require('sequelize');
+const AuditService = require('../services/auditService');
 const { getTenantDashboardBaseUrl } = require('../utils/url');
 const { generateBillNumber, generatePaymentToken } = require('../utils/billUtils');
 const {
@@ -421,7 +422,7 @@ exports.requestSubscriptionChange = async (req, res) => {
                 }
             );
 
-            await db.ActivityLog.create({
+            await AuditService.logActivity({
                 entityType: 'tenant',
                 entityId: tenantId,
                 action: 'created',
@@ -443,7 +444,7 @@ exports.requestSubscriptionChange = async (req, res) => {
                     requestedPackageId: newPackage.id,
                     requestedBillingCycle: billingCycle
                 }
-            }, { transaction });
+            }, { request: req, transaction });
 
             await notifyTenantSubscriptionChangeRequested({
                 tenant,

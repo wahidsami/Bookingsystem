@@ -75,11 +75,19 @@ const buildEligibleSourcesForContext = async ({ platformUserId, tenantId = null,
     };
 };
 
+const { runWithOperation } = require('../middleware/operationContext');
+
 /**
  * Process payment for booking or order
  * POST /api/v1/payments/process
  */
 const processPayment = async (req, res, next) => {
+    return await runWithOperation(async () => {
+        return await _processPayment(req, res, next);
+    }, 'customer_process_payment');
+};
+
+const _processPayment = async (req, res, next) => {
     let idempotencyRecord = null;
     let idempotencyKey = null;
     try {
