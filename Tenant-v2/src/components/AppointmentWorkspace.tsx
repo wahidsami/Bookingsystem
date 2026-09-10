@@ -529,7 +529,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
-  const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off'>>({});
+  const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off' | 'busy' | 'time_off'>>({});
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedStylistFilter, setSelectedStylistFilter] = useState<string>('all');
@@ -1034,11 +1034,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => mapBoardBreak(b));
           setAppointments([...mappedApts, ...mappedBreaks].sort((left, right) => left.startTime - right.startTime));
 
-          const newStatuses: Record<string, 'active'|'break'|'off'> = {};
-        (res.breaks || []).forEach((b: any) => {
-          newStatuses[b.staffId] = 'break';
-        });
-        setStylistStatuses(prev => ({ ...prev, ...newStatuses }));
+          setStylistStatuses(res.staffStatuses || {});
       }
     } catch (err) {
       console.error('Failed to load board data', err);
@@ -4260,9 +4256,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
               avatar: stylist.avatar,
               statusLabel: stylistStatuses[stylist.id]
-                ? (stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active') : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break') : (isRtl ? 'خارج' : 'Off'))
+                ? (
+                    stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active')
+                  : stylistStatuses[stylist.id] === 'busy' ? (isRtl ? 'مشغول' : 'Busy')
+                  : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break')
+                  : stylistStatuses[stylist.id] === 'time_off' ? (isRtl ? 'إجازة' : 'Time Off')
+                  : (isRtl ? 'خارج' : 'Off')
+                  )
                 : undefined,
-              statusTone: stylistStatuses[stylist.id] || 'neutral',
+              statusTone: (stylistStatuses[stylist.id] === 'active' || stylistStatuses[stylist.id] === 'busy') ? 'active'
+                        : stylistStatuses[stylist.id] === 'break' ? 'break'
+                        : (stylistStatuses[stylist.id] === 'off' || stylistStatuses[stylist.id] === 'time_off') ? 'off'
+                        : 'neutral',
               isToday: false,
               availability,
             };
