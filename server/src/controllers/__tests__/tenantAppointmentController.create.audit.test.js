@@ -72,7 +72,7 @@ describe('tenantAppointmentController - createAppointment Audit', () => {
         expect(AuditService.logActivity).toHaveBeenCalledTimes(1);
         expect(AuditService.logActivity).toHaveBeenCalledWith(expect.objectContaining({
             tenantId: 'tenant-123',
-            entityType: 'Appointment',
+            entityType: 'appointment',
             entityId: 'appt-123',
             action: 'create',
         }), expect.objectContaining({

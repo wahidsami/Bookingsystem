@@ -1055,7 +1055,7 @@ exports.createAppointment = async (req, res) => {
             for (const appt of finalAppointments) {
                 await AuditService.logActivity({
                     tenantId,
-                    entityType: 'Appointment',
+                    entityType: 'appointment',
                     entityId: appt.id,
                     action: 'create',
                     performedByType: req.tenantAccount ? 'employee' : (req.userId ? 'tenant_owner' : 'system'),
