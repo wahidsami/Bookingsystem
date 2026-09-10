@@ -1355,6 +1355,11 @@ class TenantApiAdapter {
     return this.get(`/tenant/appointments/board${query ? `?${query}` : ''}`);
   }
 
+  async getCalendarAppointments(startDate: string, endDate: string, params?: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString({ startDate, endDate, ...(params || {}) });
+    return this.get(`/tenant/appointments/calendar${query ? `?${query}` : ''}`);
+  }
+
   async getAppointments(params?: Record<string, string | number | undefined>): Promise<any> {
     const query = this.buildQueryString(params);
     return this.get(`/tenant/appointments${query ? `?${query}` : ''}`);

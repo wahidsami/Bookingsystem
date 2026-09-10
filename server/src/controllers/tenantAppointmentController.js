@@ -380,7 +380,7 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
     const lastName = rawLastName || null;
     let email = `${normalizedCustomer.email || ''}`.trim().toLowerCase();
     let phone = `${normalizedCustomer.phone || ''}`.trim();
-    
+
     if (phone) {
         phone = phone.replace(/[\s\-\(\)]/g, '');
         if (/^05\d{8}$/.test(phone)) {
@@ -883,7 +883,7 @@ exports.createAppointment = async (req, res) => {
                     if (!Array.isArray(item.packageItems) || item.packageItems.length === 0) {
                         throw new Error(`packageItems is required for package booking item ${index + 1}`);
                     }
-                    
+
                     return {
                         itemType: 'package',
                         packageId: item.packageId,
@@ -992,8 +992,8 @@ exports.createAppointment = async (req, res) => {
             });
 
             let finalAppointments = fullAppointments;
-            const hasExplicitPayment = paymentStatus === 'paid' || 
-                (amount !== undefined && amount !== null && Number(amount) > 0) || 
+            const hasExplicitPayment = paymentStatus === 'paid' ||
+                (amount !== undefined && amount !== null && Number(amount) > 0) ||
                 (Array.isArray(paymentAllocations) && paymentAllocations.length > 0);
 
             if (hasExplicitPayment) {
@@ -1307,8 +1307,8 @@ exports.createAppointment = async (req, res) => {
         });
 
         let finalAppointment = fullAppointment;
-        const hasExplicitPayment = paymentStatus === 'paid' || 
-            (amount !== undefined && amount !== null && Number(amount) > 0) || 
+        const hasExplicitPayment = paymentStatus === 'paid' ||
+            (amount !== undefined && amount !== null && Number(amount) > 0) ||
             (Array.isArray(paymentAllocations) && paymentAllocations.length > 0);
 
         if (hasExplicitPayment) {
@@ -1510,11 +1510,11 @@ exports.getAppointments = async (req, res) => {
             }
         );
 
-        const { 
-            startDate, 
-            endDate, 
-            staffId, 
-            serviceId, 
+        const {
+            startDate,
+            endDate,
+            staffId,
+            serviceId,
             status,
             paymentStatus,
             platformUserId,
@@ -1523,7 +1523,7 @@ exports.getAppointments = async (req, res) => {
         } = req.query;
 
         const where = {};
-        
+
         // Filter by tenant (through service or staff)
         // We need to ensure appointments belong to this tenant
         // Since appointments link to services and staff, we'll filter through those
@@ -1613,9 +1613,27 @@ exports.getCalendarAppointments = async (req, res) => {
         const { startDate, endDate, staffId } = req.query;
 
         const where = {};
-        
-        // Build date range filter
-        Object.assign(where, buildDateRangeWhere('startTime', startDate, endDate));
+
+        if (startDate || endDate) {
+            const tenantSettings = await db.TenantSettings.findOne({
+                where: { tenantId },
+                attributes: ['timezone']
+            });
+            const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+
+            const filter = {};
+            if (startDate) {
+                const { startOfDay } = availabilityService._getTimeZoneDayRange(startDate, timezone);
+                filter[Op.gte] = startOfDay;
+            }
+            if (endDate) {
+                const { endOfDay } = availabilityService._getTimeZoneDayRange(endDate, timezone);
+                filter[Op.lt] = new Date(endOfDay.getTime() + 1);
+            }
+            if (Object.keys(filter).length > 0) {
+                where.startTime = filter;
+            }
+        }
 
         if (staffId) {
             where.staffId = staffId;
@@ -2297,7 +2315,7 @@ exports.updateAppointmentStatus = async (req, res) => {
             });
         }
         console.log('[TRACE] Validation passed: appointment exists');
-        
+
         console.log('[TRACE] Current status:', appointment.status);
         console.log('[TRACE] paymentStatus:', appointment.paymentStatus);
         console.log('[TRACE] totalPaid:', appointment.totalPaid);
@@ -2543,7 +2561,7 @@ exports.updateAppointmentStatus = async (req, res) => {
         }
 
         console.log('[TRACE] returning response successfully');
-        
+
         // Rebuild the response from a fresh canonical database read
         await appointment.reload({
             include: [
@@ -2595,10 +2613,10 @@ exports.updateAppointmentStatus = async (req, res) => {
         });
     } catch (error) {
         try { if (transaction && !transaction.finished) await transaction.rollback(); } catch (_) {}
-        
+
         console.error('Update appointment status error:', error);
         console.log('[TRACE] Exception caught in updateAppointmentStatus:', error.message);
-        
+
         const debugInfo = {
             id: req.params.id,
             currentStatus: appointment ? appointment.status : null,
@@ -2630,7 +2648,7 @@ exports.updatePaymentStatus = async (req, res) => {
         const tenantId = req.tenantId;
         const { id } = req.params;
         const { paymentStatus, paymentMethod, amount, paymentAllocations, transactionRef, notes } = req.body;
-        
+
         const validPaymentStatuses = [
             APPOINTMENT_PAYMENT_STATUS.PENDING,
             APPOINTMENT_PAYMENT_STATUS.DEPOSIT_PAID,
@@ -3536,7 +3554,7 @@ exports.getAppointmentStats = async (req, res) => {
         const { startDate, endDate } = req.query;
 
         const where = {};
-        
+
         Object.assign(where, buildDateRangeWhere('startTime', startDate, endDate));
 
         // Get appointments with service filter

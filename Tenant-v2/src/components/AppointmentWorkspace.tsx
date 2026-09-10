@@ -1023,18 +1023,37 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const loadBoardData = async () => {
     setIsLoading(true);
     try {
-        const dateStr = getSelectedDateKey();
-        const res = await tenantApiAdapter.getAppointmentsBoard(dateStr, {
-          staffId: selectedStylistFilter === 'all' ? undefined : selectedStylistFilter,
-          status: statusFilter === 'all' ? undefined : statusFilter,
-          search: searchQuery.trim() || undefined
-        });
+      const dateStr = getSelectedDateKey();
+      const params = {
+        staffId: selectedStylistFilter === 'all' ? undefined : selectedStylistFilter,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: searchQuery.trim() || undefined
+      };
+
+      if (viewMode === 'month') {
+        const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+
+        const res = await tenantApiAdapter.getCalendarAppointments(getLocalDateKey(startOfMonth), getLocalDateKey(endOfMonth), params);
+        if (res && res.success) {
+          const mappedApts: Appointment[] = [];
+          if (res.appointments) {
+            Object.keys(res.appointments).forEach(dayKey => {
+              const dayAppointments = res.appointments[dayKey] || [];
+              mappedApts.push(...dayAppointments.map((a: any) => mapBoardAppointment(a, dayKey)));
+            });
+          }
+          setAppointments(mappedApts.sort((left, right) => left.startTime - right.startTime));
+        }
+      } else {
+        const res = await tenantApiAdapter.getAppointmentsBoard(dateStr, params);
         if (res && res.success) {
           const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => mapBoardAppointment(a, dateStr));
           const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => mapBoardBreak(b));
           setAppointments([...mappedApts, ...mappedBreaks].sort((left, right) => left.startTime - right.startTime));
 
           setStylistStatuses(res.staffStatuses || {});
+        }
       }
     } catch (err) {
       console.error('Failed to load board data', err);
