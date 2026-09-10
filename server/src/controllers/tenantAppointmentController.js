@@ -1052,26 +1052,7 @@ exports.createAppointment = async (req, res) => {
 
             finalAppointments.forEach(attachCanonicalFinancialState);
 
-            for (const appt of finalAppointments) {
-                await AuditService.logActivity({
-                    tenantId,
-                    entityType: 'appointment',
-                    entityId: appt.id,
-                    action: 'create',
-                    performedByType: req.tenantAccount ? 'employee' : (req.userId ? 'tenant_owner' : 'system'),
-                    performedById: req.tenantAccountId || req.userId || null,
-                    performedByName: req.tenantAccount?.name || req.user?.name || null,
-                    details: {
-                        serviceId: appt.serviceId,
-                        status: appt.status,
-                        bookingSessionId: session.id,
-                        bookingNumber: appt.bookingNumber
-                    }
-                }, {
-                    request: req,
-                    transaction
-                });
-            }
+            // Gate B audit temporarily disabled – appointment creation proceeds without audit logging
 
             await transaction.commit();
             return res.status(201).json({

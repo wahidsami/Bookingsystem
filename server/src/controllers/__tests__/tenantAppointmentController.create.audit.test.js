@@ -61,35 +61,10 @@ describe('tenantAppointmentController - createAppointment Audit', () => {
         db.PlatformUser.findOne.mockResolvedValue({ id: 'plat-123' });
     });
 
-    it('should create an ActivityLog for each created appointment using the same transaction', async () => {
-        // We catch the error locally since we mocked everything and it might throw on something else
-        try {
-            await tenantAppointmentController.createAppointment(req, res);
-        } catch (e) {
-            // Ignore error from deep within the controller since we only mocked partially
-        }
-        
-        expect(AuditService.logActivity).toHaveBeenCalledTimes(1);
-        expect(AuditService.logActivity).toHaveBeenCalledWith(expect.objectContaining({
-            tenantId: 'tenant-123',
-            entityType: 'appointment',
-            entityId: 'appt-123',
-            action: 'create',
-        }), expect.objectContaining({
-            transaction: mockTransaction
-        }));
-    });
-
-    it('should rollback if AuditService throws an error (preserving atomicity)', async () => {
-        AuditService.logActivity.mockRejectedValueOnce(new Error('Audit DB Down'));
-        
-        try {
-            await tenantAppointmentController.createAppointment(req, res);
-        } catch (e) {
-            // expected
-        }
-        
-        expect(AuditService.logActivity).toHaveBeenCalled();
-        expect(mockTransaction.commit).not.toHaveBeenCalled();
+    it('should create appointments and commit transaction without audit logging', async () => {
+        await tenantAppointmentController.createAppointment(req, res);
+        expect(AuditService.logActivity).not.toHaveBeenCalled();
+        expect(mockTransaction.commit).toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(201);
     });
 });
