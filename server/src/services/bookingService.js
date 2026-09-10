@@ -636,7 +636,7 @@ class BookingService {
         return await runWithOperation(async () => {
             return await this._createBookingSession(data, options);
         }, 'create_booking_session');
-    },
+    }
 
     async _createBookingSession(data, options = {}) {
         const { tenantId, platformUserId, items, notes, paymentMethod, paymentAllocations, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation, skipAdvanceValidation } = data;
