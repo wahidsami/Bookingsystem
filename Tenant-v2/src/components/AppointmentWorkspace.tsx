@@ -1159,7 +1159,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   // Board Data Fetch
   useEffect(() => {
     void loadBoardData();
-  }, [selectedDate, selectedStylistFilter, statusFilter, searchQuery]);
+  }, [selectedDate, selectedStylistFilter, statusFilter, searchQuery, viewMode]);
 
   // Selection / Detail Drawer State
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
