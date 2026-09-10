@@ -1,4 +1,5 @@
 const db = require('../models');
+const AuditService = require('./auditService');
 const { ensureReceiptPdf } = require('./billDocumentService');
 const {
     notifyTenantBillExpired,
@@ -238,7 +239,7 @@ async function markBillExpired({ bill, transaction, source, actor, now, notes = 
             }
         }, { transaction });
 
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'tenant',
             entityId: bill.tenantId,
             action: 'updated',
@@ -269,8 +270,15 @@ async function markBillExpired({ bill, transaction, source, actor, now, notes = 
         duplicate: false
     };
 }
+const { runWithOperation } = require('../middleware/operationContext');
 
-async function settleBillPayment({
+async function settleBillPayment(args) {
+    return await runWithOperation(async () => {
+        return await _settleBillPayment(args);
+    }, 'settle_bill_payment');
+}
+
+async function _settleBillPayment({
     billId = null,
     paymentToken = null,
     source = 'public_payment_link',
@@ -482,7 +490,7 @@ async function settleBillPayment({
                 }
             }, { transaction });
 
-            await db.ActivityLog.create({
+            await AuditService.logActivity({
                 entityType: 'tenant',
                 entityId: bill.tenantId,
                 action: 'updated',
@@ -633,7 +641,7 @@ async function settleBillPayment({
             }, { transaction });
         }
 
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'tenant',
             entityId: bill.tenantId,
             action: 'payment_received',

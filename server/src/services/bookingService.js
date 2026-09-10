@@ -632,6 +632,13 @@ class BookingService {
      * Each item is still persisted as a normal appointment row.
      */
     async createBookingSession(data, options = {}) {
+        const { runWithOperation } = require('../middleware/operationContext');
+        return await runWithOperation(async () => {
+            return await this._createBookingSession(data, options);
+        }, 'create_booking_session');
+    },
+
+    async _createBookingSession(data, options = {}) {
         const { tenantId, platformUserId, items, notes, paymentMethod, paymentAllocations, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation, skipAdvanceValidation } = data;
         const transaction = options.transaction;
         const shouldCommit = !transaction;

@@ -29,6 +29,7 @@ const tenantNotificationController = require('../controllers/tenantNotificationC
 const tenantGiftCardController = require('../controllers/tenantGiftCardController');
 const tenantCartController = require('../controllers/tenantCartController');
 const customerInvoiceController = require('../controllers/customerInvoiceController');
+const auditController = require('../controllers/auditController');
 const tenantDashboardAccountRoutes = require('./tenantDashboardAccountRoutes');
 const supportRoutes = require('./supportRoutes');
 const aiController = require('../controllers/tenant/aiController');
@@ -339,5 +340,12 @@ router.get('/ai/consultant/reports/:id', aiController.requireConsultantSubscript
 router.get('/ai/consultant/briefings', aiController.requireConsultantSubscription, aiController.getConsultantBriefings);
 router.get('/ai/consultant/briefings/:id', aiController.requireConsultantSubscription, aiController.getConsultantBriefing);
 router.post('/ai/consultant/workflows/run', aiController.requireConsultantSubscription, aiController.runConsultantWorkflow);
+
+// Audit Logs
+router.get('/audit', requireActiveSubscription, auditController.listTenantAuditLogs);
+router.get('/audit/:id', requireActiveSubscription, auditController.getTenantAuditLogDetails);
+router.get('/audit/entity/:entityType/:entityId', requireActiveSubscription, auditController.getTenantEntityHistory);
+router.get('/audit/operation/:operationId', requireActiveSubscription, auditController.getTenantOperationHistory);
+router.get('/audit/correlation/:correlationId', requireActiveSubscription, auditController.getTenantCorrelationHistory);
 
 module.exports = router;

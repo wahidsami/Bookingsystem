@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { Op } = require('sequelize');
 const db = require('../models');
+const AuditService = require('../services/auditService');
 const {
     ensureInvoicePdf,
     ensureReceiptPdf
@@ -476,7 +477,7 @@ exports.voidBill = async (req, res) => {
         });
 
         try {
-            await db.ActivityLog.create({
+            await AuditService.logActivity({
                 entityType: 'tenant',
                 entityId: bill.tenantId,
                 action: 'updated',
@@ -498,7 +499,7 @@ exports.voidBill = async (req, res) => {
                 },
                 ipAddress: req.ip,
                 userAgent: req.headers['user-agent']
-            });
+            }, { request: req });
         } catch (activityLogError) {
             console.error('voidBill activity log error:', activityLogError);
         }

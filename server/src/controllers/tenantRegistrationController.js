@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { notifyTenantRegistered } = require('../services/adminNotificationService');
+const AuditService = require('../services/auditService');
 
 const VALID_BUSINESS_TYPES = ['salon', 'spa', 'barbershop', 'beauty_center', 'clinic', 'nail_studio', 'other'];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -106,7 +107,15 @@ exports.uploadMiddleware = upload.fields([
  * @desc Register a new tenant (salon/spa/barbershop)
  * @access Public
  */
+const { runWithOperation } = require('../middleware/operationContext');
+
 exports.register = async (req, res) => {
+    return await runWithOperation(async () => {
+        return await _register(req, res);
+    }, 'tenant_registration');
+};
+
+const _register = async (req, res) => {
     let transaction;
     try {
         const {
@@ -437,7 +446,7 @@ exports.register = async (req, res) => {
         }, { transaction });
 
         // Log activity (within transaction)
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'tenant',
             entityId: tenant.id,
             action: 'created',
@@ -453,7 +462,7 @@ exports.register = async (req, res) => {
                 status: 'pending_approval',
                 selectedPackage: subscriptionPackage?.name || 'None'
             }
-        }, { transaction });
+        }, { request: req, transaction });
 
         await notifyTenantRegistered(tenant, transaction);
 
@@ -537,7 +546,7 @@ exports.resubmitRequest = async (req, res) => {
         });
 
         const { db } = require('../models');
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'tenant',
             entityId: tenant.id,
             action: 'resubmitted',
@@ -546,7 +555,7 @@ exports.resubmitRequest = async (req, res) => {
             details: {},
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
 
         res.json({
             success: true,

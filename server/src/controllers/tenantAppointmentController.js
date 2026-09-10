@@ -2759,7 +2759,15 @@ exports.updatePaymentStatus = async (req, res) => {
  * Reassign an appointment to another staff member without changing time.
  * PATCH /api/v1/tenant/appointments/:id/reassign-staff
  */
+const { runWithOperation } = require('../middleware/operationContext');
+
 exports.reassignAppointmentStaff = async (req, res) => {
+    return await runWithOperation(async () => {
+        return await _reassignAppointmentStaff(req, res);
+    }, 'reassign_appointment_staff');
+};
+
+const _reassignAppointmentStaff = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
         const tenantId = req.tenantId;

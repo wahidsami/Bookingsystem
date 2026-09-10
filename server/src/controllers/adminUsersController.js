@@ -1,4 +1,5 @@
 const db = require('../models');
+const AuditService = require('../services/auditService');
 const { Op } = require('sequelize');
 
 /**
@@ -240,7 +241,7 @@ const updateUser = async (req, res) => {
         await user.update(filteredUpdates);
 
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'platform_user',
             entityId: user.id,
             action: 'updated',
@@ -251,7 +252,7 @@ const updateUser = async (req, res) => {
             newValue: filteredUpdates,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req, transaction: undefined });
 
         res.json({
             success: true,
@@ -289,7 +290,7 @@ const toggleUserStatus = async (req, res) => {
         await user.update({ isActive });
 
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'platform_user',
             entityId: user.id,
             action: isActive ? 'activated' : 'suspended',
@@ -299,7 +300,7 @@ const toggleUserStatus = async (req, res) => {
             details: { reason },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req, transaction: undefined });
 
         res.json({
             success: true,
@@ -361,7 +362,7 @@ const adjustUserBalance = async (req, res) => {
         await user.update({ [field]: newValue });
 
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'platform_user',
             entityId: user.id,
             action: 'updated',
@@ -373,7 +374,7 @@ const adjustUserBalance = async (req, res) => {
             details: { type, amount, reason },
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req, transaction: undefined });
 
         res.json({
             success: true,

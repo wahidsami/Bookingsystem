@@ -1,5 +1,6 @@
 const db = require('../models');
 const jwt = require('jsonwebtoken');
+const AuditService = require('../services/auditService');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -21,10 +22,18 @@ const buildAdminProfileResponse = async (admin) => {
     };
 };
 
+const { runWithOperation } = require('../middleware/operationContext');
+
 /**
  * Super Admin Login
  */
 const login = async (req, res) => {
+    return await runWithOperation(async () => {
+        return await _login(req, res);
+    }, 'superadmin_login');
+};
+
+const _login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -87,7 +96,7 @@ const login = async (req, res) => {
         });
 
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'super_admin',
             entityId: admin.id,
             action: 'login',
@@ -96,7 +105,7 @@ const login = async (req, res) => {
             performedByName: `${admin.firstName} ${admin.lastName}`,
             ipAddress: req.ip || req.connection.remoteAddress,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
 
         res.json({
             success: true,
@@ -211,7 +220,7 @@ const getProfile = async (req, res) => {
 const logout = async (req, res) => {
     try {
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'super_admin',
             entityId: req.adminId,
             action: 'logout',
@@ -220,7 +229,7 @@ const logout = async (req, res) => {
             performedByName: req.adminName,
             ipAddress: req.ip || req.connection.remoteAddress,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
 
         res.json({
             success: true,
@@ -270,7 +279,7 @@ const changePassword = async (req, res) => {
         await admin.update({ password: newPassword });
 
         // Log activity
-        await db.ActivityLog.create({
+        await AuditService.logActivity({
             entityType: 'super_admin',
             entityId: admin.id,
             action: 'password_change',
@@ -279,7 +288,7 @@ const changePassword = async (req, res) => {
             performedByName: `${admin.firstName} ${admin.lastName}`,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent']
-        });
+        }, { request: req });
 
         res.json({
             success: true,

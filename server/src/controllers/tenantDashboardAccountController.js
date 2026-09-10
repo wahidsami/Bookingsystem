@@ -69,7 +69,7 @@ const normalizeRoleKey = (roleKey) => {
 
 const writeActivityLog = async ({ req, tenantId, accountId, action, details, previousValue, newValue }) => {
   try {
-    await db.ActivityLog.create({
+    await AuditService.logActivity({
       entityType: 'tenant',
       entityId: tenantId,
       action,
@@ -84,7 +84,7 @@ const writeActivityLog = async ({ req, tenantId, accountId, action, details, pre
       newValue,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
-    });
+    }, { request: req });
   } catch (error) {
     console.warn('Failed to log dashboard account activity:', error.message);
   }
