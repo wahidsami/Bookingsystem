@@ -181,6 +181,14 @@ const searchAvailability = async (req, res) => {
 };
 
 const evaluateScheduling = async (req, res) => {
+    // TEMP UAT DEBUG — REMOVE AFTER AVAILABILITY ROOT CAUSE IS CONFIRMED
+    console.info('evaluateSchedulingEntry', {
+        tenantId: req.tenantId || req.body?.tenantId,
+        serviceId: req.body?.serviceId,
+        variantId: req.body?.variantId,
+        requestedStart: req.body?.startTime,
+        tenantTimezone: req.headers['x-tenant-timezone'] || 'UTC'
+    });
     try {
         const { tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId } = req.body || {};
         if (!tenantId || !serviceId || !staffId || !startTime) {
@@ -206,6 +214,9 @@ const evaluateScheduling = async (req, res) => {
             overtimeApproval,
             excludeAppointmentId
         });
+
+        // TEMP UAT DEBUG — REMOVE AFTER AVAILABILITY ROOT CAUSE IS CONFIRMED
+        console.info('evaluateSchedulingDecision', { decision });
 
         return res.status(decision.valid ? 200 : 409).json({
             success: decision.valid,

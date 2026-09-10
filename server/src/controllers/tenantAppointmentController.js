@@ -1686,6 +1686,9 @@ exports.getAppointmentsBoard = async (req, res) => {
     try {
         const tenantId = req.tenantId;
 
+        // TEMP UAT DEBUG — REMOVE AFTER AVAILABILITY ROOT CAUSE IS CONFIRMED
+        console.info('liveRoomStatusEntry', { tenantId, boardDate: req.query.date, timezone: req.query.timezone });
+
         res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
@@ -1869,11 +1872,14 @@ exports.getAppointmentsBoard = async (req, res) => {
             endDateTime: buildBreakDateTime(dateKey, breakRecord.endTime)
         }));
 
+        // Compute staff statuses for the board date
+        let staffStatuses = await availabilityService.computeStaffStatuses(tenantId, boardStaffIds, dateKey, timezone, now);
         res.json({
             success: true,
             date: dateKey,
             appointments,
-            breaks: mappedBreaks
+            breaks: mappedBreaks,
+            staffStatuses
         });
     } catch (error) {
         console.error('Get appointments board error:', error);

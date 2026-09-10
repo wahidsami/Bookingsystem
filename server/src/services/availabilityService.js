@@ -538,39 +538,7 @@ class AvailabilityService {
         }
         const tenantHours = this._parseBusinessHours(tenant.workingHours, dayOfWeek);
 
-        const dateSpecificShifts = await db.StaffShift.findAll({
-            where: {
-                staffId,
-                specificDate: date,
-                isActive: true,
-                isRecurring: false
-            }
-        });
-
-        const recurringShifts = await db.StaffShift.findAll({
-            where: {
-                staffId,
-                dayOfWeek,
-                isRecurring: true,
-                isActive: true,
-                [Op.and]: [
-                    {
-                        [Op.or]: [
-                            { startDate: null },
-                            { startDate: { [Op.lte]: date } }
-                        ]
-                    },
-                    {
-                        [Op.or]: [
-                            { endDate: null },
-                            { endDate: { [Op.gte]: date } }
-                        ]
-                    }
-                ]
-            }
-        });
-
-        const allShifts = [...dateSpecificShifts, ...recurringShifts];
+        const { dateSpecificShifts, recurringShifts, allShifts } = await this._getStaffShiftWindows(staffId, dateKey, dayOfWeek);
 
         let rawWindows = [];
         let legacySchedule = null;
@@ -845,6 +813,21 @@ class AvailabilityService {
             });
         }
 
+        // TEMP UAT DEBUG — REMOVE AFTER AVAILABILITY ROOT CAUSE IS CONFIRMED
+        console.info('availabilityDiagnostic', {
+            staffId,
+            staffName: fallbackStaffName,
+            requestedDate: dateKey,
+            tenantTimezone: timezone,
+            serverCurrentTime: new Date().toISOString(),
+            rawWindowsLength: rawWindows.length,
+            finalWindowsLength: finalWindows.length,
+            breaksLength: breaks.length,
+            timeOffLength: timeOff.length,
+            overridesLength: overrides.length,
+            diagnosticsLength: diagnostics.length
+        });
+
         return diagnostics;
     }
 
@@ -1049,13 +1032,14 @@ class AvailabilityService {
      * Get staff breaks for a specific date
      * @private
      */
-    async _getStaffBreaks(staffId, date, timezone = 'Asia/Riyadh') {
+    async _getStaffBreaks(staffIds, date, timezone = 'Asia/Riyadh') {
+        const staffIdList = Array.isArray(staffIds) ? staffIds : [staffIds];
         const dayOfWeek = this._getDayOfWeekForDate(date);
         
         // Get date-specific breaks
         const dateBreaks = await db.StaffBreak.findAll({
             where: {
-                staffId,
+                staffId: { [Op.in]: staffIdList },
                 specificDate: date,
                 isActive: true,
                 isRecurring: false
@@ -1065,7 +1049,7 @@ class AvailabilityService {
         // Get recurring breaks for this day
         const recurringBreaks = await db.StaffBreak.findAll({
             where: {
-                staffId,
+                staffId: { [Op.in]: staffIdList },
                 isRecurring: true,
                 isActive: true,
                 [Op.or]: [
@@ -1093,6 +1077,7 @@ class AvailabilityService {
         // Combine and convert to time windows
         const allBreaks = [...dateBreaks, ...recurringBreaks];
         return allBreaks.map(breakRecord => ({
+            staffId: breakRecord.staffId,
             startTime: this._combineDateAndTime(date, breakRecord.startTime, timezone),
             endTime: this._combineDateAndTime(date, breakRecord.endTime, timezone)
         }));
@@ -1102,10 +1087,11 @@ class AvailabilityService {
      * Get staff time-off for a specific date
      * @private
      */
-    async _getStaffTimeOff(staffId, date, timezone = 'Asia/Riyadh') {
+    async _getStaffTimeOff(staffIds, date, timezone = 'Asia/Riyadh') {
+        const staffIdList = Array.isArray(staffIds) ? staffIds : [staffIds];
         const timeOffRecords = await db.StaffTimeOff.findAll({
             where: {
-                staffId,
+                staffId: { [Op.in]: staffIdList },
                 isApproved: true,
                 startDate: { [Op.lte]: date },
                 endDate: { [Op.gte]: date }
@@ -1114,6 +1100,7 @@ class AvailabilityService {
 
         // Convert to full-day time windows
         return timeOffRecords.map(record => ({
+            staffId: record.staffId,
             startTime: this._combineDateAndTime(record.startDate, '00:00', timezone),
             endTime: this._combineDateAndTime(record.endDate, '23:59', timezone)
         }));
@@ -1298,7 +1285,143 @@ class AvailabilityService {
             message: `No available slots found in the next ${daysToSearch} days`
         };
     }
+
+    /**
+     * Get staff shift windows for one or multiple staff members
+     * @private
+     */
+    async _getStaffShiftWindows(staffIds, date, dayOfWeek) {
+        const staffIdList = Array.isArray(staffIds) ? staffIds : [staffIds];
+
+        const dateSpecificShifts = await db.StaffShift.findAll({
+            where: {
+                staffId: { [Op.in]: staffIdList },
+                specificDate: date,
+                isActive: true,
+                isRecurring: false
+            }
+        });
+
+        const recurringShifts = await db.StaffShift.findAll({
+            where: {
+                staffId: { [Op.in]: staffIdList },
+                dayOfWeek,
+                isRecurring: true,
+                isActive: true,
+                [Op.and]: [
+                    {
+                        [Op.or]: [
+                            { startDate: null },
+                            { startDate: { [Op.lte]: date } }
+                        ]
+                    },
+                    {
+                        [Op.or]: [
+                            { endDate: null },
+                            { endDate: { [Op.gte]: date } }
+                        ]
+                    }
+                ]
+            }
+        });
+
+        return {
+            dateSpecificShifts,
+            recurringShifts,
+            allShifts: [...dateSpecificShifts, ...recurringShifts]
+        };
+    }
+
+    /**
+     * Compute live staff statuses for a given board date.
+     * @param {string} tenantId
+     * @param {Array<string|number>} staffIds
+     * @param {string} dateKey - YYYY-MM-DD
+     * @param {string} timezone - tenant timezone
+     * @param {Date} now - current time
+     * @returns {Promise<Object>} status map of staffId -> status string
+     */
+    async computeStaffStatuses(tenantId, staffIds, dateKey, timezone, now) {
+        const statusMap = {};
+        // Default off
+        staffIds.forEach(id => statusMap[id] = 'off');
+
+        const todayKey = this._getDatePartsInTimeZone(now, timezone).dateKey;
+        const isToday = todayKey === dateKey;
+        if (!isToday) {
+            return statusMap;
+        }
+
+        const dayOfWeek = this._getDayOfWeekForDate(dateKey);
+        const [shiftsResult, timeOffRecords, breaks, appointments] = await Promise.all([
+            this._getStaffShiftWindows(staffIds, dateKey, dayOfWeek),
+            this._getStaffTimeOff(staffIds, dateKey, timezone),
+            this._getStaffBreaks(staffIds, dateKey, timezone),
+            this._getStaffAppointmentsBatch(staffIds, dateKey, timezone)
+        ]);
+
+        const allShifts = shiftsResult.allShifts;
+        // Active base (only if currently inside the shift)
+        allShifts.forEach(shift => {
+            const start = this._combineDateAndTime(dateKey, shift.startTime, timezone);
+            const end = this._combineDateAndTime(dateKey, shift.endTime, timezone);
+            if (now >= start && now < end) {
+                statusMap[shift.staffId] = 'active';
+            }
+        });
+
+        // Busy overrides active (but not break or time_off)
+        appointments.forEach(app => {
+            const start = new Date(app.startTime);
+            const end = new Date(app.endTime);
+            if (now >= start && now < end) {
+                if (statusMap[app.staffId] === 'active') {
+                    statusMap[app.staffId] = 'busy';
+                }
+            }
+        });
+
+        // Time-off overrides everything
+        timeOffRecords.forEach(rec => {
+            const start = new Date(rec.startTime);
+            const end = new Date(rec.endTime);
+            if (now >= start && now < end) {
+                statusMap[rec.staffId] = 'time_off';
+            }
+        });
+
+        // Breaks override active/busy but not time_off
+        breaks.forEach(brk => {
+            const start = new Date(brk.startTime);
+            const end = new Date(brk.endTime);
+            if (now >= start && now < end) {
+                if (statusMap[brk.staffId] !== 'time_off') {
+                    statusMap[brk.staffId] = 'break';
+                }
+            }
+        });
+
+        return statusMap;
+    }
+
+    /**
+     * Batch fetch appointments for multiple staff on a given date.
+     * @private
+     */
+    async _getStaffAppointmentsBatch(staffIds, dateKey, timezone) {
+        const staffIdList = Array.isArray(staffIds) ? staffIds : [staffIds];
+        const { startOfDay, endOfDay } = this._getTimeZoneDayRange(dateKey, timezone);
+        const nextDayStart = new Date(endOfDay.getTime() + 1);
+
+        return await db.Appointment.findAll({
+            where: {
+                staffId: { [Op.in]: staffIdList },
+                status: { [Op.notIn]: ['cancelled', 'no_show'] },
+                startTime: { [Op.lt]: nextDayStart },
+                endTime: { [Op.gt]: startOfDay }
+            }
+        });
+    }
 }
 
 module.exports = new AvailabilityService();
-
