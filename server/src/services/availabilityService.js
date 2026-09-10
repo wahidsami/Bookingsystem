@@ -188,7 +188,7 @@ class AvailabilityService {
 
         // Get tenant settings for booking configuration
         const tenantSettings = await this._getTenantSettings(tenantId);
-        const stepSize = tenantSettings.booking?.slotInterval || 15; // Default 15 minutes
+        const stepSize = tenantSettings.booking?.slotInterval || 5; // Default 5 minutes to match UI
         const timezone = tenantSettings.timezone || 'Asia/Riyadh';
 
         // Service duration and buffers
@@ -957,7 +957,7 @@ class AvailabilityService {
             if (tenantSettings && tenantSettings.bookingSettings) {
                 return {
                     booking: {
-                        slotInterval: tenantSettings.bookingSettings.slotInterval || 15,
+                        slotInterval: tenantSettings.bookingSettings.slotInterval || 5,
                         defaultBufferBefore: tenantSettings.bookingSettings.defaultBufferBefore || 5,
                         defaultBufferAfter: tenantSettings.bookingSettings.defaultBufferAfter || 5,
                         allowAnyStaff: tenantSettings.bookingSettings.allowAnyStaff !== false, // Default true
@@ -972,7 +972,7 @@ class AvailabilityService {
         // Return defaults if no settings found
         return {
             booking: {
-                slotInterval: 15, // minutes
+                slotInterval: 5, // minutes
                 defaultBufferBefore: 5,
                 defaultBufferAfter: 5,
                 allowAnyStaff: true,
