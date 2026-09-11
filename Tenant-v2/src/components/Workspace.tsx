@@ -377,15 +377,7 @@ export default function Workspace({
           </button>
 
 
-          {view === 'customers' && (
-            <button
-              onClick={() => onQuickAction('customer')}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs md:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-            >
-              <Search size={16} />
-              <span>{isRtl ? 'البحث عن عميل' : 'Find Customer'}</span>
-            </button>
-          )}
+
           {view === 'services' && (
             <button
               onClick={() => onQuickAction('service')}
