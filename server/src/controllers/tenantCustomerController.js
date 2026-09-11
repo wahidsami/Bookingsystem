@@ -805,6 +805,141 @@ async function buildCustomerSpendMap({ tenantId, customerIds = [], transaction =
     return spendMap;
 }
 
+function buildCustomerQuery({
+    tenantId,
+    search = '',
+    loyaltyTier = '',
+    customerType = '',
+    sortBy = 'lastVisit',
+    sortOrder = 'DESC',
+    limit = 20,
+    offset = 0
+}) {
+    const replacements = { tenantId, limit: parseInt(limit, 10), offset: parseInt(offset, 10) };
+    
+    let searchCondition = '';
+    if (search) {
+        searchCondition = `
+            AND (
+                LOWER(tc."firstName") LIKE :search OR
+                LOWER(tc."lastName") LIKE :search OR
+                LOWER(tc."email") LIKE :search OR
+                LOWER(tc."phone") LIKE :search
+            )
+        `;
+        replacements.search = `%${search.toLowerCase()}%`;
+    }
+
+    let loyaltyCondition = '';
+    if (loyaltyTier) {
+        loyaltyCondition = `AND i."loyaltyTier" = :loyaltyTier`;
+        replacements.loyaltyTier = loyaltyTier;
+    }
+
+    let typeCondition = '';
+    if (customerType) {
+        typeCondition = `AND ct."customerType" = :customerType`;
+        replacements.customerType = customerType;
+    }
+
+    let orderByClause = '';
+    const safeSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    switch (sortBy) {
+        case 'totalSpent':
+            orderByClause = `ORDER BY i."totalSpent" ${safeSortOrder} NULLS LAST`;
+            break;
+        case 'totalBookings':
+            orderByClause = `ORDER BY i."totalBookings" ${safeSortOrder} NULLS LAST`;
+            break;
+        case 'firstName':
+            orderByClause = `ORDER BY tc."firstName" ${safeSortOrder} NULLS LAST`;
+            break;
+        case 'lastVisit':
+        default:
+            orderByClause = `ORDER BY COALESCE(i."lastVisit", tc."joinedAt") ${safeSortOrder} NULLS LAST`;
+            break;
+    }
+
+    const baseCte = `
+WITH tenant_customers AS (
+  SELECT pu.id,
+         pu."firstName",
+         pu."lastName",
+         pu.email,
+         pu.phone,
+         pu.gender,
+         pu."createdAt" AS "joinedAt",
+         pu."profileImage"
+  FROM "PlatformUser" pu
+  WHERE EXISTS (
+    SELECT 1 FROM "Appointment" a        WHERE a."tenantId" = :tenantId AND a."platformUserId" = pu.id
+    UNION
+    SELECT 1 FROM "Order" o               WHERE o."tenantId" = :tenantId AND o."platformUserId" = pu.id
+    UNION
+    SELECT 1 FROM "GiftCardTransaction" g WHERE g."tenantId" = :tenantId AND (g."senderPlatformUserId" = pu.id OR g."recipientPlatformUserId" = pu.id)
+    UNION
+    SELECT 1 FROM "TenantWalletLedgerEntry" w   WHERE w."tenantId" = :tenantId AND w."platformUserId" = pu.id
+  )
+),
+insights AS (
+  SELECT ci."platformUserId",
+         ci."loyaltyTier",
+         ci."tags",
+         ci."notes",
+         ci."totalBookings",
+         ci."totalSpent",
+         ci."firstVisit",
+         ci."lastVisit",
+         ci."noShowCount",
+         ci."cancellationCount",
+         ci."tenantLoyaltyPoints"
+  FROM "CustomerInsight" ci
+  WHERE ci."tenantId" = :tenantId
+),
+customer_type AS (
+  SELECT tc.id,
+         CASE
+           WHEN EXISTS (SELECT 1 FROM "Appointment" a WHERE a."tenantId" = :tenantId AND a."platformUserId" = tc.id AND a."isWalkIn" = true) THEN 'walk_in'
+           WHEN EXISTS (SELECT 1 FROM "Appointment" a WHERE a."tenantId" = :tenantId AND a."platformUserId" = tc.id)
+            AND EXISTS (SELECT 1 FROM "Order" o WHERE o."tenantId" = :tenantId AND o."platformUserId" = tc.id) THEN 'both'
+           WHEN EXISTS (SELECT 1 FROM "Appointment" a WHERE a."tenantId" = :tenantId AND a."platformUserId" = tc.id) THEN 'service_only'
+           WHEN EXISTS (SELECT 1 FROM "Order" o WHERE o."tenantId" = :tenantId AND o."platformUserId" = tc.id) THEN 'product_only'
+           WHEN EXISTS (SELECT 1 FROM "TenantWalletLedgerEntry" w WHERE w."tenantId" = :tenantId AND w."platformUserId" = tc.id) THEN 'wallet_only'
+           WHEN EXISTS (SELECT 1 FROM "GiftCardTransaction" g WHERE g."tenantId" = :tenantId AND (g."senderPlatformUserId" = tc.id OR g."recipientPlatformUserId" = tc.id)) THEN 'giftcard_only'
+           ELSE 'unknown'
+         END AS "customerType"
+  FROM tenant_customers tc
+)
+`;
+
+    const sql = `${baseCte}
+SELECT tc.*, 
+       i."loyaltyTier", i."tags", i."notes", i."totalBookings", i."totalSpent", 
+       i."firstVisit", i."lastVisit", i."noShowCount", i."cancellationCount", i."tenantLoyaltyPoints",
+       ct."customerType"
+FROM tenant_customers tc
+LEFT JOIN insights i ON i."platformUserId" = tc.id
+JOIN customer_type ct ON ct.id = tc.id
+WHERE 1=1
+  ${searchCondition}
+  ${loyaltyCondition}
+  ${typeCondition}
+${orderByClause}
+LIMIT :limit OFFSET :offset;`;
+
+    const countSql = `${baseCte}
+SELECT COUNT(*) AS total
+FROM tenant_customers tc
+LEFT JOIN insights i ON i."platformUserId" = tc.id
+JOIN customer_type ct ON ct.id = tc.id
+WHERE 1=1
+  ${searchCondition}
+  ${loyaltyCondition}
+  ${typeCondition};`;
+
+    return { sql, countSql, replacements };
+}
+
 /**
  * Get all customers who have booked with this tenant
  */
@@ -819,250 +954,90 @@ exports.getCustomers = async (req, res) => {
             sortOrder = 'DESC',
             loyaltyTier = '',
             minBookings = 0,
-            minSpent = 0
+            minSpent = 0,
+            customerType = ''
         } = req.query;
 
         const safePage = Math.max(parseInt(page, 10) || 1, 1);
         const safeLimit = Math.max(parseInt(limit, 10) || 20, 1);
         const offset = (safePage - 1) * safeLimit;
-        const customerType = req.query.customerType || ''; // 'service_only', 'product_only', 'both', 'walk_in', or ''
 
-        // Find all platform users who have appointments OR orders with this tenant
-        const whereClause = {};
+        const { sql, countSql, replacements } = buildCustomerQuery({
+            tenantId,
+            search,
+            loyaltyTier,
+            customerType,
+            sortBy,
+            sortOrder,
+            limit: safeLimit,
+            offset
+        });
+
+        const [rows] = await db.sequelize.query(sql, { 
+            replacements, 
+            type: db.sequelize.QueryTypes.SELECT 
+        });
+
+        // The query builder returns rows in raw object format or wrapped depending on Sequelize version.
+        // We ensure rows is an array of objects.
+        const customers = Array.isArray(rows) && rows.length > 0 && typeof rows[0] === 'object' && !('id' in rows[0]) && Array.isArray(rows[0]) ? rows[0] : (Array.isArray(rows) ? rows : [rows]);
+
+        const [countRows] = await db.sequelize.query(countSql, { 
+            replacements, 
+            type: db.sequelize.QueryTypes.SELECT 
+        });
         
-        if (search) {
-            whereClause[Op.or] = [
-                { firstName: { [Op.iLike]: `%${search}%` } },
-                { lastName: { [Op.iLike]: `%${search}%` } },
-                { email: { [Op.iLike]: `%${search}%` } },
-                { phone: { [Op.iLike]: `%${search}%` } }
-            ];
+        let totalCount = 0;
+        const resultCount = Array.isArray(countRows) ? countRows[0] : countRows;
+        if (resultCount && resultCount.total) {
+            totalCount = parseInt(resultCount.total, 10);
         }
 
-        const baseCustomers = await db.PlatformUser.findAll({
-            where: whereClause,
-            attributes: [
-                'id', 'firstName', 'lastName', 'email', 'phone',
-                'profileImage', 'gender', 'createdAt'
-            ],
-            order: [['createdAt', 'DESC']]
-        });
-
-        const customerIds = baseCustomers.map((customer) => customer.id);
-        const [appointmentRows, orderRows] = customerIds.length > 0
-            ? await Promise.all([
-                db.Appointment.findAll({
-                    where: {
-                        platformUserId: { [Op.in]: customerIds }
-                    },
-                    include: [
-                        {
-                            model: db.Service,
-                            as: 'service',
-                            where: { tenantId },
-                            required: true,
-                            attributes: ['id', 'name_en', 'name_ar']
-                        }
-                    ],
-                    attributes: ['id', 'platformUserId', 'startTime', 'endTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid'],
-                    order: [['startTime', 'DESC']]
-                }),
-                db.Order.findAll({
-                    where: {
-                        platformUserId: { [Op.in]: customerIds },
-                        tenantId
-                    },
-                    include: [
-                        {
-                            model: db.OrderItem,
-                            as: 'items',
-                            attributes: ['id', 'quantity', 'unitPrice', 'totalPrice']
-                        }
-                    ],
-                    attributes: ['id', 'platformUserId', 'orderNumber', 'status', 'paymentStatus', 'totalAmount', 'createdAt'],
-                    order: [['createdAt', 'DESC']]
-                })
-            ])
-            : [[], []];
-
-        const appointmentMap = new Map();
-        appointmentRows.forEach((appointment) => {
-            const appointmentData = typeof appointment.toJSON === 'function' ? appointment.toJSON() : { ...appointment };
-            const customerId = appointmentData.platformUserId || null;
-            if (!customerId) {
-                return;
-            }
-            const bucket = appointmentMap.get(customerId) || [];
-            bucket.push(appointmentData);
-            appointmentMap.set(customerId, bucket);
-        });
-
-        const orderMap = new Map();
-        orderRows.forEach((order) => {
-            const orderData = typeof order.toJSON === 'function' ? order.toJSON() : { ...order };
-            const customerId = orderData.platformUserId || null;
-            if (!customerId) {
-                return;
-            }
-            const bucket = orderMap.get(customerId) || [];
-            bucket.push(orderData);
-            orderMap.set(customerId, bucket);
-        });
-
-        const customerSpendMap = customerIds.length > 0
-            ? await buildCustomerSpendMap({ tenantId, customerIds })
-            : new Map();
-
-        let allCustomers = baseCustomers.map((customer) => ({
-            ...(typeof customer.toJSON === 'function' ? customer.toJSON() : { ...customer }),
-            appointments: appointmentMap.get(customer.id) || [],
-            orders: orderMap.get(customer.id) || []
-        }));
-
-        // Filter by customer type
-        if (customerType === 'service_only') {
-            allCustomers = allCustomers.filter(c => c.appointments.length > 0 && (!c.orders || c.orders.length === 0));
-        } else if (customerType === 'product_only') {
-            allCustomers = allCustomers.filter(c => (!c.appointments || c.appointments.length === 0) && c.orders.length > 0);
-        } else if (customerType === 'both') {
-            allCustomers = allCustomers.filter(c => c.appointments.length > 0 && c.orders.length > 0);
-        } else if (customerType === 'walk_in') {
-            allCustomers = allCustomers.filter(c => isWalkInPlaceholderCustomer(c));
-        }
-
-        // Enrich with customer insights
-        const insightCustomerIds = allCustomers.map((c) => c.id);
-        const insights = insightCustomerIds.length > 0
-            ? await db.CustomerInsight.findAll({
-                where: {
-                    platformUserId: { [Op.in]: insightCustomerIds },
-                    tenantId
-                }
-            })
-            : [];
-
-        const insightsMap = {};
-        insights.forEach(i => {
-            insightsMap[i.platformUserId] = i;
-        });
-
-        // Calculate stats for each customer
-        const enrichedCustomers = allCustomers.map(customer => {
-            const appointments = customer.appointments || [];
-            const bookingSessions = aggregateAppointmentsByBookingSession(appointments);
-            const orders = customer.orders || [];
-            const insight = insightsMap[customer.id];
-
-            const appointmentDates = bookingSessions
-                .map(a => a.date || a.startTime)
-                .filter(Boolean)
-                .sort((a, b) => new Date(a) - new Date(b));
-            const orderDates = orders
-                .map(o => o.createdAt)
-                .filter(Boolean)
-                .sort((a, b) => new Date(a) - new Date(b));
-            const totalProductsPurchased = orders.reduce((sum, o) => {
-                const items = o.items || [];
-                return sum + items.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0);
-            }, 0);
-            const firstAppointment = appointmentDates.length > 0 ? appointmentDates[0] : null;
-            const firstOrder = orderDates.length > 0 ? orderDates[0] : null;
-            
-            // Determine last visit (most recent of appointment or order)
-            const lastAppointment = appointmentDates.length > 0
-                ? appointmentDates[appointmentDates.length - 1]
-                : null;
-            const lastOrder = orderDates.length > 0
-                ? orderDates[orderDates.length - 1]
-                : null;
-            const lastVisit = lastAppointment && lastOrder
-                ? (new Date(lastAppointment) > new Date(lastOrder) ? lastAppointment : lastOrder)
-                : (lastAppointment || lastOrder);
-
-            // Determine customer type
-            let customerType = 'both';
-            if (bookingSessions.length > 0 && orders.length === 0) {
-                customerType = 'service_only';
-            } else if (bookingSessions.length === 0 && orders.length > 0) {
-                customerType = 'product_only';
-            }
-
-            // Format profile image URL
-            const photoUrl = buildPublicAssetUrl(customer.profileImage);
-
+        const formattedCustomers = customers.map(c => {
+            const photoUrl = buildPublicAssetUrl(c.profileImage);
             return {
-                id: customer.id,
-                firstName: customer.firstName,
-                lastName: customer.lastName,
-                email: customer.email,
-                phone: customer.phone,
+                id: c.id,
+                firstName: c.firstName,
+                lastName: c.lastName,
+                email: c.email,
+                phone: c.phone,
                 photo: photoUrl,
-                gender: customer.gender,
-                joinedAt: customer.createdAt,
-                // Tenant-specific stats
-                totalBookings: insight?.totalBookings || bookingSessions.length,
-                totalOrders: orders.length,
-                totalProductsPurchased: totalProductsPurchased,
-                totalSpent: customerSpendMap.get(`${customer.id}`) ?? 0,
-                lastVisit: insight?.lastVisit || lastVisit,
-                firstVisit: insight?.firstVisit || (firstAppointment && firstOrder
-                    ? (new Date(firstAppointment) < new Date(firstOrder) ? firstAppointment : firstOrder)
-                    : (firstAppointment || firstOrder || null)),
-                loyaltyTier: insight?.loyaltyTier || 'bronze',
-                loyaltyPoints: insight?.tenantLoyaltyPoints || 0,
-                noShowCount: insight?.noShowCount || bookingSessions.filter(a => a.status === 'no_show').length,
-                cancellationCount: insight?.cancellationCount || bookingSessions.filter(a => a.status === 'cancelled').length,
-                tags: insight?.tags || [],
-                notes: insight?.notes || '',
-                customerType: customerType
+                gender: c.gender,
+                joinedAt: c.joinedAt,
+                totalBookings: parseInt(c.totalBookings || 0, 10),
+                totalOrders: 0, // Not explicitly fetched in the canonical row
+                totalProductsPurchased: 0,
+                totalSpent: parseFloat(c.totalSpent || 0),
+                lastVisit: c.lastVisit,
+                firstVisit: c.firstVisit,
+                loyaltyTier: c.loyaltyTier || 'bronze',
+                loyaltyPoints: parseInt(c.tenantLoyaltyPoints || 0, 10),
+                noShowCount: parseInt(c.noShowCount || 0, 10),
+                cancellationCount: parseInt(c.cancellationCount || 0, 10),
+                tags: typeof c.tags === 'string' ? JSON.parse(c.tags || '[]') : (c.tags || []),
+                notes: c.notes || '',
+                customerType: c.customerType
             };
         });
 
-        // Apply post-filters
-        let filteredCustomers = enrichedCustomers;
-        
-        if (loyaltyTier) {
-            filteredCustomers = filteredCustomers.filter(c => c.loyaltyTier === loyaltyTier);
-        }
-        if (parseInt(minBookings) > 0) {
-            filteredCustomers = filteredCustomers.filter(c => c.totalBookings >= parseInt(minBookings));
+        // Apply post-filters for minBookings / minSpent if needed
+        let finalCustomers = formattedCustomers;
+        if (parseInt(minBookings, 10) > 0) {
+            finalCustomers = finalCustomers.filter(c => c.totalBookings >= parseInt(minBookings, 10));
         }
         if (parseFloat(minSpent) > 0) {
-            filteredCustomers = filteredCustomers.filter(c => c.totalSpent >= parseFloat(minSpent));
+            finalCustomers = finalCustomers.filter(c => c.totalSpent >= parseFloat(minSpent));
         }
-
-        // Sort enriched data
-        if (sortBy === 'totalSpent') {
-            filteredCustomers.sort((a, b) => sortOrder === 'DESC' ? b.totalSpent - a.totalSpent : a.totalSpent - b.totalSpent);
-        } else if (sortBy === 'totalBookings') {
-            filteredCustomers.sort((a, b) => sortOrder === 'DESC' ? b.totalBookings - a.totalBookings : a.totalBookings - b.totalBookings);
-        } else if (sortBy === 'lastVisit') {
-            filteredCustomers.sort((a, b) => {
-                const dateA = a.lastVisit ? new Date(a.lastVisit) : new Date(0);
-                const dateB = b.lastVisit ? new Date(b.lastVisit) : new Date(0);
-                return sortOrder === 'DESC' ? dateB - dateA : dateA - dateB;
-            });
-        } else if (sortBy === 'firstName') {
-            filteredCustomers.sort((a, b) => {
-                const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
-                const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
-                return sortOrder === 'DESC' ? nameB.localeCompare(nameA) : nameA.localeCompare(nameB);
-            });
-        }
-
-        // Re-apply pagination after filtering
-        const filteredTotal = filteredCustomers.length;
-        const paginatedFiltered = filteredCustomers.slice(offset, offset + parseInt(limit));
 
         res.json({
             success: true,
             data: {
-                customers: toSerializableValue(paginatedFiltered),
+                customers: toSerializableValue(finalCustomers),
                 pagination: {
-                    total: filteredTotal,
+                    total: totalCount,
                     page: safePage,
                     limit: safeLimit,
-                    totalPages: Math.ceil(filteredTotal / safeLimit)
+                    totalPages: Math.ceil(totalCount / safeLimit)
                 }
             }
         });
@@ -1668,58 +1643,107 @@ exports.getCustomerStats = async (req, res) => {
     try {
         const tenantId = req.tenant.id;
 
-        // Get all appointments for this tenant
-        const appointments = await db.Appointment.findAll({
-            include: [
-                {
-                    model: db.Service,
-                    as: 'service',
-                    where: { tenantId },
-                    required: true,
-                    attributes: []
-                },
-                {
-                    model: db.PlatformUser,
-                    as: 'user',
-                    attributes: ['id']
-                }
-            ],
-            attributes: ['platformUserId', 'bookingSessionId', 'bookingReference', 'status', 'price', 'startTime']
-        });
+        const totalSql = `
+            SELECT COUNT(DISTINCT pu.id) AS "totalCustomers"
+            FROM "PlatformUser" pu
+            WHERE EXISTS (
+              SELECT 1 FROM "Appointment" a WHERE a."tenantId" = :tenantId AND a."platformUserId" = pu.id
+              UNION
+              SELECT 1 FROM "Order" o WHERE o."tenantId" = :tenantId AND o."platformUserId" = pu.id
+              UNION
+              SELECT 1 FROM "GiftCardTransaction" g WHERE g."tenantId" = :tenantId AND (g."senderPlatformUserId" = pu.id OR g."recipientPlatformUserId" = pu.id)
+              UNION
+              SELECT 1 FROM "TenantWalletLedgerEntry" w WHERE w."tenantId" = :tenantId AND w."platformUserId" = pu.id
+            );
+        `;
 
-        const uniqueBookingAppointments = [];
-        const seenBookingKeys = new Set();
-        appointments.forEach((appointment) => {
-            const bookingKey = `${appointment.platformUserId || 'unknown'}:${appointment.bookingSessionId || appointment.bookingReference || appointment.id}`;
-            if (seenBookingKeys.has(bookingKey)) {
-                return;
-            }
-            seenBookingKeys.add(bookingKey);
-            uniqueBookingAppointments.push(appointment);
-        });
+        const newClientsSql = `
+            WITH activity_union AS (
+              SELECT "platformUserId", "startTime"   AS "activityDate" FROM "Appointment"        WHERE "tenantId" = :tenantId AND "platformUserId" IS NOT NULL
+              UNION ALL
+              SELECT "platformUserId", "createdAt"   AS "activityDate" FROM "Order"               WHERE "tenantId" = :tenantId AND "platformUserId" IS NOT NULL
+              UNION ALL
+              SELECT "senderPlatformUserId" AS "platformUserId", "createdAt"   AS "activityDate" FROM "GiftCardTransaction" WHERE "tenantId" = :tenantId AND "senderPlatformUserId" IS NOT NULL
+              UNION ALL
+              SELECT "recipientPlatformUserId" AS "platformUserId", "createdAt"   AS "activityDate" FROM "GiftCardTransaction" WHERE "tenantId" = :tenantId AND "recipientPlatformUserId" IS NOT NULL
+              UNION ALL
+              SELECT "platformUserId", "createdAt"   AS "activityDate" FROM "TenantWalletLedgerEntry"   WHERE "tenantId" = :tenantId AND "platformUserId" IS NOT NULL
+            ),
+            first_activity AS (
+              SELECT "platformUserId", MIN("activityDate") AS "firstDt"
+              FROM activity_union
+              GROUP BY "platformUserId"
+            )
+            SELECT COUNT(*) AS "newClientsThisMonth"
+            FROM first_activity
+            WHERE "firstDt" >= :firstOfMonth;
+        `;
 
-        // Unique customers
-        const uniqueCustomerIds = [...new Set(uniqueBookingAppointments.map(a => a.platformUserId).filter(Boolean))];
-        const totalCustomers = uniqueCustomerIds.length;
+        const returningRateSql = `
+            WITH total AS (
+              SELECT COUNT(DISTINCT pu.id) AS cnt FROM "PlatformUser" pu
+              WHERE EXISTS (
+                SELECT 1 FROM "Appointment" a WHERE a."tenantId" = :tenantId AND a."platformUserId" = pu.id
+                UNION
+                SELECT 1 FROM "Order" o WHERE o."tenantId" = :tenantId AND o."platformUserId" = pu.id
+                UNION
+                SELECT 1 FROM "GiftCardTransaction" g WHERE g."tenantId" = :tenantId AND (g."senderPlatformUserId" = pu.id OR g."recipientPlatformUserId" = pu.id)
+                UNION
+                SELECT 1 FROM "TenantWalletLedgerEntry" w WHERE w."tenantId" = :tenantId AND w."platformUserId" = pu.id
+              )
+            ), returning_customers AS (
+              SELECT COUNT(*) AS cnt FROM (
+                SELECT pu.id
+                FROM "PlatformUser" pu
+                JOIN "Appointment" a ON a."platformUserId" = pu.id AND a."tenantId" = :tenantId
+                GROUP BY pu.id
+                HAVING COUNT(a.id) > 1
+              ) sub
+            )
+            SELECT COALESCE((returning_customers.cnt::decimal / NULLIF(total.cnt, 0)) * 100, 0) AS "returningRatePct"
+            FROM total, returning_customers;
+        `;
 
-        // New customers this month
+        const avgBookingsSql = `
+            SELECT COALESCE((SELECT COUNT(*) FROM "Appointment" a WHERE a."tenantId" = :tenantId AND a."platformUserId" IS NOT NULL)::decimal
+                   / NULLIF(:totalCustomers, 0), 0) AS "avgBookingsPerCustomer";
+        `;
+
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
-        const newCustomersThisMonth = uniqueBookingAppointments.filter(a => {
-            return a.startTime >= startOfMonth && a.platformUserId;
+        const [totalRows] = await db.sequelize.query(totalSql, {
+            replacements: { tenantId },
+            type: db.sequelize.QueryTypes.SELECT
         });
-        const newCustomerIds = [...new Set(newCustomersThisMonth.map(a => a.platformUserId))];
+        
+        const totalCustomersResult = Array.isArray(totalRows) ? totalRows[0] : totalRows;
+        const totalCustomers = parseInt(totalCustomersResult?.totalCustomers || 0, 10);
 
-        // Calculate returning customers
-        const customerBookingCounts = {};
-        uniqueBookingAppointments.forEach(a => {
-            if (a.platformUserId) {
-                customerBookingCounts[a.platformUserId] = (customerBookingCounts[a.platformUserId] || 0) + 1;
-            }
+        const [newClientsRows] = await db.sequelize.query(newClientsSql, {
+            replacements: { tenantId, firstOfMonth: startOfMonth },
+            type: db.sequelize.QueryTypes.SELECT
         });
-        const returningCustomers = Object.values(customerBookingCounts).filter(count => count > 1).length;
+        
+        const newClientsResult = Array.isArray(newClientsRows) ? newClientsRows[0] : newClientsRows;
+        const newCustomersThisMonth = parseInt(newClientsResult?.newClientsThisMonth || 0, 10);
+
+        const [returningRateRows] = await db.sequelize.query(returningRateSql, {
+            replacements: { tenantId },
+            type: db.sequelize.QueryTypes.SELECT
+        });
+        
+        const returningRateResult = Array.isArray(returningRateRows) ? returningRateRows[0] : returningRateRows;
+        const returningRatePct = parseFloat(returningRateResult?.returningRatePct || 0);
+
+        const [avgBookingsRows] = await db.sequelize.query(avgBookingsSql, {
+            replacements: { tenantId, totalCustomers },
+            type: db.sequelize.QueryTypes.SELECT
+        });
+        
+        const avgBookingsResult = Array.isArray(avgBookingsRows) ? avgBookingsRows[0] : avgBookingsRows;
+        const averageBookingsPerCustomer = parseFloat(avgBookingsResult?.avgBookingsPerCustomer || 0);
 
         // Get loyalty tier distribution
         const insights = await db.CustomerInsight.findAll({
@@ -1729,17 +1753,21 @@ exports.getCustomerStats = async (req, res) => {
 
         const tierDistribution = { bronze: 0, silver: 0, gold: 0, platinum: 0 };
         insights.forEach(i => {
-            tierDistribution[i.loyaltyTier] = (tierDistribution[i.loyaltyTier] || 0) + 1;
+            const tier = i.loyaltyTier || 'bronze';
+            tierDistribution[tier] = (tierDistribution[tier] || 0) + 1;
         });
+
+        // The returningCustomers count can be derived from the percentage if needed by UI
+        const returningCustomers = Math.round((returningRatePct / 100) * totalCustomers);
 
         res.json({
             success: true,
             data: {
                 totalCustomers,
-                newCustomersThisMonth: newCustomerIds.length,
+                newCustomersThisMonth,
                 returningCustomers,
-                returningRate: totalCustomers > 0 ? ((returningCustomers / totalCustomers) * 100).toFixed(1) : 0,
-                averageBookingsPerCustomer: totalCustomers > 0 ? (uniqueBookingAppointments.length / totalCustomers).toFixed(1) : 0,
+                returningRate: returningRatePct.toFixed(1),
+                averageBookingsPerCustomer: averageBookingsPerCustomer.toFixed(1),
                 loyaltyTierDistribution: tierDistribution
             }
         });
@@ -2679,68 +2707,46 @@ exports.exportCustomers = async (req, res) => {
     try {
         const tenantId = req.tenant.id;
 
-        // Get all customers with their data
-        const customers = await db.PlatformUser.findAll({
-            include: [
-                {
-                    model: db.Appointment,
-                    as: 'appointments',
-                    required: true,
-                    include: [
-                        {
-                            model: db.Service,
-                            as: 'service',
-                            where: { tenantId },
-                            required: true,
-                            attributes: ['id']
-                        }
-                    ],
-                    attributes: ['id', 'status', 'price', 'startTime']
-                }
-            ],
-            attributes: ['id', 'firstName', 'lastName', 'email', 'phone', 'gender', 'createdAt']
-        });
-
-        // Get insights
-        const customerIds = customers.map(c => c.id);
-        const insights = await db.CustomerInsight.findAll({
-            where: {
-                platformUserId: { [Op.in]: customerIds },
-                tenantId
-            }
-        });
-
-        const insightsMap = {};
-        insights.forEach(i => {
-            insightsMap[i.platformUserId] = i;
-        });
-
-        const customerSpendMap = await buildCustomerSpendMap({
+        const { querySql, replacements } = buildCustomerQuery({
             tenantId,
-            customerIds
+            search: req.query.search,
+            loyaltyTier: req.query.loyaltyTier,
+            customerType: req.query.customerType,
+            sortBy: req.query.sortBy,
+            sortOrder: req.query.sortOrder,
+            limit: 100000, // Large limit for export
+            offset: 0
+        });
+
+        const customers = await db.sequelize.query(querySql, {
+            replacements,
+            type: db.sequelize.QueryTypes.SELECT
         });
 
         // Build CSV
         const csvRows = [
-            ['Name', 'Email', 'Phone', 'Gender', 'Total Bookings', 'Total Spent', 'Loyalty Tier', 'First Visit', 'Last Visit', 'Tags'].join(',')
+            ['Name', 'Email', 'Phone', 'Gender', 'Total Bookings', 'Total Spent', 'Loyalty Tier', 'Customer Type', 'First Visit', 'Last Visit', 'Tags'].join(',')
         ];
 
         customers.forEach(customer => {
-            const insight = insightsMap[customer.id];
-            const appointments = customer.appointments || [];
-            const totalSpent = customerSpendMap.get(`${customer.id}`) ?? 0;
-
+            let tagsArray = [];
+            try {
+                tagsArray = typeof customer.tags === 'string' ? JSON.parse(customer.tags) : (customer.tags || []);
+            } catch (e) {
+                tagsArray = [];
+            }
             csvRows.push([
                 `"${customer.firstName} ${customer.lastName}"`,
-                customer.email,
-                customer.phone,
+                customer.email || '',
+                customer.phone || '',
                 customer.gender || '',
-                appointments.length,
-                totalSpent.toFixed(2),
-                insight?.loyaltyTier || 'bronze',
-                appointments.length > 0 ? new Date(appointments[appointments.length - 1].startTime).toISOString().split('T')[0] : '',
-                appointments.length > 0 ? new Date(appointments[0].startTime).toISOString().split('T')[0] : '',
-                `"${(insight?.tags || []).join(', ')}"`
+                customer.totalBookings || 0,
+                parseFloat(customer.totalSpent || 0).toFixed(2),
+                customer.loyaltyTier || 'bronze',
+                customer.customerType || 'unknown',
+                customer.firstVisit ? new Date(customer.firstVisit).toISOString().split('T')[0] : '',
+                customer.lastVisit ? new Date(customer.lastVisit).toISOString().split('T')[0] : '',
+                `"${tagsArray.join(', ')}"`
             ].join(','));
         });
 
