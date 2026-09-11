@@ -854,7 +854,7 @@ exports.getCustomers = async (req, res) => {
                     where: {
                         platformUserId: { [Op.in]: customerIds }
                     },
-                    include: [
+                    include: db.Service ? [
                         {
                             model: db.Service,
                             as: 'service',
@@ -862,8 +862,8 @@ exports.getCustomers = async (req, res) => {
                             required: true,
                             attributes: ['id', 'name_en', 'name_ar']
                         }
-                    ],
-                    attributes: ['id', 'platformUserId', 'startTime', 'endTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid'],
+                    ] : [],
+                    attributes: ['id', 'platformUserId', 'isWalkIn', 'startTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid'],
                     order: [['startTime', 'DESC']]
                 }),
                 db.Order.findAll({
@@ -871,13 +871,13 @@ exports.getCustomers = async (req, res) => {
                         platformUserId: { [Op.in]: customerIds },
                         tenantId
                     },
-                    include: [
+                    include: db.OrderItem ? [
                         {
                             model: db.OrderItem,
                             as: 'items',
                             attributes: ['id', 'quantity', 'unitPrice', 'totalPrice']
                         }
-                    ],
+                    ] : [],
                     attributes: ['id', 'platformUserId', 'orderNumber', 'status', 'paymentStatus', 'totalAmount', 'createdAt'],
                     order: [['createdAt', 'DESC']]
                 })
@@ -979,11 +979,15 @@ exports.getCustomers = async (req, res) => {
                 : (lastAppointment || lastOrder);
 
             // Determine customer type
-            let customerType = 'both';
-            if (bookingSessions.length > 0 && orders.length === 0) {
-                customerType = 'service_only';
+            let calculatedCustomerType = 'both';
+            const isWalkInCustomer = appointments.length > 0 && appointments.every(a => a.isWalkIn);
+            
+            if (isWalkInCustomer && orders.length === 0) {
+                calculatedCustomerType = 'walk_in';
+            } else if (bookingSessions.length > 0 && orders.length === 0) {
+                calculatedCustomerType = 'service_only';
             } else if (bookingSessions.length === 0 && orders.length > 0) {
-                customerType = 'product_only';
+                calculatedCustomerType = 'product_only';
             }
 
             // Format profile image URL
@@ -1013,13 +1017,16 @@ exports.getCustomers = async (req, res) => {
                 cancellationCount: insight?.cancellationCount || bookingSessions.filter(a => a.status === 'cancelled').length,
                 tags: insight?.tags || [],
                 notes: insight?.notes || '',
-                customerType: customerType
+                customerType: calculatedCustomerType
             };
         });
 
         // Apply post-filters
         let filteredCustomers = enrichedCustomers;
         
+        if (customerType) {
+            filteredCustomers = filteredCustomers.filter(c => c.customerType === customerType);
+        }
         if (loyaltyTier) {
             filteredCustomers = filteredCustomers.filter(c => c.loyaltyTier === loyaltyTier);
         }
@@ -1669,7 +1676,7 @@ exports.getCustomerStats = async (req, res) => {
 
         // Get all appointments for this tenant
         const appointments = await db.Appointment.findAll({
-            include: [
+            include: db.Service ? [
                 {
                     model: db.Service,
                     as: 'service',
@@ -1682,8 +1689,8 @@ exports.getCustomerStats = async (req, res) => {
                     as: 'user',
                     attributes: ['id']
                 }
-            ],
-            attributes: ['platformUserId', 'bookingSessionId', 'bookingReference', 'status', 'price', 'startTime']
+            ] : [],
+            attributes: ['id', 'platformUserId', 'bookingSessionId', 'bookingReference', 'status', 'price', 'startTime']
         });
 
         const uniqueBookingAppointments = [];
