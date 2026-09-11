@@ -7,6 +7,7 @@ const db = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { buildPublicAssetUrl } = require('../utils/url');
 const walletService = require('../services/walletService');
+const tenantWalletService = require('../services/tenantWalletService');
 const TENANT_APPOINTMENT_AUDIT_LOGS_ENABLED = process.env.TENANT_APPOINTMENT_AUDIT_LOGS === '1';
 
 function createRuntimeTraceLogger(req, res, label, details = {}) {
@@ -854,7 +855,7 @@ exports.getCustomers = async (req, res) => {
                     where: {
                         platformUserId: { [Op.in]: customerIds }
                     },
-                    include: db.Service ? [
+                    include: [
                         {
                             model: db.Service,
                             as: 'service',
@@ -862,8 +863,8 @@ exports.getCustomers = async (req, res) => {
                             required: true,
                             attributes: ['id', 'name_en', 'name_ar']
                         }
-                    ] : [],
-                    attributes: ['id', 'platformUserId', 'isWalkIn', 'startTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid'],
+                    ],
+                    attributes: ['id', 'platformUserId', 'startTime', 'endTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid'],
                     order: [['startTime', 'DESC']]
                 }),
                 db.Order.findAll({
@@ -871,13 +872,13 @@ exports.getCustomers = async (req, res) => {
                         platformUserId: { [Op.in]: customerIds },
                         tenantId
                     },
-                    include: db.OrderItem ? [
+                    include: [
                         {
                             model: db.OrderItem,
                             as: 'items',
                             attributes: ['id', 'quantity', 'unitPrice', 'totalPrice']
                         }
-                    ] : [],
+                    ],
                     attributes: ['id', 'platformUserId', 'orderNumber', 'status', 'paymentStatus', 'totalAmount', 'createdAt'],
                     order: [['createdAt', 'DESC']]
                 })
@@ -979,15 +980,11 @@ exports.getCustomers = async (req, res) => {
                 : (lastAppointment || lastOrder);
 
             // Determine customer type
-            let calculatedCustomerType = 'both';
-            const isWalkInCustomer = appointments.length > 0 && appointments.every(a => a.isWalkIn);
-            
-            if (isWalkInCustomer && orders.length === 0) {
-                calculatedCustomerType = 'walk_in';
-            } else if (bookingSessions.length > 0 && orders.length === 0) {
-                calculatedCustomerType = 'service_only';
+            let customerType = 'both';
+            if (bookingSessions.length > 0 && orders.length === 0) {
+                customerType = 'service_only';
             } else if (bookingSessions.length === 0 && orders.length > 0) {
-                calculatedCustomerType = 'product_only';
+                customerType = 'product_only';
             }
 
             // Format profile image URL
@@ -1017,16 +1014,13 @@ exports.getCustomers = async (req, res) => {
                 cancellationCount: insight?.cancellationCount || bookingSessions.filter(a => a.status === 'cancelled').length,
                 tags: insight?.tags || [],
                 notes: insight?.notes || '',
-                customerType: calculatedCustomerType
+                customerType: customerType
             };
         });
 
         // Apply post-filters
         let filteredCustomers = enrichedCustomers;
         
-        if (customerType) {
-            filteredCustomers = filteredCustomers.filter(c => c.customerType === customerType);
-        }
         if (loyaltyTier) {
             filteredCustomers = filteredCustomers.filter(c => c.loyaltyTier === loyaltyTier);
         }
@@ -1676,7 +1670,7 @@ exports.getCustomerStats = async (req, res) => {
 
         // Get all appointments for this tenant
         const appointments = await db.Appointment.findAll({
-            include: db.Service ? [
+            include: [
                 {
                     model: db.Service,
                     as: 'service',
@@ -1689,8 +1683,8 @@ exports.getCustomerStats = async (req, res) => {
                     as: 'user',
                     attributes: ['id']
                 }
-            ] : [],
-            attributes: ['id', 'platformUserId', 'bookingSessionId', 'bookingReference', 'status', 'price', 'startTime']
+            ],
+            attributes: ['platformUserId', 'bookingSessionId', 'bookingReference', 'status', 'price', 'startTime']
         });
 
         const uniqueBookingAppointments = [];
@@ -1829,9 +1823,13 @@ exports.getCustomerHistory = async (req, res) => {
             limit: type === 'appointment' ? 0 : parseInt(limit)
         });
 
-        const walletTransactions = await db.WalletLedgerEntry.findAll({
+        // FIX: Use TenantWalletLedgerEntry (tenant-scoped) instead of the global
+        // WalletLedgerEntry. This ensures Recent Transactions in the Appointment drawer
+        // reflects the same wallet used by the Top Up flow and Customer Profile Wallet tab.
+        const walletTransactions = await db.TenantWalletLedgerEntry.findAll({
             where: {
-                platformUserId: id
+                platformUserId: id,
+                tenantId
             },
             order: [['createdAt', 'DESC']],
             limit: parseInt(limit)
@@ -2016,15 +2014,15 @@ exports.topUpCustomerWallet = async (req, res) => {
             });
         }
 
-        const walletResult = await walletService.creditWallet({
+                const walletResult = await tenantWalletService.creditTenantWallet({
             platformUserId: id,
+            tenantId: tenantId,
             amount,
-            type: 'topup',
+            type: 'tenant_manual_topup_credit',
             referenceType: 'tenant_customer_wallet_topup',
             referenceId: appointmentId || null,
             metadata: {
                 source: 'tenant_appointment_drawer',
-                tenantId: tenantId || null,
                 actorUserId,
                 appointmentId,
                 note: note || null
