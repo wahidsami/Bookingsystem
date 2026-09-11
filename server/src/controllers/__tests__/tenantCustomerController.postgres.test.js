@@ -45,7 +45,6 @@ describe('tenantCustomerController canonical SQL (PostgreSQL)', () => {
             id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
             tenantId: DataTypes.UUID,
             platformUserId: DataTypes.UUID,
-            isWalkIn: { type: DataTypes.BOOLEAN, defaultValue: false },
             startTime: DataTypes.DATE,
             status: DataTypes.STRING,
             bookingNumber: DataTypes.STRING,
@@ -145,24 +144,27 @@ describe('tenantCustomerController canonical SQL (PostgreSQL)', () => {
 
     it('Walk-in Identity Regression: should categorize walk-in customer properly', async () => {
         const tenant = await models.Tenant.create({});
-        const walkInUser = await models.PlatformUser.create({ firstName: 'Walk', lastName: 'In' });
+        const walkInUser = await models.PlatformUser.create({ firstName: 'Customer', lastName: '001' });
 
         // Walk-in appointment
         await models.Appointment.create({
             tenantId: tenant.id,
             platformUserId: walkInUser.id,
-            isWalkIn: true,
             startTime: new Date()
         });
 
-        // We use the SQL directly to test it if the controller uses raw query
-        const req = mockReq({ tenantId: tenant.id, query: { limit: 10 } });
-        const res = mockRes();
-
-        // Inject db into controller if it uses it directly
         const db = require('../../models');
         Object.assign(db, { sequelize, ...models });
 
+        // Test 1: Canonical dataset MUST exclude placeholder walk-ins
+        let req = mockReq({ tenantId: tenant.id, query: { limit: 10 } });
+        let res = mockRes();
+        await tenantCustomerController.getCustomers(req, res);
+        expect(res.json.mock.calls[0][0].data.customers.length).toBe(0); // Excluded by default
+
+        // Test 2: Specific "walk_in" filter MUST return the placeholder walk-in correctly categorized
+        req = mockReq({ tenantId: tenant.id, query: { limit: 10, customerType: 'walk_in' } });
+        res = mockRes();
         await tenantCustomerController.getCustomers(req, res);
 
         expect(res.json).toHaveBeenCalled();

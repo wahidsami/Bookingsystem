@@ -863,7 +863,7 @@ exports.getCustomers = async (req, res) => {
                             attributes: ['id', 'name_en', 'name_ar']
                         }
                     ] : [],
-                    attributes: ['id', 'platformUserId', 'isWalkIn', 'startTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid'],
+                    attributes: ['id', 'platformUserId', 'startTime', 'bookingNumber', 'bookingSessionId', 'bookingReference', 'bookingItemIndex', 'status', 'price', 'paymentStatus', 'paymentMethod', 'depositAmount', 'remainderAmount', 'totalPaid'],
                     order: [['startTime', 'DESC']]
                 }),
                 db.Order.findAll({
@@ -927,6 +927,8 @@ exports.getCustomers = async (req, res) => {
             allCustomers = allCustomers.filter(c => c.appointments.length > 0 && c.orders.length > 0);
         } else if (customerType === 'walk_in') {
             allCustomers = allCustomers.filter(c => isWalkInPlaceholderCustomer(c));
+        } else if (!customerType || customerType === 'all') {
+            allCustomers = allCustomers.filter(c => !isWalkInPlaceholderCustomer(c));
         }
 
         // Enrich with customer insights
@@ -980,9 +982,9 @@ exports.getCustomers = async (req, res) => {
 
             // Determine customer type
             let calculatedCustomerType = 'both';
-            const isWalkInCustomer = appointments.length > 0 && appointments.every(a => a.isWalkIn);
+            const isWalkInCustomer = isWalkInPlaceholderCustomer(customer);
             
-            if (isWalkInCustomer && orders.length === 0) {
+            if (isWalkInCustomer) {
                 calculatedCustomerType = 'walk_in';
             } else if (bookingSessions.length > 0 && orders.length === 0) {
                 calculatedCustomerType = 'service_only';
