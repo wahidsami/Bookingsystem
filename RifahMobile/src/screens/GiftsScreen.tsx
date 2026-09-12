@@ -514,7 +514,7 @@ export function GiftsScreen({ navigation, route }: any) {
             <View style={styles.balanceRow}>
               <TouchableOpacity style={[styles.balanceCard, { marginRight: spacing.sm }]} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: refahBalance || 0, history })} activeOpacity={0.9}>
                 <View style={styles.balanceIcon}><AppIcon name="account_balance_wallet" size={20} color={colors.primary} /></View>
-                <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}</Text>
+                <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد بارسبا' : 'BarSpa Balance'}</Text>
                 <Text style={styles.balanceAmount}>{sar(Number(refahBalance || 0))}</Text>
                 <Text style={styles.balanceMeta}>
                   {tenantId
@@ -578,7 +578,7 @@ export function GiftsScreen({ navigation, route }: any) {
             <>
               <View style={styles.sectionHeaderRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionTitle}>{language === 'ar' ? 'بطاقات رفاه ✨' : 'Refah Gift Cards ✨'}</Text>
+                  <Text style={styles.sectionTitle}>{language === 'ar' ? 'بطاقات بارسبا ✨' : 'BarSpa Gift Cards ✨'}</Text>
                   <Text style={styles.sectionSubTitle}>{language === 'ar' ? 'أهدِ الرفاهية والعناية لمن تحب.' : 'Give the gift of wellness, self-care and joy.'}</Text>
                 </View>
               </View>
@@ -689,7 +689,7 @@ export function GiftsScreen({ navigation, route }: any) {
                   <View style={styles.recipientCard}>
                     <Text style={styles.recipientTitle}>{language === 'ar' ? 'تم العثور على المستلم' : 'Recipient found'}</Text>
                     <Text style={styles.recipientLine}>
-                      {(recipientCheck.recipient.fullName || `${recipientCheck.recipient.firstName || ''} ${recipientCheck.recipient.lastName || ''}`.trim() || (language === 'ar' ? 'مستخدم رفاه' : 'Refah User'))}
+                      {(recipientCheck.recipient.fullName || `${recipientCheck.recipient.firstName || ''} ${recipientCheck.recipient.lastName || ''}`.trim() || (language === 'ar' ? 'مستخدم بارسبا' : 'BarSpa User'))}
                     </Text>
                     {!!recipientCheck.recipient.email && <Text style={styles.recipientMeta}>{maskEmail(recipientCheck.recipient.email)}</Text>}
                     {!!recipientCheck.recipient.phone && <Text style={styles.recipientMeta}>{maskPhone(recipientCheck.recipient.phone)}</Text>}

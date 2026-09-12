@@ -4,16 +4,16 @@ const updateUrl = easProjectId ? `https://u.expo.dev/${easProjectId}` : undefine
 
 module.exports = {
   expo: {
-    name: 'Refah Staff',
+    name: 'BarSpa',
     slug: 'refah-mobile',
     scheme: 'com.refah.mobile',
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
+    icon: './assets/barspa_app_icon.png',
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     splash: {
-      image: './assets/splash-icon.png',
+      image: './assets/barspa_app_icon.png',
       resizeMode: 'contain',
       backgroundColor: '#8B5CF6',
     },
@@ -28,7 +28,7 @@ module.exports = {
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: './assets/adaptive-icon.png',
+        foregroundImage: './assets/barspa_adaptive_icon.png',
         backgroundColor: '#8B5CF6',
       },
       package: 'com.refah.mobile',

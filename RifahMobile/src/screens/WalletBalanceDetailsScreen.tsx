@@ -73,7 +73,7 @@ export function WalletBalanceDetailsScreen({ navigation, route }: any) {
       <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.lg }}>
         <ImageBackground source={HERO_IMAGE} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
           <PageHeader
-            title={language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}
+            title={language === 'ar' ? 'رصيد بارسبا' : 'BarSpa Balance'}
             showBack
             onBack={() => navigation.goBack()}
             variant="standard"

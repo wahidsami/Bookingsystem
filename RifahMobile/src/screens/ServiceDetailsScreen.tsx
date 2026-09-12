@@ -125,7 +125,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
     const handleShare = async () => {
         try {
             await Share.share({
-                message: `${serviceName} - ${tenant?.name || 'Refah'}\n${description}`,
+                message: `${serviceName} - ${tenant?.name || 'BarSpa'}\n${description}`,
             });
         } catch {}
     };

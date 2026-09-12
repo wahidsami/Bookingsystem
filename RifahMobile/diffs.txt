@@ -1,0 +1,3427 @@
+diff --git a/RifahMobile/src/screens/AppointmentDetailsScreen.tsx b/RifahMobile/src/screens/AppointmentDetailsScreen.tsx
+index 38f017c..b1c834a 100644
+--- a/RifahMobile/src/screens/AppointmentDetailsScreen.tsx
++++ b/RifahMobile/src/screens/AppointmentDetailsScreen.tsx
+@@ -419,7 +419,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
+ 
+   return (
+     <View style={styles.container}>
+-      <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.lg }}>
++      <ScrollView contentContainerStyle={{ paddingBottom: spacing.lg }}>
+         <ImageBackground source={tenantHeroUri ? { uri: tenantHeroUri } : undefined} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
+           <LinearGradient colors={tenantHeroUri ? ['rgba(38,12,89,0.82)', 'rgba(93,47,153,0.35)'] : ['#3B0E74', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+           <PageHeader 
+@@ -442,8 +442,12 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
+           <Text style={styles.label}>{language === 'ar' ? 'رقم الحجز' : 'Booking No.'}</Text>
+           <Text style={styles.bookingNumber} numberOfLines={1}>{getBookingNumber(representative)}</Text>
+           <View style={styles.pillsRow}>
+-            <AppBadge label={getStatusText(group.status, language)} variant={['confirmed', 'checked_in', 'completed'].includes(group.status) ? 'success' : group.status === 'cancelled' ? 'error' : group.status === 'pending' ? 'warning' : 'neutral'} />
+-            <AppBadge label={getPaymentStatusText(representative)} variant="brand" />
++            <View style={[styles.pill, styles.statusPill, ['confirmed', 'checked_in', 'completed'].includes(group.status) ? styles.statusPillSuccess : group.status === 'cancelled' ? styles.statusPillError : group.status === 'pending' ? styles.statusPillWarning : null]}>
++              <Text style={[styles.statusPillText, ['confirmed', 'checked_in', 'completed'].includes(group.status) ? styles.statusPillTextSuccess : group.status === 'cancelled' ? styles.statusPillTextError : group.status === 'pending' ? styles.statusPillTextWarning : null]}>{getStatusText(group.status, language)}</Text>
++            </View>
++            <View style={[styles.pill, styles.paymentPill]}>
++              <Text style={styles.paymentPillText}>{getPaymentStatusText(representative)}</Text>
++            </View>
+           </View>
+           <Text style={styles.metaText}>{group.tenant?.name || '-'}</Text>
+           <Text style={styles.metaText}>
+@@ -750,7 +754,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
+ }
+ 
+ const styles = StyleSheet.create({
+-  container: { flex: 1, backgroundColor: '#FAF8FC' },
++  container: { flex: 1, backgroundColor: '#FAF9FC' },
+   hero: { minHeight: 240, paddingHorizontal: spacing.md, paddingBottom: spacing.lg, justifyContent: 'space-between', backgroundColor: '#5B21B6' },
+   heroImage: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+   heroTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+@@ -767,61 +771,67 @@ const styles = StyleSheet.create({
+   heroTitle: { fontSize: 32, fontWeight: '800', color: '#FFFFFF' },
+   heroSubTitle: { fontSize: 12, color: 'rgba(255,255,255,0.9)' },
+   contentWrap: { paddingHorizontal: spacing.md, marginTop: -38, gap: spacing.md },
+-  summaryCard: { borderRadius: 24, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
+-  label: { color: colors.textSecondary, fontSize: 10 },
+-  bookingNumber: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: 4 },
++  summaryCard: { borderRadius: 24, borderWidth: 1, borderColor: '#E7DDFC', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, shadowColor: '#1D035F', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 24, elevation: 2 },
++  label: { color: colors.textSecondary, fontSize: 12 },
++  bookingNumber: { fontSize: 22, fontWeight: '800', color: '#1D035F', marginTop: 4 },
+   pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm, marginBottom: spacing.sm },
+-  pill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+-  statusPill: { backgroundColor: '#E7F6ED' },
+-  statusPillText: { color: '#1D7E49', fontSize: 10, fontWeight: '700' },
+-  paymentPill: { backgroundColor: '#EFE7FF' },
+-  paymentPillText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+-  metaText: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+-  metricsGrid: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, flexDirection: 'row', flexWrap: 'wrap' },
++  pill: { borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 6 },
++  statusPill: { backgroundColor: '#E7DDFC' },
++  statusPillText: { color: '#6537C0', fontSize: 12, fontWeight: '700' },
++  statusPillSuccess: { backgroundColor: '#E7F6ED' },
++  statusPillTextSuccess: { color: '#1D7E49' },
++  statusPillError: { backgroundColor: '#FEE2E2' },
++  statusPillTextError: { color: '#991B1B' },
++  statusPillWarning: { backgroundColor: '#FEF3C7' },
++  statusPillTextWarning: { color: '#92400E' },
++  paymentPill: { backgroundColor: '#E7DDFC' },
++  paymentPillText: { color: '#6537C0', fontSize: 12, fontWeight: '700' },
++  metaText: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
++  metricsGrid: { borderRadius: 20, borderWidth: 1, borderColor: '#E7DDFC', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, flexDirection: 'row', flexWrap: 'wrap', shadowColor: '#1D035F', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 24, elevation: 2 },
+   metricCell: { width: '50%', paddingVertical: spacing.sm, paddingRight: spacing.sm, minHeight: 56, justifyContent: 'center' },
+-  metricLabel: { fontSize: 10, color: colors.textSecondary },
+-  metricValue: { marginTop: 3, fontSize: 13, fontWeight: '800', color: colors.text },
+-  metricValueSmall: { marginTop: 3, fontSize: 11, fontWeight: '700', color: colors.text },
+-  sectionTitle: { fontSize: fontSize.sm, fontWeight: '800', color: colors.text, marginBottom: spacing.sm, marginTop: spacing.xs },
+-  guestCard: { borderRadius: 20, backgroundColor: '#F4EEFF', borderWidth: 1, borderColor: '#E6DAFD', padding: spacing.md, marginBottom: spacing.md },
+-  guestName: { fontSize: 14, color: colors.text, fontWeight: '700' },
+-  guestPhone: { fontSize: 11, color: colors.textSecondary, marginTop: 4 },
+-  paymentSummaryCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
++  metricLabel: { fontSize: 12, color: colors.textSecondary },
++  metricValue: { marginTop: 3, fontSize: 14, fontWeight: '800', color: '#1D035F' },
++  metricValueSmall: { marginTop: 3, fontSize: 12, fontWeight: '700', color: '#1D035F' },
++  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#1D035F', marginBottom: spacing.sm, marginTop: spacing.xs },
++  guestCard: { borderRadius: 20, backgroundColor: '#FAF9FC', borderWidth: 1, borderColor: '#E7DDFC', padding: spacing.md, marginBottom: spacing.md },
++  guestName: { fontSize: 16, color: '#1D035F', fontWeight: '700' },
++  guestPhone: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
++  paymentSummaryCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E7DDFC', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, shadowColor: '#1D035F', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 24, elevation: 2 },
+   paymentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
+-  paymentLabel: { color: colors.textSecondary, fontSize: 11 },
+-  paymentValue: { color: colors.text, fontSize: 11, fontWeight: '700' },
+-  paymentDueLabel: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+-  paymentDueValue: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+-  paymentMethodHint: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: 10 },
+-  timelineCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
+-  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: 1, borderTopColor: '#F2ECFC' },
++  paymentLabel: { color: colors.textSecondary, fontSize: 14 },
++  paymentValue: { color: '#1D035F', fontSize: 14, fontWeight: '700' },
++  paymentDueLabel: { color: '#6537C0', fontSize: 14, fontWeight: '800' },
++  paymentDueValue: { color: '#6537C0', fontSize: 16, fontWeight: '800' },
++  paymentMethodHint: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: 12 },
++  timelineCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E7DDFC', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, shadowColor: '#1D035F', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 24, elevation: 2 },
++  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: 1, borderTopColor: '#E7DDFC' },
+   timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
+-  timelineDotPrimary: { backgroundColor: colors.primary },
++  timelineDotPrimary: { backgroundColor: '#6537C0' },
+   timelineDotDanger: { backgroundColor: colors.error },
+   timelineBody: { flex: 1 },
+-  timelineTitle: { color: colors.text, fontSize: 11, fontWeight: '700' },
+-  timelineSub: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
+-  timelineTime: { color: '#7B7F98', fontSize: 9, marginTop: 2 },
+-  serviceCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, overflow: 'hidden' },
+-  serviceIndex: { fontSize: 10, color: colors.primary, fontWeight: '700' },
+-  serviceName: { marginTop: 2, fontSize: 16, fontWeight: '800', color: colors.text },
+-  serviceVariant: { marginTop: 2, fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
+-  rowText: { marginTop: 3, fontSize: 11, color: '#4B5072', flexShrink: 1 },
+-  priceText: { marginTop: spacing.sm, fontSize: 16, color: colors.primary, fontWeight: '800' },
++  timelineTitle: { color: '#1D035F', fontSize: 12, fontWeight: '700' },
++  timelineSub: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
++  timelineTime: { color: '#6E6188', fontSize: 10, marginTop: 2 },
++  serviceCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E7DDFC', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, overflow: 'hidden', shadowColor: '#1D035F', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 24, elevation: 2 },
++  serviceIndex: { fontSize: 12, color: '#6537C0', fontWeight: '700' },
++  serviceName: { marginTop: 2, fontSize: 18, fontWeight: '800', color: '#1D035F' },
++  serviceVariant: { marginTop: 2, fontSize: 14, color: colors.textSecondary, fontWeight: '600' },
++  rowText: { marginTop: 3, fontSize: 14, color: '#6E6188', flexShrink: 1 },
++  priceText: { marginTop: spacing.sm, fontSize: 18, color: '#6537C0', fontWeight: '800' },
+   actionsWrap: { marginTop: spacing.sm, gap: spacing.sm },
+-  primaryBtn: { minHeight: 48, borderRadius: 14, backgroundColor: '#6D28D9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
+-  primaryBtnText: { color: '#FFFFFF', fontWeight: '700' },
++  primaryBtn: { minHeight: 56, borderRadius: 16, backgroundColor: '#6537C0', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
++  primaryBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+   secondaryActions: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
+-  secondaryBtn: { flex: 1, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: spacing.sm },
+-  secondaryBtnText: { color: colors.primary, fontWeight: '700', fontSize: 12, textAlign: 'center' },
+-  cancelBtn: { flex: 1, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: colors.error, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: spacing.sm },
+-  cancelBtnText: { color: colors.error, fontWeight: '700', fontSize: 12, textAlign: 'center' },
+-  primaryActionCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
++  secondaryBtn: { flex: 1, minHeight: 56, borderRadius: 16, borderWidth: 1, borderColor: '#6537C0', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: spacing.sm },
++  secondaryBtnText: { color: '#6537C0', fontWeight: '700', fontSize: 14, textAlign: 'center' },
++  cancelBtn: { flex: 1, minHeight: 56, borderRadius: 16, borderWidth: 1, borderColor: colors.error, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: spacing.sm },
++  cancelBtnText: { color: colors.error, fontWeight: '700', fontSize: 14, textAlign: 'center' },
++  primaryActionCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E7DDFC', backgroundColor: '#FAF9FC', padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
+   secondaryBtnPlaceholder: { flex: 1 },
+-  addServiceBtn: { minHeight: 46, borderRadius: 14, backgroundColor: '#6D28D9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
+-  addServiceBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
+-  contactBtn: { minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: '#D7DAEA', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+-  contactBtnText: { color: '#4B5072', fontWeight: '700' },
++  addServiceBtn: { minHeight: 56, borderRadius: 16, backgroundColor: '#6537C0', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
++  addServiceBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
++  contactBtn: { minHeight: 56, borderRadius: 16, borderWidth: 1, borderColor: '#E7DDFC', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
++  contactBtnText: { color: '#1D035F', fontWeight: '700', fontSize: 14 },
+   policyNote: { marginBottom: spacing.md, borderRadius: 14, borderWidth: 1, borderColor: '#E8EAF4', backgroundColor: '#FFFFFF', padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+   policyText: { flex: 1, color: colors.textSecondary, fontSize: 10, lineHeight: 16 },
+   emptyText: { color: colors.textSecondary, marginBottom: spacing.md, textAlign: 'center' },
+diff --git a/RifahMobile/src/screens/BookingReviewScreen.tsx b/RifahMobile/src/screens/BookingReviewScreen.tsx
+index 3c9ed50..6ee85f7 100644
+--- a/RifahMobile/src/screens/BookingReviewScreen.tsx
++++ b/RifahMobile/src/screens/BookingReviewScreen.tsx
+@@ -187,7 +187,7 @@ export function BookingReviewScreen() {
+                 </View>
+             ) : (
+                 <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+-                    <ScrollView contentContainerStyle={[styles.contentScroll, { paddingBottom: scrollBottomPadding + 140 }]}>
++                    <ScrollView contentContainerStyle={[styles.contentScroll, { paddingBottom: 140 }]}>
+                         
+                         <View style={styles.progressIndicator}>
+                             <View style={styles.progressCircle}><Text style={styles.progressNum}>3</Text></View>
+@@ -311,7 +311,7 @@ export function BookingReviewScreen() {
+                 </KeyboardAvoidingView>
+             )}
+ 
+-            <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(bottomInset, spacing.md) }]}>
++            <View style={[styles.bottomBasketContainer, { paddingBottom: spacing.md }]}>
+                 <View style={styles.bottomBasketInfo}>
+                     <Text style={styles.bottomBasketItems}>{isRTL ? 'المطلوب دفعه الآن' : 'Payable Now'}</Text>
+                     <Text style={styles.bottomBasketTotal}>{formatRiyal(payableNowAmount, isRTL ? 'ar' : 'en')}</Text>
+diff --git a/RifahMobile/src/screens/BookingsScreen.tsx b/RifahMobile/src/screens/BookingsScreen.tsx
+index 19e06f1..642f0ee 100644
+--- a/RifahMobile/src/screens/BookingsScreen.tsx
++++ b/RifahMobile/src/screens/BookingsScreen.tsx
+@@ -288,14 +288,9 @@ export function BookingsScreen({ navigation }: any) {
+     if (!isAuthenticated && !loading) {
+         return (
+             <>
+-                <LinearGradient
+-                    colors={['#F6F2FF', '#FFFFFF']}
+-                    start={{ x: 0, y: 0 }}
+-                    end={{ x: 1, y: 1 }}
+-                    style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+-                >
++                <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+                     <Text style={styles.headerTitle}>{t('bookings')}</Text>
+-                </LinearGradient>
++                </View>
+                 <GuestView
+                     type="bookings"
+                     onLoginPress={showLogin}
+@@ -306,14 +301,9 @@ export function BookingsScreen({ navigation }: any) {
+ 
+     return (
+         <View style={styles.container}>
+-            <LinearGradient
+-                colors={['#F6F2FF', '#FFFFFF']}
+-                start={{ x: 0, y: 0 }}
+-                end={{ x: 1, y: 1 }}
+-                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+-            >
++            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+                 <Text style={styles.headerTitle}>{t('bookings')}</Text>
+-            </LinearGradient>
++            </View>
+ 
+             {/* Tabs */}
+             <View style={styles.tabsContainer}>
+@@ -484,27 +474,25 @@ const getStatusText = (status: string, _t: any, language?: string) => {
+ const styles = StyleSheet.create({
+     container: {
+         flex: 1,
+-        backgroundColor: colors.backgroundMuted,
++        backgroundColor: '#FAF9FC',
+     },
+     header: {
+         paddingHorizontal: spacing.lg,
+         paddingBottom: spacing.lg,
+         paddingTop: spacing.xl,
+-        backgroundColor: colors.background,
+-        borderBottomWidth: 1,
+-        borderBottomColor: colors.borderSubtle,
++        backgroundColor: '#FAF9FC',
+     },
+     headerTitle: {
+-        fontSize: fontSize.xl,
++        fontSize: 32,
+         fontWeight: '800',
+-        color: colors.textPrimary,
++        color: '#1D035F',
+     },
+     tabsContainer: {
+         flexDirection: 'row',
+         flexWrap: 'wrap',
+         paddingHorizontal: spacing.md,
+         paddingVertical: spacing.sm,
+-        backgroundColor: colors.surface,
++        backgroundColor: '#FAF9FC',
+         marginBottom: spacing.sm,
+         gap: spacing.xs,
+     },
+@@ -513,21 +501,21 @@ const styles = StyleSheet.create({
+         paddingVertical: spacing.sm,
+         alignItems: 'center',
+         borderWidth: 1,
+-        borderColor: colors.borderSubtle,
+-        borderRadius: borderRadius.full,
+-        backgroundColor: colors.surface,
++        borderColor: '#E7DDFC',
++        borderRadius: 9999,
++        backgroundColor: '#FAF9FC',
+     },
+     activeTab: {
+-        borderColor: colors.primaryLight,
+-        backgroundColor: '#F7F2FF',
++        borderColor: '#6537C0',
++        backgroundColor: '#6537C0',
+     },
+     tabText: {
+-        fontSize: fontSize.sm,
+-        color: colors.textSecondary,
++        fontSize: 14,
++        color: '#6E6188',
+         fontWeight: '600',
+     },
+     activeTabText: {
+-        color: colors.primary,
++        color: '#FFFFFF',
+         fontWeight: '700',
+     },
+     listContent: {
+@@ -537,14 +525,18 @@ const styles = StyleSheet.create({
+         gap: spacing.sm,
+     },
+     card: {
+-        backgroundColor: colors.surface,
+-        borderRadius: borderRadius.xl,
++        backgroundColor: '#FFFFFF',
++        borderRadius: 20,
+         padding: spacing.lg,
+         marginBottom: spacing.sm,
+         borderWidth: 1,
+-        borderColor: colors.borderSubtle,
++        borderColor: '#E7DDFC',
+         position: 'relative',
+-        ...shadows.sm,
++        shadowColor: '#1D035F',
++        shadowOffset: { width: 0, height: 8 },
++        shadowOpacity: 0.04,
++        shadowRadius: 24,
++        elevation: 2,
+     },
+     rescheduledRibbon: {
+         position: 'absolute',
+@@ -620,18 +612,18 @@ const styles = StyleSheet.create({
+         alignItems: 'flex-end',
+     },
+     customerName: {
+-        fontSize: fontSize.md,
++        fontSize: 18,
+         fontWeight: '700',
+-        color: colors.textPrimary,
++        color: '#1D035F',
+         marginBottom: spacing.xs,
+     },
+     customerNameRTL: {
+         textAlign: 'right',
+     },
+     serviceName: {
+-        fontSize: fontSize.md,
+-        fontWeight: '600',
+-        color: colors.textSecondary,
++        fontSize: 16,
++        fontWeight: '400',
++        color: '#6E6188',
+         lineHeight: 20,
+     },
+     serviceNameRTL: {
+diff --git a/RifahMobile/src/screens/CartScreen.tsx b/RifahMobile/src/screens/CartScreen.tsx
+index 9c94404..c9e6646 100644
+--- a/RifahMobile/src/screens/CartScreen.tsx
++++ b/RifahMobile/src/screens/CartScreen.tsx
+@@ -197,7 +197,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
+         >
+             <PageHeader title={labels.cartTitle} onBack={() => navigation.goBack()} />
+ 
+-            <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}>
++            <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.xxl }]}>
+                 <AppCard style={styles.section} padding="none">
+                     <Text style={styles.sectionTitle}>{labels.orderItems}</Text>
+                     {cartItems.map(item => (
+@@ -362,7 +362,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
+                 </AppCard>
+             </ScrollView>
+ 
+-            <View style={[styles.footer, { paddingBottom: bottomInset }]}>
++            <View style={styles.footer}>
+                 <TouchableOpacity style={styles.checkoutBtn} onPress={handleCheckout} disabled={loading}>
+                     {loading ? (
+                         <ActivityIndicator color="white" />
+diff --git a/RifahMobile/src/screens/CentersBalanceScreen.tsx b/RifahMobile/src/screens/CentersBalanceScreen.tsx
+index fe05c4a..d05bcaf 100644
+--- a/RifahMobile/src/screens/CentersBalanceScreen.tsx
++++ b/RifahMobile/src/screens/CentersBalanceScreen.tsx
+@@ -1,5 +1,5 @@
+ import React, { useEffect, useMemo, useState } from 'react';
+-import { ActivityIndicator, ImageBackground, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
++import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+ import { ThemedText as Text } from '../components/ThemedText';
+ import { AppIcon } from '../components/AppIcon';
+ import { PageHeader } from '../components/ui/PageHeader';
+@@ -7,14 +7,11 @@ import { colors, fontSize, spacing } from '../theme/colors';
+ import { useLanguage } from '../contexts/LanguageContext';
+ import { formatRiyal } from '../utils/currency';
+ import { useScreenSafeArea } from '../utils/safeArea';
+-import { LinearGradient } from 'expo-linear-gradient';
+ import { api } from '../api/client';
+ 
+-const HERO_IMAGE = require('../../assets/wallethero.jpg');
+-
+ export function CentersBalanceScreen({ navigation, route }: any) {
+   const { language } = useLanguage();
+-  const { topInset, scrollBottomPadding } = useScreenSafeArea();
++  const { scrollBottomPadding } = useScreenSafeArea();
+   const hasRouteCentersBalance = route?.params?.centersBalance !== undefined && route?.params?.centersBalance !== null;
+   const hasRouteHistory = Array.isArray(route?.params?.history);
+   const [centersBalance, setCentersBalance] = useState(Number(route?.params?.centersBalance || 0));
+@@ -107,36 +104,41 @@ export function CentersBalanceScreen({ navigation, route }: any) {
+ 
+   return (
+     <View style={styles.container}>
+-      <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.lg }}>
+-        <ImageBackground source={HERO_IMAGE} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
+-          <LinearGradient colors={['rgba(50,28,0,0.75)', 'rgba(120,89,26,0.38)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+-          <PageHeader
+-            title={language === 'ar' ? 'رصيد المراكز' : 'Centers Balance'}
+-            showBack
+-            onBack={() => navigation.goBack()}
+-            variant="standard"
+-          />
+-        </ImageBackground>
++      <PageHeader
++        title={language === 'ar' ? 'رصيد المراكز' : 'Centers Balance'}
++        showBack
++        onBack={() => navigation.goBack()}
++        variant="standard"
++      />
++      <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.xl, paddingTop: spacing.md }}>
+         <View style={styles.content}>
+           <View style={styles.balanceCard}>
+             <Text style={styles.balanceLabel}>{language === 'ar' ? 'إجمالي رصيد المراكز' : 'Total centers balance'}</Text>
+             <Text style={styles.balanceAmount}>{formatRiyal(centersBalance, language)}</Text>
+           </View>
++          
+           <Text style={styles.sectionTitle}>{language === 'ar' ? 'حسب المراكز' : 'By centers'}</Text>
+-          {grouped.length > 0 ? (
+-            grouped.map((item) => (
+-              <View key={item.id} style={styles.row}>
+-                <View style={styles.storeIcon}><AppIcon name="storefront" size={14} color="#7A4F00" /></View>
+-                <View style={{ flex: 1 }}>
+-                  <Text style={styles.rowTitle}>{item.name}</Text>
+-                  <Text style={styles.rowHint}>{language === 'ar' ? `${item.count} عمليات` : `${item.count} transactions`}</Text>
++          
++          <View style={styles.historyList}>
++            {grouped.length > 0 ? (
++              grouped.map((item, index) => (
++                <View key={item.id} style={[styles.row, index === grouped.length - 1 && styles.lastRow]}>
++                  <View style={styles.iconWrap}>
++                    <AppIcon name="storefront" size={16} color={colors.primary} />
++                  </View>
++                  <View style={{ flex: 1 }}>
++                    <Text style={styles.rowTitle}>{item.name}</Text>
++                    <Text style={styles.rowHint}>{language === 'ar' ? `${item.count} عمليات` : `${item.count} transactions`}</Text>
++                  </View>
++                  <Text style={styles.rowSub}>+{formatRiyal(Number(item.total), language)}</Text>
+                 </View>
+-                <Text style={styles.rowSub}>+{formatRiyal(Number(item.total), language)}</Text>
++              ))
++            ) : (
++              <View style={styles.emptyWrap}>
++                <Text style={styles.emptyText}>{language === 'ar' ? 'لا توجد أرصدة موزعة.' : 'No distributed balances yet.'}</Text>
+               </View>
+-            ))
+-          ) : (
+-            <Text style={styles.emptyText}>{language === 'ar' ? 'لا توجد أرصدة موزعة.' : 'No distributed balances yet.'}</Text>
+-          )}
++            )}
++          </View>
+         </View>
+       </ScrollView>
+     </View>
+@@ -144,22 +146,99 @@ export function CentersBalanceScreen({ navigation, route }: any) {
+ }
+ 
+ const styles = StyleSheet.create({
+-  container: { flex: 1, backgroundColor: '#FAF8FC' },
+-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAF8FC' },
+-  hero: { minHeight: 250, paddingHorizontal: spacing.md, paddingBottom: spacing.lg, justifyContent: 'space-between' },
+-  heroImage: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+-  backBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.24)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.38)' },
+-  heroTitle: { fontSize: 34, fontWeight: '800', color: '#FFFFFF' },
+-  heroSub: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.92)' },
+-  content: { padding: spacing.md, marginTop: -36 },
+-  balanceCard: { borderRadius: 22, borderWidth: 1, borderColor: '#F2E3C3', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
+-  balanceLabel: { fontSize: 12, color: colors.textSecondary },
+-  balanceAmount: { marginTop: 6, fontSize: 28, fontWeight: '800', color: colors.text },
+-  sectionTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+-  row: { borderRadius: 14, borderWidth: 1, borderColor: '#F2E3C3', backgroundColor: '#FFFFFF', padding: spacing.sm, marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+-  storeIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF1D8' },
+-  rowTitle: { color: colors.text, fontWeight: '700' },
+-  rowHint: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+-  rowSub: { color: '#7A4F00', fontSize: 12, fontWeight: '700' },
+-  emptyText: { color: colors.textSecondary, fontSize: fontSize.sm }
++  container: {
++    flex: 1,
++    backgroundColor: colors.background,
++  },
++  loadingWrap: {
++    flex: 1,
++    alignItems: 'center',
++    justifyContent: 'center',
++    backgroundColor: colors.background,
++  },
++  content: {
++    paddingHorizontal: spacing.lg,
++  },
++  balanceCard: {
++    backgroundColor: colors.surface,
++    padding: spacing.xl,
++    borderRadius: 16,
++    alignItems: 'center',
++    shadowColor: colors.brandPrimary,
++    shadowOffset: { width: 0, height: 8 },
++    shadowOpacity: 0.05,
++    shadowRadius: 16,
++    elevation: 2,
++    borderWidth: 1,
++    borderColor: colors.borderSubtle,
++    marginBottom: spacing.xl,
++  },
++  balanceLabel: {
++    fontSize: 14,
++    color: colors.textSecondary,
++    marginBottom: spacing.xs,
++    fontWeight: '600',
++    textTransform: 'uppercase',
++    letterSpacing: 0.5,
++  },
++  balanceAmount: {
++    fontSize: 40,
++    fontWeight: '800',
++    color: colors.primary,
++  },
++  sectionTitle: {
++    fontSize: 20,
++    fontWeight: '800',
++    color: colors.textPrimary,
++    marginBottom: spacing.md,
++  },
++  historyList: {
++    backgroundColor: colors.surface,
++    borderRadius: 16,
++    borderWidth: 1,
++    borderColor: colors.borderSubtle,
++    overflow: 'hidden',
++  },
++  row: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: spacing.md,
++    padding: spacing.lg,
++    borderBottomWidth: 1,
++    borderBottomColor: colors.borderSubtle,
++  },
++  lastRow: {
++    borderBottomWidth: 0,
++  },
++  iconWrap: {
++    width: 36,
++    height: 36,
++    borderRadius: 18,
++    alignItems: 'center',
++    justifyContent: 'center',
++    backgroundColor: colors.brandPrimaryLight,
++  },
++  rowTitle: {
++    fontSize: 16,
++    color: colors.textPrimary,
++    fontWeight: '600',
++    marginBottom: 2,
++  },
++  rowHint: {
++    color: colors.textSecondary,
++    fontSize: 12,
++  },
++  rowSub: {
++    color: colors.primary,
++    fontSize: 14,
++    fontWeight: '700',
++  },
++  emptyWrap: {
++    padding: spacing.xl,
++    alignItems: 'center',
++  },
++  emptyText: {
++    color: colors.textSecondary,
++    fontSize: 14,
++  },
+ });
+diff --git a/RifahMobile/src/screens/EditProfileScreen.tsx b/RifahMobile/src/screens/EditProfileScreen.tsx
+index 190ee95..9b05fdc 100644
+--- a/RifahMobile/src/screens/EditProfileScreen.tsx
++++ b/RifahMobile/src/screens/EditProfileScreen.tsx
+@@ -23,7 +23,7 @@ interface EditProfileScreenProps {
+ 
+ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
+     const { t, isRTL } = useLanguage();
+-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
++    const { scrollBottomPadding } = useScreenSafeArea();
+     const { isAuthenticated, user } = useAppSession();
+     const [loading, setLoading] = useState(false);
+     const [saving, setSaving] = useState(false);
+@@ -136,6 +136,7 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
+                         value={formData.dateOfBirth}
+                         onChangeText={(text) => setFormData((current) => ({ ...current, dateOfBirth: text }))}
+                         placeholder="YYYY-MM-DD"
++                        placeholderTextColor={colors.textTertiary}
+                     />
+                 </View>
+ 
+@@ -220,7 +221,7 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
+ const styles = StyleSheet.create({
+     container: {
+         flex: 1,
+-        backgroundColor: '#F7F4FF',
++        backgroundColor: colors.background,
+     },
+     centerContent: {
+         justifyContent: 'center',
+@@ -228,12 +229,12 @@ const styles = StyleSheet.create({
+     },
+     content: {
+         padding: spacing.lg,
+-        paddingBottom: spacing.xxl,
++        paddingTop: spacing.xl,
+     },
+     errorContainer: {
+-        backgroundColor: '#FEE2E2',
++        backgroundColor: colors.error + '11',
+         borderWidth: 1,
+-        borderColor: '#FCA5A5',
++        borderColor: colors.error,
+         borderRadius: borderRadius.md,
+         padding: spacing.md,
+         marginBottom: spacing.lg,
+@@ -243,72 +244,70 @@ const styles = StyleSheet.create({
+         fontSize: fontSize.sm,
+     },
+     inputGroup: {
+-        marginBottom: spacing.md,
+-        backgroundColor: '#FFFFFF',
+-        borderRadius: 16,
+-        padding: spacing.md,
+-        borderWidth: 1,
+-        borderColor: '#E9DDFD',
++        marginBottom: spacing.lg,
+     },
+     label: {
+-        fontSize: fontSize.md,
++        fontSize: 12,
+         fontWeight: '600',
+-        color: colors.text,
+-        marginBottom: spacing.xs,
++        color: colors.textSecondary,
++        textTransform: 'uppercase',
++        letterSpacing: 0.5,
++        marginBottom: 8,
+     },
+     input: {
+         borderWidth: 1,
+-        borderColor: '#E9DDFD',
+-        borderRadius: 14,
++        borderColor: colors.borderSubtle,
++        borderRadius: 16,
+         paddingHorizontal: spacing.md,
+         paddingVertical: spacing.md,
+-        fontSize: fontSize.md,
+-        color: colors.text,
+-        backgroundColor: '#FAFAFF',
+-        minHeight: 48,
++        fontSize: 16,
++        color: colors.textPrimary,
++        backgroundColor: colors.surface,
++        minHeight: 52,
+     },
+     rtlInput: {
+         textAlign: 'right',
+     },
+     genderButtons: {
+         flexDirection: 'row',
+-        gap: spacing.xs,
++        gap: spacing.sm,
+     },
+     genderButton: {
+         flex: 1,
+         borderWidth: 1,
+-        borderColor: '#DDD6FE',
+-        borderRadius: 14,
+-        paddingVertical: spacing.sm,
++        borderColor: colors.borderSubtle,
++        borderRadius: 16,
++        paddingVertical: spacing.md,
+         alignItems: 'center',
+-        backgroundColor: '#FFFFFF',
++        backgroundColor: colors.surface,
+     },
+     genderButtonSelected: {
+         backgroundColor: colors.primary,
+         borderColor: colors.primary,
+     },
+     genderButtonText: {
+-        fontSize: fontSize.sm,
+-        color: colors.text,
++        fontSize: 14,
++        fontWeight: '600',
++        color: colors.textPrimary,
+     },
+     genderButtonTextSelected: {
+         color: colors.textInverse,
+-        fontWeight: '700',
+     },
+     saveButton: {
+-        backgroundColor: '#7C3AED',
+-        borderRadius: borderRadius.lg,
+-        paddingVertical: spacing.md + 2,
++        backgroundColor: colors.primary,
++        borderRadius: 16,
++        paddingVertical: spacing.lg,
+         alignItems: 'center',
+-        marginTop: spacing.md,
+-        minHeight: 48,
++        marginTop: spacing.xl,
++        minHeight: 56,
++        justifyContent: 'center',
+     },
+     saveButtonDisabled: {
+         opacity: 0.6,
+     },
+     saveButtonText: {
+         color: colors.textInverse,
+-        fontSize: fontSize.xl,
++        fontSize: 16,
+         fontWeight: '700',
+     },
+ });
+diff --git a/RifahMobile/src/screens/GiftsScreen.tsx b/RifahMobile/src/screens/GiftsScreen.tsx
+index c84d9a6..e60861c 100644
+--- a/RifahMobile/src/screens/GiftsScreen.tsx
++++ b/RifahMobile/src/screens/GiftsScreen.tsx
+@@ -1,96 +1,17 @@
+ import React, { useEffect, useMemo, useState } from 'react';
+-import { ActivityIndicator, Alert, Image, ImageBackground, Modal, Pressable, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
++import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+ import { ThemedText as Text } from '../components/ThemedText';
+-import { AppIcon } from '../components/AppIcon';
+ import { PageHeader } from '../components/ui/PageHeader';
+ import { api } from '../api/client';
+ import { colors, fontSize, spacing } from '../theme/colors';
+ import { useLanguage } from '../contexts/LanguageContext';
+ import { useScreenSafeArea } from '../utils/safeArea';
+-import { LinearGradient } from 'expo-linear-gradient';
+ import { formatRiyal } from '../utils/currency';
+ import { useFocusEffect } from '@react-navigation/native';
+ 
+-type GiftPackage = {
+-  id: string;
+-  title?: string | null;
+-  description?: string | null;
+-  title_en: string;
+-  title_ar: string;
+-  description_en?: string | null;
+-  description_ar?: string | null;
+-  priceAmount: number;
+-  walletCreditAmount: number;
+-  bonusAmount: number;
+-  discountPreset?: string | null;
+-  discountPercent?: number | string | null;
+-  expirationPreset?: string | null;
+-  endsAt?: string | null;
+-  startsAt?: string | null;
+-  createdAt?: string | null;
+-};
+-
+-const EXPIRATION_PRESETS: Record<string, { labelEn: string; labelAr: string; days?: number }> = {
+-  '1_week': { labelEn: '1 week', labelAr: 'أسبوع واحد', days: 7 },
+-  '2_weeks': { labelEn: '2 weeks', labelAr: 'أسبوعان', days: 14 },
+-  '3_weeks': { labelEn: '3 weeks', labelAr: '3 أسابيع', days: 21 },
+-  '1_month': { labelEn: '1 month', labelAr: 'شهر واحد', days: 30 },
+-  '2_months': { labelEn: '2 months', labelAr: 'شهران', days: 60 },
+-  '3_months': { labelEn: '3 months', labelAr: '3 أشهر', days: 90 },
+-  '1_year': { labelEn: '1 year', labelAr: 'سنة واحدة', days: 365 },
+-  never: { labelEn: 'Never', labelAr: 'بدون انتهاء' }
+-};
+-
+-const getGiftPackageTitle = (pkg: GiftPackage) => pkg.title || pkg.title_en || pkg.title_ar || '-';
+-const getGiftPackageDescription = (pkg: GiftPackage) => pkg.description || pkg.description_en || pkg.description_ar || '';
+-const getGiftPackageDiscountPercent = (pkg: GiftPackage) => {
+-  if (pkg.discountPercent !== undefined && pkg.discountPercent !== null && `${pkg.discountPercent}`.trim() !== '') {
+-    const parsed = Number(pkg.discountPercent);
+-    if (Number.isFinite(parsed)) return parsed;
+-  }
+-  const wallet = Number(pkg.walletCreditAmount || 0);
+-  const price = Number(pkg.priceAmount || 0);
+-  if (wallet > 0 && price >= 0 && price <= wallet) {
+-    return Number((100 - ((price / wallet) * 100)).toFixed(2));
+-  }
+-  return 0;
+-};
+-
+-const getGiftPackageExpirationPreset = (pkg: GiftPackage) => {
+-  if (pkg.expirationPreset && EXPIRATION_PRESETS[pkg.expirationPreset]) return pkg.expirationPreset;
+-  if (!pkg.endsAt) return 'never';
+-  const startSource = pkg.createdAt || pkg.endsAt;
+-  const start = new Date(startSource);
+-  const end = new Date(pkg.endsAt);
+-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'never';
+-  const diffDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+-  const matched = Object.entries(EXPIRATION_PRESETS).find(([key, value]) => key !== 'never' && value.days && Math.abs(value.days - diffDays) <= 2);
+-  return matched?.[0] || 'never';
+-};
+-
+-type GiftHistoryItem = {
+-  id: string;
+-  tenantId?: string;
+-  status: string;
+-  totalCreditAmount: number;
+-  purchaseAmount: number;
+-  createdAt: string;
+-  tenant?: { name?: string; name_en?: string; name_ar?: string } | null;
+-};
+-
+ type WalletSummaryResponse = {
+   success: boolean;
+   summary?: {
+-    wallet?: {
+-      balance: number;
+-      currency?: string;
+-    };
+-    platformGift?: {
+-      receivedTotal?: number;
+-      pendingToOthersTotal?: number;
+-      sentPurchaseTotal?: number;
+-      transactionCount?: number;
+-    };
+     tenantGiftBalances?: Array<{
+       tenantId: string;
+       tenantName?: string | null;
+@@ -100,198 +21,26 @@ type WalletSummaryResponse = {
+   };
+ };
+ 
+-type RecipientCheckResult = {
+-  exists: boolean;
+-  recipient: null | {
+-    id: string;
+-    firstName?: string;
+-    lastName?: string;
+-    fullName?: string;
+-    email?: string;
+-    phone?: string;
+-    profileImage?: string | null;
+-  };
+-};
+-
+-const HERO_IMAGE = require('../../assets/wallethero.jpg');
+-
+ export function GiftsScreen({ navigation, route }: any) {
+-  const { language, isRTL } = useLanguage();
++  const { language, t } = useLanguage();
+   const sar = (value: number) => formatRiyal(Number(value || 0), language === 'ar' ? 'ar' : 'en');
+-  const tenantId = route?.params?.tenantId as string | undefined;
+-  const tenantName = route?.params?.tenantName as string | undefined;
+-  const [previewOnly, setPreviewOnly] = useState(Boolean(route?.params?.previewOnly));
+-  const showTenantGiftCards = Boolean(tenantId);
+-  const { topInset, scrollBottomPadding } = useScreenSafeArea();
++  const targetTenantId = route?.params?.tenantId as string | undefined;
++  const { scrollBottomPadding } = useScreenSafeArea();
+ 
+   const [loading, setLoading] = useState(true);
+-  const [saving, setSaving] = useState(false);
+-  const [packages, setPackages] = useState<GiftPackage[]>([]);
+-  const [refahBalance, setRefahBalance] = useState<number>(0);
+-  const [tenantCenterBalance, setTenantCenterBalance] = useState<number>(0);
+-  const [tenantCentersSummary, setTenantCentersSummary] = useState<Array<{ tenantId: string; balance: number }>>([]);
+-  const [history, setHistory] = useState<GiftHistoryItem[]>([]);
+-  const [selected, setSelected] = useState<GiftPackage | null>(null);
+-  const [mode, setMode] = useState<'self' | 'send'>('self');
+-  const [recipientEmail, setRecipientEmail] = useState('');
+-  const [recipientPhone, setRecipientPhone] = useState('');
+-  const [giftMessage, setGiftMessage] = useState('');
+-  const [checkingRecipient, setCheckingRecipient] = useState(false);
+-  const [recipientCheck, setRecipientCheck] = useState<RecipientCheckResult | null>(null);
+-  const [recipientDecision, setRecipientDecision] = useState<'none' | 'send_member' | 'send_email' | 'recharge_self'>('none');
+-  const [cardNumber, setCardNumber] = useState('');
+-  const [expiryDate, setExpiryDate] = useState('');
+-  const [cvv, setCvv] = useState('');
+-  const [cardholderName, setCardholderName] = useState('');
+-  const [claimCode, setClaimCode] = useState('');
+-  const [platformGiftReceivedTotal, setPlatformGiftReceivedTotal] = useState(0);
+-
+-  const centersBalance = useMemo(() => {
+-    if (tenantId) return Number(tenantCenterBalance || 0);
+-    return tenantCentersSummary.reduce((sum, item) => sum + Number(item.balance || 0), 0);
+-  }, [tenantId, tenantCenterBalance, tenantCentersSummary]);
+-  const centersCount = useMemo(() => {
+-    if (tenantId) return tenantCenterBalance > 0 ? 1 : 0;
+-    return tenantCentersSummary.length;
+-  }, [tenantId, tenantCenterBalance, tenantCentersSummary]);
+-
+-  const getStatusLabel = (status?: string) => {
+-    const key = (status || '').toLowerCase();
+-    if (language === 'ar') {
+-      if (key === 'redeemed') return 'تم الاستلام';
+-      if (key === 'sent_completed' || key === 'sent_completed_auto_wallet') return 'تم الإرسال';
+-      if (key === 'sent_pending_external_redeem') return 'بانتظار استخدام الكود';
+-      if (key === 'sent_pending_claim') return 'بانتظار الاستلام';
+-      if (key === 'purchased') return 'تم الشراء';
+-      if (key === 'cancelled') return 'ملغي';
+-      if (key === 'expired') return 'منتهي';
+-      return status || 'غير معروف';
+-    }
+-    if (key === 'redeemed') return 'Redeemed';
+-    if (key === 'sent_completed' || key === 'sent_completed_auto_wallet') return 'Sent';
+-    if (key === 'sent_pending_external_redeem') return 'Pending code redeem';
+-    if (key === 'sent_pending_claim') return 'Pending claim';
+-    if (key === 'purchased') return 'Purchased';
+-    if (key === 'cancelled') return 'Cancelled';
+-    if (key === 'expired') return 'Expired';
+-    return status || 'Unknown';
+-  };
+-
+-  const formatDateTime = (value?: string) => {
+-    if (!value) return '-';
+-    const date = new Date(value);
+-    if (Number.isNaN(date.getTime())) return value;
+-    return date.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US');
+-  };
+-
+-  const maskEmail = (value?: string) => {
+-    const email = `${value || ''}`.trim();
+-    if (!email.includes('@')) return email;
+-    const [name, domain] = email.split('@');
+-    if (!name) return email;
+-    const head = name.slice(0, 2);
+-    return `${head}${'*'.repeat(Math.max(1, name.length - 2))}@${domain}`;
+-  };
++  const [balances, setBalances] = useState<Array<{ tenantId: string; tenantName?: string | null; balance: number }>>([]);
+ 
+-  const maskPhone = (value?: string) => {
+-    const phone = `${value || ''}`.trim();
+-    if (phone.length <= 4) return phone;
+-    return `${phone.slice(0, 3)}${'*'.repeat(Math.max(2, phone.length - 5))}${phone.slice(-2)}`;
+-  };
+-
+-  useEffect(() => {
+-    const token = `${route?.params?.claimToken || ''}`.trim();
+-    const tenantToken = `${route?.params?.tenantClaimToken || ''}`.trim();
+-    if (!token && !tenantToken) return;
+-
+-    const claimGift = async () => {
+-      try {
+-        setSaving(true);
+-        if (tenantToken) {
+-          const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token: tenantToken });
+-          if (!response.success) Alert.alert('Error', response.message || 'Failed to claim gift');
+-          else Alert.alert('Success', `Gift claimed. New balance: ${sar(Number(response.walletBalance || 0))}`);
+-          await loadPackages();
+-          return;
+-        }
+-        try {
+-          const response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/claim', { token });
+-          if (!response.success) Alert.alert('Error', response.message || 'Failed to claim gift');
+-          else Alert.alert('Success', `Gift claimed. New balance: ${sar(Number(response.walletBalance || 0))}`);
+-          await loadPackages();
+-        } catch {
+-          const tenantResponse = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token });
+-          if (!tenantResponse.success) Alert.alert('Error', tenantResponse.message || 'Failed to claim gift');
+-          else Alert.alert('Success', `Gift claimed. New balance: ${sar(Number(tenantResponse.walletBalance || 0))}`);
+-          await loadPackages();
+-        }
+-      } catch (error: any) {
+-        Alert.alert('Error', error?.message || 'Failed to claim gift');
+-      } finally {
+-        setSaving(false);
+-        if (route?.params?.claimToken || route?.params?.tenantClaimToken) {
+-          navigation?.setParams?.({ claimToken: undefined, tenantClaimToken: undefined });
+-        }
+-      }
+-    };
+-
+-    claimGift();
+-  }, [route?.params?.claimToken, route?.params?.tenantClaimToken]);
+-
+-  useEffect(() => {
+-    setPreviewOnly(Boolean(route?.params?.previewOnly));
+-  }, [route?.params?.previewOnly]);
+-
+-  const loadPackages = async () => {
++  const loadBalances = async () => {
+     try {
+       setLoading(true);
+-      if (tenantId) {
+-        const response = await api.get<{ success: boolean; packages: GiftPackage[] }>(`/public/tenant/${tenantId}/gift-cards`);
+-        if (response.success) setPackages(response.packages || []);
+-        const summaryRes = await api.get<WalletSummaryResponse>('/users/wallet/summary').catch(() => null);
+-        if (summaryRes?.success && summaryRes.summary) {
+-          setRefahBalance(Number(summaryRes.summary.wallet?.balance || 0));
+-          const tenantBucket = (summaryRes.summary.tenantGiftBalances || []).find((entry: any) => entry.tenantId === tenantId);
+-          setTenantCenterBalance(Number(tenantBucket?.balance || 0));
+-          setTenantCentersSummary((summaryRes.summary.tenantGiftBalances || []).map((entry) => ({
+-            tenantId: entry.tenantId,
+-            balance: Number(entry.balance || 0),
+-          })));
+-        } else {
+-          const generalWallet = await api.getWalletBalance().catch(() => 0);
+-          setRefahBalance(Number(generalWallet || 0));
+-          const walletRes = await api.get<{ success: boolean; balance: number }>(`/users/tenant-gifts/wallet?tenantId=${encodeURIComponent(tenantId)}&limit=5`);
+-          if (walletRes.success) setTenantCenterBalance(Number(walletRes.balance || 0));
+-          setTenantCentersSummary([]);
+-        }
+-        const historyRes = await api.get<{ success: boolean; transactions: GiftHistoryItem[] }>('/users/tenant-gifts/history');
+-        if (historyRes.success) setHistory((historyRes.transactions || []).filter((tx: any) => tx.tenantId === tenantId).slice(0, 10));
++      const summaryRes = await api.get<WalletSummaryResponse>('/users/wallet/summary').catch(() => null);
++      if (summaryRes?.success && summaryRes.summary?.tenantGiftBalances) {
++        setBalances(summaryRes.summary.tenantGiftBalances);
+       } else {
+-        setPackages([]);
+-        const summaryRes = await api.get<WalletSummaryResponse>('/users/wallet/summary').catch(() => null);
+-        if (summaryRes?.success && summaryRes.summary?.wallet) {
+-          setRefahBalance(Number(summaryRes.summary.wallet.balance || 0));
+-          setPlatformGiftReceivedTotal(Number(summaryRes.summary.platformGift?.receivedTotal || 0));
+-          setTenantCentersSummary((summaryRes.summary.tenantGiftBalances || []).map((entry) => ({
+-            tenantId: entry.tenantId,
+-            balance: Number(entry.balance || 0),
+-          })));
+-        } else {
+-          const generalWallet = await api.getWalletBalance().catch(() => 0);
+-          setRefahBalance(generalWallet);
+-          setPlatformGiftReceivedTotal(0);
+-          setTenantCentersSummary([]);
+-        }
+-        setTenantCenterBalance(0);
+-        const historyRes = await api.get<{ success: boolean; transactions: GiftHistoryItem[] }>('/users/gifts/history');
+-        if (historyRes.success) {
+-          setHistory((historyRes.transactions || []).slice(0, 10));
+-        } else {
+-          setHistory([]);
+-        }
++        setBalances([]);
+       }
+-    } catch (error: any) {
+-      Alert.alert('Error', error?.message || 'Failed to load gift packages');
++    } catch (err) {
++      console.warn('Failed to load wallet summary', err);
+     } finally {
+       setLoading(false);
+     }
+@@ -299,530 +48,158 @@ export function GiftsScreen({ navigation, route }: any) {
+ 
+   useFocusEffect(
+     React.useCallback(() => {
+-      loadPackages();
+-    }, [tenantId])
++      loadBalances();
++    }, [])
+   );
+ 
+-  const handleSelfRecharge = async () => {
+-    if (!selected) return;
+-    const normalizedCardNumber = cardNumber.replace(/\s+/g, '').trim();
+-    const normalizedExpiry = expiryDate.trim();
+-    const normalizedCvv = cvv.trim();
+-    const normalizedHolder = cardholderName.trim();
+-    if (!normalizedCardNumber || !normalizedExpiry || !normalizedCvv || !normalizedHolder) {
+-      Alert.alert('Payment required', 'Please enter card details to continue.');
+-      return;
+-    }
+-
+-    try {
+-      setSaving(true);
+-      const finalResponse = tenantId
+-        ? await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/purchase', { tenantId, packageId: selected.id, cardNumber: normalizedCardNumber, expiryDate: normalizedExpiry, cvv: normalizedCvv, cardholderName: normalizedHolder })
+-        : await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/recharge', { packageId: selected.id, cardNumber: normalizedCardNumber, expiryDate: normalizedExpiry, cvv: normalizedCvv, cardholderName: normalizedHolder });
+-
+-      if (!finalResponse.success) {
+-        Alert.alert('Error', finalResponse.message || 'Failed to recharge wallet');
+-        return;
+-      }
+-      Alert.alert('Success', `Wallet recharged. New balance: ${sar(Number(finalResponse.walletBalance || 0))}`);
+-      setPreviewOnly(false);
+-      setSelected(null);
+-      setCardNumber('');
+-      setExpiryDate('');
+-      setCvv('');
+-      setCardholderName('');
+-      await loadPackages();
+-    } catch (error: any) {
+-      Alert.alert('Error', error?.message || 'Failed to recharge wallet');
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
+-
+-  const handleSendGift = async () => {
+-    if (!selected) return;
+-    if (!recipientEmail.trim() && !recipientPhone.trim()) {
+-      Alert.alert('Recipient required', 'Please enter recipient email or phone.');
+-      return;
+-    }
+-    const normalizedCardNumber = cardNumber.replace(/\s+/g, '').trim();
+-    const normalizedExpiry = expiryDate.trim();
+-    const normalizedCvv = cvv.trim();
+-    const normalizedHolder = cardholderName.trim();
+-    if (!normalizedCardNumber || !normalizedExpiry || !normalizedCvv || !normalizedHolder) {
+-      Alert.alert('Payment required', 'Please enter card details to continue.');
+-      return;
+-    }
+-
+-    try {
+-      setSaving(true);
+-      const endpoint = tenantId ? '/users/tenant-gifts/send' : '/users/gifts/send';
+-      const response = await api.post<{ success: boolean; message?: string }>(endpoint, {
+-        ...(tenantId ? { tenantId } : {}),
+-        packageId: selected.id,
+-        recipientEmail: recipientEmail.trim() || undefined,
+-        recipientPhone: recipientPhone.trim() || undefined,
+-        message: giftMessage.trim() || undefined,
+-        cardNumber: normalizedCardNumber,
+-        expiryDate: normalizedExpiry,
+-        cvv: normalizedCvv,
+-        cardholderName: normalizedHolder
+-      });
+-      if (!response.success) {
+-        Alert.alert('Error', response.message || 'Failed to send gift');
+-        return;
+-      }
+-      Alert.alert('Success', response.message || 'Gift sent successfully.');
+-      setPreviewOnly(false);
+-      setSelected(null);
+-      setRecipientEmail('');
+-      setRecipientPhone('');
+-      setGiftMessage('');
+-      setCardNumber('');
+-      setExpiryDate('');
+-      setCvv('');
+-      setCardholderName('');
+-    } catch (error: any) {
+-      Alert.alert('Error', error?.message || 'Failed to send gift');
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
+-
+-  const checkRecipient = async () => {
+-    const email = recipientEmail.trim();
+-    const phone = recipientPhone.trim();
+-    if (!email && !phone) {
+-      Alert.alert('Recipient required', 'Please enter recipient email or phone.');
+-      return;
+-    }
+-    try {
+-      setCheckingRecipient(true);
+-      setRecipientCheck(null);
+-      setRecipientDecision('none');
+-      const endpoint = tenantId ? '/users/tenant-gifts/recipient-check' : '/users/gifts/recipient-check';
+-      const query = `recipientEmail=${encodeURIComponent(email)}&recipientPhone=${encodeURIComponent(phone)}`;
+-      const result = await api.get<{ success: boolean; exists: boolean; recipient: RecipientCheckResult['recipient'] }>(`${endpoint}?${query}`);
+-      if (!result.success) {
+-        Alert.alert('Error', 'Failed to verify recipient');
+-        return;
+-      }
+-      const next = { exists: !!result.exists, recipient: result.recipient || null };
+-      setRecipientCheck(next);
+-      if (next.exists) {
+-        setRecipientDecision('send_member');
+-        return;
+-      }
+-
+-      if (!email) {
+-        setRecipientDecision('none');
+-        Alert.alert(
+-          language === 'ar' ? 'لا يوجد حساب' : 'No account found',
+-          language === 'ar'
+-            ? 'لم يتم العثور على حساب لهذا الجوال. أضف بريد المستلم لإرسال كود الهدية عبر البريد.'
+-            : 'No account matched this phone. Add recipient email to send gift code by email.'
+-        );
+-        return;
+-      }
+-
+-      Alert.alert(
+-        language === 'ar' ? 'المستلم لا يملك حساباً' : 'Recipient has no account',
+-        language === 'ar'
+-          ? 'هل تريد إرسال بطاقة الهدية إلى بريده الإلكتروني بدلاً من ذلك؟'
+-          : 'Would you like to send the gift card to their email instead?',
+-        [
+-          {
+-            text: language === 'ar' ? 'إلغاء' : 'Cancel',
+-            style: 'cancel',
+-            onPress: () => setRecipientDecision('none'),
+-          },
+-          {
+-            text: language === 'ar' ? 'إرسال بالبريد' : 'Send by Email',
+-            onPress: () => setRecipientDecision('send_email'),
+-          },
+-        ]
+-      );
+-    } catch (error: any) {
+-      Alert.alert('Error', error?.message || 'Failed to verify recipient');
+-    } finally {
+-      setCheckingRecipient(false);
++  const currentBalance = useMemo(() => {
++    if (balances.length === 0) return 0;
++    if (targetTenantId) {
++      const match = balances.find(b => b.tenantId === targetTenantId);
++      if (match) return match.balance;
+     }
+-  };
++    // Default to the first balance or primary
++    return balances[0].balance;
++  }, [balances, targetTenantId]);
+ 
+-  const handleConfirm = async () => {
+-    if (mode === 'self') return handleSelfRecharge();
+-    if (!recipientCheck) return Alert.alert('Verify recipient', 'Please check recipient first.');
+-    if (recipientCheck.exists) {
+-      if (recipientDecision !== 'send_member') return Alert.alert('Confirm recipient', 'Please confirm the recipient first.');
+-      return handleSendGift();
+-    }
+-    if (recipientDecision === 'recharge_self') return handleSelfRecharge();
+-    if (recipientDecision !== 'send_email') return Alert.alert('Choose action', 'Please choose an action for this recipient.');
+-    return handleSendGift();
+-  };
++  const walletTitle = language === 'ar' ? 'المحفظة' : 'Wallet';
+ 
+-  const handleClaimCode = async () => {
+-    const token = claimCode.trim();
+-    if (!token) {
+-      Alert.alert(language === 'ar' ? 'تنبيه' : 'Notice', language === 'ar' ? 'أدخل كود الهدية أولاً.' : 'Enter gift code first.');
+-      return;
++  const currentTenantName = useMemo(() => {
++    if (balances.length === 0) return walletTitle;
++    if (targetTenantId) {
++      const match = balances.find(b => b.tenantId === targetTenantId);
++      if (match && match.tenantName) return match.tenantName;
+     }
+-    try {
+-      setSaving(true);
+-      let response;
+-      try {
+-        response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/gifts/claim', { token });
+-      } catch {
+-        response = await api.post<{ success: boolean; walletBalance: number; message?: string }>('/users/tenant-gifts/claim', { token });
+-      }
+-      if (!response.success) {
+-        Alert.alert('Error', response.message || 'Failed to claim gift');
+-        return;
+-      }
+-      setClaimCode('');
+-      Alert.alert(language === 'ar' ? 'نجاح' : 'Success', language === 'ar' ? 'تم استلام الهدية بنجاح.' : 'Gift claimed successfully.');
+-      await loadPackages();
+-    } catch (error: any) {
+-      Alert.alert('Error', error?.message || 'Failed to claim gift');
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
++    return balances[0].tenantName || walletTitle;
++  }, [balances, targetTenantId, t]);
+ 
+   return (
+     <View style={styles.container}>
+-      <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.xl }}>
+-        <ImageBackground source={HERO_IMAGE} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
+-          <LinearGradient colors={['rgba(38,12,89,0.85)', 'rgba(93,47,153,0.35)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+-          <PageHeader
+-            title={language === 'ar' ? 'الهدايا والمحفظة' : 'Gifts & Wallet'}
+-            showBack
+-            onBack={() => navigation.goBack()}
+-            variant="transparent"
+-            rightAction={
+-              <TouchableOpacity style={styles.heroGlassBtn}>
+-                <AppIcon name="card_giftcard" size={20} color="#FFFFFF" />
+-              </TouchableOpacity>
+-            }
+-          />
+-          <Text style={styles.heroTitle}>{language === 'ar' ? 'الهدايا والمحفظة' : 'Gifts & Wallet'}</Text>
+-          <Text style={styles.heroSubTitle}>{language === 'ar' ? 'أرصدة الهدايا ونشاطك في مكان واحد.' : 'Your balances, gifts and activity in one place.'}</Text>
+-        </ImageBackground>
+-
+-        <View style={styles.contentWrap}>
+-          {!previewOnly ? (
+-            <View style={styles.balanceRow}>
+-              <TouchableOpacity style={[styles.balanceCard, { marginRight: spacing.sm }]} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: refahBalance || 0, history })} activeOpacity={0.9}>
+-                <View style={styles.balanceIcon}><AppIcon name="account_balance_wallet" size={20} color={colors.primary} /></View>
+-                <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}</Text>
+-                <Text style={styles.balanceAmount}>{sar(Number(refahBalance || 0))}</Text>
+-                <Text style={styles.balanceMeta}>
+-                  {tenantId
+-                    ? (language === 'ar' ? 'رصيد بطاقات هذا المركز' : 'This center gift balance')
+-                    : (language === 'ar'
+-                      ? `متاح لكل المراكز${platformGiftReceivedTotal > 0 ? ` • هدايا مستلمة ${sar(platformGiftReceivedTotal)}` : ''}`
+-                      : `Usable across all centers${platformGiftReceivedTotal > 0 ? ` • Received gifts ${sar(platformGiftReceivedTotal)}` : ''}`)}
+-                </Text>
+-              </TouchableOpacity>
++      <PageHeader title={walletTitle} showBack onBack={() => navigation.goBack()} />
++      
++      {loading && balances.length === 0 ? (
++        <View style={styles.center}>
++          <ActivityIndicator size="large" color={colors.primary} />
++        </View>
++      ) : (
++        <ScrollView
++          style={styles.content}
++          contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.xl, paddingTop: spacing.md }}
++        >
++          {/* Current Balance Card */}
++          <View style={styles.balanceCard}>
++            <Text style={styles.balanceLabel}>
++              {language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}
++            </Text>
++            <Text style={styles.balanceAmount}>{sar(currentBalance)}</Text>
++            <Text style={styles.tenantName}>{currentTenantName}</Text>
++          </View>
+ 
+-              <TouchableOpacity style={[styles.balanceCard, styles.centerBalanceCard]} onPress={() => navigation.navigate('CentersBalance', { centersBalance, history })} activeOpacity={0.9}>
+-                <View style={[styles.balanceIcon, styles.centerBalanceIcon]}><AppIcon name="storefront" size={20} color="#7A4F00" /></View>
+-                <Text style={styles.balanceLabel}>{language === 'ar' ? 'رصيد المراكز' : 'Centers Balance'}</Text>
+-                <Text style={styles.balanceAmount}>{sar(Number(centersBalance || 0))}</Text>
+-                <Text style={styles.balanceMeta}>{language === 'ar' ? `عبر ${centersCount || 0} مراكز` : `Across ${centersCount || 0} centers`}</Text>
+-              </TouchableOpacity>
+-            </View>
+-          ) : (
+-            <View style={styles.previewNotice}>
+-              <AppIcon name="info" size={16} color={colors.primary} />
+-              <Text style={styles.previewNoticeText}>
+-                {language === 'ar'
+-                  ? 'استعرض بطاقات هذا المركز أولاً. سيتم تحديث الرصيد فقط بعد إتمام الشراء.'
+-                  : 'Browse this center first. Balance updates only after purchase is completed.'}
++          {/* All Balances */}
++          {balances.length > 0 && (
++            <View style={styles.allBalancesSection}>
++              <Text style={styles.sectionTitle}>
++                {language === 'ar' ? 'كل الأرصدة' : 'All Balances'}
+               </Text>
+-            </View>
+-          )}
+-
+-          {!previewOnly && showTenantGiftCards ? (
+-            <>
+-              <View style={styles.quickRow}>
+-                <TouchableOpacity style={styles.quickCard} onPress={handleClaimCode}>
+-                  <View style={styles.quickIconWrap}>
+-                    <AppIcon name="sparkles" size={18} color={colors.primary} />
+-                  </View>
+-                  <Text style={styles.quickText}>{language === 'ar' ? 'استبدال كود الهدية' : 'Redeem Gift Code'}</Text>
+-                </TouchableOpacity>
+-                <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('WalletBalanceDetails', { walletBalance: refahBalance || 0, history })}>
+-                  <View style={styles.quickIconWrap}>
+-                    <AppIcon name="file" size={18} color={colors.primary} />
++              <View style={styles.balancesList}>
++                {balances.map((item) => (
++                  <View key={item.tenantId} style={styles.balanceItem}>
++                    <Text style={styles.itemTenantName} numberOfLines={1}>
++                      {item.tenantName || 'BarSpa'}
++                    </Text>
++                    <Text style={styles.itemBalance}>{sar(item.balance)}</Text>
+                   </View>
+-                  <Text style={styles.quickText}>{language === 'ar' ? 'سجل المحفظة والهدايا' : 'Wallet & Gift History'}</Text>
+-                </TouchableOpacity>
+-              </View>
+-              <View style={styles.claimRow}>
+-                <TextInput
+-                  style={[styles.input, styles.claimInput]}
+-                  value={claimCode}
+-                  onChangeText={setClaimCode}
+-                  placeholder={language === 'ar' ? 'أدخل كود الهدية' : 'Enter gift code'}
+-                  autoCapitalize="none"
+-                />
+-                <TouchableOpacity style={styles.claimBtn} onPress={handleClaimCode} disabled={saving}>
+-                  <Text style={styles.claimBtnText}>{language === 'ar' ? 'استلام' : 'Claim'}</Text>
+-                </TouchableOpacity>
+-              </View>
+-            </>
+-          ) : null}
+-
+-          {showTenantGiftCards ? (
+-            <>
+-              <View style={styles.sectionHeaderRow}>
+-                <View style={{ flex: 1 }}>
+-                  <Text style={styles.sectionTitle}>{language === 'ar' ? 'بطاقات رفاه ✨' : 'Refah Gift Cards ✨'}</Text>
+-                  <Text style={styles.sectionSubTitle}>{language === 'ar' ? 'أهدِ الرفاهية والعناية لمن تحب.' : 'Give the gift of wellness, self-care and joy.'}</Text>
+-                </View>
++                ))}
+               </View>
+-
+-              {loading ? <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} /> : null}
+-              {packages.map((pkg, index) => {
+-                const title = getGiftPackageTitle(pkg);
+-                const desc = getGiftPackageDescription(pkg);
+-                const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
+-                const discountPercent = getGiftPackageDiscountPercent(pkg);
+-                const expirationPreset = getGiftPackageExpirationPreset(pkg);
+-                const expirationLabel = EXPIRATION_PRESETS[expirationPreset]?.[language === 'ar' ? 'labelAr' : 'labelEn'] || (language === 'ar' ? 'غير محدد' : 'Unspecified');
+-                return (
+-                  <TouchableOpacity key={pkg.id} style={styles.giftCard} onPress={() => setSelected(pkg)} activeOpacity={0.95}>
+-                    <ImageBackground source={HERO_IMAGE} style={styles.giftHero} imageStyle={styles.giftHeroImage}>
+-                      {index === 0 ? <View style={styles.badgePill}><Text style={styles.badgeText}>{language === 'ar' ? 'الأكثر شعبية' : 'Most Popular'}</Text></View> : null}
+-                      <View style={styles.pricePill}><Text style={styles.pricePillText}>{sar(Number(pkg.priceAmount))}</Text></View>
+-                    </ImageBackground>
+-                      <View style={styles.giftBody}>
+-                        <Text style={styles.giftTitle}>{title}</Text>
+-                        {!!desc ? <Text style={styles.giftDesc} numberOfLines={2}>{desc}</Text> : null}
+-                        <View style={styles.metaRow}>
+-                          <View style={styles.metaPill}><Text style={styles.metaPillText}>{language === 'ar' ? 'القيمة' : 'Value'} {sar(Number(pkg.walletCreditAmount || 0))}</Text></View>
+-                          <View style={styles.metaPill}><Text style={styles.metaPillText}>{language === 'ar' ? 'الخصم' : 'Discount'} {discountPercent.toFixed(2)}%</Text></View>
+-                          <View style={styles.metaPill}><Text style={styles.metaPillText}>{expirationLabel}</Text></View>
+-                        </View>
+-                        <View style={styles.payGetBlock}>
+-                          <View>
+-                            <Text style={styles.payGetLabel}>{language === 'ar' ? 'أنت تدفع' : 'You Pay'}</Text>
+-                            <Text style={styles.payGetPay}>{sar(Number(pkg.priceAmount))}</Text>
+-                          </View>
+-                        <Text style={styles.payGetArrow}>{isRTL ? '←' : '→'}</Text>
+-                        <View style={{ alignItems: 'flex-end' }}>
+-                          <Text style={[styles.payGetLabel, { color: '#0F8A4B' }]}>{language === 'ar' ? 'تحصل على' : 'You Get'}</Text>
+-                          <Text style={styles.payGetGet}>{sar(totalCredit)}</Text>
+-                          </View>
+-                        </View>
+-                        <View style={styles.footerRow}>
+-                          {Number(pkg.bonusAmount || 0) > 0 ? <View style={styles.bonusPill}><Text style={styles.bonusText}>+ {sar(Number(pkg.bonusAmount))} {language === 'ar' ? 'مكافأة' : 'Bonus'}</Text></View> : <View />}
+-                          <View style={styles.validityRow}><AppIcon name="event" size={14} color={colors.textSecondary} /><Text style={styles.validityText}>{expirationLabel}</Text></View>
+-                        </View>
+-                        <TouchableOpacity style={styles.buyBtn} onPress={() => setSelected(pkg)}>
+-                          <Text style={styles.buyBtnText}>{language === 'ar' ? 'شراء / إرسال هدية' : 'Buy / Send Gift'}</Text>
+-                        </TouchableOpacity>
+-                      </View>
+-                    </TouchableOpacity>
+-                );
+-              })}
+-            </>
+-          ) : null}
+-
+-          {!!history.length && (
+-            <View style={styles.activityCard}>
+-              <Text style={styles.sectionTitle}>{language === 'ar' ? 'آخر نشاط الهدايا ✨' : 'Recent Gift Activity ✨'}</Text>
+-              {history.map((item) => (
+-                <View key={item.id} style={styles.activityRow}>
+-                  <View style={styles.activityIconWrap}><AppIcon name="receipt_long" size={16} color={colors.primary} /></View>
+-                  <View style={{ flex: 1 }}>
+-                    <Text style={styles.activityTitle}>{getStatusLabel(item.status)}</Text>
+-                    <Text style={styles.activitySub}>{formatDateTime(item.createdAt)}</Text>
+-                  </View>
+-                  <Text style={styles.activityAmount}>+{sar(Number(item.totalCreditAmount || 0))}</Text>
+-                </View>
+-              ))}
+             </View>
+           )}
+-
+-          <View style={styles.trustBanner}>
+-            <AppIcon name="verified_user" size={20} color={colors.primary} />
+-            <View style={{ flex: 1 }}>
+-              <Text style={styles.trustTitle}>{language === 'ar' ? 'آمن وموثوق' : 'Secure & Trusted'}</Text>
+-              <Text style={styles.trustSub}>{language === 'ar' ? 'جميع العمليات مشفرة وبياناتك محمية دائماً.' : 'All transactions are secure and your data is always protected.'}</Text>
+-            </View>
+-          </View>
+-        </View>
+-      </ScrollView>
+-
+-      <Modal visible={!!selected} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
+-        <Pressable style={styles.modalBackdrop} onPress={() => { setSelected(null); setRecipientCheck(null); setRecipientDecision('none'); }}>
+-          <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
+-            <Text style={styles.modalTitle}>{language === 'ar' ? 'اختر الإجراء' : 'Choose action'}</Text>
+-            {selected ? (
+-              <View style={styles.selectedSummaryCard}>
+-                <Text style={styles.selectedSummaryTitle}>{getGiftPackageTitle(selected)}</Text>
+-                {!!getGiftPackageDescription(selected) ? <Text style={styles.selectedSummaryDesc}>{getGiftPackageDescription(selected)}</Text> : null}
+-                <View style={styles.selectedSummaryRow}>
+-                  <View style={styles.selectedSummaryPill}><Text style={styles.selectedSummaryPillText}>{language === 'ar' ? 'القيمة' : 'Value'} {sar(Number(selected.walletCreditAmount || 0))}</Text></View>
+-                  <View style={styles.selectedSummaryPill}><Text style={styles.selectedSummaryPillText}>{language === 'ar' ? 'السعر' : 'Price'} {sar(Number(selected.priceAmount || 0))}</Text></View>
+-                  <View style={styles.selectedSummaryPill}><Text style={styles.selectedSummaryPillText}>{language === 'ar' ? 'الخصم' : 'Discount'} {getGiftPackageDiscountPercent(selected).toFixed(2)}%</Text></View>
+-                  <View style={styles.selectedSummaryPill}><Text style={styles.selectedSummaryPillText}>{EXPIRATION_PRESETS[getGiftPackageExpirationPreset(selected)]?.[language === 'ar' ? 'labelAr' : 'labelEn'] || (language === 'ar' ? 'غير محدد' : 'Unspecified')}</Text></View>
+-                </View>
+-              </View>
+-            ) : null}
+-            <View style={styles.modeRow}>
+-              <TouchableOpacity style={[styles.modeBtn, mode === 'self' && styles.modeBtnActive]} onPress={() => { setMode('self'); setRecipientCheck(null); setRecipientDecision('none'); }}><Text style={[styles.modeText, mode === 'self' && styles.modeTextActive]}>{language === 'ar' ? 'إضافة لمحفظتي' : 'Add to my wallet'}</Text></TouchableOpacity>
+-              <TouchableOpacity style={[styles.modeBtn, mode === 'send' && styles.modeBtnActive]} onPress={() => setMode('send')}><Text style={[styles.modeText, mode === 'send' && styles.modeTextActive]}>{language === 'ar' ? 'إرسال لشخص' : 'Send to someone'}</Text></TouchableOpacity>
+-            </View>
+-            {mode === 'send' ? (
+-              <View style={{ gap: spacing.sm }}>
+-                <Text style={styles.inputLabel}>{language === 'ar' ? 'البريد الإلكتروني للمستلم' : 'Recipient Email'}</Text>
+-                <TextInput style={styles.input} value={recipientEmail} onChangeText={setRecipientEmail} placeholder={language === 'ar' ? 'بريد المستلم' : 'Recipient email'} keyboardType="email-address" autoCapitalize="none" />
+-                <Text style={styles.inputLabel}>{language === 'ar' ? 'جوال المستلم' : 'Recipient Phone'}</Text>
+-                <TextInput style={styles.input} value={recipientPhone} onChangeText={setRecipientPhone} placeholder={language === 'ar' ? 'جوال المستلم' : 'Recipient phone'} keyboardType="phone-pad" />
+-                <Text style={styles.inputLabel}>{language === 'ar' ? 'الرسالة (اختياري)' : 'Message (Optional)'}</Text>
+-                <TextInput style={styles.input} value={giftMessage} onChangeText={setGiftMessage} placeholder={language === 'ar' ? 'رسالة (اختياري)' : 'Message (optional)'} />
+-                <TouchableOpacity style={styles.checkBtn} onPress={checkRecipient} disabled={checkingRecipient}>{checkingRecipient ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.checkBtnText}>{language === 'ar' ? 'تحقق من المستلم' : 'Check recipient'}</Text>}</TouchableOpacity>
+-                {recipientCheck?.exists && recipientCheck.recipient ? (
+-                  <View style={styles.recipientCard}>
+-                    <Text style={styles.recipientTitle}>{language === 'ar' ? 'تم العثور على المستلم' : 'Recipient found'}</Text>
+-                    <Text style={styles.recipientLine}>
+-                      {(recipientCheck.recipient.fullName || `${recipientCheck.recipient.firstName || ''} ${recipientCheck.recipient.lastName || ''}`.trim() || (language === 'ar' ? 'مستخدم رفاه' : 'Refah User'))}
+-                    </Text>
+-                    {!!recipientCheck.recipient.email && <Text style={styles.recipientMeta}>{maskEmail(recipientCheck.recipient.email)}</Text>}
+-                    {!!recipientCheck.recipient.phone && <Text style={styles.recipientMeta}>{maskPhone(recipientCheck.recipient.phone)}</Text>}
+-                  </View>
+-                ) : null}
+-                {recipientCheck && !recipientCheck.exists && recipientDecision === 'send_email' ? (
+-                  <View style={styles.recipientCard}>
+-                    <Text style={styles.recipientTitle}>{language === 'ar' ? 'المستلم لا يملك حساباً' : 'Recipient has no account'}</Text>
+-                    <Text style={styles.recipientMeta}>
+-                      {language === 'ar'
+-                        ? 'سيتم إرسال كود الهدية إلى البريد الإلكتروني الذي أدخلته.'
+-                        : 'Gift code will be sent to the entered email.'}
+-                    </Text>
+-                  </View>
+-                ) : null}
+-              </View>
+-            ) : null}
+-            {(mode === 'self' || (mode === 'send' && recipientCheck?.exists && recipientDecision === 'send_member') || (mode === 'send' && !recipientCheck?.exists && (recipientDecision === 'send_email' || recipientDecision === 'recharge_self'))) && (
+-              <View style={{ gap: spacing.sm }}>
+-                <Text style={styles.paymentTitle}>{language === 'ar' ? 'بيانات الدفع' : 'Payment details'}</Text>
+-                <Text style={styles.inputLabel}>{language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder Name'}</Text>
+-                <TextInput style={styles.input} value={cardholderName} onChangeText={setCardholderName} placeholder={language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder name'} autoCapitalize="words" />
+-                <Text style={styles.inputLabel}>{language === 'ar' ? 'رقم البطاقة' : 'Card Number'}</Text>
+-                <TextInput style={styles.input} value={cardNumber} onChangeText={setCardNumber} placeholder={language === 'ar' ? 'رقم البطاقة' : 'Card number'} keyboardType="number-pad" />
+-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+-                  <View style={{ flex: 1, gap: 6 }}>
+-                    <Text style={styles.inputLabel}>{language === 'ar' ? 'تاريخ الانتهاء (MM/YY)' : 'Expiry Date (MM/YY)'}</Text>
+-                    <TextInput style={[styles.input, { flex: 1 }]} value={expiryDate} onChangeText={setExpiryDate} placeholder="MM/YY" />
+-                  </View>
+-                  <View style={{ flex: 1, gap: 6 }}>
+-                    <Text style={styles.inputLabel}>{language === 'ar' ? 'رمز الأمان (CVV)' : 'CVV'}</Text>
+-                    <TextInput style={[styles.input, { flex: 1 }]} value={cvv} onChangeText={setCvv} placeholder="CVV" keyboardType="number-pad" secureTextEntry />
+-                  </View>
+-                </View>
+-              </View>
+-            )}
+-            <TouchableOpacity style={[styles.submitBtn, saving && { opacity: 0.7 }]} onPress={handleConfirm} disabled={saving}>
+-              {saving ? <ActivityIndicator color={colors.textInverse} /> : <Text style={styles.submitText}>{language === 'ar' ? 'تأكيد' : 'Confirm'}</Text>}
+-            </TouchableOpacity>
+-          </Pressable>
+-        </Pressable>
+-      </Modal>
++        </ScrollView>
++      )}
+     </View>
+   );
+ }
+ 
+ const styles = StyleSheet.create({
+-  container: { flex: 1, backgroundColor: '#FAF8FC' },
+-  hero: { minHeight: 320, paddingHorizontal: spacing.md, paddingBottom: spacing.lg, justifyContent: 'space-between' },
+-  heroImage: { borderBottomLeftRadius: 36, borderBottomRightRadius: 36 },
+-  heroTopBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+-  heroGlassBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.24)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.38)' },
+-  heroTitle: { fontSize: 36, lineHeight: 40, fontWeight: '800', color: '#FFFFFF', marginTop: spacing.xl },
+-  heroSubTitle: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.92)', marginTop: spacing.xs },
+-  contentWrap: { paddingHorizontal: spacing.md, marginTop: -50 },
+-  balanceRow: { flexDirection: 'row', marginBottom: spacing.md },
+-  balanceCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 24, padding: spacing.md, borderWidth: 1, borderColor: '#EDE3FD' },
+-  centerBalanceCard: { borderColor: '#F2E3C3' },
+-  balanceIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F2E9FF', marginBottom: spacing.xs },
+-  centerBalanceIcon: { backgroundColor: '#FFF4DC' },
+-  balanceLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '600' },
+-  balanceAmount: { color: colors.text, fontSize: 17, fontWeight: '800', marginTop: 4 },
+-  balanceMeta: { color: colors.textSecondary, fontSize: 9, marginTop: 4 },
+-  previewNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F4F0FF', borderRadius: 16, padding: spacing.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E6DBFF' },
+-  previewNoticeText: { flex: 1, color: colors.textSecondary, fontSize: 11, lineHeight: 16 },
+-  quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+-  quickCard: { flex: 1, minHeight: 84, borderRadius: 20, backgroundColor: '#F6F0FF', borderWidth: 1, borderColor: '#E7DAFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, gap: 8 },
+-  quickIconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEE5FF' },
+-  quickText: { fontSize: 11, color: colors.primary, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
+-  claimRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+-  claimInput: { flex: 1 },
+-  claimBtn: { minWidth: 96, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6D28D9', paddingHorizontal: spacing.md },
+-  claimBtnText: { color: '#FFFFFF', fontSize: fontSize.sm, fontWeight: '700' },
+-  sectionHeaderRow: { marginBottom: spacing.sm },
+-  sectionTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.text },
+-  sectionSubTitle: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
+-  giftCard: { borderRadius: 28, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EDE3FD', overflow: 'hidden', marginBottom: spacing.md },
+-  giftHero: { height: 185, padding: spacing.sm, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+-  giftHeroImage: { borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+-  badgePill: { backgroundColor: '#7C3AED', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+-  badgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '700' },
+-  pricePill: { backgroundColor: 'rgba(20,16,30,0.55)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+-  pricePillText: { color: '#FFFFFF', fontSize: 9, fontWeight: '700' },
+-  giftBody: { padding: spacing.md, gap: spacing.sm },
+-  giftTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+-  giftDesc: { fontSize: 11, color: colors.textSecondary, lineHeight: 16 },
+-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+-  metaPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F4F0FF', borderWidth: 1, borderColor: '#E2D8FF' },
+-  metaPillText: { fontSize: 10, color: '#5D36B0', fontWeight: '700' },
+-  payGetBlock: { borderRadius: 18, padding: spacing.sm, borderWidth: 1, borderColor: '#E8E0F8', backgroundColor: '#F8F5FF', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+-  payGetLabel: { fontSize: 9, color: colors.textSecondary, fontWeight: '600' },
+-  payGetPay: { fontSize: 12, color: colors.text, fontWeight: '800' },
+-  payGetArrow: { color: colors.primary, fontWeight: '700', fontSize: fontSize.lg },
+-  payGetGet: { fontSize: 12, color: '#0F8A4B', fontWeight: '800' },
+-  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
+-  bonusPill: { alignSelf: 'flex-start', backgroundColor: '#E8F7EE', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+-  bonusText: { color: '#0F8A4B', fontSize: 10, fontWeight: '700' },
+-  validityRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+-  validityText: { color: colors.textSecondary, fontSize: 10 },
+-  buyBtn: { minHeight: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6D28D9' },
+-  buyBtnText: { color: '#FFFFFF', fontSize: fontSize.sm, fontWeight: '700' },
+-  activityCard: { borderRadius: 22, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EDE3FD', padding: spacing.md, marginBottom: spacing.md },
+-  activityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: 1, borderTopColor: '#F0E9FC', paddingTop: spacing.sm, marginTop: spacing.sm },
+-  activityIconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F2E9FF' },
+-  activityTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
+-  activitySub: { color: colors.textSecondary, fontSize: 9 },
+-  activityAmount: { color: colors.primary, fontWeight: '800', fontSize: fontSize.sm },
+-  trustBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: 24, backgroundColor: '#F3ECFF', borderWidth: 1, borderColor: '#E9DBFF', padding: spacing.md },
+-  trustTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
+-  trustSub: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
+-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(18, 13, 33, 0.55)' },
+-  modalCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md, borderWidth: 1, borderColor: '#E9DDFD' },
+-  modalTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+-  selectedSummaryCard: { borderRadius: 20, backgroundColor: '#F7F3FF', borderWidth: 1, borderColor: '#E7DBFF', padding: spacing.md, gap: spacing.sm },
+-  selectedSummaryTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.text },
+-  selectedSummaryDesc: { fontSize: 11, color: colors.textSecondary, lineHeight: 16 },
+-  selectedSummaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+-  selectedSummaryPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2D8FF' },
+-  selectedSummaryPillText: { fontSize: 10, color: '#5D36B0', fontWeight: '700' },
+-  modeRow: { flexDirection: 'row', gap: spacing.sm },
+-  modeBtn: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: '#D8C7FA', paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: '#FFFFFF' },
+-  modeBtnActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },
+-  modeText: { color: colors.text, fontSize: fontSize.sm, fontWeight: '600' },
+-  modeTextActive: { color: colors.primary },
+-  checkBtn: { borderWidth: 1, borderColor: colors.primary, borderRadius: 14, paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: '#F5F3FF' },
+-  checkBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
+-  recipientCard: { borderRadius: 14, borderWidth: 1, borderColor: '#D8C7FA', backgroundColor: '#F6F1FF', padding: spacing.sm, gap: 4 },
+-  recipientTitle: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+-  recipientLine: { color: colors.text, fontSize: 13, fontWeight: '700' },
+-  recipientMeta: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' },
+-  paymentTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: '700' },
+-  inputLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+-  input: { minHeight: 46, borderWidth: 1, borderColor: '#E9DDFD', borderRadius: 14, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: '#FAFAFF', color: colors.text },
+-  submitBtn: { backgroundColor: '#7C3AED', borderRadius: 16, alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.md },
+-  submitText: { color: colors.textInverse, fontWeight: '700', fontSize: fontSize.md }
++  container: {
++    flex: 1,
++    backgroundColor: colors.background,
++  },
++  center: {
++    flex: 1,
++    justifyContent: 'center',
++    alignItems: 'center',
++  },
++  content: {
++    flex: 1,
++  },
++  balanceCard: {
++    backgroundColor: colors.surface,
++    marginHorizontal: spacing.lg,
++    padding: spacing.xl,
++    borderRadius: 16,
++    alignItems: 'center',
++    shadowColor: colors.brandPrimary,
++    shadowOffset: { width: 0, height: 8 },
++    shadowOpacity: 0.05,
++    shadowRadius: 16,
++    elevation: 2,
++    borderWidth: 1,
++    borderColor: colors.borderSubtle,
++  },
++  balanceLabel: {
++    fontSize: 14,
++    color: colors.textSecondary,
++    marginBottom: spacing.xs,
++    fontWeight: '600',
++    textTransform: 'uppercase',
++    letterSpacing: 0.5,
++  },
++  balanceAmount: {
++    fontSize: 40,
++    fontWeight: '800',
++    color: colors.primary,
++    marginBottom: spacing.xs,
++  },
++  tenantName: {
++    fontSize: 16,
++    color: colors.textPrimary,
++    fontWeight: '600',
++  },
++  allBalancesSection: {
++    paddingHorizontal: spacing.lg,
++    marginTop: spacing.xl,
++  },
++  sectionTitle: {
++    fontSize: 20,
++    fontWeight: '800',
++    color: colors.textPrimary,
++    marginBottom: spacing.md,
++  },
++  balancesList: {
++    backgroundColor: colors.surface,
++    borderRadius: 16,
++    borderWidth: 1,
++    borderColor: colors.borderSubtle,
++    overflow: 'hidden',
++  },
++  balanceItem: {
++    flexDirection: 'row',
++    justifyContent: 'space-between',
++    alignItems: 'center',
++    padding: spacing.lg,
++    borderBottomWidth: 1,
++    borderBottomColor: colors.borderSubtle,
++  },
++  itemTenantName: {
++    fontSize: 16,
++    fontWeight: '600',
++    color: colors.textPrimary,
++    flex: 1,
++    marginRight: spacing.md,
++  },
++  itemBalance: {
++    fontSize: 16,
++    fontWeight: '700',
++    color: colors.primary,
++  },
+ });
+diff --git a/RifahMobile/src/screens/InfoPageScreen.tsx b/RifahMobile/src/screens/InfoPageScreen.tsx
+index f0adebc..fa58182 100644
+--- a/RifahMobile/src/screens/InfoPageScreen.tsx
++++ b/RifahMobile/src/screens/InfoPageScreen.tsx
+@@ -24,7 +24,7 @@ const FALLBACK_KEYS = {
+ 
+ export function InfoPageScreen({ navigation, route }: InfoPageScreenProps) {
+     const { language, t } = useLanguage();
+-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
++    const { scrollBottomPadding } = useScreenSafeArea();
+     const [content, setContent] = useState<PublicAppContent | null>(null);
+     const [loading, setLoading] = useState(true);
+ 
+@@ -95,30 +95,6 @@ const styles = StyleSheet.create({
+         flex: 1,
+         backgroundColor: colors.background,
+     },
+-    header: {
+-        flexDirection: 'row',
+-        alignItems: 'center',
+-        justifyContent: 'space-between',
+-        paddingHorizontal: spacing.lg,
+-        paddingBottom: spacing.lg,
+-        backgroundColor: colors.surface,
+-        borderBottomWidth: 1,
+-        borderBottomColor: colors.border,
+-    },
+-    backText: {
+-        fontSize: fontSize.xl,
+-        color: colors.text,
+-    },
+-    headerTitle: {
+-        flex: 1,
+-        textAlign: 'center',
+-        fontSize: fontSize.lg,
+-        color: colors.text,
+-        fontWeight: '700',
+-    },
+-    headerSpacer: {
+-        width: 24,
+-    },
+     loadingWrap: {
+         flex: 1,
+         alignItems: 'center',
+@@ -129,20 +105,26 @@ const styles = StyleSheet.create({
+     },
+     card: {
+         backgroundColor: colors.surface,
+-        borderRadius: 20,
++        borderRadius: 16,
+         borderWidth: 1,
+-        borderColor: colors.border,
+-        padding: spacing.lg,
++        borderColor: colors.borderSubtle,
++        padding: spacing.xl,
+         gap: spacing.md,
++        shadowColor: colors.brandPrimary,
++        shadowOffset: { width: 0, height: 8 },
++        shadowOpacity: 0.05,
++        shadowRadius: 14,
++        elevation: 2,
+     },
+     title: {
+-        fontSize: fontSize.xl,
+-        fontWeight: '700',
+-        color: colors.text,
++        fontSize: 24,
++        fontWeight: '800',
++        color: colors.textPrimary,
++        marginBottom: spacing.xs,
+     },
+     body: {
+-        fontSize: fontSize.md,
++        fontSize: 15,
+         color: colors.textSecondary,
+-        lineHeight: 28,
++        lineHeight: 26,
+     },
+ });
+diff --git a/RifahMobile/src/screens/MoreScreen.tsx b/RifahMobile/src/screens/MoreScreen.tsx
+index 94db30d..7da6559 100644
+--- a/RifahMobile/src/screens/MoreScreen.tsx
++++ b/RifahMobile/src/screens/MoreScreen.tsx
+@@ -10,7 +10,7 @@ import { useAppSession } from '../contexts/AppSessionContext';
+ import { useScreenSafeArea } from '../utils/safeArea';
+ import { AppIcon } from '../components/AppIcon';
+ import * as Notifications from 'expo-notifications';
+-import { AccountHeader } from '../components/ui/AccountHeader';
++import { PageHeader } from '../components/ui/PageHeader';
+ 
+ interface MoreScreenProps {
+     navigation?: any;
+@@ -19,7 +19,7 @@ interface MoreScreenProps {
+ export function MoreScreen({ navigation }: MoreScreenProps) {
+     const { t, language } = useLanguage();
+     const { isAuthenticated, logout, showLogin, user } = useAppSession();
+-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
++    const { scrollBottomPadding } = useScreenSafeArea();
+     const [appContent, setAppContent] = useState<PublicAppContent | null>(null);
+     const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+ 
+@@ -36,7 +36,6 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
+             } else {
+                 setNotificationUnreadCount(0);
+             }
+-
+         }, [isAuthenticated])
+     );
+ 
+@@ -81,9 +80,7 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
+         {
+             id: 'aboutRefah',
+             icon: 'sparkles',
+-            label: appContent?.legal?.about_refah?.[
+-                language === 'ar' ? 'titleAr' : 'titleEn'
+-            ] || t('aboutRefah'),
++            label: language === 'ar' ? 'عن بارسبا' : 'About BarSpa',
+             action: () => navigation?.navigate('InfoPage', { pageType: 'about' }),
+         },
+         {
+@@ -117,55 +114,68 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
+             await logout();
+             return;
+         }
+-
+         showLogin();
+     };
+ 
+     return (
+         <View style={styles.container}>
+-            {/* Header */}
+-            <AccountHeader navigation={navigation} />
+-            <View style={styles.userInfo}>
+-                <UserAvatar
+-                    firstName={user?.firstName}
+-                    lastName={user?.lastName}
+-                    profileImage={user?.profileImage}
+-                    size={60}
+-                    backgroundColor={colors.textInverse}
+-                    textColor={colors.primary}
+-                />
+-                <View>
+-                    <Text style={styles.userName}>{user ? `${user.firstName} ${user.lastName}` : t('guestTitle')}</Text>
+-                    <Text style={styles.userEmail}>{user?.email || t('welcome')}</Text>
+-                </View>
+-            </View>
++            <PageHeader title={language === 'ar' ? 'حسابي' : 'Me'} showBack={false} />
+ 
+             <ScrollView
+                 style={styles.content}
+                 contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
+             >
+-                {/* Menu Items */}
+-                <View style={styles.menuSection}>
+-                    {menuItems.map((item) => (
+-                        <TouchableOpacity
+-                            key={item.id}
+-                            style={styles.menuItem}
+-                            onPress={() => {
+-                                if (item.id !== 'browse' && !isAuthenticated) {
+-                                    showLogin();
+-                                    return;
+-                                }
++                {/* Profile Identity Area */}
++                <View style={styles.profileHeader}>
++                    <TouchableOpacity onPress={() => isAuthenticated ? navigation?.navigate('Profile') : showLogin()} style={styles.avatarWrap}>
++                        <UserAvatar
++                            firstName={user?.firstName}
++                            lastName={user?.lastName}
++                            profileImage={user?.profileImage}
++                            size={80}
++                        />
++                    </TouchableOpacity>
++                    <Text style={styles.profileName}>
++                        {isAuthenticated ? (user ? `${user.firstName} ${user.lastName}` : t('guestTitle')) : t('guestTitle')}
++                    </Text>
++                    {isAuthenticated && user?.email && (
++                        <Text style={styles.profileEmail}>{user.email}</Text>
++                    )}
++                </View>
++
++                {/* Wallet Preview Card */}
++                {isAuthenticated && (
++                    <TouchableOpacity style={styles.walletCard} onPress={() => navigation?.navigate('Gifts')}>
++                        <View style={styles.walletCardLeft}>
++                            <View style={styles.walletIconWrap}>
++                                <AppIcon name="account_balance_wallet" size={24} color={colors.primary} />
++                            </View>
++                            <View>
++                                <Text style={styles.walletCardTitle}>{language === 'ar' ? 'المحفظة' : 'Wallet'}</Text>
++                                <Text style={styles.walletCardSub}>{language === 'ar' ? 'رصيد المركز الخاص بك' : 'Your center balance'}</Text>
++                            </View>
++                        </View>
++                        <AppIcon name={language === 'ar' ? 'arrow_back' : 'arrow_forward'} size={24} color={colors.textTertiary} />
++                    </TouchableOpacity>
++                )}
+ 
+-                                if (item.action) {
+-                                    item.action();
+-                                }
+-                            }}
+-                        >
++                {/* Menus */}
++                <View style={styles.sectionHeaderWrap}>
++                    <Text style={styles.sectionHeaderText}>{t('myAppointments')}</Text>
++                </View>
++                <View style={styles.menuSection}>
++                    {menuItems.filter(i => i.id !== 'gifts' && i.id !== 'profile').map((item) => (
++                        <TouchableOpacity key={item.id} style={styles.menuItem} onPress={() => {
++                            if (item.id !== 'browse' && !isAuthenticated) { showLogin(); return; }
++                            if (item.action) item.action();
++                        }}>
+                             <View style={styles.menuItemLeft}>
+-                                <AppIcon name={item.icon as any} size={22} color={colors.primary} />
++                                <View style={styles.menuIconWrap}>
++                                    <AppIcon name={item.icon as any} size={20} color={colors.primary} />
++                                </View>
+                                 <Text style={styles.menuLabel}>{item.label}</Text>
+                             </View>
+-                            <Text style={styles.menuArrow}>›</Text>
++                            <AppIcon name={language === 'ar' ? 'arrow_back' : 'arrow_forward'} size={20} color={colors.textTertiary} />
+                         </TouchableOpacity>
+                     ))}
+                 </View>
+@@ -175,7 +185,6 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
+                         <View style={styles.sectionHeaderWrap}>
+                             <Text style={styles.sectionHeaderText}>{t('followRefah')}</Text>
+                         </View>
+-
+                         <View style={styles.socialCard}>
+                             <View style={styles.socialRow}>
+                                 {socialLinks.map((item) => (
+@@ -195,26 +204,19 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
+                 <View style={styles.sectionHeaderWrap}>
+                     <Text style={styles.sectionHeaderText}>{t('settings')}</Text>
+                 </View>
+-
+                 <View style={styles.menuSection}>
+                     {settingsItems.map((item) => (
+-                        <TouchableOpacity
+-                            key={item.id}
+-                            style={styles.menuItem}
+-                            onPress={() => {
+-                                if (!isAuthenticated) {
+-                                    showLogin();
+-                                    return;
+-                                }
+-
+-                                void item.action();
+-                            }}
+-                        >
++                        <TouchableOpacity key={item.id} style={styles.menuItem} onPress={() => {
++                            if (!isAuthenticated) { showLogin(); return; }
++                            if (item.action) item.action();
++                        }}>
+                             <View style={styles.menuItemLeft}>
+-                                <AppIcon name={item.icon as any} size={22} color={colors.primary} />
++                                <View style={styles.menuIconWrap}>
++                                    <AppIcon name={item.icon as any} size={20} color={colors.primary} />
++                                </View>
+                                 <Text style={styles.menuLabel}>{item.label}</Text>
+                             </View>
+-                            <Text style={styles.menuArrow}>›</Text>
++                            <AppIcon name={language === 'ar' ? 'arrow_back' : 'arrow_forward'} size={20} color={colors.textTertiary} />
+                         </TouchableOpacity>
+                     ))}
+                 </View>
+@@ -222,19 +224,16 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
+                 <View style={styles.sectionHeaderWrap}>
+                     <Text style={styles.sectionHeaderText}>{t('supportAndLegal')}</Text>
+                 </View>
+-
+                 <View style={styles.menuSection}>
+                     {supportItems.map((item) => (
+-                        <TouchableOpacity
+-                            key={item.id}
+-                            style={styles.menuItem}
+-                            onPress={item.action}
+-                        >
++                        <TouchableOpacity key={item.id} style={styles.menuItem} onPress={item.action}>
+                             <View style={styles.menuItemLeft}>
+-                                <AppIcon name={item.icon as any} size={22} color={colors.primary} />
++                                <View style={styles.menuIconWrap}>
++                                    <AppIcon name={item.icon as any} size={20} color={colors.primary} />
++                                </View>
+                                 <Text style={styles.menuLabel}>{item.label}</Text>
+                             </View>
+-                            <Text style={styles.menuArrow}>›</Text>
++                            <AppIcon name={language === 'ar' ? 'arrow_back' : 'arrow_forward'} size={20} color={colors.textTertiary} />
+                         </TouchableOpacity>
+                     ))}
+                 </View>
+@@ -260,45 +259,96 @@ const styles = StyleSheet.create({
+         flex: 1,
+         backgroundColor: colors.background,
+     },
+-    // Deprecated header style removed; using AccountHeader component
+-    userInfo: {
++    content: {
++        flex: 1,
++    },
++    profileHeader: {
++        alignItems: 'center',
++        paddingTop: spacing.xl,
++        paddingBottom: spacing.lg,
++    },
++    avatarWrap: {
++        marginBottom: spacing.md,
++        shadowColor: colors.brandPrimary,
++        shadowOffset: { width: 0, height: 8 },
++        shadowOpacity: 0.15,
++        shadowRadius: 16,
++        elevation: 4,
++        borderRadius: 40,
++    },
++    profileName: {
++        fontSize: 20,
++        fontWeight: '800',
++        color: colors.textPrimary,
++        marginBottom: 4,
++    },
++    profileEmail: {
++        fontSize: 14,
++        color: colors.textSecondary,
++    },
++    walletCard: {
++        backgroundColor: colors.surface,
++        marginHorizontal: spacing.lg,
++        padding: spacing.lg,
++        borderRadius: 16,
++        flexDirection: 'row',
++        alignItems: 'center',
++        justifyContent: 'space-between',
++        borderWidth: 1,
++        borderColor: colors.borderSubtle,
++        shadowColor: colors.brandPrimary,
++        shadowOffset: { width: 0, height: 4 },
++        shadowOpacity: 0.05,
++        shadowRadius: 8,
++        elevation: 2,
++        marginBottom: spacing.md,
++    },
++    walletCardLeft: {
+         flexDirection: 'row',
+         alignItems: 'center',
+         gap: spacing.md,
+     },
+-    userName: {
+-        fontSize: fontSize.lg,
++    walletIconWrap: {
++        width: 48,
++        height: 48,
++        borderRadius: 24,
++        backgroundColor: colors.brandPrimaryLight,
++        alignItems: 'center',
++        justifyContent: 'center',
++    },
++    walletCardTitle: {
++        fontSize: 16,
+         fontWeight: '700',
+-        color: colors.textInverse,
+-        marginBottom: 4,
++        color: colors.textPrimary,
++        marginBottom: 2,
+     },
+-    userEmail: {
+-        fontSize: fontSize.sm,
+-        color: colors.textInverse,
+-        opacity: 0.9,
++    walletCardSub: {
++        fontSize: 12,
++        color: colors.textSecondary,
+     },
+-    content: {
+-        flex: 1,
++    sectionHeaderWrap: {
++        paddingHorizontal: spacing.lg,
++        paddingTop: spacing.xl,
++        paddingBottom: spacing.sm,
++    },
++    sectionHeaderText: {
++        fontSize: 20,
++        fontWeight: '800',
++        color: colors.textPrimary,
+     },
+     menuSection: {
+         backgroundColor: colors.surface,
+-        marginTop: spacing.md,
+-        marginHorizontal: spacing.md,
+-        borderRadius: 20,
++        marginHorizontal: spacing.lg,
++        borderRadius: 16,
+         borderWidth: 1,
+         borderColor: colors.borderSubtle,
+         overflow: 'hidden',
+-        shadowColor: colors.brandPrimaryDark,
+-        shadowOffset: { width: 0, height: 8 },
+-        shadowOpacity: 0.08,
+-        shadowRadius: 16,
+-        elevation: 2,
+     },
+     menuItem: {
+         flexDirection: 'row',
+         alignItems: 'center',
+         justifyContent: 'space-between',
+-        paddingVertical: spacing.lg,
++        paddingVertical: spacing.md,
+         paddingHorizontal: spacing.lg,
+         borderBottomWidth: 1,
+         borderBottomColor: colors.borderSubtle,
+@@ -308,40 +358,27 @@ const styles = StyleSheet.create({
+         alignItems: 'center',
+         gap: spacing.md,
+     },
+-    menuLabel: {
+-        fontSize: fontSize.md,
+-        color: colors.text,
+-        fontWeight: '500',
+-    },
+-    menuSubLabel: {
+-        fontSize: fontSize.xs,
+-        color: colors.textSecondary,
+-        marginTop: 2,
+-    },
+-    menuArrow: {
+-        fontSize: 24,
+-        color: colors.textSecondary,
+-    },
+-    sectionHeaderWrap: {
+-        paddingHorizontal: spacing.lg,
+-        paddingTop: spacing.xl,
+-        paddingBottom: spacing.sm,
++    menuIconWrap: {
++        width: 36,
++        height: 36,
++        borderRadius: 18,
++        backgroundColor: colors.background,
++        alignItems: 'center',
++        justifyContent: 'center',
+     },
+-    sectionHeaderText: {
+-        fontSize: fontSize.sm,
+-        fontWeight: '700',
+-        color: colors.textSecondary,
+-        textTransform: 'uppercase',
++    menuLabel: {
++        fontSize: 16,
++        fontWeight: '600',
++        color: colors.textPrimary,
+     },
+     socialCard: {
+-        backgroundColor: '#FFFFFF',
++        backgroundColor: colors.surface,
+         marginHorizontal: spacing.lg,
+-        marginTop: spacing.sm,
+-        borderRadius: 20,
++        borderRadius: 16,
+         borderWidth: 1,
+-        borderColor: '#E9DDFD',
++        borderColor: colors.borderSubtle,
+         padding: spacing.lg,
+-        shadowColor: '#2E1065',
++        shadowColor: colors.brandPrimary,
+         shadowOffset: { width: 0, height: 8 },
+         shadowOpacity: 0.06,
+         shadowRadius: 14,
+@@ -353,9 +390,9 @@ const styles = StyleSheet.create({
+         gap: spacing.md,
+     },
+     socialIconButton: {
+-        width: 52,
+-        height: 52,
+-        borderRadius: 26,
++        width: 48,
++        height: 48,
++        borderRadius: 24,
+         backgroundColor: colors.brandPrimaryLight,
+         alignItems: 'center',
+         justifyContent: 'center',
+@@ -367,17 +404,15 @@ const styles = StyleSheet.create({
+         alignItems: 'center',
+         justifyContent: 'center',
+         gap: spacing.sm,
+-        backgroundColor: colors.error + '33',
+         marginHorizontal: spacing.lg,
+-        marginTop: spacing.xl,
++        marginTop: spacing.xxl,
+         padding: spacing.lg,
+-        borderRadius: 12,
+-        borderWidth: 1,
+-        borderColor: colors.error,
++        borderRadius: 16,
++        backgroundColor: colors.error + '11',
+     },
+     logoutText: {
+-        fontSize: fontSize.md,
+-        fontWeight: '600',
++        fontSize: 16,
++        fontWeight: '700',
+         color: colors.error,
+     },
+     appInfo: {
+@@ -386,8 +421,7 @@ const styles = StyleSheet.create({
+         gap: 4,
+     },
+     appInfoText: {
+-        fontSize: fontSize.xs,
+-        color: colors.textSecondary,
++        fontSize: 12,
++        color: colors.textTertiary,
+     },
+ });
+-
+diff --git a/RifahMobile/src/screens/NotificationDetailScreen.tsx b/RifahMobile/src/screens/NotificationDetailScreen.tsx
+index b7f32d9..d208b80 100644
+--- a/RifahMobile/src/screens/NotificationDetailScreen.tsx
++++ b/RifahMobile/src/screens/NotificationDetailScreen.tsx
+@@ -15,7 +15,6 @@ import { CustomerNotification, api, getImageUrl } from '../api/client';
+ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
+ import { useLanguage } from '../contexts/LanguageContext';
+ import { useScreenSafeArea } from '../utils/safeArea';
+-import { LinearGradient } from 'expo-linear-gradient';
+ 
+ interface NotificationDetailScreenProps {
+     navigation: any;
+@@ -29,7 +28,7 @@ interface NotificationDetailScreenProps {
+ 
+ export function NotificationDetailScreen({ navigation, route }: NotificationDetailScreenProps) {
+     const { language } = useLanguage();
+-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
++    const { scrollBottomPadding } = useScreenSafeArea();
+     const [notification, setNotification] = useState<CustomerNotification | null>(null);
+     const [loading, setLoading] = useState(true);
+ 
+@@ -205,34 +204,8 @@ export function NotificationDetailScreen({ navigation, route }: NotificationDeta
+ const styles = StyleSheet.create({
+     container: {
+         flex: 1,
+-        backgroundColor: '#F7F6FB',
+-    },
+-    header: {
+-        flexDirection: 'row',
+-        alignItems: 'center',
+-        justifyContent: 'space-between',
+-        paddingHorizontal: spacing.lg,
+-        paddingBottom: spacing.md,
+         backgroundColor: colors.background,
+     },
+-    headerButton: {
+-        width: 42,
+-        height: 42,
+-        borderRadius: 21,
+-        alignItems: 'center',
+-        justifyContent: 'center',
+-        backgroundColor: '#FFFFFF',
+-        borderWidth: 1,
+-        borderColor: '#E8E1FA',
+-    },
+-    headerButtonSpacer: {
+-        width: 40,
+-    },
+-    headerTitle: {
+-        fontSize: 28,
+-        fontWeight: '800',
+-        color: '#14153C',
+-    },
+     loadingWrap: {
+         flex: 1,
+         alignItems: 'center',
+@@ -248,7 +221,7 @@ const styles = StyleSheet.create({
+         marginTop: spacing.md,
+         fontSize: 20,
+         fontWeight: '800',
+-        color: '#1A1A44',
++        color: colors.textPrimary,
+     },
+     content: {
+         padding: spacing.lg,
+@@ -256,44 +229,46 @@ const styles = StyleSheet.create({
+     heroImage: {
+         width: '100%',
+         height: 220,
+-        borderRadius: 22,
++        borderRadius: 16,
+         marginBottom: spacing.lg,
+         backgroundColor: colors.primaryLight,
+     },
+     card: {
+-        backgroundColor: '#FFFFFF',
+-        borderRadius: 22,
++        backgroundColor: colors.surface,
++        borderRadius: 16,
+         borderWidth: 1,
+-        borderColor: '#ECE7FA',
++        borderColor: colors.borderSubtle,
+         padding: spacing.lg,
+-        shadowColor: '#1A1440',
++        shadowColor: colors.brandPrimary,
+         shadowOffset: { width: 0, height: 8 },
+-        shadowOpacity: 0.08,
++        shadowOpacity: 0.05,
+         shadowRadius: 14,
+         elevation: 2,
+     },
+     title: {
+-        fontSize: 30,
++        fontSize: 24,
+         fontWeight: '800',
+-        color: '#171840',
++        color: colors.textPrimary,
+         lineHeight: 32,
+     },
+     date: {
+         marginTop: spacing.sm,
+-        fontSize: 13,
+-        color: '#6E7596',
++        fontSize: 12,
++        color: colors.textSecondary,
+     },
+     body: {
+         marginTop: spacing.lg,
+-        fontSize: 15,
+-        color: '#5B6384',
+-        lineHeight: 24,
++        fontSize: 14,
++        color: colors.textSecondary,
++        lineHeight: 22,
+     },
+     metaCard: {
+         marginTop: spacing.lg,
+         padding: spacing.md,
+         borderRadius: 16,
+-        backgroundColor: '#F8F4FF',
++        backgroundColor: colors.background,
++        borderWidth: 1,
++        borderColor: colors.borderSubtle,
+         gap: spacing.sm,
+     },
+     metaRow: {
+@@ -302,55 +277,60 @@ const styles = StyleSheet.create({
+         gap: spacing.md,
+     },
+     metaLabel: {
+-        fontSize: 14,
+-        color: '#6E7596',
++        fontSize: 12,
++        fontWeight: '600',
++        color: colors.textSecondary,
+     },
+     metaValue: {
+         flex: 1,
+         textAlign: 'right',
+         fontSize: 14,
+-        color: '#1F204D',
++        color: colors.textPrimary,
+         fontWeight: '700',
+     },
+     primaryButton: {
+         marginTop: spacing.lg,
+         backgroundColor: colors.primary,
+         paddingVertical: spacing.md,
+-        borderRadius: 14,
++        borderRadius: 16,
+         alignItems: 'center',
++        minHeight: 52,
++        justifyContent: 'center',
+     },
+     primaryButtonText: {
+         color: colors.textInverse,
+-        fontSize: fontSize.md,
++        fontSize: 16,
+         fontWeight: '700',
+     },
+     secondaryButton: {
+         marginTop: spacing.md,
+         borderWidth: 1,
+-        borderColor: '#D3C3F8',
++        borderColor: colors.borderSubtle,
+         paddingVertical: spacing.md,
+-        borderRadius: 14,
++        borderRadius: 16,
+         alignItems: 'center',
++        minHeight: 52,
++        justifyContent: 'center',
+     },
+     secondaryButtonText: {
+-        color: colors.text,
+-        fontSize: fontSize.md,
++        color: colors.textPrimary,
++        fontSize: 16,
+         fontWeight: '600',
+     },
+     reviewTabButton: {
+         marginTop: spacing.md,
+-        backgroundColor: '#F5F0FF',
++        backgroundColor: colors.brandPrimaryLight + '33',
+         paddingVertical: spacing.md,
+-        borderRadius: 14,
++        borderRadius: 16,
+         alignItems: 'center',
+         borderWidth: 1,
+-        borderColor: '#D9CCFA',
++        borderColor: colors.primary + '33',
++        minHeight: 52,
++        justifyContent: 'center',
+     },
+     reviewTabButtonText: {
+-        color: '#5F3DC4',
+-        fontSize: fontSize.md,
++        color: colors.primary,
++        fontSize: 16,
+         fontWeight: '700',
+     },
+ });
+-
+-
+diff --git a/RifahMobile/src/screens/NotificationsScreen.tsx b/RifahMobile/src/screens/NotificationsScreen.tsx
+index a5e2574..ad8945d 100644
+--- a/RifahMobile/src/screens/NotificationsScreen.tsx
++++ b/RifahMobile/src/screens/NotificationsScreen.tsx
+@@ -15,8 +15,6 @@ import { CustomerNotification, api, getImageUrl } from '../api/client';
+ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
+ import { useLanguage } from '../contexts/LanguageContext';
+ import { useScreenSafeArea } from '../utils/safeArea';
+-import { LinearGradient } from 'expo-linear-gradient';
+-import * as Notifications from 'expo-notifications';
+ 
+ interface NotificationsScreenProps {
+     navigation: any;
+@@ -24,7 +22,7 @@ interface NotificationsScreenProps {
+ 
+ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
+     const { language } = useLanguage();
+-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
++    const { scrollBottomPadding } = useScreenSafeArea();
+     const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
+     const [loading, setLoading] = useState(true);
+     const [refreshing, setRefreshing] = useState(false);
+@@ -162,43 +160,8 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
+ const styles = StyleSheet.create({
+     container: {
+         flex: 1,
+-        backgroundColor: '#F7F6FB',
+-    },
+-    header: {
+-        flexDirection: 'row',
+-        alignItems: 'center',
+-        justifyContent: 'space-between',
+-        paddingHorizontal: spacing.lg,
+-        paddingBottom: spacing.md,
+         backgroundColor: colors.background,
+     },
+-    headerButton: {
+-        width: 42,
+-        height: 42,
+-        borderRadius: 21,
+-        alignItems: 'center',
+-        justifyContent: 'center',
+-        backgroundColor: '#FFFFFF',
+-        borderWidth: 1,
+-        borderColor: '#E8E1FA',
+-    },
+-    headerButtonSpacer: {
+-        width: 40,
+-    },
+-    headerContent: {
+-        flex: 1,
+-        alignItems: 'center',
+-    },
+-    headerTitle: {
+-        fontSize: 30,
+-        fontWeight: '800',
+-        color: '#14153C',
+-    },
+-    headerSubtitle: {
+-        fontSize: 13,
+-        color: '#6E7596',
+-        marginTop: 4,
+-    },
+     loadingWrap: {
+         flex: 1,
+         alignItems: 'center',
+@@ -209,20 +172,20 @@ const styles = StyleSheet.create({
+         gap: spacing.md,
+     },
+     card: {
+-        backgroundColor: '#FFFFFF',
+-        borderRadius: 20,
++        backgroundColor: colors.surface,
++        borderRadius: 16,
+         borderWidth: 1,
+-        borderColor: '#ECE7FA',
++        borderColor: colors.borderSubtle,
+         padding: spacing.lg,
+-        shadowColor: '#1A1440',
++        shadowColor: colors.brandPrimary,
+         shadowOffset: { width: 0, height: 8 },
+-        shadowOpacity: 0.08,
++        shadowOpacity: 0.05,
+         shadowRadius: 14,
+         elevation: 2,
+     },
+     cardUnread: {
+-        borderColor: '#C7B2FB',
+-        backgroundColor: '#F8F3FF',
++        borderColor: colors.primary,
++        backgroundColor: colors.brandPrimaryLight + '33',
+     },
+     cardHeader: {
+         flexDirection: 'row',
+@@ -235,18 +198,18 @@ const styles = StyleSheet.create({
+         gap: 4,
+     },
+     cardTitle: {
+-        fontSize: 20,
++        fontSize: 18,
+         fontWeight: '800',
+-        color: '#171840',
++        color: colors.textPrimary,
+     },
+     cardDate: {
+         fontSize: 12,
+-        color: '#6E7596',
++        color: colors.textSecondary,
+     },
+     unreadDot: {
+-        width: 10,
+-        height: 10,
+-        borderRadius: 5,
++        width: 8,
++        height: 8,
++        borderRadius: 4,
+         backgroundColor: colors.primary,
+         marginTop: 4,
+     },
+@@ -256,13 +219,13 @@ const styles = StyleSheet.create({
+     },
+     unreadLabel: {
+         fontSize: 12,
+-        color: '#C2410C',
++        color: colors.primary,
+         fontWeight: '700',
+     },
+     cardBody: {
+-        marginTop: spacing.sm,
+-        fontSize: 15,
+-        color: '#5B6384',
++        marginTop: spacing.md,
++        fontSize: 14,
++        color: colors.textSecondary,
+         lineHeight: 22,
+     },
+     cardFooter: {
+@@ -277,12 +240,12 @@ const styles = StyleSheet.create({
+         gap: 6,
+         paddingHorizontal: spacing.sm,
+         paddingVertical: 6,
+-        borderRadius: 999,
+-        backgroundColor: '#EEE6FF',
++        borderRadius: 8,
++        backgroundColor: colors.brandPrimaryLight,
+     },
+     linkBadgeText: {
+-        fontSize: fontSize.xs,
+-        color: colors.primaryDark,
++        fontSize: 12,
++        color: colors.primary,
+         fontWeight: '600',
+     },
+     imageBadge: {
+@@ -291,11 +254,13 @@ const styles = StyleSheet.create({
+         gap: 6,
+         paddingHorizontal: spacing.sm,
+         paddingVertical: 6,
+-        borderRadius: 999,
+-        backgroundColor: '#F4F5FA',
++        borderRadius: 8,
++        backgroundColor: colors.surface,
++        borderWidth: 1,
++        borderColor: colors.borderSubtle,
+     },
+     imageBadgeText: {
+-        fontSize: fontSize.xs,
++        fontSize: 12,
+         color: colors.textSecondary,
+         fontWeight: '600',
+     },
+@@ -309,14 +274,13 @@ const styles = StyleSheet.create({
+         marginTop: spacing.md,
+         fontSize: 20,
+         fontWeight: '800',
+-        color: '#1A1A44',
++        color: colors.textPrimary,
+     },
+     emptyBody: {
+         marginTop: spacing.sm,
+-        fontSize: 15,
+-        color: '#6E7596',
++        fontSize: 14,
++        color: colors.textSecondary,
+         textAlign: 'center',
+         lineHeight: 22,
+     },
+ });
+-
+diff --git a/RifahMobile/src/screens/PaymentScreen.tsx b/RifahMobile/src/screens/PaymentScreen.tsx
+index f724fa6..1d092d4 100644
+--- a/RifahMobile/src/screens/PaymentScreen.tsx
++++ b/RifahMobile/src/screens/PaymentScreen.tsx
+@@ -210,7 +210,7 @@ export function PaymentScreen({ route, navigation }: any) {
+                 <Text style={styles.headerTitle}>{t('payment')}</Text>
+             </View>
+ 
+-            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}>
++            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: spacing.xl }]}>
+                 <View style={styles.summaryContainer}>
+                     <View style={styles.summaryHeader}>
+                         <Text style={styles.summaryTitle}>{isRTL ? 'مراجعة الزيارة' : 'Review your visit'}</Text>
+diff --git a/RifahMobile/src/screens/PurchaseDetailsScreen.tsx b/RifahMobile/src/screens/PurchaseDetailsScreen.tsx
+index 8195b2c..785cc41 100644
+--- a/RifahMobile/src/screens/PurchaseDetailsScreen.tsx
++++ b/RifahMobile/src/screens/PurchaseDetailsScreen.tsx
+@@ -59,10 +59,10 @@ export function PurchaseDetailsScreen({ route, navigation }: any) {
+     return (
+         <View style={styles.container}>
+             <PageHeader title={isRTL ? 'تفاصيل الطلب' : 'Purchase Details'} onBack={() => navigation.goBack()} />
+-            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding + 32 }]}>
++            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 32 }]}>
+                 <AppCard style={styles.heroCard} padding="none">
+                     <View style={styles.heroIcon}>
+-                        <AppIcon name="purchases" size={30} color={colors.primary} />
++                        <AppIcon name="purchases" size={30} color="#6537C0" />
+                     </View>
+                     <Text style={styles.heroTitle}>#{order.orderNumber || order.id.slice(0,8).toUpperCase()}</Text>
+                     <Text style={styles.heroSubtitle}>
+@@ -100,7 +100,7 @@ export function PurchaseDetailsScreen({ route, navigation }: any) {
+ const styles = StyleSheet.create({
+     container: {
+         flex: 1,
+-        backgroundColor: '#F7F4FF',
++        backgroundColor: '#FAF9FC',
+     },
+     centered: {
+         alignItems: 'center',
+@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
+         justifyContent: 'space-between',
+         paddingHorizontal: spacing.lg,
+         paddingBottom: spacing.md,
+-        backgroundColor: '#F7F4FF',
++        backgroundColor: '#FAF9FC',
+     },
+     backButton: {
+         padding: spacing.xs,
+@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
+     headerTitle: {
+         fontSize: 18,
+         fontWeight: '700',
+-        color: colors.text,
++        color: '#1D035F',
+     },
+     content: {
+         paddingHorizontal: spacing.lg,
+@@ -130,14 +130,14 @@ const styles = StyleSheet.create({
+         alignItems: 'center',
+         justifyContent: 'center',
+         backgroundColor: '#FFFFFF',
+-        borderRadius: 30,
++        borderRadius: 20,
+         padding: spacing.xl,
+         borderWidth: 1,
+-        borderColor: '#EAE1FA',
+-        shadowColor: '#241444',
+-        shadowOpacity: 0.06,
+-        shadowRadius: 18,
+-        shadowOffset: { width: 0, height: 10 },
++        borderColor: '#E7DDFC',
++        shadowColor: '#1D035F',
++        shadowOpacity: 0.04,
++        shadowRadius: 24,
++        shadowOffset: { width: 0, height: 8 },
+         elevation: 2,
+         marginTop: spacing.md,
+     },
+@@ -147,13 +147,13 @@ const styles = StyleSheet.create({
+         borderRadius: 36,
+         alignItems: 'center',
+         justifyContent: 'center',
+-        backgroundColor: '#F4EEFF',
++        backgroundColor: '#F5F3FF',
+         marginBottom: spacing.md,
+     },
+     heroTitle: {
+         fontSize: 24,
+         fontWeight: '900',
+-        color: colors.text,
++        color: '#1D035F',
+         textAlign: 'center',
+     },
+     heroSubtitle: {
+@@ -165,19 +165,23 @@ const styles = StyleSheet.create({
+     },
+     summaryCard: {
+         backgroundColor: '#FFFFFF',
+-        borderRadius: 28,
++        borderRadius: 20,
+         borderWidth: 1,
+-        borderColor: '#EAE1FA',
++        borderColor: '#E7DDFC',
+         padding: spacing.lg,
+         gap: spacing.sm,
++        shadowColor: '#1D035F',
++        shadowOpacity: 0.04,
++        shadowRadius: 24,
++        shadowOffset: { width: 0, height: 8 },
++        elevation: 2,
+     },
+     sectionTitle: {
+-        fontSize: fontSize.xs,
+-        fontWeight: '900',
+-        letterSpacing: 0.6,
+-        color: colors.primary,
+-        textTransform: 'uppercase',
+-        marginBottom: 4,
++        fontSize: 20,
++        fontWeight: 'bold',
++        color: '#1D035F',
++        marginBottom: spacing.sm,
++        marginTop: spacing.xs,
+     },
+     itemRow: {
+         flexDirection: 'row',
+@@ -186,7 +190,7 @@ const styles = StyleSheet.create({
+     },
+     itemName: {
+         fontSize: 14,
+-        color: colors.text,
++        color: '#1D035F',
+         flex: 1,
+     },
+     itemQty: {
+@@ -203,15 +207,15 @@ const styles = StyleSheet.create({
+     },
+     amountLabel: {
+         flex: 1,
+-        fontSize: fontSize.sm,
++        fontSize: 16,
+         color: colors.textSecondary,
+         fontWeight: '700',
+     },
+     amountValue: {
+         flex: 1,
+-        fontSize: fontSize.md,
++        fontSize: 16,
+         fontWeight: '900',
+-        color: colors.primary,
++        color: '#6537C0',
+         textAlign: 'right',
+     },
+ });
+diff --git a/RifahMobile/src/screens/PurchasesScreen.tsx b/RifahMobile/src/screens/PurchasesScreen.tsx
+index a149021..ae6b41b 100644
+--- a/RifahMobile/src/screens/PurchasesScreen.tsx
++++ b/RifahMobile/src/screens/PurchasesScreen.tsx
+@@ -139,10 +139,9 @@ export function PurchasesScreen({ navigation, route }: any) {
+                         )}
+                         <Text style={styles.salonName} numberOfLines={1}>{item.tenant?.name || 'Store Name'}</Text>
+                     </View>
+-                    <AppBadge 
+-                        label={getStatusText(item.status, language)} 
+-                        variant={['delivered', 'completed'].includes(item.status) ? 'success' : ['cancelled', 'refunded'].includes(item.status) ? 'error' : 'neutral'} 
+-                    />
++                    <View style={[styles.pill, ['delivered', 'completed'].includes(item.status) ? styles.pillSuccess : ['cancelled', 'refunded'].includes(item.status) ? styles.pillError : styles.pillNeutral]}>
++                        <Text style={[styles.pillText, ['delivered', 'completed'].includes(item.status) ? styles.pillTextSuccess : ['cancelled', 'refunded'].includes(item.status) ? styles.pillTextError : styles.pillTextNeutral]}>{getStatusText(item.status, language)}</Text>
++                    </View>
+                 </View>
+ 
+                 {/* COMPACT VIEW */}
+@@ -166,14 +165,9 @@ export function PurchasesScreen({ navigation, route }: any) {
+     if (!isAuthenticated && !loading) {
+         return (
+             <>
+-                <LinearGradient
+-                    colors={['#F5F0FF', '#FFFFFF']}
+-                    start={{ x: 0, y: 0 }}
+-                    end={{ x: 1, y: 1 }}
+-                    style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+-                >
++                <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+                     <Text style={styles.headerTitle}>{t('myPurchases' as any)}</Text>
+-                </LinearGradient>
++                </View>
+                 <GuestView
+                     type="orders"
+                     onLoginPress={showLogin}
+@@ -184,14 +178,9 @@ export function PurchasesScreen({ navigation, route }: any) {
+ 
+     return (
+         <View style={styles.container}>
+-            <LinearGradient
+-                colors={['#F5F0FF', '#FFFFFF']}
+-                start={{ x: 0, y: 0 }}
+-                end={{ x: 1, y: 1 }}
+-                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
+-            >
++            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+                 <Text style={styles.headerTitle}>{t('myPurchases')}</Text>
+-            </LinearGradient>
++            </View>
+ 
+             {/* List */}
+             {orders.length > 0 ? (
+@@ -271,11 +260,11 @@ const getStatusText = (status: string, language: 'ar' | 'en') => {
+ const styles = StyleSheet.create({
+     container: {
+         flex: 1,
+-        backgroundColor: '#F7F6FB',
++        backgroundColor: '#FAF9FC',
+     },
+     header: {
+         padding: spacing.xl,
+-        backgroundColor: colors.surface,
++        backgroundColor: '#FAF9FC',
+         flexDirection: 'row',
+         alignItems: 'center',
+         gap: spacing.md,
+@@ -285,7 +274,7 @@ const styles = StyleSheet.create({
+         height: 42,
+         borderRadius: 21,
+         borderWidth: 1,
+-        borderColor: '#E8E1FA',
++        borderColor: '#E7DDFC',
+         backgroundColor: '#FFFFFF',
+         alignItems: 'center',
+         justifyContent: 'center',
+@@ -293,16 +282,20 @@ const styles = StyleSheet.create({
+     headerTitle: {
+         fontSize: 32,
+         fontWeight: '800',
+-        color: '#14153C',
++        color: '#1D035F',
+     },
+     listContent: {
+         padding: spacing.lg,
+         gap: spacing.md,
+     },
+     compactCard: {
+-        padding: 12,
+-        borderRadius: 16,
+-        shadowRadius: 8,
++        padding: 16,
++        borderRadius: 20,
++        shadowColor: '#1D035F',
++        shadowOffset: { width: 0, height: 8 },
++        shadowOpacity: 0.04,
++        shadowRadius: 24,
++        elevation: 2,
+     },
+     compactCardHeader: {
+         paddingBottom: 8,
+@@ -312,9 +305,9 @@ const styles = StyleSheet.create({
+         marginTop: 4,
+     },
+     compactTitle: {
+-        fontSize: 15,
+-        fontWeight: '700',
+-        color: '#171840',
++        fontSize: 16,
++        fontWeight: '800',
++        color: '#1D035F',
+         marginBottom: 6,
+     },
+     compactFooterRow: {
+@@ -328,22 +321,17 @@ const styles = StyleSheet.create({
+         gap: 6,
+     },
+     compactPrice: {
+-        fontSize: 15,
++        fontSize: 16,
+         fontWeight: '800',
+-        color: colors.primary,
++        color: '#6537C0',
+     },
+     card: {
+         backgroundColor: '#FFFFFF',
+-        borderRadius: 22,
++        borderRadius: 20,
+         padding: spacing.lg,
+-        shadowColor: '#1A1440',
+-        shadowOffset: { width: 0, height: 8 },
+-        shadowOpacity: 0.08,
+-        shadowRadius: 14,
+-        elevation: 2,
+         marginBottom: spacing.md,
+         borderWidth: 1,
+-        borderColor: '#ECE7FA',
++        borderColor: '#E7DDFC',
+     },
+     cardHeader: {
+         flexDirection: 'row',
+@@ -374,9 +362,39 @@ const styles = StyleSheet.create({
+         fontWeight: '700',
+     },
+     salonName: {
+-        fontSize: 15,
++        fontSize: 16,
++        fontWeight: '700',
++        color: '#1D035F',
++    },
++    pill: {
++        borderRadius: 9999,
++        paddingHorizontal: 12,
++        paddingVertical: 6,
++    },
++    pillText: {},
++    pillNeutral: {
++        backgroundColor: '#F5F3FF',
++    },
++    pillTextNeutral: {
++        color: '#6537C0',
++        fontSize: 12,
++        fontWeight: '700',
++    },
++    pillSuccess: {
++        backgroundColor: '#E7F6ED',
++    },
++    pillTextSuccess: {
++        color: '#1D7E49',
++        fontSize: 12,
++        fontWeight: '700',
++    },
++    pillError: {
++        backgroundColor: '#FEE2E2',
++    },
++    pillTextError: {
++        color: '#991B1B',
++        fontSize: 12,
+         fontWeight: '700',
+-        color: '#1A1A44',
+     },
+     statusBadge: {
+         paddingHorizontal: spacing.sm,
+@@ -425,9 +443,9 @@ const styles = StyleSheet.create({
+     },
+     viewDetailsText: {
+         marginTop: spacing.xs,
+-        fontSize: 12,
++        fontSize: 14,
+         fontWeight: '700',
+-        color: colors.primary,
++        color: '#6537C0',
+     },
+     cardFooter: {
+         flexDirection: 'row',
+diff --git a/RifahMobile/src/screens/ServiceBookingCartScreen.tsx b/RifahMobile/src/screens/ServiceBookingCartScreen.tsx
+index aa4030f..4064b2b 100644
+--- a/RifahMobile/src/screens/ServiceBookingCartScreen.tsx
++++ b/RifahMobile/src/screens/ServiceBookingCartScreen.tsx
+@@ -268,7 +268,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
+                 }
+             />
+ 
+-            <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}>
++            <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.xxl }]}>
+                 <AppCard>
+                     <SectionTitle title={language === 'ar' ? 'ملخص الدفع' : 'Payment Summary'} />
+                     <View style={styles.summaryRow}>
+@@ -372,7 +372,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
+                 })}
+             </ScrollView>
+ 
+-            <View style={[styles.footer, { paddingBottom: bottomInset }]}>
++            <View style={styles.footer}>
+                 <TouchableOpacity style={[styles.secondaryButton, loading && styles.disabledButton]} onPress={openTenant} disabled={loading}>
+                     <Text style={styles.secondaryButtonText}>{language === 'ar' ? 'إضافة خدمة أخرى' : 'Add More Services'}</Text>
+                 </TouchableOpacity>
+diff --git a/RifahMobile/src/screens/ServiceDetailsScreen.tsx b/RifahMobile/src/screens/ServiceDetailsScreen.tsx
+index e15adef..cccdd66 100644
+--- a/RifahMobile/src/screens/ServiceDetailsScreen.tsx
++++ b/RifahMobile/src/screens/ServiceDetailsScreen.tsx
+@@ -203,7 +203,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
+                     </View>
+                 }
+             />
+-            <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: Math.max(scrollBottomPadding, 120) }}>
++            <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 120 }}>
+                 <ImageBackground source={{ uri: heroUri }} style={styles.hero}>
+                     <LinearGradient colors={['rgba(0,0,0,0.12)', 'rgba(0,0,0,0.52)']} style={styles.heroShade} />
+                 </ImageBackground>
+@@ -295,7 +295,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
+                 </AppCard>
+             </ScrollView>
+ 
+-            <View style={[styles.stickyBar, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>
++            <View style={[styles.stickyBar, { paddingBottom: 14 }]}>
+                 <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Booking')}>
+                     <AppIcon name="bookings" size={16} color={colors.primary} />
+                     <Text style={styles.cartBtnText}>{isRTL ? 'السلة' : 'Basket'}</Text>
+diff --git a/RifahMobile/src/screens/SettingsScreen.tsx b/RifahMobile/src/screens/SettingsScreen.tsx
+index 514a577..0b3d22a 100644
+--- a/RifahMobile/src/screens/SettingsScreen.tsx
++++ b/RifahMobile/src/screens/SettingsScreen.tsx
+@@ -16,7 +16,6 @@ interface SettingsScreenProps {
+ export function SettingsScreen({ navigation }: SettingsScreenProps) {
+     const { t, language, setLanguage } = useLanguage();
+     const { logout } = useAppSession();
+-    const { topInset } = useScreenSafeArea();
+     const [profile, setProfile] = React.useState<any>(null);
+     const [pushEnabled, setPushEnabled] = React.useState(true);
+     const [pushLoading, setPushLoading] = React.useState(false);
+@@ -166,7 +165,7 @@ export function SettingsScreen({ navigation }: SettingsScreenProps) {
+                 </TouchableOpacity>
+             </View>
+ 
+-            <Modal visible={deleteModalVisible} animationType="slide" transparent onRequestClose={() => setDeleteModalVisible(false)}>
++            <Modal visible={deleteModalVisible} animationType="fade" transparent onRequestClose={() => setDeleteModalVisible(false)}>
+                 <View style={styles.modalOverlay}>
+                     <View style={styles.modalCard}>
+                         <Text style={styles.modalTitle}>{t('deleteAccountConfirmTitle')}</Text>
+@@ -219,40 +218,27 @@ const styles = StyleSheet.create({
+         flex: 1,
+         backgroundColor: colors.background,
+     },
+-    // header removed, using PageHeader
+-    backText: {
+-        fontSize: fontSize.xl,
+-        color: colors.text,
+-    },
+-    headerTitle: {
+-        fontSize: fontSize.xl,
+-        color: colors.text,
+-        fontWeight: '700',
+-    },
+-    headerSpacer: {
+-        width: 24,
+-    },
+     card: {
+-        backgroundColor: '#FFFFFF',
++        backgroundColor: colors.surface,
+         margin: spacing.lg,
+-        borderRadius: 20,
++        borderRadius: 16,
+         padding: spacing.lg,
+         borderWidth: 1,
+-        borderColor: '#E9DDFD',
++        borderColor: colors.borderSubtle,
+         gap: spacing.sm,
+-        shadowColor: '#2E1065',
++        shadowColor: colors.brandPrimary,
+         shadowOffset: { width: 0, height: 8 },
+-        shadowOpacity: 0.06,
++        shadowOpacity: 0.05,
+         shadowRadius: 14,
+         elevation: 1,
+     },
+     cardTitle: {
+-        fontSize: fontSize.lg,
+-        color: colors.text,
+-        fontWeight: '700',
++        fontSize: 20,
++        color: colors.textPrimary,
++        fontWeight: '800',
+     },
+     cardDescription: {
+-        fontSize: fontSize.sm,
++        fontSize: 14,
+         color: colors.textSecondary,
+         lineHeight: 22,
+     },
+@@ -264,13 +250,13 @@ const styles = StyleSheet.create({
+         gap: spacing.md,
+     },
+     currentValue: {
+-        fontSize: fontSize.md,
+-        color: colors.text,
++        fontSize: 16,
++        color: colors.textPrimary,
+         fontWeight: '600',
+     },
+     actionButton: {
+-        backgroundColor: '#7C3AED',
+-        borderRadius: 14,
++        backgroundColor: colors.primary,
++        borderRadius: 12,
+         paddingVertical: spacing.sm,
+         paddingHorizontal: spacing.md,
+         alignItems: 'center',
+@@ -278,69 +264,70 @@ const styles = StyleSheet.create({
+     },
+     actionButtonText: {
+         color: colors.textInverse,
+-        fontSize: fontSize.md,
++        fontSize: 14,
+         fontWeight: '700',
+     },
+     actionButtonDisabled: {
+         opacity: 0.6,
+     },
+     deleteButton: {
+-        backgroundColor: '#FEF2F2',
+-        borderRadius: 14,
+-        paddingVertical: spacing.sm,
++        backgroundColor: colors.error + '11',
++        borderRadius: 12,
++        paddingVertical: spacing.md,
+         paddingHorizontal: spacing.md,
+         alignItems: 'center',
+         marginTop: spacing.xs,
+         borderWidth: 1,
+-        borderColor: '#FECACA',
++        borderColor: colors.error + '44',
+     },
+     deleteButtonText: {
+-        color: '#DC2626',
+-        fontSize: fontSize.md,
++        color: colors.error,
++        fontSize: 14,
+         fontWeight: '700',
+     },
+     modalOverlay: {
+         flex: 1,
+-        backgroundColor: 'rgba(17, 24, 39, 0.55)',
++        backgroundColor: 'rgba(23, 24, 64, 0.6)',
+         justifyContent: 'center',
+         padding: spacing.lg,
+     },
+     modalCard: {
+-        backgroundColor: '#FFFFFF',
++        backgroundColor: colors.surface,
+         borderRadius: 24,
+-        padding: spacing.lg,
++        padding: spacing.xl,
+         gap: spacing.sm,
+         borderWidth: 1,
+-        borderColor: '#E9DDFD',
++        borderColor: colors.borderSubtle,
+     },
+     modalTitle: {
+-        fontSize: fontSize.xl,
+-        color: colors.text,
+-        fontWeight: '700',
++        fontSize: 20,
++        color: colors.textPrimary,
++        fontWeight: '800',
+     },
+     modalBody: {
+-        fontSize: fontSize.md,
++        fontSize: 14,
+         color: colors.textSecondary,
+         lineHeight: 22,
+     },
+     modalLabel: {
+-        fontSize: fontSize.sm,
+-        color: colors.text,
++        fontSize: 14,
++        color: colors.textPrimary,
+         fontWeight: '600',
+         marginTop: spacing.xs,
+     },
+     modalInput: {
+         borderWidth: 1,
+-        borderColor: '#E9DDFD',
++        borderColor: colors.borderSubtle,
+         borderRadius: 14,
+         paddingHorizontal: spacing.md,
+         paddingVertical: spacing.sm,
+-        fontSize: fontSize.md,
+-        backgroundColor: '#FAFAFF',
+-        color: colors.text,
++        fontSize: 16,
++        backgroundColor: colors.background,
++        color: colors.textPrimary,
++        minHeight: 48,
+     },
+     modalHint: {
+-        fontSize: fontSize.sm,
++        fontSize: 12,
+         color: colors.textSecondary,
+         fontStyle: 'italic',
+     },
+@@ -351,32 +338,32 @@ const styles = StyleSheet.create({
+         justifyContent: 'flex-end',
+     },
+     modalButton: {
+-        borderRadius: 14,
++        borderRadius: 12,
+         paddingVertical: spacing.sm,
+-        paddingHorizontal: spacing.md,
+-        minWidth: 110,
++        paddingHorizontal: spacing.lg,
++        minWidth: 100,
+         alignItems: 'center',
++        minHeight: 44,
++        justifyContent: 'center',
+     },
+     modalCancelButton: {
+-        backgroundColor: '#F3F4F6',
++        backgroundColor: colors.background,
++        borderWidth: 1,
++        borderColor: colors.borderSubtle,
+     },
+     modalCancelButtonText: {
+-        color: colors.text,
+-        fontSize: fontSize.md,
++        color: colors.textPrimary,
++        fontSize: 14,
+         fontWeight: '700',
+     },
+     modalDeleteButton: {
+-        backgroundColor: '#DC2626',
++        backgroundColor: colors.error,
+     },
+     modalDeleteButtonText: {
+         color: colors.textInverse,
+-        fontSize: fontSize.md,
++        fontSize: 14,
+         fontWeight: '700',
+     },
+-    hint: {
+-        fontSize: fontSize.xs,
+-        color: colors.textSecondary,
+-    },
+     toggleRow: {
+         marginTop: spacing.sm,
+         flexDirection: 'row',
+@@ -384,8 +371,8 @@ const styles = StyleSheet.create({
+         justifyContent: 'space-between',
+     },
+     toggleLabel: {
+-        fontSize: fontSize.md,
+-        color: colors.text,
++        fontSize: 16,
++        color: colors.textPrimary,
+         fontWeight: '600',
+     },
+ });
+diff --git a/RifahMobile/src/screens/TenantScreen.tsx b/RifahMobile/src/screens/TenantScreen.tsx
+index f8b182e..5b32b53 100644
+--- a/RifahMobile/src/screens/TenantScreen.tsx
++++ b/RifahMobile/src/screens/TenantScreen.tsx
+@@ -1630,7 +1630,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
+             )}
+ 
+             {activeTab === 'products' && itemCount > 0 && (
+-                <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(scrollBottomPadding, spacing.md) }]}>
++                <View style={[styles.bottomBasketContainer, { paddingBottom: spacing.md }]}>
+                     <View style={styles.bottomBasketLeft}>
+                         <Text style={styles.bottomBasketPrice}>
+                             {itemCount} {isRTL ? (itemCount === 1 ? 'منتج' : 'منتجات') : (itemCount === 1 ? 'item' : 'items')}
+diff --git a/RifahMobile/src/screens/WalletBalanceDetailsScreen.tsx b/RifahMobile/src/screens/WalletBalanceDetailsScreen.tsx
+index 28df19b..fb41abc 100644
+--- a/RifahMobile/src/screens/WalletBalanceDetailsScreen.tsx
++++ b/RifahMobile/src/screens/WalletBalanceDetailsScreen.tsx
+@@ -1,5 +1,5 @@
+ import React, { useEffect, useState } from 'react';
+-import { ActivityIndicator, ImageBackground, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
++import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+ import { ThemedText as Text } from '../components/ThemedText';
+ import { AppIcon } from '../components/AppIcon';
+ import { PageHeader } from '../components/ui/PageHeader';
+@@ -7,14 +7,11 @@ import { colors, fontSize, spacing } from '../theme/colors';
+ import { useLanguage } from '../contexts/LanguageContext';
+ import { formatRiyal } from '../utils/currency';
+ import { useScreenSafeArea } from '../utils/safeArea';
+-import { LinearGradient } from 'expo-linear-gradient';
+ import { api } from '../api/client';
+ 
+-const HERO_IMAGE = require('../../assets/wallethero.jpg');
+-
+ export function WalletBalanceDetailsScreen({ navigation, route }: any) {
+   const { language } = useLanguage();
+-  const { topInset, scrollBottomPadding } = useScreenSafeArea();
++  const { scrollBottomPadding } = useScreenSafeArea();
+   const hasRouteWalletBalance = route?.params?.walletBalance !== undefined && route?.params?.walletBalance !== null;
+   const hasRouteHistory = Array.isArray(route?.params?.history);
+   const [walletBalance, setWalletBalance] = useState(Number(route?.params?.walletBalance || 0));
+@@ -70,34 +67,44 @@ export function WalletBalanceDetailsScreen({ navigation, route }: any) {
+ 
+   return (
+     <View style={styles.container}>
+-      <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.lg }}>
+-        <ImageBackground source={HERO_IMAGE} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
+-          <PageHeader
+-            title={language === 'ar' ? 'رصيد رفاه' : 'Refah Balance'}
+-            showBack
+-            onBack={() => navigation.goBack()}
+-            variant="standard"
+-          />
+-        </ImageBackground>
++      <PageHeader
++        title={language === 'ar' ? 'تفاصيل الرصيد' : 'Wallet Details'}
++        showBack
++        onBack={() => navigation.goBack()}
++        variant="standard"
++      />
++      <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.xl, paddingTop: spacing.md }}>
+         <View style={styles.content}>
+           <View style={styles.balanceCard}>
+             <Text style={styles.balanceLabel}>{language === 'ar' ? 'الرصيد الحالي' : 'Current balance'}</Text>
+             <Text style={styles.balanceAmount}>{formatRiyal(walletBalance, language)}</Text>
+           </View>
++          
+           <Text style={styles.sectionTitle}>{language === 'ar' ? 'آخر النشاطات' : 'Recent activity'}</Text>
+-          {history.length > 0 ? (
+-            history.map((item: any) => (
+-              <View key={item.id} style={styles.row}>
+-                <View style={styles.iconWrap}><AppIcon name="receipt_long" size={14} color={colors.primary} /></View>
+-                <View style={{ flex: 1 }}>
+-                  <Text style={styles.rowTitle}>{item.status || '-'}</Text>
+-                  <Text style={styles.rowSub}>{new Date(item.createdAt).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')}</Text>
++          
++          <View style={styles.historyList}>
++            {history.length > 0 ? (
++              history.map((item: any, index) => (
++                <View key={item.id} style={[styles.row, index === history.length - 1 && styles.lastRow]}>
++                  <View style={styles.iconWrap}>
++                    <AppIcon name="receipt_long" size={16} color={colors.primary} />
++                  </View>
++                  <View style={{ flex: 1 }}>
++                    <Text style={styles.rowTitle}>{item.status || '-'}</Text>
++                    <Text style={styles.rowSub}>
++                      {new Date(item.createdAt).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', {
++                        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
++                      })}
++                    </Text>
++                  </View>
+                 </View>
++              ))
++            ) : (
++              <View style={styles.emptyWrap}>
++                <Text style={styles.emptyText}>{language === 'ar' ? 'لا توجد حركات حديثة.' : 'No recent activity.'}</Text>
+               </View>
+-            ))
+-          ) : (
+-            <Text style={styles.emptyText}>{language === 'ar' ? 'لا توجد حركات حديثة.' : 'No recent activity.'}</Text>
+-          )}
++            )}
++          </View>
+         </View>
+       </ScrollView>
+     </View>
+@@ -105,21 +112,94 @@ export function WalletBalanceDetailsScreen({ navigation, route }: any) {
+ }
+ 
+ const styles = StyleSheet.create({
+-  container: { flex: 1, backgroundColor: '#FAF8FC' },
+-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAF8FC' },
+-  hero: { minHeight: 250, paddingHorizontal: spacing.md, paddingBottom: spacing.lg, justifyContent: 'space-between' },
+-  heroImage: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+-  backBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.24)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.38)' },
+-  heroTitle: { fontSize: 34, fontWeight: '800', color: '#FFFFFF' },
+-  heroSub: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.92)' },
+-  content: { padding: spacing.md, marginTop: -36 },
+-  balanceCard: { borderRadius: 22, borderWidth: 1, borderColor: '#EDE3FD', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
+-  balanceLabel: { fontSize: 12, color: colors.textSecondary },
+-  balanceAmount: { marginTop: 6, fontSize: 28, fontWeight: '800', color: colors.text },
+-  sectionTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+-  row: { borderRadius: 14, borderWidth: 1, borderColor: '#ECE3FA', backgroundColor: '#FFFFFF', padding: spacing.sm, marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+-  iconWrap: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F2E9FF' },
+-  rowTitle: { color: colors.text, fontWeight: '700' },
+-  rowSub: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
+-  emptyText: { color: colors.textSecondary, fontSize: fontSize.sm }
++  container: {
++    flex: 1,
++    backgroundColor: colors.background,
++  },
++  loadingWrap: {
++    flex: 1,
++    alignItems: 'center',
++    justifyContent: 'center',
++    backgroundColor: colors.background,
++  },
++  content: {
++    paddingHorizontal: spacing.lg,
++  },
++  balanceCard: {
++    backgroundColor: colors.surface,
++    padding: spacing.xl,
++    borderRadius: 16,
++    alignItems: 'center',
++    shadowColor: colors.brandPrimary,
++    shadowOffset: { width: 0, height: 8 },
++    shadowOpacity: 0.05,
++    shadowRadius: 16,
++    elevation: 2,
++    borderWidth: 1,
++    borderColor: colors.borderSubtle,
++    marginBottom: spacing.xl,
++  },
++  balanceLabel: {
++    fontSize: 14,
++    color: colors.textSecondary,
++    marginBottom: spacing.xs,
++    fontWeight: '600',
++    textTransform: 'uppercase',
++    letterSpacing: 0.5,
++  },
++  balanceAmount: {
++    fontSize: 40,
++    fontWeight: '800',
++    color: colors.primary,
++  },
++  sectionTitle: {
++    fontSize: 20,
++    fontWeight: '800',
++    color: colors.textPrimary,
++    marginBottom: spacing.md,
++  },
++  historyList: {
++    backgroundColor: colors.surface,
++    borderRadius: 16,
++    borderWidth: 1,
++    borderColor: colors.borderSubtle,
++    overflow: 'hidden',
++  },
++  row: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: spacing.md,
++    padding: spacing.lg,
++    borderBottomWidth: 1,
++    borderBottomColor: colors.borderSubtle,
++  },
++  lastRow: {
++    borderBottomWidth: 0,
++  },
++  iconWrap: {
++    width: 36,
++    height: 36,
++    borderRadius: 18,
++    alignItems: 'center',
++    justifyContent: 'center',
++    backgroundColor: colors.brandPrimaryLight,
++  },
++  rowTitle: {
++    fontSize: 16,
++    color: colors.textPrimary,
++    fontWeight: '600',
++    marginBottom: 2,
++  },
++  rowSub: {
++    color: colors.textSecondary,
++    fontSize: 12,
++  },
++  emptyWrap: {
++    padding: spacing.xl,
++    alignItems: 'center',
++  },
++  emptyText: {
++    color: colors.textSecondary,
++    fontSize: 14,
++  },
+ });

@@ -108,7 +108,7 @@ export function AppointmentInviteScreen({ route, navigation }: any) {
         ? (invite.service?.name_ar || invite.service?.name_en || '-')
         : (invite.service?.name_en || invite.service?.name_ar || '-');
     const tenantLogoUrl = getImageUrl(invite.tenant?.logo);
-    const tenantName = (invite.tenant?.name || 'Refah').trim();
+    const tenantName = (invite.tenant?.name || 'BarSpa').trim();
     const tenantInitial = tenantName.charAt(0).toUpperCase();
     const providerName = invite.staff?.name || (language === 'ar' ? 'مقدم الخدمة' : 'Service provider');
     const customerName = language === 'ar' ? 'عميلنا' : 'Customer';

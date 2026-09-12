@@ -73,7 +73,7 @@ export const authTranslations = {
     },
     ar: {
         // Welcome Screen
-        welcomeTitle: 'مرحباً بك في رفاه',
+        welcomeTitle: 'مرحباً بك في بارسبا',
         welcomeSubtitle: 'رفيقك في الجمال والعافية',
         loginButton: 'تسجيل الدخول',
         registerButton: 'إنشاء حساب',
@@ -92,7 +92,7 @@ export const authTranslations = {
 
         // Register
         createAccount: 'إنشاء حساب',
-        registerSubtitle: 'انضم إلى رفاه اليوم',
+        registerSubtitle: 'انضم إلى بارسبا اليوم',
         firstName: 'الاسم الأول',
         lastName: 'اسم العائلة',
         phone: 'رقم الهاتف',
