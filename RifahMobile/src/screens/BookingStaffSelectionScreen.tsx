@@ -17,7 +17,7 @@ export function BookingStaffSelectionScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
     const route = useRoute<any>();
     const { tenantId } = route.params || {};
-    const { items, updateItem } = useServiceBookingCart();
+    const { items, updateItem, totalPrice } = useServiceBookingCart();
     const { isRTL } = useLanguage();
     const { topInset, bottomInset, scrollBottomPadding } = useScreenSafeArea();
 
@@ -26,34 +26,24 @@ export function BookingStaffSelectionScreen() {
     const [serviceStaffMap, setServiceStaffMap] = useState<Record<string, Staff[]>>({});
     const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null);
 
-    // Compute total duration
     const totalDuration = useMemo(() => {
         return items.reduce((acc, item) => acc + (item.service.duration || 0), 0);
     }, [items]);
 
     const formatDuration = (minutes: number) => {
-        if (minutes < 60) {
-            return isRTL ? `${minutes} دقيقة` : `${minutes} min`;
-        }
+        if (minutes < 60) return isRTL ? `${minutes} دقيقة` : `${minutes} min`;
         const hours = Math.floor(minutes / 60);
         const mins = minutes % 60;
-        if (mins === 0) {
-            return isRTL ? `${hours} ساعة` : `${hours} h`;
-        }
+        if (mins === 0) return isRTL ? `${hours} ساعة` : `${hours} h`;
         return isRTL ? `${hours} س ${mins} د` : `${hours}h ${mins}m`;
     };
 
     useEffect(() => {
         if (!tenantId || items.length === 0) {
-            if (navigation.isFocused()) {
-                navigation.goBack();
-            }
+            if (navigation.isFocused()) navigation.goBack();
             return;
         }
 
-        // Initialize mode based on current cart state if not set yet.
-        // If all items have a requestedStaffId or staff assigned, it's 'choose'.
-        // Otherwise, we default to 'any' initially if they haven't explicitly chosen.
         if (selectedMode === null) {
             const hasAnyExplicitStaff = items.some(item => item.requestedStaffId || item.staff);
             setSelectedMode(hasAnyExplicitStaff ? 'choose' : 'any');
@@ -66,9 +56,8 @@ export function BookingStaffSelectionScreen() {
         try {
             setLoading(true);
             const map: Record<string, Staff[]> = {};
-            
             const promises = items.map(async (item) => {
-                if (map[item.service.id]) return; // Skip if already fetched
+                if (map[item.service.id]) return;
                 const response = await api.get<{ success: boolean; staff: Staff[] }>(`/public/tenant/${tenantId}/services/${item.service.id}/staff`);
                 if (response.success) {
                     map[item.service.id] = (response.staff || []).map(normalizeStaff);
@@ -76,7 +65,6 @@ export function BookingStaffSelectionScreen() {
                     map[item.service.id] = [];
                 }
             });
-            
             await Promise.all(promises);
             setServiceStaffMap(map);
         } catch (error) {
@@ -89,23 +77,16 @@ export function BookingStaffSelectionScreen() {
     const handleSelectMode = (mode: SelectionMode) => {
         setSelectedMode(mode);
         if (mode === 'any') {
-            // Explicitly clear staff assignments when Any is selected
-            items.forEach(item => {
-                updateItem(item.id, { staff: null, requestedStaffId: null });
-            });
+            items.forEach(item => updateItem(item.id, { staff: null, requestedStaffId: null }));
             setExpandedServiceId(null);
         } else if (mode === 'choose' && items.length > 0) {
-            // Auto expand the first item for convenience if they haven't selected one
             setExpandedServiceId(items[0].id);
         }
     };
 
     const handleSelectStaff = (itemId: string, staff: Staff | null) => {
-        updateItem(itemId, {
-            staff: staff,
-            requestedStaffId: staff ? staff.id : null
-        });
-        setExpandedServiceId(null); // Close accordion on selection
+        updateItem(itemId, { staff: staff, requestedStaffId: staff ? staff.id : null });
+        setExpandedServiceId(null);
     };
 
     const toggleAccordion = (itemId: string) => {
@@ -132,7 +113,7 @@ export function BookingStaffSelectionScreen() {
         );
     }
 
-    const renderStaffAvatar = (staff: Staff, size: number = 40) => {
+    const renderStaffAvatar = (staff: Staff, size: number = 48) => {
         const imageUrl = getImageUrl(staff.avatar || staff.image);
         if (imageUrl) {
             return <Image source={{ uri: imageUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
@@ -146,9 +127,6 @@ export function BookingStaffSelectionScreen() {
         );
     };
 
-    // Determine if continue is allowed
-    // Any mode: always allowed
-    // Choose mode: every service must have a staff selected
     const isContinueEnabled = selectedMode === 'any' || (selectedMode === 'choose' && items.every(item => item.staff !== null && item.staff !== undefined));
 
     return (
@@ -161,63 +139,54 @@ export function BookingStaffSelectionScreen() {
                 <View style={styles.headerRight} />
             </View>
 
-            <View style={styles.summaryContainer}>
-                <Text style={styles.summaryText}>
-                    {items.length} {isRTL ? (items.length === 1 ? 'خدمة' : 'خدمات') : (items.length === 1 ? 'service' : 'services')} · {formatDuration(totalDuration)}
-                </Text>
-            </View>
-
             {loading ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             ) : (
-                <ScrollView contentContainerStyle={[styles.listContent, { paddingBottom: scrollBottomPadding + 100 }]}>
-                    
-                    {/* Any Professional Mode */}
-                    <TouchableOpacity 
-                        style={[styles.modeCard, selectedMode === 'any' && styles.selectedModeCard]}
-                        onPress={() => handleSelectMode('any')}
-                    >
-                        <View style={styles.modeCardContent}>
-                            <View style={[styles.modeInfo, isRTL ? styles.modeInfoRtl : null]}>
-                                <Text style={styles.modeName}>
-                                    {isRTL ? 'أي مختص' : 'Any professional'}
-                                </Text>
-                                <Text style={styles.modeDescription}>
-                                    {isRTL ? 'سنختار لك أفضل مختص متاح للخدمات التي اخترتها.' : 'We\'ll find the best available professional for your selected services.'}
-                                </Text>
+                <ScrollView contentContainerStyle={[styles.listContent, { paddingBottom: scrollBottomPadding + 140 }]}>
+                    {/* Booking Context Pill Card (Stitch aligned) */}
+                    <View style={styles.contextPill}>
+                        <View style={styles.contextPillRow}>
+                            <View style={styles.contextPillIcon}>
+                                <AppIcon name="storefront" size={20} color={colors.primary} />
                             </View>
-                            <View style={[styles.selectionIndicator, selectedMode === 'any' && styles.selectionIndicatorActive]}>
-                                {selectedMode === 'any' && <View style={styles.checkDot} />}
-                            </View>
+                            <Text style={styles.contextPillText}>
+                                {isRTL ? 'تفاصيل الحجز' : 'Booking Details'}
+                            </Text>
                         </View>
-                    </TouchableOpacity>
+                        <View style={styles.contextPillDuration}>
+                            <AppIcon name="clock" size={14} color={colors.textSecondary} />
+                            <Text style={styles.contextPillDurationText}>{formatDuration(totalDuration)}</Text>
+                        </View>
+                    </View>
 
-                    {/* Choose Professionals Mode */}
-                    <TouchableOpacity 
-                        style={[styles.modeCard, selectedMode === 'choose' && styles.selectedModeCard]}
-                        onPress={() => handleSelectMode('choose')}
-                    >
-                        <View style={styles.modeCardContent}>
-                            <View style={[styles.modeInfo, isRTL ? styles.modeInfoRtl : null]}>
-                                <Text style={styles.modeName}>
-                                    {isRTL ? 'اختيار المختصين' : 'Choose professionals'}
-                                </Text>
-                                <Text style={styles.modeDescription}>
-                                    {isRTL ? 'اختر مختصًا لكل خدمة.' : 'Choose a professional for each service.'}
-                                </Text>
-                            </View>
-                            <View style={[styles.selectionIndicator, selectedMode === 'choose' && styles.selectionIndicatorActive]}>
-                                {selectedMode === 'choose' && <View style={styles.checkDot} />}
-                            </View>
-                        </View>
-                    </TouchableOpacity>
+                    {/* Professional Mode Segmented Controller */}
+                    <View style={styles.segmentedController}>
+                        <TouchableOpacity 
+                            style={[styles.segmentButton, selectedMode === 'any' && styles.segmentButtonActive]}
+                            onPress={() => handleSelectMode('any')}
+                        >
+                            <AppIcon name="sparkles" size={18} color={selectedMode === 'any' ? colors.primary : colors.textSecondary} />
+                            <Text style={[styles.segmentText, selectedMode === 'any' && styles.segmentTextActive]}>
+                                {isRTL ? 'أي مختص' : 'Any professional'}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.segmentButton, selectedMode === 'choose' && styles.segmentButtonActive]}
+                            onPress={() => handleSelectMode('choose')}
+                        >
+                            <AppIcon name="star" size={18} color={selectedMode === 'choose' ? colors.primary : colors.textSecondary} />
+                            <Text style={[styles.segmentText, selectedMode === 'choose' && styles.segmentTextActive]}>
+                                {isRTL ? 'اختيار المختصين' : 'Choose professionals'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
 
                     {/* Per-Service Selection Interface */}
                     {selectedMode === 'choose' && (
                         <View style={styles.perServiceContainer}>
-                            {items.map(item => {
+                            {items.map((item, index) => {
                                 const isExpanded = expandedServiceId === item.id;
                                 const staffList = serviceStaffMap[item.service.id] || [];
                                 const selectedStaff = item.staff;
@@ -225,74 +194,76 @@ export function BookingStaffSelectionScreen() {
                                 return (
                                     <View key={item.id} style={[styles.serviceCard, isExpanded && styles.serviceCardExpanded]}>
                                         <View style={styles.serviceHeader}>
-                                            <View style={[styles.serviceInfo, isRTL ? styles.serviceInfoRtl : null]}>
-                                                <Text style={styles.serviceName}>
-                                                    {isRTL ? (item.service.name_ar || item.service.name_en) : (item.service.name_en || item.service.name_ar)}
-                                                </Text>
-                                                <Text style={styles.serviceDuration}>
-                                                    {formatDuration(item.service.duration)} · {formatRiyal(item.totalPrice, isRTL ? 'ar' : 'en')}
+                                            <View style={styles.serviceBadge}>
+                                                <Text style={styles.serviceBadgeText}>
+                                                    {isRTL ? 'الخدمة' : 'Service'} {index + 1}
                                                 </Text>
                                             </View>
+                                            <Text style={styles.serviceName}>
+                                                {isRTL ? (item.service.name_ar || item.service.name_en) : (item.service.name_en || item.service.name_ar)}
+                                            </Text>
+                                            <Text style={styles.serviceDuration}>
+                                                {formatDuration(item.service.duration)} · {formatRiyal(item.totalPrice, isRTL ? 'ar' : 'en')}
+                                            </Text>
                                         </View>
 
-                                        <Text style={[styles.professionalLabel, isRTL ? { textAlign: 'right' } : null]}>
-                                            {isRTL ? 'المختص:' : 'Professional:'}
-                                        </Text>
-
                                         <TouchableOpacity 
-                                            style={styles.dropdownSelector}
+                                            style={[styles.dropdownSelector, isExpanded && styles.dropdownSelectorExpanded]}
                                             onPress={() => toggleAccordion(item.id)}
                                             activeOpacity={0.7}
                                         >
-                                            <View style={[styles.dropdownContent, isRTL ? { flexDirection: 'row-reverse' } : null]}>
+                                            <View style={styles.dropdownContent}>
                                                 {selectedStaff ? (
-                                                    <>
-                                                        {renderStaffAvatar(selectedStaff, 24)}
-                                                        <Text style={[styles.dropdownSelectedText, isRTL ? { marginRight: spacing.sm, textAlign: 'right' } : null]} numberOfLines={1}>
+                                                    <View style={styles.dropdownStaffInfo}>
+                                                        {renderStaffAvatar(selectedStaff, 32)}
+                                                        <Text style={styles.dropdownSelectedText} numberOfLines={1}>
                                                             {isRTL ? (selectedStaff.name_ar || selectedStaff.name_en || selectedStaff.name) : (selectedStaff.name_en || selectedStaff.name_ar || selectedStaff.name)}
                                                         </Text>
-                                                    </>
+                                                        <View style={styles.dropdownVerified}>
+                                                            <AppIcon name="check" size={16} color={colors.primary} />
+                                                        </View>
+                                                    </View>
                                                 ) : (
-                                                    <Text style={[styles.dropdownSelectedText, { color: colors.textSecondary }, isRTL ? { textAlign: 'right' } : null]} numberOfLines={1}>
-                                                        {isRTL ? '[ اختر مختصًا ▼ ]' : '[ Choose professional ▼ ]'}
+                                                    <Text style={styles.dropdownPlaceholderText} numberOfLines={1}>
+                                                        {isRTL ? 'اختر المختص' : 'Select a professional'}
                                                     </Text>
                                                 )}
+                                                <AppIcon name={isExpanded ? 'minus' : 'plus'} size={24} color={colors.textSecondary} />
                                             </View>
                                         </TouchableOpacity>
 
                                         {isExpanded && (
                                             <View style={styles.expandedList}>
-                                                {/* Staff Options */}
                                                 {staffList.map(staff => {
                                                     const isSelected = selectedStaff?.id === staff.id;
                                                     return (
                                                         <TouchableOpacity 
                                                             key={staff.id}
-                                                            style={[styles.staffListItem, isSelected && styles.staffListItemSelected, isRTL ? { flexDirection: 'row-reverse' } : null]}
+                                                            style={[styles.staffListItem, isSelected && styles.staffListItemSelected]}
                                                             onPress={() => handleSelectStaff(item.id, staff)}
                                                         >
-                                                            {renderStaffAvatar(staff, 40)}
-                                                            <View style={[styles.staffListItemInfo, isRTL ? styles.staffListItemInfoRtl : null]}>
-                                                                <Text style={[styles.staffListItemName, isRTL ? { textAlign: 'right' } : null]}>
+                                                            {renderStaffAvatar(staff, 48)}
+                                                            <View style={styles.staffListItemInfo}>
+                                                                <Text style={styles.staffListItemName}>
                                                                     {isRTL ? (staff.name_ar || staff.name_en || staff.name) : (staff.name_en || staff.name_ar || staff.name)}
                                                                 </Text>
                                                                 {(staff.role || staff.specialty || staff.specialization) && (
-                                                                    <Text style={[styles.staffListItemRole, isRTL ? { textAlign: 'right' } : null]}>
+                                                                    <Text style={styles.staffListItemRole}>
                                                                         {staff.role || staff.specialty || staff.specialization}
                                                                     </Text>
                                                                 )}
+                                                                {staff.rating !== undefined && (
+                                                                    <View style={styles.ratingContainer}>
+                                                                        <AppIcon name="star" size={14} color="#F59E0B" />
+                                                                        <Text style={styles.ratingText}>{staff.rating.toFixed(1)}</Text>
+                                                                    </View>
+                                                                )}
                                                             </View>
-                                                            {staff.rating !== undefined && (
-                                                                <View style={styles.ratingContainer}>
-                                                                    <AppIcon name="star" size={14} color="#FBBF24" />
-                                                                    <Text style={styles.ratingText}>{staff.rating.toFixed(1)}</Text>
-                                                                </View>
-                                                            )}
-                                                            {isSelected && (
-                                                                <View style={[styles.checkDotWrapper, isRTL ? { marginRight: spacing.sm } : { marginLeft: spacing.sm }]}>
-                                                                    <AppIcon name="check" size={16} color={colors.primary} />
-                                                                </View>
-                                                            )}
+                                                            <View style={[styles.staffSelectBtn, isSelected && styles.staffSelectBtnActive]}>
+                                                                <Text style={[styles.staffSelectBtnText, isSelected && styles.staffSelectBtnTextActive]}>
+                                                                    {isSelected ? (isRTL ? 'مختار' : 'Selected') : (isRTL ? 'اختيار' : 'Select')}
+                                                                </Text>
+                                                            </View>
                                                         </TouchableOpacity>
                                                     );
                                                 })}
@@ -313,17 +284,31 @@ export function BookingStaffSelectionScreen() {
 
             {/* Bottom Fixed Button */}
             <View style={[styles.bottomBasketContainer, { paddingBottom: Math.max(bottomInset, spacing.md) }]}>
-                {!isContinueEnabled && selectedMode === 'choose' && (
-                    <Text style={[styles.validationMessage, isRTL ? { textAlign: 'right' } : null]}>
-                        {isRTL ? 'يرجى اختيار مختص لكل خدمة.' : 'Please choose a professional for each service.'}
-                    </Text>
+                {(!isContinueEnabled && selectedMode === 'choose') ? (
+                    <View style={styles.validationCallout}>
+                        <AppIcon name="info" size={16} color="#B45309" />
+                        <Text style={styles.validationMessage}>
+                            {isRTL ? 'يرجى اختيار مختص لكل خدمة' : 'Please select a professional for all services'}
+                        </Text>
+                    </View>
+                ) : (
+                    <View style={styles.bottomBasketInfo}>
+                        <Text style={styles.bottomBasketItems}>
+                            {items.length} {isRTL ? 'عناصر' : 'items'} · {formatDuration(totalDuration)}
+                        </Text>
+                        <Text style={styles.bottomBasketTotal}>
+                            {formatRiyal(totalPrice, isRTL ? 'ar' : 'en')}
+                        </Text>
+                    </View>
                 )}
+                
                 <TouchableOpacity
                     style={[styles.continueButton, !isContinueEnabled && styles.continueButtonDisabled]}
                     disabled={!isContinueEnabled}
                     onPress={handleContinue}
                 >
-                    <Text style={styles.continueButtonText}>{isRTL ? 'متابعة' : 'Continue'}</Text>
+                    <Text style={styles.continueButtonText}>{isRTL ? 'المتابعة للوقت' : 'Continue to Date & Time'}</Text>
+                    <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={20} color="#FFFFFF" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -331,282 +316,83 @@ export function BookingStaffSelectionScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
+    container: { flex: 1, backgroundColor: colors.background },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        backgroundColor: colors.surface,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+        backgroundColor: 'rgba(255,255,255,0.9)',
     },
-    backButton: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
+    backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text },
+    headerRight: { width: 40 },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    emptyText: { marginTop: spacing.md, fontSize: 16, color: colors.textSecondary },
+    listContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
+    contextPill: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        backgroundColor: colors.surface, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+        borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg,
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: colors.text,
+    contextPillRow: { flexDirection: 'row', alignItems: 'center' },
+    contextPillIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
+    contextPillText: { fontSize: 15, fontWeight: 'bold', color: colors.text },
+    contextPillDuration: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+    contextPillDurationText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginLeft: 4 },
+    segmentedController: {
+        flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 12, padding: 4, marginBottom: spacing.lg
     },
-    headerRight: {
-        width: 40,
+    segmentButton: {
+        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        paddingVertical: 12, borderRadius: 8,
     },
-    summaryContainer: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        alignItems: 'center',
-    },
-    summaryText: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        fontWeight: '500',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    emptyState: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    emptyText: {
-        marginTop: spacing.md,
-        fontSize: 16,
-        color: colors.textSecondary,
-    },
-    listContent: {
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.lg,
-    },
-    modeCard: {
-        backgroundColor: colors.surface,
-        borderRadius: 12,
-        padding: spacing.md,
-        marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    selectedModeCard: {
-        borderColor: colors.primary,
-        backgroundColor: '#F9F5FF',
-    },
-    modeCardContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    modeInfo: {
-        flex: 1,
-        paddingRight: spacing.md,
-    },
-    modeInfoRtl: {
-        paddingRight: 0,
-        paddingLeft: spacing.md,
-    },
-    modeName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: colors.text,
-        marginBottom: 4,
-    },
-    modeDescription: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        lineHeight: 18,
-    },
-    selectionIndicator: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: colors.border,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    selectionIndicatorActive: {
-        borderColor: colors.primary,
-    },
-    checkDot: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: colors.primary,
-    },
-    perServiceContainer: {
-        marginTop: spacing.md,
-    },
-    serviceCard: {
-        backgroundColor: colors.surface,
-        borderRadius: 12,
-        padding: spacing.md,
-        marginBottom: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    serviceCardExpanded: {
-        borderColor: colors.primary,
-    },
-    serviceHeader: {
-        marginBottom: spacing.sm,
-    },
-    serviceInfo: {
-        flex: 1,
-    },
-    serviceInfoRtl: {
-        alignItems: 'flex-end',
-    },
-    serviceName: {
-        fontSize: 15,
-        fontWeight: 'bold',
-        color: colors.text,
-        marginBottom: 2,
-    },
-    serviceDuration: {
-        fontSize: 13,
-        color: colors.textSecondary,
-    },
-    professionalLabel: {
-        fontSize: 13,
-        color: colors.text,
-        fontWeight: '600',
-        marginBottom: spacing.xs,
-        marginTop: spacing.sm,
-    },
+    segmentButtonActive: { backgroundColor: colors.surface, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+    segmentText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginLeft: 6 },
+    segmentTextActive: { color: colors.primary },
+    perServiceContainer: { gap: spacing.md },
+    serviceCard: { backgroundColor: colors.surface, borderRadius: 16, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+    serviceCardExpanded: { borderColor: colors.primary },
+    serviceHeader: { marginBottom: spacing.sm },
+    serviceBadge: { alignSelf: 'flex-start', backgroundColor: '#F3F4F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginBottom: 8 },
+    serviceBadgeText: { fontSize: 10, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase' },
+    serviceName: { fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
+    serviceDuration: { fontSize: 14, color: colors.textSecondary },
     dropdownSelector: {
-        backgroundColor: colors.backgroundGray || '#F9FAFB',
-        padding: spacing.sm,
-        paddingHorizontal: spacing.md,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: colors.border,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        backgroundColor: '#F9FAFB', padding: spacing.sm, borderRadius: 12, borderWidth: 1, borderColor: colors.border, marginTop: spacing.sm
     },
-    dropdownContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    dropdownSelectedText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: colors.text,
-        marginLeft: spacing.sm,
-        flex: 1,
-    },
-    avatarPlaceholder: {
-        backgroundColor: colors.border,
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-    },
-    avatarPlaceholderText: {
-        fontWeight: 'bold',
-        color: colors.textSecondary,
-    },
-    expandedList: {
-        marginTop: spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        paddingTop: spacing.sm,
-    },
-    staffListItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: spacing.sm,
-        borderRadius: 8,
-        paddingHorizontal: spacing.sm,
-    },
-    staffListItemSelected: {
-        backgroundColor: '#F9F5FF',
-    },
-    staffListItemInfo: {
-        flex: 1,
-        marginLeft: spacing.md,
-        marginRight: spacing.sm,
-    },
-    staffListItemInfoRtl: {
-        marginLeft: spacing.sm,
-        marginRight: spacing.md,
-    },
-    staffListItemName: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: colors.text,
-        marginBottom: 2,
-    },
-    staffListItemRole: {
-        fontSize: 13,
-        color: colors.textSecondary,
-    },
-    ratingContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.sm,
-    },
-    ratingText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: colors.textSecondary,
-        marginLeft: 4,
-    },
-    checkDotWrapper: {
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    noStaffText: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        textAlign: 'center',
-        marginVertical: spacing.md,
-    },
+    dropdownSelectorExpanded: { borderColor: colors.primary, backgroundColor: '#F8F5FF' },
+    dropdownContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flex: 1 },
+    dropdownStaffInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    dropdownSelectedText: { fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: spacing.sm, flex: 1 },
+    dropdownPlaceholderText: { fontSize: 15, color: colors.textSecondary, flex: 1 },
+    dropdownVerified: { marginLeft: spacing.xs },
+    avatarPlaceholder: { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    avatarPlaceholderText: { fontWeight: 'bold', color: colors.textSecondary },
+    expandedList: { marginTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, gap: spacing.sm },
+    staffListItem: { flexDirection: 'row', alignItems: 'center', padding: spacing.sm, borderRadius: 12, borderWidth: 1, borderColor: 'transparent' },
+    staffListItemSelected: { backgroundColor: '#F8F5FF', borderColor: '#EAE1FA' },
+    staffListItemInfo: { flex: 1, marginLeft: spacing.md },
+    staffListItemName: { fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 2 },
+    staffListItemRole: { fontSize: 13, color: colors.textSecondary },
+    ratingContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    ratingText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginLeft: 4 },
+    staffSelectBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6' },
+    staffSelectBtnActive: { backgroundColor: colors.primary },
+    staffSelectBtnText: { fontSize: 13, fontWeight: 'bold', color: colors.text },
+    staffSelectBtnTextActive: { color: '#FFFFFF' },
+    noStaffText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginVertical: spacing.md },
     bottomBasketContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: colors.surface,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.md,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 10,
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        backgroundColor: 'rgba(255,255,255,0.9)', borderTopWidth: 1, borderTopColor: colors.border,
+        paddingHorizontal: spacing.md, paddingTop: spacing.md,
     },
-    validationMessage: {
-        color: '#DC2626',
-        fontSize: 13,
-        fontWeight: '500',
-        marginBottom: spacing.sm,
-        textAlign: 'center',
-    },
-    continueButton: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.primary,
-        paddingVertical: 14,
-        borderRadius: 12,
-        width: '100%',
-    },
-    continueButtonDisabled: {
-        backgroundColor: colors.border,
-    },
-    continueButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '700',
-    },
+    bottomBasketInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+    bottomBasketItems: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+    bottomBasketTotal: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+    validationCallout: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', padding: spacing.sm, borderRadius: 8, marginBottom: spacing.sm },
+    validationMessage: { color: '#B45309', fontSize: 13, fontWeight: '600', marginLeft: spacing.sm },
+    continueButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 16, width: '100%' },
+    continueButtonDisabled: { backgroundColor: colors.border },
+    continueButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginRight: 8 },
 });
