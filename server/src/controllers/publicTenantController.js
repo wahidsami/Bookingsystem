@@ -198,6 +198,146 @@ exports.getAllTenants = async (req, res) => {
 };
 
 /**
+ * Get organically trending tenants based on real recent booking activity.
+ *
+ * Ranking:
+ *   1. Recent valid-booking count (30-day rolling window) DESC
+ *   2. Tenant average rating (stats.averageRating) DESC
+ *   3. Most recent qualifying booking date DESC
+ *   4. Tenant createdAt DESC (deterministic tie-break)
+ *
+ * Valid appointment statuses counted: confirmed, checked_in, in_service, completed
+ * Excluded: cancelled, no_show, pending
+ *
+ * Cold-start fallback: when no tenants have recent activity the endpoint
+ * returns the newest eligible active tenants instead (createdAt DESC).
+ *
+ * GET /api/v1/public/tenants/trending?limit=8
+ */
+exports.getTrendingTenants = async (req, res) => {
+    try {
+        const requestedLimit = parseInt(req.query.limit || '8', 10);
+        const limit = Math.min(Math.max(requestedLimit, 1), 20); // enforce 1-20
+
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const cutoffISO = thirtyDaysAgo.toISOString();
+
+        // ── Primary query: tenants ranked by recent booking activity ──
+        const activeTenants = await db.Tenant.findAll({
+            where: { status: 'active' },
+            attributes: [
+                'id',
+                'name',
+                'name_en',
+                'name_ar',
+                'slug',
+                'businessType',
+                'logo',
+                'coverImage',
+                'city',
+                'status',
+                'stats',
+                'createdAt',
+                // Aggregate: count of valid recent appointments
+                [
+                    db.sequelize.literal(`(
+                        SELECT COUNT(*)
+                        FROM "public"."appointments" AS "a"
+                        WHERE "a"."tenantId" = "Tenant"."id"
+                          AND "a"."status" IN ('confirmed','checked_in','in_service','completed')
+                          AND "a"."startTime" >= '${cutoffISO}'
+                    )`),
+                    'recentBookingCount'
+                ],
+                // Latest qualifying booking date for recency tie-break
+                [
+                    db.sequelize.literal(`(
+                        SELECT MAX("a"."startTime")
+                        FROM "public"."appointments" AS "a"
+                        WHERE "a"."tenantId" = "Tenant"."id"
+                          AND "a"."status" IN ('confirmed','checked_in','in_service','completed')
+                          AND "a"."startTime" >= '${cutoffISO}'
+                    )`),
+                    'latestBookingDate'
+                ]
+            ],
+            order: [
+                [db.sequelize.literal(`(
+                    SELECT COUNT(*)
+                    FROM "public"."appointments" AS "a2"
+                    WHERE "a2"."tenantId" = "Tenant"."id"
+                      AND "a2"."status" IN ('confirmed','checked_in','in_service','completed')
+                      AND "a2"."startTime" >= '${cutoffISO}'
+                )`), 'DESC'],
+                [db.sequelize.literal(`COALESCE(("stats"->>'averageRating')::numeric, 0)`), 'DESC'],
+                [db.sequelize.literal(`COALESCE((
+                    SELECT MAX("a3"."startTime")
+                    FROM "public"."appointments" AS "a3"
+                    WHERE "a3"."tenantId" = "Tenant"."id"
+                      AND "a3"."status" IN ('confirmed','checked_in','in_service','completed')
+                      AND "a3"."startTime" >= '${cutoffISO}'
+                ), '1970-01-01'::timestamp)`), 'DESC'],
+                ['createdAt', 'DESC']
+            ],
+            limit
+        });
+
+        // Check if we got organic activity (at least one tenant with bookings > 0)
+        const hasActivity = activeTenants.some(
+            t => parseInt(t.getDataValue('recentBookingCount') || '0', 10) > 0
+        );
+
+        let resultTenants;
+
+        if (hasActivity) {
+            // ── Organic result ──
+            resultTenants = activeTenants.map(t => {
+                const data = t.toJSON();
+                // Remove internal ranking fields from the response
+                delete data.recentBookingCount;
+                delete data.latestBookingDate;
+                return data;
+            });
+        } else {
+            // ── Cold-start fallback: newest eligible active tenants ──
+            const fallbackTenants = await db.Tenant.findAll({
+                where: { status: 'active' },
+                attributes: [
+                    'id',
+                    'name',
+                    'name_en',
+                    'name_ar',
+                    'slug',
+                    'businessType',
+                    'logo',
+                    'coverImage',
+                    'city',
+                    'status',
+                    'stats',
+                    'createdAt'
+                ],
+                order: [['createdAt', 'DESC']],
+                limit
+            });
+            resultTenants = fallbackTenants.map(t => t.toJSON());
+        }
+
+        res.json({
+            success: true,
+            tenants: resultTenants,
+            count: resultTenants.length
+        });
+    } catch (error) {
+        console.error('Get trending tenants error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch trending tenants'
+        });
+    }
+};
+
+/**
  * Get public business categories derived from active tenants
  */
 exports.getPublicCategories = async (req, res) => {
