@@ -14,6 +14,7 @@ const { optionalAuth } = require('../middleware/authUser');
 
 // Get all active tenants (for browse/discovery)
 router.get('/tenants', publicTenantController.getAllTenants);
+router.get('/tenants/trending', publicTenantController.getTrendingTenants);
 router.get('/providers/top', publicTenantController.getTopProviders);
 
 // Get tenant by slug
