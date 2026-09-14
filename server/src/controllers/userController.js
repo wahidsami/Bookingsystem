@@ -470,6 +470,24 @@ const markNotificationRead = async (req, res) => {
     }
 };
 
+const markAllNotificationsRead = async (req, res) => {
+    try {
+        const result = await customerNotificationService.markAllUserNotificationsRead(req.userId);
+
+        res.json({
+            success: true,
+            updated: result.updated,
+            message: 'All notifications marked as read'
+        });
+    } catch (error) {
+        console.error('Mark all customer notifications read error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to update notifications'
+        });
+    }
+};
+
 /**
  * Register customer mobile push token
  * POST /api/v1/users/push-token
@@ -626,9 +644,9 @@ module.exports = {
     getNotificationDetail,
     getNotificationByCampaign,
     markNotificationRead,
+    markAllNotificationsRead,
     registerPushToken,
     unregisterPushToken,
     deleteAccount,
     uploadMiddleware: upload.single('photo')
 };
-

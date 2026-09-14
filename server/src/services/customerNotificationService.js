@@ -456,5 +456,22 @@ module.exports = {
         }
 
         return recipient;
+    },
+    async markAllUserNotificationsRead(platformUserId) {
+        if (!platformUserId) {
+            return { updated: 0 };
+        }
+        
+        const [updatedRows] = await db.TenantPushCampaignRecipient.update(
+            { readAt: new Date() },
+            {
+                where: {
+                    platformUserId,
+                    readAt: null
+                }
+            }
+        );
+        
+        return { updated: updatedRows };
     }
 };

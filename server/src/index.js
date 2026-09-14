@@ -238,6 +238,7 @@ app.use('/api/v1/bookings', bookingRoutes);
 app.use('/api/v1/staff', staffRoutes);
 app.use('/api/v1/services', serviceRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/addresses', require('./routes/addressRoutes'));
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/orders', require('./routes/orderRoutes')); // Order management
 app.use('/api/v1/subscription', subscriptionRoutes); // Subscription management (singular for authenticated routes)
@@ -726,6 +727,41 @@ const ensureTenantGiftCardSchema = async () => {
     }
 };
 
+const ensureUserAddressSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                -- Create user_addresses table if it does not exist
+                CREATE TABLE IF NOT EXISTS public.user_addresses (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    platform_user_id UUID NOT NULL REFERENCES public.platform_users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                    title VARCHAR(255) NOT NULL DEFAULT 'Home',
+                    street VARCHAR(255) NOT NULL,
+                    city VARCHAR(255) NOT NULL,
+                    building VARCHAR(255) NULL,
+                    floor VARCHAR(255) NULL,
+                    apartment VARCHAR(255) NULL,
+                    phone VARCHAR(255) NULL,
+                    notes TEXT NULL,
+                    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                );
+
+                -- Index for fast user lookup
+                CREATE INDEX IF NOT EXISTS user_addresses_platform_user_id_idx
+                    ON public.user_addresses (platform_user_id);
+            END $$;
+        `);
+
+        console.log('User address schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure user address schema:', error);
+        throw error;
+    }
+};
+
 // Database Connection and Server Start
 const startServer = async () => {
     try {
@@ -742,6 +778,7 @@ const startServer = async () => {
         await ensureAppointmentSchema();
         await ensureBookingSessionSchema();
         await ensurePaymentTransactionSchema();
+        await ensureUserAddressSchema();
 
         console.log('✅ Database connectivity verified successfully.');
 
