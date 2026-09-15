@@ -15,7 +15,9 @@ import {
   hasHotDealsEntitlement,
   hasProductsAndOrdersEntitlement,
   hasPublicPageCustomizationEntitlement,
-  hasPushNotificationsEntitlement
+  hasPushNotificationsEntitlement,
+  hasAIConsultantEntitlement,
+  hasServicePackagesEntitlement
 } from './lib/tenantEntitlements';
 import {
   dashboardLandingPageToView,
@@ -379,22 +381,22 @@ export default function App() {
   const handleToggleLang = () => {
     setLang(prev => {
       const next = prev === 'ar' ? 'en' : 'ar';
-      
+
       // Update tenant name translation counterpart automatically
       if (next === 'en') {
-        setCurrentTenant(c => 
-          c.includes('العليا') 
-            ? 'La Colline Luxury Spa - Olaya Riyadh' 
-            : c.includes('الكورنيش') 
-            ? 'REFAH Beauty & Spa - Corniche Jeddah' 
+        setCurrentTenant(c =>
+          c.includes('العليا')
+            ? 'La Colline Luxury Spa - Olaya Riyadh'
+            : c.includes('الكورنيش')
+            ? 'REFAH Beauty & Spa - Corniche Jeddah'
             : 'Royal Bridal Salon - Khobar Branch'
         );
       } else {
-        setCurrentTenant(c => 
-          c.includes('Olaya') 
-            ? 'سبا لا كولين الفاخر - فرع العليا الرياض' 
-            : c.includes('Corniche') 
-            ? 'مركز تجميل واستجمام رفاه - فرع الكورنيش جدة' 
+        setCurrentTenant(c =>
+          c.includes('Olaya')
+            ? 'سبا لا كولين الفاخر - فرع العليا الرياض'
+            : c.includes('Corniche')
+            ? 'مركز تجميل واستجمام رفاه - فرع الكورنيش جدة'
             : 'صالون العروس الملكي - فرع الخبر'
         );
       }
@@ -456,7 +458,7 @@ export default function App() {
       else if (path === '/dashboard/messages') targetView = 'messages';
       else if (path === '/dashboard/appointments') targetView = 'appointments';
       else if (path === '/dashboard/customers' || path.startsWith('/dashboard/customers/')) targetView = 'customers';
-      
+
       if (targetView) {
         handleSelectView(targetView);
       }
@@ -485,7 +487,7 @@ export default function App() {
         path = '/dashboard/customers';
       }
     }
-    
+
     if (path && window.location.pathname !== path) {
       window.history.pushState(null, '', path);
     }
@@ -538,11 +540,17 @@ export default function App() {
       return;
     }
 
+    if (type === 'navigate' && action?.viewId) {
+      handleSelectView(action.viewId);
+      return;
+    }
+
     const targetView =
       type === 'appointment' ? 'appointments' :
       type === 'customer' ? 'customers' :
       type === 'service' ? 'services' :
       type === 'product' ? 'products' :
+      type === 'packages' ? 'packages' :
       'dashboard';
 
     handleSelectView(targetView);
@@ -628,7 +636,6 @@ export default function App() {
       />
     );
   }
-
   return (
     <div
       dir={isRtl ? 'rtl' : 'ltr'}
@@ -637,7 +644,7 @@ export default function App() {
       }`}
       id="refah-app-shell"
     >
-      
+
       {/* Sidebar (dark luxury layout with favoritePages) */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
@@ -647,11 +654,12 @@ export default function App() {
         onSelectView={handleSelectView}
         favoritePages={favoritePages}
         accessibleMarketingModules={accessibleMarketingModules}
+        hasServicePackages={hasServicePackagesEntitlement(packageEntitlements)}
       />
 
       {/* Main Workspace Frame */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" id="main-content-panel">
-        
+
         {/* Sticky Header with integrated tab navigator */}
         <Topbar
           lang={lang}

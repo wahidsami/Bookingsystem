@@ -1,27 +1,37 @@
-import React, { useMemo } from 'react';
-import { Search } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Search, Package as PackageIcon, Clock, DollarSign, Trash } from 'lucide-react';
 import { type ServiceRecord, type ServiceVariantRecord } from '../../lib/serviceContract';
 import AppointmentServiceRow from './AppointmentServiceRow';
 export interface StagedService {
   id: string;
+  itemType?: 'service' | 'package';
+  packageId?: string;
+  packageInstanceId?: string;
   serviceId: string;
   variantId?: string;
   serviceCategory?: string;
   staffId: string;
   startTime: number;
   duration: number;
-  discountType: 'none' | 'flat' | 'percent';
-  discountValue: number;
-  notes: string;
+  discountType?: 'none' | 'flat' | 'percent';
+  discountValue?: number;
+  notes?: string;
   basePrice?: number;
   finalPrice?: number;
+  timingMode?: 'auto' | 'manual';
+  overtimeApproval?: { approved: boolean };
 }
 interface AppointmentServicesStepProps {
+  tenantId: string;
+  tenantTimezone: string;
+  selectedDate: string;
   isRtl: boolean;
   boardStartHour?: number;
+  slotMinutes?: number;
   bookingRecoveryMode?: 'chain' | 'modify_professionals' | 'separate_services';
   forceExpandAll?: boolean;
   canonicalServices: ServiceRecord[];
+  servicePackages?: any[];
   stagedServices: StagedService[];
   availableStylists: any[];
   serviceCategoryTabs: { key: string; labelAr: string; labelEn: string }[];
@@ -30,6 +40,7 @@ interface AppointmentServicesStepProps {
   serviceSearch: string;
   setServiceSearch: (val: string) => void;
   onAddService: (service: ServiceRecord, variant?: ServiceVariantRecord | null) => void;
+  onAddPackage?: (packageId: string) => void;
   onUpdateService: (id: string, updates: Partial<StagedService>) => void;
   onRemoveService: (index: number) => void;
   formatMinutesToTime: (mins: number) => string;
@@ -38,11 +49,16 @@ interface AppointmentServicesStepProps {
 }
 
 export default function AppointmentServicesStep({
+  tenantId,
+  tenantTimezone,
+  selectedDate,
   isRtl,
   boardStartHour = 9,
+  slotMinutes = 5,
   bookingRecoveryMode = 'chain',
   forceExpandAll = false,
   canonicalServices,
+  servicePackages = [],
   stagedServices,
   availableStylists,
   serviceCategoryTabs,
@@ -51,9 +67,12 @@ export default function AppointmentServicesStep({
   serviceSearch,
   setServiceSearch,
   onAddService,
+  onAddPackage,
   onUpdateService,
   onRemoveService,
 }: AppointmentServicesStepProps) {
+
+  const [activeTab, setActiveTab] = useState<'services' | 'packages'>('services');
 
   const filteredServices = useMemo(() => {
     let filtered = canonicalServices;
@@ -153,7 +172,31 @@ export default function AppointmentServicesStep({
             />
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex bg-slate-100 rounded-xl p-1 shrink-0 mb-4">
+            <button
+              onClick={() => setActiveTab('services')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${
+                activeTab === 'services'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {isRtl ? 'الخدمات' : 'Services'}
+            </button>
+            <button
+              onClick={() => setActiveTab('packages')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${
+                activeTab === 'packages'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {isRtl ? 'الباقات' : 'Packages'}
+            </button>
+          </div>
+
+          {activeTab === 'services' && (
+            <div className="flex flex-wrap gap-2">
             {serviceCategoryTabs.map((tab) => {
               const active = currentServiceCategory === tab.key || (!currentServiceCategory && tab.key === 'all');
               return (
@@ -172,8 +215,143 @@ export default function AppointmentServicesStep({
               );
             })}
           </div>
+          )}
 
-          <div className="space-y-6 pb-4">
+          {activeTab === 'packages' && (
+            <div className="space-y-6 pb-4">
+              {/* Selected Packages Block */}
+              {(() => {
+                const pkgCartItems = stagedServices.filter(s => s.itemType === 'package');
+                if (pkgCartItems.length === 0) return null;
+                
+                const pkgGroups = pkgCartItems.reduce((acc, curr) => {
+                   const groupKey = curr.packageInstanceId || curr.packageId!;
+                   if (!acc[groupKey]) acc[groupKey] = [];
+                   acc[groupKey].push(curr);
+                   return acc;
+                }, {} as Record<string, typeof stagedServices>);
+
+                return (
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-medium tracking-tight text-slate-900 px-1 border-b border-slate-100 pb-2">
+                      {isRtl ? 'الباقات المختارة' : 'Selected Packages'}
+                    </h3>
+                    {Object.entries(pkgGroups).map(([instanceId, items]) => {
+                      const pkgId = items[0].packageId;
+                      const pkg = servicePackages?.find(p => p.id === pkgId);
+                      if (!pkg) return null;
+                      return (
+                        <div key={instanceId} className="bg-slate-50 border border-primary/20 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-full h-1 bg-primary"></div>
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h4 className="font-bold text-slate-900 text-lg">{isRtl ? pkg.name_ar : pkg.name_en}</h4>
+                              <p className="text-sm text-slate-500 mt-1">{pkg.totalPrice} {isRtl ? 'ر.س' : 'SAR'} • {pkg.totalDuration} {isRtl ? 'دقيقة' : 'min'}</p>
+                            </div>
+                            <button 
+                              onClick={() => {
+                                if (onRemoveService) {
+                                  const indicesToRemove: number[] = [];
+                                  stagedServices.forEach((s, idx) => {
+                                    if ((s.packageInstanceId || s.packageId) === instanceId) indicesToRemove.push(idx);
+                                  });
+                                  indicesToRemove.reverse().forEach(idx => onRemoveService(idx));
+                                }
+                              }}
+                              className="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition"
+                            >
+                              <Trash className="w-5 h-5" />
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-3 mt-4 border-t border-slate-200 pt-4">
+                            <h5 className="font-semibold text-slate-700 text-sm">{isRtl ? 'خطوات التنفيذ' : 'Execution Steps'}</h5>
+                            {items.map((item) => {
+                              const srv = canonicalServices.find(s => s.id === item.serviceId);
+                              if (!srv) return null;
+                              return (
+                                <AppointmentServiceRow
+                                  tenantId={tenantId}
+                                  tenantTimezone={tenantTimezone}
+                                  selectedDate={selectedDate}
+                                  key={item.id}
+                                  service={srv}
+                                  variant={srv.variants?.find((v: any) => v.id === item.variantId) || null}
+                                  isRtl={isRtl}
+                                  boardStartHour={boardStartHour}
+                                  slotMinutes={slotMinutes}
+                                  forceExpanded={true}
+                                  availableStylists={availableStylists}
+                                  stagedItem={item}
+                                  onAddService={() => {}} 
+                                  onUpdateService={onUpdateService}
+                                  onRemoveService={() => {}} 
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              <h3 className="text-xl font-medium tracking-tight text-slate-900 px-1 border-b border-slate-100 pb-2 mt-6">
+                {isRtl ? 'الباقات المتاحة' : 'Available Packages'}
+              </h3>
+              {servicePackages.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {servicePackages.map(pkg => (
+                    <div key={pkg.id} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                      <div className="flex gap-3 mb-4">
+                        <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200 shadow-sm overflow-hidden">
+                          {pkg.image ? (
+                            <img src={pkg.image} alt="thumbnail" className="w-full h-full object-cover" />
+                          ) : (
+                            <PackageIcon className="w-6 h-6 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-bold text-slate-900 truncate">{isRtl ? pkg.name_ar : pkg.name_en}</h4>
+                          </div>
+                          <div className="text-[11px] font-semibold text-primary bg-primary/10 w-fit px-2 py-0.5 rounded-full mb-2">
+                            {pkg.items?.length || 0} {isRtl ? 'خدمات' : 'services'}
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+                            <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> {pkg.totalPrice} {isRtl ? 'ر.س' : 'SAR'}</span>
+                            <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {pkg.totalDuration} {isRtl ? 'دقيقة' : 'min'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="px-1 mb-4">
+                        <ul className="text-xs text-slate-500 space-y-1 list-disc list-inside">
+                          {(pkg.items || []).map((item: any) => {
+                            const srv = canonicalServices.find((s: any) => s.id === item.serviceId);
+                            return srv ? <li key={item.id} className="truncate">{isRtl ? srv.nameAr || srv.name_ar : srv.nameEn || srv.name_en}</li> : null;
+                          })}
+                        </ul>
+                      </div>
+                      <button
+                        onClick={() => onAddPackage && onAddPackage(pkg.id)}
+                        className="w-full py-2 bg-primary/10 text-primary hover:bg-primary/20 font-bold text-sm rounded-xl transition"
+                      >
+                        {isRtl ? 'إضافة الباقة' : 'Add Package'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
+                  {isRtl ? 'لا توجد باقات متاحة.' : 'No packages available.'}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'services' && (
+            <div className="space-y-6 pb-4">
             {Object.keys(groupedServices).length > 0 ? (
               Object.keys(groupedServices).map((categoryName) => (
                 <div key={categoryName} className="space-y-3">
@@ -183,16 +361,20 @@ export default function AppointmentServicesStep({
                   <div className="space-y-3">
                     {groupedServices[categoryName].map(({ service, variant }) => {
                       const stagedItem = variant
-                        ? stagedServices.find((s) => s.serviceId === service.id && s.variantId === variant.id)
-                        : stagedServices.find((s) => s.serviceId === service.id && !s.variantId);
+                        ? stagedServices.find((s) => s.serviceId === service.id && s.variantId === variant.id && s.itemType !== 'package')
+                        : stagedServices.find((s) => s.serviceId === service.id && !s.variantId && s.itemType !== 'package');
 
                       return (
                         <AppointmentServiceRow
+                          tenantId={tenantId}
+                          tenantTimezone={tenantTimezone}
+                          selectedDate={selectedDate}
                           key={variant ? `${service.id}-${variant.id}` : service.id}
                           service={service}
                           variant={variant}
                           isRtl={isRtl}
                           boardStartHour={boardStartHour}
+                          slotMinutes={slotMinutes}
                           forceExpanded={forceExpandAll}
                           availableStylists={availableStylists}
                           stagedItem={stagedItem || null}
@@ -216,6 +398,7 @@ export default function AppointmentServicesStep({
               </div>
             )}
           </div>
+          )}
         </div>
       </section>
     </div>

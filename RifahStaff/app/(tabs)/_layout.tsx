@@ -5,11 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '../../src/context/AuthContext';
 import {
-  getOverflowStaffSections,
   getVisibleStaffTabSections,
   staffIconMap,
 } from '../../src/utils/staffNavigation';
 import { useLanguage } from '../../src/context/LanguageContext';
+import { StaffHeader } from '../../src/components/StaffHeader';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -17,17 +17,15 @@ export default function TabLayout() {
   const { user } = useAuth();
   const { language } = useLanguage();
   const visibleSections = getVisibleStaffTabSections(user, language);
-  const overflowSections = getOverflowStaffSections(user, language);
-  const hasMoreTab = overflowSections.some((section) => section.kind === 'tab');
-  const isArabic = language === 'ar';
 
   return (
     <Tabs
-      initialRouteName="appointments"
+      initialRouteName="schedule"
       screenOptions={{
         tabBarActiveTintColor: '#8B5ADF',
         tabBarInactiveTintColor: colorScheme === 'dark' ? '#9ca3af' : '#6b7280',
-        headerShown: false,
+        headerShown: true,
+        header: () => <StaffHeader />,
         tabBarShowLabel: true,
         tabBarStyle: {
           backgroundColor: colorScheme === 'dark' ? '#1f2937' : '#ffffff',
@@ -51,37 +49,20 @@ export default function TabLayout() {
           paddingBottom: 2,
         },
       }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="home"
-        options={{
-          href: null,
-        }}
-      />
+      {/* Hide all these auxiliary screens from the tab bar */}
+      <Tabs.Screen name="index" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="home" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="appointments" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="more" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="earnings" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="reviews" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="notifications" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="pos" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="explore" options={{ href: null, headerShown: false }} />
 
-      {['appointments', 'customers', 'reviews', 'messages', 'notifications', 'earnings', 'profile', 'more', 'pos', 'explore'].map((routeName) => {
-        if (routeName === 'more') {
-          if (!hasMoreTab) {
-            return <Tabs.Screen key={routeName} name={routeName} options={{ href: null }} />;
-          }
-
-          return (
-            <Tabs.Screen
-              key={routeName}
-              name={routeName}
-              options={{
-                title: isArabic ? 'المزيد' : 'More',
-                tabBarIcon: ({ color }) => <Ionicons name="menu-outline" size={22} color={color} />,
-              }}
-            />
-          );
-        }
-
+      {/* Primary strict tabs (conditionally rendered) */}
+      {['schedule', 'customers', 'messages', 'account'].map((routeName) => {
         const section = visibleSections.find((item) => item.route === routeName);
         if (section) {
           return (

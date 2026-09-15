@@ -674,6 +674,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
                       <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الحد الأقصى للحجوزات' : 'Bookings limit'}: {pkg?.limits?.maxBookingsPerMonth === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : `${pkg?.limits?.maxBookingsPerMonth ?? 0}/mo`}</div>
                       <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الفرق' : 'Staff'}: {pkg?.limits?.maxStaff === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxStaff ?? 0}</div>
                       <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الخدمات' : 'Services'}: {pkg?.limits?.maxServices === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxServices ?? 0}</div>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الباقات' : 'Packages'}: {pkg?.limits?.maxPackages === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxPackages ?? 0}</div>
                       <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'العمولة' : 'Commission'}: {pkg?.platformCommission ?? 0}%</div>
                     </div>
                   </button>

@@ -49,6 +49,7 @@ interface TenantAuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  refreshSubscription: () => Promise<void>;
   hasPermission: (permissionKey: string) => boolean;
 }
 
@@ -341,6 +342,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     refreshUser,
+    refreshSubscription: loadSubscriptionState,
     hasPermission
   }), [
     user,
@@ -358,6 +360,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     refreshUser,
+    loadSubscriptionState,
     hasPermission
   ]);
 

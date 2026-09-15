@@ -1,6 +1,5 @@
 import api from './api';
 import { getRiyadhDateKey } from '../utils/riyadhDate';
-import { normalizeBreak, BreakWindow } from './schedule';
 
 export interface Appointment {
     id: string;
@@ -10,6 +9,7 @@ export interface Appointment {
     bookingItemIndex?: number | null;
     startTime: string;
     endTime: string;
+    duration?: number;
     status: 'pending' | 'confirmed' | 'started' | 'completed' | 'cancelled' | 'no_show';
     notes?: string;
     paymentStatus?: string;
@@ -83,19 +83,15 @@ const normalizeAppointment = (appointment: any): Appointment => {
 /**
  * Fetch appointments for a specific day for the logged-in staff
  */
-export const getAppointmentsForDate = async (date: string): Promise<{ appointments: Appointment[], breaks: BreakWindow[] }> => {
+export const getAppointmentsForDate = async (date: string): Promise<Appointment[]> => {
     try {
         const response = await api.get(`/staff/appointments?date=${date}`);
         if (response.data.success) {
-            const appointments = Array.isArray(response.data.appointments)
+            return Array.isArray(response.data.appointments)
                 ? response.data.appointments.map(normalizeAppointment)
                 : [];
-            const breaks = Array.isArray(response.data.breaks)
-                ? response.data.breaks.map((b: any) => normalizeBreak(b, date))
-                : [];
-            return { appointments, breaks };
         }
-        return { appointments: [], breaks: [] };
+        return [];
     } catch (error) {
         console.error('Error fetching today appointments:', error);
         throw error;
@@ -105,7 +101,7 @@ export const getAppointmentsForDate = async (date: string): Promise<{ appointmen
 /**
  * Fetch today's appointments for the logged-in staff
  */
-export const getTodayAppointments = async (): Promise<{ appointments: Appointment[], breaks: BreakWindow[] }> => {
+export const getTodayAppointments = async (): Promise<Appointment[]> => {
     return getAppointmentsForDate(getTodayDateKey());
 };
 

@@ -12,6 +12,7 @@ interface SidebarProps {
   onSelectView: (viewId: ViewType) => void;
   favoritePages?: ViewType[];
   accessibleMarketingModules?: Record<string, boolean>;
+  hasServicePackages?: boolean;
 }
 
 export default function Sidebar({
@@ -22,6 +23,7 @@ export default function Sidebar({
   onSelectView,
   favoritePages = [],
   accessibleMarketingModules,
+  hasServicePackages = true,
 }: SidebarProps) {
   const t = translations[lang];
   const isRtl = lang === 'ar';
@@ -44,7 +46,7 @@ export default function Sidebar({
         isCollapsed ? 'w-20' : 'w-64'
       } ${isRtl ? 'border-l' : 'border-r'}`}
     >
-      
+
       {/* Upper Logo and Collapse Button */}
       <div className="flex flex-col">
         <div className="p-5 flex items-center justify-between border-b border-zinc-900 h-16 bg-zinc-950/80">
@@ -90,7 +92,7 @@ export default function Sidebar({
 
         {/* Multi-Level Group Navigation */}
         <div className="px-3 py-4 space-y-5 overflow-y-auto max-h-[calc(100vh-190px)] scrollbar-none">
-          
+
           {/* Favorite Pages Shelf (Personalization Hook) */}
           {favoriteNavItems.length > 0 && (
             <div className="space-y-1 bg-zinc-900/30 p-2 rounded-xl border border-zinc-900/40">
@@ -100,7 +102,7 @@ export default function Sidebar({
                   <span>{isRtl ? 'المفضلة الفورية' : 'My Saved Favorites'}</span>
                 </h4>
               )}
-              
+
               <div className="space-y-0.5">
                 {favoriteNavItems.map((item) => {
                   const isActive = activeView === item.id;
@@ -121,7 +123,7 @@ export default function Sidebar({
                         </span>
                         {!isCollapsed && <span className="truncate">{itemLabel}</span>}
                       </div>
-                      
+
                       {isCollapsed && (
                         <span className={`absolute ${isRtl ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap font-sans`}>
                           ⭐ {itemLabel}
@@ -135,7 +137,15 @@ export default function Sidebar({
           )}
 
           {categories.map((cat) => {
-            const itemsInCat = navigationItems.filter((i) => i.category === cat);
+            let itemsInCat = navigationItems.filter((i) => i.category === cat);
+
+            // Hide packages menu if entitlement is disabled
+            if (!hasServicePackages) {
+              itemsInCat = itemsInCat.filter((i) => i.id !== 'packages');
+            }
+
+            if (itemsInCat.length === 0) return null;
+
             return (
               <div key={cat} className="space-y-1">
                 {/* Section title (Hide if collapsed) */}
@@ -280,10 +290,10 @@ export default function Sidebar({
                         {/* Badges (only if not collapsed) */}
                         {!isCollapsed && badge && (
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                            badge === 'New' || badge === 'جديد' 
-                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
-                              : badge === 'Alert' || badge === 'تنبيه' 
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                            badge === 'New' || badge === 'جديد'
+                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                              : badge === 'Alert' || badge === 'تنبيه'
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                               : 'bg-brand-500/10 text-brand-400 border border-brand-500/20'
                           }`}>
                             {badge}

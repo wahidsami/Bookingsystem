@@ -421,8 +421,14 @@ function normalizeCustomerProfileResponse(payload: any): CanonicalCustomerProfil
   const lastName = toStringValue(customer?.lastName || customer?.last_name || '');
   const name = normalizePersonName(customer, 'Guest');
   const avatar = customer?.avatar || customer?.photo || customer?.profileImage || null;
-  const walletLedgerEntries = toArray(customer?.walletLedgerEntries);
-  const giftCardTransactions = toArray(customer?.giftCardTransactions);
+  const walletLedgerEntries = toArray(customer?.walletLedgerEntries).map((entry: any) => ({
+    ...entry,
+    timestamp: entry.processedAt || entry.createdAt || entry.date || ''
+  }));
+  const giftCardTransactions = toArray(customer?.giftCardTransactions).map((tx: any) => ({
+    ...tx,
+    createdDate: tx.processedAt || tx.createdAt || tx.date || ''
+  }));
   const favorites = toArray(customer?.favoriteServices);
   const preferredStaff = toArray(customer?.preferredStaff);
   const recentAppointments = toArray(customer?.recentAppointments);
@@ -647,9 +653,10 @@ function normalizeResponseForPath(pathname: string, method: string, payload: any
 
 class TenantApiAdapter {
   private fetchImpl: FetchLike;
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor(fetchImpl?: FetchLike) {
-    this.fetchImpl = fetchImpl || window.fetch.bind(window);
+    this.fetchImpl = fetchImpl || (typeof window !== 'undefined' ? window.fetch.bind(window) : () => Promise.resolve(new Response()));
   }
 
   private get baseUrl(): string {
@@ -701,22 +708,34 @@ class TenantApiAdapter {
   }
 
   private async refreshAccessToken(): Promise<boolean> {
-    const refreshToken = this.getRefreshToken();
-    if (!refreshToken) return false;
-
-    const response = await this.fetchImpl(`${API_BASE_URL}/auth/tenant/refresh-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken })
-    });
-
-    const data = await response.json().catch(() => null);
-    if (data?.success && data?.accessToken) {
-      this.setTokens(data.accessToken, data.refreshToken || refreshToken);
-      return true;
+    if (this.refreshPromise) {
+      return this.refreshPromise;
     }
 
-    return false;
+    this.refreshPromise = (async () => {
+      try {
+        const refreshToken = this.getRefreshToken();
+        if (!refreshToken) return false;
+
+        const response = await this.fetchImpl(`${API_BASE_URL}/auth/tenant/refresh-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+
+        const data = await response.json().catch(() => null);
+        if (data?.success && data?.accessToken) {
+          this.setTokens(data.accessToken, data.refreshToken || refreshToken);
+          return true;
+        }
+
+        return false;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   async ensureFreshAuthSession(): Promise<boolean> {
@@ -760,8 +779,36 @@ class TenantApiAdapter {
     return this.get('/api/v1/subscription/current');
   }
 
+  async requestSubscriptionChange(payload: { packageId: string; billingCycle: string }): Promise<any> {
+    return this.post('/api/v1/subscription/change-request', payload);
+  }
+
   async getTenantBills(): Promise<any> {
     return this.get('/tenant/bills');
+  }
+
+  async getCurrentUnpaidBill(): Promise<any> {
+    return this.get('/tenant/bills/current-unpaid');
+  }
+
+  async getBillDetails(billId: string | number): Promise<any> {
+    return this.get(`/tenant/bills/${billId}`);
+  }
+
+  getInvoicePdfUrl(billId: string | number): string {
+    const url = this.buildUrl(`/tenant/bills/${billId}/invoice-pdf`);
+    return url.toString();
+  }
+
+  async downloadInvoicePdf(billId: string | number): Promise<Blob> {
+    const response = await this.request(`/tenant/bills/${billId}/invoice-pdf`);
+    if (!response.ok) throw new Error('Failed to download invoice PDF');
+    return response.blob();
+  }
+
+  getReceiptPdfUrl(billId: string | number): string {
+    const url = this.buildUrl(`/tenant/bills/${billId}/receipt-pdf`);
+    return url.toString();
   }
 
   async registerTenant(formData: FormData): Promise<any> {
@@ -1136,6 +1183,14 @@ class TenantApiAdapter {
     return this.put(`/tenant/employees/${id}`, data);
   }
 
+  async sendEmployeeAppInvite(id: string): Promise<any> {
+    return this.post(`/tenant/employees/${id}/send-invite`, {});
+  }
+
+  async resetEmployeePassword(id: string): Promise<any> {
+    return this.post(`/tenant/employees/${id}/reset-password`, {});
+  }
+
   async deleteEmployee(id: string): Promise<any> {
     return this.delete(`/tenant/employees/${id}`);
   }
@@ -1254,9 +1309,55 @@ class TenantApiAdapter {
     return this.delete(`/tenant/services/${id}`);
   }
 
+  // --- Service Packages ---
+  async getPackages(): Promise<any> {
+    return this.get('/tenant/packages');
+  }
+
+  async getPackage(id: string): Promise<any> {
+    return this.get(`/tenant/packages/${id}`);
+  }
+
+  async createPackage(data: FormData | Record<string, any>): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await this.fetchImpl(`${this.baseUrl}/tenant/packages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
+    return this.post('/tenant/packages', data);
+  }
+
+  async updatePackage(id: string, data: FormData | Record<string, any>): Promise<any> {
+    if (data instanceof FormData) {
+      const response = await this.fetchImpl(`${this.baseUrl}/tenant/packages/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
+    return this.put(`/tenant/packages/${id}`, data);
+  }
+
+  async deletePackage(id: string): Promise<any> {
+    return this.delete(`/tenant/packages/${id}`);
+  }
+
   async getAppointmentsBoard(date: string, params?: Record<string, string | number | undefined>): Promise<any> {
     const query = this.buildQueryString({ date, ...(params || {}) });
     return this.get(`/tenant/appointments/board${query ? `?${query}` : ''}`);
+  }
+
+  async getCalendarAppointments(startDate: string, endDate: string, params?: Record<string, string | number | undefined>): Promise<any> {
+    const query = this.buildQueryString({ startDate, endDate, ...(params || {}) });
+    return this.get(`/tenant/appointments/calendar${query ? `?${query}` : ''}`);
   }
 
   async getAppointments(params?: Record<string, string | number | undefined>): Promise<any> {
@@ -1272,6 +1373,10 @@ class TenantApiAdapter {
     return this.post('/api/v1/bookings/search', data);
   }
 
+  async evaluateScheduling(data: Record<string, any>): Promise<any> {
+    return this.post('/api/v1/bookings/evaluate', data);
+  }
+
   async createAppointment(data: Record<string, any>): Promise<any> {
     return this.post('/tenant/appointments', data);
   }
@@ -1284,8 +1389,8 @@ class TenantApiAdapter {
     return this.patch(`/tenant/appointments/${id}`, data);
   }
 
-  async updateAppointmentStatus(id: string, status: string, notes?: string): Promise<any> {
-    return this.patch(`/tenant/appointments/${id}/status`, { status, notes, notifyCustomer: true });
+  async updateAppointmentStatus(id: string, status: string, notes?: string, cancelScope?: 'single' | 'chain'): Promise<any> {
+    return this.patch(`/tenant/appointments/${id}/status`, { status, notes, cancelScope, notifyCustomer: true });
   }
 
   async reassignAppointmentStaff(id: string, staffId: string): Promise<any> {
@@ -1576,6 +1681,33 @@ class TenantApiAdapter {
     payload: { amount: number; reason?: string; paymentMethod?: string }
   ): Promise<any> {
     return this.post(`/tenant/appointments/${id}/refund`, payload);
+  }
+
+  async getAuditLogs(params: Record<string, any> = {}): Promise<TenantApiResponse<any>> {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, String(value));
+      }
+    });
+    const query = searchParams.toString();
+    return this.get(`/tenant/audit${query ? `?${query}` : ''}`);
+  }
+
+  async getAuditLog(id: string): Promise<TenantApiResponse<any>> {
+    return this.get(`/tenant/audit/${id}`);
+  }
+
+  async getAuditByEntity(entityType: string, entityId: string): Promise<TenantApiResponse<any>> {
+    return this.get(`/tenant/audit/entity/${entityType}/${entityId}`);
+  }
+
+  async getAuditByOperation(operationId: string): Promise<TenantApiResponse<any>> {
+    return this.get(`/tenant/audit/operation/${operationId}`);
+  }
+
+  async getAuditByCorrelation(correlationId: string): Promise<TenantApiResponse<any>> {
+    return this.get(`/tenant/audit/correlation/${correlationId}`);
   }
 
   async topUpCustomerWallet(id: string, payload: any): Promise<any> {

@@ -11,11 +11,16 @@ import AppointmentServiceConfiguration from './AppointmentServiceConfiguration';
 import { type StagedService } from './AppointmentServicesStep';
 
 interface AppointmentServiceRowProps {
+  key?: React.Key;
+  tenantId: string;
+  tenantTimezone: string;
+  selectedDate: string;
   service: ServiceRecord;
   isRtl: boolean;
   variant?: ServiceVariantRecord | null;
   depth?: number;
   boardStartHour?: number;
+  slotMinutes?: number;
   forceExpanded?: boolean;
   availableStylists: any[];
   stagedItem: StagedService | null;
@@ -26,11 +31,15 @@ interface AppointmentServiceRowProps {
 }
 
 export default function AppointmentServiceRow({
+  tenantId,
+  tenantTimezone,
+  selectedDate,
   service,
   isRtl,
   variant = null,
   depth = 0,
   boardStartHour = 9,
+  slotMinutes = 5,
   forceExpanded = false,
   availableStylists,
   stagedItem,
@@ -199,8 +208,14 @@ export default function AppointmentServiceRow({
 
       {isExpanded && (
         <AppointmentServiceConfiguration
+          tenantId={tenantId}
+          tenantTimezone={tenantTimezone}
+          selectedDate={selectedDate}
+          serviceId={service.id}
+          variantId={variant?.id || stagedItem?.variantId}
           isRtl={isRtl}
           boardStartHour={boardStartHour}
+          slotMinutes={slotMinutes}
           draftConfig={draftConfig}
           setDraftConfig={setDraftConfig}
           validStylists={validStylists}

@@ -10,7 +10,7 @@ ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_PUBLIC_PAGE_URL=$VITE_PUBLIC_PAGE_URL
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --include=dev
 
 # Build the app in production mode without affecting dependency installation.
 ENV NODE_ENV=production

@@ -34,6 +34,7 @@ import SalesLogDetailsReport from './SalesLogDetailsReport';
 import DiscountSummaryReport from './DiscountSummaryReport';
 import TaxSummaryReport from './TaxSummaryReport';
 import GiftCardListReport from './GiftCardListReport';
+import RefundsReport from './RefundsReport';
 import {
   createCustomerOverviewReportDefinition,
   createEmployeePerformanceReportDefinition,
@@ -47,7 +48,7 @@ import {
 import type { BIDatePresetValue, BIDateRange, BIOption, BIReportColumnDefinition, BIReportFilterValues, BIReportSortState } from '../../lib/bi';
 import type { Language } from '../../types';
 
-type OperationsTab = 'sales-overview' | 'sales-list' | 'sales-log-details' | 'discount-summary' | 'tax-summary' | 'gift-card-list' | 'customer-overview' | 'employee-performance' | 'service-performance' | 'product-performance';
+type OperationsTab = 'sales-overview' | 'sales-list' | 'sales-log-details' | 'discount-summary' | 'tax-summary' | 'gift-card-list' | 'customer-overview' | 'employee-performance' | 'service-performance' | 'product-performance' | 'refunds';
 
 type OperationsFullReportPayload = {
   overview?: any;
@@ -1800,6 +1801,7 @@ export default function OperationsIntelligenceReport({ lang }: { lang: Language 
     { id: 'employee-performance', labelEn: 'Employee Performance', labelAr: 'أداء الموظفين', icon: <UserCheck size={16} /> },
     { id: 'service-performance', labelEn: 'Service Performance', labelAr: 'أداء الخدمات', icon: <Sparkles size={16} /> },
     { id: 'product-performance', labelEn: 'Product Performance', labelAr: 'أداء المنتجات', icon: <Package size={16} /> },
+    { id: 'refunds', labelEn: 'Refunds', labelAr: 'المستردات', icon: <RefreshCw size={16} /> },
   ];
 
   return (
@@ -1834,6 +1836,7 @@ export default function OperationsIntelligenceReport({ lang }: { lang: Language 
       {activeTab === 'employee-performance' ? <div key={`employee-performance-${refreshEpoch}`} className="contents"><EmployeePerformanceReport lang={lang} /></div> : null}
       {activeTab === 'service-performance' ? <div key={`service-performance-${refreshEpoch}`} className="contents"><ServicePerformanceReport lang={lang} /></div> : null}
       {activeTab === 'product-performance' ? <div key={`product-performance-${refreshEpoch}`} className="contents"><ProductPerformanceReport lang={lang} /></div> : null}
+      {activeTab === 'refunds' ? <div key={`refunds-${refreshEpoch}`} className="contents"><RefundsReport lang={lang} /></div> : null}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Platform, Vibration } from 'react-native';
+import { Platform, Vibration, DeviceEventEmitter } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -43,6 +43,14 @@ export function usePushNotifications() {
         notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
             setNotification(notification);
 
+            const data = notification?.request?.content?.data || {};
+            const type = `${(data as any).type || ''}`.trim();
+            const appointmentId = `${(data as any).appointmentId || ''}`.trim();
+
+            if (type.startsWith('staff_appointment_') || type.startsWith('booking_') || appointmentId) {
+                DeviceEventEmitter.emit('staff_appointment_assigned');
+            }
+
             if (Platform.OS !== 'web') {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {
                     // Ignore haptics failures on devices that do not support it.
@@ -65,6 +73,11 @@ export function usePushNotifications() {
                 || appointmentId
             ) {
                 router.push('/appointments' as never);
+                return;
+            }
+
+            if (type === 'new_message') {
+                router.push('/messages' as never);
                 return;
             }
 

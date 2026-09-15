@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { calculateNearestValidChain, calculateAllValidChains } from '../utils/bookingChains';
+import { isAutoDerivedFromPreviousChain } from '../lib/chainedServiceTiming';
+import { useAppointmentSubmission } from '../hooks/useAppointmentSubmission';
+import { useSmartConflictResolver } from '../hooks/useSmartConflictResolver';
+import { SmartConflictModal } from './appointment/SmartConflictModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  X, Calendar, Loader2 as CalendarIcon, User, Users, PlusCircle, Check, 
+import {
+  X, Calendar, Loader2 as CalendarIcon, User, Users, PlusCircle, Check,
   Trash, ChevronLeft, Loader2, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search
 } from 'lucide-react';
 import AppointmentServicesStep from './appointment/AppointmentServicesStep';
@@ -30,7 +34,8 @@ import {
 import {
   buildTenantIsoFromMinutes,
   resolveTenantTimezone
-} from '../lib/tenantTime';
+, getDatePartsInTimeZone } from '../lib/tenantTime';
+import { resolveBookingDuration } from '../lib/bookingDuration';
 import {
   buildAdvanceBookingDialog,
   buildExtendedHoursBookingDialog,
@@ -41,6 +46,7 @@ import {
   isBookingTooSoonError,
   type BookingDialogCopy
 } from '../lib/bookingUiDialogs';
+import { buildEmptyAppointmentDraftSnapshot, isAppointmentDraftContent } from '../lib/appointmentDraftState';
 
 const toMoney = (value: any) => {
   const numeric = Number(value);
@@ -87,6 +93,7 @@ interface InteractiveDrawersProps {
   setIsCreateDrawerOpen: (open: boolean) => void;
   preserveBoardStartTime?: boolean;
   boardStartHour?: number;
+  slotMinutes?: number;
   isCartDrawerOpen: boolean;
   setIsCartDrawerOpen: (open: boolean) => void;
   appointments: any[];
@@ -103,6 +110,7 @@ interface InteractiveDrawersProps {
   selectedDate: Date;
   customers: any[];
   services: any[];
+  servicePackages?: any[];
   products: any[];
   giftCardPackages?: GiftCardPackage[];
   stylists: any[];
@@ -147,8 +155,12 @@ export interface GuestProfile {
 
 interface StagedService {
   id: string;
+  itemType?: "service" | "package";
   serviceId: string;
   variantId?: string;
+  packageId?: string;
+  packageItemId?: string;
+  packageInstanceId?: string;
   serviceCategory?: string;
   staffId: string;
   startTime: number;
@@ -159,6 +171,8 @@ interface StagedService {
   notes: string;
   basePrice?: number;
   finalPrice?: number;
+  timingMode?: 'auto' | 'manual';
+  overtimeApproval?: { approved: boolean };
 }
 
 interface QueuedServiceEditDraft {
@@ -338,6 +352,7 @@ export default function InteractiveDrawers({
   setIsCreateDrawerOpen,
   preserveBoardStartTime = false,
   boardStartHour = 9,
+  slotMinutes = 5,
   isCartDrawerOpen,
   setIsCartDrawerOpen,
   appointments,
@@ -354,6 +369,7 @@ export default function InteractiveDrawers({
   selectedDate,
   customers,
   services,
+  servicePackages = [],
   products,
   giftCardPackages = [],
   stylists,
@@ -362,7 +378,7 @@ export default function InteractiveDrawers({
   tenantTimezone
 }: InteractiveDrawersProps) {
   const resolvedTenantTimezone = useMemo(() => resolveTenantTimezone(tenantTimezone), [tenantTimezone]);
-  
+
   // Create Modal Step
   const [createMode, setCreateMode] = useState<'appointment' | 'blocked'>('appointment');
   const [createStep, setCreateStep] = useState<number>(1);
@@ -484,15 +500,15 @@ export default function InteractiveDrawers({
 
   // Structured Guest State
   const [guestsList, setGuestsList] = useState<GuestProfile[]>([
-    { 
-      id: 'g-1', 
-      name: '', 
-      phone: '', 
+    {
+      id: 'g-1',
+      name: '',
+      phone: '',
       email: '',
       birthDate: '',
-      notes: '', 
-      isFree: false, 
-      services: [createEmptyGuestService()] 
+      notes: '',
+      isFree: false,
+      services: [createEmptyGuestService()]
     }
   ]);
 
@@ -532,7 +548,7 @@ export default function InteractiveDrawers({
         const resolvedService = service.serviceId ? services.find((srv) => srv.id === service.serviceId) : null;
         const resolvedStaff = service.staffId ? availableStylists.find((staff) => staff.id === service.staffId) : null;
         const nextService = resolvedService || primaryService;
-        
+
         let nextStaffId = resolvedStaff?.id || primaryStaff?.id || '';
         if (nextService) {
           const normalizedAssignments = (nextService.employeeAssignments || []).map((id: any) => String(id));
@@ -640,20 +656,34 @@ export default function InteractiveDrawers({
   const [currentServiceCategory, setCurrentServiceCategory] = useState<string>('all');
   const [serviceSearch, setServiceSearch] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
-  const [bookingRecoveryMode, setBookingRecoveryMode] = useState<'chain' | 'modify_professionals' | 'separate_services'>('chain');
 
-  const [chainConflictDialog, setChainConflictDialog] = useState<{
-    originalStaged: any[];
-    payloadItems: any[];
-    conflictCards: ConflictCard[];
-    selectedDate: string;
-    validChains: any[];
-    selectedChain: any | null;
-    isRevalidating: boolean;
-    onConfirm: (chain: any) => void;
-    onCancel: () => void;
-  } | null>(null);
-  const [chainConflictView, setChainConflictView] = useState<'explanation' | 'date-selection' | 'time-selection' | 'confirmation'>('explanation');
+  const { executeFinalSubmission: sharedExecuteSubmission, isSubmitting } = useAppointmentSubmission();
+  const executeFinalSubmissionRef = useRef<((items: any[]) => Promise<void>) | null>(null);
+
+  const {
+    conflictDialog,
+    setConflictDialog,
+    conflictView,
+    setConflictView,
+    bookingRecoveryMode,
+    setBookingRecoveryMode,
+    preflightMultiServiceChain,
+    preflightSeparateServices,
+    acceptSuggestedChain,
+    selectAlternativeDate,
+    closeDialog
+  } = useSmartConflictResolver({
+    tenantId,
+    isRtl,
+    stylists,
+    onSubmitValidatedItems: async (itemsToSubmit) => {
+       if (executeFinalSubmissionRef.current) {
+         await executeFinalSubmissionRef.current(itemsToSubmit);
+       }
+    },
+    onRevalidationFailed: () => {}
+  });
+
   const [bookingErrorDialog, setBookingErrorDialog] = useState<BookingDialogCopy | null>(null);
   const [bookingHoursDecisionDialog, setBookingHoursDecisionDialog] = useState<(BookingDialogCopy & {
     extensionMinutes: number;
@@ -727,13 +757,13 @@ export default function InteractiveDrawers({
   const [sessionNotes, setSessionNotes] = useState('');
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(true);
   const [createSplitActive, setCreateSplitActive] = useState(false);
-  const [createSplitAmounts, setCreateSplitAmounts] = useState({ 
-    card: 0, 
-    cash: 0, 
-    online: 0, 
-    bank_transfer: 0, 
-    wallet: 0, 
-    gift_card: 0 
+  const [createSplitAmounts, setCreateSplitAmounts] = useState({
+    card: 0,
+    cash: 0,
+    online: 0,
+    bank_transfer: 0,
+    wallet: 0,
+    gift_card: 0
   });
   const [giftCardCodeInput, setGiftCardCodeInput] = useState('');
 
@@ -787,6 +817,7 @@ export default function InteractiveDrawers({
   const [cartDraftPending, setCartDraftPending] = useState<boolean>(() => Boolean(readDraftStorage<CartDraftSnapshot>(CART_DRAFT_STORAGE_KEY)));
   const [showAppointmentDraftPrompt, setShowAppointmentDraftPrompt] = useState(false);
   const [showCartDraftPrompt, setShowCartDraftPrompt] = useState(false);
+  const suppressAppointmentDraftPersistenceRef = useRef(false);
   const previousCreateDrawerOpenRef = useRef(isCreateDrawerOpen);
   const previousCartDrawerOpenRef = useRef(isCartDrawerOpen);
 
@@ -875,14 +906,15 @@ export default function InteractiveDrawers({
 
   const blockStartTimeOptions = useMemo(() => {
     const options: Array<{ value: string; label: string }> = [];
-    for (let absoluteMinutes = boardStartHour * 60; absoluteMinutes < (24 * 60); absoluteMinutes += 15) {
+    const step = Math.max(1, slotMinutes);
+    for (let absoluteMinutes = boardStartHour * 60; absoluteMinutes < (24 * 60); absoluteMinutes += step) {
       const hours = Math.floor(absoluteMinutes / 60);
       const minutes = absoluteMinutes % 60;
       const value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
       options.push({ value, label: to12HourTime(value) });
     }
     return options;
-  }, [boardStartHour]);
+  }, [boardStartHour, slotMinutes]);
 
   const formatBlockStartClockValue = (minutesFromNine?: number | null) => {
     const safeOffset = Math.max(0, Math.round(Number(minutesFromNine || 0)));
@@ -977,44 +1009,7 @@ export default function InteractiveDrawers({
     blockEndDate
   ]);
 
-  const appointmentDraftHasContent = useMemo(() => (
-    createMode !== 'appointment'
-    || createStep !== 1
-    || custMode !== 'existing'
-    || Boolean(
-      selectedCustId
-      || customerSearch.trim()
-      || walkinFullName.trim()
-      || walkinPhone.trim()
-      || walkinEmail.trim()
-      || walkinDob.trim()
-      || walkinIsVip
-      || includeGroupGuests
-      || guestCount !== 1
-      || guestNames.trim()
-      || currentServiceId
-      || currentStaffId
-      || currentStartTime !== 120
-      || currentDuration !== 60
-      || currentDiscountType !== 'none'
-      || currentDiscountValue !== 0
-      || currentServiceNotes.trim()
-      || stagedServices.length > 0
-      || sessionNotes.trim()
-      || !notifyWhatsApp
-      || createSplitActive
-      || Object.values(createSplitAmounts).some((amount) => Number(amount) > 0)
-      || giftCardCodeInput.trim()
-      || blockTitleAr.trim() !== 'استراحة قهوة الموظفين'
-      || blockTitleEn.trim() !== 'Staff Espresso Recess'
-      || blockStaffId
-      || blockStartTime !== 180
-      || blockDuration !== 45
-      || blockType !== 'Break'
-      || blockIsRecurring
-      || blockEndDate.trim()
-    )
-  ), [
+  const appointmentDraftHasContent = useMemo(() => isAppointmentDraftContent({
     createMode,
     createStep,
     custMode,
@@ -1035,7 +1030,42 @@ export default function InteractiveDrawers({
     currentDiscountType,
     currentDiscountValue,
     currentServiceNotes,
-    stagedServices.length,
+    stagedServices,
+    sessionNotes,
+    notifyWhatsApp,
+    createSplitActive,
+    createSplitAmounts,
+    giftCardCodeInput,
+    blockTitleAr,
+    blockTitleEn,
+    blockStaffId,
+    blockStartTime,
+    blockDuration,
+    blockType,
+    blockIsRecurring,
+    blockEndDate
+  }), [
+    createMode,
+    createStep,
+    custMode,
+    selectedCustId,
+    customerSearch,
+    walkinFullName,
+    walkinPhone,
+    walkinEmail,
+    walkinDob,
+    walkinIsVip,
+    includeGroupGuests,
+    guestCount,
+    guestNames,
+    currentServiceId,
+    currentStaffId,
+    currentStartTime,
+    currentDuration,
+    currentDiscountType,
+    currentDiscountValue,
+    currentServiceNotes,
+    stagedServices,
     sessionNotes,
     notifyWhatsApp,
     createSplitActive,
@@ -1170,21 +1200,21 @@ export default function InteractiveDrawers({
   };
 
   const resetAppointmentDraft = () => {
-    const boardSeedStartTime = preserveBoardStartTime ? currentStartTime : null;
+    const emptyDraft = buildEmptyAppointmentDraftSnapshot();
 
-    setCreateMode('appointment');
-    setCreateStep(1);
-    setCustMode('existing');
-    setSelectedCustId('');
-    setCustomerSearch('');
-    setWalkinFullName('');
-    setWalkinPhone('');
-    setWalkinEmail('');
-    setWalkinDob('');
-    setWalkinIsVip(false);
-    setIncludeGroupGuests(false);
-    setGuestCount(1);
-    setGuestNames('');
+    setCreateMode(emptyDraft.createMode as 'appointment' | 'blocked');
+    setCreateStep(emptyDraft.createStep as number);
+    setCustMode(emptyDraft.custMode as 'existing' | 'walkin');
+    setSelectedCustId(emptyDraft.selectedCustId as string);
+    setCustomerSearch(emptyDraft.customerSearch as string);
+    setWalkinFullName(emptyDraft.walkinFullName as string);
+    setWalkinPhone(emptyDraft.walkinPhone as string);
+    setWalkinEmail(emptyDraft.walkinEmail as string);
+    setWalkinDob(emptyDraft.walkinDob as string);
+    setWalkinIsVip(Boolean(emptyDraft.walkinIsVip));
+    setIncludeGroupGuests(Boolean(emptyDraft.includeGroupGuests));
+    setGuestCount(Number(emptyDraft.guestCount || 1));
+    setGuestNames(emptyDraft.guestNames as string);
     setGuestsList([
       {
         id: 'g-1',
@@ -1197,35 +1227,27 @@ export default function InteractiveDrawers({
         services: [createEmptyGuestService()]
       }
     ]);
-    setCurrentServiceId('');
-    setCurrentStaffId('');
-    if (boardSeedStartTime !== null) {
-      setCurrentStartTime(boardSeedStartTime);
-    } else {
-      setCurrentStartTime(120);
-    }
-    setCurrentDuration(60);
-    setCurrentDiscountType('none');
-    setCurrentDiscountValue(0);
-    setCurrentServiceNotes('');
+    setCurrentServiceId(emptyDraft.currentServiceId as string);
+    setCurrentStaffId(emptyDraft.currentStaffId as string);
+    setCurrentStartTime(Number(emptyDraft.currentStartTime || 120));
+    setCurrentDuration(Number(emptyDraft.currentDuration || 60));
+    setCurrentDiscountType(emptyDraft.currentDiscountType as 'none' | 'flat' | 'percent');
+    setCurrentDiscountValue(Number(emptyDraft.currentDiscountValue || 0));
+    setCurrentServiceNotes(emptyDraft.currentServiceNotes as string);
     setStagedServices([]);
-    setSessionNotes('');
-    setNotifyWhatsApp(true);
-    setCreateSplitActive(false);
-    setCreateSplitAmounts({ card: 0, cash: 0, online: 0, bank_transfer: 0, wallet: 0, gift_card: 0 });
-    setGiftCardCodeInput('');
-    setBlockTitleAr('استراحة قهوة الموظفين');
-    setBlockTitleEn('Staff Espresso Recess');
-    setBlockStaffId('');
-    if (boardSeedStartTime !== null) {
-      setBlockStartTime(boardSeedStartTime);
-    } else {
-      setBlockStartTime(180);
-    }
-    setBlockDuration(45);
-    setBlockType('Break');
-    setBlockIsRecurring(false);
-    setBlockEndDate('');
+    setSessionNotes(emptyDraft.sessionNotes as string);
+    setNotifyWhatsApp(Boolean(emptyDraft.notifyWhatsApp));
+    setCreateSplitActive(Boolean(emptyDraft.createSplitActive));
+    setCreateSplitAmounts(emptyDraft.createSplitAmounts as { card: number; cash: number; online: number; bank_transfer: number; wallet: number; gift_card: number });
+    setGiftCardCodeInput(emptyDraft.giftCardCodeInput as string);
+    setBlockTitleAr(emptyDraft.blockTitleAr as string);
+    setBlockTitleEn(emptyDraft.blockTitleEn as string);
+    setBlockStaffId(emptyDraft.blockStaffId as string);
+    setBlockStartTime(Number(emptyDraft.blockStartTime || 180));
+    setBlockDuration(Number(emptyDraft.blockDuration || 45));
+    setBlockType(emptyDraft.blockType as 'Break' | 'Lunch' | 'Meeting');
+    setBlockIsRecurring(Boolean(emptyDraft.blockIsRecurring));
+    setBlockEndDate(emptyDraft.blockEndDate as string);
   };
 
   const restoreCartDraft = (snapshot: CartDraftSnapshot | null) => {
@@ -1314,6 +1336,12 @@ export default function InteractiveDrawers({
   };
 
   useEffect(() => {
+    if (suppressAppointmentDraftPersistenceRef.current) {
+      suppressAppointmentDraftPersistenceRef.current = false;
+      removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+      return;
+    }
+
     if (appointmentDraftHasContent) {
       writeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY, appointmentDraftSnapshot);
     } else {
@@ -1394,30 +1422,82 @@ export default function InteractiveDrawers({
   // Removed obsolete handleAddStagedService and toggleServiceExpansion since AppointmentServicesStep handles it
 
   const handleUpdateStagedService = (itemId: string, updates: Partial<StagedService>) => {
-    setStagedServices(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
-      const next = { ...item, ...updates };
-      const shouldResyncStartIso =
-        Object.prototype.hasOwnProperty.call(updates, 'startTime') ||
-        !next.startTimeIso ||
-        !Number.isFinite(new Date(next.startTimeIso).getTime()) ||
-        new Date(next.startTimeIso).getTime() !== new Date(buildIsoFromMinutes(selectedDate, Number(next.startTime || 0))).getTime();
+    setStagedServices(prev => {
+      // 1. Update the target item
+      const updatedList = prev.map(item => {
+        if (item.id !== itemId) return item;
+        const next = { ...item, ...updates };
+        const shouldResyncStartIso =
+          Object.prototype.hasOwnProperty.call(updates, 'startTime') ||
+          !next.startTimeIso ||
+          !Number.isFinite(new Date(next.startTimeIso).getTime()) ||
+          new Date(next.startTimeIso).getTime() !== new Date(buildIsoFromMinutes(selectedDate, Number(next.startTime || 0))).getTime();
 
-      if (shouldResyncStartIso) {
-        next.startTimeIso = buildIsoFromMinutes(selectedDate, Number(next.startTime || 0));
-      }
-
-      if (next.basePrice !== undefined) {
-        let priceAfterDiscount = next.basePrice;
-        if (next.discountType === 'flat') {
-          priceAfterDiscount = Math.max(0, next.basePrice - next.discountValue);
-        } else if (next.discountType === 'percent') {
-          priceAfterDiscount = Math.max(0, next.basePrice - (next.basePrice * next.discountValue) / 100);
+        if (shouldResyncStartIso) {
+          next.startTimeIso = buildIsoFromMinutes(selectedDate, Number(next.startTime || 0));
         }
-        next.finalPrice = priceAfterDiscount;
+
+        if (next.basePrice !== undefined) {
+          let priceAfterDiscount = next.basePrice;
+          if (next.discountType === 'flat') {
+            priceAfterDiscount = Math.max(0, next.basePrice - next.discountValue);
+          } else if (next.discountType === 'percent') {
+            priceAfterDiscount = Math.max(0, next.basePrice - (next.basePrice * next.discountValue) / 100);
+          }
+          next.finalPrice = priceAfterDiscount;
+        }
+        return next;
+      });
+
+      // 2. Cascade only when later services are still in the auto-derived chain state.
+      // If a user explicitly adjusted a later service time, preserve that value and do not
+      // overwrite it when an earlier service changes.
+      const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
+      if (!shouldChainServiceTimes) {
+        return updatedList;
       }
-      return next;
-    }));
+
+      for (let i = 1; i < updatedList.length; i++) {
+        const prevItem = updatedList[i - 1];
+        const currentItem = updatedList[i];
+        const priorItem = prev[i - 1];
+        const priorCurrentItem = prev[i];
+
+        const previousExpectedStart = priorItem ? priorItem.startTime + priorItem.duration : null;
+        const previousExpectedStartIso = priorItem
+          ? addMinutesToIso(getSyncedStagedStartIso(priorItem), priorItem.duration)
+          : null;
+
+        const isAutoDerived = isAutoDerivedFromPreviousChain({
+          priorItem,
+          currentItem: priorCurrentItem,
+          expectedStartIso: previousExpectedStartIso || buildIsoFromMinutes(selectedDate, previousExpectedStart || 0)
+        });
+
+        if (!isAutoDerived) {
+          const newPrevEnd = prevItem.startTime + prevItem.duration;
+          if (newPrevEnd > priorCurrentItem.startTime) {
+            addLocalToast(
+              isRtl ? 'تحذير: وقت الخدمة السابقة يتداخل مع هذه الخدمة' : 'Warning: Previous service overlaps with this service',
+              isRtl ? 'Warning: Previous service overlaps with this service' : 'تحذير: وقت الخدمة السابقة يتداخل مع هذه الخدمة',
+              'warning'
+            );
+          }
+          continue;
+        }
+
+        const nextStartTime = prevItem.startTime + prevItem.duration;
+        const nextStartTimeIso = addMinutesToIso(
+          getSyncedStagedStartIso(prevItem),
+          prevItem.duration
+        );
+
+        currentItem.startTime = nextStartTime;
+        currentItem.startTimeIso = nextStartTimeIso;
+      }
+
+      return updatedList;
+    });
   };
 
   const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
@@ -1464,12 +1544,13 @@ export default function InteractiveDrawers({
         staffId: defaultStaffId,
         startTime: nextStartTime,
         startTimeIso: nextStartTimeIso,
-        duration: resolvedVariant?.duration || service.duration || 60,
+        duration: resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration),
         discountType: 'none',
         discountValue: 0,
         notes: '',
         basePrice,
-        finalPrice: basePrice
+        finalPrice: basePrice,
+        timingMode: 'auto'
       };
 
       setStagedServices(prev => [...prev, newItem]);
@@ -1478,7 +1559,7 @@ export default function InteractiveDrawers({
         `Service "${isRtl ? service.nameAr : service.nameEn}" added to session queue.`,
         'success'
       );
-      
+
       setExpandedServiceIds((current) => ({
         ...current,
         [service.id]: true
@@ -1486,43 +1567,86 @@ export default function InteractiveDrawers({
     }
   };
 
-  const fetchAvailabilityLayers = async (currentItems: any[], dateString: string) => {
-      const layers: import('../utils/bookingChains').BookingSlot[][] = [];
-      const diagnosticsByLayer: AvailabilityDiagnostic[][] = [];
-      let anyFailed = false;
-      for (let i = 0; i < currentItems.length; i++) {
-        const item = currentItems[i];
-        const searchResp = await tenantApiAdapter.searchAvailability({
-          tenantId,
-          serviceId: item.serviceId,
-          staffId: item.requestedStaffId || undefined,
-          date: dateString
+  const handleAddPackageToStaged = (pkgId: string) => {
+    const pkg = servicePackages?.find(p => p.id === pkgId);
+    if (!pkg || !pkg.items || pkg.items.length === 0) {
+      addLocalToast(
+        `لم يتم العثور على خدمات في الباقة "${isRtl ? pkg?.name_ar : pkg?.name_en}".`,
+        `The package "${isRtl ? pkg?.name_ar : pkg?.name_en}" contains no services.`,
+        'warning'
+      );
+      return;
+    }
+
+    setStagedServices(prev => {
+      let nextStartTime = currentStartTime;
+      const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
+      if (shouldChainServiceTimes && prev.length > 0) {
+        const lastItem = prev[prev.length - 1];
+        nextStartTime = lastItem.startTime + lastItem.duration;
+      }
+
+      const newItems: StagedService[] = [];
+      let runningStartTime = nextStartTime;
+
+      const sortedItems = [...pkg.items].sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
+      const packageInstanceId = `pkg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      for (const item of sortedItems) {
+        const service = canonicalServices.find(s => s.id === item.serviceId);
+        if (!service) continue;
+
+        const resolvedVariant = item.variantId 
+          ? (service.variants || []).find((v: any) => v.id === item.variantId) 
+          : null;
+
+        const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
+        const duration = resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration);
+
+        let staffId = item.defaultStaffId || currentStaffId || '';
+        const normalizedAssignments = (service.employeeAssignments || []).map(id => String(id));
+        if (staffId && normalizedAssignments.length > 0 && !normalizedAssignments.includes(String(staffId))) {
+          staffId = ''; // default staff not assigned to this service
+        }
+
+        const nextStartTimeIso = shouldChainServiceTimes && (prev.length > 0 || newItems.length > 0)
+          ? buildIsoFromMinutes(selectedDate, runningStartTime)
+          : buildIsoFromMinutes(selectedDate, runningStartTime);
+
+        newItems.push({
+          id: `stg-pkg-${pkg.id}-${item.id}-${Date.now()}-${Math.random()}`,
+          itemType: 'package',
+          packageInstanceId,
+          packageId: pkg.id,
+          packageItemId: item.id,
+          serviceId: service.id,
+          variantId: resolvedVariant?.id || undefined,
+          serviceCategory: service.category,
+          staffId,
+          startTime: runningStartTime,
+          startTimeIso: nextStartTimeIso,
+          duration,
+          discountType: 'none',
+          discountValue: 0,
+          notes: '',
+          basePrice,
+          finalPrice: basePrice,
+          timingMode: 'auto'
         });
-        if (searchResp?.success && searchResp.slots) {
-          layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: item.serviceId })));
-          diagnosticsByLayer.push(Array.isArray(searchResp.diagnostics) ? searchResp.diagnostics : []);
-        } else {
-          layers.push([]);
-          diagnosticsByLayer.push([]);
-          anyFailed = true;
+
+        if (shouldChainServiceTimes) {
+          runningStartTime += duration;
         }
       }
-      return { layers, diagnosticsByLayer, anyFailed };
-  };
 
-  const handleSearchDate = async (dateStr: string) => {
-    if (!chainConflictDialog || !chainConflictDialog.payloadItems) return;
-    const { layers } = await fetchAvailabilityLayers(chainConflictDialog.payloadItems, dateStr);
-    const validChains = calculateAllValidChains(layers);
-    setChainConflictDialog(prev => prev ? { ...prev, selectedDate: dateStr, validChains } : null);
-    setChainConflictView('time-selection');
-  };
+      return [...prev, ...newItems];
+    });
 
-  const reopenServicesForRecovery = (mode: 'modify_professionals' | 'separate_services') => {
-    setBookingRecoveryMode(mode);
-    setChainConflictDialog(null);
-    setChainConflictView('explanation');
-    setCreateStep(3);
+    addLocalToast(
+      `تمت إضافة الباقة "${isRtl ? pkg.name_ar : pkg.name_en}" بنجاح.`,
+      `Package "${isRtl ? pkg.name_ar : pkg.name_en}" added successfully.`,
+      'success'
+    );
   };
 
   const showBookingErrorDialog = (dialog: {
@@ -1683,7 +1807,7 @@ export default function InteractiveDrawers({
         totalRawPrice += priceAfterDisc;
         serviceNamesEn.push(variant ? `${srv.nameEn} / ${variant.nameEn}` : srv.nameEn);
         serviceNamesAr.push(variant ? `${srv.nameAr} / ${variant.nameAr}` : srv.nameAr);
-        totalDuration += variant?.duration || item.duration;
+        totalDuration += resolveBookingDuration(item.duration, variant?.duration, srv.duration);
       }
     });
 
@@ -1704,30 +1828,75 @@ export default function InteractiveDrawers({
 
     const finalPrice = Math.max(0, totalRawPrice + guestAddonsPrice);
 
-    const items = finalStaged.map((item) => {
+    const normalClosingMinutes = Math.max(0, Math.round(Number(normalEndHour ?? (boardStartHour + 8)))) * 60;
+
+    const items: any[] = [];
+    const groupedPackages = new Map<string, any>();
+
+    finalStaged.forEach((item) => {
       const resolvedServiceId = `${item.serviceId || ''}`.trim();
       const service = canonicalServices.find(s => s.id === resolvedServiceId);
       const variant = service?.variants.find((entry) => entry.id === item.variantId) || service?.variants[0] || null;
       const requestStartIso = getSyncedStagedStartIso(item);
-      return {
-        serviceId: resolvedServiceId,
-        staffId: item.staffId,
-        requestedStaffId: item.staffId,
-        startTime: requestStartIso,
-        notes: item.notes || undefined,
-        duration: variant?.duration || item.duration,
-        price: variant ? toMoney(variant.finalPrice ?? variant.price) : (service ? toMoney(service.price) : 0),
-        discountType: item.discountType,
-        discountValue: item.discountValue,
-        paymentMethod: 'at-center',
-        assignmentMode: 'tenant_reassigned',
-        variantId: variant?.id || undefined,
-        serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined,
-        variantName: variant ? (isRtl ? variant.nameAr : variant.nameEn) : undefined
-      };
+      const packageId = (item as any).packageId;
+      const resolvedDuration = resolveBookingDuration(item.duration, variant?.duration, service?.duration);
+
+      if (packageId) {
+        if (!groupedPackages.has(packageId)) {
+          groupedPackages.set(packageId, {
+            itemType: 'package',
+            packageId,
+            packageItems: [],
+            notes: []
+          });
+        }
+        const pkgGroup = groupedPackages.get(packageId);
+        if (item.notes) pkgGroup.notes.push(item.notes);
+
+        pkgGroup.packageItems.push({
+          serviceId: resolvedServiceId,
+          variantId: variant?.id || undefined,
+          staffId: item.staffId,
+          requestedStaffId: item.staffId,
+          startTime: requestStartIso,
+          duration: resolvedDuration,
+          assignmentMode: 'tenant_reassigned',
+          packageItemId: (item as any).packageItemId || undefined,
+          overtimeApproval: item.overtimeApproval || (allowExtendedHours
+            && (boardStartHour * 60) + item.startTime + Number(resolvedDuration || 0) > normalClosingMinutes
+            ? { approved: true }
+            : undefined)
+        });
+      } else {
+        items.push({
+          serviceId: resolvedServiceId,
+          staffId: item.staffId,
+          requestedStaffId: item.staffId,
+          startTime: requestStartIso,
+          notes: item.notes || undefined,
+          duration: resolvedDuration,
+          price: variant ? toMoney(variant.finalPrice ?? variant.price) : (service ? toMoney(service.price) : 0),
+          discountType: item.discountType,
+          discountValue: item.discountValue,
+          paymentMethod: 'at-center',
+          assignmentMode: 'tenant_reassigned',
+          variantId: variant?.id || undefined,
+          overtimeApproval: item.overtimeApproval || (allowExtendedHours
+            && (boardStartHour * 60) + item.startTime + Number(resolvedDuration || 0) > normalClosingMinutes
+            ? { approved: true }
+            : undefined),
+          serviceName: service ? (isRtl ? service.nameAr : service.nameEn) : undefined,
+          variantName: variant ? (isRtl ? variant.nameAr : variant.nameEn) : undefined
+        });
+      }
     });
 
-    const resolvedPrimaryServiceId = `${items[0]?.serviceId || ''}`.trim();
+    groupedPackages.forEach((pkgGroup) => {
+      pkgGroup.notes = pkgGroup.notes.join(' | ') || undefined;
+      items.push(pkgGroup);
+    });
+
+    const resolvedPrimaryServiceId = `${items[0]?.serviceId || items[0]?.packageId || ''}`.trim();
     const resolvedPrimaryStaffId = `${firstStaffId || currentStaffId || ''}`.trim();
     if (!resolvedPrimaryServiceId) {
       showBookingErrorDialog({
@@ -1739,7 +1908,6 @@ export default function InteractiveDrawers({
       return;
     }
 
-    const normalClosingMinutes = Math.max(0, Math.round(Number(normalEndHour ?? (boardStartHour + 8)))) * 60;
     const finalChainEndMinutes = (boardStartHour * 60) + getBookingChainFinalEndMinutes(finalStaged);
     const extensionMinutes = finalChainEndMinutes - normalClosingMinutes;
 
@@ -1759,94 +1927,39 @@ export default function InteractiveDrawers({
       return;
     }
 
-  const preflightSeparateServices = async (currentItems: any[]) => {
-    try {
-      const validatedItems: any[] = [];
-      const conflictCards: ConflictCard[] = [];
-      let allItemsValid = true;
+    const executeFinalSubmission = async (itemsToSubmit: any[]) => {
+    // Group package items for the backend
+    const standaloneItems = itemsToSubmit.filter(i => i.itemType !== 'package');
+    const pkgItems = itemsToSubmit.filter(i => i.itemType === 'package');
+    const groupedPackages: Record<string, any[]> = {};
+    pkgItems.forEach(i => {
+      const groupKey = i.packageInstanceId || i.packageId;
+      if (!groupedPackages[groupKey]) groupedPackages[groupKey] = [];
+      groupedPackages[groupKey].push(i);
+    });
 
-      for (const item of currentItems) {
-        const requestStartIso = getSyncedStagedStartIso(item);
-        const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
-        const requestDate = requestStartIso.includes('T') ? requestStartIso.split('T')[0] : getLocalDateKey(selectedDate);
-        const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers([item], requestDate);
-        const layerSlots = layers[0] || [];
-        const diagnostics = diagnosticsByLayer[0] || [];
-        const reqTimeMs = new Date(requestStartIso).getTime();
-        const normalizedStaffId = `${item.requestedStaffId || item.staffId || ''}`.trim();
-        const exactSlot = layerSlots.find((slot: any) => {
-          const slotTimeMs = new Date(slot.startTime).getTime();
-          const slotStaffId = `${slot.staffId || ''}`.trim();
-          return slotTimeMs === reqTimeMs && (!normalizedStaffId || slotStaffId === normalizedStaffId);
-        });
+    const formattedItems = [
+      ...standaloneItems.map(i => ({
+        ...i,
+        itemType: 'service'
+      })),
+      ...Object.entries(groupedPackages).map(([_instanceId, children]) => ({
+        itemType: 'package',
+        packageId: children[0].packageId,
+        packageItems: children.map(c => ({
+          packageItemId: c.packageItemId,
+          serviceId: c.serviceId,
+          staffId: c.staffId,
+          startTime: c.startTime,
+          duration: c.duration,
+          sequenceOrder: c.sequenceOrder || 0
+        }))
+      }))
+    ];
 
-        const staff = stylists.find((candidate) => `${candidate.id || ''}`.trim() === normalizedStaffId)
-          || stylists.find((candidate) => `${candidate.id || ''}`.trim() === `${exactSlot?.staffId || ''}`.trim());
-        const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : (isRtl ? 'المختص' : 'Professional');
-        const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
-
-        if (anyFailed || !exactSlot || !exactSlot.available) {
-          allItemsValid = false;
-          const diagnostic = pickBestConflictDiagnostic({
-            diagnostics,
-            serviceId: item.serviceId,
-            staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-            requestedStartTime: requestStartIso,
-            requestedEndTime: requestEndIso,
-            exactSlotStartTime: exactSlot?.startTime,
-            exactSlotEndTime: exactSlot?.endTime
-          });
-
-          conflictCards.push(buildConflictCard({
-            diagnostic,
-            staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
-            staffName,
-            avatar,
-            isRtl
-          }));
-        } else {
-          validatedItems.push({
-            ...item,
-            staffId: exactSlot.staffId || item.staffId,
-            assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
-          });
-        }
-      }
-
-      if (allItemsValid) {
-        await executeFinalSubmission(validatedItems);
-        return;
-      }
-
-      setBookingRecoveryMode('separate_services');
-      setChainConflictView('explanation');
-      setChainConflictDialog({
-        originalStaged: stagedServices,
-        payloadItems: currentItems,
-        conflictCards,
-        selectedDate: selectedDate,
-        validChains: [],
-        selectedChain: null,
-        isRevalidating: false,
-        onConfirm: async () => {},
-        onCancel: () => {
-          setChainConflictDialog(null);
-          setChainConflictView('explanation');
-        }
-      });
-    } catch (err: any) {
-      showBookingErrorDialog({
-        titleAr: 'تعذر التحقق من التوفر',
-        titleEn: 'Unable to check availability',
-        bodyAr: 'تعذر التحقق من الإتاحة في الوقت الحالي. يرجى المحاولة مرة أخرى.',
-        bodyEn: 'We could not check availability right now. Please try again.'
-      });
-    }
-  };
-
-  const executeFinalSubmission = async (itemsToSubmit: any[]) => {
     const payload: any = {
-      items: itemsToSubmit,
+      items: formattedItems,
+      overtimeApproval: allowExtendedHours || itemsToSubmit.some(i => i.overtimeApproval?.approved) ? { approved: true } : undefined,
       staffId: resolvedPrimaryStaffId,
       startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
       notes: sessionNotes || [
@@ -1930,230 +2043,62 @@ export default function InteractiveDrawers({
         payload.paymentAllocations = paymentAllocations;
       }
 
-      const response = await tenantApiAdapter.createAppointment(payload);
-      if (!response?.success) {
-        throw new Error(response?.message || 'Failed to create appointment');
-      }
-      resetAppointmentDraft();
-      removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
-      setAppointmentDraftPending(false);
-      setShowAppointmentDraftPrompt(false);
-      setIsCreateDrawerOpen(false);
-      if (onBoardChanged) {
-        await onBoardChanged();
-      }
-      addLocalToast(
-        `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
-        `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
-        'success'
-      );
-    } catch (err: any) {
-      console.error('Failed to create appointment', err);
-      const errorMeta = extractBookingErrorMeta(err);
-
-      if (isBookingTooSoonError(errorMeta)) {
-        showBookingErrorDialog(buildAdvanceBookingDialog({
-          isRtl,
-          currentLabel: getRiyadhCurrentTimeLabel(),
-          slotLabel: formatMinutesToTime(itemsToSubmit[0]?.startTime ? Number(itemsToSubmit[0].startTime) : currentStartTime)
-        }));
-        return;
-      }
-
-      if (isBookingConflictError(errorMeta)) {
-        if (itemsToSubmit.length > 1 || hasStructuredBookingDiagnostics(errorMeta)) {
-          if (!chainConflictDialog) {
-            if (bookingRecoveryMode === 'separate_services') {
-              await preflightSeparateServices(itemsToSubmit);
+      await sharedExecuteSubmission(itemsToSubmit, payload, {
+        onSuccess: async () => {
+          suppressAppointmentDraftPersistenceRef.current = true;
+          resetAppointmentDraft();
+          removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+          setAppointmentDraftPending(false);
+          setShowAppointmentDraftPrompt(false);
+          setIsCreateDrawerOpen(false);
+          if (onBoardChanged) {
+            await onBoardChanged();
+          }
+          addLocalToast(
+            `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
+            `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
+            'success'
+          );
+        },
+        onTooSoon: (meta) => {
+          showBookingErrorDialog(buildAdvanceBookingDialog({
+            isRtl,
+            currentLabel: getRiyadhCurrentTimeLabel(),
+            slotLabel: formatMinutesToTime(itemsToSubmit[0]?.startTime ? (typeof itemsToSubmit[0].startTime === 'string' && itemsToSubmit[0].startTime.includes('T') ? (new Date(itemsToSubmit[0].startTime).getHours() * 60 + new Date(itemsToSubmit[0].startTime).getMinutes()) : Number(itemsToSubmit[0].startTime)) : currentStartTime)
+          }));
+        },
+        onConflict: async (itemsArg, meta) => {
+          if (itemsArg.length > 1 || hasStructuredBookingDiagnostics(meta)) {
+            if (!conflictDialog) {
+              if (bookingRecoveryMode === 'separate_services') {
+                await preflightSeparateServices(itemsArg, stagedServices, getLocalDateKey(selectedDate));
+              } else {
+                await preflightMultiServiceChain(itemsArg, stagedServices, getLocalDateKey(selectedDate), true);
+              }
             } else {
-              await preflightMultiServiceChain(itemsToSubmit, true);
+              setConflictView(bookingRecoveryMode === 'separate_services' ? 'explanation' : 'time-selection');
             }
           } else {
-            setChainConflictView(bookingRecoveryMode === 'separate_services' ? 'explanation' : 'time-selection');
+            showBookingErrorDialog(buildGenericBookingErrorDialog());
           }
-          return;
+        },
+        onError: (err) => {
+          showBookingErrorDialog(buildGenericBookingErrorDialog());
         }
-
-        showBookingErrorDialog(buildGenericBookingErrorDialog());
-        return;
-      }
-
-      showBookingErrorDialog(buildGenericBookingErrorDialog());
-    }
-  };
-
-  const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
-    try {
-      const requestedStartISO = getSyncedStagedStartIso(currentItems[0]);
-      const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getLocalDateKey(selectedDate));
-      
-      let isRequestedChainValid = true;
-      const discoveredStaffIds: string[] = [];
-      const conflictCards: ConflictCard[] = [];
-
-      if (anyFailed) {
-          isRequestedChainValid = false;
-          conflictCards.push({
-            staffId: '',
-            staffName: isRtl ? 'المختص' : 'Professional',
-            reasonType: 'unknown',
-            reasonTitle: isRtl ? 'تعذر جلب الأوقات المتاحة للخدمة' : 'Could not fetch availability',
-            reasonDescription: isRtl ? 'تعذر التحقق من الإتاحة لهذه الخدمة في الوقت الحالي.' : 'Could not verify availability for this service right now.'
-          });
-      } else {
-          for (let i = 0; i < currentItems.length; i++) {
-            const item = currentItems[i];
-            const layerSlots = layers[i];
-            const diagnostics = diagnosticsByLayer[i] || [];
-            const requestStartIso = getSyncedStagedStartIso(item);
-            const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
-            const reqTimeMs = new Date(requestStartIso).getTime();
-            
-            const exactSlot = layerSlots.find((s: any) => new Date(s.startTime).getTime() === reqTimeMs);
-            
-            const staff = stylists.find(s => s.id === item.requestedStaffId) || stylists.find(s => s.id === exactSlot?.staffId);
-            const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : 'المختص';
-            const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
-
-            if (exactSlot && !exactSlot.available) {
-              isRequestedChainValid = false;
-              const diagnostic = pickBestConflictDiagnostic({
-                diagnostics,
-                serviceId: item.serviceId,
-                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-                requestedStartTime: requestStartIso,
-                requestedEndTime: requestEndIso,
-                exactSlotStartTime: exactSlot.startTime,
-                exactSlotEndTime: exactSlot.endTime
-              });
-              conflictCards.push(buildConflictCard({
-                diagnostic,
-                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
-                staffName,
-                avatar,
-                isRtl
-              }));
-            } else if (!exactSlot) {
-              isRequestedChainValid = false;
-              const diagnostic = pickBestConflictDiagnostic({
-                diagnostics,
-                serviceId: item.serviceId,
-                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-                requestedStartTime: requestStartIso,
-                requestedEndTime: requestEndIso
-              });
-              conflictCards.push(buildConflictCard({
-                diagnostic,
-                staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
-                staffName,
-                avatar,
-                isRtl
-              }));
-            } else {
-              discoveredStaffIds.push(exactSlot.staffId);
-            }
-          }
-      }
-
-      if (isRequestedChainValid && !isRetry) {
-        const validatedItems = currentItems.map((item, idx) => ({
-           ...item,
-           staffId: discoveredStaffIds[idx] || item.staffId,
-           assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
-        }));
-        await executeFinalSubmission(validatedItems);
-      } else {
-        setChainConflictView('explanation');
-        setChainConflictDialog({
-          originalStaged: stagedServices,
-          payloadItems: currentItems,
-          conflictCards: isRetry ? [{
-            staffId: '',
-            staffName: isRtl ? 'المختص' : 'Professional',
-            reasonType: 'unknown',
-            reasonTitle: isRtl ? 'تغيرت الإتاحة' : 'Availability changed',
-            reasonDescription: isRtl ? 'تغيرت الإتاحة، يرجى المحاولة بوقت آخر.' : 'Availability changed, please try another time.'
-          }] : conflictCards,
-          selectedDate: selectedDate,
-          validChains: [],
-          selectedChain: null,
-          isRevalidating: false,
-          onConfirm: async (chain: any) => {
-            setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: true } : null);
-            // Fresh verification immediately before booking
-            const dateToValidate = chain.startTime.split('T')[0];
-            const { layers: freshLayers } = await fetchAvailabilityLayers(currentItems, dateToValidate);
-            
-            let isStillValid = true;
-            for (let i = 0; i < currentItems.length; i++) {
-               const reqTimeMs = new Date(chain.slots[i].startTime).getTime();
-               const exactSlot = freshLayers[i].find((s: any) => new Date(s.startTime).getTime() === reqTimeMs && s.staffId === chain.slots[i].staffId);
-               if (!exactSlot || !exactSlot.available) {
-                  isStillValid = false;
-                  break;
-               }
-            }
-
-              if (isStillValid) {
-                const confirmedItems = currentItems.map((item, idx) => {
-                   const slot = chain.slots[idx];
-                   return {
-                     ...item,
-                     startTime: slot.startTime,
-                     staffId: slot.staffId,
-                     assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
-                   };
-                });
-                setChainConflictDialog(null);
-                setChainConflictView('explanation');
-                await executeFinalSubmission(confirmedItems);
-              } else {
-                  setChainConflictDialog(prev => prev ? { ...prev, isRevalidating: false } : null);
-                  showBookingErrorDialog({
-                    titleAr: 'تعذر إكمال الحجز',
-                    titleEn: 'Unable to complete booking',
-                    bodyAr: 'لم يعد هذا الوقت متاحاً. يرجى اختيار وقت آخر.',
-                    bodyEn: 'This time is no longer available. Please choose another time.'
-                  });
-                  setChainConflictView('time-selection'); // Go back to selection
-              }
-            },
-          onCancel: () => {
-            setChainConflictDialog(null);
-            setChainConflictView('explanation');
-          }
-        });
-      }
+      });
     } catch (err: any) {
-      const errorMeta = extractBookingErrorMeta(err);
-
-      if (isBookingTooSoonError(errorMeta)) {
-        showBookingErrorDialog(buildAdvanceBookingDialog({
-          isRtl,
-          currentLabel: getRiyadhCurrentTimeLabel(),
-          slotLabel: formatMinutesToTime(currentStartTime)
-        }));
-        return;
-      }
-
-      if (isBookingConflictError(errorMeta)) {
-        showBookingErrorDialog(buildGenericBookingErrorDialog());
-        return;
-      }
-
+      console.error('Failed to calculate payments or construct payload', err);
       showBookingErrorDialog(buildGenericBookingErrorDialog());
     }
   };
-
-
-
 
   void (async () => {
-    if (items.length > 1) {
+    executeFinalSubmissionRef.current = executeFinalSubmission;
+    if (items.length > 1 && !allowExtendedHours) {
       if (bookingRecoveryMode === 'separate_services') {
-        await preflightSeparateServices(items);
+        await preflightSeparateServices(items, stagedServices, getLocalDateKey(selectedDate));
       } else {
-        await preflightMultiServiceChain(items, false);
+        await preflightMultiServiceChain(items, stagedServices, getLocalDateKey(selectedDate), false);
       }
     } else {
       await executeFinalSubmission(items);
@@ -2334,7 +2279,7 @@ export default function InteractiveDrawers({
     setCartItems(prev => {
       const exists = prev.find(item => item.id === prod.id);
       if (exists) {
-        return prev.map(item => 
+        return prev.map(item =>
           item.id === prod.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       } else {
@@ -2362,7 +2307,7 @@ export default function InteractiveDrawers({
       setCartItems(prev => prev.filter(item => item.id !== id));
       return;
     }
-    setCartItems(prev => prev.map(item => 
+    setCartItems(prev => prev.map(item =>
       item.id === id ? { ...item, quantity: newQty } : item
     ));
   };
@@ -2449,8 +2394,11 @@ export default function InteractiveDrawers({
         if (prodRes.orderId || prodRes.transactionRef) orderId = prodRes.orderId || prodRes.transactionRef;
       }
 
+      const collectedRedeemCodes: Record<string, string[]> = {};
+
       if (giftCardItems.length > 0) {
         for (const gc of giftCardItems) {
+          collectedRedeemCodes[gc.id] = [];
           for (let q = 0; q < (gc.quantity || 1); q++) {
             const gcRes = await tenantApiAdapter.checkoutGiftCards({
               packageId: gc.packageId || gc.id,
@@ -2466,15 +2414,32 @@ export default function InteractiveDrawers({
             if (gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id) {
               orderId = gcRes.orderId || gcRes.transactionRef || gcRes.transaction?.id;
             }
+            if (gcRes.externalRedeemCode) {
+              collectedRedeemCodes[gc.id].push(gcRes.externalRedeemCode);
+            }
           }
         }
       }
 
+      const completedReceiptItems = cartItems.map(it => {
+        if (it.type === 'giftcard') {
+          if (collectedRedeemCodes[it.id] && collectedRedeemCodes[it.id].length > 0) {
+            return { ...it, skuOrCode: collectedRedeemCodes[it.id].join(', ') };
+          } else {
+            return { ...it, skuOrCode: 'تم إضافة الرصيد للمحفظة / Wallet credited' };
+          }
+        }
+        return it;
+      });
+
       const completedReceipt = {
         orderId: orderId,
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        date: (() => {
+          const tzParts = getDatePartsInTimeZone(new Date(), resolvedTenantTimezone);
+          return `${tzParts.year}-${tzParts.month}-${tzParts.day} ${tzParts.hour}:${tzParts.minute}`;
+        })(),
         customerName: buyerName,
-        items: [...cartItems],
+        items: completedReceiptItems,
         subtotal,
         vat,
         total,
@@ -2509,15 +2474,15 @@ export default function InteractiveDrawers({
       <AnimatePresence>
         {isCreateDrawerOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity"
               onClick={() => setIsCreateDrawerOpen(false)}
             />
-            
-            <motion.div 
+
+            <motion.div
               initial={{ x: isRtl ? '-100%' : '100%' }}
               animate={{ x: 0 }}
               exit={{ x: isRtl ? '-100%' : '100%' }}
@@ -2600,7 +2565,7 @@ export default function InteractiveDrawers({
                       : (isRtl ? 'جدولة الخدمات والخصومات وتخصيص الدفع لعملاء صالون واستجمام رفاه الفاخر' : 'Schedule luxury services, client profiles, and payment allocations')}
                   </p>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsCreateDrawerOpen(false)}
                   className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all cursor-pointer"
                 >
@@ -2897,12 +2862,12 @@ export default function InteractiveDrawers({
                               <p className="text-[10px] text-slate-400">{isRtl ? 'حجز خدمات إضافية لمرافقين في نفس الموعد' : 'Schedule additional treatments for guests in this reservation'}</p>
                             </div>
                             <div className="flex items-center gap-1.5 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/20">
-                              <input 
-                                type="checkbox" 
-                                id="group-check-step2" 
-                                checked={includeGroupGuests} 
-                                onChange={(e) => setIncludeGroupGuests(e.target.checked)} 
-                                className="rounded text-amber-500 focus:ring-0 cursor-pointer h-4 w-4" 
+                              <input
+                                type="checkbox"
+                                id="group-check-step2"
+                                checked={includeGroupGuests}
+                                onChange={(e) => setIncludeGroupGuests(e.target.checked)}
+                                className="rounded text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
                               />
                               <label htmlFor="group-check-step2" className="font-bold text-amber-800 text-[11px] cursor-pointer">
                                 {isRtl ? 'تفعيل حجز المرافقين' : 'Enable Guest Bookings'}
@@ -2919,8 +2884,8 @@ export default function InteractiveDrawers({
                                   <span>{isRtl ? 'قواعد ملكية حجز المرافقين' : 'GUEST OWNERSHIP & BOOKING RULES'}</span>
                                 </p>
                                 <p className="text-[10px] leading-relaxed">
-                                  {isRtl 
-                                    ? 'الضيوف المرافقين تابعين للحساب الرئيسي للعميل. لا يمكن تعديل أو تتبع حالة دفعهم بشكل منفصل؛ يتم إصدار فاتورة موحدة لكافة الخدمات.' 
+                                  {isRtl
+                                    ? 'الضيوف المرافقين تابعين للحساب الرئيسي للعميل. لا يمكن تعديل أو تتبع حالة دفعهم بشكل منفصل؛ يتم إصدار فاتورة موحدة لكافة الخدمات.'
                                     : 'All guest reservations are owned by the primary customer account. Individual rescheduling is locked; payment and checkout are processed under a unified invoice.'}
                                 </p>
                               </div>
@@ -2931,7 +2896,7 @@ export default function InteractiveDrawers({
                                   <p className="text-[10px] text-slate-400">{isRtl ? 'الحد الأقصى 8 ضيوف في الجلسة' : 'Maximum of 8 guests'}</p>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <button 
+                                  <button
                                     type="button"
                                     onClick={() => setGuestCount(prev => Math.max(1, prev - 1))}
                                     className="w-7 h-7 bg-white hover:bg-slate-100 border rounded-lg font-bold flex items-center justify-center cursor-pointer text-sm text-slate-700"
@@ -2939,7 +2904,7 @@ export default function InteractiveDrawers({
                                     -
                                   </button>
                                   <span className="w-8 text-center font-mono font-black text-slate-800 text-sm">{guestCount}</span>
-                                  <button 
+                                  <button
                                     type="button"
                                     onClick={() => setGuestCount(prev => Math.min(8, prev + 1))}
                                     className="w-7 h-7 bg-white hover:bg-slate-100 border rounded-lg font-bold flex items-center justify-center cursor-pointer text-sm text-slate-700"
@@ -2960,11 +2925,11 @@ export default function InteractiveDrawers({
                                   const guestServicesSubtotal = (guest.services || []).reduce((acc, gs) => acc + (guest.isFree || gs.isFree ? 0 : gs.finalPrice), 0);
 
                                   return (
-                                    <div 
-                                      key={guest.id} 
+                                    <div
+                                      key={guest.id}
                                       className={`p-4 bg-slate-50/50 rounded-xl border transition-all space-y-4 ${
-                                        hasValidationError 
-                                          ? 'border-red-200 bg-red-50/10 focus-within:border-red-400' 
+                                        hasValidationError
+                                          ? 'border-red-200 bg-red-50/10 focus-within:border-red-400'
                                           : 'border-slate-200 focus-within:border-amber-400'
                                       }`}
                                     >
@@ -2983,25 +2948,25 @@ export default function InteractiveDrawers({
                                       <div className="grid grid-cols-2 gap-2.5">
                                         <div>
                                           <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'الاسم بالكامل *' : 'Full Name *'}</label>
-                                          <input 
-                                            type="text" 
+                                          <input
+                                            type="text"
                                             required
-                                            value={guest.name} 
+                                            value={guest.name}
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, name: e.target.value } : g))}
-                                            placeholder={isRtl ? `الاسم الأول (مثال: سارة)` : `e.g. Guest ${index + 1}`} 
+                                            placeholder={isRtl ? `الاسم الأول (مثال: سارة)` : `e.g. Guest ${index + 1}`}
                                             className={`w-full bg-white border p-2 rounded-lg text-xs font-semibold focus:outline-none ${
                                               isNameEmpty ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-amber-400'
-                                            }`} 
+                                            }`}
                                           />
                                         </div>
                                         <div>
                                           <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'رقم الجوال' : 'Phone'}</label>
-                                          <input 
-                                            type="text" 
-                                            value={guest.phone} 
+                                          <input
+                                            type="text"
+                                            value={guest.phone}
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, phone: e.target.value } : g))}
-                                            placeholder="+966 50" 
-                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold" 
+                                            placeholder="+966 50"
+                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold"
                                           />
                                         </div>
                                       </div>
@@ -3009,23 +2974,23 @@ export default function InteractiveDrawers({
                                       <div className="grid grid-cols-2 gap-2.5">
                                         <div>
                                           <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'البريد الإلكتروني' : 'Email Address'}</label>
-                                          <input 
-                                            type="email" 
-                                            value={guest.email || ''} 
+                                          <input
+                                            type="email"
+                                            value={guest.email || ''}
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, email: e.target.value } : g))}
-                                            placeholder="guest@example.com" 
+                                            placeholder="guest@example.com"
                                             className={`w-full bg-white border p-2 rounded-lg text-xs font-semibold focus:outline-none ${
                                               isEmailInvalid ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-amber-400'
-                                            }`} 
+                                            }`}
                                           />
                                         </div>
                                         <div>
                                           <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'تاريخ الميلاد' : 'Birth Date'}</label>
-                                          <input 
-                                            type="date" 
-                                            value={guest.birthDate || ''} 
+                                          <input
+                                            type="date"
+                                            value={guest.birthDate || ''}
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, birthDate: e.target.value } : g))}
-                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold" 
+                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold"
                                           />
                                         </div>
                                       </div>
@@ -3128,12 +3093,12 @@ export default function InteractiveDrawers({
 
                                       <div>
                                         <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'ملاحظات وتفضيلات الضيف (حقل أساسي)' : 'Guest Notes / Requests'}</label>
-                                        <textarea 
+                                        <textarea
                                           rows={1}
                                           value={guest.notes}
                                           onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, notes: e.target.value } : g))}
-                                          placeholder={isRtl ? 'تفضيلات العناية، تفاصيل مخصصة، حساسية للمنتجات...' : 'Allergies, design reference, specific preferences.'} 
-                                          className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold" 
+                                          placeholder={isRtl ? 'تفضيلات العناية، تفاصيل مخصصة، حساسية للمنتجات...' : 'Allergies, design reference, specific preferences.'}
+                                          className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold"
                                         />
                                       </div>
 
@@ -3144,12 +3109,12 @@ export default function InteractiveDrawers({
                                             {guestServicesSubtotal} SAR
                                           </span>
                                         </span>
-                                        
+
                                         {/* Guest free-service toggle as a clear control */}
                                         <label className="flex items-center gap-1.5 cursor-pointer">
-                                          <input 
-                                            type="checkbox" 
-                                            checked={guest.isFree} 
+                                          <input
+                                            type="checkbox"
+                                            checked={guest.isFree}
                                             onChange={(e) => {
                                               const checked = e.target.checked;
                                               setGuestsList(prev => prev.map(g => {
@@ -3160,7 +3125,7 @@ export default function InteractiveDrawers({
                                                 return g;
                                               }));
                                             }}
-                                            className="rounded text-emerald-500 focus:ring-0 cursor-pointer h-4 w-4" 
+                                            className="rounded text-emerald-500 focus:ring-0 cursor-pointer h-4 w-4"
                                           />
                                           <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg flex items-center gap-0.5">
                                             <span>🎁</span>
@@ -3211,8 +3176,8 @@ export default function InteractiveDrawers({
                             <div className="py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center space-y-1">
                               <p className="font-black text-slate-700">{isRtl ? 'حجز عميل فردي' : 'Single Customer Reservation'}</p>
                               <p className="text-[10px] text-slate-400 max-w-sm mx-auto">
-                                {isRtl 
-                                  ? 'لم يتم تفعيل المرافقين لهذا الحجز. سيتم جدولة العميل الرئيسي فقط.' 
+                                {isRtl
+                                  ? 'لم يتم تفعيل المرافقين لهذا الحجز. سيتم جدولة العميل الرئيسي فقط.'
                                   : 'No guest profiles included. Proceeding with single customer booking only.'}
                               </p>
                             </div>
@@ -3223,11 +3188,16 @@ export default function InteractiveDrawers({
 
                     {createStep === 3 && (
                       <AppointmentServicesStep
+                        tenantId={tenantId}
+                        tenantTimezone={resolvedTenantTimezone}
+                        selectedDate={getLocalDateKey(selectedDate)}
                         isRtl={isRtl}
                         boardStartHour={boardStartHour}
+                        slotMinutes={slotMinutes}
                         bookingRecoveryMode={bookingRecoveryMode}
                         forceExpandAll={bookingRecoveryMode !== 'chain'}
                         canonicalServices={canonicalServices}
+                        servicePackages={servicePackages}
                         stagedServices={stagedServices as any[]}
                         availableStylists={availableStylists}
                         serviceCategoryTabs={serviceCategoryTabs}
@@ -3236,6 +3206,7 @@ export default function InteractiveDrawers({
                         serviceSearch={serviceSearch}
                         setServiceSearch={setServiceSearch}
                         onAddService={handleToggleServiceSelection}
+                        onAddPackage={handleAddPackageToStaged}
                         onUpdateService={handleUpdateStagedService}
                         onRemoveService={(index) => setStagedServices(prev => prev.filter((_, i) => i !== index))}
                         formatMinutesToTime={formatMinutesToTime}
@@ -3264,7 +3235,7 @@ export default function InteractiveDrawers({
                           </div>
                         )}
                         {(() => {
-                          const queuedLineItems = stagedServices.map((item, index) => {
+                          const standaloneCartItems = stagedServices.filter(s => s.itemType !== 'package').map((item, index) => {
                             const srv = canonicalServices.find((service) => service.id === item.serviceId);
                             const variant = srv?.variants.find((entry) => entry.id === item.variantId) || srv?.variants[0] || null;
                             const staff = availableStylists.find((stylist) => stylist.id === item.staffId);
@@ -3276,18 +3247,48 @@ export default function InteractiveDrawers({
                               finalPrice = Math.max(0, basePrice - (basePrice * item.discountValue) / 100);
                             }
 
+                            const resolvedDuration = resolveBookingDuration(item.duration, variant?.duration, srv?.duration);
+
                             return {
                               id: item.id,
                               index,
+                              itemType: 'service',
                               serviceName: srv ? `${isRtl ? srv.nameAr : srv.nameEn}${variant ? ` / ${isRtl ? variant.nameAr : variant.nameEn}` : ''}` : item.serviceId,
                               staffName: isRtl ? staff?.nameAr : staff?.nameEn,
-                              duration: variant?.duration || item.duration,
+                              duration: resolvedDuration,
                               startTime: item.startTime,
                               price: finalPrice,
                               basePrice,
                               hasDiscount: item.discountType !== 'none' && item.discountValue > 0
                             };
                           });
+
+                          const pkgCartItems = stagedServices.filter(s => s.itemType === 'package');
+                          const pkgGroups = pkgCartItems.reduce((acc, curr) => {
+                             const groupKey = curr.packageInstanceId || curr.packageId!;
+                             if (!acc[groupKey]) acc[groupKey] = [];
+                             acc[groupKey].push(curr);
+                             return acc;
+                          }, {} as Record<string, typeof stagedServices>);
+                          
+                          const packageCartItems = Object.entries(pkgGroups).map(([instanceId, items]: [string, any[]]) => {
+                             const pkgId = items[0].packageId;
+                             const pkg = servicePackages?.find(p => p.id === pkgId);
+                             const packagePrice = Number(pkg?.totalPrice ?? 0);
+                             return {
+                               id: instanceId,
+                               itemType: 'package',
+                               serviceName: pkg ? (isRtl ? pkg.name_ar : pkg.name_en) : 'Package',
+                               staffName: items.length + (isRtl ? ' خدمات' : ' services'),
+                               duration: pkg?.totalDuration || 0,
+                               startTime: items[0]?.startTime || 0,
+                               price: packagePrice,
+                               basePrice: packagePrice,
+                               hasDiscount: false
+                             };
+                          });
+
+                          const queuedLineItems = [...packageCartItems, ...standaloneCartItems];
                           const primarySubtotal = queuedLineItems.reduce((sum, item) => sum + item.price, 0);
                           const guestsSubtotal = includeGroupGuests
                             ? guestsList.reduce((acc, g) => acc + (g.isFree ? 0 : (g.services || []).reduce((sum, gs) => sum + (gs.isFree ? 0 : toMoney(gs.finalPrice)), 0)), 0)
@@ -3417,7 +3418,7 @@ export default function InteractiveDrawers({
                           );
                         })()}
 
-{/* TEMPORARILY DISABLED (Refah – Remove Payment from Wizard) 
+{/* TEMPORARILY DISABLED (Refah – Remove Payment from Wizard)
                         <div className="p-4 bg-white border rounded-xl space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="font-bold">{isRtl ? 'طريقة الدفع' : 'Payment allocation'}</span>
@@ -3472,8 +3473,8 @@ export default function InteractiveDrawers({
                     ) : <div />}
 
                     {createStep < 4 ? (
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => {
                           if (createStep === 1) {
                             if (custMode === 'existing' && !selectedCustId) {
@@ -3497,7 +3498,7 @@ export default function InteractiveDrawers({
                             return;
                           }
                           setCreateStep(prev => prev + 1);
-                        }} 
+                        }}
                         className="py-2 px-5 bg-zinc-950 text-white rounded-xl text-xs font-bold"
                       >
                         {isRtl ? 'التالي' : 'Next Step'}
@@ -3609,15 +3610,15 @@ export default function InteractiveDrawers({
       <AnimatePresence>
         {isCartDrawerOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity"
               onClick={() => setIsCartDrawerOpen(false)}
             />
-            
-            <motion.div 
+
+            <motion.div
               initial={{ x: isRtl ? '-100%' : '100%' }}
               animate={{ x: 0 }}
               exit={{ x: isRtl ? '-100%' : '100%' }}
@@ -3689,7 +3690,7 @@ export default function InteractiveDrawers({
                     </h3>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsCartDrawerOpen(false)}
                   className="p-1 rounded bg-zinc-950/10 hover:bg-zinc-950/20 text-zinc-950 cursor-pointer"
                 >
@@ -3877,7 +3878,7 @@ export default function InteractiveDrawers({
                 <div className="w-5/12 bg-slate-50 flex flex-col justify-between h-full overflow-hidden border-s border-slate-200">
                   <div className="flex-1 p-3 flex flex-col overflow-hidden">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-2">{isRtl ? 'سلة المشتريات' : 'POS Checkout Items'}</span>
-                    
+
                     <div className="flex-1 overflow-y-auto space-y-1.5 mb-3">
                       {cartItems.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-xs">
@@ -4031,7 +4032,7 @@ export default function InteractiveDrawers({
                       const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                       const vat = total - (total / 1.15);
                       const subtotal = total - vat;
-                      
+
                       const posSplitSum = (posSplitAmounts.card || 0) + (posSplitAmounts.cash || 0) + (posSplitAmounts.wallet || 0);
                       const posRemaining = Math.max(0, total - posSplitSum);
                       const isPosSplitValid = total > 0 && Math.abs(posSplitSum - total) < 0.01;
@@ -4054,7 +4055,7 @@ export default function InteractiveDrawers({
                               <span className="font-mono text-amber-600 font-black">{total.toFixed(2)} SAR</span>
                             </div>
                           </div>
-                        
+
                           <div className="p-3 bg-white border-t space-y-2 mt-3">
                             <div className="flex justify-between items-center">
                               <span className="text-[9px] font-black text-slate-400">{isRtl ? 'بوابة التحصيل مدى' : 'Integrated Mada Gate'}</span>
@@ -4085,8 +4086,8 @@ export default function InteractiveDrawers({
                                 <div className="grid grid-cols-3 gap-2 text-[10px]">
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Mada</label>
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         if (!posSplitAmounts.card && posRemaining > 0) {
                                           setPosSplitAmounts(prev => ({ ...prev, card: parseFloat((posRemaining + (prev.card || 0)).toFixed(2)) }));
@@ -4100,8 +4101,8 @@ export default function InteractiveDrawers({
                                   </div>
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Cash</label>
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         if (!posSplitAmounts.cash && posRemaining > 0) {
                                           setPosSplitAmounts(prev => ({ ...prev, cash: parseFloat((posRemaining + (prev.cash || 0)).toFixed(2)) }));
@@ -4115,8 +4116,8 @@ export default function InteractiveDrawers({
                                   </div>
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Wallet</label>
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         if (!posSplitAmounts.wallet && posRemaining > 0) {
                                           setPosSplitAmounts(prev => ({ ...prev, wallet: parseFloat((posRemaining + (prev.wallet || 0)).toFixed(2)) }));
@@ -4140,8 +4141,8 @@ export default function InteractiveDrawers({
 
                             {posCustMode === 'walkin' && cartItems.some(i => i.type === 'giftcard') && !posCheckoutComplete && (
                               <div className="w-full py-2 px-3 bg-rose-50 border border-rose-200 text-rose-700 font-bold rounded-xl text-[10px] text-center my-2 animate-fadeIn">
-                                ⚠️ {isRtl 
-                                  ? 'لن يتم إيداع هذه البطاقة في أي محفظة. سيتم إنشاء رمز استرداد بدلاً من ذلك.' 
+                                ⚠️ {isRtl
+                                  ? 'لن يتم إيداع هذه البطاقة في أي محفظة. سيتم إنشاء رمز استرداد بدلاً من ذلك.'
                                   : 'This gift card will not be credited to any customer wallet. A redemption code will be generated instead.'}
                               </div>
                             )}
@@ -4253,11 +4254,11 @@ export default function InteractiveDrawers({
                 {isRtl ? 'بيانات المستلم (زائر)' : 'Walk-in Recipient Details'}
               </h3>
             </div>
-            
+
             <div className="text-xs text-slate-600 space-y-3 leading-relaxed">
               <p>
-                {isRtl 
-                  ? 'يرجى إدخال بيانات المشتري لضمان إرسال بطاقة الهدية الرقمية بنجاح وعدم فقدانها.' 
+                {isRtl
+                  ? 'يرجى إدخال بيانات المشتري لضمان إرسال بطاقة الهدية الرقمية بنجاح وعدم فقدانها.'
                   : 'Please enter the buyer details to ensure the digital gift card is sent successfully and not lost.'}
               </p>
 
@@ -4302,13 +4303,13 @@ export default function InteractiveDrawers({
             </div>
 
             <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100">
-              <button 
+              <button
                 onClick={() => setShowWalkinModal(false)}
                 className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
               >
                 {isRtl ? 'إلغاء' : 'Cancel'}
               </button>
-              <button 
+              <button
                 onClick={() => {
                   if (!posWalkinName || !posWalkinEmail) {
                     addLocalToast(
@@ -4341,23 +4342,23 @@ export default function InteractiveDrawers({
                 {isRtl ? 'الخدمة غير معينة' : 'Service Not Assigned'}
               </h3>
             </div>
-            
+
             <div className="text-xs text-slate-600 space-y-2 leading-relaxed">
               <p>
-                {isRtl 
-                  ? 'الخدمة المحددة غير معينة للموظف المحدد.' 
+                {isRtl
+                  ? 'الخدمة المحددة غير معينة للموظف المحدد.'
                   : 'The selected service is not assigned to the selected employee.'}
               </p>
               <p className="font-bold">{isRtl ? 'يرجى إما:' : 'Please either:'}</p>
               <ul className="list-disc pl-4 space-y-1">
                 <li>
-                  {isRtl 
-                    ? '• اختيار موظف آخر يقوم بتقديم هذه الخدمة.' 
+                  {isRtl
+                    ? '• اختيار موظف آخر يقوم بتقديم هذه الخدمة.'
                     : '• Select another employee who performs this service.'}
                 </li>
                 <li>
-                  {isRtl 
-                    ? '• تعيين هذه الخدمة للموظف المحدد أولاً من إدارة الموظفين.' 
+                  {isRtl
+                    ? '• تعيين هذه الخدمة للموظف المحدد أولاً من إدارة الموظفين.'
                     : '• Assign this service to the selected employee first from Employee Management.'}
                 </li>
               </ul>
@@ -4491,272 +4492,31 @@ export default function InteractiveDrawers({
         )}
       </AnimatePresence>
 
-<AnimatePresence>
-        {chainConflictDialog && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" dir={isRtl ? 'rtl' : 'ltr'}>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={chainConflictDialog.onCancel}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative z-10 max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-center gap-3 mb-4 text-rose-600">
-                <AlertTriangle className="w-6 h-6" />
-                <h3 className="text-lg font-bold">
-                  {isRtl ? 'تعذر إكمال الحجز' : 'Unable to complete booking'}
-                </h3>
-              </div>
 
-              {chainConflictView === 'explanation' && (
-                <>
-                  <p className="text-sm font-medium text-slate-800 mb-2">
-                    {isRtl ? 'لا يمكن تنفيذ الخدمات بشكل متواصل في الوقت المحدد للأسباب التالية:' : 'The requested services cannot be booked continuously due to the following reasons:'}
-                  </p>
-                  <div className="mb-6 space-y-3">
-                    {chainConflictDialog.conflictCards?.map((card, idx) => (
-                      <div key={`${card.staffId || card.staffName || 'conflict'}-${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-sm font-bold text-slate-600">
-                            {card.avatar ? (
-                              <img src={card.avatar} alt={card.staffName} className="h-full w-full object-cover" />
-                            ) : (
-                              <span>
-                                {card.staffName
-                                  .split(' ')
-                                  .filter(Boolean)
-                                  .map((part) => part[0])
-                                  .slice(0, 2)
-                                  .join('')
-                                  .toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="truncate text-sm font-extrabold text-slate-900">{card.staffName}</h4>
-                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${card.reasonType === 'existing_booking' ? 'bg-rose-50 text-rose-600' : card.reasonType === 'outside_working_hours' ? 'bg-amber-50 text-amber-700' : card.reasonType === 'time_off' ? 'bg-slate-100 text-slate-600' : card.reasonType === 'blocked_time' ? 'bg-orange-50 text-orange-700' : card.reasonType === 'staff_break' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{card.reasonTitle}</span>
-                            </div>
-                            <p className="mt-2 text-sm leading-6 text-slate-600">{card.reasonDescription}</p>
-                            {(card.conflictStartTime || card.conflictEndTime) && (
-                              <p className="mt-2 text-xs font-semibold text-slate-500">
-                                {formatConflictTime(card.conflictStartTime, isRtl)}
-                                {card.conflictEndTime ? ` – ${formatConflictTime(card.conflictEndTime, isRtl)}` : ''}
-                              </p>
-                            )}
-                            {card.workingHoursEnd && card.reasonType === 'outside_working_hours' && (
-                              <p className="mt-1 text-xs font-semibold text-slate-500">
-                                {isRtl
-                                  ? `ينتهي دوامها: ${formatConflictTime(card.workingHoursEnd, isRtl)}`
-                                  : `Working hours end: ${formatConflictTime(card.workingHoursEnd, isRtl)}`}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <button
-                      onClick={() => setChainConflictView('date-selection')}
-                      className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors"
-                    >
-                      {isRtl ? 'البحث عن موعد بديل' : 'Search for alternative time'}
-                    </button>
-                    
-                    <button
-                      onClick={() => reopenServicesForRecovery('modify_professionals')}
-                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                    >
-                      {isRtl ? 'تعديل المختصين' : 'Modify Professionals'}
-                    </button>
-
-                    <button
-                      onClick={() => reopenServicesForRecovery('separate_services')}
-                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                    >
-                      {isRtl ? 'حجز الخدمات بشكل منفصل' : 'Book services separately'}
-                    </button>
-                    
-                    <button
-                      onClick={chainConflictDialog.onCancel}
-                      className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors mt-2"
-                    >
-                      {isRtl ? 'إلغاء' : 'Cancel'}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {chainConflictView === 'date-selection' && (
-                <>
-                  <p className="text-sm font-medium text-slate-800 mb-4">
-                    {isRtl ? 'اختر اليوم الذي تريد البحث فيه' : 'Choose the day to search'}
-                  </p>
-                  
-                  <div className="flex flex-col gap-3">
-                    <button
-                      onClick={() => handleSearchDate(new Date().toISOString().split('T')[0])}
-                      className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                    >
-                      {isRtl ? 'اليوم' : 'Today'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        const d = new Date(); d.setDate(d.getDate() + 1);
-                        handleSearchDate(d.toISOString().split('T')[0]);
-                      }}
-                      className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                    >
-                      {isRtl ? 'غداً' : 'Tomorrow'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        const d = new Date(); d.setDate(d.getDate() + 2);
-                        handleSearchDate(d.toISOString().split('T')[0]);
-                      }}
-                      className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                    >
-                      {isRtl ? 'بعد غد' : 'Day after tomorrow'}
-                    </button>
-                    <div className="relative w-full">
-                      <input 
-                        type="date"
-                        className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
-                        onChange={(e) => {
-                          if (e.target.value) handleSearchDate(e.target.value);
-                        }}
-                      />
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={() => setChainConflictView('explanation')}
-                    className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors mt-4"
-                  >
-                    {isRtl ? 'رجوع' : 'Back'}
-                  </button>
-                </>
-              )}
-
-              {chainConflictView === 'time-selection' && (
-                <>
-                  <p className="text-sm font-bold text-slate-800 mb-4">
-                    {isRtl ? 'الأوقات المتاحة لبدء الحجز' : 'Available Start Times'}
-                  </p>
-                  
-                  {chainConflictDialog.validChains.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2 mb-4">
-                      {chainConflictDialog.validChains.map((chain, i) => {
-                         const d = new Date(chain.startTime);
-                         const min = (d.getHours() * 60 + d.getMinutes()) - (START_HOUR * 60);
-                         return (
-                           <button
-                             key={i}
-                             onClick={() => setChainConflictDialog(prev => prev ? { ...prev, selectedChain: chain } : null) || setChainConflictView('confirmation')}
-                             className="px-2 py-3 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                           >
-                             {formatMinutesToTime(min)}
-                           </button>
-                         );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6">
-                      <p className="text-sm text-slate-600 mb-6">
-                        {isRtl ? 'لا توجد سلسلة متواصلة متاحة في هذا اليوم. يمكنك اختيار يوماً آخر للبحث عن موعد مناسب.' : 'No continuous chain available on this day. Please choose another day.'}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => setChainConflictView('date-selection')}
-                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                    >
-                      {isRtl ? 'اختيار يوم آخر' : 'Choose another day'}
-                    </button>
-                    <button
-                      onClick={chainConflictDialog.onCancel}
-                      className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-                    >
-                      {isRtl ? 'إلغاء' : 'Cancel'}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {chainConflictView === 'confirmation' && chainConflictDialog.selectedChain && (
-                <>
-                  <p className="text-sm font-bold text-emerald-600 mb-2">
-                    {isRtl ? 'الموعد متاح' : 'Time is available'}
-                  </p>
-                  <p className="text-sm text-slate-600 mb-6">
-                    {isRtl ? 'يمكن تنفيذ الخدمات بالتسلسل في الوقت الذي اخترته:' : 'The services can be executed sequentially at the time you chose:'}
-                  </p>
-                  
-                  <div className="space-y-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    {chainConflictDialog.selectedChain.slots.map((slot, index) => {
-                      const srv = canonicalServices.find(s => s.id === slot.serviceId);
-                      const st = stylists.find(s => s.id === slot.staffId);
-                      const dStart = new Date(slot.startTime);
-                      const dEnd = new Date(slot.endTime);
-                      const startMin = (dStart.getHours() * 60 + dStart.getMinutes()) - (START_HOUR * 60);
-                      const endMin = (dEnd.getHours() * 60 + dEnd.getMinutes()) - (START_HOUR * 60);
-                      
-                      return (
-                        <div key={index} className="flex flex-col gap-1 text-sm border-b border-slate-100 pb-2 last:border-0 last:pb-0">
-                          <div className="font-bold text-slate-800">{isRtl ? srv?.nameAr : srv?.nameEn}</div>
-                          <div className="flex justify-between items-center text-slate-500">
-                            <span className="flex items-center gap-1"><User className="w-3.5 h-3.5"/> {isRtl ? st?.nameAr : st?.nameEn}</span>
-                            <span className="flex items-center gap-1 font-mono text-xs">{formatMinutesToTime(startMin)} - {formatMinutesToTime(endMin)}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <p className="text-sm font-semibold text-slate-800 text-center mb-6">
-                    {isRtl ? 'هل تريد حجز هذا الموعد الآن؟' : 'Do you want to book this time now?'}
-                  </p>
-
-                  <div className="flex flex-col gap-3">
-                    <button
-                      disabled={chainConflictDialog.isRevalidating}
-                      onClick={() => chainConflictDialog.selectedChain && chainConflictDialog.onConfirm(chainConflictDialog.selectedChain)}
-                      className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
-                    >
-                      {chainConflictDialog.isRevalidating && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {isRtl ? 'نعم، احجز الموعد' : 'Yes, book this time'}
-                    </button>
-                    <button
-                      disabled={chainConflictDialog.isRevalidating}
-                      onClick={() => setChainConflictView('time-selection')}
-                      className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50"
-                    >
-                      {isRtl ? 'اختيار وقت آخر' : 'Choose another time'}
-                    </button>
-                    <button
-                      disabled={chainConflictDialog.isRevalidating}
-                      onClick={chainConflictDialog.onCancel}
-                      className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50"
-                    >
-                      {isRtl ? 'إلغاء' : 'Cancel'}
-                    </button>
-                  </div>
-                </>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <SmartConflictModal
+        isRtl={isRtl}
+        startHour={boardStartHour}
+        stylists={stylists}
+        canonicalServices={canonicalServices}
+        conflictDialog={conflictDialog as any}
+        conflictView={conflictView as any}
+        bookingRecoveryMode={bookingRecoveryMode}
+        setConflictView={setConflictView}
+        setConflictDialog={setConflictDialog as any}
+        onClose={closeDialog}
+        onConfirm={acceptSuggestedChain}
+        onSearchDate={selectAlternativeDate}
+        onModifyProfessionals={() => {
+           setBookingRecoveryMode('modify_professionals');
+           closeDialog();
+           setCreateStep(3);
+        }}
+        onSeparateServices={() => {
+           setBookingRecoveryMode('separate_services');
+           closeDialog();
+           setCreateStep(3);
+        }}
+      />
 
     </>
   );

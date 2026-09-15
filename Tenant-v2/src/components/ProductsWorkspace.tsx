@@ -141,6 +141,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([]);
 
   // 7. Client Side Filtering & Sorting
   const filteredProducts = useMemo(() => {
@@ -216,6 +217,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
       );
       return;
     }
+    setSelectedImageFiles([]);
     setFormMode('add');
     setFormData({
       id: '',
@@ -263,6 +265,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
 
   // Action: Open Edit form
   const handleOpenEdit = (prd: EnhancedProduct) => {
+    setSelectedImageFiles([]);
     setFormMode('edit');
     const normalized = normalizeProductRecord(prd);
     setFormData({
@@ -380,6 +383,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result) {
+        setSelectedImageFiles(prev => [...prev, file]);
         setFormData(prev => {
           const currentImages = prev.images.filter(img => img !== defaultImagePlaceholder);
           return {
@@ -464,14 +468,34 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
       categoryAr: selectedCat.labelAr,
       category: selectedCat.id,
       isAvailable: formData.stock > 0 && formData.isAvailable,
-      images: submittedImages,
-      retainedImages: submittedImages
+      images: submittedImages.filter(img => !img.startsWith('data:')),
+      retainedImages: submittedImages.filter(img => !img.startsWith('data:'))
     });
+
+    const buildFormData = () => {
+      const fd = new FormData();
+      Object.entries(finalProductData).forEach(([key, value]) => {
+        if (key !== 'images' && key !== 'retainedImages') {
+          if (value !== undefined && value !== null) {
+            fd.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+          }
+        }
+      });
+      finalProductData.retainedImages.forEach((img: string) => {
+        fd.append('retainedImages', img);
+      });
+      selectedImageFiles.forEach(file => {
+        fd.append('images', file);
+      });
+      return fd;
+    };
+
+    const payload = selectedImageFiles.length > 0 ? buildFormData() : finalProductData;
 
     try {
       if (formMode === 'add') {
         // Send to backend
-        const res = await tenantApiAdapter.createProduct(finalProductData);
+        const res = await tenantApiAdapter.createProduct(payload);
         setProducts(prev => [normalizeProductRecord(res.product), ...prev]);
         triggerToast(
           `Deployed new product successfully!`,
@@ -479,7 +503,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
           'success'
         );
       } else {
-        const res = await tenantApiAdapter.updateProduct(finalProductData.id, finalProductData);
+        const res = await tenantApiAdapter.updateProduct(finalProductData.id, payload);
         setProducts(prev => prev.map(p => p.id === finalProductData.id ? normalizeProductRecord(res.product) : p));
         triggerToast(
           `Updated product details!`,
@@ -487,6 +511,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
           'success'
         );
       }
+      setSelectedImageFiles([]);
       setActiveView('list');
     } catch (err: any) {
        triggerToast(err.message || 'Failed to save product', 'فشل حفظ المنتج', 'error');
@@ -1438,6 +1463,11 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
                                 type="button"
                                 onClick={() => {
                                   setFormData(prev => {
+                                    const imgToRemove = prev.images[idx];
+                                    if (imgToRemove.startsWith('data:')) {
+                                      const dataUriIndex = prev.images.slice(0, idx).filter(x => x.startsWith('data:')).length;
+                                      setSelectedImageFiles(files => files.filter((_, i) => i !== dataUriIndex));
+                                    }
                                     const filtered = prev.images.filter((_, i) => i !== idx);
                                     return {
                                       ...prev,

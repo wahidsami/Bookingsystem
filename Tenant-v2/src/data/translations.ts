@@ -65,6 +65,13 @@ export const navigationItems: NavigationItem[] = [
     category: 'operations',
   },
   {
+    id: 'packages',
+    labelAr: 'الباقات',
+    labelEn: 'Packages',
+    iconName: 'PackagePlus',
+    category: 'operations',
+  },
+  {
     id: 'products',
     labelAr: 'المنتجات',
     labelEn: 'Products',
@@ -166,6 +173,13 @@ export const navigationItems: NavigationItem[] = [
     labelAr: 'الإعدادات',
     labelEn: 'Settings',
     iconName: 'Settings',
+    category: 'management',
+  },
+  {
+    id: 'audit',
+    labelAr: 'سجل العمليات',
+    labelEn: 'Audit & Operations',
+    iconName: 'History',
     category: 'management',
   },
 ];

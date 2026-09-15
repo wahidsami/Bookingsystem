@@ -243,6 +243,10 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
         return { label: isRtl ? 'منتجات' : 'Products', classes: 'bg-rose-50 text-rose-700', icon: '🛍️' };
       case 'walk_in':
         return { label: isRtl ? 'عميل حضوري' : 'Walk-in', classes: 'bg-amber-100 text-amber-800', icon: '🚶' };
+      case 'wallet_only':
+        return { label: isRtl ? 'محفظة فقط' : 'Wallet Only', classes: 'bg-emerald-50 text-emerald-700', icon: '💳' };
+      case 'giftcard_only':
+        return { label: isRtl ? 'بطاقة هدية فقط' : 'Gift Card Only', classes: 'bg-purple-50 text-purple-700', icon: '🎁' };
       default:
         return null;
     }
@@ -954,7 +958,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                   <UserCheck size={20} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-[10px] text-neutral-400 font-mono font-black uppercase tracking-wider">{isRtl ? 'عملاء جدد هذا الشهر' : 'New Clients (June)'}</p>
+                  <p className="text-[10px] text-neutral-400 font-mono font-black uppercase tracking-wider">{isRtl ? 'عملاء جدد هذا الشهر' : 'New Clients (This Month)'}</p>
                   {isLoadingStats ? (
                     <div className="h-6 w-16 bg-neutral-100 animate-pulse rounded-md mt-1" />
                   ) : (
@@ -1050,6 +1054,8 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                     <option value="service_only">{isRtl ? 'خدمات فقط' : 'Service Only'}</option>
                     <option value="product_only">{isRtl ? 'منتجات فقط' : 'Product Only'}</option>
                     <option value="both">{isRtl ? 'خدمات ومنتجات' : 'Both (Service & Product)'}</option>
+                    <option value="wallet_only">{isRtl ? 'محفظة فقط' : 'Wallet Only'}</option>
+                    <option value="giftcard_only">{isRtl ? 'بطاقة هدية فقط' : 'Gift Card Only'}</option>
                   </select>
                 </div>
 
@@ -2500,7 +2506,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                                         </div>
                                       ) : (
                                         walletHistoryData.walletLedger.map((row: any) => {
-                                          const isCredit = row.type === 'credit';
+                                          const isCredit = row.direction === 'credit';
                                           return (
                                             <div key={row.id} className="p-4 hover:bg-neutral-50/50 transition-colors flex items-center justify-between gap-4 text-xs">
                                               <div className="space-y-1 min-w-0">

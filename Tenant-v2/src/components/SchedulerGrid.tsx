@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Users, ChevronDown, Link2, Package } from 'lucide-react';
+import { getSchedulerEventBoxMetrics } from './schedulerGeometry';
+
 
 export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
 
@@ -10,10 +12,15 @@ export interface SchedulerColumn {
   title: string;
   subtitle?: string;
   avatar?: string;
-  statusLabel?: string;
+  statusIndicator?: 'available' | 'unavailable';
   statusTone?: 'active' | 'break' | 'off' | 'today' | 'neutral';
+
   dateKey?: string;
   isToday?: boolean;
+  /**
+   * Staff availability visual state
+   */
+  availability?: 'available' | 'break' | 'unavailable';
 }
 
 export interface SchedulerEvent {
@@ -22,6 +29,7 @@ export interface SchedulerEvent {
   columnId: string;
   dateKey: string;
   startMinutes: number;
+  endMinutes: number;
   durationMinutes: number;
   title: string;
   subtitle?: string;
@@ -107,6 +115,14 @@ const DEFAULT_END_HOUR = 21;
 const DEFAULT_TIME_COLUMN_WIDTH = 84;
 const DEFAULT_SLOT_HEIGHT = 10;
 
+// Derive the physical hours scale from the current slot resolution and row height.
+// The actual placement logic now uses the shared helper in schedulerGeometry.ts,
+// but this local helper remains available for any fallback or external use.
+export const minutesToPixels = (minutes: number, slotMinutes: number, slotHeight: number): number => {
+  const pixelsPerHour = (slotHeight * 60) / Math.max(1, slotMinutes);
+  return (Math.max(0, minutes) / 60) * pixelsPerHour;
+};
+
 const toneClasses: Record<NonNullable<SchedulerColumn['statusTone']>, string> = {
   active: 'bg-emerald-500',
   break: 'bg-amber-500',
@@ -189,20 +205,6 @@ const getAppointmentStatusTheme = (status?: string | null, kind?: SchedulerEvent
       };
     case 'confirmed':
       return {
-        shell: 'bg-amber-50 border-amber-200 text-amber-950',
-        accent: 'bg-amber-500',
-        primaryText: 'text-amber-950',
-        secondaryText: 'text-amber-800/90',
-        mutedText: 'text-amber-700/70',
-        serviceBadge: 'border-amber-200 bg-amber-100 text-amber-800',
-        statusBadge: 'border-amber-200 bg-amber-100 text-amber-800',
-        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
-        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
-        staffAvatar: 'border-amber-200 bg-white text-amber-800',
-      };
-    case 'arrived':
-      return {
         shell: 'bg-emerald-50 border-emerald-200 text-emerald-950',
         accent: 'bg-emerald-500',
         primaryText: 'text-emerald-950',
@@ -215,19 +217,33 @@ const getAppointmentStatusTheme = (status?: string | null, kind?: SchedulerEvent
         paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
         staffAvatar: 'border-emerald-200 bg-white text-emerald-800',
       };
-    case 'started':
+    case 'arrived':
       return {
-        shell: 'bg-indigo-50 border-indigo-200 text-indigo-950',
-        accent: 'bg-indigo-500',
-        primaryText: 'text-indigo-950',
-        secondaryText: 'text-indigo-800/90',
-        mutedText: 'text-indigo-700/70',
-        serviceBadge: 'border-indigo-200 bg-indigo-100 text-indigo-800',
-        statusBadge: 'border-indigo-200 bg-indigo-100 text-indigo-800',
+        shell: 'bg-blue-50 border-blue-200 text-blue-950',
+        accent: 'bg-blue-500',
+        primaryText: 'text-blue-950',
+        secondaryText: 'text-blue-800/90',
+        mutedText: 'text-blue-700/70',
+        serviceBadge: 'border-blue-200 bg-blue-100 text-blue-800',
+        statusBadge: 'border-blue-200 bg-blue-100 text-blue-800',
         paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
         paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
         paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
-        staffAvatar: 'border-indigo-200 bg-white text-indigo-800',
+        staffAvatar: 'border-blue-200 bg-white text-blue-800',
+      };
+    case 'started':
+      return {
+        shell: 'bg-purple-50 border-purple-200 text-purple-950',
+        accent: 'bg-purple-500',
+        primaryText: 'text-purple-950',
+        secondaryText: 'text-purple-800/90',
+        mutedText: 'text-purple-700/70',
+        serviceBadge: 'border-purple-200 bg-purple-100 text-purple-800',
+        statusBadge: 'border-purple-200 bg-purple-100 text-purple-800',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
+        staffAvatar: 'border-purple-200 bg-white text-purple-800',
       };
     case 'completed':
       return {
@@ -259,17 +275,17 @@ const getAppointmentStatusTheme = (status?: string | null, kind?: SchedulerEvent
       };
     case 'no_show':
       return {
-        shell: 'bg-slate-800 border-slate-700 text-slate-50',
-        accent: 'bg-slate-300',
-        primaryText: 'text-white',
-        secondaryText: 'text-slate-200',
-        mutedText: 'text-slate-300',
-        serviceBadge: 'border-white/15 bg-white/10 text-white',
-        statusBadge: 'border-white/15 bg-white/10 text-white',
-        paymentBadgePaid: 'border-white/15 bg-white/10 text-white',
-        paymentBadgePartial: 'border-white/15 bg-white/10 text-white',
-        paymentBadgeUnpaid: 'border-white/15 bg-white/10 text-white',
-        staffAvatar: 'border-white/20 bg-white/10 text-white',
+        shell: 'bg-red-50 border-red-200 text-red-950',
+        accent: 'bg-red-500',
+        primaryText: 'text-red-950',
+        secondaryText: 'text-red-800/90',
+        mutedText: 'text-red-700/70',
+        serviceBadge: 'border-red-200 bg-red-100 text-red-800',
+        statusBadge: 'border-red-200 bg-red-100 text-red-800',
+        paymentBadgePaid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        paymentBadgePartial: 'border-amber-200 bg-amber-100 text-amber-800',
+        paymentBadgeUnpaid: 'border-rose-200 bg-rose-50 text-rose-700',
+        staffAvatar: 'border-red-200 bg-white text-red-800',
       };
     case 'booked':
     default:
@@ -388,6 +404,8 @@ export default function SchedulerGrid({
   const [selectionAnchor, setSelectionAnchor] = useState<SchedulerSlot | null>(null);
   const [selectionFocus, setSelectionFocus] = useState<SchedulerSlot | null>(null);
   const suppressNextClickRef = useRef(false);
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+  // The old pointer-events data-drag-active workaround is removed.
   const slotsPerHour = 60 / slotMinutes;
   const slotCount = Math.max(1, Math.round(((endHour - startHour) * 60) / slotMinutes));
   const gridTemplateColumns = useMemo(
@@ -398,8 +416,9 @@ export default function SchedulerGrid({
   const currentMinutesSinceMidnight = getRiyadhMinutesSinceMidnight(boardCurrentTime);
   const isDayBoardMode = viewMode === 'day' || viewMode === 'team-day' || viewMode === 'employee-day';
   const normalizedNormalEndHour = Math.max(startHour + 1, Math.min(endHour, normalEndHour ?? endHour));
+  const pixelsPerHour = 100;
   const currentTimeLinePosition = showCurrentTimeIndicator && isDayBoardMode && visibleDateKey === selectedDateKey && currentMinutesSinceMidnight >= startHour * 60 && currentMinutesSinceMidnight <= endHour * 60
-    ? ((currentMinutesSinceMidnight - (startHour * 60)) / slotMinutes) * slotHeight
+    ? ((currentMinutesSinceMidnight - (startHour * 60)) / 60) * pixelsPerHour
     : null;
   const pastAreaHeight = currentTimeLinePosition !== null ? Math.max(0, currentTimeLinePosition) : null;
   const showAssignedStaffIdentity = !isDayBoardMode;
@@ -511,6 +530,9 @@ export default function SchedulerGrid({
   ].join(' ');
 
   const positionedEvents = useMemo(() => {
+    if ((window as any).__dd_drag_active) {
+      console.log('[DD_TRACE] 8.3 ENTER positionedEvents calculation in SchedulerGrid.tsx', Date.now());
+    }
     const groupedByColumn = new Map<string, SchedulerEvent[]>();
     columns.forEach((column) => {
       groupedByColumn.set(column.id, []);
@@ -529,7 +551,7 @@ export default function SchedulerGrid({
     groupedByColumn.forEach((columnEvents, columnId) => {
       const sortedEvents = [...columnEvents].sort((a, b) => {
         if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
-        return (b.startMinutes + b.durationMinutes) - (a.startMinutes + a.durationMinutes);
+        return b.endMinutes - a.endMinutes;
       });
 
       const clusters: SchedulerEvent[][] = [];
@@ -537,7 +559,7 @@ export default function SchedulerGrid({
       let clusterEnd = -1;
 
       sortedEvents.forEach((event) => {
-        const eventEnd = event.startMinutes + Math.max(slotMinutes, event.durationMinutes);
+        const eventEnd = event.endMinutes;
         if (activeCluster.length === 0) {
           activeCluster = [event];
           clusterEnd = eventEnd;
@@ -566,10 +588,10 @@ export default function SchedulerGrid({
           .slice()
           .sort((a, b) => {
             if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
-            return (b.startMinutes + b.durationMinutes) - (a.startMinutes + a.durationMinutes);
+            return b.endMinutes - a.endMinutes;
           })
           .map((event) => {
-            const eventEnd = event.startMinutes + Math.max(slotMinutes, event.durationMinutes);
+            const eventEnd = event.endMinutes;
             let laneIndex = lanes.findIndex((lane) => lane.lastEnd <= event.startMinutes);
             if (laneIndex === -1) {
               laneIndex = lanes.length;
@@ -592,6 +614,9 @@ export default function SchedulerGrid({
       });
     });
 
+    if ((window as any).__dd_drag_active) {
+      console.log('[DD_TRACE] 8.4 EXIT positionedEvents calculation in SchedulerGrid.tsx', Date.now());
+    }
     return positioned;
   }, [columns, events, slotMinutes]);
 
@@ -619,47 +644,54 @@ export default function SchedulerGrid({
         if (!groups.has(sid)) groups.set(sid, []);
         groups.get(sid)!.push(ev);
     }
-    
+
     const lines: Array<{
       key: string;
       x1: number; y1: number;
       x2: number; y2: number;
       isSameColumn: boolean;
     }> = [];
-    
+
     Array.from(groups.values()).forEach(group => {
         if (group.length <= 1) return;
-        
+
         // Sort chronologically
         group.sort((a,b) => a.startMinutes - b.startMinutes);
-        
+
         for (let i = 0; i < group.length - 1; i++) {
             const ev1 = group[i];
             const ev2 = group[i+1];
-            
+
             const colIdx1 = getColumnIndex(ev1.columnId);
             const colIdx2 = getColumnIndex(ev2.columnId);
             if (colIdx1 === -1 || colIdx2 === -1) continue;
-            
+
             const cellWidth = Math.max(50, staffColumnWidth);
-            
+
             // Calc x1, y1
-            const top1 = (Math.max(0, ev1.startMinutes) / slotMinutes) * slotHeight;
-            const height1 = Math.max(slotHeight, (Math.max(ev1.durationMinutes, slotMinutes) / slotMinutes) * slotHeight);
+            const { top: top1, height: height1 } = getSchedulerEventBoxMetrics({
+              startMinutes: ev1.startMinutes,
+              endMinutes: ev1.endMinutes,
+              pixelsPerHour,
+            });
             const laneWidthPx1 = cellWidth / Math.max(1, ev1.laneCount);
             const eventCardWidth1 = laneWidthPx1 - 8;
             const inlineStart1 = (colIdx1 * cellWidth) + (ev1.laneIndex * laneWidthPx1);
             const cx1 = inlineStart1 + (eventCardWidth1 / 2);
             const y1 = top1 + height1;
-            
+
             // Calc x2, y2
-            const top2 = (Math.max(0, ev2.startMinutes) / slotMinutes) * slotHeight;
+            const { top: top2 } = getSchedulerEventBoxMetrics({
+              startMinutes: ev2.startMinutes,
+              endMinutes: ev2.endMinutes,
+              pixelsPerHour,
+            });
             const laneWidthPx2 = cellWidth / Math.max(1, ev2.laneCount);
             const eventCardWidth2 = laneWidthPx2 - 8;
             const inlineStart2 = (colIdx2 * cellWidth) + (ev2.laneIndex * laneWidthPx2);
             const cx2 = inlineStart2 + (eventCardWidth2 / 2);
             const y2 = top2;
-            
+
             lines.push({
                 key: `chain-${ev1.id}-${ev2.id}`,
                 x1: cx1,
@@ -670,12 +702,42 @@ export default function SchedulerGrid({
             });
         }
     });
-    
+
     return lines;
   }, [positionedEvents, slotMinutes, slotHeight, staffColumnWidth, getColumnIndex]);
+  const handleColumnDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isEditable) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleColumnDrop = (event: React.DragEvent<HTMLDivElement>, column: SchedulerColumn, columnIndex: number) => {
+    if (!isEditable) return;
+    event.preventDefault();
+
+    const draggedEventId = event.dataTransfer.getData('text/plain');
+    if (!draggedEventId) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const relativeY = Math.max(0, event.clientY - rect.top);
+    const droppedMinutes = (relativeY / pixelsPerHour) * 60;
+    const slotIndex = Math.floor(droppedMinutes / slotMinutes);
+
+    if (slotIndex < 0 || slotIndex >= slotCount) return;
+
+    const targetSlot = resolveSlot(column, columnIndex, slotIndex);
+
+
+    onSlotDrop?.(targetSlot, draggedEventId);
+  };
 
   return (
-    <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-visible" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div
+      ref={gridContainerRef}
+      data-scheduler-grid="true"
+      className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-visible"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       <div className="sticky top-0 z-50 grid border-b border-slate-200 bg-slate-50/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-sm" style={{ gridTemplateColumns, minWidth: 'min-content' }}>
         <div
           className="flex items-center justify-center border-r border-slate-200 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 bg-slate-50"
@@ -694,26 +756,28 @@ export default function SchedulerGrid({
             key={column.id}
             onClick={isEmployeeHeader ? (e) => onColumnHeaderClick?.(e, headerResourceId) : undefined}
             onContextMenu={isEmployeeHeader ? (e) => onColumnHeaderContextMenu?.(e, headerResourceId) : undefined}
-            className={`min-w-0 overflow-hidden border-r last:border-r-0 border-slate-200 px-1.5 py-2 flex items-center justify-between gap-1 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''} ${isEmployeeHeader && (onColumnHeaderClick || onColumnHeaderContextMenu) ? 'cursor-pointer hover:bg-slate-100' : ''}`}
+            className={`min-w-0 overflow-hidden border-r last:border-r-0 border-slate-200 px-1.5 py-2 flex items-center justify-between gap-1 transition-colors ${laneShade} ${column.isToday ? 'bg-amber-500/10' : ''} ${isActiveLane ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/50' : ''} ${isEmployeeHeader && (onColumnHeaderClick || onColumnHeaderContextMenu) ? 'cursor-pointer hover:bg-slate-100' : ''} ${column.availability === 'unavailable' ? 'bg-slate-100/50' : ''}`}
           >
             <div className="min-w-0 flex items-center gap-2">
               {column.avatar ? (
-                <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                <div className={`h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 ${column.availability === 'unavailable' ? 'opacity-[0.65]' : ''}`}>
                   <img src={column.avatar} alt={column.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                 </div>
               ) : (
-                <div className={`h-8 w-8 shrink-0 rounded-full text-[10px] font-black text-white flex items-center justify-center ${toneClasses[column.statusTone || 'neutral']}`}>
+                <div className={`h-8 w-8 shrink-0 rounded-full text-[10px] font-black text-white flex items-center justify-center ${toneClasses[column.statusTone || 'neutral']} ${column.availability === 'unavailable' ? 'opacity-[0.65]' : ''}`}>
                   {String(column.title || '•').charAt(0).toUpperCase()}
                 </div>
               )}
 
               <div className="min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
-                  <p className="truncate text-xs font-black text-slate-800">{column.title}</p>
-                  {column.statusLabel && (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-600">
-                      {column.statusLabel}
-                    </span>
+                  <p className={`truncate text-xs font-black ${column.availability === 'unavailable' ? 'text-slate-400' : 'text-slate-800'}`}>{column.title}</p>
+                  {column.statusIndicator && (
+                    <span
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${column.statusIndicator === 'available' ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                      title={column.statusIndicator === 'available' ? 'Available' : 'Not Available'}
+                      aria-label={column.statusIndicator === 'available' ? 'Available' : 'Not Available'}
+                    />
                   )}
                 </div>
                 {column.subtitle && (
@@ -728,6 +792,7 @@ export default function SchedulerGrid({
                   {isRtl ? 'اليوم' : 'Today'}
                 </span>
               )}
+
               {isEmployeeHeader && (onColumnHeaderClick || onColumnHeaderContextMenu) && (
                 <ChevronDown size={14} className="text-slate-400 opacity-60 shrink-0" />
               )}
@@ -736,7 +801,10 @@ export default function SchedulerGrid({
         );})}
       </div>
 
-      <div className="relative isolate" style={{ minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}>
+      <div
+        className="relative isolate grid"
+        style={{ gridTemplateColumns, minHeight: `${slotCount * slotHeight}px`, minWidth: 'min-content' }}
+      >
         {pastAreaHeight !== null && (
           <div
             className="pointer-events-none absolute inset-x-0 top-0 z-[5]"
@@ -787,7 +855,8 @@ export default function SchedulerGrid({
           </div>
         )}
 
-        <div className="relative z-10">
+        {/* Time Column */}
+        <div className="relative flex flex-col border-r border-slate-200" style={{ width: timeColumnWidth }}>
           {rows.map((row) => {
             const hourBoundary = row.slotIndex % slotsPerHour === 0;
             const rowLabel = hourBoundary ? formatSlotTime(row.startMinutes, startHour, isRtl) : '';
@@ -795,315 +864,204 @@ export default function SchedulerGrid({
             return (
               <div
                 key={row.slotIndex}
-                className="grid"
-                style={{ gridTemplateColumns, height: `${slotHeight}px`, minWidth: 'min-content' }}
+                className={`relative flex items-start justify-center pr-2 text-[10px] font-black font-mono tracking-tight text-slate-400 ${isExtendedHourRow ? 'bg-slate-100/80' : 'bg-slate-50/60'} ${hourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80'}`}
+                style={{ height: `${slotHeight}px` }}
               >
-                <div
-                  className={`relative flex items-start justify-center pr-2 text-[10px] font-black font-mono tracking-tight text-slate-400 ${isExtendedHourRow ? 'bg-slate-100/80' : 'bg-slate-50/60'} border-r border-slate-200 ${hourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80'}`}
-                  style={{ width: timeColumnWidth }}
-                >
-                  {hourBoundary && <span className="mt-[-1px]">{rowLabel}</span>}
-                </div>
-
-                {columns.map((column, columnIndex) => {
-                  const slot = resolveSlot(column, columnIndex, row.slotIndex);
-                  const isHovered = hoveredSlot?.columnId === slot.columnId && hoveredSlot.slotIndex === slot.slotIndex;
-                  const isSelected = isSlotInsideSelection(slot);
-                  const laneShade = isExtendedHourRow
-                    ? (columnIndex % 2 === 0 ? 'bg-slate-100/80' : 'bg-slate-50/80')
-                    : (columnIndex % 2 === 0 ? 'bg-slate-50/70' : 'bg-white');
-                  return (
-                    <button
-                      key={`${column.id}-${row.slotIndex}`}
-                      type="button"
-                      data-slot-index={slot.slotIndex}
-                      data-column-id={slot.columnId}
-                      data-date-key={slot.dateKey}
-                      data-start-minutes={slot.startMinutes}
-                      data-end-minutes={slot.endMinutes}
-                      className={`${slotCellClassName(hourBoundary, isHovered || isSelected)} ${laneShade} ${isHovered ? 'ring-1 ring-inset ring-amber-400/50 bg-amber-500/10' : ''} ${isSelected ? 'bg-amber-500/12' : ''}`}
-                      style={{ height: `${slotHeight}px` }}
-                      aria-label={`${column.title} ${formatSlotTime(slot.startMinutes, startHour, isRtl)}`}
-                      onMouseDown={(event) => {
-                        if (!isEditable || event.button !== 0) return;
-                        setSelectionAnchor(slot);
-                        setSelectionFocus(slot);
-                        onAddSlotHover?.(slot);
-                      }}
-                      onMouseEnter={(event) => {
-                        if (selectionAnchor && isSameAxis(selectionAnchor, slot)) {
-                          setSelectionFocus(slot);
-                        }
-                        setHoveredSlot(slot);
-                        setHoverTooltip({
-                          x: event.clientX,
-                          y: event.clientY,
-                          label: formatSlotTime(slot.startMinutes, startHour, isRtl),
-                        });
-                        onAddSlotHover?.(slot);
-                      }}
-                      onMouseMove={(event) => {
-                        setHoverTooltip({
-                          x: event.clientX,
-                          y: event.clientY,
-                          label: formatSlotTime(slot.startMinutes, startHour, isRtl),
-                        });
-                      }}
-                      onMouseUp={() => {
-                        if (!isEditable) return;
-                        commitSelection();
-                      }}
-                      onMouseLeave={() => {
-                        setHoveredSlot((current) => (current?.columnId === slot.columnId && current.slotIndex === slot.slotIndex ? null : current));
-                        setHoverTooltip(null);
-                        onAddSlotHover?.(null);
-                      }}
-                      onClick={(event) => {
-                        if (!isEditable) return;
-                        if (suppressNextClickRef.current) {
-                          suppressNextClickRef.current = false;
-                          event.preventDefault();
-                          event.stopPropagation();
-                          return;
-                        }
-                        event.preventDefault();
-                        event.stopPropagation();
-                        // Unify click behavior: left click opens the context menu
-                        onSlotContextMenu?.(event, slot);
-                      }}
-                      onContextMenu={(event) => {
-                        if (!isEditable) return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onSlotContextMenu?.(event, slot);
-                      }}
-                      onDragOver={(event) => {
-                        if (!isEditable) return;
-                        event.preventDefault();
-                        event.dataTransfer.dropEffect = 'move';
-                        setHoveredSlot(slot);
-                        onAddSlotHover?.(slot);
-                      }}
-                      onDrop={(event) => {
-                        if (!isEditable) return;
-                        event.preventDefault();
-                        const draggedEventId = event.dataTransfer.getData('text/plain');
-                        if (draggedEventId) {
-                          onSlotDrop?.(slot, draggedEventId);
-                        }
-                      }}
-                    />
-                  );
-                })}
+                {hourBoundary && <span className="mt-[-1px]">{rowLabel}</span>}
               </div>
             );
           })}
         </div>
 
-        <div
-          className="pointer-events-none absolute inset-y-0 z-20 overflow-hidden"
-          style={eventLayerInsetStyle}
-        >
-          {positionedEvents.map((event) => {
-            const columnIndex = getColumnIndex(event.columnId);
-            if (columnIndex === -1) return null;
+        {/* Staff Columns */}
+        {columns.map((column, columnIndex) => {
+          return (
+            <div
+              key={column.id}
+              className="relative flex flex-col min-w-0"
+              onDragOver={handleColumnDragOver}
+              onDrop={(event) => handleColumnDrop(event, column, columnIndex)}
+            >
+              {rows.map((row) => {
+                const hourBoundary = row.slotIndex % slotsPerHour === 0;
+                const isExtendedHourRow = normalEndHour !== undefined && row.startMinutes >= (normalizedNormalEndHour - startHour) * 60;
+                const slot = resolveSlot(column, columnIndex, row.slotIndex);
+                const isHovered = hoveredSlot?.columnId === slot.columnId && hoveredSlot.slotIndex === slot.slotIndex;
+                const isSelected = isSlotInsideSelection(slot);
+                const laneShade = isExtendedHourRow
+                  ? (columnIndex % 2 === 0 ? 'bg-slate-100/80' : 'bg-slate-50/80')
+                  : (columnIndex % 2 === 0 ? 'bg-slate-50/70' : 'bg-white');
+                return (
+                  <button
+                    key={`${column.id}-${row.slotIndex}`}
+                    type="button"
+                    data-slot-index={slot.slotIndex}
+                    data-column-id={slot.columnId}
+                    data-date-key={slot.dateKey}
+                    data-start-minutes={slot.startMinutes}
+                    data-end-minutes={slot.endMinutes}
+                    className={`${slotCellClassName(hourBoundary, isHovered || isSelected)} ${laneShade} ${isHovered ? 'ring-1 ring-inset ring-amber-400/50 bg-amber-500/10' : ''} ${isSelected ? 'bg-amber-500/12' : ''}`}
+                    style={{ height: `${slotHeight}px` }}
+                    aria-label={`${column.title} ${formatSlotTime(slot.startMinutes, startHour, isRtl)}`}
+                    onMouseDown={(event) => {
+                      if (!isEditable || event.button !== 0) return;
+                      setSelectionAnchor(slot);
+                      setSelectionFocus(slot);
+                      onAddSlotHover?.(slot);
+                    }}
+                    onMouseEnter={(event) => {
+                      if (selectionAnchor && isSameAxis(selectionAnchor, slot)) {
+                        setSelectionFocus(slot);
+                      }
+                      setHoveredSlot(slot);
+                      setHoverTooltip({
+                        x: event.clientX,
+                        y: event.clientY,
+                        label: formatSlotTime(slot.startMinutes, startHour, isRtl),
+                      });
+                      onAddSlotHover?.(slot);
+                    }}
+                    onMouseMove={(event) => {
+                      setHoverTooltip({
+                        x: event.clientX,
+                        y: event.clientY,
+                        label: formatSlotTime(slot.startMinutes, startHour, isRtl),
+                      });
+                    }}
+                    onMouseUp={() => {
+                      if (!isEditable) return;
+                      commitSelection();
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredSlot((current) => (current?.columnId === slot.columnId && current.slotIndex === slot.slotIndex ? null : current));
+                      setHoverTooltip(null);
+                      onAddSlotHover?.(null);
+                    }}
+                    onClick={(event) => {
+                      if (!isEditable) return;
+                      if (suppressNextClickRef.current) {
+                        suppressNextClickRef.current = false;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSlotContextMenu?.(event, slot);
+                    }}
+                    onContextMenu={(event) => {
+                      if (!isEditable) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSlotContextMenu?.(event, slot);
+                    }}
+                  />
+                );
+              })}
 
-            const top = (Math.max(0, event.startMinutes) / slotMinutes) * slotHeight;
-            const height = Math.max(slotHeight, (Math.max(event.durationMinutes, slotMinutes) / slotMinutes) * slotHeight);
-            const cellWidth = Math.max(50, staffColumnWidth);
-            const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
-            const inlineStart = `calc(${columnIndex * cellWidth}px + ${event.laneIndex * laneWidthPx}px)`;
-            const statusTheme = getAppointmentStatusTheme(event.status, event.kind);
-            const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
-            const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
-            const assignedStaffName = event.assignedStaffName || event.raw?.staff?.name || event.role || '';
-            const assignedStaffRole = event.assignedStaffRole || event.role || '';
-            const variantLabel = event.variantLabel || event.raw?.serviceVariantName || event.raw?.serviceVariantDescription || '';
-            const variantDescription = event.variantDescription || event.raw?.serviceVariantDescription || '';
-            const isCompact = height < 42;
-            const isMedium = height >= 42 && height < 64;
-            const showStatusMeta = showAppointmentStatusBadges;
-            
-            const chainColor = (event.kind === 'appointment' && event.raw?.bookingSessionId) ? chainedSessionColors.get(event.raw.bookingSessionId) : null;
+              {positionedEvents.filter(e => e.columnId === column.id).map((event) => {
+                const { top, bottom, height } = getSchedulerEventBoxMetrics({
+                  startMinutes: event.startMinutes,
+                  endMinutes: event.endMinutes,
+                  pixelsPerHour,
+                });
+                const cellWidth = Math.max(50, staffColumnWidth);
+                const laneWidthPx = cellWidth / Math.max(1, event.laneCount);
+                const inlineStart = `calc(${event.laneIndex * laneWidthPx}px)`;
+                const statusTheme = getAppointmentStatusTheme(event.status, event.kind);
+                const customerAvatar = event.avatar || event.raw?.user?.photo || event.raw?.user?.profileImage || null;
+                const staffAvatar = event.staffAvatar || event.raw?.staff?.photo || null;
+                const assignedStaffName = event.assignedStaffName || event.raw?.staff?.name || event.role || '';
+                const assignedStaffRole = event.assignedStaffRole || event.role || '';
+                const variantLabel = event.variantLabel || event.raw?.serviceVariantName || event.raw?.serviceVariantDescription || '';
+                const variantDescription = event.variantDescription || event.raw?.serviceVariantDescription || '';
+                const isCompact = height < 42;
+                const isMedium = height >= 42 && height < 64;
+                const showStatusMeta = showAppointmentStatusBadges;
 
-            return (
-              <div
-                key={event.id}
-              className="absolute"
-              style={{
-                  ...(isRtl ? { right: inlineStart } : { left: inlineStart }),
-                  width: `calc(${laneWidthPx}px - 8px)`,
-                  maxWidth: `calc(${laneWidthPx}px - 8px)`,
-                  top: `${top}px`,
-                  height: `${height}px`,
-                  maxHeight: '100%',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <div
-                  role="button"
-                  tabIndex={0}
-                  draggable={isEditable && event.kind !== 'blocked'}
-                  onDragStart={(dragEvent) => {
-                    if (!isEditable || event.kind === 'blocked') return;
-                    dragEvent.dataTransfer.setData('text/plain', event.id);
-                    onEventDragStart?.(event);
-                  }}
-                  onDragEnd={() => {
-                    if (!isEditable || event.kind === 'blocked') return;
-                    onEventDragEnd?.(event);
-                  }}
-                  onClick={(clickEvent) => {
-                    clickEvent.stopPropagation();
-                    onEventClick?.(event);
-                  }}
-                  onContextMenu={(contextEvent) => {
-                    if (!isEditable) return;
-                    contextEvent.preventDefault();
-                    contextEvent.stopPropagation();
-                    onEventContextMenu?.(contextEvent, event);
-                  }}
-                  className={`pointer-events-auto relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${chainColor ? `ring-2 ${chainColor.ring} ${chainColor.shadow}` : ''}`}
-                >
-                  <div className={`absolute inset-x-0 top-0 h-1 ${statusTheme.accent}`} />
+                const chainColor = (event.kind === 'appointment' && event.raw?.bookingSessionId) ? chainedSessionColors.get(event.raw.bookingSessionId) : null;
+                const showChainIndicator = Boolean(event.kind === 'appointment' && event.raw?.bookingSessionId && chainColor);
 
-                  <div className="flex min-w-0 items-start justify-between gap-2">
-                    <div className="flex min-w-0 flex-1 items-start gap-2">
-                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border text-[10px] font-black ${statusTheme.staffAvatar}`}>
-                        {customerAvatar ? (
-                          <img src={customerAvatar} alt={event.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span>{getInitials(event.title)}</span>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
-                          {event.isPackage ? <Package size={10} className="inline mr-1 text-amber-600" /> : null}
-                          {event.title}
-                        </p>
-                        {!isCompact && (
-                          <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                            <span className={`max-w-full truncate rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide ${statusTheme.serviceBadge}`}>
-                              {event.subtitle || 'Service'}
-                            </span>
-                            {variantLabel && (
-                              <span className={`truncate text-[9px] font-semibold ${statusTheme.secondaryText}`}>
-                                {variantLabel}
+                return (
+                  <div
+                    key={event.id}
+                    className="absolute z-20"
+                    style={{
+                      ...(isRtl ? { right: inlineStart } : { left: inlineStart }),
+                      width: `calc(${laneWidthPx}px - 8px)`,
+                      maxWidth: `calc(${laneWidthPx}px - 8px)`,
+                      top: `${top}px`,
+                      height: `${height}px`,
+                      maxHeight: '100%',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      data-appointment-card="true"
+                      draggable={isEditable && event.kind !== 'blocked'}
+                      onDragStart={(dragEvent) => {
+                        if (!isEditable || event.kind === 'blocked') {
+                          return;
+                        }
+                        dragEvent.dataTransfer.setData('text/plain', event.id);
+                        dragEvent.dataTransfer.effectAllowed = 'move';
+                        onEventDragStart?.(event);
+                      }}
+                      onDragEnd={(dragEvent) => {
+                        if (!isEditable || event.kind === 'blocked') return;
+                        onEventDragEnd?.(event);
+                      }}
+                      onClick={(clickEvent) => {
+                        clickEvent.stopPropagation();
+                        onEventClick?.(event);
+                      }}
+                      className={`relative flex h-full min-h-0 min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-2 shadow-xs transition-all ${statusTheme.shell} ${isEditable && event.kind !== 'blocked' ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default'} ${chainColor ? `ring-2 ${chainColor.ring} ${chainColor.shadow}` : ''}`}
+                    >
+                      <div className={`absolute inset-x-0 top-0 h-1 ${statusTheme.accent}`} />
+
+                      {event.kind === 'blocked' ? (
+                        <div className="flex h-full min-w-0 flex-col items-center justify-center overflow-hidden p-1">
+                          <p className={`truncate text-center text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
+                            {event.title || event.blockedType || 'Blocked'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex min-w-0 flex-col gap-1 p-0.5 overflow-hidden">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
+                              {event.isPackage ? <Package size={10} className="inline mr-1 text-amber-600" /> : null}
+                              {event.title || 'Customer'}
+                            </p>
+                            {showChainIndicator && (
+                              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${chainColor ? `${chainColor.border} bg-white/90` : 'border-slate-200 bg-white/90'} shadow-sm`}>
+                                <Link2 size={10} className={chainColor ? chainColor.text : 'text-slate-500'} />
                               </span>
                             )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-tight ${statusTheme.statusBadge}`}>
-                        {formatSlotTime(event.startMinutes, startHour, isRtl)}
-                      </span>
-                      {!isCompact && showStatusMeta && (
-                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${statusTheme.statusBadge}`}>
-                          {formatAppointmentStatusLabel(event.status, event.kind)}
-                        </span>
+                          <p className={`truncate text-[11px] font-bold ${statusTheme.secondaryText}`}>
+                            {event.subtitle || 'Service'}
+                          </p>
+                        </div>
                       )}
-                      {!isCompact && event.kind !== 'blocked' && showStatusMeta && (
-                        <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide ${
-                          event.paymentStatus === 'paid'
-                            ? statusTheme.paymentBadgePaid
-                            : event.paymentStatus === 'partial'
-                              ? statusTheme.paymentBadgePartial
-                              : statusTheme.paymentBadgeUnpaid
-                        }`}>
-                          {event.paymentStatus === 'paid' ? 'Paid' : event.paymentStatus === 'partial' ? 'Partial' : 'Unpaid'}
-                        </span>
+
+                      {isEditable && event.kind !== 'blocked' && (
+                        <button
+                          type="button"
+                          className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-black/5 hover:bg-black/15"
+                          onMouseDown={(mouseEvent) => onEventResizeStart?.(event, mouseEvent)}
+                          aria-label="Resize appointment"
+                        />
                       )}
                     </div>
                   </div>
+                );
+              })}
 
-                  {!isCompact && (showStaffPhotos || assignedStaffName || assignedStaffRole) && (
-                    <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[9px]">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        {showStaffPhotos && staffAvatar ? (
-                          <div className={`h-4 w-4 shrink-0 overflow-hidden rounded-full border shadow-sm ${statusTheme.staffAvatar}`}>
-                            <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                          </div>
-                        ) : assignedStaffName ? (
-                          <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[7px] font-black ${statusTheme.staffAvatar}`}>
-                            {getInitials(assignedStaffName)}
-                          </div>
-                        ) : null}
-                        <span className={`truncate font-bold ${statusTheme.secondaryText}`}>
-                          {assignedStaffName || (event.kind === 'blocked' ? (event.blockedType || 'Blocked') : 'Unassigned')}
-                        </span>
-                        {assignedStaffRole && (
-                          <span className={`truncate ${statusTheme.mutedText}`}>
-                            · {assignedStaffRole}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {event.isGroupBooking && (
-                          <span className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[8px] font-bold ${statusTheme.secondaryText}`}>
-                            <Users size={9} />
-                            <span>{event.guestCount || 2}</span>
-                          </span>
-                        )}
-                        {typeof event.price === 'number' && (
-                          <span className={`font-black font-mono ${statusTheme.secondaryText}`}>
-                            {event.price}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {isCompact && showAssignedStaffIdentity && assignedStaffName && (
-                    <div className={`mt-1 flex min-w-0 items-center gap-1.5 text-[8px] font-bold ${statusTheme.secondaryText}`}>
-                      {showStaffPhotos && staffAvatar ? (
-                        <div className={`h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full border shadow-sm ${statusTheme.staffAvatar}`}>
-                          <img src={staffAvatar} alt={assignedStaffName || 'Staff'} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                        </div>
-                      ) : (
-                        <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[6px] font-black ${statusTheme.staffAvatar}`}>
-                          {getInitials(assignedStaffName)}
-                        </div>
-                      )}
-                      <span className="truncate">{assignedStaffName}</span>
-                    </div>
-                  )}
-
-                  {isMedium && variantDescription && (
-                    <p className={`mt-1 truncate text-[8px] italic ${statusTheme.mutedText}`}>
-                      {variantDescription}
-                    </p>
-                  )}
-
-                  {!isCompact && event.notes && (
-                    <p className={`mt-1 truncate text-[9px] italic ${statusTheme.mutedText}`}>
-                      "{event.notes}"
-                    </p>
-                  )}
-
-                  {isCompact && (
-                    <div className={`mt-1 flex items-center justify-between gap-1 text-[8px] font-bold ${statusTheme.secondaryText}`}>
-                      <span className="truncate">
-                        {event.subtitle || variantLabel || formatAppointmentStatusLabel(event.status, event.kind)}
-                      </span>
-                      {typeof event.price === 'number' && <span className={`font-mono ${statusTheme.secondaryText}`}>{event.price}</span>}
-                    </div>
-                  )}
-
-                  {isEditable && event.kind !== 'blocked' && (
-                    <button
-                      type="button"
-                      className="pointer-events-auto absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize bg-black/5 hover:bg-black/15"
-                      onMouseDown={(mouseEvent) => onEventResizeStart?.(event, mouseEvent)}
-                      aria-label="Resize appointment"
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+</div>
+          );
+        })}
 
         {hoverTooltip && (
           <div

@@ -38,6 +38,29 @@ export const getMessages = async (): Promise<StaffMessage[]> => {
 };
 
 /**
+ * Fetch all notifications for the authenticated staff member
+ */
+export const getNotifications = async (): Promise<StaffMessage[]> => {
+    const response = await api.get('/staff/me/notifications');
+    if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Failed to load notifications');
+    }
+
+    return (response.data?.data || []).map((item: any) => ({
+        id: `${item.id}`,
+        senderType: `${item.senderType || ''}`,
+        senderId: `${item.senderId || ''}`,
+        recipientType: item.recipientType ?? null,
+        recipientId: item.recipientId ?? null,
+        subject: item.subject || '',
+        body: item.body || '',
+        isPinned: Boolean(item.isPinned),
+        readBy: Array.isArray(item.readBy) ? item.readBy.map((value: any) => `${value}`) : [],
+        createdAt: item.createdAt,
+    }));
+};
+
+/**
  * Mark a message as read
  */
 export const markMessageAsRead = async (id: string): Promise<boolean> => {

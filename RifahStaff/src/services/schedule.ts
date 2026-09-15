@@ -87,7 +87,7 @@ const normalizeTimeOff = (item: any): TimeOff => ({
     createdAt: toText(item?.createdAt),
 });
 
-export const normalizeBreak = (item: any, date: string): BreakWindow => ({
+const normalizeBreak = (item: any, date: string): BreakWindow => ({
     id: `${date}-${toText(item?.id)}`,
     breakId: toText(item?.id),
     date,

@@ -15,6 +15,7 @@ export type ViewType =
   | 'customers'
   | 'employees'
   | 'services'
+  | 'packages'
   | 'products'
   | 'pos'
   | 'financial'
@@ -33,7 +34,8 @@ export type ViewType =
   | 'marketing-gift-cards'
   | 'marketing-notifications'
   | 'marketing-reviews'
-  | 'marketing-page-setup';
+  | 'marketing-page-setup'
+  | 'audit';
 
 export interface NavigationItem {
   id: ViewType;

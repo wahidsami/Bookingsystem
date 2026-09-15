@@ -260,6 +260,173 @@ function buildGiftCardBackendGaps(rows: GiftCardListTableRow[]) {
   return Array.from(gaps);
 }
 
+
+function GiftCardActivityViewer({ transactionId, lang, copy }: { transactionId: string, lang: Language, copy: any }) {
+  const [loading, setLoading] = useState(true);
+  const [activity, setActivity] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    tenantApiAdapter.get(`/tenant/gift-cards/reports/transactions/${transactionId}/activity`)
+      .then((res: any) => {
+        if (mounted) {
+          if (res.success) {
+            setActivity(res.activity);
+          } else {
+            setError(res.message || 'Failed to load activity');
+          }
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          setError(err.message || 'Failed to load activity');
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+    return () => { mounted = false; };
+  }, [transactionId]);
+
+  if (loading) {
+    return (
+      <div className="flex h-32 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+        <RefreshCw className="h-5 w-5 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+        <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+        {error}
+      </div>
+    );
+  }
+
+  if (!activity) return null;
+
+  const { transaction, walletCreditLedgerEntry, subsequentWalletActivity } = activity;
+  const isAutoWallet = transaction?.sourceTransaction?.status === 'sent_completed_auto_wallet';
+  const formatMoney = (val: any) => {
+    const num = Number(val || 0);
+    return new Intl.NumberFormat(lang === 'ar' ? 'ar-SA' : 'en-US', { style: 'currency', currency: 'SAR' }).format(num);
+  };
+  const formatDateStr = (val: any) => {
+    if (!val) return '';
+    return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-SA' : 'en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(val));
+  };
+
+  return (
+    <div className="space-y-6 mt-4">
+      {isAutoWallet ? (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="flex items-center gap-2 font-semibold text-emerald-800">
+              <Wallet className="h-5 w-5" />
+              {lang === 'ar' ? 'تم إضافة الرصيد للمحفظة' : 'Wallet Credited'}
+            </div>
+            <div className="mt-3 grid gap-2 text-sm text-emerald-900 sm:grid-cols-2">
+              <div>
+                <span className="text-emerald-700">{lang === 'ar' ? 'المبلغ:' : 'Amount:'}</span>{' '}
+                <strong>{formatMoney(walletCreditLedgerEntry?.amount || transaction?.totalCreditAmount)}</strong>
+              </div>
+              <div>
+                <span className="text-emerald-700">{lang === 'ar' ? 'التاريخ:' : 'Date:'}</span>{' '}
+                {formatDateStr(walletCreditLedgerEntry?.createdAt || transaction?.createdAt)}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">
+              {lang === 'ar' ? 'النشاط اللاحق في المحفظة' : 'Subsequent Wallet Activity'}
+            </div>
+            <div className="divide-y divide-slate-100">
+              {subsequentWalletActivity?.length > 0 ? (
+                subsequentWalletActivity.map((debit: any) => (
+                  <div key={debit.id} className="p-4 text-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-medium text-slate-900">{formatDateStr(debit.createdAt)}</span>
+                      <span className="font-semibold text-red-600">-{formatMoney(debit.amount)}</span>
+                    </div>
+                    <div className="text-slate-600">
+                      {debit.referenceType === 'appointment' && debit.appointment && (
+                        <span>
+                          {lang === 'ar' ? 'حجز' : 'Appointment'} #{debit.appointment.bookingNumber}
+                          {debit.appointment.service && ` - ${lang === 'ar' ? debit.appointment.service.name_ar : debit.appointment.service.name_en}`}
+                        </span>
+                      )}
+                      {debit.referenceType === 'order' && debit.order && (
+                        <span>
+                          {lang === 'ar' ? 'طلب' : 'Order'} #{debit.order.orderNumber}
+                        </span>
+                      )}
+                      {!debit.appointment && !debit.order && (
+                        <span>{debit.referenceType} ({debit.referenceId})</span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-6 text-center text-sm text-slate-500">
+                  {lang === 'ar' ? 'لا يوجد نشاط لاحق' : 'No subsequent activity'}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">
+            {lang === 'ar' ? 'سجل الاستخدام' : 'Redemption History'}
+          </div>
+          <div className="divide-y divide-slate-100">
+            {transaction?.redemptions?.length > 0 ? (
+              transaction.redemptions.map((redemption: any) => (
+                <div key={redemption.id} className="p-4 text-sm">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-medium text-slate-900">{formatDateStr(redemption.createdAt)}</span>
+                    <span className="font-semibold text-red-600">-{formatMoney(redemption.amount)}</span>
+                  </div>
+                  <div className="text-slate-600">
+                    {redemption.appointment && (
+                      <span>
+                        {lang === 'ar' ? 'حجز' : 'Appointment'} #{redemption.appointment.bookingNumber}
+                        {redemption.appointment.service && ` - ${lang === 'ar' ? redemption.appointment.service.name_ar : redemption.appointment.service.name_en}`}
+                      </span>
+                    )}
+                    {redemption.order && (
+                      <span>
+                        {lang === 'ar' ? 'طلب' : 'Order'} #{redemption.order.orderNumber}
+                      </span>
+                    )}
+                    {!redemption.appointment && !redemption.order && (
+                      <span>{redemption.appointmentId ? `Appointment #${redemption.appointmentId}` : redemption.orderId ? `Order #${redemption.orderId}` : 'Unknown'}</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-6 text-center text-sm text-slate-500">
+                {lang === 'ar' ? 'لم يتم الاستخدام بعد' : 'Not redeemed yet'}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GiftCardListReport({ lang }: { lang: Language }) {
   const isRtl = lang === 'ar';
   const reportId = 'gift-card-list';
@@ -537,15 +704,37 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
 
   const backendGaps = useMemo(() => buildGiftCardBackendGaps(rows), [rows]);
 
-  const tableColumns = useMemo(() => columns.map((column) => {
-    if (['originalAmount', 'redeemedAmount', 'remainingBalance'].includes(column.id)) {
-      return { ...column, format: (value: unknown) => formatMoney(value, lang) };
-    }
-    if (['issueDate', 'expiryDate'].includes(column.id)) {
-      return { ...column, format: (value: unknown) => formatDate(value, lang) };
-    }
-    return column;
-  }), [columns, lang]);
+
+  const tableColumns = useMemo(() => {
+    const cols = columns.map((column) => {
+      if (['originalAmount', 'redeemedAmount', 'remainingBalance'].includes(column.id)) {
+        return { ...column, format: (value: unknown) => formatMoney(value, lang) };
+      }
+      if (['issueDate', 'expiryDate'].includes(column.id)) {
+        return { ...column, format: (value: unknown) => formatDate(value, lang) };
+      }
+      return column;
+    });
+
+    cols.push({
+      id: 'actions',
+      label: lang === 'ar' ? 'الإجراءات' : 'Actions',
+      format: (_, row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setDrawerRow(row as any);
+          }}
+          className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+        >
+          {lang === 'ar' ? 'عرض النشاط' : 'View Activity'}
+        </button>
+      )
+    } as any);
+
+    return cols;
+  }, [columns, lang]);
+
 
   const { columnState, visibleColumns, toggleColumn, moveColumn, resetColumns } = useBIColumnPreferences(reportId, tableColumns);
   const { savedViews, saveView, deleteView } = useBISavedViews(reportId);
@@ -776,6 +965,11 @@ export default function GiftCardListReport({ lang }: { lang: Language }) {
                   <Field label={copy.redeemedFor} value={row.customer} emptyLabel={copy.unavailable} />
                 </div>
               </div>
+<div className="xl:col-span-2">
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500 mb-3">{lang === 'ar' ? 'النشاط' : 'Activity'}</div>
+                <GiftCardActivityViewer transactionId={row.id} lang={lang} copy={copy} />
+              </div>
+
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{copy.invoice}</div>
                 <div className="mt-3 space-y-2 text-sm">

@@ -14,13 +14,14 @@ import {
     Modal,
     Pressable,
     useWindowDimensions,
+    DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { differenceInCalendarDays } from 'date-fns';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { canMarkNoShow, canRequestTimeOff, canStartService, canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
 import { Appointment, getAppointmentsForDate, updateAppointmentStatus } from '../../src/services/appointments';
 import { BreakWindow, cancelTimeOffRequest, getSchedule, Shift, TimeOff } from '../../src/services/schedule';
@@ -116,6 +117,31 @@ const getAppointmentStatusLabel = (status?: string) => {
     }
 };
 
+const getAppointmentStatusColors = (status?: string) => {
+    const normalized = `${status || ''}`.trim().toLowerCase();
+    switch (normalized) {
+        case 'pending':
+        case 'booked':
+            return { bg: '#fffbeb', text: '#d97706' };
+        case 'confirmed':
+            return { bg: '#ecfdf5', text: '#059669' };
+        case 'arrived':
+        case 'checked_in':
+            return { bg: '#eff6ff', text: '#2563eb' };
+        case 'in_service':
+        case 'started':
+            return { bg: '#faf5ff', text: '#9333ea' };
+        case 'completed':
+            return { bg: '#f4f4f5', text: '#52525b' };
+        case 'cancelled':
+            return { bg: '#fff1f2', text: '#e11d48' };
+        case 'no_show':
+            return { bg: '#fef2f2', text: '#dc2626' };
+        default:
+            return { bg: '#f3f4f6', text: '#6b7280' };
+    }
+};
+
 const getDateSpanDays = (startDate: string, endDate: string) => {
     const start = parseRiyadhDateKey(startDate);
     const end = parseRiyadhDateKey(endDate);
@@ -133,6 +159,7 @@ const getDateSpanDays = (startDate: string, endDate: string) => {
 
 export default function ScheduleScreen() {
     const { user } = useAuth();
+    const { t } = useTranslation();
     const { width: viewportWidth } = useWindowDimensions();
     const weekGridScrollRef = useRef<ScrollView | null>(null);
     const { alert: appointmentAlert, clearAlert, syncAppointments } = useAppointmentArrivalAlert();
@@ -149,7 +176,7 @@ export default function ScheduleScreen() {
     const [weekAppointmentsLoading, setWeekAppointmentsLoading] = useState(false);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
     const [scheduleViewMode, setScheduleViewMode] = useState<'grid' | 'cards'>('grid');
-    const [dayScopeMode, setDayScopeMode] = useState<'day' | 'week'>('week');
+    const [dayScopeMode, setDayScopeMode] = useState<'day' | 'week'>('day');
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [visibleWeeks, setVisibleWeeks] = useState(1);
     const [gridScalePercent, setGridScalePercent] = useState(42);
@@ -244,13 +271,9 @@ export default function ScheduleScreen() {
         try {
             setAppointmentsLoading(true);
             const data = await getAppointmentsForDate(selectedDateKey);
-            await syncAppointments(data.appointments, shouldNotify);
-            setAppointments(data.appointments);
-            setAppointmentsByDate((current) => ({ ...current, [selectedDateKey]: data.appointments }));
-            setBreaks((currentBreaks) => {
-                const filtered = currentBreaks.filter(b => b.date !== selectedDateKey);
-                return [...filtered, ...(data.breaks || [])];
-            });
+            await syncAppointments(data, shouldNotify);
+            setAppointments(data);
+            setAppointmentsByDate((current) => ({ ...current, [selectedDateKey]: data }));
         } catch (error) {
             console.error('Failed to load appointments for selected day', error);
             setAppointments([]);
@@ -265,14 +288,10 @@ export default function ScheduleScreen() {
         try {
             setWeekAppointmentsLoading(true);
             const responses = await Promise.all(
-                weekDays.map(async (dayKey) => {
-                    const data = await getAppointmentsForDate(dayKey);
-                    return {
-                        dayKey,
-                        appointments: data.appointments,
-                        breaks: data.breaks || []
-                    };
-                })
+                weekDays.map(async (dayKey) => ({
+                    dayKey,
+                    appointments: await getAppointmentsForDate(dayKey),
+                }))
             );
 
             setAppointmentsByDate((current) => {
@@ -281,12 +300,6 @@ export default function ScheduleScreen() {
                     next[dayKey] = dayAppointments;
                 });
                 return next;
-            });
-
-            setBreaks((currentBreaks) => {
-                const currentFiltered = currentBreaks.filter(b => !weekDays.includes(b.date));
-                const newBreaks = responses.flatMap(r => r.breaks);
-                return [...currentFiltered, ...newBreaks];
             });
         } catch (error) {
             console.error('Failed to load appointments for visible week', error);
@@ -382,6 +395,21 @@ export default function ScheduleScreen() {
 
     useEffect(() => {
         if (!user) return;
+        const subscription = DeviceEventEmitter.addListener('staff_appointment_assigned', () => {
+            console.log('Push notification received: refreshing schedule');
+            loadData();
+            if (dayScopeMode === 'week') {
+                loadAppointmentsForVisibleWeek();
+            } else {
+                loadAppointmentsForSelectedDate(true);
+            }
+        });
+
+        return () => subscription.remove();
+    }, [user, loadData, dayScopeMode, loadAppointmentsForVisibleWeek, loadAppointmentsForSelectedDate]);
+
+    useEffect(() => {
+        if (!user) return;
         const interval = setInterval(() => {
             if (dayScopeMode === 'week') {
                 loadAppointmentsForVisibleWeek();
@@ -440,19 +468,6 @@ export default function ScheduleScreen() {
             setWeekOffset((current) => Math.max(0, current - 1));
         } else if (direction > 0 && candidate > addRiyadhDays(weekStartKey, 6)) {
             setWeekOffset((current) => Math.min(visibleWeeks - 1, current + 1));
-        }
-    };
-
-    const getCurrentRiyadhHour = () => {
-        try {
-            const hour = Number(new Intl.DateTimeFormat('en-US', {
-                timeZone: 'Asia/Riyadh',
-                hour: '2-digit',
-                hour12: true,
-            }).format(new Date()));
-            return Number.isFinite(hour) ? hour : 12;
-        } catch {
-            return 12;
         }
     };
 
@@ -560,6 +575,12 @@ export default function ScheduleScreen() {
     };
 
     const getRiyadhMinutes = (value: string) => {
+        if (!value) return null;
+
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value)) {
+            return getMinutesFromClock(value);
+        }
+
         const parsed = new Date(value);
         if (Number.isNaN(parsed.getTime())) {
             return null;
@@ -605,9 +626,9 @@ export default function ScheduleScreen() {
         return (
             <View style={styles.gridCard}>
                 <View style={styles.gridHeaderRow}>
-                    <Text style={styles.sectionTitle}>{dayScopeMode === 'week' ? 'Week Grid' : 'Day Grid'}</Text>
+                    <Text style={styles.sectionTitle}>{dayScopeMode === 'week' ? t('schedule.weekGrid') : t('schedule.dayGrid')}</Text>
                     <Text style={styles.gridHint}>
-                        {totalAppointmentsInScope} appointment{totalAppointmentsInScope === 1 ? '' : 's'}
+                        {t('schedule.appointmentsCount', { count: totalAppointmentsInScope })}
                     </Text>
                 </View>
 
@@ -764,9 +785,6 @@ export default function ScheduleScreen() {
 
                                                                     {!compactGridCards ? (
                                                                         <View style={styles.gridAppointmentFooter}>
-                                                                            <Text style={[styles.gridAppointmentPrice, compactGridCards && styles.gridAppointmentPriceCompact]}>
-                                                                                SAR {getAppointmentPrice(appointment).toFixed(2)}
-                                                                            </Text>
                                                                             <Text style={[styles.gridAppointmentAction, compactGridCards && styles.gridAppointmentActionCompact, isStarted && { color: '#047857' }]} numberOfLines={1}>
                                                                                 {groupCount > 1 ? `${groupCount} services` : (isStarted ? 'In Service' : 'Upcoming')}
                                                                             </Text>
@@ -828,7 +846,7 @@ export default function ScheduleScreen() {
                     {!hasTimelineItems ? (
                         <View style={styles.gridInlineEmptyState}>
                             <Ionicons name="calendar-outline" size={18} color="#6b7280" />
-                            <Text style={styles.gridInlineEmptyText}>No appointments, blocked time, or leave in this scope.</Text>
+                            <Text style={styles.gridInlineEmptyText}>{t('schedule.emptyGridScope')}</Text>
                         </View>
                     ) : null}
                 </View>
@@ -953,15 +971,15 @@ export default function ScheduleScreen() {
                                                 {formatTime(appointment.startTime)} to {formatTime(appointment.endTime)}
                                             </Text>
                                             <Text style={styles.appointmentDuration}>
-                                                {appointment.service?.duration || 0} min
+                                                {appointment.duration || appointment.service?.duration || 0} min
                                             </Text>
                                         </View>
                                         <View style={styles.appointmentCardBadges}>
                                             <View style={[styles.urgencyBadge, { backgroundColor: urgency.background }]}>
                                                 <Text style={[styles.urgencyText, { color: urgency.color }]}>{urgency.label}</Text>
                                             </View>
-                                            <View style={styles.statusBadge}>
-                                                <Text style={[styles.appointmentStatusText, appointment.status === 'started' && { color: '#fbbf24' }, appointment.status === 'completed' && { color: '#10b981' }, appointment.status === 'cancelled' && { color: '#ef4444' }]}>
+                                            <View style={[styles.statusBadge, { backgroundColor: getAppointmentStatusColors(appointment.status).bg }]}>
+                                                <Text style={[styles.appointmentStatusText, { color: getAppointmentStatusColors(appointment.status).text }]}>
                                                     {getAppointmentStatusLabel(appointment.status)}
                                                 </Text>
                                             </View>
@@ -984,9 +1002,6 @@ export default function ScheduleScreen() {
                                                 <Text style={styles.appointmentBookingMeta}>
                                                     Booking #{appointment.bookingNumber?.slice(0, 8) || appointment.id.slice(0, 8)}
                                                 </Text>
-                                            </View>
-                                            <View style={styles.appointmentAmountBox}>
-                                                <Text style={styles.appointmentAmountText}>SAR {amount.toFixed(2)}</Text>
                                             </View>
                                         </View>
 
@@ -1152,7 +1167,7 @@ export default function ScheduleScreen() {
                                     {formatTime(appointment.startTime)} to {formatTime(appointment.endTime)}
                                 </Text>
                                 <Text style={styles.appointmentDuration}>
-                                    {appointment.service?.duration || 0} min
+                                    {appointment.duration || appointment.service?.duration || 0} min
                                 </Text>
                             </View>
                             <View style={styles.appointmentCardBadges}>
@@ -1177,9 +1192,6 @@ export default function ScheduleScreen() {
                                 <Text style={styles.appointmentBookingMeta}>
                                     Booking #{appointment.bookingNumber?.slice(0, 8) || appointment.id.slice(0, 8)}
                                 </Text>
-                            </View>
-                            <View style={styles.appointmentAmountBox}>
-                                <Text style={styles.appointmentAmountText}>SAR {amount.toFixed(2)}</Text>
                             </View>
                         </View>
 
@@ -1282,8 +1294,6 @@ export default function ScheduleScreen() {
         );
     };
 
-    const currentHour = getCurrentRiyadhHour();
-    const greeting = currentHour < 12 ? 'Good morning,' : currentHour < 17 ? 'Good afternoon,' : 'Good evening,';
     const controllerTitle = dayScopeMode === 'week'
         ? `${formatRiyadhMonthDay(weekStartKey)} - ${formatRiyadhMonthDay(addRiyadhDays(weekStartKey, 6))}`
         : formatRiyadhLongDate(selectedDateKey);
@@ -1294,24 +1304,6 @@ export default function ScheduleScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <LinearGradient colors={['#8B5ADF', '#683AB7']} style={styles.header}>
-                <View style={styles.headerTopRow}>
-                    <View>
-                        <Text style={styles.headerGreeting}>{greeting}</Text>
-                        <Text style={styles.headerStaffName}>{user?.name?.split(' ')[0] || 'Staff'} {currentHour < 17 ? '☀️' : '🌙'}</Text>
-                    </View>
-                    <View style={styles.headerAvatarWrap}>
-                        {user?.photo ? (
-                            <Image source={{ uri: getImageUrl(user.photo) }} style={styles.headerAvatar} />
-                        ) : (
-                            <View style={styles.headerAvatarFallback}>
-                                <Text style={styles.headerAvatarInitial}>{user?.name?.charAt(0)?.toUpperCase() || 'S'}</Text>
-                            </View>
-                        )}
-                    </View>
-                </View>
-            </LinearGradient>
-
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8B5ADF']} />}
@@ -1568,51 +1560,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f3f4f6',
-    },
-    header: {
-        paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'android' ? 14 : 8,
-        paddingBottom: 12,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-    },
-    headerTopRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    headerGreeting: {
-        fontSize: 15,
-        color: 'rgba(255,255,255,0.8)',
-        marginBottom: 4,
-    },
-    headerStaffName: {
-        fontSize: 32,
-        fontWeight: '800',
-        color: '#ffffff',
-    },
-    headerAvatarWrap: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 28,
-        padding: 2,
-    },
-    headerAvatar: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
-    },
-    headerAvatarFallback: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerAvatarInitial: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#ffffff',
     },
     content: {
         paddingHorizontal: 12,
@@ -2156,15 +2103,17 @@ const styles = StyleSheet.create({
     },
     gridBreakBlock: {
         position: 'absolute',
-        left: 10,
-        right: 10,
+        left: 0,
+        right: 0,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
         backgroundColor: 'rgba(245, 158, 11, 0.16)',
         borderWidth: 1,
         borderColor: '#fbbf24',
-        borderRadius: 14,
+        borderLeftWidth: 0,
+        borderRightWidth: 0,
+        borderRadius: 0,
         paddingHorizontal: 10,
         paddingVertical: 8,
         zIndex: 1,

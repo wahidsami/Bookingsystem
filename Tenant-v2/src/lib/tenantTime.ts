@@ -99,3 +99,24 @@ export function buildTenantIsoFromMinutes(
     timeZone
   ).toISOString();
 }
+
+export function getBoardMinutesFromTimestamp(
+  value: string | Date | null | undefined,
+  timeZone = DEFAULT_TENANT_TIMEZONE,
+  boardStartHour = 9
+) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  const parts = getDatePartsInTimeZone(parsed, timeZone);
+  const hours = Number(parts.hour || '0');
+  const minutes = Number(parts.minute || '0');
+  const totalMinutes = (hours * 60) + minutes;
+  return Math.max(0, totalMinutes - (boardStartHour * 60));
+}

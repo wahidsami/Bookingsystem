@@ -1,10 +1,18 @@
 import React, { useMemo } from 'react';
 import { type StagedService } from './AppointmentServicesStep';
 import { to12HourTime, to24HourTime } from '../../lib/employeeHelpers';
+import { useEarlyAvailabilityValidation } from '../../hooks/useEarlyAvailabilityValidation';
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface AppointmentServiceConfigurationProps {
+  tenantId: string;
+  tenantTimezone: string;
+  selectedDate: string;
+  serviceId: string;
+  variantId?: string;
   isRtl: boolean;
   boardStartHour?: number;
+  slotMinutes?: number;
   draftConfig: Partial<StagedService>;
   setDraftConfig: React.Dispatch<React.SetStateAction<Partial<StagedService>>>;
   validStylists: any[];
@@ -13,14 +21,31 @@ interface AppointmentServiceConfigurationProps {
 }
 
 export default function AppointmentServiceConfiguration({
+  tenantId,
+  tenantTimezone,
+  selectedDate,
+  serviceId,
+  variantId,
   isRtl,
   boardStartHour = 9,
+  slotMinutes = 5,
   draftConfig,
   setDraftConfig,
   validStylists,
   onSave,
   onCancel
 }: AppointmentServiceConfigurationProps) {
+  const validation = useEarlyAvailabilityValidation({
+    tenantId,
+    serviceId,
+    variantId,
+    staffId: draftConfig.staffId,
+    dateKey: selectedDate,
+    tenantTimezone,
+    boardStartHour,
+    startTimeMinutes: Number(draftConfig.startTime || 0)
+  });
+
   const offsetBaseMinutes = boardStartHour * 60;
   const formatOffsetToClockValue = (offsetMinutes?: number | null) => {
     const safeOffset = Math.max(0, Math.round(Number(offsetMinutes || 0)));
@@ -43,7 +68,8 @@ export default function AppointmentServiceConfiguration({
 
   const timeOptions = useMemo(() => {
     const options: Array<{ value: string; label: string }> = [];
-    for (let absoluteMinutes = offsetBaseMinutes; absoluteMinutes < (24 * 60); absoluteMinutes += 15) {
+    const step = Math.max(1, slotMinutes);
+    for (let absoluteMinutes = offsetBaseMinutes; absoluteMinutes < (24 * 60); absoluteMinutes += step) {
       const hours = Math.floor(absoluteMinutes / 60);
       const minutes = absoluteMinutes % 60;
       const value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
@@ -53,7 +79,7 @@ export default function AppointmentServiceConfiguration({
       });
     }
     return options;
-  }, [offsetBaseMinutes]);
+  }, [offsetBaseMinutes, slotMinutes]);
 
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">
@@ -77,6 +103,75 @@ export default function AppointmentServiceConfiguration({
               ))}
             </select>
           </label>
+
+
+          {/* Validation Status */}
+          {draftConfig.staffId && validation.status !== 'idle' && (
+            <div className="col-span-full md:col-span-2 -mt-2 mb-1">
+              {validation.status === 'loading' && (
+                <p className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {isRtl ? 'جاري التحقق من التوفر...' : 'Checking availability...'}
+                </p>
+              )}
+              {validation.status === 'available' && (
+                <p className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {isRtl ? 'متاح في الوقت المحدد' : `Available at ${to12HourTime(formatOffsetToClockValue(draftConfig.startTime))}`}
+                </p>
+              )}
+              {validation.status === 'needs_overtime' && validation.diagnostic && (
+                <div className="flex flex-col gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-[11px] text-indigo-900 mt-1 mb-2">
+                  <div className="flex items-start gap-1.5">
+                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" />
+                    <div>
+                      <span className="font-semibold text-indigo-800">
+                        {isRtl ? 'تجاوز ساعات العمل' : 'Overtime candidate'}
+                      </span>
+                      <p className="opacity-90 mt-0.5">
+                        {validation.diagnostic.reasonType === 'after_employee_duty' && (isRtl ? `الموعد سيتجاوز ساعات عمل الموظف — ينتهي دوامه الساعة ${validation.diagnostic.workingHoursEnd || ''}` : `Appointment exceeds employee duty — duty ends at ${validation.diagnostic.workingHoursEnd || ''}`)}
+                        {validation.diagnostic.reasonType === 'after_tenant_close' && (isRtl ? `الموعد سيتجاوز ساعات عمل المركز — يغلق المركز الساعة ${validation.diagnostic.workingHoursEnd || ''}` : `Appointment exceeds center hours — closes at ${validation.diagnostic.workingHoursEnd || ''}`)}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDraftConfig(c => ({ ...c, overtimeApproval: { approved: true } }))}
+                    className="self-start rounded-md bg-indigo-600 px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-indigo-700"
+                  >
+                    {isRtl ? 'الموافقة على العمل الإضافي' : 'Approve Overtime'}
+                  </button>
+                </div>
+              )}
+              {validation.status === 'unavailable' && validation.diagnostic && (
+                <div className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 mt-1 mb-2">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                  <div>
+                    <span className="font-semibold text-amber-800">
+                      {isRtl ? 'الموظف غير متاح.' : 'Unavailable at this time.'}
+                    </span>
+                    <span className="ml-1 opacity-90 block mt-0.5">
+                      {validation.diagnostic.reasonType === 'staff_break' && (isRtl ? 'الموظف لديه استراحة في هذا الوقت' : 'Staff break')}
+                      {validation.diagnostic.reasonType === 'time_off' && (isRtl ? 'الموظف غير متاح بسبب إجازة/وقت محجوز' : 'Time off')}
+                      {validation.diagnostic.reasonType === 'existing_booking' && (isRtl ? 'الموظف لديه حجز آخر في هذا الوقت' : 'Existing booking')}
+                      {validation.diagnostic.reasonType === 'before_tenant_open' && (isRtl ? 'الموعد يبدأ قبل ساعات عمل المركز' : 'Appointment starts before center hours')}
+                      {validation.diagnostic.reasonType === 'after_tenant_close' && (isRtl ? 'الموعد سيتجاوز ساعات عمل المركز' : 'Appointment exceeds center hours')}
+                      {validation.diagnostic.reasonType === 'tenant_closed' && (isRtl ? 'المركز مغلق في هذا اليوم' : 'Center is closed on this day')}
+                      {validation.diagnostic.reasonType === 'no_employee_duty' && (isRtl ? 'الموظف ليس لديه دوام في هذا اليوم' : 'Employee has no duty on this day')}
+                      {validation.diagnostic.reasonType === 'before_employee_duty' && (isRtl ? 'الموظف خارج ساعات عمله — يبدأ دوامه لاحقاً' : 'Outside employee duty hours')}
+                      {validation.diagnostic.reasonType === 'after_employee_duty' && (isRtl ? 'الموعد سيتجاوز ساعات عمل الموظف' : 'Appointment exceeds employee duty')}
+                      {validation.diagnostic.reasonType === 'outside_working_hours' && (isRtl ? 'خارج أوقات العمل' : 'Outside working hours')}
+                      {validation.diagnostic.reasonType === 'blocked_time' && (isRtl ? 'وقت محجوز' : 'Blocked time')}
+                      {(!validation.diagnostic.reasonType || validation.diagnostic.reasonType === 'unavailable') && (isRtl ? 'غير متوفر' : 'Unavailable')}
+                      {validation.diagnostic.startTime && validation.diagnostic.endTime && (
+                        ` (${new Date(validation.diagnostic.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${new Date(validation.diagnostic.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Discount Setup */}
           <div className="grid grid-cols-2 gap-3">
@@ -117,7 +212,7 @@ export default function AppointmentServiceConfiguration({
             </span>
             <select
               value={formatOffsetToClockValue(draftConfig.startTime)}
-              onChange={(e) => setDraftConfig((c) => ({ ...c, startTime: convertClockToOffset(e.target.value) }))}
+              onChange={(e) => setDraftConfig((c) => ({ ...c, startTime: convertClockToOffset(e.target.value), timingMode: 'manual' }))}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary shadow-sm"
             >
               {timeOptions.map((option) => (

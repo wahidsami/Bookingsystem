@@ -38,6 +38,7 @@ type BookingSettingsForm = {
   bufferTime: number;
   maxAdvanceBookingDays: number;
   cancellationHours: number;
+  rescheduleHours: number;
   cancellationPolicy: string;
   slotInterval: number;
   defaultBufferBefore: number;
@@ -246,6 +247,7 @@ function createBookingForm(settings: Record<string, any> | null | undefined): Bo
     bufferTime: Number(source.bufferTime ?? 15),
     maxAdvanceBookingDays: Number(source.maxAdvanceBookingDays ?? 30),
     cancellationHours: Number(source.cancellationHours ?? 24),
+    rescheduleHours: Number(source.rescheduleHours ?? 24),
     cancellationPolicy: source.cancellationPolicy || '',
     slotInterval: [5, 10, 15].includes(Number(source.slotInterval)) ? Number(source.slotInterval) : 15,
     defaultBufferBefore: Number(source.defaultBufferBefore ?? 5),
@@ -709,7 +711,7 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
     });
 
     if (response?.accessToken) {
-      tenantApiAdapter.setAuthTokens(response.accessToken, response.refreshToken || null);
+      tenantApiAdapter.setTokens(response.accessToken, response.refreshToken || null);
     }
     await refreshUser();
     return response;
@@ -1035,24 +1037,28 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
               className="h-4 w-4 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
             />
           </label>
-          <label className="space-y-2">
-            <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'الحجز الذاتي' : 'Allow walk-in booking'}</span>
-            <input
-              type="checkbox"
-              checked={bookingForm.allowWalkInBooking}
-              onChange={(event) => setBookingForm((current) => ({ ...current, allowWalkInBooking: event.target.checked }))}
-              className="h-4 w-4 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
-            />
-          </label>
-          <label className="space-y-2">
-            <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'الاعتماد التلقائي' : 'Auto approve bookings'}</span>
-            <input
-              type="checkbox"
-              checked={bookingForm.autoApproveBookings}
-              onChange={(event) => setBookingForm((current) => ({ ...current, autoApproveBookings: event.target.checked }))}
-              className="h-4 w-4 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
-            />
-          </label>
+          {false && (
+            <>
+              <label className="space-y-2">
+                <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'الحجز الذاتي' : 'Allow walk-in booking'}</span>
+                <input
+                  type="checkbox"
+                  checked={bookingForm.allowWalkInBooking}
+                  onChange={(event) => setBookingForm((current) => ({ ...current, allowWalkInBooking: event.target.checked }))}
+                  className="h-4 w-4 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'الاعتماد التلقائي' : 'Auto approve bookings'}</span>
+                <input
+                  type="checkbox"
+                  checked={bookingForm.autoApproveBookings}
+                  onChange={(event) => setBookingForm((current) => ({ ...current, autoApproveBookings: event.target.checked }))}
+                  className="h-4 w-4 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
+                />
+              </label>
+            </>
+          )}
           <label className="space-y-2">
             <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'تقدم الحجز (دقائق)' : 'Minimum advance booking (minutes)'}</span>
             <input
@@ -1082,16 +1088,18 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
               />
             </div>
           </label>
-          <label className="space-y-2">
-            <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'أيام التقدم القصوى' : 'Maximum advance booking days'}</span>
-            <input
-              type="number"
-              min={1}
-              value={bookingForm.maxAdvanceBookingDays}
-              onChange={(event) => setBookingForm((current) => ({ ...current, maxAdvanceBookingDays: Number(event.target.value || 0) }))}
-              className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-brand-500 ${darkMode ? 'border-zinc-800 bg-zinc-950 text-zinc-100' : 'border-neutral-200 bg-white text-slate-800'}`}
-            />
-          </label>
+          {false && (
+            <label className="space-y-2">
+              <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'أيام التقدم القصوى' : 'Maximum advance booking days'}</span>
+              <input
+                type="number"
+                min={1}
+                value={bookingForm.maxAdvanceBookingDays}
+                onChange={(event) => setBookingForm((current) => ({ ...current, maxAdvanceBookingDays: Number(event.target.value || 0) }))}
+                className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-brand-500 ${darkMode ? 'border-zinc-800 bg-zinc-950 text-zinc-100' : 'border-neutral-200 bg-white text-slate-800'}`}
+              />
+            </label>
+          )}
           <label className="space-y-2">
             <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'ساعات الإلغاء' : 'Cancellation hours'}</span>
             <input
@@ -1099,6 +1107,16 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
               min={0}
               value={bookingForm.cancellationHours}
               onChange={(event) => setBookingForm((current) => ({ ...current, cancellationHours: Number(event.target.value || 0) }))}
+              className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-brand-500 ${darkMode ? 'border-zinc-800 bg-zinc-950 text-zinc-100' : 'border-neutral-200 bg-white text-slate-800'}`}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="block text-xs font-bold uppercase tracking-[0.16em] text-neutral-400">{isRtl ? 'ساعات إعادة الجدولة للعملاء' : 'Customer reschedule hours'}</span>
+            <input
+              type="number"
+              min={0}
+              value={bookingForm.rescheduleHours}
+              onChange={(event) => setBookingForm((current) => ({ ...current, rescheduleHours: Number(event.target.value || 0) }))}
               className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-brand-500 ${darkMode ? 'border-zinc-800 bg-zinc-950 text-zinc-100' : 'border-neutral-200 bg-white text-slate-800'}`}
             />
           </label>

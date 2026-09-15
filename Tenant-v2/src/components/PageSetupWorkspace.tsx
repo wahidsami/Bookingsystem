@@ -5,7 +5,13 @@ import {
   Instagram, Twitter, Youtube, Linkedin, Sparkles, Upload, Map, ExternalLink,
   ChevronLeft, ChevronRight, FileText, CheckCircle, Smartphone, HelpCircle
 } from 'lucide-react';
-import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import { tenantApiAdapter, API_ORIGIN } from '../lib/tenantApiAdapter';
+
+const getFullImageUrl = (path: string) => {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) return path;
+  return `${API_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
+};
 
 interface PageSetupWorkspaceProps {
   lang: 'ar' | 'en';
@@ -15,6 +21,7 @@ interface PageSetupWorkspaceProps {
 interface SectionsVisibility {
   services: boolean;
   products: boolean;
+  gifts: boolean;
   reviews: boolean;
   about: boolean;
 }
@@ -53,6 +60,7 @@ const normalizeSectionsVisibility = (value: any): SectionsVisibility => {
   return {
     services: sections.services !== false,
     products: sections.products !== false,
+    gifts: sections.gifts !== false,
     reviews: sections.reviews === true,
     about: sections.about !== false && sections.callToAction !== false
   };
@@ -380,6 +388,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
         sections: {
           services: sectionsVisibility.services,
           products: sectionsVisibility.products,
+          gifts: sectionsVisibility.gifts,
           reviews: sectionsVisibility.reviews,
           about: sectionsVisibility.about,
           callToAction: sectionsVisibility.about
@@ -505,8 +514,8 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* LEFT: CONTENT MANAGEMENT CONTROLS (7 cols) */}
-          <div className="lg:col-span-7 space-y-6">
+          {/* LEFT: CONTENT MANAGEMENT CONTROLS (12 cols full width) */}
+          <div className="lg:col-span-12 space-y-6">
             <div className={`rounded-2xl border p-2 ${darkMode ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white border-neutral-200 shadow-xs'}`}>
               <div className="flex flex-wrap gap-2">
                 {PAGE_SETUP_TABS.map((tab) => {
@@ -546,7 +555,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
               {/* Cover Preview */}
               {coverImage ? (
                 <div className="relative h-44 rounded-xl overflow-hidden border border-zinc-800 group">
-                  <img src={coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                  <img src={getFullImageUrl(coverImage)} alt="Cover Preview" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                     <button
                       type="button"
@@ -697,6 +706,25 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                   {sectionsVisibility.products ? <Check className="text-brand-500" size={16} /> : <EyeOff size={16} />}
                 </button>
 
+                {/* Gift Cards Toggle */}
+                <button
+                  type="button"
+                  onClick={() => handleSectionToggle('gifts')}
+                  className={`p-4 rounded-xl border flex items-center justify-between text-start transition-all cursor-pointer ${
+                    sectionsVisibility.gifts
+                      ? 'bg-brand-500/5 border-brand-500/30 text-white'
+                      : 'bg-zinc-950/20 border-zinc-800 text-zinc-500'
+                  }`}
+                >
+                  <div>
+                    <span className={`font-black text-xs block ${sectionsVisibility.gifts ? 'text-brand-400' : 'text-zinc-500'}`}>
+                      {isRtl ? 'قسم بطاقات الهدايا' : 'Gift Cards Block'}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block mt-0.5">{isRtl ? 'عرض وشراء بطاقات الهدايا' : 'Displays purchaseable gift cards'}</span>
+                  </div>
+                  {sectionsVisibility.gifts ? <Check className="text-brand-500" size={16} /> : <EyeOff size={16} />}
+                </button>
+
                 {/* Reviews Toggle */}
                 <button
                   type="button"
@@ -843,7 +871,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   {gallery.map((img, idx) => (
                     <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-800 group bg-zinc-950">
-                      <img src={img} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                      <img src={getFullImageUrl(img)} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <button
                           type="button"
@@ -1169,8 +1197,8 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
 
           </div>
 
-          {/* RIGHT: INTERACTIVE LIVE PUBLIC PAGE PREVIEW (5 cols) */}
-          <div className="lg:col-span-5 lg:sticky lg:top-6 space-y-4">
+          {/* RIGHT: INTERACTIVE LIVE PUBLIC PAGE PREVIEW (Hidden for now) */}
+          <div className="hidden">
             
             <div className={`p-4 rounded-2xl border text-start space-y-4 ${
               darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-150 shadow-xs'

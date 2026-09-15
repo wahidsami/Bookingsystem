@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Calendar as CalendarIcon, Clock, Plus, Search, User, Users, Check, X, 
-  ChevronLeft, ChevronRight, CreditCard, Tag, MessageSquare, MapPin, 
-  Activity, Wallet, ChevronDown, Trash, Undo2, AlertCircle, Filter, 
+import {
+  Calendar as CalendarIcon, Clock, Plus, Search, User, Users, Check, X,
+  ChevronLeft, ChevronRight, CreditCard, Tag, MessageSquare, MapPin,
+  Activity, Wallet, ChevronDown, Trash, Undo2, AlertCircle, Filter,
   SlidersHorizontal, Star, Split, Share2, Printer, CheckCircle2,
   Lock, Scissors, Sparkles, Smile, ShieldCheck, Mail, Phone,
   TrendingUp, CircleDot, AlertTriangle, FileText, RefreshCw, Copy, Settings2,
@@ -37,15 +37,21 @@ import {
 } from '../lib/bookingUiDialogs';
 import {
   buildTenantIsoFromMinutes,
-  resolveTenantTimezone
+  getBoardMinutesFromTimestamp,
+  resolveTenantTimezone,
+  getDatePartsInTimeZone
 } from '../lib/tenantTime';
 import {
   buildConflictCard,
   formatConflictTime,
+  getConflictBadgeClasses,
   pickBestConflictDiagnostic,
   type AvailabilityDiagnostic,
   type ConflictCard
 } from '../lib/bookingConflictDiagnostics';
+
+const TEMP_HIDE_REASSIGN_UI = true;
+const SHOW_LATE_CANCEL_BUTTON = false;
 
 interface AppointmentWorkspaceProps {
   lang: Language;
@@ -65,6 +71,8 @@ interface Stylist {
   roleEn: string;
   roleAr: string;
   color: string;
+  status?: string;
+  schedule?: any[];
 }
 
 interface Appointment {
@@ -94,6 +102,12 @@ interface Appointment {
   paymentMethod?: string | null;
   invoiceNumber?: string | null;
   paymentTransactions?: any[];
+  overtimeApproval?: {
+    approved: boolean;
+    authorizedBy: string;
+    authorizedAt: string;
+    reason?: string | null;
+  } | null;
   isGroupBooking: boolean;
   guestCount?: number;
   hasNotes: boolean;
@@ -504,17 +518,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     serviceId?: string;
     serviceSection?: 'basic' | 'team' | 'options' | 'settings';
   } | null>(null);
-  
+
   // New API States replacing mock data
   const [liveStylists, setLiveStylists] = useState<Stylist[]>([]);
   const [liveServices, setLiveServices] = useState<any[]>([]);
   const [liveCustomers, setLiveCustomers] = useState<any[]>([]);
   const [liveProducts, setLiveProducts] = useState<any[]>([]);
+  const [servicePackages, setServicePackages] = useState<any[]>([]);
   const [giftCardPackages, setGiftCardPackages] = useState<GiftCardPackage[]>([]);
-  
+
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
-  const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off'>>({});
+  const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off' | 'busy' | 'time_off'>>({});
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedStylistFilter, setSelectedStylistFilter] = useState<string>('all');
@@ -685,6 +700,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     updateMenuPosition();
 
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+  // Guard: ignore native draggable elements
+  const targetEl = event.target as HTMLElement | null;
+  if (targetEl?.closest?.('[draggable="true"]')) {
+    console.log('[DD_POINTER_GUARD] bypassed global mousedown for draggable target');
+    return;
+  }
+  // Existing logic follows
+
       const target = event.target;
       if (!(target instanceof Node)) {
         return;
@@ -729,13 +752,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
-        const [empRes, srvRes, custRes, prodRes] = await Promise.all([
+        const [empRes, srvRes, custRes, prodRes, pkgRes] = await Promise.all([
           tenantApiAdapter.getEmployees(),
           tenantApiAdapter.getServices(),
           tenantApiAdapter.getCustomers({ limit: 1000 }),
-          tenantApiAdapter.getProducts()
+          tenantApiAdapter.getProducts(),
+          tenantApiAdapter.getPackages()
         ]);
-        
+
         const employees = (empRes?.employees || []).filter((emp: any) => `${emp?.status || ''}`.toLowerCase() !== 'off' && emp?.isActive !== false);
         setLiveStylists(employees.map((emp: any, index: number) => ({
           id: emp.id,
@@ -745,7 +769,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           roleAr: emp.title || 'موظف',
           avatar: resolveEmployeeImageUrl(emp.avatar || emp.photo || emp.profileImage),
           color: API_COLORS[index % API_COLORS.length],
-          status: emp.status || (emp.isActive === false ? 'off' : 'active')
+          status: emp.status || (emp.isActive === false ? 'off' : 'active'),
+          schedule: Array.isArray(emp.schedule) ? emp.schedule : [],
         })));
 
         const services = srvRes?.services || [];
@@ -780,6 +805,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           images: Array.isArray(p.images) ? p.images : (p.images ? [p.images] : [])
         })));
 
+        const packages = pkgRes?.packages || (pkgRes as any)?.data?.packages || [];
+        setServicePackages(packages.map((pkg: any) => ({
+          ...pkg,
+          image: resolveProductImageUrl(pkg.image || pkg.imageUrl || '')
+        })));
+
         if (employees.length > 0) {
           setCurrentStaffId((current) => employees.some((emp: any) => emp.id === current) ? current : employees[0].id);
           setBlockStaffId((current) => employees.some((emp: any) => emp.id === current) ? current : employees[0].id);
@@ -807,8 +838,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   }, []);
 
   const mapBoardAppointment = (a: any, dateKey: string): Appointment => {
-    const startDate = new Date(a.startTime);
-    const startMins = startDate.getHours() * 60 + startDate.getMinutes() - (boardStartHour * 60);
+    const startMinutes = getBoardMinutesFromTimestamp(a.startTime, tenantTimezone, boardStartHour);
+    const startMins = startMinutes ?? 0;
     const sessionAppointments = Array.isArray(a.bookingSession?.appointments) ? a.bookingSession.appointments : [];
     const services = sessionAppointments.length > 0
       ? sessionAppointments
@@ -881,9 +912,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const serviceNameAr = services.length > 1
       ? services.map((item: any) => normalizeServiceName(item, 'ar')).filter(Boolean).join(' + ')
       : primaryServiceNameAr;
-    const duration = sessionAppointments.length > 0
-      ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.duration || item?.service?.duration || 0), 0)
-      : (a.service?.duration || a.duration || 60);
+    const ownIntervalMinutes = (a.startTime && a.endTime)
+      ? (new Date(a.endTime).getTime() - new Date(a.startTime).getTime()) / 60000
+      : NaN;
+    const hasValidOwnInterval = !Number.isNaN(ownIntervalMinutes) && ownIntervalMinutes > 0;
+    // This appointment's own start/end interval is the single source of truth for its
+    // geometry duration. It must never be replaced by an aggregate across chain/session siblings.
+    const duration = hasValidOwnInterval
+      ? ownIntervalMinutes
+      : (sessionAppointments.length > 0
+        ? sessionAppointments.reduce((sum: number, item: any) => sum + Number(item?.duration || item?.service?.duration || 0), 0)
+        : (a.service?.duration || a.duration || 60));
     return {
       id: a.id,
       customerId: a.user?.id || a.customerId,
@@ -949,6 +988,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       internalNotes: a.internalNotes || '',
       paymentTransactions: Array.isArray(a.paymentTransactions) ? a.paymentTransactions : [],
       invoice: a.invoice || null,
+      overtimeApproval: a.overtimeApproval || null,
       type: 'appointment',
       serviceCategory: a.service?.category || a.serviceCategory || 'hair',
       date: getLocalDateKey(a.startTime || a.date || dateKey)
@@ -983,22 +1023,37 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const loadBoardData = async () => {
     setIsLoading(true);
     try {
-        const dateStr = getSelectedDateKey();
-        const res = await tenantApiAdapter.getAppointmentsBoard(dateStr, {
-          staffId: selectedStylistFilter === 'all' ? undefined : selectedStylistFilter,
-          status: statusFilter === 'all' ? undefined : statusFilter,
-          search: searchQuery.trim() || undefined
-        });
+      const dateStr = getSelectedDateKey();
+      const params = {
+        staffId: selectedStylistFilter === 'all' ? undefined : selectedStylistFilter,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: searchQuery.trim() || undefined
+      };
+
+      if (viewMode === 'month') {
+        const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+
+        const res = await tenantApiAdapter.getCalendarAppointments(getLocalDateKey(startOfMonth), getLocalDateKey(endOfMonth), params);
+        if (res && res.success) {
+          const mappedApts: Appointment[] = [];
+          if (res.appointments) {
+            Object.keys(res.appointments).forEach(dayKey => {
+              const dayAppointments = res.appointments[dayKey] || [];
+              mappedApts.push(...dayAppointments.map((a: any) => mapBoardAppointment(a, dayKey)));
+            });
+          }
+          setAppointments(mappedApts.sort((left, right) => left.startTime - right.startTime));
+        }
+      } else {
+        const res = await tenantApiAdapter.getAppointmentsBoard(dateStr, params);
         if (res && res.success) {
           const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => mapBoardAppointment(a, dateStr));
           const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => mapBoardBreak(b));
           setAppointments([...mappedApts, ...mappedBreaks].sort((left, right) => left.startTime - right.startTime));
 
-          const newStatuses: Record<string, 'active'|'break'|'off'> = {};
-        (res.breaks || []).forEach((b: any) => {
-          newStatuses[b.staffId] = 'break';
-        });
-        setStylistStatuses(prev => ({ ...prev, ...newStatuses }));
+          setStylistStatuses(res.staffStatuses || {});
+        }
       }
     } catch (err) {
       console.error('Failed to load board data', err);
@@ -1104,10 +1159,30 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   // Board Data Fetch
   useEffect(() => {
     void loadBoardData();
-  }, [selectedDate, selectedStylistFilter, statusFilter, searchQuery]);
+  }, [selectedDate, selectedStylistFilter, statusFilter, searchQuery, viewMode]);
 
   // Selection / Detail Drawer State
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [rescheduleForm, setRescheduleForm] = useState<{
+    staffId: string;
+    startTime: number;
+    date: string;
+    status: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (activeAppointment) {
+      setRescheduleForm({
+        staffId: activeAppointment.staffId || '',
+        startTime: activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0,
+        // Calculate the fallback directly without depending on variables defined later or functions that recreate every render
+        date: activeAppointment.date || (selectedDate ? getLocalDateKey(selectedDate) : '') || '',
+        status: activeAppointment.status || 'booked'
+      });
+    } else {
+      setRescheduleForm(null);
+    }
+  }, [activeAppointment]); // selectedDateKey removed to prevent infinite reset loops
   const [activeBlockedTime, setActiveBlockedTime] = useState<any | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<'overview' | 'financials' | 'timeline' | 'reviews'>('overview');
@@ -1121,7 +1196,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
   const [customerProfileError, setCustomerProfileError] = useState<string | null>(null);
   const [customerProfileRefreshToken, setCustomerProfileRefreshToken] = useState(0);
-  const [customerTransactionsExpanded, setCustomerTransactionsExpanded] = useState(false);
+  const [customerInvoicesExpanded, setCustomerInvoicesExpanded] = useState(false);
+  const [simulatedPaymentAmount, setSimulatedPaymentAmount] = useState<string>('');
   const [customerTransactionDetail, setCustomerTransactionDetail] = useState<any | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const selectedDateKey = getLocalDateKey(selectedDate);
@@ -1636,6 +1712,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   })();
 
   const activeVisitProductEntries = (() => {
+
     const sources = [
       ...(Array.isArray(activeAppointment?.products) ? activeAppointment.products : []),
       ...(Array.isArray(activeAppointment?.productItems) ? activeAppointment.productItems : []),
@@ -1677,6 +1754,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   ];
 
   const customerTimelineEntries = (() => {
+
     const rows = [
       ...customerAppointmentHistory.map((item: any) => ({
         id: `apt-${item.id || item.bookingNumber || Math.random().toString(36).slice(2)}`,
@@ -1748,11 +1826,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       })
       .slice()
       .sort((a: any, b: any) => new Date(b.date || b.createdAt || b.time || 0).getTime() - new Date(a.date || a.createdAt || a.time || 0).getTime())
-      .slice(0, customerTransactionsExpanded ? 12 : 4);
+      .slice(0, 50);
   })();
-  
-  // Custom Drag State & Interactive Preview
-  const [draggedAptId, setDraggedAptId] = useState<string | null>(null);
+
+  // Custom Drag State & Interactive Preview (drag is handled natively by SchedulerGrid via DataTransfer)
+
 
   useEffect(() => {
     let cancelled = false;
@@ -1856,11 +1934,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   } | null>(null);
 
   // Split payments demo state
-  const [splitAmounts, setSplitAmounts] = useState<{ card: number; cash: number; wallet: number }>({ card: 0, cash: 0, wallet: 0 });
+  const [splitAmounts, setSplitAmounts] = useState<{ card: number; cash: number; wallet: number; gift: number }>({ card: 0, cash: 0, wallet: 0, gift: 0 });
   const [isSplitActive, setIsSplitActive] = useState(false);
 
   // Wallet simulation state
-  const [simulatedWalletTopUp, setSimulatedWalletTopUp] = useState<string>('');
 
   // Checkout combined products & gift cards state for active appointment
   const [checkoutProducts, setCheckoutProducts] = useState<{ id: string; nameAr: string; nameEn: string; price: number; quantity: number; sku: string }[]>([]);
@@ -1878,6 +1955,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [pendingStatusAfterPayment, setPendingStatusAfterPayment] = useState<string | null>(null);
   const [showPaymentRequiredDialog, setShowPaymentRequiredDialog] = useState(false);
   const [showCancelReasonDialog, setShowCancelReasonDialog] = useState(false);
+  const [showCancelScopeModal, setShowCancelScopeModal] = useState<{ id: string, notes?: string, isLateCancel?: boolean } | null>(null);
   const [cancelReasonText, setCancelReasonText] = useState('');
   const resolvedAppointmentPaymentMethod = useMemo(
     () => resolveAppointmentPaymentMethod(activeAppointment),
@@ -2048,7 +2126,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [createMode, setCreateMode] = useState<'appointment' | 'blocked'>('appointment');
   const [createStep, setCreateStep] = useState<number>(1);
-  
+
   // Step 1: Customer Details State
   const [custMode, setCustMode] = useState<'existing' | 'new' | 'walkin'>('existing');
   const [selectedCustId, setSelectedCustId] = useState<string>('');
@@ -2071,7 +2149,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
   const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
   const [currentServiceNotes, setCurrentServiceNotes] = useState<string>('');
-  
+
   // Staged Services queue for multi-service sequence bookings
   interface StagedService {
     id: string;
@@ -2168,7 +2246,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [cartTab, setCartTab] = useState<'products' | 'giftcards'>('products');
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  
+
   // Cart items sequence
   interface CartItem {
     id: string;
@@ -2182,17 +2260,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     sender?: string;
   }
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  
+
   // Gift Card generator
   const [gcSender, setGcSender] = useState('');
   const [gcRecipient, setGcRecipient] = useState('');
   const [gcValue, setGcValue] = useState<number>(500);
   const [generatedGcCode, setGeneratedGcCode] = useState(() => `REF-GFT-2026-${Math.floor(1000 + Math.random() * 9000)}`);
-  
+
   // POS Checkout customer association
   const [posCustMode, setPosCustMode] = useState<'walkin' | 'existing'>('walkin');
   const [posSelectedCustId, setPosSelectedCustId] = useState('');
-  
+
   // POS Split checkout state
   const [posSplitActive, setPosSplitActive] = useState(false);
   const [posSplitAmounts, setPosSplitAmounts] = useState({ card: 0, cash: 0, wallet: 0, bank: 0 });
@@ -2334,19 +2412,29 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     });
   }, [onQuickAction]);
 
-  // Conversions for layout
-  const SLOT_HEIGHT = 100; // 100px per hour
+  // Keep one authoritative physical hour scale and let slot resolution only subdivide it.
+  const SLOT_MINUTES = 5;
+  const PIXELS_PER_HOUR = 100;
+  const SLOT_HEIGHT = (PIXELS_PER_HOUR * SLOT_MINUTES) / 60;
+  const SLOT_HEIGHT_FOR_GRID = SLOT_HEIGHT;
   const START_HOUR = schedulerConfig.startHour;
   const END_HOUR = schedulerConfig.endHour;
-  const SLOT_MINUTES = schedulerConfig.slotMinutes;
+  const BOARD_END_HOUR = Math.min(24, Math.max(
+    END_HOUR,
+    Math.ceil(((boardStartHour * 60) + appointments.reduce((latestEnd: number, appointment: Appointment) => (
+      appointment.type === 'appointment'
+        ? Math.max(latestEnd, Number(appointment.startTime || 0) + Number(appointment.duration || 0))
+        : latestEnd
+    ), 0)) / 60)
+ ));
   const TOTAL_HOURS = Math.max(1, END_HOUR - START_HOUR);
 
   const minutesToTop = (mins: number) => {
-    return (mins / 60) * SLOT_HEIGHT;
+    return (mins / 60) * PIXELS_PER_HOUR;
   };
 
   const minutesToHeight = (duration: number) => {
-    return (duration / 60) * SLOT_HEIGHT;
+    return (duration / 60) * PIXELS_PER_HOUR;
   };
 
   const TOTAL_STAFF_LANES = 4;
@@ -2387,7 +2475,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return null;
     }
 
-    return ((currentMinutes - visibleStart) / 60) * SLOT_HEIGHT;
+    return ((currentMinutes - visibleStart) / 60) * PIXELS_PER_HOUR;
   };
 
   const handleDayShift = (days: number) => {
@@ -2421,10 +2509,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   const handleMouseMove = (e: MouseEvent) => {
     if (!dragState) return;
-    
+
     const deltaY = e.clientY - dragState.startMouseY;
-    // Each 1 hour is SLOT_HEIGHT (100px). So deltaMinutes = (deltaY / 100) * 60
-    const deltaMinutes = Math.round(((deltaY / SLOT_HEIGHT) * 60) / SLOT_MINUTES) * SLOT_MINUTES;
+    // Use the physical hour scale, then snap to the current slot resolution.
+    const deltaMinutes = Math.round(((deltaY / PIXELS_PER_HOUR) * 60) / SLOT_MINUTES) * SLOT_MINUTES;
 
     if (dragState.isResizing) {
       // Handle resizing duration
@@ -2499,7 +2587,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   }, []);
 
   // Quick action from Context Menu
-  const triggerContextAction = async (actionType: 'new' | 'block' | 'shift' | 'break' | 'paste' | 'refresh' | 'giftcards' | 'products') => {
+  const triggerContextAction = async (actionType: 'new' | 'block' | 'shift' | 'break' | 'paste' | 'refresh' | 'giftcards' | 'products' | 'packages') => {
     const isMutationAction = ['new', 'block', 'shift', 'break', 'paste', 'giftcards', 'products'].includes(actionType);
     if (!isBoardEditable && isMutationAction) {
       addLocalToast(
@@ -2575,6 +2663,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       }
       setInitialCartTab('products');
       setIsCartDrawerOpen(true);
+    } else if (actionType === 'packages') {
+      onQuickAction({ type: 'navigate', viewId: 'packages' });
     } else if (actionType === 'shift') {
       if (contextMenu) {
         setSelectedShiftStaffId(contextMenu.staffId);
@@ -2614,7 +2704,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setRefundSubmitting(false);
     setAppointmentDetailsReadOnly(Boolean(options.readOnly) || !isBoardEditable);
     setIsCustomerProfileOpen(false);
-    setCustomerTransactionsExpanded(false);
     setCustomerTransactionDetail(null);
     setCustomerProfile(null);
     setCustomerHistoryData(null);
@@ -2630,7 +2719,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setAppointmentDetailsReadOnly(true);
     setDrawerOpen(false);
     setIsCustomerProfileOpen(false);
-    setCustomerTransactionsExpanded(false);
     setCustomerTransactionDetail(null);
     setCustomerProfile(null);
     setCustomerHistoryData(null);
@@ -2747,7 +2835,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setDrawerTab('overview');
     setAppointmentDetailsReadOnly(true);
     setIsCustomerProfileOpen(false);
-    setCustomerTransactionsExpanded(false);
     setCustomerDrawerTab('overview');
     setCustomerTransactionDetail(null);
     setCustomerProfileError(null);
@@ -2876,7 +2963,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       );
       return;
     }
-    
+
     // Calculate appointment discount for receipt
     const _rawPrice = Number(activeAppointment?.rawPrice || 0);
     const _finalPrice = Number(activeAppointment?.price || 0);
@@ -2918,10 +3005,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 ? 'card_pos'
                 : paymentMethod === 'bank'
                   ? 'bank_transfer'
+              : paymentMethod === 'gift'
+                ? 'gift_card_code'
               : paymentMethod,
-            amount: Number(amount)
+            amount: Number(amount),
+            ...(paymentMethod === 'gift' ? { giftCardCode: giftCardCodeInput } : {})
           }))
-      : undefined;
+      : selectedPaymentMethod === 'gift_card_code'
+        ? [{ paymentMethod: 'gift_card_code', amount: total, giftCardCode: giftCardCodeInput }]
+        : undefined;
     const selectedMethodOption = paymentMethodOptions.find((option) => option.value === paymentMethodApi);
     let paymentMethodSummary = selectedMethodOption
       ? (isRtl ? selectedMethodOption.labelAr : selectedMethodOption.labelEn)
@@ -2931,6 +3023,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       if (splitAmounts.card > 0) parts.push(`${isRtl ? 'بطاقة عند المركز' : 'Card POS'}: ${splitAmounts.card} ${t.riyal}`);
       if (splitAmounts.cash > 0) parts.push(`${isRtl ? 'كاش' : 'Cash'}: ${splitAmounts.cash} ${t.riyal}`);
       if (splitAmounts.wallet > 0) parts.push(`${isRtl ? 'المحفظة' : 'Wallet'}: ${splitAmounts.wallet} ${t.riyal}`);
+      if (splitAmounts.gift > 0) parts.push(`${isRtl ? 'بطاقة هدية' : 'Gift Card'}: ${splitAmounts.gift} ${t.riyal}`);
       if (parts.length === 0 && paymentMethodSummary) {
         parts.push(paymentMethodSummary);
       }
@@ -2995,7 +3088,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
       const receipt = {
         orderId: `REF-APT-${activeAppointment.id.substring(0, 8).toUpperCase()}`,
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        date: (() => {
+          const tzParts = getDatePartsInTimeZone(new Date(), tenantTimezone);
+          return `${tzParts.year}-${tzParts.month}-${tzParts.day} ${tzParts.hour}:${tzParts.minute}`;
+        })(),
         customerName: isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn,
         serviceName: isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn,
         servicePrice: serviceSubtotal,
@@ -3009,7 +3105,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
       setCheckoutReceiptData(receipt);
       setShowReceiptModal(true);
-      
+
       addLocalToast(
         'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',
         'Session invoice settled and customer checked out successfully! 🧾',
@@ -3068,8 +3164,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
-    const finalNotes = cancellationReason 
-      ? `${activeAppointment.notes || ''}\n[Cancellation Reason]: ${cancellationReason}` 
+    const finalNotes = cancellationReason
+      ? `${activeAppointment.notes || ''}\n[Cancellation Reason]: ${cancellationReason}`
       : activeAppointment.notes;
 
     setStatusUpdating(true);
@@ -3119,49 +3215,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setCustomerProfileRefreshToken(token => token + 1);
       } catch (bgErr) {
         console.error("[STATUS BACKGROUND REFRESH FAILED]", bgErr);
-      }
-    }
-  };
-
-  const handleAddWalletBalance = async () => {
-    const amount = parseFloat(simulatedWalletTopUp);
-    if (!isNaN(amount) && amount > 0 && activeAppointment) {
-      if (appointmentDetailsReadOnly) {
-        addLocalToast(
-          isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-          isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-          'info'
-        );
-        return;
-      }
-      try {
-        if (!activeAppointment.customerId) {
-          throw new Error('Missing customer id for wallet top-up');
-        }
-
-        const response = await tenantApiAdapter.topUpCustomerWallet(activeAppointment.customerId, {
-          amount,
-          appointmentId: activeAppointment.id,
-          note: 'Appointment drawer wallet recharge'
-        });
-        const nextBalance = Number(response?.walletBalance ?? response?.newBalance ?? response?.customer?.walletBalance ?? activeAppointment.walletBalance ?? 0);
-        setSimulatedWalletTopUp('');
-        setActiveAppointment(prev => prev ? { ...prev, walletBalance: nextBalance } : null);
-        setCustomerProfile(prev => prev ? { ...prev, walletBalance: nextBalance } : prev);
-        setCustomerProfileRefreshToken(token => token + 1);
-        await loadBoardData();
-        addLocalToast(
-          `تم شحن محفظة العميل بقيمة ${amount} ر.س بنجاح!`,
-          `Successfully recharged customer wallet with ${amount} SAR!`,
-          'success'
-        );
-      } catch (err) {
-        console.error('Customer wallet top-up failed', err);
-        addLocalToast(
-          isRtl ? 'تعذر شحن المحفظة.' : 'Unable to recharge the wallet.',
-          isRtl ? 'Unable to recharge the wallet.' : 'تعذر شحن المحفظة.',
-          'warning'
-        );
       }
     }
   };
@@ -3231,7 +3284,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const handleSearchDate = async (dateStr: string) => {
     if (!chainConflictDialog || !chainConflictDialog.payloadItems) return;
     const { layers } = await fetchAvailabilityLayers(chainConflictDialog.payloadItems, dateStr);
-    const validChains = calculateAllValidChains(layers);
+    const durations = chainConflictDialog.payloadItems.map((item, idx) => {
+      const layerSlots = layers[idx];
+      const sampleSlot = layerSlots?.find((s: any) => s.available) || layerSlots?.[0];
+      return sampleSlot
+          ? (new Date(sampleSlot.endTime).getTime() - new Date(sampleSlot.startTime).getTime()) / 60000
+          : Number(item.duration || 60);
+    });
+    const validChains = calculateAllValidChains(layers, durations);
     setChainConflictDialog(prev => prev ? { ...prev, selectedDate: dateStr, validChains } : null);
     setChainConflictView('time-selection');
   };
@@ -3358,23 +3418,64 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         return;
       }
 
-      const payloadItems = finalStaged.map((item) => {
+      const payloadItems: any[] = [];
+      const groupedPackages = new Map<string, any>();
+
+      finalStaged.forEach((item) => {
         const resolvedServiceId = `${item.serviceId || ''}`.trim();
         const srv = liveServices.find((s) => s.id === resolvedServiceId);
         const requestStartIso = item.startTimeIso || buildIsoFromMinutes(getSelectedDateKey(), item.startTime);
-        return {
-          serviceId: resolvedServiceId,
-          staffId: item.staffId,
-          requestedStaffId: item.staffId,
-          startTime: requestStartIso,
-          notes: item.notes || sessionNotes || null,
-          paymentMethod: 'at-center',
-          assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
-          duration: item.duration || srv?.duration || 60,
-          discountType: item.discountType,
-          discountValue: item.discountValue,
-          serviceName: isRtl ? (srv?.nameAr || srv?.name || '') : (srv?.nameEn || srv?.name || '')
-        };
+        const packageId = (item as any).packageId;
+
+        if (packageId) {
+          if (!groupedPackages.has(packageId)) {
+            groupedPackages.set(packageId, {
+              itemType: 'package',
+              packageId,
+              packageItems: [],
+              notes: []
+            });
+          }
+          const pkgGroup = groupedPackages.get(packageId);
+          if (item.notes || sessionNotes) pkgGroup.notes.push(item.notes || sessionNotes);
+
+          pkgGroup.packageItems.push({
+            serviceId: resolvedServiceId,
+            staffId: item.staffId,
+            requestedStaffId: item.staffId,
+            startTime: requestStartIso,
+            duration: item.duration || srv?.duration || 60,
+            assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
+            packageItemId: (item as any).packageItemId || undefined,
+            overtimeApproval: allowExtendedHours
+              && (boardStartHour * 60) + item.startTime + Number(item.duration || srv?.duration || 0) > normalClosingMinutes
+              ? { approved: true }
+              : undefined
+          });
+        } else {
+          payloadItems.push({
+            serviceId: resolvedServiceId,
+            staffId: item.staffId,
+            requestedStaffId: item.staffId,
+            startTime: requestStartIso,
+            notes: item.notes || sessionNotes || null,
+            paymentMethod: 'at-center',
+            assignmentMode: item.staffId ? 'tenant_reassigned' : 'auto_assigned',
+            duration: item.duration || srv?.duration || 60,
+            discountType: item.discountType,
+            discountValue: item.discountValue,
+            overtimeApproval: allowExtendedHours
+              && (boardStartHour * 60) + item.startTime + Number(item.duration || srv?.duration || 0) > normalClosingMinutes
+              ? { approved: true }
+              : undefined,
+            serviceName: isRtl ? (srv?.nameAr || srv?.name || '') : (srv?.nameEn || srv?.name || '')
+          });
+        }
+      });
+
+      groupedPackages.forEach((pkgGroup) => {
+        pkgGroup.notes = pkgGroup.notes.join(' | ') || undefined;
+        payloadItems.push(pkgGroup);
       });
 
       const resolvedPrimaryServiceId = `${payloadItems[0]?.serviceId || currentServiceId || ''}`.trim();
@@ -3414,6 +3515,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
           const response = await tenantApiAdapter.createAppointment({
             items: itemsToSubmit,
+            overtimeApproval: allowExtendedHours ? { approved: true } : undefined,
             staffId: itemsToSubmit[0]?.staffId || currentStaffId,
             startTime: itemsToSubmit[0]?.startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime),
             notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
@@ -3523,9 +3625,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   : buildIsoFromMinutes(getSelectedDateKey(), Number(item.startTime || earliestStartTime));
               const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
               const reqTimeMs = new Date(requestStartIso).getTime();
-              
+
               const exactSlot = layerSlots.find((s: any) => new Date(s.startTime).getTime() === reqTimeMs);
-              
+
               const staff = liveStylists.find(s => s.id === item.requestedStaffId) || liveStylists.find(s => s.id === exactSlot?.staffId);
               const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : 'المختص';
               const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
@@ -3649,7 +3751,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         }
       };
 
-      if (payloadItems.length > 1) {
+      if (payloadItems.length > 1 && !allowExtendedHours) {
         await preflightMultiServiceChain(payloadItems, false);
       } else {
         await executeFinalSubmission(payloadItems);
@@ -3730,7 +3832,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     setCartItems(prev => {
       const exists = prev.find(item => item.id === prod.id);
       if (exists) {
-        return prev.map(item => 
+        return prev.map(item =>
           item.id === prod.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       } else {
@@ -3841,7 +3943,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       setCartItems(prev => prev.filter(item => item.id !== id));
       return;
     }
-    setCartItems(prev => prev.map(item => 
+    setCartItems(prev => prev.map(item =>
       item.id === id ? { ...item, quantity: newQty } : item
     ));
   };
@@ -3936,7 +4038,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
       setCompletedOrder({
         orderId: orderId,
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        date: (() => {
+          const tzParts = getDatePartsInTimeZone(new Date(), tenantTimezone);
+          return `${tzParts.year}-${tzParts.month}-${tzParts.day} ${tzParts.hour}:${tzParts.minute}`;
+        })(),
         customerName: buyerName,
         items: [...cartItems],
         subtotal,
@@ -4035,60 +4140,72 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   }, [serviceCategoryFilter, serviceCategoryOptions]);
 
   // Filters application
-  const filteredAppointments = appointments.filter(apt => {
-    const boardVisibleStaffIds = isEmployeeBoardMode(viewMode)
-      ? (focusedEmployeeId ? [focusedEmployeeId] : [])
-      : resolvedVisibleEmployeeIds;
-    const customerNameEn = String(apt.customerNameEn || '');
-    const customerNameAr = String(apt.customerNameAr || '');
-    const serviceNameEn = String(apt.serviceNameEn || '');
-    const serviceNameAr = String(apt.serviceNameAr || '');
-    const matchesStaff = boardVisibleStaffIds.length === 0 || boardVisibleStaffIds.includes(apt.staffId);
-    const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
-    const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
-      const matchesSearch = searchQuery === '' || 
-      customerNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customerNameAr.includes(searchQuery) ||
-      serviceNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      serviceNameAr.includes(searchQuery) ||
-      `${apt.customerPhone || ''}`.includes(searchQuery) ||
-      `${apt.id || ''}`.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter(apt => {
+      const boardVisibleStaffIds = isEmployeeBoardMode(viewMode)
+        ? (focusedEmployeeId ? [focusedEmployeeId] : [])
+        : resolvedVisibleEmployeeIds;
+      const customerNameEn = String(apt.customerNameEn || '');
+      const customerNameAr = String(apt.customerNameAr || '');
+      const serviceNameEn = String(apt.serviceNameEn || '');
+      const serviceNameAr = String(apt.serviceNameAr || '');
+      const matchesStaff = boardVisibleStaffIds.length === 0 || boardVisibleStaffIds.includes(apt.staffId);
+      const matchesStatus = statusFilter === 'all' || apt.status === statusFilter;
+      const matchesCategory = serviceCategoryFilter === 'all' || apt.type === 'blocked' || apt.serviceCategory === serviceCategoryFilter;
+      const matchesSearch = searchQuery === '' ||
+        customerNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        customerNameAr.includes(searchQuery) ||
+        serviceNameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        serviceNameAr.includes(searchQuery) ||
+        `${apt.customerPhone || ''}`.includes(searchQuery) ||
+        `${apt.id || ''}`.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const dateStr = apt.date || getSelectedDateKey();
-    let matchesDate = false;
-    
-    if (isDayBoardMode(viewMode)) {
-      matchesDate = dateStr === getSelectedDateKey();
-    } else if (isWeekBoardMode(viewMode)) {
-      const activeBlock = getDaysOfActiveWeek(selectedDate);
-      matchesDate = activeBlock.includes(dateStr);
-    } else if (isMonthBoardMode(viewMode)) {
-      const currentMonth = selectedDate.getMonth();
-      const currentYear = selectedDate.getFullYear();
-      const dateValue = parseLocalDateKey(dateStr);
-      matchesDate = dateValue.getFullYear() === currentYear && dateValue.getMonth() === currentMonth;
-    } else {
-      // Agenda view shows all appointments starting from selected date
-      const targetDateStr = getSelectedDateKey();
-      matchesDate = dateStr >= targetDateStr;
-    }
+      const dateStr = apt.date || getSelectedDateKey();
+      let matchesDate = false;
 
-    return matchesStaff && matchesStatus && matchesCategory && matchesSearch && matchesDate;
-  });
+      if (isDayBoardMode(viewMode)) {
+        matchesDate = dateStr === getSelectedDateKey();
+      } else if (isWeekBoardMode(viewMode)) {
+        const activeBlock = getDaysOfActiveWeek(selectedDate);
+        matchesDate = activeBlock.includes(dateStr);
+      } else if (isMonthBoardMode(viewMode)) {
+        const currentMonth = selectedDate.getMonth();
+        const currentYear = selectedDate.getFullYear();
+        const dateValue = parseLocalDateKey(dateStr);
+        matchesDate = dateValue.getFullYear() === currentYear && dateValue.getMonth() === currentMonth;
+      } else {
+        // Agenda view shows all appointments starting from selected date
+        const targetDateStr = getSelectedDateKey();
+        matchesDate = dateStr >= targetDateStr;
+      }
 
-  // Calculate coordinates of the dragged element's ghost card
-  const draggedApt = draggedAptId ? appointments.find(a => a.id === draggedAptId) : null;
-  const schedulerAppointments = filteredAppointments.filter((appointment) => {
-    if (appointment.kind !== 'blocked') {
-      return true;
-    }
+      return matchesStaff && matchesStatus && matchesCategory && matchesSearch && matchesDate;
+    });
+  }, [
+    appointments,
+    viewMode,
+    focusedEmployeeId,
+    resolvedVisibleEmployeeIds,
+    statusFilter,
+    serviceCategoryFilter,
+    searchQuery,
+    selectedDateKey,
+    selectedDate,
+  ]);
 
-    if (activeSchedulerSettings.showLunchBreaks) {
-      return true;
-    }
+  const schedulerAppointments = useMemo(() => {
+    return filteredAppointments.filter((appointment) => {
+      if (appointment.kind !== 'blocked') {
+        return true;
+      }
 
-    return `${appointment.blockedType || ''}`.trim().toLowerCase() !== 'lunch';
-  });
+      if (activeSchedulerSettings.showLunchBreaks) {
+        return true;
+      }
+
+      return `${appointment.blockedType || ''}`.trim().toLowerCase() !== 'lunch';
+    });
+  }, [filteredAppointments, activeSchedulerSettings.showLunchBreaks]);
   const monthCalendarDays = useMemo(() => getMonthCalendarDays(selectedDate), [selectedDate]);
   const appointmentsByDate = useMemo(() => {
     const grouped = new Map<string, Appointment[]>();
@@ -4101,86 +4218,127 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     return grouped;
   }, [filteredAppointments]);
 
-  const schedulerColumns: SchedulerColumn[] = isDayBoardMode(viewMode)
-    ? liveStylists
-        .filter((stylist) => {
-          if (focusedEmployeeId) {
-            return stylist.id === focusedEmployeeId;
-          }
+  const schedulerColumns: SchedulerColumn[] = useMemo(() => {
+    return isDayBoardMode(viewMode)
+      ? liveStylists
+          .filter((stylist) => {
+            if (focusedEmployeeId) {
+              return stylist.id === focusedEmployeeId;
+            }
 
-          const selectedTeamCount = visibleEmployeeIds.length > 0 ? visibleEmployeeIds.length : liveStylists.length;
-          if (selectedTeamCount === liveStylists.length) {
-            return true;
-          }
+            const selectedTeamCount = visibleEmployeeIds.length > 0 ? visibleEmployeeIds.length : liveStylists.length;
+            if (selectedTeamCount === liveStylists.length) {
+              return true;
+            }
 
-          return visibleEmployeeIds.includes(stylist.id);
-        })
-        .map((stylist) => ({
-          id: getSchedulerColumnId(viewMode, stylist.id),
-          kind: 'employee',
-          resourceId: stylist.id,
-          title: String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim() || stylist.nameEn || stylist.nameAr || stylist.id || '—',
-          subtitle: `${isRtl ? stylist.roleAr : stylist.roleEn}${stylistStatuses[stylist.id] ? ` • ${stylistStatuses[stylist.id]}` : ''}`,
-          avatar: stylist.avatar,
-          statusLabel: stylistStatuses[stylist.id]
-            ? (stylistStatuses[stylist.id] === 'active' ? (isRtl ? 'نشط' : 'Active') : stylistStatuses[stylist.id] === 'break' ? (isRtl ? 'استراحة' : 'Break') : (isRtl ? 'خارج' : 'Off'))
-            : undefined,
-          statusTone: stylistStatuses[stylist.id] || 'neutral',
-          isToday: false,
-        }))
-    : getDaysOfActiveWeek(selectedDate).map((dayStr) => {
-        const dateValue = parseLocalDateKey(dayStr);
-        const dayName = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
-        const dateLabel = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
-        const isTodayDate = getLocalDateKey(new Date()) === dayStr;
-        return {
-          id: getSchedulerColumnId(viewMode, dayStr),
-          kind: 'day',
-          resourceId: dayStr,
-          title: `${dayName}`,
-          subtitle: dateLabel,
-          statusLabel: isTodayDate ? (isRtl ? 'اليوم' : 'Today') : undefined,
-          statusTone: isTodayDate ? 'today' : 'neutral',
-          dateKey: dayStr,
-          isToday: isTodayDate,
-        };
-      });
+            return visibleEmployeeIds.includes(stylist.id);
+          })
+          .map((stylist) => {
+            let availability: 'available' | 'break' | 'unavailable' = 'unavailable';
+            const currentMinutes = boardCurrentTime.getHours() * 60 + boardCurrentTime.getMinutes();
 
-  const schedulerEvents: SchedulerEvent[] = schedulerAppointments.map((apt) => {
-    const staff = liveStylists.find((stylist) => stylist.id === apt.staffId);
-    const columnId = getSchedulerColumnId(viewMode, isDayBoardMode(viewMode) ? apt.staffId : (apt.date || getSelectedDateKey()));
-    const title = isRtl ? apt.customerNameAr : apt.customerNameEn;
-    const subtitle = isRtl ? apt.serviceNameAr : apt.serviceNameEn;
+            const isCurrentlyOnBreak = appointments.some(appt =>
+              appt.staffId === stylist.id &&
+              (appt.type === 'blocked' || appt.kind === 'blocked' || appt.tags?.includes('Blocked') || appt.serviceNameEn === 'Staff Break') &&
+              currentMinutes >= (appt.startTime + (boardStartHour * 60)) &&
+              currentMinutes < (appt.startTime + (boardStartHour * 60) + appt.duration)
+            );
 
-    return {
-      id: apt.id,
-      appointmentId: apt.appointmentId || apt.id,
-      columnId,
-      dateKey: apt.date || getSelectedDateKey(),
-      startMinutes: Math.max(0, apt.startTime),
-      durationMinutes: Math.max(5, apt.duration),
-      title,
-      subtitle,
-      variantLabel: isRtl ? (apt.serviceVariantDescription || apt.serviceVariantName || '') : (apt.serviceVariantName || apt.serviceVariantDescription || ''),
-      variantDescription: apt.serviceVariantDescription || apt.serviceVariantName || '',
-      notes: apt.notes,
-      price: apt.price,
-      paymentStatus: apt.paymentStatus,
-      status: apt.status,
-      kind: apt.type || 'appointment',
-      blockedType: apt.blockedType,
-      isGroupBooking: apt.isGroupBooking,
-      guestCount: apt.guestCount,
-      hasNotes: apt.hasNotes,
-      avatar: apt.avatar || undefined,
-      staffAvatar: apt.staffAvatar || staff?.avatar,
-      assignedStaffName: apt.assignedStaffName || staff?.nameEn || staff?.name || '',
-      assignedStaffRole: staff ? (isRtl ? staff.roleAr : staff.roleEn) : '',
-      role: isRtl ? staff?.roleAr : staff?.roleEn,
-      raw: apt,
-      isPackage: Boolean(apt.packageId || apt.packageSnapshot),
-    };
-  });
+            if (isCurrentlyOnBreak) {
+              availability = 'break';
+            } else if (stylist.schedule && stylist.schedule.length > 0) {
+              const currentBoardDate = parseLocalDateKey(selectedDateKey);
+              const DAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              const dayOfWeekStr = DAYS_EN[currentBoardDate.getDay()];
+
+              const daySchedule = stylist.schedule.find((s: any) => s.dayEn === dayOfWeekStr);
+              if (daySchedule && daySchedule.status === 'working' && daySchedule.subShifts && daySchedule.subShifts.length > 0) {
+                const isWorking = daySchedule.subShifts.some((shift: any) => {
+                  const [startH, startM] = (shift.startTime || '00:00').split(':').map(Number);
+                  const [endH, endM] = (shift.endTime || '00:00').split(':').map(Number);
+                  const shiftStart = startH * 60 + startM;
+                  const shiftEnd = endH * 60 + endM;
+                  return currentMinutes >= shiftStart && currentMinutes < shiftEnd;
+                });
+
+                if (isWorking) {
+                  availability = 'available';
+                }
+              }
+            }
+
+            return {
+              id: getSchedulerColumnId(viewMode, stylist.id),
+              kind: 'employee',
+              resourceId: stylist.id,
+              title: String(isRtl ? stylist.nameAr : stylist.nameEn || stylist.id || '').trim() || stylist.nameEn || stylist.nameAr || stylist.id || '—',
+              subtitle: isRtl ? stylist.roleAr : stylist.roleEn,
+              avatar: stylist.avatar,
+              statusIndicator: stylistStatuses[stylist.id] === 'active' ? 'available' : 'unavailable',
+              statusTone: 'neutral',
+              isToday: false,
+              availability,
+            };
+          })
+      : getDaysOfActiveWeek(selectedDate).map((dayStr) => {
+          const dateValue = parseLocalDateKey(dayStr);
+          const dayName = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
+          const dateLabel = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
+          const isTodayDate = getLocalDateKey(new Date()) === dayStr;
+          return {
+            id: getSchedulerColumnId(viewMode, dayStr),
+            kind: 'day',
+            resourceId: dayStr,
+            title: `${dayName}`,
+            subtitle: dateLabel,
+            statusLabel: isTodayDate ? (isRtl ? 'اليوم' : 'Today') : undefined,
+            statusTone: isTodayDate ? 'today' : 'neutral',
+            dateKey: dayStr,
+            isToday: isTodayDate,
+          };
+        });
+  }, [viewMode, liveStylists, focusedEmployeeId, visibleEmployeeIds, isRtl, stylistStatuses, selectedDate]);
+
+  const schedulerEvents: SchedulerEvent[] = useMemo(() => {
+    return schedulerAppointments.map((apt) => {
+      const staff = liveStylists.find((stylist) => stylist.id === apt.staffId);
+      const columnId = getSchedulerColumnId(viewMode, isDayBoardMode(viewMode) ? apt.staffId : (apt.date || getSelectedDateKey()));
+      const title = isRtl ? apt.customerNameAr : apt.customerNameEn;
+      const subtitle = isRtl ? apt.serviceNameAr : apt.serviceNameEn;
+
+      return {
+        id: apt.id,
+        appointmentId: apt.appointmentId || apt.id,
+        columnId,
+        dateKey: apt.date || getSelectedDateKey(),
+        // Real timeline coordinates only: never clamp/shift start before deriving end.
+        // Off-window clipping is handled independently by SchedulerGrid's own top/bottom math.
+        startMinutes: apt.startTime,
+        endMinutes: apt.startTime + (Number(apt.duration) || 0),
+        durationMinutes: (Number(apt.duration) || 0),
+        title,
+        subtitle,
+        variantLabel: isRtl ? (apt.serviceVariantDescription || apt.serviceVariantName || '') : (apt.serviceVariantName || apt.serviceVariantDescription || ''),
+        variantDescription: apt.serviceVariantDescription || apt.serviceVariantName || '',
+        notes: apt.notes,
+        price: apt.price,
+        paymentStatus: apt.paymentStatus,
+        status: apt.status,
+        kind: apt.type || 'appointment',
+        blockedType: apt.blockedType,
+        isGroupBooking: apt.isGroupBooking,
+        guestCount: apt.guestCount,
+        hasNotes: apt.hasNotes,
+        avatar: apt.avatar || undefined,
+        staffAvatar: apt.staffAvatar || staff?.avatar,
+        assignedStaffName: apt.assignedStaffName || staff?.nameEn || staff?.name || '',
+        assignedStaffRole: staff ? (isRtl ? staff.roleAr : staff.roleEn) : '',
+        role: isRtl ? staff?.roleAr : staff?.roleEn,
+        raw: apt,
+        isPackage: Boolean(apt.packageId || apt.packageSnapshot),
+      };
+    });
+  }, [schedulerAppointments, liveStylists, viewMode, isRtl, selectedDateKey]);
 
   const focusedEmployee = isEmployeeBoardMode(viewMode) && focusedEmployeeId
     ? liveStylists.find((stylist) => stylist.id === focusedEmployeeId) || null
@@ -4302,6 +4460,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     handleContextMenu(event, targetStaffId, slot.startMinutes, undefined, slot.dateKey);
   };
 
+
   const handleSchedulerSlotDrop = (slot: SchedulerSlot, draggedEventId: string) => {
     if (!isBoardEditable) {
       return;
@@ -4319,6 +4478,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const serviceName = isRtl ? movedAppointment.serviceNameAr : movedAppointment.serviceNameEn;
     const targetStaff = liveStylists.find((staff) => staff.id === targetStaffId);
     const sourceStaff = liveStylists.find((staff) => staff.id === movedAppointment.staffId);
+
     const canMove = canAssignServiceToStaff(movedAppointment.serviceId, targetStaffId);
 
     if (!canMove) {
@@ -4357,11 +4517,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
 
     try {
-      await tenantApiAdapter.reassignRescheduleAppointment(dragMoveDialog.appointmentId, {
+      const res = await tenantApiAdapter.reassignRescheduleAppointment(dragMoveDialog.appointmentId, {
         staffId: dragMoveDialog.targetStaffId,
         startTime: buildIsoFromMinutes(dragMoveDialog.targetDateKey, dragMoveDialog.targetStartMinutes),
         notifyCustomer: dragMoveDialog.notifyCustomer
       });
+
       setActiveAppointment((current) => current && current.id === movedAppointment.id
         ? {
             ...current,
@@ -4373,7 +4534,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         : current
       );
       setDragMoveDialog(null);
+
       await loadBoardData();
+
       emitBIReportRefresh({
         source: 'appointment-workspace',
         kind: 'appointment-moved',
@@ -4630,31 +4793,31 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       dir={isRtl ? 'rtl' : 'ltr'}
       style={workspaceHeight ? { height: `${workspaceHeight}px` } : undefined}
     >
-      
+
       {/* 1. COMPREHENSIVE CONTROL BAR & BOARD CONTROLS */}
       <div className={`relative z-50 flex-none rounded-t-2xl rounded-b-none border border-slate-200 border-b-0 bg-white p-4 shadow-sm space-y-3 ${isWorkspaceMaximized ? 'p-3' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          
+
           {/* Unified Tool controls: Prev, Next, Today, Date Picker, Day / Week, Refresh */}
           <div className="flex flex-wrap items-center gap-2">
-            
+
             {/* Day Shift Segment */}
             <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-              <button 
-                onClick={() => handleDayShift(-1)} 
+              <button
+                onClick={() => handleDayShift(-1)}
                 className="p-1 hover:bg-white rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
                 title="Previous Day"
               >
                 <ChevronLeft size={14} />
               </button>
-              <button 
+              <button
                 onClick={() => setSelectedDate(getRiyadhCalendarDate())}
                 className="px-2.5 py-1 font-bold text-xs hover:bg-white rounded-md text-slate-700 transition-all"
               >
                 {t.today}
               </button>
-              <button 
-                onClick={() => handleDayShift(1)} 
+              <button
+                onClick={() => handleDayShift(1)}
                 className="p-1 hover:bg-white rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
                 title="Next Day"
               >
@@ -4665,22 +4828,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             {/* Date Picker Input */}
             <div className="relative flex items-center bg-slate-100 rounded-lg border border-slate-200 p-1 px-2 text-xs font-bold text-slate-700">
               <CalendarIcon size={13} className="mr-1.5 ml-1.5 text-slate-500" />
-              <input 
-                type="date" 
-                value={getSelectedDateKey()} 
+              <input
+                type="date"
+                value={getSelectedDateKey()}
                 onChange={(e) => {
                   const parts = e.target.value.split('-');
                   if (parts.length === 3) {
                     setSelectedDate(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
                   }
                 }}
-                className="bg-transparent border-none outline-none text-xs font-bold font-sans cursor-pointer focus:ring-0 p-0.5" 
+                className="bg-transparent border-none outline-none text-xs font-bold font-sans cursor-pointer focus:ring-0 p-0.5"
               />
             </div>
 
             {/* Time Scope */}
             <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                <button 
+                <button
                 onClick={() => {
                   setViewMode(isEmployeeBoardMode(viewMode) ? 'employee-day' : 'team-day');
                 }}
@@ -4801,7 +4964,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             </div>
 
             {/* Refresh button with action */}
-            <button 
+            <button
               onClick={triggerRefresh}
               className="p-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center justify-center cursor-pointer"
               title="Refresh Schedule"
@@ -4875,8 +5038,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               key={cat.id}
               onClick={() => setServiceCategoryFilter(cat.id)}
               className={`py-1 px-3 border rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                serviceCategoryFilter === cat.id 
-                  ? 'bg-zinc-900 text-white border-zinc-950 scale-102 shadow-xs' 
+                serviceCategoryFilter === cat.id
+                  ? 'bg-zinc-900 text-white border-zinc-950 scale-102 shadow-xs'
                   : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
               }`}
             >
@@ -4894,10 +5057,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
       {/* 2. GRID WORKSPACE: LEFT CONTROLLER & CENTER BOARD */}
       <div className="flex min-h-0 flex-1 flex-col gap-4">
-        
+
         {/* LEFT COLUMN: CONTROLS & DATE NAVIGATOR (col-span-3) */}
         <div className="hidden lg:col-span-3 space-y-4">
-          
+
           {/* Quick Date Indicator Widget */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
             <div className="flex justify-between items-center">
@@ -4938,12 +5101,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 day.setDate(day.getDate() + offset);
                 const isSelected = offset === 0;
                 return (
-                  <button 
+                  <button
                     key={offset}
                     onClick={() => handleDayShift(offset)}
                     className={`p-1.5 rounded-lg text-[11px] font-bold transition-all flex flex-col items-center gap-0.5 ${
-                      isSelected 
-                        ? 'bg-zinc-900 text-white shadow-md scale-105' 
+                      isSelected
+                        ? 'bg-zinc-900 text-white shadow-md scale-105'
                         : 'hover:bg-slate-100 text-slate-500'
                     }`}
                   >
@@ -4972,7 +5135,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">{isRtl ? 'البحث عن حجز' : 'Search'}</label>
               <div className="relative">
                 <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400`} size={13} />
-                <input 
+                <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -5019,8 +5182,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     key={opt.id}
                     onClick={() => setStatusFilter(opt.id)}
                     className={`py-1.5 px-2 rounded-lg text-[10px] font-bold text-center border transition-all ${
-                      statusFilter === opt.id 
-                        ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                      statusFilter === opt.id
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
                         : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
@@ -5032,7 +5195,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
             {/* Clear filters trigger */}
             {(selectedStylistFilter !== 'all' || serviceCategoryFilter !== 'all' || statusFilter !== 'all' || searchQuery !== '') && (
-              <button 
+              <button
                 onClick={() => {
                   setSelectedStylistFilter('all');
                   setServiceCategoryFilter('all');
@@ -5052,7 +5215,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
         {/* CENTER COLUMN: INTERACTIVE SCHEDULER BOARD (col-span-9) */}
         <div className="min-h-0 flex flex-1 flex-col">
-          
+
           <div
             className="relative z-0 flex min-h-0 flex-col overflow-hidden rounded-b-2xl rounded-t-none border border-slate-200 border-t-0 bg-white shadow-sm"
             style={{
@@ -5060,7 +5223,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               minWidth: '100%'
             }}
           >
-            
+
             {/* Timeline Scheduler Navigation Bar */}
             <div className="p-3.5 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
               <div className="flex items-center gap-2">
@@ -5069,7 +5232,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   {isRtl ? 'مراقبة الصالون والسبا الحية' : 'LIVE SALON ROOM MONITOR'}
                 </span>
               </div>
-              
+
               {/* Layout strip helpers */}
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold text-slate-400 uppercase mr-2">{isRtl ? 'مستوى الدقة:' : 'Step Precision:'}</span>
@@ -5199,8 +5362,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <div>
                       <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{isRtl ? 'قائمة أجندة المواعيد النشطة والمستقبلية' : 'AGENDA OF ACTIVE & UPCOMING SESSIONS'}</h3>
                       <p className="text-[11px] text-slate-400 font-semibold mt-1">
-                        {isRtl 
-                          ? `تعرض الجلسات المجدولة ابتداءً من ${selectedDate.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}` 
+                        {isRtl
+                          ? `تعرض الجلسات المجدولة ابتداءً من ${selectedDate.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}`
                           : `Displaying scheduling matrix from ${selectedDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })} onwards.`}
                       </p>
                     </div>
@@ -5221,18 +5384,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <div className="space-y-3.5">
                       {filteredAppointments.map((apt) => {
                         const stylist = liveStylists.find(s => s.id === apt.staffId);
-                        const statusBadgeColor = 
+                        const statusBadgeColor =
                           apt.status === 'confirmed' ? 'bg-amber-100 text-amber-700 border-amber-200/60' :
                           apt.status === 'checked_in' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
                           apt.status === 'completed' ? 'bg-zinc-100 text-zinc-700 border-zinc-200' : 'bg-rose-100 text-rose-700 border-rose-200';
 
-                        const statusText = 
+                        const statusText =
                           apt.status === 'confirmed' ? t.confirmed :
                           apt.status === 'checked_in' ? t.arrived :
                           apt.status === 'completed' ? t.completed : (isRtl ? 'ملغي' : 'Cancelled');
 
                         return (
-                          <div 
+                          <div
                             key={apt.id}
                             className="flex flex-col lg:flex-row lg:items-center justify-between p-4 bg-slate-50/60 hover:bg-slate-50 border border-slate-200/80 hover:border-slate-300 rounded-xl hover:shadow-sm transition-all cursor-pointer gap-4"
                             onClick={() => openAppointmentDetails(apt)}
@@ -5290,7 +5453,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   {apt.paymentStatus === 'paid' ? t.paid : apt.paymentStatus === 'partial' ? t.partial : t.unpaid}
                                 </p>
                               </div>
-                              
+
                               <div className="flex items-center gap-2">
                                 <span className={`px-2 py-0.5 text-[9px] font-black border rounded-md shadow-2xs ${statusBadgeColor}`}>
                                   {statusText}
@@ -5317,10 +5480,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   events={schedulerEvents}
                   slotMinutes={SLOT_MINUTES}
                   startHour={START_HOUR}
-                  endHour={END_HOUR}
+                  endHour={BOARD_END_HOUR}
                   normalEndHour={schedulerConfig.normalEndHour}
                   timeColumnWidth={84}
-                  slotHeight={activeSchedulerSettings.timeSlotHeight}
+                  slotHeight={SLOT_HEIGHT_FOR_GRID}
                   staffColumnWidth={activeSchedulerSettings.staffColumnWidth}
                   showCurrentTimeIndicator={activeSchedulerSettings.showCurrentTimeIndicator}
                   showLunchBreaks={activeSchedulerSettings.showLunchBreaks}
@@ -5333,9 +5496,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   onSlotRangeSelect={handleSchedulerSlotRangeSelect}
                   onEventClick={handleSchedulerEventClick}
                   onEventContextMenu={handleSchedulerEventContextMenu}
-                  onEventDragStart={(eventItem) => setDraggedAptId(eventItem.id)}
+                  onEventDragStart={(eventItem) => {
+                  }}
                   onEventDragEnd={() => {
-                    setDraggedAptId(null);
                   }}
                   onEventResizeStart={(eventItem, mouseEvent) => {
                     if (isDayBoardMode(viewMode) && isBoardEditable && eventItem.kind !== 'blocked') {
@@ -5777,48 +5940,56 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       {/* 3. ABSOLUTE PORTAL POPUP CONTEXT MENU */}
       <AnimatePresence>
         {contextMenu && contextMenu.visible && (
-          <div 
+          <div
             className="fixed bg-zinc-950 text-white rounded-xl shadow-2xl border border-zinc-800 p-2 py-2.5 z-50 w-56 space-y-0.5 text-xs text-start"
             style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
           >
             <p className="text-[9px] text-zinc-500 font-black tracking-widest uppercase p-1.5 border-b border-zinc-800/80 mb-1">
               {isRtl ? 'أدوات التحكم السريعة' : 'QUICK BOARD CONTROLS'}
             </p>
-            
-            <button 
-              onClick={() => void triggerContextAction('new')} 
+
+            <button
+              onClick={() => void triggerContextAction('new')}
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <Plus size={13} className="text-amber-400" />
               <span>{isRtl ? 'إضافة حجز جديد' : 'Add New Appointment'}</span>
             </button>
-            
-            <button 
-              onClick={() => void triggerContextAction('giftcards')} 
+
+            <button
+              onClick={() => void triggerContextAction('giftcards')}
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <Gift size={13} className="text-pink-400" />
               <span>{isRtl ? 'بطاقات الهدايا' : 'Gift Cards'}</span>
             </button>
 
-            <button 
-              onClick={() => void triggerContextAction('products')} 
+            <button
+              onClick={() => void triggerContextAction('products')}
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <ShoppingBag size={13} className="text-teal-400" />
               <span>{isRtl ? 'المنتجات والمستحضرات' : 'Products'}</span>
             </button>
 
-            <button 
-              onClick={() => void triggerContextAction('block')} 
+            <button
+              onClick={() => void triggerContextAction('packages')}
+              className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
+            >
+              <ShoppingBag size={13} className="text-rose-400" />
+              <span>{isRtl ? 'الباقات' : 'Packages'}</span>
+            </button>
+
+            <button
+              onClick={() => void triggerContextAction('block')}
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <Lock size={13} className="text-neutral-400" />
               <span>{isRtl ? 'حظر فترة زمنية' : 'Add Blocked Time'}</span>
             </button>
 
-            <button 
-              onClick={() => void triggerContextAction('shift')} 
+            <button
+              onClick={() => void triggerContextAction('shift')}
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2"
             >
               <Scissors size={13} className="text-indigo-400" />
@@ -5826,8 +5997,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             </button>
 
             <div className="border-t border-zinc-800/60 my-1" />
-            <button 
-              onClick={() => void triggerContextAction('refresh')} 
+            <button
+              onClick={() => void triggerContextAction('refresh')}
               className="w-full text-start px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 font-semibold transition-all flex items-center gap-2 text-zinc-400"
             >
               <RefreshCw size={13} />
@@ -5841,9 +6012,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       <AnimatePresence>
         {drawerOpen && activeAppointment && (
           <div className="fixed inset-0 z-50 flex overflow-hidden">
-            
+
             {/* Backdrop slide dim background */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -5859,7 +6030,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-[88vw] bg-slate-50 border-${isRtl ? 'r' : 'l'} border-slate-200 shadow-2xl flex flex-col`}
             >
-              
+
               {/* STICKY COMMAND HEADER */}
               <header className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between z-10 shrink-0 shadow-xs h-16">
                 <div className="flex items-center gap-3">
@@ -5900,14 +6071,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         onChange={(event) => {
                           const nextStatus = event.target.value as Appointment['status'];
                           if (nextStatus === normalizeWorkspaceAppointmentStatus(activeAppointment.status)) return;
-                          
+
                           if (nextStatus === 'completed') {
                             if (activeAppointment.paymentStatus !== 'paid') {
                               setShowPaymentRequiredDialog(true);
                               return;
                             }
                           }
-                          
+
                           if (nextStatus === 'cancelled') {
                             setShowCancelReasonDialog(true);
                             return;
@@ -5944,7 +6115,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     </div>
                   </button>
                   <div className="h-5 w-px bg-slate-200 mx-1" />
-                  <button 
+                  <button
                     onClick={() => setDrawerOpen(false)}
                     className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
                   >
@@ -5955,11 +6126,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
               {/* OPERATIONS THREE-COLUMN WORKSPACE BODY */}
               <div className="flex-1 overflow-y-auto p-6 md:p-8 grid grid-cols-1 xl:grid-cols-12 gap-6">
-                
+
                 {/* COLUMN 1: STICKY CUSTOMER PROFILE & OPERATIONS SUMMARY (col-span-3) */}
                 <div className="xl:col-span-3">
                   <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 sticky top-4">
-                    
+
                     {/* Customer Info Card Header */}
                     <div className="text-center pb-4 border-b border-slate-100">
                       <div className="w-16 h-16 bg-amber-100 border border-amber-200 rounded-full flex items-center justify-center font-bold text-amber-700 text-xl mx-auto mb-2 select-none shadow-xs">
@@ -6037,7 +6208,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                 {/* COLUMN 2: TABS & ACTION MODULES (col-span-5) */}
                 <div className="xl:col-span-5 space-y-5">
-                  
+
                   {/* Sliding Tabs selector header */}
                   <div className="bg-white p-1 rounded-xl border border-slate-200/60 flex gap-1 shadow-2xs">
                     {[
@@ -6049,8 +6220,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         key={tab.id}
                         onClick={() => setDrawerTab(tab.id as any)}
                         className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
-                          drawerTab === tab.id 
-                            ? 'bg-zinc-900 text-white' 
+                          drawerTab === tab.id
+                            ? 'bg-zinc-900 text-white'
                             : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                         }`}
                       >
@@ -6062,7 +6233,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   {/* TAB 1: CORE OPERATIONS & WALLET INTERFACE */}
                   {drawerTab === 'overview' && (
                     <div className="space-y-5">
-                      
+
                       {/* Active service item banner */}
                       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
                         <div className="flex justify-between items-start">
@@ -6088,67 +6259,23 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                         {/* Interactive Rebook / Reschedule tool buttons */}
                         <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
-                          <button 
+                          <button
                             onClick={async () => {
-                              if (appointmentDetailsReadOnly) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-                              const serviceId = activeAppointment.serviceId;
-                              if (!serviceId) {
-                                addLocalToast(
-                                  isRtl ? 'تعذر تكرار الموعد لأن الخدمة الأصلية غير متاحة.' : 'Unable to duplicate appointment because the source service is missing.',
-                                  isRtl ? 'Unable to duplicate appointment because the source service is missing.' : 'تعذر تكرار الموعد لأن الخدمة الأصلية غير متاحة.',
-                                  'warning'
-                                );
-                                return;
-                              }
-
-                              const baseDate = activeAppointment.date || getSelectedDateKey();
-                              const duplicateStart = buildIsoFromMinutes(baseDate, activeAppointment.startTime + 120);
-                              try {
-                                const response = await tenantApiAdapter.createAppointment({
-                                  serviceId,
-                                  staffId: activeAppointment.staffId,
-                                  startTime: duplicateStart,
-                                  notes: activeAppointment.notes,
-                                  notifyCustomer: false,
-                                  assignmentMode: 'tenant_reassigned',
-                                  customer: activeAppointment.customerId ? null : undefined,
-                                  platformUserId: activeAppointment.customerId || undefined,
-                                  skipAdvanceValidation: shouldSkipAdvanceValidation(baseDate, activeAppointment.startTime + 120)
-                                });
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setCustomerProfileRefreshToken(token => token + 1);
-                                  addLocalToast(
-                                    isRtl ? 'تمت إضافة نسخة جديدة من الموعد بعد ساعتين.' : 'Duplicate appointment created two hours later.',
-                                    isRtl ? 'Duplicate appointment created two hours later.' : 'تمت إضافة نسخة جديدة من الموعد بعد ساعتين.',
-                                    'success'
-                                  );
-                                } else {
-                                  throw new Error(response?.message || 'Failed to duplicate appointment');
-                                }
-                              } catch (err: any) {
-                                console.error('Failed to duplicate appointment', err);
-                                addLocalToast(
-                                  isRtl ? 'تعذر إنشاء النسخة المكررة.' : 'Unable to create duplicate appointment.',
-                                  isRtl ? 'Unable to create duplicate appointment.' : 'تعذر إنشاء النسخة المكررة.',
-                                  'warning'
-                                );
-                              }
+                              if (!appointmentDetailsReadOnly) return;
+                              setAppointmentDetailsReadOnly(false);
+                              addLocalToast(
+                                isRtl ? 'الآن يمكنك إعادة جدولة هذا الموعد.' : 'You can now reschedule this appointment.',
+                                isRtl ? 'You can now reschedule this appointment.' : 'الآن يمكنك إعادة جدولة هذا الموعد.',
+                                'info'
+                              );
                             }}
                             className="py-2 border border-slate-200 hover:border-zinc-900 hover:bg-zinc-900 hover:text-white bg-white rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <Undo2 size={13} />
                             <span>{t.rebook}</span>
                           </button>
-                          
-                          <button 
+
+                          <button
                             onClick={async () => {
                               if (appointmentDetailsReadOnly) {
                                 addLocalToast(
@@ -6158,27 +6285,31 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                 );
                                 return;
                               }
-                              try {
-                                const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, 'cancelled', activeAppointment.notes);
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
-                                  setCustomerProfileRefreshToken(token => token + 1);
+                              if (activeAppointment.bookingSessionId) {
+                                setShowCancelScopeModal({ id: activeAppointment.id, notes: activeAppointment.notes, isLateCancel: false });
+                              } else {
+                                try {
+                                  const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, 'cancelled', activeAppointment.notes, 'single');
+                                  if (response?.success) {
+                                    await loadBoardData();
+                                    setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                                    setCustomerProfileRefreshToken(token => token + 1);
+                                    addLocalToast(
+                                      isRtl ? 'تم إلغاء الموعد وحفظ الحالة على الخادم.' : 'Appointment cancelled and synced to the server.',
+                                      isRtl ? 'Appointment cancelled and synced to the server.' : 'تم إلغاء الموعد وحفظ الحالة على الخادم.',
+                                      'success'
+                                    );
+                                  } else {
+                                    throw new Error(response?.message || 'Failed to cancel appointment');
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to cancel appointment', err);
                                   addLocalToast(
-                                    isRtl ? 'تم إلغاء الموعد وحفظ الحالة على الخادم.' : 'Appointment cancelled and synced to the server.',
-                                    isRtl ? 'Appointment cancelled and synced to the server.' : 'تم إلغاء الموعد وحفظ الحالة على الخادم.',
-                                    'success'
+                                    isRtl ? 'تعذر إلغاء الموعد.' : 'Unable to cancel appointment.',
+                                    isRtl ? 'Unable to cancel appointment.' : 'تعذر إلغاء الموعد.',
+                                    'warning'
                                   );
-                                } else {
-                                  throw new Error(response?.message || 'Failed to cancel appointment');
                                 }
-                              } catch (err) {
-                                console.error('Failed to cancel appointment', err);
-                                addLocalToast(
-                                  isRtl ? 'تعذر إلغاء الموعد.' : 'Unable to cancel appointment.',
-                                  isRtl ? 'Unable to cancel appointment.' : 'تعذر إلغاء الموعد.',
-                                  'warning'
-                                );
                               }
                             }}
                             className="py-2 border border-rose-200 hover:border-rose-500 hover:bg-rose-50 bg-white rounded-lg text-xs font-bold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
@@ -6187,48 +6318,56 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             <span>{isRtl ? 'إلغاء الموعد' : 'Cancel Booking'}</span>
                           </button>
 
-                          <button 
-                            onClick={async () => {
-                              if (appointmentDetailsReadOnly) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-                              try {
-                                const response = await tenantApiAdapter.updateAppointmentStatus(
-                                  activeAppointment.id,
-                                  'cancelled',
-                                  `${activeAppointment.notes || ''}${activeAppointment.notes ? ' | ' : ''}${isRtl ? 'إلغاء متأخر' : 'Late cancel'}`
-                                );
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
-                                  setCustomerProfileRefreshToken(token => token + 1);
+                          {SHOW_LATE_CANCEL_BUTTON && (
+                            <button
+                              onClick={async () => {
+                                if (appointmentDetailsReadOnly) {
                                   addLocalToast(
-                                    isRtl ? 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.' : 'Late cancel recorded and synced to the server.',
-                                    isRtl ? 'Late cancel recorded and synced to the server.' : 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.',
-                                    'success'
+                                    isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                    isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                    'info'
                                   );
-                                } else {
-                                  throw new Error(response?.message || 'Failed to mark late cancel');
+                                  return;
                                 }
-                              } catch (err) {
-                                console.error('Failed to mark late cancel', err);
-                                addLocalToast(
-                                  isRtl ? 'تعذر تسجيل الإلغاء المتأخر.' : 'Unable to mark late cancel.',
-                                  isRtl ? 'Unable to mark late cancel.' : 'تعذر تسجيل الإلغاء المتأخر.',
-                                  'warning'
-                                );
-                              }
-                            }}
-                            className="py-2 border border-amber-200 hover:border-amber-500 hover:bg-amber-50 bg-white rounded-lg text-xs font-bold text-amber-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <AlertTriangle size={13} />
-                            <span>{isRtl ? 'إلغاء متأخر' : 'Late Cancel'}</span>
-                          </button>
+                                const lateCancelNotes = `${activeAppointment.notes || ''}${activeAppointment.notes ? ' | ' : ''}${isRtl ? 'إلغاء متأخر' : 'Late cancel'}`;
+                                if (activeAppointment.bookingSessionId) {
+                                  setShowCancelScopeModal({ id: activeAppointment.id, notes: lateCancelNotes, isLateCancel: true });
+                                } else {
+                                  try {
+                                    const response = await tenantApiAdapter.updateAppointmentStatus(
+                                      activeAppointment.id,
+                                      'cancelled',
+                                      lateCancelNotes,
+                                      'single'
+                                    );
+                                    if (response?.success) {
+                                      await loadBoardData();
+                                      setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                                      setCustomerProfileRefreshToken(token => token + 1);
+                                      addLocalToast(
+                                        isRtl ? 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.' : 'Late cancel recorded and synced to the server.',
+                                        isRtl ? 'Late cancel recorded and synced to the server.' : 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.',
+                                        'success'
+                                      );
+                                    } else {
+                                      throw new Error(response?.message || 'Failed to mark late cancel');
+                                    }
+                                  } catch (err) {
+                                    console.error('Failed to mark late cancel', err);
+                                    addLocalToast(
+                                      isRtl ? 'تعذر تسجيل الإلغاء المتأخر.' : 'Unable to mark late cancel.',
+                                      isRtl ? 'Unable to mark late cancel.' : 'تعذر تسجيل الإلغاء المتأخر.',
+                                      'warning'
+                                    );
+                                  }
+                                }
+                              }}
+                              className="py-2 border border-amber-200 hover:border-amber-500 hover:bg-amber-50 bg-white rounded-lg text-xs font-bold text-amber-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <AlertTriangle size={13} />
+                              <span>{isRtl ? 'إلغاء متأخر' : 'Late Cancel'}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -6260,7 +6399,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       {guest.isFree ? (isRtl ? 'خدمة مجانية 🎁' : 'Complimentary 🎁') : `${srv?.price || 0} SAR`}
                                     </span>
                                   </div>
-                                  
+
                                   <div className="text-slate-600 text-[11px] space-y-1">
                                     <p className="font-medium">
                                       <span className="text-slate-400">{isRtl ? 'الخدمة المطلوبة: ' : 'Treatment: '}</span>
@@ -6286,268 +6425,203 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         </div>
                       )}
 
-                      {/* INTERACTIVE REASSIGN & RESCHEDULE WORKSPACE CONTROLS */}
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                          <span className="p-1.5 bg-amber-50 text-amber-600 rounded-md">
-                            <CalendarIcon size={14} />
-                          </span>
-                          <span className="text-xs font-black text-slate-800">{isRtl ? 'إعادة التعيين والجدولة الفورية' : 'REASSIGN & RESCHEDULE WORKSPACE'}</span>
-                        </div>
+{!TEMP_HIDE_REASSIGN_UI && (
+                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+                          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                            <span className="p-1.5 bg-amber-50 text-amber-600 rounded-md">
+                              <CalendarIcon size={14} />
+                            </span>
+                            <span className="text-xs font-black text-slate-800">{isRtl ? 'إعادة التعيين والجدولة الفورية' : 'REASSIGN & RESCHEDULE WORKSPACE'}</span>
+                          </div>
 
-                        {/* Dropdown for Reassignment */}
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
-                          <select
-                            value={activeAppointment.staffId || ''}
-                            disabled={appointmentDetailsReadOnly}
-                            onChange={async (e) => {
-                              if (appointmentDetailsReadOnly) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-                              const newStaffId = e.target.value;
-                              try {
-                                const response = await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, newStaffId);
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setActiveAppointment(prev => prev ? { ...prev, staffId: newStaffId } : null);
-                                  setCustomerProfileRefreshToken(token => token + 1);
-                                  addLocalToast(
-                                    'تمت إعادة تعيين أخصائية التجميل بنجاح!',
-                                    'Stylist successfully reassigned for this session!',
-                                    'success'
-                                  );
-                                } else {
-                                  throw new Error(response?.message || 'Failed to reassign stylist');
-                                }
-                              } catch (err) {
-                                console.error('Failed to reassign stylist', err);
-                                const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر إعادة تعيين الموظفة.' : 'Unable to reassign stylist.', isRtl ? 'Unable to reassign stylist.' : 'تعذر إعادة تعيين الموظفة.');
-                                addLocalToast(
-                                  toast.ar,
-                                  toast.en,
-                                  'warning'
-                                );
-                              }
-                            }}
-                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                          >
-                            {liveStylists.map(s => (
-                              <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Reschedule Time Selection */}
-                        <div className="grid grid-cols-2 gap-2">
+                          {/* Status Dropdown */}
                           <div className="space-y-1">
-                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
-                          <select
-                            value={activeAppointment.startTime || ''}
-                            disabled={appointmentDetailsReadOnly}
-                            onChange={async (e) => {
-                              if (appointmentDetailsReadOnly) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-                              const newTime = parseInt(e.target.value);
-                              try {
-                                const response = await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
-                                  staffId: activeAppointment.staffId,
-                                  startTime: buildIsoFromMinutes(activeAppointment.date || getSelectedDateKey(), newTime),
-                                  notifyCustomer: true
-                                });
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setActiveAppointment(prev => prev ? { ...prev, startTime: newTime } : null);
-                                  setCustomerProfileRefreshToken(token => token + 1);
-                                  addLocalToast(
-                                    'تم تغيير موعد البدء بنجاح!',
-                                    'Appointment start time successfully updated!',
-                                    'success'
-                                  );
-                                } else {
-                                  throw new Error(response?.message || 'Failed to reschedule appointment');
-                                }
-                              } catch (err) {
-                                console.error('Failed to reschedule appointment', err);
-                                const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر تعديل التوقيت.' : 'Unable to reschedule appointment.', isRtl ? 'Unable to reschedule appointment.' : 'تعذر تعديل التوقيت.');
-                                addLocalToast(
-                                  toast.ar,
-                                  toast.en,
-                                  'warning'
-                                );
-                              }
-                            }}
-                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                          >
-                              {Array.from({ length: TOTAL_HOURS * (60 / SLOT_MINUTES) }).map((_, idx) => {
-                                const totalMins = idx * SLOT_MINUTES;
-                                return (
-                                  <option key={idx} value={totalMins}>
-                                    {formatMinutesToTime(totalMins)}
-                                  </option>
-                                );
-                              })}
+                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'حالة الموعد' : 'Appointment Status'}</label>
+                            <select
+                              value={rescheduleForm?.status || ''}
+                              disabled={appointmentDetailsReadOnly}
+                              onChange={(e) => {
+                                if (appointmentDetailsReadOnly) return;
+                                setRescheduleForm(prev => prev ? { ...prev, status: e.target.value } : null);
+                              }}
+                              className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                            >
+                              <option value="pending">{isRtl ? 'قيد الانتظار' : 'Pending'}</option>
+                              <option value="confirmed">{isRtl ? 'مؤكد' : 'Confirmed'}</option>
+                              <option value="checked_in">{isRtl ? 'وصلت الزبونة' : 'Arrived / Checked In'}</option>
+                              <option value="in_service">{isRtl ? 'بدأت الجلسة' : 'In Service'}</option>
+                              <option value="completed">{isRtl ? 'مكتمل' : 'Completed'}</option>
+                              <option value="no_show">{isRtl ? 'عدم حضور' : 'No Show'}</option>
+                              <option value="cancelled">{isRtl ? 'ملغى' : 'Cancelled'}</option>
                             </select>
                           </div>
 
+                          {/* Dropdown for Reassignment */}
                           <div className="space-y-1">
-                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
-                          <input
-                              type="date"
-                              value={activeAppointment.date || getSelectedDateKey() || ''}
+                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
+                            <select
+                              value={rescheduleForm?.staffId || ''}
                               disabled={appointmentDetailsReadOnly}
-                              onChange={async (e) => {
-                                if (appointmentDetailsReadOnly) {
-                                  addLocalToast(
-                                    isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                    isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                    'info'
-                                  );
-                                  return;
-                                }
-                                const newDateStr = e.target.value;
-                                try {
-                                  const response = await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
-                                    staffId: activeAppointment.staffId,
-                                    startTime: buildIsoFromMinutes(newDateStr, activeAppointment.startTime),
-                                    notifyCustomer: true
-                                  });
-                                if (response?.success) {
-                                  await loadBoardData();
-                                  setActiveAppointment(prev => prev ? { ...prev, date: newDateStr } : null);
-                                  setCustomerProfileRefreshToken(token => token + 1);
-                                  addLocalToast(
-                                    'تم تحديث تاريخ الحجز بنجاح!',
-                                    'Booking session date successfully updated!',
-                                    'success'
-                                    );
-                                  } else {
-                                    throw new Error(response?.message || 'Failed to update booking date');
-                                  }
-                                } catch (err) {
-                                  console.error('Failed to update booking date', err);
-                                  const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر تحديث تاريخ الحجز.' : 'Unable to update booking date.', isRtl ? 'Unable to update booking date.' : 'تعذر تحديث تاريخ الحجز.');
-                                  addLocalToast(
-                                    toast.ar,
-                                    toast.en,
-                                    'warning'
-                                  );
-                                }
+                              onChange={(e) => {
+                                if (appointmentDetailsReadOnly) return;
+                                setRescheduleForm(prev => prev ? { ...prev, staffId: e.target.value } : null);
                               }}
                               className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Combined Action Reassign + Reschedule */}
-                        <button
-                          onClick={() => {
-                            if (appointmentDetailsReadOnly) {
-                              addLocalToast(
-                                isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                'info'
-                              );
-                              return;
-                            }
-                            addLocalToast(
-                              'تم حفظ الموعد بالتعديل الجديد، وجاري إرسال إشعار فوري للزبونة! 💬',
-                              'Session schedule updated. Dynamic operations push alert successfully dispatched! 💬',
-                              'success'
-                            );
-                          }}
-                          className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Sparkles size={13} className="text-amber-400" />
-                          <span>{isRtl ? 'حفظ وإرسال إشعار فوري 💬' : 'Commit Roster & Send Notification 💬'}</span>
-                        </button>
-                      </div>
-
-                      {/* CLIENT WALLET INTERACTIVE COMPONENT */}
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                        <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                          <div className="flex items-center gap-2">
-                            <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-md">
-                              <Wallet size={14} />
-                            </span>
-                            <span className="text-xs font-bold text-slate-800">{t.walletText}</span>
-                          </div>
-                          <span className="text-xs font-black text-emerald-600 font-mono">
-                            {activeAppointment.walletBalance || 0} {t.riyal}
-                          </span>
-                        </div>
-
-                        {/* Simulate Wallet Top-up */}
-                        <div className="space-y-2">
-                          <p className="text-[10px] text-slate-400 font-semibold uppercase">{isRtl ? 'شحن رصيد إضافي للمحفظة' : 'CREDIT / TOP-UP SIMULATOR'}</p>
-                          <div className="flex gap-1.5">
-                            <input
-                              type="number"
-                              value={simulatedWalletTopUp}
-                              disabled={appointmentDetailsReadOnly}
-                              onChange={(e) => setSimulatedWalletTopUp(e.target.value)}
-                              placeholder={isRtl ? 'المبلغ ر.س...' : 'Amount SAR...'}
-                              className={`flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-amber-500 ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : ''}`}
-                            />
-                            <button
-                              onClick={handleAddWalletBalance}
-                              disabled={appointmentDetailsReadOnly}
-                              className={`px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                             >
-                              {isRtl ? 'شحن فوري' : 'Top Up'}
-                            </button>
+                              {liveStylists.map(s => (
+                                <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
+                              ))}
+                            </select>
                           </div>
-                        </div>
-                      </div>
 
-                      {/* CLIENT ACTIVE TRANSACTION HISTORY */}
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{isRtl ? 'سجل العمليات المالية الأخيرة' : 'RECENT TRANSACTIONS'}</h4>
+                          {/* Reschedule Time Selection */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
+                              <select
+                                value={rescheduleForm?.startTime ?? ''}
+                                disabled={appointmentDetailsReadOnly}
+                                onChange={(e) => {
+                                  if (appointmentDetailsReadOnly) return;
+                                  setRescheduleForm(prev => prev ? { ...prev, startTime: parseInt(e.target.value) } : null);
+                                }}
+                                className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                              >
+                                {Array.from({ length: TOTAL_HOURS * (60 / SLOT_MINUTES) }).map((_, idx) => {
+                                  const totalMins = idx * SLOT_MINUTES;
+                                  return (
+                                    <option key={idx} value={totalMins}>
+                                      {formatMinutesToTime(totalMins)}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
+                              <input
+                                type="date"
+                                value={rescheduleForm?.date || ''}
+                                disabled={appointmentDetailsReadOnly}
+                                onChange={(e) => {
+                                  if (appointmentDetailsReadOnly) return;
+                                  setRescheduleForm(prev => prev ? { ...prev, date: e.target.value } : null);
+                                }}
+                                className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Combined Action Reassign + Reschedule */}
                           <button
-                            type="button"
-                            onClick={() => setCustomerTransactionsExpanded(prev => !prev)}
-                            className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700"
+                            onClick={async () => {
+                              if (appointmentDetailsReadOnly || !rescheduleForm || !activeAppointment) {
+                                addLocalToast(
+                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
+                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
+                                  'info'
+                                );
+                                return;
+                              }
+
+                              let statusChanged = false;
+                              let staffChanged = false;
+                              let timeChanged = false;
+                              let hasError = false;
+
+                              const originalStartTime = activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0;
+                              const originalDate = activeAppointment.date || getSelectedDateKey() || '';
+                              const isTimeChanged = rescheduleForm.startTime !== originalStartTime || rescheduleForm.date !== originalDate;
+                              const isStaffChanged = rescheduleForm.staffId !== activeAppointment.staffId;
+
+                              if (isTimeChanged || isStaffChanged) {
+                                try {
+                                  const evalResponse = await tenantApiAdapter.evaluateScheduling({
+                                    tenantId: activeAppointment.tenantId || activeAppointment.tenant_id,
+                                    serviceId: activeAppointment.serviceId,
+                                    staffId: rescheduleForm.staffId,
+                                    startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
+                                    duration: activeAppointment.duration || 60,
+                                    variantId: activeAppointment.variantId,
+                                    excludeAppointmentId: activeAppointment.id
+                                  });
+
+                                  if (!evalResponse?.success || !evalResponse?.decision?.valid) {
+                                    const errObj = { response: { data: { decision: evalResponse?.decision } } };
+                                    const toast = getSchedulingErrorToast(errObj, isRtl ? 'تعذر الحفظ بسبب تعارض في المواعيد.' : 'Cannot save due to a scheduling conflict.', isRtl ? 'Cannot save due to a scheduling conflict.' : 'تعذر الحفظ بسبب تعارض في المواعيد.');
+                                    addLocalToast(toast.ar, toast.en, 'warning');
+                                    return;
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to pre-validate reschedule', err);
+                                  const toast = getSchedulingErrorToast(err, isRtl ? 'فشل التحقق من الموعد.' : 'Failed to validate appointment.', isRtl ? 'Failed to validate appointment.' : 'فشل التحقق من الموعد.');
+                                  addLocalToast(toast.ar, toast.en, 'warning');
+                                  return;
+                                }
+                              }
+
+                              try {
+                                if (rescheduleForm.status !== (activeAppointment.status || 'booked')) {
+                                  await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, rescheduleForm.status);
+                                  statusChanged = true;
+                                }
+
+                                if (isStaffChanged) {
+                                  await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, rescheduleForm.staffId);
+                                  staffChanged = true;
+                                }
+
+                                if (isTimeChanged) {
+                                  await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
+                                    staffId: rescheduleForm.staffId,
+                                    startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
+                                    notifyCustomer: true
+                                  });
+                                  timeChanged = true;
+                                }
+                              } catch (err) {
+                                console.error('Failed to commit workspace changes', err);
+                                hasError = true;
+                                const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر إكمال التعديلات.' : 'Unable to complete changes.', isRtl ? 'Unable to complete changes.' : 'تعذر إكمال التعديلات.');
+                                addLocalToast(toast.ar, toast.en, 'warning');
+                              } finally {
+                                if (statusChanged || staffChanged || timeChanged) {
+                                  await loadBoardData();
+                                  setActiveAppointment(prev => prev ? {
+                                    ...prev,
+                                    status: statusChanged ? rescheduleForm.status : prev.status,
+                                    staffId: (staffChanged || timeChanged) ? rescheduleForm.staffId : prev.staffId,
+                                    startTime: timeChanged ? buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime) : prev.startTime,
+                                    startMinutes: timeChanged ? rescheduleForm.startTime : (prev.startMinutes ?? prev.startTime ?? 0),
+                                    date: timeChanged ? rescheduleForm.date : (prev.date || getSelectedDateKey() || '')
+                                  } : null);
+                                  setCustomerProfileRefreshToken(token => token + 1);
+
+                                  if (!hasError) {
+                                    addLocalToast(
+                                      'تم حفظ التعديلات وإرسال الإشعار للعميلة بنجاح! 💬',
+                                      'Workspace changes committed and notification sent successfully! 💬',
+                                      'success'
+                                    );
+                                  }
+                                } else if (!hasError) {
+                                  addLocalToast(
+                                    'لم يتم إجراء أي تعديلات للحفظ.',
+                                    'No changes to commit.',
+                                    'info'
+                                  );
+                                }
+                              }
+                            }}
+                            className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
-                            {isRtl ? 'عرض الكل' : 'View All'}
+                            <Sparkles size={13} className="text-amber-400" />
+                            <span>{isRtl ? 'حفظ وإرسال إشعار فوري 💬' : 'Commit Roster & Send Notification 💬'}</span>
                           </button>
                         </div>
-                        <div className="space-y-2">
-                          {customerRecentTransactions.length === 0 ? (
-                            <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 text-[10px] text-slate-500">
-                              {isRtl ? 'لا توجد عمليات مالية حديثة مسجلة.' : 'No recent financial activity found.'}
-                            </div>
-                          ) : customerRecentTransactions.slice(0, customerTransactionsExpanded ? customerRecentTransactions.length : 3).map((item: any, idx: number) => {
-                            const amount = Number(item.amount ?? item.totalAmount ?? item.value ?? item.price ?? 0);
-                            const label = item.invoiceNumber || item.orderNumber || item.type || item.method || item.paymentMethod || `TX-${idx + 1}`;
-                            const dateLabel = item.date || item.createdAt || item.time || '';
-                            return (
-                              <div key={`${label}-${idx}`} className="flex justify-between gap-2 text-xs p-2 bg-slate-50 rounded-lg">
-                                <div className="min-w-0">
-                                  <p className="font-bold text-slate-800 truncate">{label}</p>
-                                  <p className="text-[9px] text-slate-400 truncate">
-                                    {dateLabel ? new Date(dateLabel).toLocaleString(isRtl ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
-                                  </p>
-                                </div>
-                                <span className={`font-mono font-bold ${amount >= 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
-                                  {amount >= 0 ? '+' : '-'}{Math.abs(amount).toFixed(2)} {t.riyal}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      )}
+
 
                     </div>
                   )}
@@ -6598,7 +6672,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       {drawerTab === 'reviews' && (
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{t.reviewsText}</h4>
-                      
+
                       <div className="space-y-3.5">
                         {(() => {
                           const reviews = customerLiveReviews;
@@ -6721,7 +6795,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                           {isRtl ? 'تطبيق كوبون / بطاقة هدايا 🎁' : 'APPLY VOUCHER / GIFT CARD 🎁'}
                         </span>
-                        
+
                         <div className="flex gap-1.5">
                           <input
                             type="text"
@@ -6823,9 +6897,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                     {/* SPLIT PAYMENTS COMPONENT CONTAINER */}
                     {(() => {
-                      const isAlreadyFullyPaid = 
-                        activeAppointment.paymentStatus === 'paid' || 
-                        activeAppointment.paymentStatus === 'fully_paid' || 
+                      const isAlreadyFullyPaid =
+                        activeAppointment.paymentStatus === 'paid' ||
+                        activeAppointment.paymentStatus === 'fully_paid' ||
                         (activeInvoiceTotal > 0 && Math.max(0, activeInvoiceTotal - Number(activeAppointment.totalPaid ?? 0)) <= 0);
 
                       if (isAlreadyFullyPaid) {
@@ -6862,6 +6936,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             </option>
                           ))}
                         </select>
+                        {selectedPaymentMethod === 'gift_card_code' && !isSplitActive && (
+                          <div className="pt-2">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                              {isRtl ? 'رمز بطاقة الهدية' : 'Gift Card Code'}
+                            </label>
+                            <input
+                              type="text"
+                              value={giftCardCodeInput}
+                              onChange={(e) => setGiftCardCodeInput(e.target.value)}
+                              placeholder="XXXX-XXXX-XXXX"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 uppercase"
+                            />
+                          </div>
+                        )}
                         <p className="text-[10px] text-slate-400 leading-relaxed">
                           {isRtl
                             ? 'اختر طريقة الدفع قبل المتابعة.'
@@ -6871,7 +6959,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{t.splitPayments}</span>
-                        <button 
+                        <button
                           onClick={() => setIsSplitActive(!isSplitActive)}
                           className={`text-[10px] font-bold px-2 py-0.5 rounded transition-all flex items-center gap-1 cursor-pointer ${
                             isSplitActive ? 'bg-amber-500 text-zinc-950' : 'bg-slate-100 text-slate-600'
@@ -6886,7 +6974,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <div className="space-y-3 animate-fadeIn mt-2">
                           {(() => {
                             const totalDue = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
-                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0);
+                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0);
                             const remaining = Math.max(0, totalDue - splitSum);
                             const isSplitValid = totalDue > 0 && Math.abs(splitSum - totalDue) < 0.01;
                             const isSplitComplete = totalDue > 0 && remaining === 0 && isSplitValid;
@@ -6911,11 +6999,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-2 text-[10px]">
+                                <div className="grid grid-cols-4 gap-2 text-[10px]">
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Mada</label>
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         if (!splitAmounts.card && remaining > 0) {
                                           setSplitAmounts(prev => ({ ...prev, card: parseFloat((remaining + (prev.card || 0)).toFixed(2)) }));
@@ -6929,8 +7017,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   </div>
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Cash</label>
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         if (!splitAmounts.cash && remaining > 0) {
                                           setSplitAmounts(prev => ({ ...prev, cash: parseFloat((remaining + (prev.cash || 0)).toFixed(2)) }));
@@ -6944,8 +7032,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   </div>
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Wallet</label>
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       onClick={() => {
                                         if (!splitAmounts.wallet && remaining > 0) {
                                           setSplitAmounts(prev => ({ ...prev, wallet: parseFloat((remaining + (prev.wallet || 0)).toFixed(2)) }));
@@ -6957,7 +7045,36 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                     </button>
                                     <input type="number" placeholder="0" value={splitAmounts.wallet || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
                                   </div>
+                                  <div>
+                                    <label className="text-slate-400 block text-center mb-1">Gift</label>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!splitAmounts.gift && remaining > 0) {
+                                          setSplitAmounts(prev => ({ ...prev, gift: parseFloat((remaining + (prev.gift || 0)).toFixed(2)) }));
+                                        }
+                                      }}
+                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                    >
+                                      {isRtl ? '+ إضافة' : '+ Add'}
+                                    </button>
+                                    <input type="number" placeholder="0" value={splitAmounts.gift || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, gift: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
+                                  </div>
                                 </div>
+                                {splitAmounts.gift > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-slate-100">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                                      {isRtl ? 'رمز بطاقة الهدية' : 'Gift Card Code'}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={giftCardCodeInput}
+                                      onChange={(e) => setGiftCardCodeInput(e.target.value)}
+                                      placeholder="XXXX-XXXX-XXXX"
+                                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 uppercase"
+                                    />
+                                  </div>
+                                )}
                               </>
                             );
                           })()}
@@ -6973,13 +7090,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <div className="pt-3">
                         <button
                           disabled={
-                            isSplitActive 
-                              ? !(Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) > 0 && Math.max(0, Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) - ((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0))) === 0 && Math.abs(((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0)) - Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0))) < 0.01)
+                            isSplitActive
+                              ? !(Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) > 0 && Math.max(0, Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) - ((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0))) === 0 && Math.abs(((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0)) - Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0))) < 0.01)
                               : !selectedPaymentMethod.trim()
                           }
                           onClick={() => {
                             const totalDue = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
-                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0);
+                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0);
                             const remaining = Math.max(0, totalDue - splitSum);
                             const isSplitValid = totalDue > 0 && Math.abs(splitSum - totalDue) < 0.01;
                             const isSplitComplete = totalDue > 0 && remaining === 0 && isSplitValid;
@@ -7004,7 +7121,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             setShowPaymentConfirmModal(true);
                           }}
                           className={`w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold tracking-wider transition-all shadow-md flex items-center justify-center gap-2 ${
-                            (isSplitActive 
+                            (isSplitActive
                               ? (Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) > 0 && Math.max(0, Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) - ((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0))) === 0 && Math.abs(((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0)) - Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0))) < 0.01)
                               : selectedPaymentMethod.trim()) ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'
                           }`}
@@ -7064,7 +7181,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       className="absolute inset-0 bg-zinc-950/10"
                       onClick={() => {
                         setIsCustomerProfileOpen(false);
-                        setCustomerTransactionsExpanded(false);
                         setCustomerTransactionDetail(null);
                       }}
                     />
@@ -7084,7 +7200,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             type="button"
                             onClick={() => {
                               setIsCustomerProfileOpen(false);
-                              setCustomerTransactionsExpanded(false);
                               setCustomerTransactionDetail(null);
                             }}
                             className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all shrink-0 cursor-pointer"
@@ -7102,7 +7217,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           </div>
                         </div>
                         <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                          {isRtl ? 'يرتبط بالموعد الحالي' : 'Scoped to current appointment'}
+                          {isRtl ? 'ملف العميل الشامل' : 'Lifetime Customer Profile'}
                         </span>
                       </header>
 
@@ -7175,28 +7290,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                     },
                                     disabled: !activeCustomerPhone,
                                     tone: 'bg-slate-100 text-slate-700'
-                                  },
-                                  {
-                                    label: isRtl ? 'نسخ' : 'Copy',
-                                    action: async () => {
-                                      const payload = [
-                                        activeCustomerName,
-                                        activeCustomerPhone,
-                                        activeCustomerEmail,
-                                        activeAppointment?.id ? `Appointment: ${activeAppointment.id}` : ''
-                                      ].filter(Boolean).join(' | ');
-                                      if (navigator.clipboard?.writeText && payload) {
-                                        await navigator.clipboard.writeText(payload);
-                                      }
-                                    },
-                                    disabled: false,
-                                    tone: 'bg-slate-100 text-slate-700'
-                                  },
-                                  {
-                                    label: isRtl ? 'ملاحظات' : 'Notes',
-                                    action: () => setCustomerDrawerTab('notes'),
-                                    disabled: false,
-                                    tone: 'bg-slate-100 text-slate-700'
                                   }
                                 ].map((item, idx) => (
                                   <button
@@ -7212,52 +7305,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                               </div>
                             </section>
 
-                            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
-                              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                {isRtl ? 'مخزون المحفظة' : 'Wallet Summary'}
-                              </h4>
-                              <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                                <div className="rounded-xl bg-amber-50/70 border border-amber-100 p-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'الرصيد' : 'Wallet'}</p>
-                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{activeCustomerWallet.toFixed(2)} {t.riyal}</p>
-                                </div>
-                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'إجمالي الإنفاق' : 'Total Spent'}</p>
-                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{Number(customerProfile?.totalSpent || 0).toFixed(2)} {t.riyal}</p>
-                                </div>
-                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'المواعيد' : 'Appointments'}</p>
-                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{customerAppointmentHistory.length}</p>
-                                </div>
-                                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{isRtl ? 'المعاملات' : 'Transactions'}</p>
-                                  <p className="text-base font-black text-slate-800 mt-1 font-mono">{customerRecentTransactions.length}</p>
-                                </div>
-                              </div>
-                            </section>
 
-                            <section id="customer-notes-section" className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
-                              <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                  {isRtl ? 'الملاحظات الداخلية' : 'Internal Notes'}
-                                </h4>
-                                <button
-                                  type="button"
-                                  onClick={() => setCustomerDrawerTab('notes')}
-                                  className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-700"
-                                >
-                                  {isRtl ? 'فتح القسم' : 'Open section'}
-                                </button>
-                              </div>
-                              <div className="grid grid-cols-1 gap-2">
-                                {customerInternalNotes.map((note, idx) => (
-                                  <div key={`${note.label}-${idx}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{note.label}</p>
-                                    <p className="leading-relaxed">{note.value || '—'}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </section>
                           </div>
 
                           <div className="xl:col-span-7 space-y-4">
@@ -7269,7 +7317,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       {isRtl ? 'سجل التفاعل والنشاط' : 'Customer Interaction Workspace'}
                                     </h4>
                                     <p className="text-[10px] text-slate-400 mt-1">
-                                      {isRtl ? 'عرض سياقي مرتبط بالموعد الحالي فقط.' : 'Contextually scoped to the currently opened appointment.'}
+                                      {isRtl ? 'بيانات العميل التاريخية الشاملة.' : 'Lifetime customer intelligence and history.'}
                                     </p>
                                   </div>
                                   <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
@@ -7545,7 +7593,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                         </div>
                                         <button
                                           type="button"
-                                          onClick={() => setCustomerTransactionsExpanded(prev => !prev)}
                                           className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-700"
                                         >
                                           {isRtl ? 'عرض الكل' : 'View All'}
@@ -7799,7 +7846,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       </AnimatePresence>
 
       {/* Render modular advanced interactive creation & POS checkout drawers */}
-      <InteractiveDrawers 
+      <InteractiveDrawers
         isRtl={isRtl}
         tenantId={tenant?.id || ''}
         tenantTimezone={tenantTimezone}
@@ -7815,6 +7862,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setCurrentStartTime={setCurrentStartTime}
         preserveBoardStartTime={preserveBoardStartTime}
         boardStartHour={START_HOUR}
+        slotMinutes={SLOT_MINUTES}
         normalEndHour={schedulerConfig.normalEndHour}
         currentStaffId={currentStaffId}
         setCurrentStaffId={setCurrentStaffId}
@@ -7825,6 +7873,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         selectedDate={selectedDate}
         customers={liveCustomers}
         services={liveServices}
+        servicePackages={servicePackages}
         products={liveProducts}
         giftCardPackages={giftCardPackages}
         onBoardChanged={loadBoardData}
@@ -7882,7 +7931,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <h4 className="truncate text-sm font-extrabold text-slate-900">{card.staffName}</h4>
-                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${card.reasonType === 'existing_booking' ? 'bg-rose-50 text-rose-600' : card.reasonType === 'outside_working_hours' ? 'bg-amber-50 text-amber-700' : card.reasonType === 'time_off' ? 'bg-slate-100 text-slate-600' : card.reasonType === 'blocked_time' ? 'bg-orange-50 text-orange-700' : card.reasonType === 'staff_break' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{card.reasonTitle}</span>
+                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${getConflictBadgeClasses(card.reasonType)}`}>{card.reasonTitle}</span>
                             </div>
                             <p className="mt-2 text-sm leading-6 text-slate-600">{card.reasonDescription}</p>
                             {(card.conflictStartTime || card.conflictEndTime) && (
@@ -7911,7 +7960,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     >
                       {isRtl ? 'البحث عن موعد بديل' : 'Search for alternative time'}
                     </button>
-                    
+
                     <button
                       onClick={chainConflictDialog.onCancel}
                       className="w-full px-4 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
@@ -7925,7 +7974,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     >
                       {isRtl ? 'حجز الخدمات بشكل منفصل' : 'Book services separately'}
                     </button>
-                    
+
                     <button
                       onClick={chainConflictDialog.onCancel}
                       className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors mt-2"
@@ -7941,7 +7990,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   <p className="text-sm font-medium text-slate-800 mb-4">
                     {isRtl ? 'اختر اليوم الذي تريد البحث فيه' : 'Choose the day to search'}
                   </p>
-                  
+
                   <div className="flex flex-col gap-3">
                     <button
                       onClick={() => handleSearchDate(new Date().toISOString().split('T')[0])}
@@ -7968,7 +8017,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       {isRtl ? 'بعد غد' : 'Day after tomorrow'}
                     </button>
                     <div className="relative w-full">
-                      <input 
+                      <input
                         type="date"
                         className="w-full px-4 py-3 text-sm font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
                         onChange={(e) => {
@@ -7977,7 +8026,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       />
                     </div>
                   </div>
-                  
+
                   <button
                     onClick={() => setChainConflictView('explanation')}
                     className="w-full px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors mt-4"
@@ -7992,7 +8041,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   <p className="text-sm font-bold text-slate-800 mb-4">
                     {isRtl ? 'الأوقات المتاحة لبدء الحجز' : 'Available Start Times'}
                   </p>
-                  
+
                   {chainConflictDialog.validChains.length > 0 ? (
                     <div className="grid grid-cols-3 gap-2 mb-4">
                       {chainConflictDialog.validChains.map((chain, i) => {
@@ -8042,7 +8091,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   <p className="text-sm text-slate-600 mb-6">
                     {isRtl ? 'يمكن تنفيذ الخدمات بالتسلسل في الوقت الذي اخترته:' : 'The services can be executed sequentially at the time you chose:'}
                   </p>
-                  
+
                   <div className="space-y-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
                     {chainConflictDialog.selectedChain.slots.map((slot, index) => {
                       const srv = liveServices.find(s => s.id === slot.serviceId);
@@ -8051,7 +8100,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       const dEnd = new Date(slot.endTime);
                       const startMin = (dStart.getHours() * 60 + dStart.getMinutes()) - (START_HOUR * 60);
                       const endMin = (dEnd.getHours() * 60 + dEnd.getMinutes()) - (START_HOUR * 60);
-                      
+
                       return (
                         <div key={index} className="flex flex-col gap-1 text-sm border-b border-slate-100 pb-2 last:border-0 last:pb-0">
                           <div className="font-bold text-slate-800">{isRtl ? srv?.nameAr : srv?.nameEn}</div>
@@ -8208,12 +8257,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       </AnimatePresence>
 
       {/* Render Roster / Employee Weekly Schedule Editor Modal */}
-      <EmployeeWeeklyScheduleEditor 
+      <EmployeeWeeklyScheduleEditor
         isOpen={isShiftModalOpen}
         onClose={() => setIsShiftModalOpen(false)}
         isRtl={isRtl}
         staffId={selectedShiftStaffId}
-        staffName={isRtl 
+        staffName={isRtl
           ? (liveStylists.find(s => s.id === selectedShiftStaffId)?.nameAr || selectedShiftStaffId)
           : (liveStylists.find(s => s.id === selectedShiftStaffId)?.nameEn || selectedShiftStaffId)
         }
@@ -8225,9 +8274,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       <AnimatePresence>
         {showReceiptModal && checkoutReceiptData && (
           <div className="fixed inset-0 z-[60] bg-slate-900/85 backdrop-blur-xs flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-2xl p-5 w-80 font-mono text-xs border text-slate-800 space-y-3 shadow-2xl relative"
             >
@@ -8236,15 +8285,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <p className="text-[9px] text-zinc-400">Simplified VAT Tax Invoice</p>
                 <p className="text-[8px] text-zinc-400">VAT Registration: 31092813100003</p>
                 <div className="h-px border-b border-dashed my-1" />
-                
+
                 <div className="text-[9px] text-left space-y-0.5 text-slate-600">
                   <p>INV ID: {checkoutReceiptData.orderId}</p>
                   <p>DATE: {checkoutReceiptData.date}</p>
                   <p>BUYER: {checkoutReceiptData.customerName}</p>
                 </div>
-                
+
                 <div className="h-px border-b border-dashed my-1" />
-                
+
                 {/* Items List */}
                 <div className="space-y-1">
                   {/* Service Line */}
@@ -8252,7 +8301,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <span className="truncate flex-1 text-left">{checkoutReceiptData.serviceName}</span>
                     <span className="shrink-0">{checkoutReceiptData.servicePrice.toFixed(2)} SAR</span>
                   </div>
-                  
+
                   {/* Product Lines */}
                   {checkoutReceiptData.products.map((it: any) => (
                     <div key={it.id} className="flex justify-between text-[10px] text-slate-600 pl-2">
@@ -8261,9 +8310,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     </div>
                   ))}
                 </div>
-                
+
                 <div className="h-px border-b border-dashed my-1" />
-                
+
                 {/* Subtotals */}
                 <div className="space-y-0.5 text-[9px] text-left text-slate-600">
                   <div className="flex justify-between">
@@ -8285,9 +8334,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <span>{checkoutReceiptData.total.toFixed(2)} SAR</span>
                   </div>
                 </div>
-                
+
                 <div className="h-px border-b border-dashed my-1.5" />
-                
+
                 <p className="text-[8px] bg-zinc-950 text-white rounded p-0.5 font-bold tracking-wider">
                   PAID IN FULL - CHECKOUT COMPLETE
                 </p>
@@ -8298,22 +8347,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   شكراً لزيارتكم صالون رفاه الفاخر 🌸 Thank you
                 </p>
               </div>
-              
+
               <div className="flex gap-2 pt-1">
-                <button 
+                <button
                   type="button"
-                  onClick={() => { 
-                    addLocalToast('تمت محاكاة طباعة الفاتورة الضريبية الورقية الملكية لـ ZATCA!', 'Simulated royal paper ZATCA simplified invoice print successfully!', 'success'); 
-                    setShowReceiptModal(false); 
-                  }} 
+                  onClick={() => {
+                    addLocalToast('تمت محاكاة طباعة الفاتورة الضريبية الورقية الملكية لـ ZATCA!', 'Simulated royal paper ZATCA simplified invoice print successfully!', 'success');
+                    setShowReceiptModal(false);
+                  }}
                   className="flex-1 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   <Printer size={12} className="text-amber-400" />
                   <span>Print Receipt</span>
                 </button>
-                <button 
+                <button
                   type="button"
-                  onClick={() => setShowReceiptModal(false)} 
+                  onClick={() => setShowReceiptModal(false)}
                   className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600 cursor-pointer"
                 >
                   Close
@@ -8597,8 +8646,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 </h3>
               </div>
               <div className="text-[11px] text-slate-500 leading-relaxed font-semibold">
-                {isRtl 
-                  ? 'لا يمكن تغيير حالة هذا الموعد إلى مكتمل لعدم سداد القيمة الإجمالية بالكامل.' 
+                {isRtl
+                  ? 'لا يمكن تغيير حالة هذا الموعد إلى مكتمل لعدم سداد القيمة الإجمالية بالكامل.'
                   : 'This appointment cannot be marked as Completed because payment has not been fully collected.'}
                 <br />
                 {isRtl ? 'يرجى سداد الفاتورة أولاً.' : 'Please complete the payment first.'}
@@ -8683,6 +8732,106 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         )}
       </AnimatePresence>
 
+
+      {/* CANCEL SCOPE MODAL */}
+      <AnimatePresence>
+        {showCancelScopeModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs" onClick={() => setShowCancelScopeModal(null)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl"
+              dir={isRtl ? 'rtl' : 'ltr'}
+            >
+              <div className="bg-rose-50 p-6 flex flex-col items-center justify-center text-rose-600">
+                <Trash size={48} strokeWidth={1.5} className="mb-4" />
+                <h3 className="text-xl font-black">{isRtl ? 'إلغاء الموعد' : 'Cancel Booking'}</h3>
+                <p className="text-sm font-medium text-rose-600/70 mt-1 text-center">
+                  {isRtl
+                    ? 'هذا الموعد جزء من سلسلة مواعيد مرتبطة. هل ترغب في إلغاء هذه الخدمة فقط أم جميع الخدمات المرتبطة؟'
+                    : 'This appointment is part of a chained booking. Would you like to cancel only this service or all chain services?'}
+                </p>
+              </div>
+              <div className="p-6 space-y-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const reqData = showCancelScopeModal;
+                    setShowCancelScopeModal(null);
+                    try {
+                      const response = await tenantApiAdapter.updateAppointmentStatus(reqData.id, 'cancelled', reqData.notes, 'single');
+                      if (response?.success) {
+                        await loadBoardData();
+                        setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                        setCustomerProfileRefreshToken(token => token + 1);
+                        addLocalToast(
+                          isRtl ? 'تم إلغاء الخدمة المحددة.' : 'Selected service cancelled.',
+                          isRtl ? 'Selected service cancelled.' : 'تم إلغاء الخدمة المحددة.',
+                          'success'
+                        );
+                      } else {
+                        throw new Error(response?.message || 'Failed to cancel appointment');
+                      }
+                    } catch (err) {
+                      console.error('Failed to cancel appointment', err);
+                      addLocalToast(
+                        isRtl ? 'تعذر إلغاء الموعد.' : 'Unable to cancel appointment.',
+                        isRtl ? 'Unable to cancel appointment.' : 'تعذر إلغاء الموعد.',
+                        'warning'
+                      );
+                    }
+                  }}
+                  className="w-full rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-black text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition-all cursor-pointer"
+                >
+                  {isRtl ? 'إلغاء هذه الخدمة فقط' : 'Cancel only this service'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const reqData = showCancelScopeModal;
+                    setShowCancelScopeModal(null);
+                    try {
+                      const response = await tenantApiAdapter.updateAppointmentStatus(reqData.id, 'cancelled', reqData.notes, 'chain');
+                      if (response?.success) {
+                        await loadBoardData();
+                        setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
+                        setCustomerProfileRefreshToken(token => token + 1);
+                        addLocalToast(
+                          isRtl ? 'تم إلغاء جميع الخدمات المرتبطة.' : 'All chain services cancelled.',
+                          isRtl ? 'All chain services cancelled.' : 'تم إلغاء جميع الخدمات المرتبطة.',
+                          'success'
+                        );
+                      } else {
+                        throw new Error(response?.message || 'Failed to cancel appointments');
+                      }
+                    } catch (err) {
+                      console.error('Failed to cancel appointments', err);
+                      addLocalToast(
+                        isRtl ? 'تعذر إلغاء المواعيد.' : 'Unable to cancel appointments.',
+                        isRtl ? 'Unable to cancel appointments.' : 'تعذر إلغاء المواعيد.',
+                        'warning'
+                      );
+                    }
+                  }}
+                  className="w-full rounded-xl bg-rose-600 px-4 py-3 text-sm font-black text-white hover:bg-rose-700 transition-all cursor-pointer"
+                >
+                  {isRtl ? 'إلغاء جميع الخدمات المرتبطة' : 'Cancel all chain services'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCancelScopeModal(null)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 hover:bg-slate-50 transition-all cursor-pointer mt-4"
+                >
+                  {isRtl ? 'تراجع' : 'Back'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* SELF-CONTAINED LOCAL FLOATING TOASTS NOTIFICATION PORTAL */}
       <div className={`fixed bottom-6 z-50 flex flex-col gap-2 max-w-sm ${isRtl ? 'left-6' : 'right-6'}`}>
         <AnimatePresence>
@@ -8693,8 +8842,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, y: -10 }}
               className={`p-3 rounded-xl shadow-xl flex items-start gap-2 border backdrop-blur-md ${
-                toast.type === 'success' 
-                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-800' 
+                toast.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-800'
                   : toast.type === 'warning'
                     ? 'bg-rose-500/10 border-rose-500 text-rose-800'
                     : 'bg-amber-500/10 border-amber-500 text-amber-800'
@@ -8713,12 +8862,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       <AnimatePresence>
         {employeeMenuState && employeeMenuState.visible && (
           <>
-            <div 
+            <div
               className="fixed inset-0 z-[60]"
               onClick={(e) => { e.stopPropagation(); setEmployeeMenuState(null); }}
               onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setEmployeeMenuState(null); }}
             />
-            
+
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: -5 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -8740,7 +8889,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 {['view', 'appointments', 'availability', 'management', 'employee'].map((category) => {
                   const items = EMPLOYEE_ACTIONS_CONFIG.filter(a => a.category === category);
                   if (items.length === 0) return null;
-                  
+
                   return (
                     <div key={category} className="mb-2 last:mb-0">
                       {items.map(action => {
@@ -8787,3 +8936,5 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     </div>
   );
 }
+
+
