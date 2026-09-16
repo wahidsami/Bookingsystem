@@ -111,6 +111,8 @@ interface InteractiveDrawersProps {
   customers: any[];
   services: any[];
   servicePackages?: any[];
+  services2Bundles?: any[];
+  tenantCategories?: any[];
   products: any[];
   giftCardPackages?: GiftCardPackage[];
   stylists: any[];
@@ -370,6 +372,8 @@ export default function InteractiveDrawers({
   customers,
   services,
   servicePackages = [],
+  services2Bundles = [],
+  tenantCategories = [],
   products,
   giftCardPackages = [],
   stylists,
@@ -695,18 +699,36 @@ export default function InteractiveDrawers({
 
   const [expandedServiceIds, setExpandedServiceIds] = useState<Record<string, boolean>>({});
 
-  const canonicalServices = useMemo<ServiceRecord[]>(() => services.map((service) => normalizeServiceRecord(service)), [services]);
+  const canonicalServices = useMemo<ServiceRecord[]>(() => services.map((service) => ({
+    ...normalizeServiceRecord(service),
+    tenantServiceCategoryId: service.tenantServiceCategoryId || (service as any).tenant_service_category_id || null
+  })), [services]);
   const serviceCategories = useMemo(() => groupServicesByCategory(canonicalServices), [canonicalServices]);
   const serviceCategoryTabs = useMemo(() => {
-    return [
-      { key: 'all', labelAr: 'الكل', labelEn: 'All' },
-      ...serviceCategories.map((group) => ({
-        key: group.key,
-        labelAr: group.labelAr,
-        labelEn: group.labelEn
-      }))
+    const tabs = [
+      { key: 'all', labelAr: 'الكل', labelEn: 'All' }
     ];
-  }, [serviceCategories]);
+
+    (tenantCategories || []).forEach(cat => {
+      tabs.push({
+        key: cat.id,
+        labelAr: cat.name_ar || cat.nameAr || cat.name_en || 'فئة',
+        labelEn: cat.name_en || cat.nameEn || cat.name_ar || 'Category'
+      });
+    });
+
+    const hasUncategorizedServices = canonicalServices.some(s => !s.tenantServiceCategoryId);
+    const hasUncategorizedBundles = (services2Bundles || []).some(b => !b.tenantServiceCategoryId);
+    if (hasUncategorizedServices || hasUncategorizedBundles) {
+      tabs.push({
+        key: 'uncategorized',
+        labelAr: 'غير مصنف',
+        labelEn: 'Uncategorized'
+      });
+    }
+
+    return tabs;
+  }, [tenantCategories, canonicalServices, services2Bundles]);
 
   useEffect(() => {
     if (createStep === 4 && stagedServices.length === 0) {
@@ -1568,11 +1590,20 @@ export default function InteractiveDrawers({
   };
 
   const handleAddPackageToStaged = (pkgId: string) => {
-    const pkg = servicePackages?.find(p => p.id === pkgId);
+    const pkg = services2Bundles?.find(p => p.id === pkgId) || servicePackages?.find(p => p.id === pkgId);
     if (!pkg || !pkg.items || pkg.items.length === 0) {
       addLocalToast(
         `لم يتم العثور على خدمات في الباقة "${isRtl ? pkg?.name_ar : pkg?.name_en}".`,
         `The package "${isRtl ? pkg?.name_ar : pkg?.name_en}" contains no services.`,
+        'warning'
+      );
+      return;
+    }
+
+    if (pkg.scheduleType === 'parallel') {
+      addLocalToast(
+        isRtl ? 'عذراً، الباقات المتزامنة (Parallel) قيد التطوير وستتاح في مرحلة قادمة. يرجى اختيار باقة متتابعة.' : 'Parallel bundles are currently in development and will be available in an upcoming release. Please select a sequential bundle.',
+        isRtl ? 'Parallel bundles are currently in development and will be available in an upcoming release. Please select a sequential bundle.' : 'عذراً، الباقات المتزامنة (Parallel) قيد التطوير وستتاح في مرحلة قادمة. يرجى اختيار باقة متتابعة.',
         'warning'
       );
       return;
@@ -1609,9 +1640,7 @@ export default function InteractiveDrawers({
           staffId = ''; // default staff not assigned to this service
         }
 
-        const nextStartTimeIso = shouldChainServiceTimes && (prev.length > 0 || newItems.length > 0)
-          ? buildIsoFromMinutes(selectedDate, runningStartTime)
-          : buildIsoFromMinutes(selectedDate, runningStartTime);
+        const nextStartTimeIso = buildIsoFromMinutes(selectedDate, runningStartTime);
 
         newItems.push({
           id: `stg-pkg-${pkg.id}-${item.id}-${Date.now()}-${Math.random()}`,
@@ -3198,6 +3227,8 @@ export default function InteractiveDrawers({
                         forceExpandAll={bookingRecoveryMode !== 'chain'}
                         canonicalServices={canonicalServices}
                         servicePackages={servicePackages}
+                        services2Bundles={services2Bundles}
+                        tenantCategories={tenantCategories}
                         stagedServices={stagedServices as any[]}
                         availableStylists={availableStylists}
                         serviceCategoryTabs={serviceCategoryTabs}
@@ -3206,6 +3237,7 @@ export default function InteractiveDrawers({
                         serviceSearch={serviceSearch}
                         setServiceSearch={setServiceSearch}
                         onAddService={handleToggleServiceSelection}
+                        onAddBundle={handleAddPackageToStaged}
                         onAddPackage={handleAddPackageToStaged}
                         onUpdateService={handleUpdateStagedService}
                         onRemoveService={(index) => setStagedServices(prev => prev.filter((_, i) => i !== index))}
@@ -3273,7 +3305,7 @@ export default function InteractiveDrawers({
                           
                           const packageCartItems = Object.entries(pkgGroups).map(([instanceId, items]: [string, any[]]) => {
                              const pkgId = items[0].packageId;
-                             const pkg = servicePackages?.find(p => p.id === pkgId);
+                             const pkg = services2Bundles?.find(p => p.id === pkgId) || servicePackages?.find(p => p.id === pkgId);
                              const packagePrice = Number(pkg?.totalPrice ?? 0);
                              return {
                                id: instanceId,

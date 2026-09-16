@@ -525,6 +525,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [liveCustomers, setLiveCustomers] = useState<any[]>([]);
   const [liveProducts, setLiveProducts] = useState<any[]>([]);
   const [servicePackages, setServicePackages] = useState<any[]>([]);
+  const [services2Bundles, setServices2Bundles] = useState<any[]>([]);
+  const [tenantCategories, setTenantCategories] = useState<any[]>([]);
   const [giftCardPackages, setGiftCardPackages] = useState<GiftCardPackage[]>([]);
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -752,12 +754,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
-        const [empRes, srvRes, custRes, prodRes, pkgRes] = await Promise.all([
+        const [empRes, srvRes, custRes, prodRes, pkgRes, bundlesRes, categoriesRes] = await Promise.all([
           tenantApiAdapter.getEmployees(),
           tenantApiAdapter.getServices(),
           tenantApiAdapter.getCustomers({ limit: 1000 }),
           tenantApiAdapter.getProducts(),
-          tenantApiAdapter.getPackages()
+          tenantApiAdapter.getPackages(),
+          tenantApiAdapter.getServices2Bundles(),
+          tenantApiAdapter.getTenantServiceCategories()
         ]);
 
         const employees = (empRes?.employees || []).filter((emp: any) => `${emp?.status || ''}`.toLowerCase() !== 'off' && emp?.isActive !== false);
@@ -776,8 +780,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         const services = srvRes?.services || [];
         setLiveServices(services.map((s: any) => ({
           ...normalizeServiceRecord(s),
-          serviceId: s.id
+          serviceId: s.id,
+          tenantServiceCategoryId: s.tenantServiceCategoryId || null
         })));
+        setServices2Bundles(bundlesRes?.bundles || []);
+        setTenantCategories(categoriesRes?.categories || []);
 
         const customers = custRes?.customers || (custRes as any)?.data?.customers || [];
         setLiveCustomers(customers.map((c: any) => ({
@@ -7874,6 +7881,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         customers={liveCustomers}
         services={liveServices}
         servicePackages={servicePackages}
+        services2Bundles={services2Bundles}
+        tenantCategories={tenantCategories}
         products={liveProducts}
         giftCardPackages={giftCardPackages}
         onBoardChanged={loadBoardData}
