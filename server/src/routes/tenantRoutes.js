@@ -11,6 +11,8 @@ const tenantEmployeeController = require('../controllers/tenantEmployeeControlle
 const tenantProductController = require('../controllers/tenantProductController');
 const tenantServiceController = require('../controllers/tenantServiceController');
 const tenantPackageController = require('../controllers/tenantPackageController');
+const tenantServiceCategoryController = require('../controllers/tenantServiceCategoryController');
+const tenantBundleController = require('../controllers/tenantBundleController');
 const tenantAppointmentController = require('../controllers/tenantAppointmentController');
 const tenantFinancialController = require('../controllers/tenantFinancialController');
 const tenantCustomerController = require('../controllers/tenantCustomerController');
@@ -157,6 +159,30 @@ router.post(
 );
 router.put('/packages/:id', tenantPackageController.uploadImage, tenantPackageController.updatePackage);
 router.delete('/packages/:id', tenantPackageController.deletePackage);
+
+// Services 2: Tenant-owned Categories
+router.get('/services2/categories', tenantServiceCategoryController.getCategories);
+router.get('/services2/categories/:id', tenantServiceCategoryController.getCategory);
+router.post('/services2/categories', requireActiveSubscription, tenantServiceCategoryController.createCategory);
+router.put('/services2/categories/:id', tenantServiceCategoryController.updateCategory);
+router.delete('/services2/categories/:id', tenantServiceCategoryController.deleteCategory);
+
+// Services 2: Bundles (Persistent ServicePackage model)
+router.get('/services2/bundles', tenantBundleController.getBundles);
+router.get('/services2/bundles/:id', tenantBundleController.getBundle);
+router.post(
+    '/services2/bundles',
+    requireActiveSubscription,
+    tenantBundleController.uploadImage,
+    tenantBundleController.createBundle
+);
+router.put(
+    '/services2/bundles/:id',
+    requireActiveSubscription,
+    tenantBundleController.uploadImage,
+    tenantBundleController.updateBundle
+);
+router.delete('/services2/bundles/:id', tenantBundleController.deleteBundle);
 
 // Appointment management
 router.get('/appointments', tenantAppointmentController.getAppointments);

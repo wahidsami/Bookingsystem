@@ -36,19 +36,32 @@ exports.uploadImage = upload.single('image');
 
 exports.getPackages = async (req, res) => {
     try {
+        const where = {
+            tenantId: req.tenantId,
+            isActive: true
+        };
+
+        if (req.query.tenantServiceCategoryId) {
+            where.tenantServiceCategoryId = req.query.tenantServiceCategoryId;
+        }
+
         const packages = await ServicePackage.findAll({
-            where: {
-                tenantId: req.tenantId,
-                isActive: true
-            },
-            include: [{
-                model: ServicePackageItem,
-                as: 'items',
-                include: [
-                    { model: Service, as: 'service' },
-                    { model: Staff, as: 'defaultStaff' }
-                ]
-            }],
+            where,
+            include: [
+                {
+                    model: ServicePackageItem,
+                    as: 'items',
+                    include: [
+                        { model: Service, as: 'service' },
+                        { model: Staff, as: 'defaultStaff' }
+                    ]
+                },
+                {
+                    model: db.TenantServiceCategory,
+                    as: 'tenantCategory',
+                    attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
+                }
+            ],
             order: [['createdAt', 'DESC']]
         });
         
@@ -81,14 +94,21 @@ exports.getPackage = async (req, res) => {
                 tenantId: req.tenantId,
                 isActive: true
             },
-            include: [{
-                model: ServicePackageItem,
-                as: 'items',
-                include: [
-                    { model: Service, as: 'service' },
-                    { model: Staff, as: 'defaultStaff' }
-                ]
-            }]
+            include: [
+                {
+                    model: ServicePackageItem,
+                    as: 'items',
+                    include: [
+                        { model: Service, as: 'service' },
+                        { model: Staff, as: 'defaultStaff' }
+                    ]
+                },
+                {
+                    model: db.TenantServiceCategory,
+                    as: 'tenantCategory',
+                    attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
+                }
+            ]
         });
 
         if (!pkg) {
@@ -118,7 +138,7 @@ exports.getPackage = async (req, res) => {
 exports.createPackage = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
-        const { name_en, name_ar, items } = req.body;
+        const { name_en, name_ar, items, tenantServiceCategoryId, tenantCategoryId } = req.body;
         let image = req.body.image;
         if (req.file) {
             image = req.file.path.replace(/\\/g, '/').split('uploads/')[1];
@@ -130,6 +150,24 @@ exports.createPackage = async (req, res) => {
                 success: false,
                 message: 'Missing required fields: name_en, name_ar, or items'
             });
+        }
+
+        // Validate Services 2 tenant category if provided
+        let validTenantCategoryId = null;
+        const requestedTenantCatId = tenantServiceCategoryId || tenantCategoryId;
+        if (requestedTenantCatId) {
+            const categoryMatch = await db.TenantServiceCategory.findOne({
+                where: { id: requestedTenantCatId, tenantId: req.tenantId },
+                transaction
+            });
+            if (!categoryMatch) {
+                await transaction.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'The selected tenant service category does not exist or does not belong to your salon'
+                });
+            }
+            validTenantCategoryId = categoryMatch.id;
         }
 
         // Calculate totals based on the items provided
@@ -177,6 +215,7 @@ exports.createPackage = async (req, res) => {
 
         const pkg = await ServicePackage.create({
             tenantId: req.tenantId,
+            tenantServiceCategoryId: validTenantCategoryId,
             name_en,
             name_ar,
             image,
@@ -215,7 +254,7 @@ exports.updatePackage = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
         const packageId = req.params.id;
-        const { name_en, name_ar, image, items } = req.body;
+        const { name_en, name_ar, image, items, tenantServiceCategoryId, tenantCategoryId } = req.body;
 
         const pkg = await ServicePackage.findOne({
             where: {
@@ -231,6 +270,27 @@ exports.updatePackage = async (req, res) => {
                 success: false,
                 message: 'Package not found'
             });
+        }
+
+        // Validate Services 2 tenant category if provided
+        if (tenantServiceCategoryId !== undefined || tenantCategoryId !== undefined) {
+            const requestedTenantCatId = tenantServiceCategoryId !== undefined ? tenantServiceCategoryId : tenantCategoryId;
+            if (requestedTenantCatId) {
+                const categoryMatch = await db.TenantServiceCategory.findOne({
+                    where: { id: requestedTenantCatId, tenantId: req.tenantId },
+                    transaction
+                });
+                if (!categoryMatch) {
+                    await transaction.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: 'The selected tenant service category does not exist or does not belong to your salon'
+                    });
+                }
+                pkg.tenantServiceCategoryId = categoryMatch.id;
+            } else {
+                pkg.tenantServiceCategoryId = null;
+            }
         }
 
         // Update header

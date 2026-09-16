@@ -342,6 +342,10 @@ exports.getServices = async (req, res) => {
             where.category = category;
         }
 
+        if (req.query.tenantServiceCategoryId) {
+            where.tenantServiceCategoryId = req.query.tenantServiceCategoryId;
+        }
+
         if (search) {
             where[Op.or] = [
                 { name_en: { [Op.iLike]: `%${search}%` } },
@@ -363,6 +367,11 @@ exports.getServices = async (req, res) => {
                         attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     },
                     attributes: ['id', 'name', 'photo', 'isActive']
+                },
+                {
+                    model: db.TenantServiceCategory,
+                    as: 'tenantCategory',
+                    attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
                 }
             ],
             order: [['createdAt', 'DESC']]
@@ -407,6 +416,11 @@ exports.getService = async (req, res) => {
                         attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     },
                     attributes: ['id', 'name', 'photo', 'isActive']
+                },
+                {
+                    model: db.TenantServiceCategory,
+                    as: 'tenantCategory',
+                    attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
                 }
             ]
         });
@@ -455,6 +469,8 @@ exports.createService = async (req, res) => {
             priceType,
             targetGender,
             category,
+            tenantServiceCategoryId,
+            tenantCategoryId,
             duration,
             includes, // JSON string or array
             variants,
@@ -494,6 +510,24 @@ exports.createService = async (req, res) => {
                 success: false,
                 message: 'Valid final price is required'
             });
+        }
+
+        // Validate Services 2 tenant category if provided
+        let validTenantCategoryId = null;
+        const requestedTenantCatId = tenantServiceCategoryId || tenantCategoryId;
+        if (requestedTenantCatId) {
+            const categoryMatch = await db.TenantServiceCategory.findOne({
+                where: { id: requestedTenantCatId, tenantId },
+                transaction
+            });
+            if (!categoryMatch) {
+                await transaction.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'The selected tenant service category does not exist or does not belong to your salon'
+                });
+            }
+            validTenantCategoryId = categoryMatch.id;
         }
 
         // Get global settings for tax and commission rates (admin-controlled, ignore any tenant input)
@@ -579,6 +613,7 @@ exports.createService = async (req, res) => {
             priceType: priceTypeValue,
             targetGender: targetGenderValue,
             category: category || 'general',
+            tenantServiceCategoryId: validTenantCategoryId,
             duration: duration ? parseInt(duration) : 30,
             includes: includesArray,
             variants: variantsArray,
@@ -599,7 +634,7 @@ exports.createService = async (req, res) => {
             await db.ServiceEmployee.bulkCreate(buildServiceEmployeeRows(service.id, selectedEmployeeAssignments), { transaction });
         }
 
-        // Reload service with employees
+        // Reload service with employees and tenant category
         await service.reload({
             include: [
                 {
@@ -610,6 +645,11 @@ exports.createService = async (req, res) => {
                     through: {
                         attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     }
+                },
+                {
+                    model: db.TenantServiceCategory,
+                    as: 'tenantCategory',
+                    attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
                 }
             ],
             transaction
@@ -662,6 +702,8 @@ exports.updateService = async (req, res) => {
             priceType,
             targetGender,
             category,
+            tenantServiceCategoryId,
+            tenantCategoryId,
             duration,
             includes,
             variants,
@@ -789,6 +831,28 @@ exports.updateService = async (req, res) => {
         service.finalPrice = derivedFinalPrice; // Always recalculate
         if (targetGender !== undefined) service.targetGender = targetGenderValue;
         if (category !== undefined) service.category = category;
+
+        // Validate and update Services 2 tenant category if provided
+        if (tenantServiceCategoryId !== undefined || tenantCategoryId !== undefined) {
+            const requestedTenantCatId = tenantServiceCategoryId !== undefined ? tenantServiceCategoryId : tenantCategoryId;
+            if (requestedTenantCatId) {
+                const categoryMatch = await db.TenantServiceCategory.findOne({
+                    where: { id: requestedTenantCatId, tenantId },
+                    transaction
+                });
+                if (!categoryMatch) {
+                    await transaction.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: 'The selected tenant service category does not exist or does not belong to your salon'
+                    });
+                }
+                service.tenantServiceCategoryId = categoryMatch.id;
+            } else {
+                service.tenantServiceCategoryId = null;
+            }
+        }
+
         if (duration !== undefined) service.duration = parseInt(duration);
         service.includes = includesArray;
         if (variants !== undefined) service.variants = variantsArray;
@@ -836,7 +900,7 @@ exports.updateService = async (req, res) => {
             }
         }
 
-        // Reload service with employees
+        // Reload service with employees and tenant category
         await service.reload({
             include: [
                 {
@@ -847,6 +911,11 @@ exports.updateService = async (req, res) => {
                     through: {
                         attributes: ['commissionRate', 'commissionType', 'commissionValue', 'isPrimary', 'notes']
                     }
+                },
+                {
+                    model: db.TenantServiceCategory,
+                    as: 'tenantCategory',
+                    attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
                 }
             ],
             transaction

@@ -30,6 +30,12 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'serviceId',
                 as: 'appointments'
             });
+
+            // Services 2: Belongs to tenant-owned category
+            Service.belongsTo(models.TenantServiceCategory, {
+                foreignKey: 'tenantServiceCategoryId',
+                as: 'tenantCategory'
+            });
         }
 
         /**
@@ -92,6 +98,15 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false,
             defaultValue: 'general'
+        },
+        tenantServiceCategoryId: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            references: {
+                model: 'tenant_service_categories',
+                key: 'id'
+            },
+            comment: 'Services 2 tenant-owned category foreign key'
         },
         duration: {
             type: DataTypes.INTEGER, // in minutes

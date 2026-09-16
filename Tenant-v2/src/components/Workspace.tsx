@@ -20,6 +20,7 @@ import OperationsIntelligenceReport from './reports/OperationsIntelligenceReport
 import CustomersWorkspace from './CustomersWorkspace';
 import TeamsWorkspace from './TeamsWorkspace';
 import ServicesWorkspace from './ServicesWorkspace';
+import Services2Workspace from './Services2Workspace';
 import ProductsWorkspace from './ProductsWorkspace';
 import HotDealsWorkspace from './HotDealsWorkspace';
 import CustomerPushNotificationsWorkspace from './CustomerPushNotificationsWorkspace';
@@ -378,7 +379,7 @@ export default function Workspace({
 
 
 
-          {view === 'services' && (
+          {(view === 'services' || view === 'services2') && (
             <button
               onClick={() => onQuickAction('service')}
               className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs md:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
@@ -689,6 +690,11 @@ export default function Workspace({
       {/* 5. SERVICES */}
       {view === 'services' && (
         <ServicesWorkspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
+      )}
+
+      {/* 5B. SERVICES 2 */}
+      {view === 'services2' && (
+        <Services2Workspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
       )}
 
       {/* 6. PRODUCTS */}

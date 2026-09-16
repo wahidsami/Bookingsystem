@@ -1350,6 +1350,91 @@ class TenantApiAdapter {
     return this.delete(`/tenant/packages/${id}`);
   }
 
+  // --- Services 2: Tenant-Owned Categories ---
+  async getTenantServiceCategories(params?: { search?: string; isActive?: boolean }): Promise<{ success: boolean; categories: any[]; total: number }> {
+    const query = this.buildQueryString(params || {});
+    return this.get(`/tenant/services2/categories${query ? `?${query}` : ''}`);
+  }
+
+  async getTenantServiceCategory(id: string): Promise<{ success: boolean; category: any }> {
+    return this.get(`/tenant/services2/categories/${id}`);
+  }
+
+  async createTenantServiceCategory(data: {
+    name_en: string;
+    name_ar: string;
+    description_en?: string;
+    description_ar?: string;
+    slug?: string;
+    icon?: string;
+    sortOrder?: number;
+    isActive?: boolean;
+  }): Promise<{ success: boolean; message: string; category: any }> {
+    return this.post('/tenant/services2/categories', data);
+  }
+
+  async updateTenantServiceCategory(
+    id: string,
+    data: {
+      name_en?: string;
+      name_ar?: string;
+      description_en?: string;
+      description_ar?: string;
+      slug?: string;
+      icon?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    }
+  ): Promise<{ success: boolean; message: string; category: any }> {
+    return this.put(`/tenant/services2/categories/${id}`, data);
+  }
+
+  async deleteTenantServiceCategory(id: string): Promise<{ success: boolean; message: string }> {
+    return this.delete(`/tenant/services2/categories/${id}`);
+  }
+
+  // --- Services 2: Bundles ---
+  async getServices2Bundles(params?: { tenantServiceCategoryId?: string; search?: string }): Promise<{ success: boolean; bundles: any[] }> {
+    const query = this.buildQueryString(params || {});
+    return this.get(`/tenant/services2/bundles${query ? `?${query}` : ''}`);
+  }
+
+  async getServices2Bundle(id: string): Promise<{ success: boolean; bundle: any }> {
+    return this.get(`/tenant/services2/bundles/${id}`);
+  }
+
+  async createServices2Bundle(data: FormData | Record<string, any>): Promise<{ success: boolean; bundle: any; message?: string }> {
+    if (data instanceof FormData) {
+      const response = await this.fetchImpl(`${this.baseUrl}/tenant/services2/bundles`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
+    return this.post('/tenant/services2/bundles', data);
+  }
+
+  async updateServices2Bundle(id: string, data: FormData | Record<string, any>): Promise<{ success: boolean; bundle: any; message?: string }> {
+    if (data instanceof FormData) {
+      const response = await this.fetchImpl(`${this.baseUrl}/tenant/services2/bundles/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: data
+      });
+      return this.handleResponse(response);
+    }
+    return this.put(`/tenant/services2/bundles/${id}`, data);
+  }
+
+  async deleteServices2Bundle(id: string): Promise<{ success: boolean; message: string }> {
+    return this.delete(`/tenant/services2/bundles/${id}`);
+  }
+
   async getAppointmentsBoard(date: string, params?: Record<string, string | number | undefined>): Promise<any> {
     const query = this.buildQueryString({ date, ...(params || {}) });
     return this.get(`/tenant/appointments/board${query ? `?${query}` : ''}`);

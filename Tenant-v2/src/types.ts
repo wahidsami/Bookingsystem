@@ -15,6 +15,7 @@ export type ViewType =
   | 'customers'
   | 'employees'
   | 'services'
+  | 'services2'
   | 'packages'
   | 'products'
   | 'pos'

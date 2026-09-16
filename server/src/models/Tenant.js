@@ -500,5 +500,13 @@ module.exports = (sequelize, DataTypes) => {
         return await bcrypt.compare(candidatePassword, this.password);
     };
 
+    // Associations
+    Tenant.associate = (models) => {
+        Tenant.hasMany(models.TenantServiceCategory, {
+            foreignKey: 'tenantId',
+            as: 'serviceCategories'
+        });
+    };
+
     return Tenant;
 };
