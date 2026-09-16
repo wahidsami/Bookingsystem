@@ -1302,13 +1302,17 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                 src={resolveServiceImageUrl(item.image)}
                 alt={item.nameEn} 
                 className="w-full h-full object-cover" 
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fb = e.currentTarget.parentElement?.querySelector('.bundle-fallback-placeholder');
+                  if (fb) fb.classList.remove('hidden');
+                }}
               />
-            ) : (
-              <div className="flex flex-col items-center justify-center p-2 text-center">
-                <Package size={28} className="text-purple-600 mb-1" />
-                <span className="text-[9px] font-black text-purple-700 uppercase tracking-tighter">BUNDLE</span>
-              </div>
-            )}
+            ) : null}
+            <div className={`bundle-fallback-placeholder flex flex-col items-center justify-center p-2 text-center ${item.image ? 'hidden' : ''}`}>
+              <Package size={28} className="text-purple-600 mb-1" />
+              <span className="text-[9px] font-black text-purple-700 uppercase tracking-tighter">BUNDLE</span>
+            </div>
           </div>
 
           <div className="space-y-1.5 flex-1 min-w-0">

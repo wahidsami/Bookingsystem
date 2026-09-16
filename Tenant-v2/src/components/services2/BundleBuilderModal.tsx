@@ -513,7 +513,14 @@ export default function BundleBuilderModal({
               <div className="flex items-center gap-4">
                 {imagePreview ? (
                   <div className="relative w-20 h-20 rounded-2xl overflow-hidden border border-purple-200 shadow-xs group">
-                    <img src={imagePreview} alt="Bundle preview" className="w-full h-full object-cover" />
+                    <img
+                      src={imagePreview}
+                      alt="Bundle preview"
+                      className="w-full h-full object-cover"
+                      onError={() => {
+                        setImagePreview(null);
+                      }}
+                    />
                     <button
                       type="button"
                       onClick={handleRemoveImage}

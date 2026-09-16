@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Users, ChevronDown, Link2, Package } from 'lucide-react';
+import { Users, ChevronDown, Link2, Package, Zap } from 'lucide-react';
 import { getSchedulerEventBoxMetrics } from './schedulerGeometry';
 
 
@@ -1030,10 +1030,26 @@ export default function SchedulerGrid({
                       ) : (
                         <div className="flex min-w-0 flex-col gap-1 p-0.5 overflow-hidden">
                           <div className="flex items-center justify-between gap-2">
-                            <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
-                              {event.isPackage ? <Package size={10} className="inline mr-1 text-amber-600" /> : null}
-                              {event.title || 'Customer'}
-                            </p>
+                            <div className="flex items-center gap-1 min-w-0">
+                              {event.isPackage ? (
+                                <Package
+                                  size={10}
+                                  className={`shrink-0 ${
+                                    event.raw?.packageSnapshot?.scheduleType === 'parallel'
+                                      ? 'text-purple-600'
+                                      : 'text-amber-600'
+                                  }`}
+                                />
+                              ) : null}
+                              <p className={`truncate text-[11px] font-black leading-tight ${statusTheme.primaryText}`}>
+                                {event.title || 'Customer'}
+                              </p>
+                              {event.raw?.packageSnapshot?.scheduleType === 'parallel' && (
+                                <span className="shrink-0 text-[8px] font-black bg-purple-100 text-purple-800 border border-purple-200 px-1 py-0.2 rounded uppercase tracking-tighter">
+                                  PARALLEL
+                                </span>
+                              )}
+                            </div>
                             {showChainIndicator && (
                               <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${chainColor ? `${chainColor.border} bg-white/90` : 'border-slate-200 bg-white/90'} shadow-sm`}>
                                 <Link2 size={10} className={chainColor ? chainColor.text : 'text-slate-500'} />

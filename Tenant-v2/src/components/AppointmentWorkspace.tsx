@@ -4478,6 +4478,28 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
+    // Safety protection for parallel bundle child appointments (Correction 3):
+    // Use the strongest existing instance/group identity (bookingSessionId / bookingReference)
+    const rawApt: any = movedAppointment.raw || movedAppointment;
+    const isParallelBundleChild = Boolean(
+      (rawApt.packageSnapshot?.scheduleType === 'parallel' ||
+       movedAppointment.packageSnapshot?.scheduleType === 'parallel') &&
+      (rawApt.bookingSessionId || movedAppointment.bookingSessionId || rawApt.bookingReference || movedAppointment.bookingReference || rawApt.packageId || movedAppointment.packageId)
+    );
+
+    if (isParallelBundleChild) {
+      const bundleName = isRtl
+        ? (rawApt.packageSnapshot?.packageNameAr || movedAppointment.packageSnapshot?.packageNameAr || 'الباقة المتزامنة')
+        : (rawApt.packageSnapshot?.packageNameEn || movedAppointment.packageSnapshot?.packageNameEn || 'Parallel Bundle');
+
+      addLocalToast(
+        `لا يمكن سحب هذه الخدمة بشكل منفرد لأنها مرتبطة بجلسة "${bundleName}". يرجى إعادة جدولة الباقة المتزامنة بالكامل من خلال تفاصيل الموعد للحفاظ على تزامن المختصين.`,
+        `Cannot move this service independently because it belongs to parallel session "${bundleName}". Please reschedule the parallel bundle as a coordinated group via appointment details.`,
+        'warning'
+      );
+      return;
+    }
+
     const targetDateKey = slot.dateKey || getSelectedDateKey();
     const targetStaffId = isDayBoardMode(viewMode)
       ? (slot.employeeId || parseSchedulerColumnResourceId(slot.columnId))

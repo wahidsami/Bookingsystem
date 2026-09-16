@@ -1600,14 +1600,7 @@ export default function InteractiveDrawers({
       return;
     }
 
-    if (pkg.scheduleType === 'parallel') {
-      addLocalToast(
-        isRtl ? 'عذراً، الباقات المتزامنة (Parallel) قيد التطوير وستتاح في مرحلة قادمة. يرجى اختيار باقة متتابعة.' : 'Parallel bundles are currently in development and will be available in an upcoming release. Please select a sequential bundle.',
-        isRtl ? 'Parallel bundles are currently in development and will be available in an upcoming release. Please select a sequential bundle.' : 'عذراً، الباقات المتزامنة (Parallel) قيد التطوير وستتاح في مرحلة قادمة. يرجى اختيار باقة متتابعة.',
-        'warning'
-      );
-      return;
-    }
+    const isParallel = pkg.scheduleType === 'parallel';
 
     setStagedServices(prev => {
       let nextStartTime = currentStartTime;
@@ -1622,6 +1615,7 @@ export default function InteractiveDrawers({
 
       const sortedItems = [...pkg.items].sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
       const packageInstanceId = `pkg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const usedStaffIdsInBundle = new Set<string>();
 
       for (const item of sortedItems) {
         const service = canonicalServices.find(s => s.id === item.serviceId);
@@ -1634,13 +1628,30 @@ export default function InteractiveDrawers({
         const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
         const duration = resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration);
 
-        let staffId = item.defaultStaffId || currentStaffId || '';
+        // Coordinated distinct staff allocation for parallel items
+        let staffId = '';
         const normalizedAssignments = (service.employeeAssignments || []).map(id => String(id));
-        if (staffId && normalizedAssignments.length > 0 && !normalizedAssignments.includes(String(staffId))) {
-          staffId = ''; // default staff not assigned to this service
+        const isQualified = (sId: string) => !normalizedAssignments.length || normalizedAssignments.includes(String(sId));
+
+        if (item.defaultStaffId && isQualified(String(item.defaultStaffId)) && (!isParallel || !usedStaffIdsInBundle.has(String(item.defaultStaffId)))) {
+          staffId = String(item.defaultStaffId);
+        } else if (currentStaffId && isQualified(String(currentStaffId)) && (!isParallel || !usedStaffIdsInBundle.has(String(currentStaffId)))) {
+          staffId = String(currentStaffId);
+        } else if (availableStylists && availableStylists.length > 0) {
+          const candidate = availableStylists.find(s => 
+            isQualified(String(s.id)) && (!isParallel || !usedStaffIdsInBundle.has(String(s.id)))
+          );
+          if (candidate) {
+            staffId = String(candidate.id);
+          }
         }
 
-        const nextStartTimeIso = buildIsoFromMinutes(selectedDate, runningStartTime);
+        if (staffId && isParallel) {
+          usedStaffIdsInBundle.add(staffId);
+        }
+
+        const itemStartTime = isParallel ? nextStartTime : runningStartTime;
+        const nextStartTimeIso = buildIsoFromMinutes(selectedDate, itemStartTime);
 
         newItems.push({
           id: `stg-pkg-${pkg.id}-${item.id}-${Date.now()}-${Math.random()}`,
@@ -1648,11 +1659,12 @@ export default function InteractiveDrawers({
           packageInstanceId,
           packageId: pkg.id,
           packageItemId: item.id,
+          sequenceOrder: item.sequenceOrder || 0,
           serviceId: service.id,
           variantId: resolvedVariant?.id || undefined,
           serviceCategory: service.category,
           staffId,
-          startTime: runningStartTime,
+          startTime: itemStartTime,
           startTimeIso: nextStartTimeIso,
           duration,
           discountType: 'none',
@@ -1663,7 +1675,7 @@ export default function InteractiveDrawers({
           timingMode: 'auto'
         });
 
-        if (shouldChainServiceTimes) {
+        if (shouldChainServiceTimes && !isParallel) {
           runningStartTime += duration;
         }
       }
@@ -1811,6 +1823,36 @@ export default function InteractiveDrawers({
               setShowAssignWarning(true);
               return;
             }
+          }
+        }
+      }
+    }
+
+    // Check for parallel same-staff collision across bundle items
+    const parallelGroups = new Map<string, typeof finalStaged>();
+    finalStaged.filter(s => s.itemType === 'package').forEach(item => {
+      const pkg = services2Bundles?.find(p => p.id === item.packageId) || servicePackages?.find(p => p.id === item.packageId);
+      if (pkg?.scheduleType === 'parallel') {
+        const groupKey = item.packageInstanceId || item.packageId!;
+        if (!parallelGroups.has(groupKey)) parallelGroups.set(groupKey, []);
+        parallelGroups.get(groupKey)!.push(item);
+      }
+    });
+
+    for (const [, groupItems] of parallelGroups.entries()) {
+      for (let i = 0; i < groupItems.length; i++) {
+        for (let j = i + 1; j < groupItems.length; j++) {
+          const a = groupItems[i];
+          const b = groupItems[j];
+          const overlaps = a.startTime < (b.startTime + b.duration) && (a.startTime + a.duration) > b.startTime;
+          if (overlaps && a.staffId && b.staffId && String(a.staffId) === String(b.staffId)) {
+            showBookingErrorDialog({
+              titleAr: 'تعارض في تعيين المختصين للباقة المتزامنة',
+              titleEn: 'Parallel Bundle Specialist Conflict',
+              bodyAr: 'لا يمكن تعيين نفس الموظف لأكثر من خدمة متزامنة في نفس الوقت ضمن نفس الباقة. يرجى اختيار مختص مختلف لكل خدمة.',
+              bodyEn: 'The same specialist cannot be assigned to multiple overlapping services within a parallel bundle. Please select a different specialist for each service.'
+            });
+            return;
           }
         }
       }
@@ -1970,6 +2012,7 @@ export default function InteractiveDrawers({
     const formattedItems = [
       ...standaloneItems.map(i => ({
         ...i,
+        startTime: getSyncedStagedStartIso(i),
         itemType: 'service'
       })),
       ...Object.entries(groupedPackages).map(([_instanceId, children]) => ({
@@ -1979,7 +2022,7 @@ export default function InteractiveDrawers({
           packageItemId: c.packageItemId,
           serviceId: c.serviceId,
           staffId: c.staffId,
-          startTime: c.startTime,
+          startTime: getSyncedStagedStartIso(c),
           duration: c.duration,
           sequenceOrder: c.sequenceOrder || 0
         }))
@@ -1988,6 +2031,7 @@ export default function InteractiveDrawers({
 
     const payload: any = {
       items: formattedItems,
+      skipAdvanceValidation: true,
       overtimeApproval: allowExtendedHours || itemsToSubmit.some(i => i.overtimeApproval?.approved) ? { approved: true } : undefined,
       staffId: resolvedPrimaryStaffId,
       startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
@@ -3307,12 +3351,16 @@ export default function InteractiveDrawers({
                              const pkgId = items[0].packageId;
                              const pkg = services2Bundles?.find(p => p.id === pkgId) || servicePackages?.find(p => p.id === pkgId);
                              const packagePrice = Number(pkg?.totalPrice ?? 0);
+                             const isParallel = pkg?.scheduleType === 'parallel';
+                             const duration = isParallel
+                               ? Math.max(...items.map(it => Number(it.duration || 0)))
+                               : (pkg?.totalDuration || items.reduce((sum, it) => sum + Number(it.duration || 0), 0));
                              return {
                                id: instanceId,
                                itemType: 'package',
                                serviceName: pkg ? (isRtl ? pkg.name_ar : pkg.name_en) : 'Package',
-                               staffName: items.length + (isRtl ? ' خدمات' : ' services'),
-                               duration: pkg?.totalDuration || 0,
+                               staffName: items.length + (isRtl ? (isParallel ? ' خدمات متزامنة' : ' خدمات') : (isParallel ? ' parallel services' : ' services')),
+                               duration,
                                startTime: items[0]?.startTime || 0,
                                price: packagePrice,
                                basePrice: packagePrice,

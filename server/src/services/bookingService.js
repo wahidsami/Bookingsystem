@@ -185,7 +185,7 @@ class BookingService {
      * @returns {Promise<Appointment>}
      */
     async createBooking(data, options = {}) {
-        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue, skipServicePaymentOptionValidation, overtimeApproval, overrideRawPrice, packageId, packageItemId, packageSequenceOrder, packageSnapshot, packageItemSnapshot } = data;
+        const { serviceId, variantId, staffId, requestedStaffId, platformUserId, tenantId, startTime, notes, paymentMethod, assignmentMode, bookingSessionId, bookingReference, bookingItemIndex, skipAdvanceValidation, skipBookingSessionSync, duration, discountType, discountValue, skipServicePaymentOptionValidation, overtimeApproval, overrideRawPrice, overrideFinalPrice, packageId, packageItemId, packageSequenceOrder, packageSnapshot, packageItemSnapshot } = data;
         const transaction = options.transaction;
         
         // Use transaction if provided, otherwise create one
@@ -367,15 +367,21 @@ class BookingService {
         }
 
         // ========== PRICING CALCULATION ==========
-        const baseRawPrice = typeof overrideRawPrice === 'number' 
-            ? overrideRawPrice
-            : (serviceVariant
-                ? calculateRawPriceFromFinalPrice(
-                    serviceVariant.finalPrice,
-                    service.taxRate,
-                    service.commissionRate
-                )
-                : normalizeNumber(service.rawPrice ?? service.basePrice, 0));
+        const baseRawPrice = typeof overrideFinalPrice === 'number'
+            ? calculateRawPriceFromFinalPrice(
+                overrideFinalPrice,
+                service.taxRate,
+                service.commissionRate
+            )
+            : (typeof overrideRawPrice === 'number' 
+                ? overrideRawPrice
+                : (serviceVariant
+                    ? calculateRawPriceFromFinalPrice(
+                        serviceVariant.finalPrice,
+                        service.taxRate,
+                        service.commissionRate
+                    )
+                    : normalizeNumber(service.rawPrice ?? service.basePrice, 0)));
         const discountAmount = resolveDiscountAmount(baseRawPrice, discountType, discountValue);
         const discountedRawPrice = Math.max(0, baseRawPrice - discountAmount);
         const pricingSource = {
@@ -386,6 +392,11 @@ class BookingService {
             duration: resolvedDuration
         };
         const pricing = db.Appointment.calculateRevenueBreakdown(pricingSource, staff);
+        if (typeof overrideFinalPrice === 'number') {
+            pricing.price = overrideFinalPrice;
+            pricing.taxAmount = parseFloat(Math.max(0, overrideFinalPrice - pricing.rawPrice - pricing.platformFee).toFixed(2));
+            pricing.tenantRevenue = parseFloat((pricing.rawPrice + pricing.taxAmount).toFixed(2));
+        }
         
         // Restore the original base gross price so it is recorded in the ledger
         // This allows mathematical derivation of the discount amount later
@@ -747,30 +758,41 @@ class BookingService {
                         packageSteps.push({ pItem, service, basePrice });
                     }
 
-                    if (totalBasePrice <= 0) {
-                        throw new Error('Total base price of package services must be greater than zero for pro-rata allocation');
+                    if (packageTotalPrice === 0) {
+                        // Free bundle: all child allocated prices must become 0.00
+                        packageSteps.forEach(step => {
+                            step.allocatedPrice = 0.00;
+                        });
+                    } else if (totalBasePrice <= 0) {
+                        // Paid bundle but all services have zero base price: reject safely
+                        throw new Error('Cannot allocate pricing for a paid bundle when all included services have zero base price.');
+                    } else {
+                        // Deterministic pro-rata pricing
+                        let sumAllocated = 0;
+                        packageSteps.forEach(step => {
+                            const ratio = step.basePrice / totalBasePrice;
+                            step.allocatedPrice = Math.round(ratio * packageTotalPrice * 100) / 100;
+                            sumAllocated += step.allocatedPrice;
+                        });
+
+                        const remainder = Math.round((packageTotalPrice - sumAllocated) * 100) / 100;
+                        if (remainder !== 0) {
+                            // Allocate remainder to highest base price item
+                            let maxIndex = 0;
+                            let maxPrice = packageSteps[0].basePrice;
+                            for (let i = 1; i < packageSteps.length; i++) {
+                                if (packageSteps[i].basePrice > maxPrice) {
+                                    maxPrice = packageSteps[i].basePrice;
+                                    maxIndex = i;
+                                }
+                            }
+                            packageSteps[maxIndex].allocatedPrice = Math.round((packageSteps[maxIndex].allocatedPrice + remainder) * 100) / 100;
+                        }
                     }
 
-                    // Deterministic pro-rata pricing
-                    let sumAllocated = 0;
-                    packageSteps.forEach(step => {
-                        const ratio = step.basePrice / totalBasePrice;
-                        step.allocatedPrice = Math.round(ratio * packageTotalPrice * 100) / 100;
-                        sumAllocated += step.allocatedPrice;
-                    });
-
-                    const remainder = Math.round((packageTotalPrice - sumAllocated) * 100) / 100;
-                    if (remainder !== 0) {
-                        // Allocate remainder to highest base price item
-                        let maxIndex = 0;
-                        let maxPrice = packageSteps[0].basePrice;
-                        for (let i = 1; i < packageSteps.length; i++) {
-                            if (packageSteps[i].basePrice > maxPrice) {
-                                maxPrice = packageSteps[i].basePrice;
-                                maxIndex = i;
-                            }
-                        }
-                        packageSteps[maxIndex].allocatedPrice = Math.round((packageSteps[maxIndex].allocatedPrice + remainder) * 100) / 100;
+                    // Parallel Bundle Validation & Coordinated Staff Allocation
+                    if (servicePackage.scheduleType === 'parallel') {
+                        await this._coordinateParallelStaffAllocation(tenantId, packageSteps, finalTransaction);
                     }
 
                     const packageSnapshot = {
@@ -778,7 +800,8 @@ class BookingService {
                         packageNameEn: servicePackage.name_en || servicePackage.nameEn,
                         packageNameAr: servicePackage.name_ar || servicePackage.nameAr,
                         packagePrice: packageTotalPrice,
-                        packageDuration: servicePackage.duration
+                        packageDuration: servicePackage.duration,
+                        scheduleType: servicePackage.scheduleType || 'sequence'
                     };
 
                     for (let i = 0; i < packageSteps.length; i++) {
@@ -801,6 +824,7 @@ class BookingService {
                             bookingItemIndex: currentItemIndex,
                             skipBookingSessionSync: true,
                             overrideRawPrice: step.allocatedPrice,
+                            overrideFinalPrice: step.allocatedPrice,
                             packageId: servicePackage.id,
                             packageItemId: step.pItem.packageItemId || null,
                             packageSequenceOrder: step.pItem.sequenceOrder || (i + 1),
@@ -1079,6 +1103,123 @@ class BookingService {
         });
 
         return candidates[0].staff.id;
+    }
+
+    /**
+     * Coordinated parallel staff allocation and overlap validation
+     * Enforces:
+     * - Collect qualified candidates for each item
+     * - Ensure simultaneous availability
+     * - Assign DISTINCT staff IDs across overlapping items
+     * - Validate complete assignment
+     * @private
+     */
+    async _coordinateParallelStaffAllocation(tenantId, packageSteps, transaction) {
+        // 1. Calculate time windows for all steps
+        const stepWindows = packageSteps.map(step => {
+            const start = new Date(step.pItem.startTime).getTime();
+            const dur = (step.pItem.duration || step.service.duration || 30) * 60000;
+            const end = start + dur;
+            return {
+                step,
+                start,
+                end,
+                staffId: step.pItem.staffId ? String(step.pItem.staffId) : null
+            };
+        });
+
+        // 2. Validate qualification of pre-selected staff and ensure no two overlapping steps share the same staffId
+        for (let i = 0; i < stepWindows.length; i++) {
+            const wA = stepWindows[i];
+            if (wA.staffId) {
+                // Verify qualification
+                const qualified = await db.ServiceEmployee.findOne({
+                    where: { serviceId: wA.step.service.id, staffId: wA.staffId },
+                    transaction
+                });
+                if (!qualified) {
+                    throw new Error(`Selected staff member is not qualified to perform service: ${wA.step.service.name_en || wA.step.service.nameEn || wA.step.service.id}`);
+                }
+            }
+
+            for (let j = i + 1; j < stepWindows.length; j++) {
+                const wB = stepWindows[j];
+                const overlaps = wA.start < wB.end && wA.end > wB.start;
+                if (overlaps && wA.staffId && wB.staffId && wA.staffId === wB.staffId) {
+                    throw new Error('A staff member cannot perform multiple overlapping services within a parallel bundle.');
+                }
+            }
+        }
+
+        // 3. For any steps missing staffId, perform coordinated group auto-allocation
+        const unassignedSteps = stepWindows.filter(w => !w.staffId);
+        if (unassignedSteps.length > 0) {
+            const candidatesPerStep = [];
+            for (const item of unassignedSteps) {
+                const serviceEmployees = await db.ServiceEmployee.findAll({
+                    where: { serviceId: item.step.service.id },
+                    transaction
+                });
+                const staffIds = serviceEmployees.map(se => se.staffId);
+                const eligibleStaff = await db.Staff.findAll({
+                    where: {
+                        id: { [Op.in]: staffIds },
+                        tenantId,
+                        isActive: true
+                    },
+                    transaction
+                });
+
+                const availableForStep = [];
+                for (const staff of eligibleStaff) {
+                    const check = await this.evaluateSchedulingRequest({
+                        tenantId,
+                        serviceId: item.step.service.id,
+                        staffId: staff.id,
+                        startTime: new Date(item.start),
+                        duration: (item.end - item.start) / 60000
+                    }, transaction);
+
+                    if (check.valid) {
+                        availableForStep.push(staff);
+                    }
+                }
+                candidatesPerStep.push({ item, candidates: availableForStep });
+            }
+
+            // Coordinated assignment search: assign distinct staff across overlapping items
+            const findAssignment = (index) => {
+                if (index === candidatesPerStep.length) return true;
+                const { item, candidates } = candidatesPerStep[index];
+
+                for (const cand of candidates) {
+                    const candIdStr = String(cand.id);
+                    // Check if cand is already assigned to any overlapping step
+                    const overlapsWithAssigned = stepWindows.some(w => {
+                        return w.staffId === candIdStr && (item.start < w.end && item.end > w.start);
+                    });
+
+                    if (!overlapsWithAssigned) {
+                        item.staffId = candIdStr;
+                        item.step.pItem.staffId = cand.id;
+                        item.step.pItem.requestedStaffId = cand.id;
+                        item.step.pItem.assignmentMode = 'auto_assigned';
+
+                        if (findAssignment(index + 1)) {
+                            return true;
+                        }
+                        item.staffId = null;
+                        item.step.pItem.staffId = null;
+                    }
+                }
+                return false;
+            };
+
+            const success = findAssignment(0);
+            if (!success) {
+                throw new Error('Could not find distinct available staff members for all parallel bundle services at the selected time.');
+            }
+        }
     }
 
     /**

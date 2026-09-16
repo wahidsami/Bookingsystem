@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Search, Package as PackageIcon, Clock, Trash, PlusCircle, Layers } from 'lucide-react';
-import { type ServiceRecord, type ServiceVariantRecord } from '../../lib/serviceContract';
+import { resolveServiceImageUrl, type ServiceRecord, type ServiceVariantRecord } from '../../lib/serviceContract';
 import AppointmentServiceRow from './AppointmentServiceRow';
 
 export interface StagedService {
@@ -287,7 +287,10 @@ export default function AppointmentServicesStep({
                   const pkg = effectiveBundles.find(p => p.id === pkgId);
                   const pkgName = pkg ? (isRtl ? pkg.name_ar || pkg.nameAr : pkg.name_en || pkg.nameEn) : 'Bundle';
                   const pkgPrice = pkg ? pkg.totalPrice : 0;
-                  const pkgDuration = pkg ? pkg.totalDuration : 0;
+                  const isParallel = pkg?.scheduleType === 'parallel';
+                  const pkgDuration = isParallel
+                    ? Math.max(...items.map(it => Number(it.duration || 0)))
+                    : (pkg ? pkg.totalDuration : items.reduce((sum, it) => sum + Number(it.duration || 0), 0));
 
                   return (
                     <div key={instanceId} className="bg-white border border-purple-200 rounded-xl p-4 shadow-2xs relative overflow-hidden">
@@ -298,10 +301,15 @@ export default function AppointmentServicesStep({
                             <span className="text-[9px] font-black bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded uppercase">
                               BUNDLE
                             </span>
+                            {isParallel && (
+                              <span className="text-[9px] font-black bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded uppercase">
+                                PARALLEL
+                              </span>
+                            )}
                             <h4 className="font-bold text-slate-900 text-base">{pkgName}</h4>
                           </div>
                           <p className="text-xs text-slate-500 mt-1 font-semibold">
-                            {pkgPrice} {isRtl ? 'ر.س' : 'SAR'} • {pkgDuration} {isRtl ? 'دقيقة إجمالية' : 'min total'}
+                            {pkgPrice} {isRtl ? 'ر.س' : 'SAR'} • {pkgDuration} {isRtl ? (isParallel ? 'دقيقة (متزامن)' : 'دقيقة إجمالية') : (isParallel ? 'min (parallel)' : 'min total')}
                           </p>
                         </div>
                         <button
@@ -410,12 +418,22 @@ export default function AppointmentServicesStep({
                               >
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                   <div className="flex items-start gap-3 min-w-0">
-                                    <div className="w-12 h-12 rounded-xl bg-purple-100 border border-purple-200 flex items-center justify-center shrink-0 text-purple-600 overflow-hidden">
+                                    <div className="w-12 h-12 rounded-xl bg-purple-100 border border-purple-200 flex items-center justify-center shrink-0 text-purple-600 overflow-hidden relative">
                                       {bundle.image ? (
-                                        <img src={bundle.image} alt="" className="w-full h-full object-cover" />
-                                      ) : (
+                                        <img
+                                          src={resolveServiceImageUrl(bundle.image)}
+                                          alt=""
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            const fb = e.currentTarget.parentElement?.querySelector('.bundle-fallback-icon');
+                                            if (fb) fb.classList.remove('hidden');
+                                          }}
+                                        />
+                                      ) : null}
+                                      <div className={`bundle-fallback-icon flex items-center justify-center w-full h-full ${bundle.image ? 'hidden' : ''}`}>
                                         <PackageIcon className="w-6 h-6 text-purple-600" />
-                                      )}
+                                      </div>
                                     </div>
                                     <div className="min-w-0 space-y-1">
                                       <div className="flex items-center gap-2 flex-wrap">
@@ -423,8 +441,8 @@ export default function AppointmentServicesStep({
                                           BUNDLE
                                         </span>
                                         {isParallel && (
-                                          <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">
-                                            {isRtl ? 'متزامن (قيد التطوير)' : 'Parallel (Soon)'}
+                                          <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded uppercase">
+                                            {isRtl ? 'متزامن (Parallel)' : 'Parallel'}
                                           </span>
                                         )}
                                         <h4 className="font-bold text-slate-900 text-sm truncate">
@@ -437,7 +455,14 @@ export default function AppointmentServicesStep({
                                       <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-500">
                                         <span className="flex items-center gap-1">
                                           <Clock className="w-3 h-3 text-purple-500" />
-                                          <span>{bundle.totalDuration} {isRtl ? 'دقيقة' : 'min'}</span>
+                                          <span>
+                                            {isParallel
+                                              ? (bundle.items && bundle.items.length > 0
+                                                  ? Math.max(...bundle.items.map((it: any) => Number(it.customDuration || it.service?.duration || 0)))
+                                                  : bundle.totalDuration)
+                                              : bundle.totalDuration}{' '}
+                                            {isRtl ? 'دقيقة (مدة العميل)' : 'min (wall-clock)'}
+                                          </span>
                                         </span>
                                         <span>•</span>
                                         <span>{bundle.items?.length || 0} {isRtl ? 'خدمات مدمجة' : 'included services'}</span>
