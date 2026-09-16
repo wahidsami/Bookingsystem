@@ -24,6 +24,7 @@ interface AppointmentServiceRowProps {
   forceExpanded?: boolean;
   availableStylists: any[];
   stagedItem: StagedService | null;
+  otherStagedServices?: any[];
   onAddService: (service: ServiceRecord, variant?: ServiceVariantRecord | null) => void;
   onUpdateService: (id: string, updates: Partial<StagedService>) => void;
   onRemoveService: (id: string) => void;
@@ -43,6 +44,7 @@ export default function AppointmentServiceRow({
   forceExpanded = false,
   availableStylists,
   stagedItem,
+  otherStagedServices = [],
   onAddService,
   onUpdateService,
   onRemoveService,
@@ -212,6 +214,7 @@ export default function AppointmentServiceRow({
           tenantTimezone={tenantTimezone}
           selectedDate={selectedDate}
           serviceId={service.id}
+          service={service}
           variantId={variant?.id || stagedItem?.variantId}
           isRtl={isRtl}
           boardStartHour={boardStartHour}
@@ -219,6 +222,7 @@ export default function AppointmentServiceRow({
           draftConfig={draftConfig}
           setDraftConfig={setDraftConfig}
           validStylists={validStylists}
+          otherStagedServices={otherStagedServices}
           onSave={handleSave}
           onCancel={handleCancel}
         />

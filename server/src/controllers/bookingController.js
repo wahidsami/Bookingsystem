@@ -159,6 +159,7 @@ const searchAvailability = async (req, res) => {
             success: true,
             slots: result.slots,
             diagnostics: result.diagnostics || [],
+            scheduleContext: result.scheduleContext || null,
             date,
             totalSlots: result.slots.length,
             availableSlots: result.metadata.availableSlots,

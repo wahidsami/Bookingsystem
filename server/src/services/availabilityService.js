@@ -284,6 +284,28 @@ class AvailabilityService {
             return {
                 slots: [],
                 diagnostics,
+                scheduleContext: {
+                    tenantHours: availabilityContext.tenantHours || null,
+                    employeeDutyWindows: (availabilityContext.employeeDutyWindows || availabilityContext.rawWindows || []).map(w => ({
+                        startTime: w.startTime instanceof Date ? w.startTime.toISOString() : new Date(w.startTime).toISOString(),
+                        endTime: w.endTime instanceof Date ? w.endTime.toISOString() : new Date(w.endTime).toISOString()
+                    })),
+                    breaks: (availabilityContext.breaks || []).map(b => ({
+                        startTime: b.startTime instanceof Date ? b.startTime.toISOString() : new Date(b.startTime).toISOString(),
+                        endTime: b.endTime instanceof Date ? b.endTime.toISOString() : new Date(b.endTime).toISOString(),
+                        type: b.type || null,
+                        label: b.label || null
+                    })),
+                    timeOff: (availabilityContext.timeOff || []).map(t => ({
+                        startTime: t.startTime instanceof Date ? t.startTime.toISOString() : new Date(t.startTime).toISOString(),
+                        endTime: t.endTime instanceof Date ? t.endTime.toISOString() : new Date(t.endTime).toISOString()
+                    })),
+                    existingAppointments: [],
+                    bufferBefore,
+                    bufferAfter,
+                    duration,
+                    timezone
+                },
                 metadata: {
                     date,
                     serviceId,
@@ -344,6 +366,32 @@ class AvailabilityService {
         return {
             slots: allSlots,
             diagnostics,
+            scheduleContext: {
+                tenantHours: availabilityContext.tenantHours || null,
+                employeeDutyWindows: (availabilityContext.employeeDutyWindows || availabilityContext.rawWindows || []).map(w => ({
+                    startTime: w.startTime instanceof Date ? w.startTime.toISOString() : new Date(w.startTime).toISOString(),
+                    endTime: w.endTime instanceof Date ? w.endTime.toISOString() : new Date(w.endTime).toISOString()
+                })),
+                breaks: (availabilityContext.breaks || []).map(b => ({
+                    startTime: b.startTime instanceof Date ? b.startTime.toISOString() : new Date(b.startTime).toISOString(),
+                    endTime: b.endTime instanceof Date ? b.endTime.toISOString() : new Date(b.endTime).toISOString(),
+                    type: b.type || null,
+                    label: b.label || null
+                })),
+                timeOff: (availabilityContext.timeOff || []).map(t => ({
+                    startTime: t.startTime instanceof Date ? t.startTime.toISOString() : new Date(t.startTime).toISOString(),
+                    endTime: t.endTime instanceof Date ? t.endTime.toISOString() : new Date(t.endTime).toISOString()
+                })),
+                existingAppointments: existingAppointments.map(appt => ({
+                    id: appt.id,
+                    startTime: appt.startTime instanceof Date ? appt.startTime.toISOString() : new Date(appt.startTime).toISOString(),
+                    endTime: appt.endTime instanceof Date ? appt.endTime.toISOString() : new Date(appt.endTime).toISOString()
+                })),
+                bufferBefore,
+                bufferAfter,
+                duration,
+                timezone
+            },
             metadata: {
                 date,
                 serviceId,

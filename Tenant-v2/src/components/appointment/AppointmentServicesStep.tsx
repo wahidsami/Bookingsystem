@@ -351,12 +351,16 @@ export default function AppointmentServicesStep({
                               isRtl={isRtl}
                               boardStartHour={boardStartHour}
                               slotMinutes={slotMinutes}
-                              forceExpanded={true}
+                              forceExpanded={forceExpandAll}
                               availableStylists={availableStylists}
                               stagedItem={item}
-                              onAddService={() => {}}
+                              otherStagedServices={stagedServices.filter(s => s.id !== item.id)}
+                              onAddService={onAddService}
                               onUpdateService={onUpdateService}
-                              onRemoveService={() => {}}
+                              onRemoveService={(id) => {
+                                const idx = stagedServices.findIndex(s => s.id === id);
+                                if (idx !== -1) onRemoveService(idx);
+                              }}
                             />
                           );
                         })}
@@ -548,6 +552,7 @@ export default function AppointmentServicesStep({
                                   forceExpanded={forceExpandAll}
                                   availableStylists={availableStylists}
                                   stagedItem={stagedItem || null}
+                                  otherStagedServices={stagedServices.filter(s => s.id !== stagedItem?.id)}
                                   onAddService={onAddService}
                                   onUpdateService={onUpdateService}
                                   onRemoveService={(id) => {
