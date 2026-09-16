@@ -4,7 +4,7 @@ import {
   Sparkles, Trash2, Plus, ArrowLeft, Check, X, Gift, DollarSign, 
   Clock, Users, Heart, Info, Calendar, Coffee, Tag, MapPin, 
   Sparkle, Upload, Edit, Eye, Filter, SlidersHorizontal, Search, CheckSquare, Square,
-  Activity, RotateCw, AlertTriangle, Image, Package, FolderPlus, ChevronDown, Layers,
+  Activity, RotateCw, AlertTriangle, Image, Package, FolderPlus, ChevronDown, ChevronLeft, ChevronRight, Layers,
   Globe, CheckCircle2, MoreVertical
 } from 'lucide-react';
 import { Language, Employee, Product, QuickLaunchRequest } from '../types';
@@ -318,11 +318,8 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
     reader.readAsDataURL(file);
   };
 
-  // Categories: Strictly "All Categories" + Tenant-Owned Categories (no global Super Admin categories)
-  const categories = [
-    { id: 'all', slug: 'all', labelAr: 'كل الفئات', labelEn: 'All Categories' },
-    ...serviceCategories
-  ];
+  // Categories: Strictly Tenant-Owned Categories (no global Super Admin categories)
+  const categories = serviceCategories;
 
   // Unified Items: Map Services and Packages into a Unified Catalog Item List
   const unifiedItems: UnifiedCatalogItem[] = React.useMemo(() => {
@@ -425,13 +422,17 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
   const getCategoryStats = (catId: string) => {
     const matched = catId === 'all'
       ? unifiedItems
-      : unifiedItems.filter(item => matchesCategoryValue(item, catId));
+      : catId === 'uncategorized'
+      ? unifiedItems.filter(item => !resolveItemCategory(item))
+      : unifiedItems.filter(item => resolveItemCategory(item)?.id === catId);
     const serviceCount = matched.filter(i => i.type === 'service').length;
     const bundleCount = matched.filter(i => i.type === 'bundle').length;
     return {
       total: matched.length,
       services: serviceCount,
-      bundles: bundleCount
+      bundles: bundleCount,
+      serviceCount,
+      bundleCount
     };
   };
 
@@ -441,7 +442,9 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
     return {
       total: uncat.length,
       services: uncat.filter(i => i.type === 'service').length,
-      bundles: uncat.filter(i => i.type === 'bundle').length
+      bundles: uncat.filter(i => i.type === 'bundle').length,
+      serviceCount: uncat.filter(i => i.type === 'service').length,
+      bundleCount: uncat.filter(i => i.type === 'bundle').length
     };
   }, [unifiedItems, serviceCategories]);
 
@@ -1094,6 +1097,340 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
 
   const isLimitReached = serviceLimit !== null && serviceLimit !== -1 && serviceUsage >= serviceLimit;
 
+  // Group filtered items by real category for "All Categories" view
+  const groupedCategorySections = React.useMemo(() => {
+    if (selectedCategory !== 'all') {
+      return [];
+    }
+
+    const sections: Array<{
+      id: string;
+      labelAr: string;
+      labelEn: string;
+      category: TenantCategoryOption | null;
+      items: UnifiedCatalogItem[];
+      servicesCount: number;
+      bundlesCount: number;
+    }> = [];
+
+    // 1. Tenant-owned categories in deterministic order
+    serviceCategories.forEach(cat => {
+      const catItems = filteredItems.filter(item => {
+        const resolved = resolveItemCategory(item);
+        return resolved?.id === cat.id;
+      });
+
+      if (catItems.length > 0) {
+        sections.push({
+          id: cat.id,
+          labelAr: cat.labelAr,
+          labelEn: cat.labelEn,
+          category: cat,
+          items: catItems,
+          servicesCount: catItems.filter(i => i.type === 'service').length,
+          bundlesCount: catItems.filter(i => i.type === 'bundle').length,
+        });
+      }
+    });
+
+    // 2. Uncategorized items (placed last)
+    const uncatItems = filteredItems.filter(item => !resolveItemCategory(item));
+    if (uncatItems.length > 0) {
+      sections.push({
+        id: 'uncategorized',
+        labelAr: 'غير مصنفة',
+        labelEn: 'Uncategorized',
+        category: null,
+        items: uncatItems,
+        servicesCount: uncatItems.filter(i => i.type === 'service').length,
+        bundlesCount: uncatItems.filter(i => i.type === 'bundle').length,
+      });
+    }
+
+    return sections;
+  }, [selectedCategory, serviceCategories, filteredItems]);
+
+  // Reusable card renderer for unified services and bundles
+  const renderCatalogItem = (item: UnifiedCatalogItem) => {
+    if (item.type === 'service') {
+      return (
+        <div 
+          key={`srv-${item.id}`} 
+          className="bg-white rounded-2xl border border-neutral-200/60 p-4 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between shadow-2xs hover:shadow-md transition-all relative group"
+        >
+          {/* Identity zone */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-1 min-w-0">
+            <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 border shrink-0 relative">
+              <img 
+                src={resolveServiceImageUrl(item.image || defaultImage)}
+                alt={item.nameEn} 
+                className="w-full h-full object-cover" 
+              />
+              {item.hasOffer && (
+                <span className="absolute top-1 left-1 bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-sm">
+                  {item.offerDiscountPct}% OFF
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* TYPE BADGE: [SERVICE] */}
+                <span className="text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-200/80 px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles size={10} />
+                  <span>SERVICE</span>
+                </span>
+
+                {/* Category badge */}
+                <span className="text-[9px] bg-slate-100 text-neutral-600 px-2 py-0.5 rounded-md font-bold uppercase">
+                  {isRtl 
+                    ? (resolveItemCategory(item)?.labelAr || item.categoryAr || item.category || 'عام')
+                    : (resolveItemCategory(item)?.labelEn || item.categoryEn || item.category || 'General')}
+                </span>
+
+                {/* Active/Inactive state */}
+                <span className={`text-[9px] px-2 py-0.5 rounded-md font-black uppercase ${
+                  item.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-neutral-50 text-neutral-500 border border-neutral-200'
+                }`}>
+                  {item.isActive ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'غير نشط' : 'Inactive')}
+                </span>
+
+                {/* Gender availability */}
+                <span className="text-[9px] bg-slate-100 text-neutral-600 px-2 py-0.5 rounded-md font-bold">
+                  {item.targetGender === 'female' ? (isRtl ? 'للنساء' : 'Females') : item.targetGender === 'male' ? (isRtl ? 'للرجال' : 'Males') : (isRtl ? 'للجنسين' : 'Unisex')}
+                </span>
+              </div>
+
+              <h3 className="text-sm font-black text-neutral-800 tracking-tight leading-tight line-clamp-1">
+                {isRtl ? item.nameAr : item.nameEn}
+              </h3>
+
+              <p className="text-xs text-neutral-400 line-clamp-1">
+                {isRtl ? (item.descriptionAr || 'لا يوجد وصف عربي متاح.') : (item.descriptionEn || 'No English description added.')}
+              </p>
+              
+              <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-500 font-bold">
+                <span className="flex items-center gap-1">
+                  <Clock size={12} className="text-indigo-500" />
+                  <span>{item.duration} {isRtl ? 'دقيقة' : 'mins'}</span>
+                </span>
+                <span className="w-1 h-1 rounded-full bg-neutral-300" />
+                <span className="flex items-center gap-1">
+                  <Users size={12} className="text-indigo-500" />
+                  <span>{(item.employeeAssignments || []).length} {isRtl ? 'أخصائيات معتمدات' : 'specialists'}</span>
+                </span>
+              </div>
+
+              {/* Offer / Gift labels */}
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {item.hasOffer && (
+                  <span className="text-[9px] bg-amber-50 text-amber-800 border border-amber-100 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1">
+                    <Tag size={10} />
+                    <span>{isRtl ? item.offerDetailsAr : item.offerDetailsEn}</span>
+                  </span>
+                )}
+                {item.hasGift && (
+                  <span className="text-[9px] bg-indigo-50 text-indigo-800 border border-indigo-100 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1">
+                    <Gift size={10} />
+                    <span>{isRtl ? item.giftDetailsAr : item.giftDetailsEn}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Price and actions zone */}
+          <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between lg:justify-center gap-4 w-full lg:w-48 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+            <div className="text-left lg:text-right">
+              <span className="text-[9px] text-neutral-400 font-black uppercase block">{isRtl ? 'السعر النهائي' : 'Final Price'}</span>
+              <div className="flex items-center gap-1.5 lg:justify-end">
+                {item.hasOffer && (
+                  <span className="text-xs text-neutral-400 line-through font-mono">
+                    {item.price}
+                  </span>
+                )}
+                <span className="text-base font-black text-indigo-600 font-mono">
+                  {item.finalPrice} <span className="text-[10px]">{isRtl ? 'ر.س' : 'SAR'}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleToggleActiveStatus(item.id)}
+                className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all cursor-pointer ${
+                  item.isActive 
+                    ? 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100' 
+                    : 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100'
+                }`}
+              >
+                {item.isActive ? (isRtl ? 'تعطيل' : 'Deactivate') : (isRtl ? 'تفعيل' : 'Activate')}
+              </button>
+              
+              <button
+                onClick={() => handleOpenEditForm(item.rawRecord)}
+                className="p-1.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 rounded-xl transition-all cursor-pointer"
+                title={isRtl ? 'تعديل الخدمة' : 'Configure Service'}
+              >
+                <Edit size={13} />
+              </button>
+              
+              <button
+                onClick={() => handleDeleteService(item.id)}
+                className="p-1.5 bg-slate-50 border border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all cursor-pointer"
+                title={isRtl ? 'حذف الخدمة' : 'Remove Service'}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. BUNDLE CARD PRESENTATION
+    return (
+      <div 
+        key={`bundle-${item.id}`} 
+        className="bg-white rounded-2xl border border-purple-200/80 p-4 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between shadow-2xs hover:shadow-md transition-all relative group bg-gradient-to-r from-purple-50/20 via-transparent to-transparent"
+      >
+        {/* Identity zone */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-1 min-w-0">
+          <div className="w-24 h-24 rounded-xl overflow-hidden bg-purple-100/70 border border-purple-200 shrink-0 relative flex items-center justify-center text-purple-600">
+            {item.image ? (
+              <img 
+                src={resolveServiceImageUrl(item.image)}
+                alt={item.nameEn} 
+                className="w-full h-full object-cover" 
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center p-2 text-center">
+                <Package size={28} className="text-purple-600 mb-1" />
+                <span className="text-[9px] font-black text-purple-700 uppercase tracking-tighter">BUNDLE</span>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1.5 flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* TYPE BADGE: [BUNDLE] */}
+              <span className="text-[9px] bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1 shadow-2xs">
+                <Package size={10} />
+                <span>BUNDLE</span>
+              </span>
+
+              {/* Category badge */}
+              <span className="text-[9px] bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md font-bold uppercase">
+                {isRtl 
+                  ? (resolveItemCategory(item)?.labelAr || 'باقات العناية') 
+                  : (resolveItemCategory(item)?.labelEn || 'Care Bundles')}
+              </span>
+
+              {/* Active/Inactive state */}
+              <span className={`text-[9px] px-2 py-0.5 rounded-md font-black uppercase ${
+                item.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-neutral-50 text-neutral-500 border border-neutral-200'
+              }`}>
+                {item.isActive ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'غير نشط' : 'Inactive')}
+              </span>
+
+              {/* Online booking status */}
+              <span className={`text-[9px] px-2 py-0.5 rounded-md font-bold flex items-center gap-1 ${
+                item.allowOnlineBooking 
+                  ? 'bg-blue-50 text-blue-700 border border-blue-100' 
+                  : 'bg-neutral-100 text-neutral-600'
+              }`}>
+                <Globe size={10} />
+                <span>{item.allowOnlineBooking ? (isRtl ? 'أونلاين' : 'Online Booking') : (isRtl ? 'داخلي فقط' : 'In-store only')}</span>
+              </span>
+
+              {/* Gender availability */}
+              <span className="text-[9px] bg-slate-100 text-neutral-600 px-2 py-0.5 rounded-md font-bold">
+                {item.targetGender === 'female' ? (isRtl ? 'للنساء' : 'Females') : item.targetGender === 'male' ? (isRtl ? 'للرجال' : 'Males') : (isRtl ? 'للجنسين' : 'Unisex')}
+              </span>
+            </div>
+
+            <h3 className="text-sm font-black text-purple-950 tracking-tight leading-tight line-clamp-1">
+              {isRtl ? item.nameAr : item.nameEn}
+            </h3>
+
+            <p className="text-xs text-neutral-400 line-clamp-1">
+              {isRtl ? (item.descriptionAr || 'باقة مجمعة من الخدمات المميزة.') : (item.descriptionEn || 'Combined bundle of premium services.')}
+            </p>
+            
+            <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-600 font-bold">
+              <span className="flex items-center gap-1 text-purple-700 font-black">
+                <Layers size={12} className="text-purple-600" />
+                <span>{item.itemsCount} {isRtl ? 'خدمات مدمجة' : 'included services'}</span>
+              </span>
+              <span className="w-1 h-1 rounded-full bg-neutral-300" />
+              <span className="flex items-center gap-1">
+                <Clock size={12} className="text-purple-600" />
+                <span>{item.duration} {isRtl ? 'دقيقة إجمالية' : 'total mins'}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Price and actions zone */}
+        <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between lg:justify-center gap-4 w-full lg:w-48 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-purple-100">
+          <div className="text-left lg:text-right">
+            <span className="text-[9px] text-purple-600 font-black uppercase block">{isRtl ? 'سعر الباقة الإجمالي' : 'Bundle Price'}</span>
+            <div className="flex items-center gap-1.5 lg:justify-end">
+              {item.totalPrice > item.price && (
+                <span className="text-xs text-neutral-400 line-through font-mono">
+                  {item.totalPrice}
+                </span>
+              )}
+              <span className="text-base font-black text-purple-700 font-mono">
+                {item.price} <span className="text-[10px]">{isRtl ? 'ر.س' : 'SAR'}</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => handleToggleBundleStatus(item.id, item.isActive)}
+              className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all cursor-pointer ${
+                item.isActive 
+                  ? 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100' 
+                  : 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100'
+              }`}
+            >
+              {item.isActive ? (isRtl ? 'تعطيل' : 'Deactivate') : (isRtl ? 'تفعيل' : 'Activate')}
+            </button>
+            
+            <button
+              onClick={() => handleOpenEditBundle(item)}
+              className="p-1.5 bg-purple-50 border border-purple-200 hover:bg-purple-100 hover:text-purple-800 rounded-xl text-purple-700 transition-all cursor-pointer"
+              title={isRtl ? 'تعديل الباقة' : 'Edit Bundle'}
+            >
+              <Edit size={13} />
+            </button>
+            
+            <button
+              onClick={() => {
+                setSelectedBundleForInfo(item);
+                setIsBundleInfoModalOpen(true);
+              }}
+              className="p-1.5 bg-slate-50 border border-slate-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 rounded-xl text-slate-600 transition-all cursor-pointer"
+              title={isRtl ? 'تفاصيل الباقة' : 'Bundle details'}
+            >
+              <Package size={13} />
+            </button>
+            
+            <button
+              onClick={() => handleDeleteBundle(item.id)}
+              className="p-1.5 bg-slate-50 border border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all cursor-pointer"
+              title={isRtl ? 'حذف الباقة' : 'Remove Bundle'}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="font-sans relative space-y-6" id="services-management-workspace">
       
@@ -1136,26 +1473,6 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
             exit={{ opacity: 0, y: -10 }}
             className="space-y-6"
           >
-            {/* 2.2 Top Header Block - simplified to remove duplicate banner title */}
-            <div className="flex justify-end gap-4 bg-white p-4 rounded-3xl border border-neutral-200/60 shadow-2xs">
-              {/* Subscription limit summary chip */}
-              <div className="flex items-center gap-2.5 bg-indigo-50/50 border border-indigo-100 p-3 rounded-2xl shrink-0">
-                <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-sm shadow-indigo-600/20">
-                  <Activity size={14} />
-                </div>
-                <div>
-                  <span className="text-[9px] font-black uppercase text-indigo-700 tracking-wider block leading-none mb-1">
-                    {servicePlanName}
-                  </span>
-                  <span className="text-xs font-bold text-neutral-700 block leading-none">
-                    {isRtl 
-                      ? `تم استخدام ${serviceUsage} من أصل ${formatTenantPlanLimit(serviceLimit, 'ar')} خدمات` 
-                      : `${serviceUsage} of ${formatTenantPlanLimit(serviceLimit, 'en')} Services Used`}
-                  </span>
-                </div>
-              </div>
-            </div>
-
             {/* 2.3 Search and Actions Block */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white rounded-2xl border border-neutral-200/60 shadow-2xs">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
@@ -1381,10 +1698,10 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                       })()}
 
                       {/* 2. Tenant-Owned Categories Only */}
-                      {categories.map(cat => {
+                      {serviceCategories.map(cat => {
                         const active = selectedCategory === cat.id;
                         const stats = getCategoryStats(cat.id);
-                        const tenantCatObj = serviceCategories.find(c => c.id === cat.id);
+                        const tenantCatObj = cat;
 
                         return (
                           <div
@@ -1524,12 +1841,12 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                       <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
                       <h2 className="text-xs font-black text-neutral-800 uppercase tracking-wide">
                         {selectedCategory === 'all' 
-                          ? (isRtl ? 'جميع الأصناف' : 'All Catalog Items')
+                          ? (isRtl ? 'جميع الأصناف (مقسمة حسب الفئات)' : 'All Catalog Items (Grouped by Category)')
                           : selectedCategory === 'uncategorized'
                           ? (isRtl ? 'غير مصنفة' : 'Uncategorized Items')
                           : (isRtl 
-                              ? `فئة: ${categories.find(c => c.id === selectedCategory)?.labelAr || selectedCategory}` 
-                              : `Category: ${categories.find(c => c.id === selectedCategory)?.labelEn || selectedCategory}`)}
+                              ? `فئة: ${serviceCategories.find(c => c.id === selectedCategory)?.labelAr || selectedCategory}` 
+                              : `Category: ${serviceCategories.find(c => c.id === selectedCategory)?.labelEn || selectedCategory}`)}
                       </h2>
                       <span className="text-[10px] text-neutral-400 font-bold">
                         ({filteredServicesCount} {isRtl ? 'خدمات' : 'services'}, {filteredBundlesCount} {isRtl ? 'باقات' : 'bundles'})
@@ -1612,288 +1929,45 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                         {isRtl ? 'إعادة ضبط كل المرشحات' : 'Clear All Filters'}
                       </button>
                     </div>
+                  ) : selectedCategory === 'all' ? (
+                    <div className="space-y-8">
+                      {groupedCategorySections.map(section => (
+                        <div key={`section-${section.id}`} data-category-section={section.id} className="space-y-3">
+                          {/* Section Header */}
+                          <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/80">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0" />
+                              <h3 className="text-xs font-black text-neutral-800 uppercase tracking-wide">
+                                {isRtl ? section.labelAr : section.labelEn}
+                              </h3>
+                              <span className="text-[10px] font-bold text-neutral-400">
+                                ({section.servicesCount} {isRtl ? 'خدمات' : 'services'} • {section.bundlesCount} {isRtl ? 'باقات' : 'bundles'})
+                              </span>
+                            </div>
+
+                            {section.category && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedCategory(section.id)}
+                                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition cursor-pointer flex items-center gap-1"
+                                title={isRtl ? `تصفية حسب ${section.labelAr}` : `Filter by ${section.labelEn}`}
+                              >
+                                <span>{isRtl ? 'تصفية الفئة فقط' : 'View only'}</span>
+                                {isRtl ? <ChevronLeft size={12} /> : <ChevronRight size={12} />}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Render cards under this section */}
+                          <div className="flex flex-col gap-4">
+                            {section.items.map(item => renderCatalogItem(item))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <div className="flex flex-col gap-4">
-                      {filteredItems.map(item => {
-                        // 1. SERVICE CARD PRESENTATION
-                        if (item.type === 'service') {
-                          return (
-                            <div 
-                              key={`srv-${item.id}`} 
-                              className="bg-white rounded-2xl border border-neutral-200/60 p-4 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between shadow-2xs hover:shadow-md transition-all relative group"
-                            >
-                              {/* Identity zone */}
-                              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-1 min-w-0">
-                                <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 border shrink-0 relative">
-                                  <img 
-                                    src={resolveServiceImageUrl(item.image || defaultImage)}
-                                    alt={item.nameEn} 
-                                    className="w-full h-full object-cover" 
-                                  />
-                                  {item.hasOffer && (
-                                    <span className="absolute top-1 left-1 bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-sm">
-                                      {item.offerDiscountPct}% OFF
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="space-y-1.5 flex-1 min-w-0">
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    {/* TYPE BADGE: [SERVICE] */}
-                                    <span className="text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-200/80 px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1">
-                                      <Sparkles size={10} />
-                                      <span>SERVICE</span>
-                                    </span>
-
-                                    {/* Category badge */}
-                                    <span className="text-[9px] bg-slate-100 text-neutral-600 px-2 py-0.5 rounded-md font-bold uppercase">
-                                      {isRtl 
-                                        ? (resolveItemCategory(item)?.labelAr || item.categoryAr || item.category || 'عام')
-                                        : (resolveItemCategory(item)?.labelEn || item.categoryEn || item.category || 'General')}
-                                    </span>
-
-                                    {/* Active/Inactive state */}
-                                    <span className={`text-[9px] px-2 py-0.5 rounded-md font-black uppercase ${
-                                      item.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-neutral-50 text-neutral-500 border border-neutral-200'
-                                    }`}>
-                                      {item.isActive ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'غير نشط' : 'Inactive')}
-                                    </span>
-
-                                    {/* Gender availability */}
-                                    <span className="text-[9px] bg-slate-100 text-neutral-600 px-2 py-0.5 rounded-md font-bold">
-                                      {item.targetGender === 'female' ? (isRtl ? 'للنساء' : 'Females') : item.targetGender === 'male' ? (isRtl ? 'للرجال' : 'Males') : (isRtl ? 'للجنسين' : 'Unisex')}
-                                    </span>
-                                  </div>
-
-                                  <h3 className="text-sm font-black text-neutral-800 tracking-tight leading-tight line-clamp-1">
-                                    {isRtl ? item.nameAr : item.nameEn}
-                                  </h3>
-
-                                  <p className="text-xs text-neutral-400 line-clamp-1">
-                                    {isRtl ? (item.descriptionAr || 'لا يوجد وصف عربي متاح.') : (item.descriptionEn || 'No English description added.')}
-                                  </p>
-                                  
-                                  <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-500 font-bold">
-                                    <span className="flex items-center gap-1">
-                                      <Clock size={12} className="text-indigo-500" />
-                                      <span>{item.duration} {isRtl ? 'دقيقة' : 'mins'}</span>
-                                    </span>
-                                    <span className="w-1 h-1 rounded-full bg-neutral-300" />
-                                    <span className="flex items-center gap-1">
-                                      <Users size={12} className="text-indigo-500" />
-                                      <span>{(item.employeeAssignments || []).length} {isRtl ? 'أخصائيات معتمدات' : 'specialists'}</span>
-                                    </span>
-                                  </div>
-
-                                  {/* Offer / Gift labels */}
-                                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                    {item.hasOffer && (
-                                      <span className="text-[9px] bg-amber-50 text-amber-800 border border-amber-100 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1">
-                                        <Tag size={10} />
-                                        <span>{isRtl ? item.offerDetailsAr : item.offerDetailsEn}</span>
-                                      </span>
-                                    )}
-                                    {item.hasGift && (
-                                      <span className="text-[9px] bg-indigo-50 text-indigo-800 border border-indigo-100 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1">
-                                        <Gift size={10} />
-                                        <span>{isRtl ? item.giftDetailsAr : item.giftDetailsEn}</span>
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Price and actions zone */}
-                              <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between lg:justify-center gap-4 w-full lg:w-48 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                                <div className="text-left lg:text-right">
-                                  <span className="text-[9px] text-neutral-400 font-black uppercase block">{isRtl ? 'السعر النهائي' : 'Final Price'}</span>
-                                  <div className="flex items-center gap-1.5 lg:justify-end">
-                                    {item.hasOffer && (
-                                      <span className="text-xs text-neutral-400 line-through font-mono">
-                                        {item.price}
-                                      </span>
-                                    )}
-                                    <span className="text-base font-black text-indigo-600 font-mono">
-                                      {item.finalPrice} <span className="text-[10px]">{isRtl ? 'ر.س' : 'SAR'}</span>
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    onClick={() => handleToggleActiveStatus(item.id)}
-                                    className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all cursor-pointer ${
-                                      item.isActive 
-                                        ? 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100' 
-                                        : 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100'
-                                    }`}
-                                  >
-                                    {item.isActive ? (isRtl ? 'تعطيل' : 'Deactivate') : (isRtl ? 'تفعيل' : 'Activate')}
-                                  </button>
-                                  
-                                  <button
-                                    onClick={() => handleOpenEditForm(item.rawRecord)}
-                                    className="p-1.5 bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 rounded-xl transition-all cursor-pointer"
-                                    title={isRtl ? 'تعديل الخدمة' : 'Configure Service'}
-                                  >
-                                    <Edit size={13} />
-                                  </button>
-                                  
-                                  <button
-                                    onClick={() => handleDeleteService(item.id)}
-                                    className="p-1.5 bg-slate-50 border border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all cursor-pointer"
-                                    title={isRtl ? 'حذف الخدمة' : 'Remove Service'}
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // 2. BUNDLE CARD PRESENTATION
-                        return (
-                          <div 
-                            key={`bundle-${item.id}`} 
-                            className="bg-white rounded-2xl border border-purple-200/80 p-4 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between shadow-2xs hover:shadow-md transition-all relative group bg-gradient-to-r from-purple-50/20 via-transparent to-transparent"
-                          >
-                            {/* Identity zone */}
-                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-1 min-w-0">
-                              <div className="w-24 h-24 rounded-xl overflow-hidden bg-purple-100/70 border border-purple-200 shrink-0 relative flex items-center justify-center text-purple-600">
-                                {item.image ? (
-                                  <img 
-                                    src={resolveServiceImageUrl(item.image)}
-                                    alt={item.nameEn} 
-                                    className="w-full h-full object-cover" 
-                                  />
-                                ) : (
-                                  <div className="flex flex-col items-center justify-center p-2 text-center">
-                                    <Package size={28} className="text-purple-600 mb-1" />
-                                    <span className="text-[9px] font-black text-purple-700 uppercase tracking-tighter">BUNDLE</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="space-y-1.5 flex-1 min-w-0">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  {/* TYPE BADGE: [BUNDLE] */}
-                                  <span className="text-[9px] bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1 shadow-2xs">
-                                    <Package size={10} />
-                                    <span>BUNDLE</span>
-                                  </span>
-
-                                  {/* Category badge */}
-                                  <span className="text-[9px] bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md font-bold uppercase">
-                                    {isRtl 
-                                      ? (resolveItemCategory(item)?.labelAr || 'باقات العناية') 
-                                      : (resolveItemCategory(item)?.labelEn || 'Care Bundles')}
-                                  </span>
-
-                                  {/* Active/Inactive state */}
-                                  <span className={`text-[9px] px-2 py-0.5 rounded-md font-black uppercase ${
-                                    item.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-neutral-50 text-neutral-500 border border-neutral-200'
-                                  }`}>
-                                    {item.isActive ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'غير نشط' : 'Inactive')}
-                                  </span>
-
-                                  {/* Online booking status */}
-                                  <span className={`text-[9px] px-2 py-0.5 rounded-md font-bold flex items-center gap-1 ${
-                                    item.allowOnlineBooking 
-                                      ? 'bg-blue-50 text-blue-700 border border-blue-100' 
-                                      : 'bg-neutral-100 text-neutral-600'
-                                  }`}>
-                                    <Globe size={10} />
-                                    <span>{item.allowOnlineBooking ? (isRtl ? 'أونلاين' : 'Online Booking') : (isRtl ? 'داخلي فقط' : 'In-store only')}</span>
-                                  </span>
-
-                                  {/* Gender availability */}
-                                  <span className="text-[9px] bg-slate-100 text-neutral-600 px-2 py-0.5 rounded-md font-bold">
-                                    {item.targetGender === 'female' ? (isRtl ? 'للنساء' : 'Females') : item.targetGender === 'male' ? (isRtl ? 'للرجال' : 'Males') : (isRtl ? 'للجنسين' : 'Unisex')}
-                                  </span>
-                                </div>
-
-                                <h3 className="text-sm font-black text-purple-950 tracking-tight leading-tight line-clamp-1">
-                                  {isRtl ? item.nameAr : item.nameEn}
-                                </h3>
-
-                                <p className="text-xs text-neutral-400 line-clamp-1">
-                                  {isRtl ? (item.descriptionAr || 'باقة مجمعة من الخدمات المميزة.') : (item.descriptionEn || 'Combined bundle of premium services.')}
-                                </p>
-                                
-                                <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-600 font-bold">
-                                  <span className="flex items-center gap-1 text-purple-700 font-black">
-                                    <Layers size={12} className="text-purple-600" />
-                                    <span>{item.itemsCount} {isRtl ? 'خدمات مدمجة' : 'included services'}</span>
-                                  </span>
-                                  <span className="w-1 h-1 rounded-full bg-neutral-300" />
-                                  <span className="flex items-center gap-1">
-                                    <Clock size={12} className="text-purple-600" />
-                                    <span>{item.duration} {isRtl ? 'دقيقة إجمالية' : 'total mins'}</span>
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Price and actions zone */}
-                            <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between lg:justify-center gap-4 w-full lg:w-48 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-purple-100">
-                              <div className="text-left lg:text-right">
-                                <span className="text-[9px] text-purple-600 font-black uppercase block">{isRtl ? 'سعر الباقة الإجمالي' : 'Bundle Price'}</span>
-                                <div className="flex items-center gap-1.5 lg:justify-end">
-                                  {item.totalPrice > item.price && (
-                                    <span className="text-xs text-neutral-400 line-through font-mono">
-                                      {item.totalPrice}
-                                    </span>
-                                  )}
-                                  <span className="text-base font-black text-purple-700 font-mono">
-                                    {item.price} <span className="text-[10px]">{isRtl ? 'ر.س' : 'SAR'}</span>
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => handleToggleBundleStatus(item.id, item.isActive)}
-                                  className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all cursor-pointer ${
-                                    item.isActive 
-                                      ? 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100' 
-                                      : 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100'
-                                  }`}
-                                >
-                                  {item.isActive ? (isRtl ? 'تعطيل' : 'Deactivate') : (isRtl ? 'تفعيل' : 'Activate')}
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleOpenEditBundle(item)}
-                                  className="p-1.5 bg-purple-50 border border-purple-200 hover:bg-purple-100 hover:text-purple-800 rounded-xl text-purple-700 transition-all cursor-pointer"
-                                  title={isRtl ? 'تعديل الباقة' : 'Edit Bundle'}
-                                >
-                                  <Edit size={13} />
-                                </button>
-                                
-                                <button
-                                  onClick={() => {
-                                    setSelectedBundleForInfo(item);
-                                    setIsBundleInfoModalOpen(true);
-                                  }}
-                                  className="p-1.5 bg-slate-50 border border-slate-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 rounded-xl text-slate-600 transition-all cursor-pointer"
-                                  title={isRtl ? 'تفاصيل الباقة' : 'Bundle details'}
-                                >
-                                  <Package size={13} />
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleDeleteBundle(item.id)}
-                                  className="p-1.5 bg-slate-50 border border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl transition-all cursor-pointer"
-                                  title={isRtl ? 'حذف الباقة' : 'Remove Bundle'}
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {filteredItems.map(item => renderCatalogItem(item))}
                     </div>
                   )}
 
