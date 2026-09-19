@@ -22,6 +22,7 @@ import TeamsWorkspace from './TeamsWorkspace';
 import ServicesWorkspace from './ServicesWorkspace';
 import Services2Workspace from './Services2Workspace';
 import ProductsWorkspace from './ProductsWorkspace';
+import OrdersWorkspace from './OrdersWorkspace';
 import HotDealsWorkspace from './HotDealsWorkspace';
 import CustomerPushNotificationsWorkspace from './CustomerPushNotificationsWorkspace';
 import PageSetupWorkspace from './PageSetupWorkspace';
@@ -700,6 +701,11 @@ export default function Workspace({
       {/* 6. PRODUCTS */}
       {view === 'products' && (
         <ProductsWorkspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
+      )}
+
+      {/* 6B. ORDERS */}
+      {view === 'orders' && (
+        <OrdersWorkspace lang={lang} darkMode={darkMode} />
       )}
 
       {/* 7. POS (POINT OF SALE) WITH DETAILED STATES */}

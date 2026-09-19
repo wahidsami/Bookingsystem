@@ -2,6 +2,7 @@ import { API_BASE_URL, API_ORIGIN } from './apiConfig';
 import { normalizeEmployeeAvatarCollection } from './employeeImage';
 import { normalizeServiceCollection, normalizeServiceRecord } from './serviceContract';
 import { normalizeProductCollection, normalizeProductRecord } from './productContract';
+import type { TenantOrdersResponse, TenantOrderDetailResponse, TenantOrder } from '../types';
 
 export { API_BASE_URL, API_ORIGIN } from './apiConfig';
 
@@ -1797,6 +1798,48 @@ class TenantApiAdapter {
 
   async topUpCustomerWallet(id: string, payload: any): Promise<any> {
     return this.post(`/tenant/customers/${id}/wallet/topup`, payload);
+  }
+
+  async getOrders(params?: {
+    status?: string;
+    paymentStatus?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<TenantOrdersResponse> {
+    const q = new URLSearchParams();
+    if (params?.status && params.status !== 'all') q.set('status', params.status);
+    if (params?.paymentStatus && params.paymentStatus !== 'all') q.set('paymentStatus', params.paymentStatus);
+    if (params?.startDate) q.set('startDate', params.startDate);
+    if (params?.endDate) q.set('endDate', params.endDate);
+    if (params?.search && params.search.trim()) q.set('search', params.search.trim());
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString();
+    return this.get(`/tenant/orders${qs ? `?${qs}` : ''}`);
+  }
+
+  async getOrder(id: string): Promise<TenantOrderDetailResponse> {
+    return this.get(`/tenant/orders/${id}`);
+  }
+
+  async updateOrderStatus(id: string, data: {
+    status: string;
+    trackingNumber?: string;
+    estimatedDeliveryDate?: string;
+  }): Promise<{ success: boolean; message?: string; order: TenantOrder }> {
+    return this.patch(`/tenant/orders/${id}/status`, data);
+  }
+
+  async updateOrderPaymentStatus(id: string, data: {
+    paymentStatus: string;
+    paymentMethod?: string;
+    transactionRef?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; message?: string; order: TenantOrder }> {
+    return this.patch(`/tenant/orders/${id}/payment`, data);
   }
 }
 

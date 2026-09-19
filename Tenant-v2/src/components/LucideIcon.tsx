@@ -40,10 +40,12 @@ import {
   AlertTriangle,
   Tag,
   Percent,
-  MessageSquare
+  MessageSquare,
+  ShoppingBag
 } from 'lucide-react';
 
 const icons: Record<string, any> = {
+  ShoppingBag,
   LayoutDashboard,
   Calendar,
   Users,

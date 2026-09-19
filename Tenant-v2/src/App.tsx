@@ -655,6 +655,8 @@ export default function App() {
         favoritePages={favoritePages}
         accessibleMarketingModules={accessibleMarketingModules}
         hasServicePackages={hasServicePackagesEntitlement(packageEntitlements)}
+        hasProductsAndOrders={hasProductsAndOrdersEntitlement(packageEntitlements)}
+        hasOrdersPermission={hasFullDashboardAccess || Boolean(permissions?.view_orders)}
       />
 
       {/* Main Workspace Frame */}

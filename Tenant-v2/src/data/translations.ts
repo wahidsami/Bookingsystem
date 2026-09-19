@@ -86,6 +86,13 @@ export const navigationItems: NavigationItem[] = [
     category: 'operations',
   },
   {
+    id: 'orders',
+    labelAr: 'الطلبات',
+    labelEn: 'Orders',
+    iconName: 'ShoppingBag',
+    category: 'operations',
+  },
+  {
     id: 'inventory',
     labelAr: 'المخزون',
     labelEn: 'Inventory',

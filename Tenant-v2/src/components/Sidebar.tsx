@@ -13,6 +13,8 @@ interface SidebarProps {
   favoritePages?: ViewType[];
   accessibleMarketingModules?: Record<string, boolean>;
   hasServicePackages?: boolean;
+  hasProductsAndOrders?: boolean;
+  hasOrdersPermission?: boolean;
 }
 
 export default function Sidebar({
@@ -24,6 +26,8 @@ export default function Sidebar({
   favoritePages = [],
   accessibleMarketingModules,
   hasServicePackages = true,
+  hasProductsAndOrders = true,
+  hasOrdersPermission = true,
 }: SidebarProps) {
   const t = translations[lang];
   const isRtl = lang === 'ar';
@@ -142,6 +146,11 @@ export default function Sidebar({
             // Hide packages menu if entitlement is disabled
             if (!hasServicePackages) {
               itemsInCat = itemsInCat.filter((i) => i.id !== 'packages');
+            }
+
+            // Hide orders menu if entitlement is disabled or staff lacks permission
+            if (!hasProductsAndOrders || !hasOrdersPermission) {
+              itemsInCat = itemsInCat.filter((i) => i.id !== 'orders');
             }
 
             if (itemsInCat.length === 0) return null;

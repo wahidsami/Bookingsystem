@@ -18,6 +18,7 @@ export type ViewType =
   | 'services2'
   | 'packages'
   | 'products'
+  | 'orders'
   | 'pos'
   | 'financial'
   | 'reports'
@@ -37,6 +38,159 @@ export type ViewType =
   | 'marketing-reviews'
   | 'marketing-page-setup'
   | 'audit';
+
+export type OrderFulfillmentStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'processing'
+  | 'ready_for_pickup'
+  | 'shipped'
+  | 'delivered'
+  | 'completed'
+  | 'cancelled'
+  | 'refunded';
+
+export type OrderPaymentStatus =
+  | 'pending'
+  | 'paid'
+  | 'failed'
+  | 'refunded'
+  | 'partially_refunded';
+
+export type OrderPaymentMethod =
+  | 'online'
+  | 'cash_on_delivery'
+  | 'pay_on_visit'
+  | 'split'
+  | 'cash'
+  | 'card_pos'
+  | 'wallet';
+
+export type OrderDeliveryType = 'pickup' | 'delivery';
+
+export interface TenantOrderItemProduct {
+  id: string;
+  name_en: string;
+  name_ar?: string;
+  image?: string;
+  category?: string;
+  price?: number | string;
+}
+
+export interface TenantOrderItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  productName: string;
+  productNameAr?: string;
+  quantity: number;
+  unitPrice: number | string;
+  taxAmount: number | string;
+  totalPrice: number | string;
+  product?: TenantOrderItemProduct;
+}
+
+export interface TenantOrderUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  photo?: string;
+}
+
+export interface TenantOrderPaymentTransaction {
+  id: string;
+  type: 'deposit' | 'remainder' | 'full' | 'refund';
+  amount: number | string;
+  paymentMethod: string;
+  status: 'pending' | 'completed' | 'failed' | 'refunded' | 'cancelled';
+  transactionRef?: string | null;
+  notes?: string | null;
+  processedAt: string;
+  processor?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface TenantOrderShippingAddress {
+  street?: string;
+  city?: string;
+  district?: string;
+  postalCode?: string;
+  notes?: string;
+  buildingNumber?: string;
+  floor?: string;
+  apartment?: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+}
+
+export interface TenantOrder {
+  id: string;
+  orderNumber: string;
+  platformUserId: string;
+  tenantId: string;
+  status: OrderFulfillmentStatus;
+  paymentMethod: OrderPaymentMethod;
+  paymentStatus: OrderPaymentStatus;
+  subtotal: number | string;
+  taxAmount: number | string;
+  shippingFee: number | string;
+  platformFee: number | string;
+  totalAmount: number | string;
+  deliveryType: OrderDeliveryType;
+  shippingAddress?: TenantOrderShippingAddress | null;
+  pickupDate?: string | null;
+  trackingNumber?: string | null;
+  estimatedDeliveryDate?: string | null;
+  deliveredAt?: string | null;
+  cancelledAt?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: TenantOrderUser;
+  items?: TenantOrderItem[];
+  paymentTransactions?: TenantOrderPaymentTransaction[];
+  tenant?: {
+    id: string;
+    name: string;
+    name_en?: string;
+    name_ar?: string;
+    logo?: string;
+    phone?: string;
+    email?: string;
+  };
+}
+
+export interface TenantOrderStats {
+  total: number;
+  pending: number;
+  completed: number;
+  cancelled: number;
+}
+
+export interface TenantOrderPagination {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface TenantOrdersResponse {
+  success: boolean;
+  orders: TenantOrder[];
+  pagination: TenantOrderPagination;
+  stats: TenantOrderStats;
+}
+
+export interface TenantOrderDetailResponse {
+  success: boolean;
+  order: TenantOrder;
+}
 
 export interface NavigationItem {
   id: ViewType;
