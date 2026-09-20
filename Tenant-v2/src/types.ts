@@ -115,14 +115,21 @@ export interface TenantOrderPaymentTransaction {
 }
 
 export interface TenantOrderShippingAddress {
+  title?: string;
+  recipientName?: string;
+  name?: string;
   street?: string;
+  address?: string;
   city?: string;
   district?: string;
   postalCode?: string;
   notes?: string;
+  building?: string;
   buildingNumber?: string;
   floor?: string;
   apartment?: string;
+  phone?: string;
+  rawAddress?: string;
   coordinates?: {
     lat: number;
     lng: number;
@@ -143,7 +150,7 @@ export interface TenantOrder {
   platformFee: number | string;
   totalAmount: number | string;
   deliveryType: OrderDeliveryType;
-  shippingAddress?: TenantOrderShippingAddress | null;
+  shippingAddress?: TenantOrderShippingAddress | string | null;
   pickupDate?: string | null;
   trackingNumber?: string | null;
   estimatedDeliveryDate?: string | null;

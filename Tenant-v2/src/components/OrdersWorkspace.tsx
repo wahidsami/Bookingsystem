@@ -26,11 +26,13 @@ import {
   ChevronLeft,
   X,
   ExternalLink,
-  DollarSign
+  DollarSign,
+  AlertCircle
 } from 'lucide-react';
 import {
   Language,
   TenantOrder,
+  TenantOrderShippingAddress,
   TenantOrderStats,
   TenantOrderPagination,
   OrderFulfillmentStatus,
@@ -196,6 +198,40 @@ const PAYMENT_METHOD_LABELS: Record<string, { labelAr: string; labelEn: string }
   wallet: { labelAr: 'المحفظة', labelEn: 'Wallet' }
 };
 
+// Robust shipping address parser supporting JSON objects, stringified JSON, and plain strings
+export const parseOrderShippingAddress = (addr: any): TenantOrderShippingAddress => {
+  if (!addr) return {};
+  if (typeof addr === 'object') return addr;
+  if (typeof addr === 'string') {
+    try {
+      const parsed = JSON.parse(addr);
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch {
+      return { rawAddress: addr, address: addr, street: addr };
+    }
+  }
+  return {};
+};
+
+// Lifecycle steps mapping for delivery vs pickup fulfillment
+const LIFECYCLE_STEPS: Record<OrderDeliveryType, { key: OrderFulfillmentStatus; labelAr: string; labelEn: string }[]> = {
+  delivery: [
+    { key: 'pending', labelAr: 'استلام الطلب', labelEn: 'Order Received' },
+    { key: 'confirmed', labelAr: 'تم التأكيد', labelEn: 'Confirmed' },
+    { key: 'processing', labelAr: 'قيد التجهيز', labelEn: 'Processing' },
+    { key: 'shipped', labelAr: 'تم الشحن', labelEn: 'Shipped' },
+    { key: 'delivered', labelAr: 'تم التوصيل', labelEn: 'Delivered' },
+    { key: 'completed', labelAr: 'مكتمل', labelEn: 'Completed' },
+  ],
+  pickup: [
+    { key: 'pending', labelAr: 'استلام الطلب', labelEn: 'Order Received' },
+    { key: 'confirmed', labelAr: 'تم التأكيد', labelEn: 'Confirmed' },
+    { key: 'processing', labelAr: 'قيد التجهيز', labelEn: 'Processing' },
+    { key: 'ready_for_pickup', labelAr: 'جاهز للاستلام', labelEn: 'Ready for Pickup' },
+    { key: 'completed', labelAr: 'تم الاستلام', labelEn: 'Picked Up' },
+  ],
+};
+
 export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorkspaceProps) {
   const isRtl = lang === 'ar';
 
@@ -331,7 +367,7 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
       case 'ready_for_pickup':
         return ['completed', 'cancelled'];
       case 'shipped':
-        return ['delivered', 'cancelled'];
+        return ['delivered', 'shipped', 'cancelled'];
       case 'delivered':
         return ['completed'];
       case 'completed':
@@ -340,6 +376,19 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
       default:
         return [];
     }
+  };
+
+  const handleOpenStatusModal = (order?: TenantOrder) => {
+    const ord = order || selectedOrder;
+    if (!ord) return;
+    setTargetStatus('');
+    setTrackingNumberInput(ord.trackingNumber || '');
+    setEstimatedDeliveryInput(
+      ord.estimatedDeliveryDate
+        ? new Date(ord.estimatedDeliveryDate).toISOString().slice(0, 10)
+        : ''
+    );
+    setStatusModalOpen(true);
   };
 
   // Submit Status Update
@@ -841,74 +890,85 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                   <>
                     {/* Drawer Header */}
                     <div className={`p-5 border-b sticky top-0 z-10 flex items-center justify-between ${
-                      darkMode ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white/90 border-slate-200'
-                    } backdrop-blur-md`}>
-                      <div className="flex items-center gap-2.5">
-                        <span className="p-2 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                      darkMode ? 'bg-zinc-900/95 border-zinc-800' : 'bg-white/95 border-slate-200'
+                    } backdrop-blur-md shadow-xs`}>
+                      <div className="flex items-center gap-3">
+                        <span className="p-2.5 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400 shrink-0">
                           <ShoppingBag size={20} />
                         </span>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h2 className="font-mono font-bold text-base md:text-lg text-brand-600 dark:text-brand-400">
+                            <h2 className="font-mono font-bold text-lg text-slate-900 dark:text-zinc-100 tracking-tight">
                               {selectedOrder.orderNumber}
                             </h2>
                           </div>
-                          <p className="text-[10px] text-neutral-400">
-                            {isRtl ? 'تاريخ الإنشاء:' : 'Created:'} {formatDate(selectedOrder.createdAt)}
+                          <p className="text-xs font-medium text-slate-500 dark:text-zinc-400 mt-0.5">
+                            {isRtl ? 'تاريخ الطلب:' : 'Order Date:'}{' '}
+                            <span className="font-mono text-slate-700 dark:text-zinc-300 font-semibold">{formatDate(selectedOrder.createdAt)}</span>
                           </p>
                         </div>
                       </div>
 
-                      <button
-                        onClick={handleCloseDrawer}
-                        className="p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-zinc-800 text-neutral-400 hover:text-neutral-600 transition-colors cursor-pointer"
-                      >
-                        <X size={18} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleOpenOrderDetail(selectedOrder.id)}
+                          title={isRtl ? 'تحديث البيانات' : 'Refresh'}
+                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                        >
+                          <RefreshCw size={16} />
+                        </button>
+                        <button
+                          onClick={handleCloseDrawer}
+                          title={isRtl ? 'إغلاق' : 'Close'}
+                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Drawer Content */}
-                    <div className="p-5 space-y-5 flex-1">
+                    <div className="p-5 space-y-5 flex-1 overflow-y-auto">
 
-                      {/* Status Summary & Quick Actions */}
-                      <div className={`p-4 rounded-2xl border space-y-3.5 ${
-                        darkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50 border-slate-200'
+                      {/* 1. Status & Primary Actions Card */}
+                      <div className={`p-4 rounded-2xl border space-y-4 ${
+                        darkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50/80 border-slate-200'
                       }`}>
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            {/* Fulfillment Status */}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* Fulfillment Status Pill */}
                             {(() => {
                               const s = STATUS_CONFIG[selectedOrder.status] || STATUS_CONFIG.pending;
                               return (
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${s.bgLight} ${s.textLight} ${s.borderLight} ${s.bgDark} ${s.textDark} ${s.borderDark}`}>
-                                  {isRtl ? s.labelAr : s.labelEn}
+                                <span className={`px-3 py-1.5 rounded-full text-xs font-bold border shadow-xs inline-flex items-center gap-1.5 ${s.bgLight} ${s.textLight} ${s.borderLight} ${s.bgDark} ${s.textDark} ${s.borderDark}`}>
+                                  <span className="w-2 h-2 rounded-full bg-current opacity-80" />
+                                  <span>{isRtl ? s.labelAr : s.labelEn}</span>
                                 </span>
                               );
                             })()}
 
-                            {/* Payment Status */}
+                            {/* Payment Status Pill */}
                             {(() => {
                               const p = PAYMENT_STATUS_CONFIG[selectedOrder.paymentStatus] || PAYMENT_STATUS_CONFIG.pending;
                               return (
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${p.colorClass}`}>
-                                  {isRtl ? p.labelAr : p.labelEn}
+                                <span className={`px-3 py-1.5 rounded-full text-xs font-bold border shadow-xs inline-flex items-center gap-1.5 ${p.colorClass}`}>
+                                  <CreditCard size={13} />
+                                  <span>{isRtl ? p.labelAr : p.labelEn}</span>
                                 </span>
                               );
                             })()}
                           </div>
 
-                          {/* Order Action Buttons */}
+                          {/* Quick Action Buttons */}
                           <div className="flex items-center gap-2">
                             {/* Update Status Button */}
                             {getAllowedTransitions(selectedOrder).length > 0 && (
                               <button
-                                onClick={() => {
-                                  setTargetStatus('');
-                                  setStatusModalOpen(true);
-                                }}
-                                className="px-3 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs transition-colors shadow-xs cursor-pointer"
+                                onClick={() => handleOpenStatusModal(selectedOrder)}
+                                className="px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
                               >
-                                {isRtl ? 'تحديث الحالة' : 'Update Status'}
+                                <RefreshCw size={13} />
+                                <span>{isRtl ? 'تحديث الحالة' : 'Update Status'}</span>
                               </button>
                             )}
 
@@ -919,19 +979,78 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                                   setPaymentMethodInput('cash');
                                   setPaymentModalOpen(true);
                                 }}
-                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-xs flex items-center gap-1 cursor-pointer"
+                                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
                               >
-                                <DollarSign size={13} />
+                                <DollarSign size={14} />
                                 <span>{isRtl ? 'تحصيل الدفعة' : 'Collect Payment'}</span>
                               </button>
                             )}
                           </div>
                         </div>
 
+                        {/* Visual Lifecycle Stepper */}
+                        {selectedOrder.status !== 'cancelled' ? (
+                          <div className={`pt-3 border-t ${darkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
+                            <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-zinc-300 mb-2">
+                              <span>{isRtl ? 'مسار تنفيذ الطلب' : 'Fulfillment Lifecycle'}</span>
+                              <span className="font-semibold text-slate-500 dark:text-zinc-400">
+                                {selectedOrder.deliveryType === 'delivery'
+                                  ? (isRtl ? 'توصيل' : 'Delivery')
+                                  : (isRtl ? 'استلام من الصالون' : 'Salon Pickup')}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 w-full overflow-x-auto pb-1">
+                              {(selectedOrder.deliveryType === 'delivery'
+                                ? LIFECYCLE_STEPS.delivery
+                                : LIFECYCLE_STEPS.pickup
+                              ).map((step, idx, arr) => {
+                                const cfg = STATUS_CONFIG[step.key];
+                                const currentIdx = arr.findIndex(s => s.key === selectedOrder.status);
+                                const isCurrent = selectedOrder.status === step.key;
+                                const isPast = currentIdx !== -1 && idx < currentIdx;
+                                return (
+                                  <div key={step.key} className="flex items-center gap-1 flex-1 min-w-[70px]">
+                                    <div
+                                      title={isRtl ? cfg?.labelAr : cfg?.labelEn}
+                                      className={`h-2 flex-1 rounded-full transition-all ${
+                                        isCurrent
+                                          ? 'bg-brand-500 ring-2 ring-brand-400/40'
+                                          : isPast
+                                          ? 'bg-emerald-500'
+                                          : darkMode ? 'bg-zinc-800' : 'bg-slate-200'
+                                      }`}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="flex justify-between text-[10px] text-slate-500 dark:text-zinc-400 pt-1">
+                              <span>{isRtl ? 'بدء الطلب' : 'Start'}</span>
+                              <span className="font-bold text-brand-600 dark:text-brand-400">
+                                {isRtl
+                                  ? STATUS_CONFIG[selectedOrder.status]?.labelAr
+                                  : STATUS_CONFIG[selectedOrder.status]?.labelEn}
+                              </span>
+                              <span>{isRtl ? 'اكتمال' : 'Completed'}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                            darkMode ? 'bg-rose-950/30 border-rose-900/60 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-800'
+                          }`}>
+                            <AlertCircle size={15} className="shrink-0" />
+                            <span>{isRtl ? 'تم إلغاء هذا الطلب ولا يمكن المتابعة في مسار التنفيذ.' : 'This order has been cancelled and cannot proceed further.'}</span>
+                          </div>
+                        )}
+
                         {/* Payment Method Details */}
-                        <div className="text-xs flex items-center justify-between text-neutral-500 dark:text-neutral-400 pt-2 border-t border-neutral-200/60 dark:border-zinc-800">
-                          <span>{isRtl ? 'طريقة الدفع المختارة:' : 'Payment Method:'}</span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        <div className={`text-xs flex items-center justify-between pt-2.5 border-t ${
+                          darkMode ? 'border-zinc-800 text-zinc-300' : 'border-slate-200 text-slate-700'
+                        }`}>
+                          <span className="font-medium text-slate-500 dark:text-zinc-400">
+                            {isRtl ? 'طريقة الدفع:' : 'Payment Method:'}
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-zinc-100">
                             {PAYMENT_METHOD_LABELS[selectedOrder.paymentMethod]
                               ? (isRtl ? PAYMENT_METHOD_LABELS[selectedOrder.paymentMethod].labelAr : PAYMENT_METHOD_LABELS[selectedOrder.paymentMethod].labelEn)
                               : selectedOrder.paymentMethod}
@@ -939,183 +1058,318 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                         </div>
                       </div>
 
-                      {/* Customer Information Card */}
-                      <div className={`p-4 rounded-2xl border space-y-2.5 ${
+                      {/* 2. Customer Information Card */}
+                      <div className={`p-4 rounded-2xl border space-y-3 shadow-xs ${
                         darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
                       }`}>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-                          <User size={14} />
-                          <span>{isRtl ? 'معلومات العميل' : 'Customer Information'}</span>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                          <User size={15} className="text-brand-500" />
+                          <span>{isRtl ? 'بيانات العميل' : 'Customer Information'}</span>
                         </h4>
-                        <div className="text-xs space-y-1.5">
-                          <div className="font-bold text-sm">
-                            {selectedOrder.user?.firstName || selectedOrder.user?.lastName
-                              ? `${selectedOrder.user.firstName || ''} ${selectedOrder.user.lastName || ''}`.trim()
-                              : (isRtl ? 'عميل زائر' : 'Guest Customer')}
+
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <span className="text-slate-500 dark:text-zinc-400 block text-[11px]">
+                              {isRtl ? 'اسم العميل' : 'Customer Name'}
+                            </span>
+                            <p className="font-bold text-sm text-slate-900 dark:text-zinc-100">
+                              {selectedOrder.user?.firstName || selectedOrder.user?.lastName
+                                ? `${selectedOrder.user.firstName || ''} ${selectedOrder.user.lastName || ''}`.trim()
+                                : (isRtl ? 'عميل زائر' : 'Guest Customer')}
+                            </p>
                           </div>
+
                           {selectedOrder.user?.phone && (
-                            <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
-                              <Phone size={12} />
-                              <span className="font-mono">{selectedOrder.user.phone}</span>
+                            <div className="pt-1.5 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between">
+                              <span className="text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                                <Phone size={13} />
+                                <span>{isRtl ? 'رقم الهاتف' : 'Phone'}</span>
+                              </span>
+                              <a
+                                href={`tel:${selectedOrder.user.phone}`}
+                                dir="ltr"
+                                className="font-mono font-bold text-brand-600 dark:text-brand-400 hover:underline"
+                              >
+                                {selectedOrder.user.phone}
+                              </a>
                             </div>
                           )}
+
                           {selectedOrder.user?.email && (
-                            <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
-                              <Mail size={12} />
-                              <span>{selectedOrder.user.email}</span>
+                            <div className="pt-1.5 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between">
+                              <span className="text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                                <Mail size={13} />
+                                <span>{isRtl ? 'البريد الإلكتروني' : 'Email'}</span>
+                              </span>
+                              <a
+                                href={`mailto:${selectedOrder.user.email}`}
+                                dir="ltr"
+                                className="font-medium text-slate-800 dark:text-zinc-200 hover:underline truncate max-w-[200px]"
+                              >
+                                {selectedOrder.user.email}
+                              </a>
                             </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Fulfillment & Delivery Details */}
-                      <div className={`p-4 rounded-2xl border space-y-2.5 ${
+                      {/* 3. Fulfillment & Delivery Details */}
+                      <div className={`p-4 rounded-2xl border space-y-3.5 shadow-xs ${
                         darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
                       }`}>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-                          {selectedOrder.deliveryType === 'delivery' ? <Truck size={14} /> : <Store size={14} />}
-                          <span>{isRtl ? 'بيانات التوصيل والاستلام' : 'Fulfillment Details'}</span>
-                        </h4>
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                            {selectedOrder.deliveryType === 'delivery' ? (
+                              <Truck size={15} className="text-brand-500" />
+                            ) : (
+                              <Store size={15} className="text-brand-500" />
+                            )}
+                            <span>{isRtl ? 'تفاصيل الاستلام والتوصيل' : 'Fulfillment Details'}</span>
+                          </h4>
+                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                            selectedOrder.deliveryType === 'delivery'
+                              ? 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/50 dark:text-blue-200 dark:border-blue-800'
+                              : 'bg-indigo-50 text-indigo-800 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-200 dark:border-indigo-800'
+                          }`}>
+                            {selectedOrder.deliveryType === 'delivery'
+                              ? (isRtl ? 'توصيل' : 'Delivery')
+                              : (isRtl ? 'استلام من الصالون' : 'Pickup')}
+                          </span>
+                        </div>
 
-                        <div className="text-xs space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-neutral-400">{isRtl ? 'نوع التسليم:' : 'Delivery Type:'}</span>
-                            <span className="font-bold">
-                              {selectedOrder.deliveryType === 'delivery'
-                                ? (isRtl ? 'توصيل إلى العنوان' : 'Delivery to Address')
-                                : (isRtl ? 'استلام من الصالون' : 'Pickup at Salon')}
-                            </span>
-                          </div>
+                        {/* Delivery Order Content */}
+                        {selectedOrder.deliveryType === 'delivery' && (() => {
+                          const addr = parseOrderShippingAddress(selectedOrder.shippingAddress);
+                          const hasAddressData = addr.street || addr.city || addr.district || addr.building || addr.rawAddress;
+                          return (
+                            <div className="space-y-3 text-xs">
+                              {hasAddressData ? (
+                                <div className={`p-3.5 rounded-xl border space-y-2 ${
+                                  darkMode ? 'bg-zinc-950/50 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                                }`}>
+                                  <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-zinc-100">
+                                    <MapPin size={15} className="text-brand-500 shrink-0" />
+                                    <span>{addr.title || (isRtl ? 'عنوان التوصيل' : 'Delivery Address')}</span>
+                                  </div>
 
-                          {/* Delivery Address */}
-                          {selectedOrder.deliveryType === 'delivery' && selectedOrder.shippingAddress && (
-                            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-zinc-950/40 border border-neutral-200/50 dark:border-zinc-800/60 space-y-1">
-                              <div className="flex items-start gap-1.5 text-neutral-700 dark:text-neutral-300">
-                                <MapPin size={14} className="shrink-0 mt-0.5 text-brand-500" />
-                                <div>
-                                  {selectedOrder.shippingAddress.street && <p>{selectedOrder.shippingAddress.street}</p>}
-                                  {selectedOrder.shippingAddress.city && (
-                                    <p className="text-neutral-400">
-                                      {selectedOrder.shippingAddress.city}
-                                      {selectedOrder.shippingAddress.district ? `, ${selectedOrder.shippingAddress.district}` : ''}
-                                    </p>
+                                  {(addr.recipientName || addr.phone) && (
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600 dark:text-zinc-400 pb-1.5 border-b border-slate-200/80 dark:border-zinc-800">
+                                      {addr.recipientName && (
+                                        <span className="font-semibold text-slate-800 dark:text-zinc-200">
+                                          {addr.recipientName}
+                                        </span>
+                                      )}
+                                      {addr.phone && (
+                                        <span dir="ltr" className="font-mono font-medium">
+                                          {addr.phone}
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
-                                  {selectedOrder.shippingAddress.notes && (
-                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
-                                      {isRtl ? 'ملاحظة:' : 'Note:'} {selectedOrder.shippingAddress.notes}
-                                    </p>
+
+                                  <div className="space-y-1 text-slate-800 dark:text-zinc-200">
+                                    {addr.building && (
+                                      <p className="font-medium text-slate-700 dark:text-zinc-300">
+                                        {isRtl ? 'المبنى/الشقة:' : 'Building/Unit:'} {addr.building}
+                                      </p>
+                                    )}
+                                    {addr.street && (
+                                      <p className="font-semibold text-slate-900 dark:text-zinc-100">
+                                        {addr.street}
+                                      </p>
+                                    )}
+                                    {(addr.city || addr.district) && (
+                                      <p className="text-slate-600 dark:text-zinc-300">
+                                        {[addr.district, addr.city].filter(Boolean).join(', ')}
+                                      </p>
+                                    )}
+                                    {addr.postalCode && (
+                                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono">
+                                        {isRtl ? 'الرمز البريدي:' : 'Postal Code:'} {addr.postalCode}
+                                      </p>
+                                    )}
+                                    {!addr.street && !addr.city && addr.rawAddress && (
+                                      <p className="font-medium text-slate-800 dark:text-zinc-200 whitespace-pre-line">
+                                        {addr.rawAddress}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {addr.notes && (
+                                    <div className={`p-2 rounded-lg text-[11px] mt-1 border ${
+                                      darkMode ? 'bg-amber-950/20 border-amber-900/40 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-900'
+                                    }`}>
+                                      <span className="font-bold">{isRtl ? 'تعليمات التوصيل:' : 'Delivery Instructions:'} </span>
+                                      <span>{addr.notes}</span>
+                                    </div>
                                   )}
                                 </div>
+                              ) : (
+                                <div className={`p-3 rounded-xl border flex items-center gap-2 ${
+                                  darkMode ? 'bg-amber-950/20 border-amber-900/50 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800'
+                                }`}>
+                                  <AlertCircle size={15} className="shrink-0" />
+                                  <span>{isRtl ? 'لم يتم العثور على تفاصيل عنوان التوصيل' : 'No shipping address recorded for this order'}</span>
+                                </div>
+                              )}
+
+                              {/* Tracking Number */}
+                              {selectedOrder.trackingNumber && (
+                                <div className="flex items-center justify-between p-2.5 rounded-xl border border-cyan-200 dark:border-cyan-900/50 bg-cyan-50/50 dark:bg-cyan-950/20">
+                                  <span className="font-bold text-slate-700 dark:text-zinc-300">{isRtl ? 'رقم التتبع الشحن:' : 'Tracking Number:'}</span>
+                                  <span dir="ltr" className="font-mono font-black text-cyan-700 dark:text-cyan-300 text-sm">
+                                    {selectedOrder.trackingNumber}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Estimated Delivery Date */}
+                              {selectedOrder.estimatedDeliveryDate && (
+                                <div className="flex items-center justify-between pt-1">
+                                  <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'تاريخ التوصيل المتوقع:' : 'Estimated Delivery:'}</span>
+                                  <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{formatDate(selectedOrder.estimatedDeliveryDate)}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Pickup Order Content */}
+                        {selectedOrder.deliveryType === 'pickup' && (
+                          <div className="space-y-3 text-xs">
+                            <div className={`p-3.5 rounded-xl border space-y-2 ${
+                              darkMode ? 'bg-zinc-950/50 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                            }`}>
+                              <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-zinc-100">
+                                <Store size={16} className="text-brand-500 shrink-0" />
+                                <span>{isRtl ? 'استلام ذاتي من فرع الصالون' : 'Self-Collection from Salon'}</span>
                               </div>
+                              <p className="text-slate-600 dark:text-zinc-300 leading-relaxed">
+                                {isRtl
+                                  ? 'هذا الطلب مخصص للاستلام المباشر من الصالون. لا يتطلب شحن أو عنوان توصيل.'
+                                  : 'This order is designated for direct salon collection. No shipping or delivery address required.'}
+                              </p>
+                              {selectedOrder.pickupDate && (
+                                <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+                                  <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'موعد الاستلام المحدد:' : 'Scheduled Pickup Date:'}</span>
+                                  <span className="font-mono font-bold text-slate-900 dark:text-zinc-100">{formatDate(selectedOrder.pickupDate)}</span>
+                                </div>
+                              )}
                             </div>
-                          )}
-
-                          {/* Pickup Date */}
-                          {selectedOrder.deliveryType === 'pickup' && selectedOrder.pickupDate && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-neutral-400">{isRtl ? 'تاريخ الاستلام المحدد:' : 'Pickup Date:'}</span>
-                              <span className="font-mono">{formatDate(selectedOrder.pickupDate)}</span>
-                            </div>
-                          )}
-
-                          {/* Tracking Number */}
-                          {selectedOrder.trackingNumber && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-neutral-400">{isRtl ? 'رقم التتبع:' : 'Tracking #:'}</span>
-                              <span className="font-mono font-bold text-cyan-600 dark:text-cyan-400">
-                                {selectedOrder.trackingNumber}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Estimated Delivery */}
-                          {selectedOrder.estimatedDeliveryDate && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-neutral-400">{isRtl ? 'تاريخ التوصيل المتوقع:' : 'Estimated Delivery:'}</span>
-                              <span className="font-mono">{formatDate(selectedOrder.estimatedDeliveryDate)}</span>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Items Breakdown Table */}
-                      <div className={`p-4 rounded-2xl border space-y-3 ${
+                      {/* 4. Order Items */}
+                      <div className={`p-4 rounded-2xl border space-y-3 shadow-xs ${
                         darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
                       }`}>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-                          <Package size={14} />
-                          <span>{isRtl ? 'المنتجات المطلوبة' : 'Order Items'}</span>
-                        </h4>
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                            <Package size={15} className="text-brand-500" />
+                            <span>{isRtl ? 'منتجات الطلب' : 'Order Items'}</span>
+                          </h4>
+                          <span className="text-xs font-bold text-slate-600 dark:text-zinc-300">
+                            {selectedOrder.items?.length || 0} {isRtl ? 'منتج' : 'items'}
+                          </span>
+                        </div>
 
-                        <div className="divide-y divide-neutral-100 dark:divide-zinc-850">
+                        <div className="divide-y divide-slate-100 dark:divide-zinc-800">
                           {selectedOrder.items && selectedOrder.items.length > 0 ? (
                             selectedOrder.items.map((it) => (
-                              <div key={it.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                                <div className="flex items-center gap-2.5">
+                              <div key={it.id} className="py-3 flex items-center justify-between gap-3 text-xs">
+                                <div className="flex items-center gap-3">
                                   {it.product?.image ? (
                                     <img
                                       src={it.product.image}
                                       alt={it.productName}
-                                      className="w-10 h-10 rounded-lg object-cover border border-neutral-200 dark:border-zinc-800 shrink-0"
+                                      className="w-11 h-11 rounded-lg object-cover border border-slate-200 dark:border-zinc-800 shrink-0"
                                     />
                                   ) : (
-                                    <div className="w-10 h-10 rounded-lg bg-neutral-100 dark:bg-zinc-800 flex items-center justify-center text-neutral-400 shrink-0">
+                                    <div className="w-11 h-11 rounded-lg bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-400 dark:text-zinc-500 shrink-0">
                                       <Package size={18} />
                                     </div>
                                   )}
                                   <div>
-                                    <p className="font-bold">
+                                    <p className="font-bold text-slate-900 dark:text-zinc-100">
                                       {isRtl ? (it.productNameAr || it.productName) : it.productName}
                                     </p>
-                                    <p className="text-[10px] text-neutral-400 font-mono">
+                                    <p className="text-xs text-slate-600 dark:text-zinc-400 font-mono mt-0.5">
                                       {it.quantity} × {formatPrice(it.unitPrice)}
                                     </p>
                                   </div>
                                 </div>
-                                <div className="font-mono font-bold">
+                                <div className="font-mono font-bold text-sm text-slate-900 dark:text-zinc-100">
                                   {formatPrice(it.totalPrice)}
                                 </div>
                               </div>
                             ))
                           ) : (
-                            <p className="text-xs text-neutral-400 py-3 text-center">
+                            <p className="text-xs text-slate-500 dark:text-zinc-400 py-3 text-center">
                               {isRtl ? 'لا توجد بيانات للمنتجات' : 'No items found'}
                             </p>
                           )}
                         </div>
 
-                        {/* Financial Totals */}
-                        <div className="pt-3 border-t border-neutral-100 dark:border-zinc-800 text-xs space-y-1.5">
-                          <div className="flex justify-between text-neutral-500 dark:text-neutral-400">
-                            <span>{isRtl ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
-                            <span className="font-mono">{formatPrice(selectedOrder.subtotal)}</span>
+                        {/* Financial Totals Breakdown */}
+                        <div className={`pt-3 border-t text-xs space-y-2 ${
+                          darkMode ? 'border-zinc-800 text-zinc-300' : 'border-slate-200 text-slate-700'
+                        }`}>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
+                            <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100">{formatPrice(selectedOrder.subtotal)}</span>
                           </div>
-                          <div className="flex justify-between text-neutral-500 dark:text-neutral-400">
-                            <span>{isRtl ? 'ضريبة القيمة المضافة (15%):' : 'VAT (15%):'}</span>
-                            <span className="font-mono">{formatPrice(selectedOrder.taxAmount)}</span>
+
+                          <div className="flex justify-between">
+                            <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'ضريبة القيمة المضافة (15%):' : 'VAT (15%):'}</span>
+                            <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100">{formatPrice(selectedOrder.taxAmount)}</span>
                           </div>
-                          {Number(selectedOrder.shippingFee) > 0 && (
-                            <div className="flex justify-between text-neutral-500 dark:text-neutral-400">
-                              <span>{isRtl ? 'رسوم التوصيل:' : 'Shipping Fee:'}</span>
-                              <span className="font-mono">{formatPrice(selectedOrder.shippingFee)}</span>
+
+                          {Number(selectedOrder.shippingFee) > 0 ? (
+                            <div className="flex justify-between">
+                              <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'رسوم التوصيل:' : 'Shipping Fee:'}</span>
+                              <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100">{formatPrice(selectedOrder.shippingFee)}</span>
+                            </div>
+                          ) : (
+                            <div className="flex justify-between">
+                              <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'رسوم التوصيل:' : 'Shipping Fee:'}</span>
+                              <span className="font-bold text-emerald-600 dark:text-emerald-400">{isRtl ? 'مجاني' : 'Free'}</span>
                             </div>
                           )}
-                          <div className="flex justify-between text-sm font-black pt-2 border-t border-neutral-200 dark:border-zinc-800">
+
+                          <div className={`flex justify-between text-base font-black pt-2.5 border-t ${
+                            darkMode ? 'border-zinc-800 text-zinc-100' : 'border-slate-200 text-slate-900'
+                          }`}>
                             <span>{isRtl ? 'الإجمالي الكلي:' : 'Total Amount:'}</span>
-                            <span className="font-mono text-brand-600 dark:text-brand-400">
+                            <span className="font-mono text-brand-600 dark:text-brand-400 text-lg">
                               {formatPrice(selectedOrder.totalAmount)}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Payment Transactions Record */}
+                      {/* 5. Customer Notes */}
+                      {selectedOrder.notes && (
+                        <div className={`p-4 rounded-2xl border text-xs space-y-1.5 shadow-xs ${
+                          darkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}>
+                          <span className="font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                            <FileText size={14} className="text-brand-500" />
+                            <span>{isRtl ? 'ملاحظات العميل مع الطلب:' : 'Customer Order Notes:'}</span>
+                          </span>
+                          <p className="text-slate-700 dark:text-zinc-300 leading-relaxed font-normal whitespace-pre-line pl-5">
+                            {selectedOrder.notes}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* 6. Payment Transactions History */}
                       {selectedOrder.paymentTransactions && selectedOrder.paymentTransactions.length > 0 && (
-                        <div className={`p-4 rounded-2xl border space-y-3 ${
+                        <div className={`p-4 rounded-2xl border space-y-3 shadow-xs ${
                           darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
                         }`}>
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-                            <CreditCard size={14} />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                            <CreditCard size={15} className="text-emerald-500" />
                             <span>{isRtl ? 'سجل العمليات المالية' : 'Payment Transactions'}</span>
                           </h4>
 
@@ -1123,43 +1377,32 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                             {selectedOrder.paymentTransactions.map((tx) => (
                               <div
                                 key={tx.id}
-                                className="p-2.5 rounded-xl border border-neutral-100 dark:border-zinc-800 text-xs flex justify-between items-center"
+                                className={`p-3 rounded-xl border text-xs flex justify-between items-center ${
+                                  darkMode ? 'border-zinc-800 bg-zinc-950/40' : 'border-slate-100 bg-slate-50/60'
+                                }`}
                               >
                                 <div>
-                                  <div className="font-bold">
+                                  <div className="font-bold text-slate-900 dark:text-zinc-100">
                                     {PAYMENT_METHOD_LABELS[tx.paymentMethod]
                                       ? (isRtl ? PAYMENT_METHOD_LABELS[tx.paymentMethod].labelAr : PAYMENT_METHOD_LABELS[tx.paymentMethod].labelEn)
                                       : tx.paymentMethod}
                                   </div>
-                                  <div className="text-[10px] text-neutral-400">
+                                  <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono mt-0.5">
                                     {formatDate(tx.processedAt)}
                                     {tx.processor?.name ? ` • ${tx.processor.name}` : ''}
                                   </div>
                                 </div>
                                 <div className="text-end">
-                                  <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                  <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">
                                     {formatPrice(tx.amount)}
                                   </div>
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-zinc-800 uppercase font-semibold">
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-zinc-800 uppercase font-bold text-slate-700 dark:text-zinc-300">
                                     {tx.status}
                                   </span>
                                 </div>
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Notes */}
-                      {selectedOrder.notes && (
-                        <div className={`p-4 rounded-2xl border text-xs space-y-1 ${
-                          darkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50 border-slate-200'
-                        }`}>
-                          <span className="font-bold text-neutral-400 flex items-center gap-1">
-                            <FileText size={12} />
-                            <span>{isRtl ? 'ملاحظات العميل:' : 'Customer Notes:'}</span>
-                          </span>
-                          <p>{selectedOrder.notes}</p>
                         </div>
                       )}
 
@@ -1191,47 +1434,111 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                 darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-800'
               }`}
             >
-              <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-zinc-800">
-                <h3 className="font-bold text-base">
-                  {isRtl ? 'تحديث حالة الطلب' : 'Update Order Status'}
-                </h3>
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-zinc-800">
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-zinc-100">
+                    {isRtl ? 'تحديث حالة الطلب' : 'Update Order Status'}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 font-mono mt-0.5">
+                    {selectedOrder.orderNumber}
+                  </p>
+                </div>
                 <button
                   onClick={() => setStatusModalOpen(false)}
-                  className="p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-zinc-800 text-neutral-400"
+                  className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="text-xs space-y-3">
-                <div>
-                  <label className="block text-neutral-400 mb-1.5 font-medium">
-                    {isRtl ? 'الحالة الجديدة:' : 'New Status:'}
-                  </label>
-                  <select
-                    value={targetStatus}
-                    onChange={(e) => setTargetStatus(e.target.value as OrderFulfillmentStatus)}
-                    className={`w-full p-2.5 rounded-xl border bg-transparent text-xs focus:ring-1 focus:ring-brand-500 focus:outline-none ${
-                      darkMode ? 'border-zinc-800 text-white bg-zinc-900' : 'border-slate-200 text-slate-800 bg-white'
-                    }`}
-                  >
-                    <option value="">{isRtl ? '-- اختر الحالة --' : '-- Select Status --'}</option>
-                    {getAllowedTransitions(selectedOrder).map((st) => {
-                      const cfg = STATUS_CONFIG[st];
-                      return (
-                        <option key={st} value={st}>
-                          {isRtl ? cfg.labelAr : cfg.labelEn}
-                        </option>
-                      );
-                    })}
-                  </select>
+              <div className="text-xs space-y-4">
+                {/* Current Status Banner */}
+                <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                  darkMode ? 'bg-zinc-950/50 border-zinc-800' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <span className="text-slate-500 dark:text-zinc-400 font-medium">{isRtl ? 'الحالة الحالية:' : 'Current Status:'}</span>
+                  {(() => {
+                    const cur = STATUS_CONFIG[selectedOrder.status] || STATUS_CONFIG.pending;
+                    return (
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${cur.bgLight} ${cur.textLight} ${cur.borderLight} ${cur.bgDark} ${cur.textDark} ${cur.borderDark}`}>
+                        {isRtl ? cur.labelAr : cur.labelEn}
+                      </span>
+                    );
+                  })()}
+                </div>
+
+                {/* Explanatory Lifecycle context */}
+                <div className="space-y-1.5">
+                  <span className="font-bold text-slate-700 dark:text-zinc-300 block">
+                    {isRtl ? 'اختر الحالة التالية المعتمدة:' : 'Select Authorized Next Transition:'}
+                  </span>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-normal">
+                    {isRtl
+                      ? 'وفقاً لقواعد النظام، تقتصر الخيارات المتاحة على الحالات المسموح بالانتقال إليها مباشرة من الحالة الراهنة لضمان تسلسل تنفيذ الطلب.'
+                      : 'According to system rules, only valid subsequent steps for the current state are available to guarantee fulfillment integrity.'}
+                  </p>
+                </div>
+
+                {/* Transitions Options */}
+                <div className="space-y-2">
+                  {getAllowedTransitions(selectedOrder).map((st) => {
+                    const cfg = STATUS_CONFIG[st];
+                    const isSelected = targetStatus === st;
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setTargetStatus(st)}
+                        className={`w-full p-3 rounded-xl border text-start flex items-center justify-between transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-950/30 ring-2 ring-brand-500/20'
+                            : darkMode
+                            ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/30'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                            isSelected ? 'border-brand-600 bg-brand-600' : 'border-slate-350 dark:border-zinc-600'
+                          }`}>
+                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-900 dark:text-zinc-100">
+                              {isRtl ? cfg.labelAr : cfg.labelEn}
+                            </span>
+                            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                              {st === 'processing'
+                                ? (isRtl ? 'بدء تحضير المنتجات للتسليم' : 'Start packing/preparing items')
+                                : st === 'shipped'
+                                ? (isRtl ? 'تسليم الطلب لشركة الشحن أو السائق' : 'Hand over to courier/driver')
+                                : st === 'ready_for_pickup'
+                                ? (isRtl ? 'الطلب جاهز للاستلام من الصالون' : 'Order ready for customer pickup')
+                                : st === 'delivered'
+                                ? (isRtl ? 'تأكيد وصول الشحنة للعميل' : 'Shipment delivered to customer')
+                                : st === 'completed'
+                                ? (isRtl ? 'اكتمال الطلب والتسليم بالكامل' : 'Finalize & mark order completed')
+                                : st === 'cancelled'
+                                ? (isRtl ? 'إلغاء الطلب نهائياً' : 'Cancel this order')
+                                : (isRtl ? cfg.labelAr : cfg.labelEn)}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${cfg.bgLight} ${cfg.textLight} ${cfg.borderLight} ${cfg.bgDark} ${cfg.textDark} ${cfg.borderDark}`}>
+                          {st}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Additional fields if shipping */}
                 {targetStatus === 'shipped' && (
-                  <div className="space-y-3 pt-2 border-t border-neutral-100 dark:border-zinc-800">
+                  <div className={`p-3.5 rounded-xl border space-y-3 ${
+                    darkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
                     <div>
-                      <label className="block text-neutral-400 mb-1 font-medium">
+                      <label className="block text-slate-700 dark:text-zinc-300 mb-1 font-bold text-xs">
                         {isRtl ? 'رقم التتبع (اختياري):' : 'Tracking Number (Optional):'}
                       </label>
                       <input
@@ -1239,22 +1546,22 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                         value={trackingNumberInput}
                         onChange={(e) => setTrackingNumberInput(e.target.value)}
                         placeholder="TRK-12345678"
-                        className={`w-full p-2 rounded-xl border bg-transparent font-mono ${
-                          darkMode ? 'border-zinc-800 text-white' : 'border-slate-200 text-slate-800'
+                        className={`w-full p-2.5 rounded-xl border bg-transparent font-mono text-xs ${
+                          darkMode ? 'border-zinc-800 text-white placeholder:text-zinc-600' : 'border-slate-200 text-slate-900 placeholder:text-slate-400'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-neutral-400 mb-1 font-medium">
+                      <label className="block text-slate-700 dark:text-zinc-300 mb-1 font-bold text-xs">
                         {isRtl ? 'تاريخ التوصيل المتوقع (اختياري):' : 'Estimated Delivery Date (Optional):'}
                       </label>
                       <input
                         type="date"
                         value={estimatedDeliveryInput}
                         onChange={(e) => setEstimatedDeliveryInput(e.target.value)}
-                        className={`w-full p-2 rounded-xl border bg-transparent ${
-                          darkMode ? 'border-zinc-800 text-white' : 'border-slate-200 text-slate-800'
+                        className={`w-full p-2.5 rounded-xl border bg-transparent text-xs ${
+                          darkMode ? 'border-zinc-800 text-white' : 'border-slate-200 text-slate-900'
                         }`}
                       />
                     </div>
@@ -1262,12 +1569,12 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-zinc-800">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-zinc-800">
                 <button
                   type="button"
                   disabled={isSubmittingStatus}
                   onClick={() => setStatusModalOpen(false)}
-                  className="px-3.5 py-2 rounded-xl border text-xs font-semibold text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs font-semibold text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 transition-colors"
                 >
                   {isRtl ? 'إلغاء' : 'Cancel'}
                 </button>
@@ -1275,9 +1582,9 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                   type="button"
                   disabled={!targetStatus || isSubmittingStatus}
                   onClick={handleConfirmStatusUpdate}
-                  className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold transition-all flex items-center gap-1.5"
+                  className="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                 >
-                  {isSubmittingStatus && <RefreshCw size={12} className="animate-spin" />}
+                  {isSubmittingStatus && <RefreshCw size={13} className="animate-spin" />}
                   <span>{isRtl ? 'تأكيد التحديث' : 'Confirm Update'}</span>
                 </button>
               </div>
