@@ -14,6 +14,8 @@ export interface StagedService {
   variantId?: string;
   serviceCategory?: string;
   staffId: string;
+  isExplicitStaff?: boolean;
+  resolvedStaffId?: string;
   startTime: number;
   startTimeIso?: string;
   duration: number;

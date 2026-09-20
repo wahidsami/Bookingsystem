@@ -124,14 +124,14 @@ export default function AppointmentServiceConfiguration({
           {/* Team Member */}
           <label className="block">
             <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              {isRtl ? 'أخصائية التجميل' : 'Team member'}
+              {isRtl ? 'الموظف المختص' : 'Team member'}
             </span>
             <select
               value={draftConfig.staffId || ''}
-              onChange={(e) => setDraftConfig(c => ({ ...c, staffId: e.target.value }))}
+              onChange={(e) => setDraftConfig(c => ({ ...c, staffId: e.target.value, isExplicitStaff: Boolean(e.target.value) }))}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary shadow-sm"
             >
-              <option value="">{isRtl ? 'أي أخصائية' : 'Any Professional'}</option>
+              <option value="">{isRtl ? 'أي موظف' : 'Any Professional'}</option>
               {validStylists.map((stylist) => (
                 <option key={stylist.id} value={stylist.id}>
                   {isRtl ? stylist.nameAr : stylist.nameEn}

@@ -48,6 +48,7 @@ import {
   type BookingDialogCopy
 } from '../lib/bookingUiDialogs';
 import { buildEmptyAppointmentDraftSnapshot, isAppointmentDraftContent } from '../lib/appointmentDraftState';
+import { resolveCompatibleStaffAssignments, type StaffAssignmentResolution } from '../lib/staffAssignmentEngine';
 
 const toMoney = (value: any) => {
   const numeric = Number(value);
@@ -167,6 +168,8 @@ interface StagedService {
   sequenceOrder?: number;
   serviceCategory?: string;
   staffId: string;
+  isExplicitStaff?: boolean;
+  resolvedStaffId?: string;
   startTime: number;
   startTimeIso?: string;
   duration: number;
@@ -1571,6 +1574,9 @@ export default function InteractiveDrawers({
 
         if (isTarget) {
           const next = { ...item, ...updates };
+          if (Object.prototype.hasOwnProperty.call(updates, 'staffId')) {
+            next.isExplicitStaff = updates.isExplicitStaff !== undefined ? updates.isExplicitStaff : Boolean(updates.staffId);
+          }
           const shouldResyncStartIso =
             isStartTimeUpdate ||
             !next.startTimeIso ||
@@ -1729,18 +1735,13 @@ export default function InteractiveDrawers({
 
       const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
 
-      let defaultStaffId = currentStaffId;
-      const normalizedAssignments = (service.employeeAssignments || []).map(id => String(id));
-      if (defaultStaffId && normalizedAssignments.length > 0 && !normalizedAssignments.includes(String(defaultStaffId))) {
-        defaultStaffId = '';
-      }
-
       const newItem: StagedService = {
         id: `stg-${Date.now()}`,
         serviceId: service.id,
         variantId: resolvedVariant?.id || undefined,
         serviceCategory: service.category,
-        staffId: defaultStaffId,
+        staffId: '', // Default to Any Professional
+        isExplicitStaff: false,
         startTime: nextStartTime,
         startTimeIso: nextStartTimeIso,
         duration: resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration),
@@ -1821,28 +1822,7 @@ export default function InteractiveDrawers({
         const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
         const duration = resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration);
 
-        // Coordinated distinct staff allocation for parallel items
-        let staffId = '';
-        const normalizedAssignments = (service.employeeAssignments || []).map(id => String(id));
-        const isQualified = (sId: string) => !normalizedAssignments.length || normalizedAssignments.includes(String(sId));
-
-        if (item.defaultStaffId && isQualified(String(item.defaultStaffId)) && (!isParallel || !usedStaffIdsInBundle.has(String(item.defaultStaffId)))) {
-          staffId = String(item.defaultStaffId);
-        } else if (currentStaffId && isQualified(String(currentStaffId)) && (!isParallel || !usedStaffIdsInBundle.has(String(currentStaffId)))) {
-          staffId = String(currentStaffId);
-        } else if (availableStylists && availableStylists.length > 0) {
-          const candidate = availableStylists.find(s => 
-            isQualified(String(s.id)) && (!isParallel || !usedStaffIdsInBundle.has(String(s.id)))
-          );
-          if (candidate) {
-            staffId = String(candidate.id);
-          }
-        }
-
-        if (staffId && isParallel) {
-          usedStaffIdsInBundle.add(staffId);
-        }
-
+        // Child services in bundles default to "Any Professional" unless explicitly assigned
         const itemStartTime = isParallel ? nextStartTime : runningStartTime;
         const nextStartTimeIso = buildIsoFromMinutes(selectedDate, itemStartTime);
 
@@ -1856,7 +1836,8 @@ export default function InteractiveDrawers({
           serviceId: service.id,
           variantId: resolvedVariant?.id || undefined,
           serviceCategory: service.category,
-          staffId,
+          staffId: '', // Default to Any Professional
+          isExplicitStaff: false,
           startTime: itemStartTime,
           startTimeIso: nextStartTimeIso,
           duration,
@@ -1994,15 +1975,30 @@ export default function InteractiveDrawers({
       return;
     }
 
-    // Pre-validate staged services and guest services staff assignment
+    // Pre-validate staged services and guest services staff assignment using compatible staff resolver
+    const staffResolution = resolveCompatibleStaffAssignments(finalStaged, availableStylists, canonicalServices);
+    if (!staffResolution.success) {
+      showBookingErrorDialog({
+        titleAr: staffResolution.reason === 'explicit_overlap'
+          ? 'تعارض في تعيين المختصين'
+          : staffResolution.reason === 'no_qualified_staff'
+          ? 'لا يوجد موظف مؤهل'
+          : 'تعارض في توفر الموظفين للباقة المتزامنة',
+        titleEn: staffResolution.reason === 'explicit_overlap'
+          ? 'Specialist Scheduling Conflict'
+          : staffResolution.reason === 'no_qualified_staff'
+          ? 'No Qualified Professional'
+          : 'Parallel Bundle Specialist Conflict',
+        bodyAr: staffResolution.messageAr || 'تعذر إيجاد مختصين متاحين لجميع الخدمات في الوقت المحدد.',
+        bodyEn: staffResolution.messageEn || 'Could not find compatible available professionals for all services at the selected time.'
+      });
+      return;
+    }
+
+    // Populate resolvedStaffId for unassigned services
     for (const item of finalStaged) {
-      const srv = canonicalServices.find(s => s.id === item.serviceId);
-      if (srv && srv.employeeAssignments) {
-        const normalizedAssignments = srv.employeeAssignments.map(id => String(id));
-        if (!normalizedAssignments.includes(String(item.staffId))) {
-          setShowAssignWarning(true);
-          return;
-        }
+      if (!item.isExplicitStaff && staffResolution.resolvedStaffMap.has(item.id)) {
+        item.resolvedStaffId = staffResolution.resolvedStaffMap.get(item.id);
       }
     }
 
@@ -2012,40 +2008,10 @@ export default function InteractiveDrawers({
           const srv = canonicalServices.find(s => s.id === gs.serviceId);
           if (srv && srv.employeeAssignments) {
             const normalizedAssignments = srv.employeeAssignments.map(id => String(id));
-            if (!normalizedAssignments.includes(String(gs.staffId))) {
+            if (gs.staffId && !normalizedAssignments.includes(String(gs.staffId))) {
               setShowAssignWarning(true);
               return;
             }
-          }
-        }
-      }
-    }
-
-    // Check for parallel same-staff collision across bundle items
-    const parallelGroups = new Map<string, typeof finalStaged>();
-    finalStaged.filter(s => s.itemType === 'package').forEach(item => {
-      const pkg = services2Bundles?.find(p => p.id === item.packageId) || servicePackages?.find(p => p.id === item.packageId);
-      if (pkg?.scheduleType === 'parallel') {
-        const groupKey = item.packageInstanceId || item.packageId!;
-        if (!parallelGroups.has(groupKey)) parallelGroups.set(groupKey, []);
-        parallelGroups.get(groupKey)!.push(item);
-      }
-    });
-
-    for (const [, groupItems] of parallelGroups.entries()) {
-      for (let i = 0; i < groupItems.length; i++) {
-        for (let j = i + 1; j < groupItems.length; j++) {
-          const a = groupItems[i];
-          const b = groupItems[j];
-          const overlaps = a.startTime < (b.startTime + b.duration) && (a.startTime + a.duration) > b.startTime;
-          if (overlaps && a.staffId && b.staffId && String(a.staffId) === String(b.staffId)) {
-            showBookingErrorDialog({
-              titleAr: 'تعارض في تعيين المختصين للباقة المتزامنة',
-              titleEn: 'Parallel Bundle Specialist Conflict',
-              bodyAr: 'لا يمكن تعيين نفس الموظف لأكثر من خدمة متزامنة في نفس الوقت ضمن نفس الباقة. يرجى اختيار مختص مختلف لكل خدمة.',
-              bodyEn: 'The same specialist cannot be assigned to multiple overlapping services within a parallel bundle. Please select a different specialist for each service.'
-            });
-            return;
           }
         }
       }
@@ -2144,14 +2110,15 @@ export default function InteractiveDrawers({
         const pkgGroup = groupedPackages.get(packageId);
         if (item.notes) pkgGroup.notes.push(item.notes);
 
+        const effectiveStaffId = item.isExplicitStaff ? item.staffId : (item.resolvedStaffId || item.staffId || null);
         pkgGroup.packageItems.push({
           serviceId: resolvedServiceId,
           variantId: variant?.id || undefined,
-          staffId: item.staffId,
-          requestedStaffId: item.staffId,
+          staffId: effectiveStaffId,
+          requestedStaffId: item.isExplicitStaff ? item.staffId : null,
           startTime: requestStartIso,
           duration: resolvedDuration,
-          assignmentMode: 'tenant_reassigned',
+          assignmentMode: item.isExplicitStaff ? 'tenant_reassigned' : 'auto_assigned',
           packageItemId: (item as any).packageItemId || undefined,
           overtimeApproval: item.overtimeApproval || (allowExtendedHours
             && (boardStartHour * 60) + item.startTime + Number(resolvedDuration || 0) > normalClosingMinutes
@@ -2159,10 +2126,11 @@ export default function InteractiveDrawers({
             : undefined)
         });
       } else {
+        const effectiveStaffId = item.isExplicitStaff ? item.staffId : (item.resolvedStaffId || item.staffId || null);
         items.push({
           serviceId: resolvedServiceId,
-          staffId: item.staffId,
-          requestedStaffId: item.staffId,
+          staffId: effectiveStaffId,
+          requestedStaffId: item.isExplicitStaff ? item.staffId : null,
           startTime: requestStartIso,
           notes: item.notes || undefined,
           duration: resolvedDuration,
@@ -2170,7 +2138,7 @@ export default function InteractiveDrawers({
           discountType: item.discountType,
           discountValue: item.discountValue,
           paymentMethod: 'at-center',
-          assignmentMode: 'tenant_reassigned',
+          assignmentMode: item.isExplicitStaff ? 'tenant_reassigned' : 'auto_assigned',
           variantId: variant?.id || undefined,
           overtimeApproval: item.overtimeApproval || (allowExtendedHours
             && (boardStartHour * 60) + item.startTime + Number(resolvedDuration || 0) > normalClosingMinutes
@@ -2188,7 +2156,7 @@ export default function InteractiveDrawers({
     });
 
     const resolvedPrimaryServiceId = `${items[0]?.serviceId || items[0]?.packageId || ''}`.trim();
-    const resolvedPrimaryStaffId = `${firstStaffId || currentStaffId || ''}`.trim();
+    const resolvedPrimaryStaffId = `${firstStaffId || finalStaged[0]?.resolvedStaffId || currentStaffId || ''}`.trim();
     if (!resolvedPrimaryServiceId) {
       showBookingErrorDialog({
         titleAr: 'إعدادات خدمة غير صالحة',
@@ -2230,22 +2198,33 @@ export default function InteractiveDrawers({
     });
 
     const formattedItems = [
-      ...standaloneItems.map(i => ({
-        ...i,
-        startTime: getSyncedStagedStartIso(i),
-        itemType: 'service'
-      })),
+      ...standaloneItems.map(i => {
+        const effectiveStaffId = i.isExplicitStaff ? i.staffId : (i.resolvedStaffId || i.staffId || null);
+        return {
+          ...i,
+          staffId: effectiveStaffId,
+          requestedStaffId: i.isExplicitStaff ? i.staffId : null,
+          assignmentMode: i.isExplicitStaff ? 'tenant_reassigned' : 'auto_assigned',
+          startTime: getSyncedStagedStartIso(i),
+          itemType: 'service'
+        };
+      }),
       ...Object.entries(groupedPackages).map(([_instanceId, children]) => ({
         itemType: 'package',
         packageId: children[0].packageId,
-        packageItems: children.map(c => ({
-          packageItemId: c.packageItemId,
-          serviceId: c.serviceId,
-          staffId: c.staffId,
-          startTime: getSyncedStagedStartIso(c),
-          duration: c.duration,
-          sequenceOrder: c.sequenceOrder || 0
-        }))
+        packageItems: children.map(c => {
+          const effectiveStaffId = c.isExplicitStaff ? c.staffId : (c.resolvedStaffId || c.staffId || null);
+          return {
+            packageItemId: c.packageItemId,
+            serviceId: c.serviceId,
+            staffId: effectiveStaffId,
+            requestedStaffId: c.isExplicitStaff ? c.staffId : null,
+            assignmentMode: c.isExplicitStaff ? 'tenant_reassigned' : 'auto_assigned',
+            startTime: getSyncedStagedStartIso(c),
+            duration: c.duration,
+            sequenceOrder: c.sequenceOrder || 0
+          };
+        })
       }))
     ];
 
@@ -2259,7 +2238,7 @@ export default function InteractiveDrawers({
         ...finalStaged.map(s => s.notes),
         ...(includeGroupGuests ? guestsList.map(g => g.notes ? `${g.name}: ${g.notes}` : '') : [])
       ].filter(Boolean).join(' | '),
-      assignmentMode: 'tenant_reassigned',
+      assignmentMode: finalStaged.some(i => i.isExplicitStaff) ? 'tenant_reassigned' : 'auto_assigned',
       notifyCustomer: notifyWhatsApp,
       paymentMethod: 'at-center',
       platformUserId: custMode === 'existing' ? selectedCustId : undefined,

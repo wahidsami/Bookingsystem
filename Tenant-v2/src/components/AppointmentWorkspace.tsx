@@ -495,6 +495,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   );
   const workspaceShellRef = useRef<HTMLDivElement | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const currentBoardDayName = useMemo(() => {
+    if (!selectedDate || !(selectedDate instanceof Date) || isNaN(selectedDate.getTime())) {
+      return '';
+    }
+    const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const EN_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayIndex = selectedDate.getDay();
+    return isRtl ? AR_DAYS[dayIndex] : EN_DAYS[dayIndex];
+  }, [selectedDate, isRtl]);
   const schedulerConfig = useMemo(
     () => getTenantSchedulerConfig(tenantSettings, tenant, getLocalDateKey(selectedDate)),
     [tenantSettings, tenant, selectedDate]
@@ -5068,8 +5077,21 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 cursor-pointer"
             >
               <Save size={12} />
-              <span>{isRtl ? 'حفظ المنظر' : 'Save view filter'}</span>
+              <span>{isRtl ? 'حفظ هذا المنظر مسبقاً' : 'Save view filter'}</span>
             </button>
+
+            {/* Dynamic Board Day Name Badge */}
+            {currentBoardDayName && (
+              <span
+                className={`inline-flex items-center px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-100/90 text-slate-700 text-[10px] sm:text-[11px] font-bold shadow-2xs select-none ${
+                  isRtl ? 'font-cairo' : 'font-montserrat'
+                }`}
+                style={{ fontFamily: isRtl ? 'Cairo, Tahoma, Arial, sans-serif' : 'Montserrat, system-ui, sans-serif' }}
+                title={isRtl ? `يوم اللوحة الحالي: ${currentBoardDayName}` : `Current Board Day: ${currentBoardDayName}`}
+              >
+                {currentBoardDayName}
+              </span>
+            )}
 
             {/* Add Appointment Global Trigger */}
           </div>
