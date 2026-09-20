@@ -7,7 +7,7 @@ import { SmartConflictModal } from './appointment/SmartConflictModal';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Calendar, Loader2 as CalendarIcon, User, Users, PlusCircle, Check,
-  Trash, ChevronLeft, Loader2, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search
+  Trash, ChevronLeft, Loader2, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search, AlertCircle
 } from 'lucide-react';
 import AppointmentServicesStep from './appointment/AppointmentServicesStep';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
@@ -472,6 +472,7 @@ export default function InteractiveDrawers({
   const [includeGroupGuests, setIncludeGroupGuests] = useState(false);
   const [guestCount, setGuestCount] = useState<number>(1);
   const [guestNames, setGuestNames] = useState('');
+  const [identityValidationError, setIdentityValidationError] = useState(false);
   const registeredCustomerSearchRef = useRef<HTMLInputElement>(null);
   const walkinNameRef = useRef<HTMLInputElement>(null);
 
@@ -662,6 +663,97 @@ export default function InteractiveDrawers({
   const [currentServiceCategory, setCurrentServiceCategory] = useState<string>('all');
   const [serviceSearch, setServiceSearch] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
+
+  // Canonical Identity Validation and Messages
+  const IDENTITY_PREREQUISITE_MESSAGE = useMemo(() => ({
+    ar: 'اختر عميلاً أو حدّد خيار الزيارة بدون موعد للمتابعة.',
+    en: 'Select a customer or choose Walk-in to continue.'
+  }), []);
+
+  const hasAppointmentIdentity = (mode: 'existing' | 'walkin', custId: string): boolean => {
+    if (mode === 'walkin') return true;
+    if (mode === 'existing') return Boolean(custId && custId.trim().length > 0);
+    return false;
+  };
+
+  // Clear validation error when identity becomes satisfied
+  useEffect(() => {
+    if (hasAppointmentIdentity(custMode, selectedCustId)) {
+      setIdentityValidationError(false);
+    }
+  }, [custMode, selectedCustId]);
+
+  // Centralized guard check for advancing workflow steps
+  const canAdvanceToStep = (targetStep: number): { allowed: boolean; reason?: { ar: string; en: string } } => {
+    // Advancing beyond Step 1 (to Guests, Services, or Invoice) strictly requires Identity
+    if (targetStep >= 2) {
+      if (!hasAppointmentIdentity(custMode, selectedCustId)) {
+        return {
+          allowed: false,
+          reason: IDENTITY_PREREQUISITE_MESSAGE
+        };
+      }
+    }
+
+    // Advancing to Step 4 (Invoice) strictly requires at least one service
+    if (targetStep >= 4) {
+      if (stagedServices.length === 0) {
+        return {
+          allowed: false,
+          reason: {
+            ar: 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
+            en: 'Please add at least one service before opening the invoice step'
+          }
+        };
+      }
+    }
+
+    return { allowed: true };
+  };
+
+  // Safe guarded step setter
+  const safeSetCreateStep = (targetStepOrUpdater: number | ((prev: number) => number)) => {
+    setCreateStep((current) => {
+      const next = typeof targetStepOrUpdater === 'function' ? targetStepOrUpdater(current) : targetStepOrUpdater;
+
+      // Moving backward is always permitted
+      if (next <= current) {
+        return Math.max(1, next);
+      }
+
+      // Moving forward requires prerequisite verification
+      const guard = canAdvanceToStep(next);
+      if (!guard.allowed) {
+        if (current === 1 && !hasAppointmentIdentity(custMode, selectedCustId)) {
+          setIdentityValidationError(true);
+        }
+        if (guard.reason) {
+          addLocalToast(guard.reason.ar, guard.reason.en, 'warning');
+        }
+        return current; // Stay in current valid step
+      }
+
+      return next;
+    });
+  };
+
+  // Defensive guard: if identity prerequisite becomes invalid while on higher steps, snap back to Step 1
+  useEffect(() => {
+    if (isCreateDrawerOpen && createMode === 'appointment' && createStep >= 2) {
+      if (!hasAppointmentIdentity(custMode, selectedCustId)) {
+        setCreateStep(1);
+        setIdentityValidationError(true);
+      }
+    }
+  }, [isCreateDrawerOpen, createMode, createStep, custMode, selectedCustId]);
+
+  // Reset step to 1 whenever create drawer closes
+  useEffect(() => {
+    if (!isCreateDrawerOpen) {
+      setCreateStep(1);
+      setIdentityValidationError(false);
+    }
+  }, [isCreateDrawerOpen]);
 
   const { executeFinalSubmission: sharedExecuteSubmission, isSubmitting } = useAppointmentSubmission();
   const executeFinalSubmissionRef = useRef<((items: any[]) => Promise<void>) | null>(null);
@@ -1187,7 +1279,11 @@ export default function InteractiveDrawers({
     }
 
     setCreateMode(snapshot.createMode);
-    setCreateStep(snapshot.createStep);
+    if (snapshot.createStep >= 2 && !hasAppointmentIdentity(snapshot.custMode, snapshot.selectedCustId)) {
+      setCreateStep(1);
+    } else {
+      setCreateStep(snapshot.createStep);
+    }
     setCustMode(snapshot.custMode);
     setSelectedCustId(snapshot.selectedCustId);
     setCustomerSearch(snapshot.customerSearch);
@@ -1253,7 +1349,9 @@ export default function InteractiveDrawers({
     ]);
     setCurrentServiceId(emptyDraft.currentServiceId as string);
     setCurrentStaffId(emptyDraft.currentStaffId as string);
-    setCurrentStartTime(Number(emptyDraft.currentStartTime || 120));
+    if (!preserveBoardStartTime) {
+      setCurrentStartTime(Number(emptyDraft.currentStartTime || 120));
+    }
     setCurrentDuration(Number(emptyDraft.currentDuration || 60));
     setCurrentDiscountType(emptyDraft.currentDiscountType as 'none' | 'flat' | 'percent');
     setCurrentDiscountValue(Number(emptyDraft.currentDiscountValue || 0));
@@ -1395,10 +1493,10 @@ export default function InteractiveDrawers({
       setAppointmentDraftPending(true);
     }
 
-    if (isCreateDrawerOpen && appointmentDraftPending) {
+    if (isCreateDrawerOpen && appointmentDraftPending && !preserveBoardStartTime) {
       setShowAppointmentDraftPrompt(true);
     }
-  }, [isCreateDrawerOpen, appointmentDraftHasContent, appointmentDraftPending]);
+  }, [isCreateDrawerOpen, appointmentDraftHasContent, appointmentDraftPending, preserveBoardStartTime]);
 
   useEffect(() => {
     const wasOpen = previousCartDrawerOpenRef.current;
@@ -1447,60 +1545,132 @@ export default function InteractiveDrawers({
 
   const handleUpdateStagedService = (itemId: string, updates: Partial<StagedService>) => {
     setStagedServices(prev => {
-      // 1. Update the target item
+      const targetItem = prev.find(item => item.id === itemId);
+      if (!targetItem) return prev;
+
+      const isStartTimeUpdate = Object.prototype.hasOwnProperty.call(updates, 'startTime');
+      const targetPkgId = targetItem.packageId;
+      const targetPkg = targetPkgId
+        ? (services2Bundles?.find(p => p.id === targetPkgId) || servicePackages?.find(p => p.id === targetPkgId))
+        : null;
+      const isParallelPackage = Boolean(targetItem.packageInstanceId && targetPkg?.scheduleType === 'parallel');
+
+      const newStartTime = isStartTimeUpdate ? Number(updates.startTime || 0) : targetItem.startTime;
+      const newStartTimeIso = isStartTimeUpdate
+        ? (updates.startTimeIso || buildIsoFromMinutes(selectedDate, newStartTime))
+        : targetItem.startTimeIso;
+
+      // 1. Update the target item and, if in a parallel bundle, all parallel sibling services
       const updatedList = prev.map(item => {
-        if (item.id !== itemId) return item;
-        const next = { ...item, ...updates };
-        const shouldResyncStartIso =
-          Object.prototype.hasOwnProperty.call(updates, 'startTime') ||
-          !next.startTimeIso ||
-          !Number.isFinite(new Date(next.startTimeIso).getTime()) ||
-          new Date(next.startTimeIso).getTime() !== new Date(buildIsoFromMinutes(selectedDate, Number(next.startTime || 0))).getTime();
+        const isTarget = item.id === itemId;
+        const isParallelSibling = isParallelPackage && item.packageInstanceId === targetItem.packageInstanceId;
 
-        if (shouldResyncStartIso) {
-          next.startTimeIso = buildIsoFromMinutes(selectedDate, Number(next.startTime || 0));
+        if (!isTarget && !isParallelSibling) {
+          return item;
         }
 
-        if (next.basePrice !== undefined) {
-          let priceAfterDiscount = next.basePrice;
-          if (next.discountType === 'flat') {
-            priceAfterDiscount = Math.max(0, next.basePrice - next.discountValue);
-          } else if (next.discountType === 'percent') {
-            priceAfterDiscount = Math.max(0, next.basePrice - (next.basePrice * next.discountValue) / 100);
+        if (isTarget) {
+          const next = { ...item, ...updates };
+          const shouldResyncStartIso =
+            isStartTimeUpdate ||
+            !next.startTimeIso ||
+            !Number.isFinite(new Date(next.startTimeIso).getTime()) ||
+            new Date(next.startTimeIso).getTime() !== new Date(buildIsoFromMinutes(selectedDate, Number(next.startTime || 0))).getTime();
+
+          if (shouldResyncStartIso) {
+            next.startTimeIso = buildIsoFromMinutes(selectedDate, Number(next.startTime || 0));
           }
-          next.finalPrice = priceAfterDiscount;
+
+          if (next.basePrice !== undefined) {
+            let priceAfterDiscount = next.basePrice;
+            if (next.discountType === 'flat') {
+              priceAfterDiscount = Math.max(0, next.basePrice - (next.discountValue || 0));
+            } else if (next.discountType === 'percent') {
+              priceAfterDiscount = Math.max(0, next.basePrice - (next.basePrice * (next.discountValue || 0)) / 100);
+            }
+            next.finalPrice = priceAfterDiscount;
+          }
+          return next;
         }
-        return next;
+
+        // Parallel sibling receiving synchronized start time
+        if (isStartTimeUpdate) {
+          return {
+            ...item,
+            startTime: newStartTime,
+            startTimeIso: newStartTimeIso,
+            timingMode: updates.timingMode || item.timingMode
+          };
+        }
+
+        return item;
       });
 
-      // 2. Cascade only when later services are still in the auto-derived chain state.
-      // If a user explicitly adjusted a later service time, preserve that value and do not
-      // overwrite it when an earlier service changes.
+      // Synchronize appointment-level anchor start time
+      if (isStartTimeUpdate) {
+        const earliestStaged = Math.min(...updatedList.map(i => Number(i.startTime || 0)));
+        if (Number.isFinite(earliestStaged)) {
+          setCurrentStartTime(earliestStaged);
+        }
+      }
+
+      // 2. Cascade only when later services are in sequential chaining mode
       const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
       if (!shouldChainServiceTimes) {
         return updatedList;
       }
 
       for (let i = 1; i < updatedList.length; i++) {
-        const prevItem = updatedList[i - 1];
         const currentItem = updatedList[i];
+        const prevItem = updatedList[i - 1];
+
+        // Sibling services in the same parallel bundle share the same start time and do not chain sequentially
+        if (
+          currentItem.packageInstanceId &&
+          prevItem.packageInstanceId &&
+          currentItem.packageInstanceId === prevItem.packageInstanceId
+        ) {
+          const currentPkg = currentItem.packageId
+            ? (services2Bundles?.find(p => p.id === currentItem.packageId) || servicePackages?.find(p => p.id === currentItem.packageId))
+            : null;
+          if (currentPkg?.scheduleType === 'parallel') {
+            continue;
+          }
+        }
+
+        // Compute expected start time based on preceding service / bundle
+        let expectedStart = prevItem.startTime + prevItem.duration;
+        if (prevItem.packageInstanceId) {
+          const prevPkg = prevItem.packageId
+            ? (services2Bundles?.find(p => p.id === prevItem.packageId) || servicePackages?.find(p => p.id === prevItem.packageId))
+            : null;
+          if (prevPkg?.scheduleType === 'parallel') {
+            const parallelSiblings = updatedList.filter(it => it.packageInstanceId === prevItem.packageInstanceId);
+            expectedStart = Math.max(...parallelSiblings.map(it => Number(it.startTime || 0) + Number(it.duration || 0)));
+          }
+        }
+
         const priorItem = prev[i - 1];
         const priorCurrentItem = prev[i];
-
-        const previousExpectedStart = priorItem ? priorItem.startTime + priorItem.duration : null;
-        const previousExpectedStartIso = priorItem
-          ? addMinutesToIso(getSyncedStagedStartIso(priorItem), priorItem.duration)
-          : null;
+        let priorExpectedStart = priorItem ? priorItem.startTime + priorItem.duration : null;
+        if (priorItem?.packageInstanceId) {
+          const priorPkg = priorItem.packageId
+            ? (services2Bundles?.find(p => p.id === priorItem.packageId) || servicePackages?.find(p => p.id === priorItem.packageId))
+            : null;
+          if (priorPkg?.scheduleType === 'parallel') {
+            const priorParallelSiblings = prev.filter(it => it.packageInstanceId === priorItem.packageInstanceId);
+            priorExpectedStart = Math.max(...priorParallelSiblings.map(it => Number(it.startTime || 0) + Number(it.duration || 0)));
+          }
+        }
 
         const isAutoDerived = isAutoDerivedFromPreviousChain({
           priorItem,
           currentItem: priorCurrentItem,
-          expectedStartIso: previousExpectedStartIso || buildIsoFromMinutes(selectedDate, previousExpectedStart || 0)
+          expectedStartIso: buildIsoFromMinutes(selectedDate, priorExpectedStart || 0)
         });
 
         if (!isAutoDerived) {
-          const newPrevEnd = prevItem.startTime + prevItem.duration;
-          if (newPrevEnd > priorCurrentItem.startTime) {
+          if (expectedStart > priorCurrentItem.startTime) {
             addLocalToast(
               isRtl ? 'تحذير: وقت الخدمة السابقة يتداخل مع هذه الخدمة' : 'Warning: Previous service overlaps with this service',
               isRtl ? 'Warning: Previous service overlaps with this service' : 'تحذير: وقت الخدمة السابقة يتداخل مع هذه الخدمة',
@@ -1510,14 +1680,8 @@ export default function InteractiveDrawers({
           continue;
         }
 
-        const nextStartTime = prevItem.startTime + prevItem.duration;
-        const nextStartTimeIso = addMinutesToIso(
-          getSyncedStagedStartIso(prevItem),
-          prevItem.duration
-        );
-
-        currentItem.startTime = nextStartTime;
-        currentItem.startTimeIso = nextStartTimeIso;
+        currentItem.startTime = expectedStart;
+        currentItem.startTimeIso = buildIsoFromMinutes(selectedDate, expectedStart);
       }
 
       return updatedList;
@@ -1538,19 +1702,30 @@ export default function InteractiveDrawers({
         [service.id]: false
       }));
     } else {
+      // Defense-in-depth: Reject adding service if identity prerequisite is not met
+      if (!hasAppointmentIdentity(custMode, selectedCustId)) {
+        addLocalToast(
+          IDENTITY_PREREQUISITE_MESSAGE.ar,
+          IDENTITY_PREREQUISITE_MESSAGE.en,
+          'warning'
+        );
+        safeSetCreateStep(1);
+        return;
+      }
+
       const resolvedVariant = variantOverride || null;
       let nextStartTime = currentStartTime;
       const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
       if (shouldChainServiceTimes && stagedServices.length > 0) {
         const lastItem = stagedServices[stagedServices.length - 1];
-        nextStartTime = lastItem.startTime + lastItem.duration;
+        if (lastItem.packageInstanceId) {
+          const siblingItems = stagedServices.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
+          nextStartTime = Math.max(...siblingItems.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
+        } else {
+          nextStartTime = lastItem.startTime + lastItem.duration;
+        }
       }
-      const nextStartTimeIso = shouldChainServiceTimes && stagedServices.length > 0
-        ? addMinutesToIso(
-            getSyncedStagedStartIso(stagedServices[stagedServices.length - 1]),
-            stagedServices[stagedServices.length - 1].duration
-          )
-        : buildIsoFromMinutes(selectedDate, nextStartTime);
+      const nextStartTimeIso = buildIsoFromMinutes(selectedDate, nextStartTime);
 
       const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
 
@@ -1579,8 +1754,8 @@ export default function InteractiveDrawers({
 
       setStagedServices(prev => [...prev, newItem]);
       addLocalToast(
-        `تمت إضافة الخدمة "${isRtl ? service.nameAr : service.nameEn}" للموعد المجدول.`,
-        `Service "${isRtl ? service.nameAr : service.nameEn}" added to session queue.`,
+        `تمت إضافة "${isRtl ? service.nameAr : service.nameEn}" لقائمة الخدمات المطلوبة بنجاح`,
+        `Successfully queued "${isRtl ? service.nameAr : service.nameEn}" into the staging list`,
         'success'
       );
 
@@ -1592,6 +1767,17 @@ export default function InteractiveDrawers({
   };
 
   const handleAddPackageToStaged = (pkgId: string) => {
+    // Defense-in-depth: Reject adding bundle if identity prerequisite is not met
+    if (!hasAppointmentIdentity(custMode, selectedCustId)) {
+      addLocalToast(
+        IDENTITY_PREREQUISITE_MESSAGE.ar,
+        IDENTITY_PREREQUISITE_MESSAGE.en,
+        'warning'
+      );
+      safeSetCreateStep(1);
+      return;
+    }
+
     const pkg = services2Bundles?.find(p => p.id === pkgId) || servicePackages?.find(p => p.id === pkgId);
     if (!pkg || !pkg.items || pkg.items.length === 0) {
       addLocalToast(
@@ -1609,7 +1795,12 @@ export default function InteractiveDrawers({
       const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
       if (shouldChainServiceTimes && prev.length > 0) {
         const lastItem = prev[prev.length - 1];
-        nextStartTime = lastItem.startTime + lastItem.duration;
+        if (lastItem.packageInstanceId) {
+          const siblingItems = prev.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
+          nextStartTime = Math.max(...siblingItems.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
+        } else {
+          nextStartTime = lastItem.startTime + lastItem.duration;
+        }
       }
 
       const newItems: StagedService[] = [];
@@ -1866,6 +2057,33 @@ export default function InteractiveDrawers({
     let firstStaffId = finalStaged[0].staffId;
     let earliestStartTime = finalStaged[0].startTime;
     let totalDuration = 0;
+
+    // Pre-flight validation: 15-minute advance booking rule
+    const earliestStartTimestamp = Math.min(...finalStaged.map(item => {
+      const iso = getSyncedStagedStartIso(item);
+      return new Date(iso).getTime();
+    }));
+    const nowTimestamp = Date.now();
+    const MINIMUM_ADVANCE_MS = 15 * 60 * 1000;
+    if (Number.isFinite(earliestStartTimestamp) && (earliestStartTimestamp < nowTimestamp + MINIMUM_ADVANCE_MS)) {
+      const earliestItem = finalStaged[0];
+      const slotLabel = formatMinutesToTime(
+        typeof earliestItem?.startTime === 'number'
+          ? earliestItem.startTime
+          : currentStartTime
+      );
+      showBookingErrorDialog(buildAdvanceBookingDialog({
+        isRtl,
+        currentLabel: getRiyadhCurrentTimeLabel(),
+        slotLabel
+      }));
+      addLocalToast(
+        'يجب أن يكون وقت الحجز قبل الموعد بـ 15 دقيقة على الأقل.',
+        'Appointments must be booked at least 15 minutes in advance.',
+        'warning'
+      );
+      return;
+    }
 
     finalStaged.forEach(item => {
       const srv = canonicalServices.find(s => s.id === item.serviceId);
@@ -2678,42 +2896,53 @@ export default function InteractiveDrawers({
 
               {createMode === 'appointment' ? (
                 <div className="flex-1 flex flex-col overflow-hidden">
-                  {/* Step Progress */}
-                  <div className="px-5 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => setCreateStep(1)} className={`flex items-center gap-1 font-bold ${createStep === 1 ? 'text-[#6537C0]' : 'text-slate-400'}`}>
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 1 ? 'bg-[#6537C0] text-white font-bold' : 'bg-slate-200 text-slate-500'}`}>1</span>
-                        <span>{isRtl ? 'بيانات العميل' : 'Identity'}</span>
-                      </button>
-                      <button onClick={() => setCreateStep(2)} className={`flex items-center gap-1 font-bold ${createStep === 2 ? 'text-[#6537C0]' : 'text-slate-400'}`}>
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 2 ? 'bg-[#6537C0] text-white font-bold' : 'bg-slate-200 text-slate-500'}`}>2</span>
-                        <span>{isRtl ? 'المرافقين' : 'Include Guests'}</span>
-                      </button>
-                      <button onClick={() => setCreateStep(3)} className={`flex items-center gap-1 font-bold ${createStep === 3 ? 'text-[#6537C0]' : 'text-slate-400'}`}>
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 3 ? 'bg-[#6537C0] text-white font-bold' : 'bg-slate-200 text-slate-500'}`}>3</span>
-                        <span>{isRtl ? 'الخدمات والجدولة' : 'Services'}</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (stagedServices.length === 0) {
-                            addLocalToast(
-                              'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
-                              'Please add at least one service before opening the invoice step',
-                              'warning'
-                            );
-                            return;
-                          }
-                          setCreateStep(4);
-                        }}
-                        disabled={stagedServices.length === 0}
-                        className={`flex items-center gap-1 font-bold ${
-                          createStep === 4 ? 'text-[#6537C0]' : 'text-slate-400'
-                        } ${stagedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 4 ? 'bg-[#6537C0] text-white font-bold' : 'bg-slate-200 text-slate-500'}`}>4</span>
-                        <span>{isRtl ? 'الفاتورة والسداد' : 'Invoice'}</span>
-                      </button>
-                    </div>
+                  {/* Read-Only Step Progress Indicator */}
+                  <div
+                    className="px-5 py-2.5 bg-slate-100/90 border-b border-slate-200 flex items-center justify-between text-xs select-none cursor-default"
+                    aria-label={isRtl ? 'مؤشر مراحل الحجز' : 'Appointment booking progress'}
+                  >
+                    <ol className="flex items-center gap-2 sm:gap-4 list-none m-0 p-0">
+                      {[
+                        { step: 1, labelAr: 'بيانات العميل', labelEn: 'Identity' },
+                        { step: 2, labelAr: 'المرافقين', labelEn: 'Include Guests' },
+                        { step: 3, labelAr: 'الخدمات والجدولة', labelEn: 'Services' },
+                        { step: 4, labelAr: 'الفاتورة والسداد', labelEn: 'Invoice' }
+                      ].map((item, idx, arr) => {
+                        const isCurrent = createStep === item.step;
+                        const isCompleted = createStep > item.step;
+                        return (
+                          <li
+                            key={item.step}
+                            aria-current={isCurrent ? 'step' : undefined}
+                            className={`flex items-center gap-1.5 transition-colors select-none ${
+                              isCurrent
+                                ? 'text-[#6537C0] font-black'
+                                : isCompleted
+                                  ? 'text-slate-700 font-bold'
+                                  : 'text-slate-400 font-medium'
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-mono shrink-0 select-none ${
+                                isCurrent
+                                  ? 'bg-[#6537C0] text-white font-black shadow-xs ring-2 ring-[#6537C0]/20'
+                                  : isCompleted
+                                    ? 'bg-[#6537C0]/15 text-[#6537C0] font-black border border-[#6537C0]/30'
+                                    : 'bg-slate-200 text-slate-500 font-medium'
+                              }`}
+                            >
+                              {isCompleted ? '✓' : item.step}
+                            </span>
+                            <span className="truncate">{isRtl ? item.labelAr : item.labelEn}</span>
+                            {idx < arr.length - 1 && (
+                              <span className="text-slate-300 font-normal mx-0.5 sm:mx-1 select-none" aria-hidden="true">
+                                /
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ol>
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -2754,6 +2983,13 @@ export default function InteractiveDrawers({
                               })}
                             </div>
                           </div>
+
+                          {identityValidationError && !hasAppointmentIdentity(custMode, selectedCustId) && (
+                            <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-950 flex items-center gap-2.5 animate-fadeIn">
+                              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span>{isRtl ? IDENTITY_PREREQUISITE_MESSAGE.ar : IDENTITY_PREREQUISITE_MESSAGE.en}</span>
+                            </div>
+                          )}
 
                           <div className="mt-6">
                             {custMode === 'existing' ? (
@@ -3269,6 +3505,7 @@ export default function InteractiveDrawers({
                         isRtl={isRtl}
                         boardStartHour={boardStartHour}
                         slotMinutes={slotMinutes}
+                        normalEndHour={normalEndHour}
                         bookingRecoveryMode={bookingRecoveryMode}
                         forceExpandAll={bookingRecoveryMode !== 'chain'}
                         canonicalServices={canonicalServices}
@@ -3288,7 +3525,7 @@ export default function InteractiveDrawers({
                         onUpdateService={handleUpdateStagedService}
                         onRemoveService={(index) => setStagedServices(prev => prev.filter((_, i) => i !== index))}
                         formatMinutesToTime={formatMinutesToTime}
-                        onPrevious={() => setCreateStep(2)}
+                        onPrevious={() => safeSetCreateStep(2)}
                         onNext={() => {
                           if (stagedServices.length === 0) {
                             addLocalToast(
@@ -3298,7 +3535,35 @@ export default function InteractiveDrawers({
                             );
                             return;
                           }
-                          setCreateStep(4);
+
+                          // Pre-flight validation: 15-minute advance booking rule
+                          const earliestStartTimestamp = Math.min(...stagedServices.map(item => {
+                            const iso = getSyncedStagedStartIso(item);
+                            return new Date(iso).getTime();
+                          }));
+                          const nowTimestamp = Date.now();
+                          const MINIMUM_ADVANCE_MS = 15 * 60 * 1000;
+                          if (Number.isFinite(earliestStartTimestamp) && (earliestStartTimestamp < nowTimestamp + MINIMUM_ADVANCE_MS)) {
+                            const earliestItem = stagedServices[0];
+                            const slotLabel = formatMinutesToTime(
+                              typeof earliestItem?.startTime === 'number'
+                                ? earliestItem.startTime
+                                : currentStartTime
+                            );
+                            showBookingErrorDialog(buildAdvanceBookingDialog({
+                              isRtl,
+                              currentLabel: getRiyadhCurrentTimeLabel(),
+                              slotLabel
+                            }));
+                            addLocalToast(
+                              'يجب أن يكون وقت الحجز قبل الموعد بـ 15 دقيقة على الأقل.',
+                              'Appointments must be booked at least 15 minutes in advance.',
+                              'warning'
+                            );
+                            return;
+                          }
+
+                          safeSetCreateStep(4);
                         }}
                       />
                     )}
@@ -3549,7 +3814,7 @@ export default function InteractiveDrawers({
 
                   <div className="p-4 bg-white border-t flex justify-between">
                     {createStep > 1 ? (
-                      <button type="button" onClick={() => setCreateStep(prev => prev - 1)} className="py-2 px-4 bg-slate-100 rounded-xl text-xs font-bold">
+                      <button type="button" onClick={() => safeSetCreateStep(prev => prev - 1)} className="py-2 px-4 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 transition">
                         {isRtl ? 'السابق' : 'Previous'}
                       </button>
                     ) : <div />}
@@ -3559,27 +3824,36 @@ export default function InteractiveDrawers({
                         type="button"
                         onClick={() => {
                           if (createStep === 1) {
-                            if (custMode === 'existing' && !selectedCustId) {
-                              showBookingErrorDialog(buildGenericBookingErrorDialog());
-                              return;
-                            }
-                            if (custMode === 'walkin' && (!walkinFullName || walkinFullName.trim() === '')) {
-                              showBookingErrorDialog(buildGenericBookingErrorDialog());
+                            if (!hasAppointmentIdentity(custMode, selectedCustId)) {
+                              setIdentityValidationError(true);
+                              addLocalToast(
+                                IDENTITY_PREREQUISITE_MESSAGE.ar,
+                                IDENTITY_PREREQUISITE_MESSAGE.en,
+                                'warning'
+                              );
                               return;
                             }
                           }
                           if (createStep === 2 && includeGroupGuests) {
                             const emptyGuestName = guestsList.some(g => g.name.trim() === '');
                             if (emptyGuestName) {
-                              showBookingErrorDialog(buildGenericBookingErrorDialog());
+                              addLocalToast(
+                                isRtl ? 'يرجى تعبئة أسماء المرافقين للمتابعة' : 'Please fill in all guest names to continue',
+                                isRtl ? 'Please fill in all guest names to continue' : 'يرجى تعبئة أسماء المرافقين للمتابعة',
+                                'warning'
+                              );
                               return;
                             }
                           }
                           if (createStep === 3 && stagedServices.length === 0) {
-                            showBookingErrorDialog(buildGenericBookingErrorDialog());
+                            addLocalToast(
+                              isRtl ? 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة' : 'Please add at least one service before opening the invoice step',
+                              isRtl ? 'Please add at least one service before opening the invoice step' : 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
+                              'warning'
+                            );
                             return;
                           }
-                          setCreateStep(prev => prev + 1);
+                          safeSetCreateStep(prev => prev + 1);
                         }}
                         className="py-2 px-5 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-bold transition shadow-sm"
                       >

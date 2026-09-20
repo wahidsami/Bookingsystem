@@ -42,6 +42,7 @@ import {
   formatTenantPlanBillingAmount,
   formatTenantPlanLimit
 } from '../lib/tenantSubscription';
+import { getAppointmentStatusToken } from '../lib/statusTokens';
 
 interface WorkspaceProps {
   view: ViewType;
@@ -335,25 +336,27 @@ export default function Workspace({
 
       {/* View Header with dynamic favoriting capability (Personalization Hook) */}
       {view !== 'appointments' && (
-      <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 rounded-2xl border transition-colors duration-200 shadow-sm ${
-        darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 text-neutral-800'
+      <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 md:p-6 rounded-2xl border transition-all duration-200 shadow-2xs ${
+        darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-900'
       }`}>
         <div className="relative">
           <div className="flex items-center gap-3">
             <h1 className="text-xl md:text-2xl font-black tracking-tight font-sans flex items-center gap-2">
               <span>
-                {(() => {
-                  const navItem = navigationItems.find(item => item.id === view);
-                  const viewName = isRtl ? (navItem?.labelAr || view) : (navItem?.labelEn || view);
-                  return isRtl
-                    ? translations.ar.emptyWorkspaceTitle.replace('{name}', viewName)
-                    : translations.en.emptyWorkspaceTitle.replace('{name}', viewName);
-                })()}
+                {view === 'dashboard'
+                  ? (isRtl ? 'لوحة التحكم والعمليات' : 'Operations Dashboard')
+                  : (() => {
+                      const navItem = navigationItems.find(item => item.id === view);
+                      const viewName = isRtl ? (navItem?.labelAr || view) : (navItem?.labelEn || view);
+                      return isRtl
+                        ? translations.ar.emptyWorkspaceTitle.replace('{name}', viewName)
+                        : translations.en.emptyWorkspaceTitle.replace('{name}', viewName);
+                    })()}
               </span>
 
               {/* Custom Saved View Indicator Badge */}
               {savedViews.some(sv => sv.view === view) && (
-                <span className="text-[9px] bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-500/10">
+                <span className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/20">
                   {isRtl ? 'منظر مخصص محفوظ' : 'SAVED VIEW'}
                 </span>
               )}
@@ -362,14 +365,22 @@ export default function Workspace({
             {/* Star Favorite Button */}
             <button
               onClick={() => onToggleFavoritePage && onToggleFavoritePage(view)}
-              className={`p-1 rounded-md transition-all hover:scale-105 cursor-pointer ${
-                isFavorited ? 'text-amber-500 hover:text-amber-600' : 'text-zinc-300 hover:text-zinc-500 dark:text-zinc-600'
+              className={`p-1.5 rounded-lg transition-all hover:scale-105 cursor-pointer ${
+                isFavorited ? 'text-amber-500 hover:text-amber-600' : 'text-slate-300 hover:text-slate-500 dark:text-zinc-600 dark:hover:text-zinc-400'
               }`}
               title={isFavorited ? (isRtl ? 'إزالة من المفضلة' : 'Remove from Favorites') : (isRtl ? 'إضافة للمفضلة' : 'Save to Favorites')}
             >
               <Star size={16} fill={isFavorited ? 'currentColor' : 'none'} className="stroke-[2]" />
             </button>
           </div>
+
+          {view === 'dashboard' && (
+            <p className="text-xs md:text-sm text-slate-500 dark:text-zinc-400 mt-1 font-medium">
+              {isRtl
+                ? 'مركز إدارة ومتابعة العمليات اليومية وحركة الحجوزات لـ BarSpa'
+                : 'BarSpa operational command & real-time monitoring center'}
+            </p>
+          )}
         </div>
 
         {/* Quick buttons */}
@@ -440,23 +451,33 @@ export default function Workspace({
               // Render individual stats blocks based on user order (reordering widgets support)
               if (widgetId === 'revenue') {
                 return (
-                  <div key="revenue" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-colors duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
+                  <div key="revenue" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
                   }`}>
-                    <div>
-                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'إجمالي المبيعات' : 'Total Revenue'}</span>
-                      <p className="text-2xl font-black mt-1 font-mono">{(dashboardStats?.todaysRevenue || 0).toLocaleString()} {t.riyal}</p>
-                      <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {revenueGrowth} {isRtl ? 'عن أمس' : 'vs yesterday'}
+                    <div className="space-y-1.5">
+                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                        {isRtl ? 'إجمالي المبيعات اليوم' : 'Today\'s Total Revenue'}
                       </span>
+                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
+                        {(dashboardStats?.todaysRevenue || 0).toLocaleString()} <span className="text-base font-bold text-neutral-500 dark:text-zinc-400 font-sans">{t.riyal}</span>
+                      </p>
+                      <div className="pt-1">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border bg-emerald-50 text-emerald-950 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800">
+                          <TrendingUp size={12} className="shrink-0 text-emerald-700 dark:text-emerald-300" />
+                          <span dir="ltr">{revenueGrowth}</span>
+                          <span>{isRtl ? 'عن أمس' : 'vs yesterday'}</span>
+                        </span>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
-                      <span className="p-2.5 bg-brand-50 dark:bg-brand-950/40 rounded-xl text-brand-600 dark:text-brand-400"><TrendingUp size={18} /></span>
+                      <span className="w-10 h-10 flex items-center justify-center bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300 rounded-xl border border-brand-100 dark:border-brand-900/40 shrink-0">
+                        <TrendingUp size={20} />
+                      </span>
 
                       {/* Widget Reordering buttons */}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0}><ArrowLeft size={10} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1}><ArrowRight size={10} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -464,22 +485,32 @@ export default function Workspace({
               }
               if (widgetId === 'bookings') {
                 return (
-                  <div key="bookings" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-colors duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
+                  <div key="bookings" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
                   }`}>
-                    <div>
-                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'حجوزات اليوم' : 'Today\'s Bookings'}</span>
-                      <p className="text-2xl font-black mt-1 font-mono">{dashboardStats?.todaysBookings || 0}</p>
-                      <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {bookingsGrowth} {isRtl ? 'مقارنة بأمس' : 'vs yesterday'}
+                    <div className="space-y-1.5">
+                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                        {isRtl ? 'حجوزات اليوم' : 'Today\'s Bookings'}
                       </span>
+                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
+                        {(dashboardStats?.todaysBookings || 0).toLocaleString()}
+                      </p>
+                      <div className="pt-1">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border bg-emerald-50 text-emerald-950 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800">
+                          <Calendar size={12} className="shrink-0 text-emerald-700 dark:text-emerald-300" />
+                          <span dir="ltr">{bookingsGrowth}</span>
+                          <span>{isRtl ? 'مقارنة بأمس' : 'vs yesterday'}</span>
+                        </span>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
-                      <span className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl text-emerald-600 dark:text-emerald-400"><Calendar size={18} /></span>
+                      <span className="w-10 h-10 flex items-center justify-center bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 rounded-xl border border-emerald-100 dark:border-emerald-900/40 shrink-0">
+                        <Calendar size={20} />
+                      </span>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0}><ArrowLeft size={10} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1}><ArrowRight size={10} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -487,22 +518,31 @@ export default function Workspace({
               }
               if (widgetId === 'customers') {
                 return (
-                  <div key="customers" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-colors duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
+                  <div key="customers" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
                   }`}>
-                    <div>
-                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'إجمالي العملاء' : 'Total Customers'}</span>
-                      <p className="text-2xl font-black mt-1 font-mono">{dashboardStats?.totalCustomers || 0}</p>
-                      <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {isRtl ? 'قاعدة العملاء' : 'Active Client Base'}
+                    <div className="space-y-1.5">
+                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                        {isRtl ? 'إجمالي العملاء' : 'Total Customers'}
                       </span>
+                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
+                        {(dashboardStats?.totalCustomers || 0).toLocaleString()}
+                      </p>
+                      <div className="pt-1">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border bg-blue-50 text-blue-950 border-blue-200 dark:bg-blue-950/60 dark:text-blue-200 dark:border-blue-800">
+                          <Users size={12} className="shrink-0 text-blue-700 dark:text-blue-300" />
+                          <span>{isRtl ? 'قاعدة العملاء النشطة' : 'Active Client Base'}</span>
+                        </span>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
-                      <span className="p-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-xl text-blue-600 dark:text-blue-400"><Users size={18} /></span>
+                      <span className="w-10 h-10 flex items-center justify-center bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 rounded-xl border border-blue-100 dark:border-blue-900/40 shrink-0">
+                        <Users size={20} />
+                      </span>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0}><ArrowLeft size={10} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1}><ArrowRight size={10} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -510,26 +550,37 @@ export default function Workspace({
               }
               if (widgetId === 'occupancy') {
                 return (
-                  <div key="occupancy" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-colors duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
+                  <div key="occupancy" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
                   }`}>
-                    <div>
-                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'فريق العمل النشط' : 'Active Team Members'}</span>
-                      <p className="text-2xl font-black mt-1 font-mono">{dashboardStats?.activeEmployees || 0}</p>
-                      <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {teamSeatLimit === null
-                          ? (isRtl ? 'مزامنة حدود الباقة جارية' : 'Syncing plan limits')
-                          : teamSeatLimit === -1
-                            ? (isRtl ? 'عدد المقاعد غير محدود' : 'Unlimited plan seats')
-                            : `${dashboardStats?.activeEmployees || 0} / ${formatTenantPlanLimit(teamSeatLimit, isRtl ? 'ar' : 'en')} ${isRtl ? 'مقعد' : 'seats'}`}
+                    <div className="space-y-1.5">
+                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                        {isRtl ? 'فريق العمل النشط' : 'Active Team Members'}
                       </span>
+                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
+                        {(dashboardStats?.activeEmployees || 0).toLocaleString()}
+                      </p>
+                      <div className="pt-1">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border bg-rose-50 text-rose-950 border-rose-200 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-800">
+                          <Sparkles size={12} className="shrink-0 text-rose-700 dark:text-rose-300" />
+                          <span>
+                            {teamSeatLimit === null
+                              ? (isRtl ? 'مزامنة حدود الباقة جارية' : 'Syncing plan limits')
+                              : teamSeatLimit === -1
+                                ? (isRtl ? 'عدد المقاعد غير محدود' : 'Unlimited plan seats')
+                                : `${dashboardStats?.activeEmployees || 0} / ${formatTenantPlanLimit(teamSeatLimit, isRtl ? 'ar' : 'en')} ${isRtl ? 'مقعد' : 'seats'}`}
+                          </span>
+                        </span>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
-                      <span className="p-2.5 bg-rose-50 dark:bg-rose-950/40 rounded-xl text-rose-600 dark:text-rose-400"><Sparkles size={18} /></span>
+                      <span className="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 rounded-xl border border-rose-100 dark:border-rose-900/40 shrink-0">
+                        <Sparkles size={20} />
+                      </span>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0}><ArrowLeft size={10} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1}><ArrowRight size={10} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -537,26 +588,37 @@ export default function Workspace({
               }
               if (widgetId === 'packages') {
                 return (
-                  <div key="packages" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-colors duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
+                  <div key="packages" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
                   }`}>
-                    <div>
-                      <span className="text-xs text-neutral-400 font-semibold uppercase">{isRtl ? 'الباقات' : 'Packages'}</span>
-                      <p className="text-2xl font-black mt-1 font-mono">{packageLimit === null ? '—' : packageLimit === -1 ? '∞' : packageLimit}</p>
-                      <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-0.5 rounded-full mt-2 inline-block">
-                        {packageLimit === null
-                          ? (isRtl ? 'مزامنة حدود الباقة جارية' : 'Syncing plan limits')
-                          : packageLimit === -1
-                            ? (isRtl ? 'عدد الباقات غير محدود' : 'Unlimited packages')
-                            : `${isRtl ? 'باقة متاحة' : 'packages available'}`}
+                    <div className="space-y-1.5">
+                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                        {isRtl ? 'الباقات النشطة' : 'Active Packages'}
                       </span>
+                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
+                        {packageLimit === null ? '—' : packageLimit === -1 ? '∞' : packageLimit.toLocaleString()}
+                      </p>
+                      <div className="pt-1">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border bg-amber-50 text-amber-950 border-amber-200 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800">
+                          <Package size={12} className="shrink-0 text-amber-700 dark:text-amber-300" />
+                          <span>
+                            {packageLimit === null
+                              ? (isRtl ? 'مزامنة حدود الباقة جارية' : 'Syncing plan limits')
+                              : packageLimit === -1
+                                ? (isRtl ? 'عدد الباقات غير محدود' : 'Unlimited packages')
+                                : `${isRtl ? 'باقة متاحة' : 'packages available'}`}
+                          </span>
+                        </span>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
-                      <span className="p-2.5 bg-amber-50 dark:bg-amber-950/40 rounded-xl text-amber-600 dark:text-amber-400"><Package size={18} /></span>
+                      <span className="w-10 h-10 flex items-center justify-center bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 rounded-xl border border-amber-100 dark:border-amber-900/40 shrink-0">
+                        <Package size={20} />
+                      </span>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0}><ArrowLeft size={10} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1}><ArrowRight size={10} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -568,31 +630,36 @@ export default function Workspace({
 
           {/* Quick Saved Views Shelf (Personalization Hook) */}
           {savedViews.length > 0 && (
-            <div className={`p-5 rounded-2xl border transition-colors ${
-              darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
+            <div className={`p-4 rounded-2xl border transition-colors ${
+              darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-neutral-200/80 shadow-xs'
             }`}>
-              <h3 className="text-xs font-bold uppercase tracking-widest text-amber-500 mb-3 flex items-center gap-1.5">
-                <Save size={13} />
-                <span>{isRtl ? 'مرشحات المناظر المحفوظة المخصصة' : 'My Personalized Saved Views'}</span>
-              </h3>
-              <div className="flex flex-wrap gap-2.5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                  <Save size={14} className="shrink-0" />
+                  <span>{isRtl ? 'المناظر المحفوظة المخصصة' : 'Personalized Saved Views'}</span>
+                </h3>
+                <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800">
+                  {savedViews.length}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {savedViews.map((sv) => (
                   <div
                     key={sv.id}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all ${
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
                       darkMode
-                        ? 'bg-zinc-850 border-zinc-750 text-zinc-200 hover:bg-zinc-800'
-                        : 'bg-amber-50/40 border-amber-100 text-amber-900 hover:bg-amber-50'
+                        ? 'bg-zinc-850 border-zinc-700 text-zinc-200 hover:bg-zinc-800'
+                        : 'bg-amber-50/50 border-amber-200/80 text-amber-950 hover:bg-amber-100/60'
                     }`}
                   >
                     <span>{sv.name}</span>
-                    <span className="text-[9px] bg-white/50 px-1.5 py-0.5 rounded uppercase font-mono">{sv.view}</span>
+                    <span className="text-[10px] bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-neutral-200 dark:border-zinc-700 uppercase font-mono text-neutral-600 dark:text-zinc-400">{sv.view}</span>
                     <button
                       onClick={() => onDeleteSavedView && onDeleteSavedView(sv.id)}
-                      className="text-neutral-400 hover:text-rose-500 transition-colors ml-1"
+                      className="text-neutral-400 hover:text-rose-600 transition-colors p-0.5"
                       title={isRtl ? 'حذف هذا المنظر' : 'Delete this saved view'}
                     >
-                      <Trash2 size={11} />
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 ))}
@@ -603,65 +670,172 @@ export default function Workspace({
           {/* Quick Dashboard Sections */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            {/* Today's Schedule */}
+            {/* Today's Schedule Operational Component */}
             <div className={`p-6 rounded-2xl border transition-colors lg:col-span-2 ${
-              darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
+              darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-neutral-200/80 shadow-xs'
             }`}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-base">{isRtl ? 'المواعيد النشطة اليوم' : 'Active Appointments Today'}</h3>
-                <span className="text-xs text-brand-600 hover:underline cursor-pointer">{isRtl ? 'عرض جدول المواعيد كاملاً' : 'View Calendar'}</span>
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-neutral-100 dark:border-zinc-800">
+                <div className="flex items-center gap-2.5">
+                  <h3 className="font-bold text-base text-neutral-900 dark:text-white">
+                    {isRtl ? 'المواعيد التشغيلية اليوم' : 'Active Appointments Today'}
+                  </h3>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 dark:bg-zinc-800 dark:text-zinc-200">
+                    {todaysAppointments.length}
+                  </span>
+                </div>
+                <button
+                  onClick={() => onQuickAction('calendar')}
+                  className="text-xs font-bold text-brand-600 hover:text-brand-700 dark:text-brand-400 hover:underline inline-flex items-center gap-1"
+                >
+                  <span>{isRtl ? 'عرض جدول المواعيد كاملاً' : 'View Full Schedule'}</span>
+                  <ArrowRight size={13} className={isRtl ? 'rotate-180' : ''} />
+                </button>
               </div>
-              <div className="space-y-3">
+
+              <div className="space-y-2.5">
                 {todaysAppointments.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-neutral-400 border rounded-xl border-dashed">
-                    {isRtl ? 'لا توجد مواعيد نشطة اليوم' : 'No active appointments today'}
+                  <div className="p-8 text-center border-2 border-dashed border-neutral-200 dark:border-zinc-800 rounded-2xl">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-neutral-50 dark:bg-zinc-850 flex items-center justify-center text-neutral-400">
+                      <Calendar size={24} />
+                    </div>
+                    <p className="text-sm font-bold text-neutral-700 dark:text-zinc-300">
+                      {isRtl ? 'لا توجد مواعيد مسجلة لليوم حتى الآن' : 'No appointments scheduled for today'}
+                    </p>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      {isRtl ? 'يمكنك حجز موعد جديد مباشرة من قائمة الإجراءات السريعة' : 'You can book a new appointment directly from Quick Actions'}
+                    </p>
                   </div>
                 ) : (
-                  todaysAppointments.slice(0, 3).map((apt: any) => (
-                    <div key={apt.id} className={`p-3 border rounded-xl transition-all flex items-center justify-between ${
-                      darkMode ? 'border-zinc-800 hover:border-brand-500' : 'border-neutral-100 hover:border-brand-200'
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${apt.status === 'completed' ? 'bg-emerald-500' : apt.status === 'confirmed' ? 'bg-blue-500' : 'bg-amber-500'}`} />
-                        <div>
-                          <p className="text-sm font-semibold">{apt.customerName}</p>
-                          <p className="text-xs text-neutral-400">{isRtl ? (apt.serviceName_ar || apt.serviceName) : apt.serviceName} • {apt.employeeName}</p>
+                  todaysAppointments.slice(0, 4).map((apt: any) => {
+                    const statusToken = getAppointmentStatusToken(apt.status);
+                    return (
+                      <div
+                        key={apt.id}
+                        className={`p-3.5 border rounded-xl transition-all flex items-center justify-between ${
+                          darkMode ? 'border-zinc-800 bg-zinc-850/40 hover:border-brand-500' : 'border-neutral-200/70 bg-neutral-50/40 hover:border-brand-300 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusToken.dotClass || 'bg-neutral-400'}`} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-bold text-neutral-900 dark:text-white truncate">
+                                {apt.customerName}
+                              </p>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border ${statusToken.containerClass}`}>
+                                {isRtl ? statusToken.labelAr : statusToken.labelEn}
+                              </span>
+                            </div>
+                            <p className="text-xs text-neutral-500 dark:text-zinc-400 font-medium truncate mt-0.5">
+                              {isRtl ? (apt.serviceName_ar || apt.serviceName) : apt.serviceName}
+                              {apt.employeeName && (
+                                <>
+                                  <span className="mx-1.5 text-neutral-300 dark:text-zinc-700">•</span>
+                                  <span>{apt.employeeName}</span>
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-end shrink-0 ps-3">
+                          <div dir="ltr" className="inline-block text-end">
+                            <span className="text-xs font-bold font-mono text-neutral-900 dark:text-white block">
+                              {apt.startTime}
+                            </span>
+                            {apt.endTime && (
+                              <span className="text-[11px] text-neutral-500 dark:text-zinc-400 font-mono block">
+                                {apt.endTime}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-end">
-                        <span className="text-xs font-bold block font-mono">{apt.startTime}</span>
-                        <span className="text-[10px] text-neutral-400 block font-mono">{apt.endTime}</span>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
 
             {/* Quick Actions Panel */}
-            <div className={`p-6 rounded-2xl border transition-colors ${
-              darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
+            <div className={`p-6 rounded-2xl border transition-colors flex flex-col justify-between ${
+              darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-neutral-200/80 shadow-xs'
             }`}>
-              <h3 className="font-bold text-base mb-4">{isRtl ? 'روابط التشغيل السريعة' : 'Operation Hub Quick Shortcuts'}</h3>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => onQuickAction('appointment')} className={`p-3 border rounded-xl text-center transition-all ${
-                  darkMode ? 'border-zinc-800 hover:bg-zinc-800/50 hover:border-brand-500' : 'border-neutral-100 hover:border-brand-200 hover:bg-brand-50/20'
-                }`}>
-                  <span className="inline-block p-2 bg-brand-50 dark:bg-brand-950/40 rounded-lg text-brand-600 dark:text-brand-400 mb-1"><Calendar size={18} /></span>
-                  <p className="text-xs font-bold">{isRtl ? 'حجز جديد' : 'New Booking'}</p>
-                </button>
-                <button onClick={() => onQuickAction('service')} className={`p-3 border rounded-xl text-center transition-all ${
-                  darkMode ? 'border-zinc-800 hover:bg-zinc-800/50 hover:border-rose-500' : 'border-neutral-100 hover:border-rose-200 hover:bg-rose-50/20'
-                }`}>
-                  <span className="inline-block p-2 bg-rose-50 dark:bg-rose-950/40 rounded-lg text-rose-600 dark:text-rose-400 mb-1"><Sparkles size={18} /></span>
-                  <p className="text-xs font-bold">{isRtl ? 'إضافة خدمة' : 'Add Service'}</p>
-                </button>
-                <button onClick={() => onQuickAction('giftcard')} className={`p-3 border rounded-xl text-center transition-all ${
-                  darkMode ? 'border-zinc-800 hover:bg-zinc-800/50 hover:border-amber-500' : 'border-neutral-100 hover:border-amber-200 hover:bg-amber-50/20'
-                }`}>
-                  <span className="inline-block p-2 bg-amber-50 dark:bg-amber-950/40 rounded-lg text-amber-600 dark:text-amber-400 mb-1"><Gift size={18} /></span>
-                  <p className="text-xs font-bold">{isRtl ? 'بطاقة هدايا' : 'Issue Card'}</p>
-                </button>
+              <div>
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-neutral-100 dark:border-zinc-800">
+                  <h3 className="font-bold text-base text-neutral-900 dark:text-white">
+                    {isRtl ? 'إجراءات تشغيلية سريعة' : 'Operational Quick Actions'}
+                  </h3>
+                  <span className="text-[11px] text-neutral-400 uppercase font-mono tracking-wider">
+                    {isRtl ? 'مباشر' : 'Direct'}
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => onQuickAction('appointment')}
+                    className={`w-full p-3.5 border rounded-xl flex items-center justify-between group transition-all text-start ${
+                      darkMode ? 'border-zinc-800 bg-zinc-850/40 hover:bg-zinc-800 hover:border-brand-500' : 'border-neutral-200/80 bg-neutral-50/50 hover:bg-brand-50/30 hover:border-brand-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="p-2.5 bg-brand-50 dark:bg-brand-950/50 rounded-xl text-brand-700 dark:text-brand-300 border border-brand-100 dark:border-brand-900/50 group-hover:scale-105 transition-transform">
+                        <Calendar size={18} />
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                          {isRtl ? 'حجز موعد جديد' : 'New Booking'}
+                        </p>
+                        <p className="text-xs text-neutral-400">
+                          {isRtl ? 'تسجيل عميل في التقويم' : 'Add appointment to calendar'}
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight size={16} className={`text-neutral-400 group-hover:text-brand-600 transition-transform ${isRtl ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'}`} />
+                  </button>
+
+                  <button
+                    onClick={() => onQuickAction('service')}
+                    className={`w-full p-3.5 border rounded-xl flex items-center justify-between group transition-all text-start ${
+                      darkMode ? 'border-zinc-800 bg-zinc-850/40 hover:bg-zinc-800 hover:border-rose-500' : 'border-neutral-200/80 bg-neutral-50/50 hover:bg-rose-50/30 hover:border-rose-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="p-2.5 bg-rose-50 dark:bg-rose-950/50 rounded-xl text-rose-700 dark:text-rose-300 border border-rose-100 dark:border-rose-900/50 group-hover:scale-105 transition-transform">
+                        <Sparkles size={18} />
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                          {isRtl ? 'إضافة خدمة جديدة' : 'Add Service'}
+                        </p>
+                        <p className="text-xs text-neutral-400">
+                          {isRtl ? 'تحديث قائمة الخدمات والأسعار' : 'Update service catalog'}
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight size={16} className={`text-neutral-400 group-hover:text-rose-600 transition-transform ${isRtl ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'}`} />
+                  </button>
+
+                  <button
+                    onClick={() => onQuickAction('giftcard')}
+                    className={`w-full p-3.5 border rounded-xl flex items-center justify-between group transition-all text-start ${
+                      darkMode ? 'border-zinc-800 bg-zinc-850/40 hover:bg-zinc-800 hover:border-amber-500' : 'border-neutral-200/80 bg-neutral-50/50 hover:bg-amber-50/30 hover:border-amber-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="p-2.5 bg-amber-50 dark:bg-amber-950/50 rounded-xl text-amber-700 dark:text-amber-300 border border-amber-100 dark:border-amber-900/50 group-hover:scale-105 transition-transform">
+                        <Gift size={18} />
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                          {isRtl ? 'إصدار بطاقة هدايا' : 'Issue Gift Card'}
+                        </p>
+                        <p className="text-xs text-neutral-400">
+                          {isRtl ? 'تفعيل رصيد أو كوبون هدية' : 'Create digital voucher'}
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight size={16} className={`text-neutral-400 group-hover:text-amber-600 transition-transform ${isRtl ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'}`} />
+                  </button>
+                </div>
               </div>
             </div>
 

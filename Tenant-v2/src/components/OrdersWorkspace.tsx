@@ -32,6 +32,7 @@ import {
 import {
   Language,
   TenantOrder,
+  TenantOrderItem,
   TenantOrderShippingAddress,
   TenantOrderStats,
   TenantOrderPagination,
@@ -41,6 +42,14 @@ import {
   OrderDeliveryType
 } from '../types';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
+import {
+  getOrderStatusToken,
+  getPaymentStatusToken,
+  BARSPA_ORDER_STATUS,
+  BARSPA_PAYMENT_STATUS,
+  SemanticStatusStyle
+} from '../lib/statusTokens';
+import { resolveProductImageUrl } from '../lib/productContract';
 
 export interface OrdersWorkspaceProps {
   lang: Language;
@@ -54,138 +63,84 @@ interface ToastMessage {
   type: 'success' | 'error' | 'info';
 }
 
-const STATUS_CONFIG: Record<OrderFulfillmentStatus, {
-  labelAr: string;
-  labelEn: string;
-  bgLight: string;
-  textLight: string;
-  bgDark: string;
-  textDark: string;
-  borderLight: string;
-  borderDark: string;
-}> = {
-  pending: {
-    labelAr: 'قيد الانتظار',
-    labelEn: 'Pending',
-    bgLight: 'bg-amber-50',
-    textLight: 'text-amber-700',
-    bgDark: 'dark:bg-amber-950/40',
-    textDark: 'dark:text-amber-400',
-    borderLight: 'border-amber-200',
-    borderDark: 'dark:border-amber-800/40'
-  },
-  confirmed: {
-    labelAr: 'تم التأكيد',
-    labelEn: 'Confirmed',
-    bgLight: 'bg-purple-50',
-    textLight: 'text-[#1D035F]',
-    bgDark: 'dark:bg-[#1D035F]/40',
-    textDark: 'dark:text-[#E7DDFC]',
-    borderLight: 'border-[#A379E2]/40',
-    borderDark: 'dark:border-[#A379E2]/50'
-  },
-  processing: {
-    labelAr: 'قيد التجهيز',
-    labelEn: 'Processing',
-    bgLight: 'bg-indigo-50',
-    textLight: 'text-indigo-700',
-    bgDark: 'dark:bg-indigo-950/40',
-    textDark: 'dark:text-indigo-400',
-    borderLight: 'border-indigo-200',
-    borderDark: 'dark:border-indigo-800/40'
-  },
-  ready_for_pickup: {
-    labelAr: 'جاهز للاستلام',
-    labelEn: 'Ready for Pickup',
-    bgLight: 'bg-purple-50',
-    textLight: 'text-[#1D035F]',
-    bgDark: 'dark:bg-[#1D035F]/40',
-    textDark: 'dark:text-[#E7DDFC]',
-    borderLight: 'border-[#A379E2]/40',
-    borderDark: 'dark:border-[#A379E2]/50'
-  },
-  shipped: {
-    labelAr: 'تم الشحن',
-    labelEn: 'Shipped',
-    bgLight: 'bg-sky-50',
-    textLight: 'text-sky-800',
-    bgDark: 'dark:bg-sky-950/40',
-    textDark: 'dark:text-sky-300',
-    borderLight: 'border-sky-300',
-    borderDark: 'dark:border-sky-800/40'
-  },
-  delivered: {
-    labelAr: 'تم التوصيل',
-    labelEn: 'Delivered',
-    bgLight: 'bg-emerald-50',
-    textLight: 'text-emerald-800',
-    bgDark: 'dark:bg-emerald-950/40',
-    textDark: 'dark:text-emerald-300',
-    borderLight: 'border-emerald-300',
-    borderDark: 'dark:border-emerald-800/40'
-  },
-  completed: {
-    labelAr: 'مكتمل',
-    labelEn: 'Completed',
-    bgLight: 'bg-emerald-50',
-    textLight: 'text-emerald-800',
-    bgDark: 'dark:bg-emerald-950/40',
-    textDark: 'dark:text-emerald-300',
-    borderLight: 'border-emerald-300',
-    borderDark: 'dark:border-emerald-800/40'
-  },
-  cancelled: {
-    labelAr: 'ملغي',
-    labelEn: 'Cancelled',
-    bgLight: 'bg-rose-50',
-    textLight: 'text-rose-800',
-    bgDark: 'dark:bg-rose-950/40',
-    textDark: 'dark:text-rose-300',
-    borderLight: 'border-rose-300',
-    borderDark: 'dark:border-rose-800/40'
-  },
-  refunded: {
-    labelAr: 'مسترجع',
-    labelEn: 'Refunded',
-    bgLight: 'bg-rose-50',
-    textLight: 'text-rose-800',
-    bgDark: 'dark:bg-rose-950/40',
-    textDark: 'dark:text-rose-300',
-    borderLight: 'border-rose-300',
-    borderDark: 'dark:border-rose-800/40'
-  }
-};
+// Map legacy references directly to canonical BarSpa status tokens
+const STATUS_CONFIG = BARSPA_ORDER_STATUS;
+const PAYMENT_STATUS_CONFIG = BARSPA_PAYMENT_STATUS;
 
-const PAYMENT_STATUS_CONFIG: Record<OrderPaymentStatus, {
-  labelAr: string;
-  labelEn: string;
-  colorClass: string;
-}> = {
-  paid: {
-    labelAr: 'مدفوع',
-    labelEn: 'Paid',
-    colorClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40'
-  },
-  pending: {
-    labelAr: 'بانتظار الدفع',
-    labelEn: 'Pending',
-    colorClass: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/40'
-  },
-  failed: {
-    labelAr: 'فشل الدفع',
-    labelEn: 'Failed',
-    colorClass: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/40'
-  },
-  refunded: {
-    labelAr: 'مسترجع',
-    labelEn: 'Refunded',
-    colorClass: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/40'
-  },
-  partially_refunded: {
-    labelAr: 'مسترجع جزئياً',
-    labelEn: 'Partially Refunded',
-    colorClass: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/40'
+/**
+ * Polished Product Thumbnail for Order Drawer with resilient fallbacks:
+ * 1. Checks snapshot productImage (OrderItem column)
+ * 2. Checks associated product images (image, imageUrl, images array)
+ * 3. Normalizes via resolveProductImageUrl
+ * 4. Gracefully recovers on broken image (onError) to a BarSpa branded placeholder
+ * 5. Zero browser broken-image icons or ugly alt-text dumps
+ */
+const OrderItemThumbnail: React.FC<{
+  item: TenantOrderItem;
+  darkMode?: boolean;
+}> = ({ item, darkMode }) => {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  const rawImageUrl = useMemo(() => {
+    const itAny = item as any;
+    // 1. Authoritative snapshot field on OrderItem
+    if (itAny.productImage && typeof itAny.productImage === 'string' && itAny.productImage.trim()) {
+      return itAny.productImage.trim();
+    }
+    // 2. Associated product relation fields
+    if (item.product?.image && typeof item.product.image === 'string' && item.product.image.trim()) {
+      return item.product.image.trim();
+    }
+    if (itAny.product?.imageUrl && typeof itAny.product.imageUrl === 'string' && itAny.product.imageUrl.trim()) {
+      return itAny.product.imageUrl.trim();
+    }
+    if (Array.isArray(itAny.product?.images) && itAny.product.images.length > 0) {
+      const first = itAny.product.images[0];
+      if (typeof first === 'string' && first.trim()) return first.trim();
+    }
+    // 3. Direct image fields fallback
+    if (itAny.image && typeof itAny.image === 'string' && itAny.image.trim()) {
+      return itAny.image.trim();
+    }
+    if (itAny.imageUrl && typeof itAny.imageUrl === 'string' && itAny.imageUrl.trim()) {
+      return itAny.imageUrl.trim();
+    }
+    return '';
+  }, [item]);
+
+  const resolvedUrl = useMemo(() => {
+    if (!rawImageUrl) return '';
+    return resolveProductImageUrl(rawImageUrl);
+  }, [rawImageUrl]);
+
+  const productName = item.productName || item.productNameAr || 'Product';
+
+  if (!resolvedUrl || imageFailed) {
+    return (
+      <div
+        className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+          darkMode
+            ? 'bg-zinc-850 border-zinc-750 text-[#E7DDFC]'
+            : 'bg-purple-50/70 border-purple-200/80 text-[#6537C0]'
+        }`}
+        title={productName}
+      >
+        <Package size={22} className="stroke-[1.8] opacity-80" />
+      </div>
+    );
   }
+
+  return (
+    <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-slate-200 dark:border-zinc-800 bg-slate-100 dark:bg-zinc-850">
+      <img
+        src={resolvedUrl}
+        alt={productName}
+        onError={() => setImageFailed(true)}
+        className="w-full h-full object-cover"
+        loading="lazy"
+      />
+    </div>
+  );
 };
 
 const PAYMENT_METHOD_LABELS: Record<string, { labelAr: string; labelEn: string }> = {
@@ -665,19 +620,23 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
             { id: 'cancelled', labelAr: 'ملغي', labelEn: 'Cancelled' }
           ].map((tab) => {
             const isActive = statusFilter === tab.id;
+            const tabMeta = tab.id !== 'all' ? getOrderStatusToken(tab.id) : null;
             return (
               <button
                 key={tab.id}
                 onClick={() => setStatusFilter(tab.id)}
-                className={`px-3 py-1.5 rounded-xl font-medium transition-all shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl transition-all shrink-0 cursor-pointer inline-flex items-center gap-1.5 text-xs ${
                   isActive
-                    ? 'bg-brand-500 text-white shadow-xs font-bold'
+                    ? 'bg-[#1D035F] text-white shadow-xs font-bold border border-[#1D035F]'
                     : darkMode
-                      ? 'bg-zinc-850/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850'
-                      : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                      ? 'bg-zinc-800 text-zinc-200 border border-zinc-700/70 hover:bg-zinc-750 font-medium'
+                      : 'bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200/80 font-semibold'
                 }`}
               >
-                {isRtl ? tab.labelAr : tab.labelEn}
+                {tabMeta && (
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tabMeta.dotClass}`} />
+                )}
+                <span>{isRtl ? tab.labelAr : tab.labelEn}</span>
               </button>
             );
           })}
@@ -737,8 +696,8 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-zinc-850">
                 {orders.map((order) => {
-                  const statusMeta = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
-                  const paymentMeta = PAYMENT_STATUS_CONFIG[order.paymentStatus] || PAYMENT_STATUS_CONFIG.pending;
+                  const statusMeta = getOrderStatusToken(order.status);
+                  const paymentMeta = getPaymentStatusToken(order.paymentStatus);
                   const itemCount = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
 
                   return (
@@ -755,56 +714,56 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
 
                       {/* Customer Info */}
                       <td className="py-3.5 px-4">
-                        <div className="font-bold">
+                        <div className="font-bold text-slate-900 dark:text-zinc-100">
                           {order.user?.firstName || order.user?.lastName
                             ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim()
                             : (isRtl ? 'عميل زائر' : 'Guest Customer')}
                         </div>
                         {order.user?.phone && (
-                          <div className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                          <div dir="ltr" className="text-xs text-slate-500 dark:text-zinc-400 font-mono mt-0.5 text-start">
                             {order.user.phone}
                           </div>
                         )}
                       </td>
 
                       {/* Date */}
-                      <td className="py-3.5 px-4 text-neutral-500 dark:text-neutral-400">
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-zinc-400 font-medium text-xs">
                         {formatDate(order.createdAt)}
                       </td>
 
                       {/* Delivery Type */}
                       <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold border ${
                           order.deliveryType === 'delivery'
-                            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/40'
-                            : 'bg-neutral-50 text-neutral-700 border-neutral-200 dark:bg-zinc-800 dark:text-neutral-300 dark:border-zinc-700'
+                            ? 'bg-blue-50 text-blue-950 border-blue-200 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-800'
+                            : 'bg-neutral-100 text-neutral-800 border-neutral-200 dark:bg-zinc-800 dark:text-neutral-200 dark:border-zinc-700'
                         }`}>
                           {order.deliveryType === 'delivery' ? <Truck size={12} /> : <Store size={12} />}
                           <span>{order.deliveryType === 'delivery' ? (isRtl ? 'توصيل' : 'Delivery') : (isRtl ? 'استلام' : 'Pickup')}</span>
                         </span>
-                        <span className="text-[10px] text-neutral-400 block mt-0.5">
+                        <span className="text-[11px] text-slate-500 dark:text-zinc-400 block mt-0.5 font-medium">
                           {itemCount} {isRtl ? 'منتجات' : 'items'}
                         </span>
                       </td>
 
                       {/* Status */}
                       <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                          statusMeta.bgLight
-                        } ${statusMeta.textLight} ${statusMeta.borderLight} ${statusMeta.bgDark} ${statusMeta.textDark} ${statusMeta.borderDark}`}>
-                          {isRtl ? statusMeta.labelAr : statusMeta.labelEn}
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border shadow-2xs ${statusMeta.containerClass}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusMeta.dotClass}`} />
+                          <span>{isRtl ? statusMeta.labelAr : statusMeta.labelEn}</span>
                         </span>
                       </td>
 
                       {/* Payment Status */}
                       <td className="py-3.5 px-4">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${paymentMeta.colorClass}`}>
-                          {isRtl ? paymentMeta.labelAr : paymentMeta.labelEn}
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs ${paymentMeta.containerClass}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${paymentMeta.dotClass}`} />
+                          <span>{isRtl ? paymentMeta.labelAr : paymentMeta.labelEn}</span>
                         </span>
                       </td>
 
                       {/* Total Amount */}
-                      <td className="py-3.5 px-4 text-end font-mono font-bold text-sm">
+                      <td dir="ltr" className="py-3.5 px-4 text-end font-mono font-bold text-sm text-slate-900 dark:text-zinc-100">
                         {formatPrice(order.totalAmount)}
                       </td>
 
@@ -938,10 +897,10 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                           <div className="flex flex-wrap items-center gap-2">
                             {/* Fulfillment Status Pill */}
                             {(() => {
-                              const s = STATUS_CONFIG[selectedOrder.status] || STATUS_CONFIG.pending;
+                              const s = getOrderStatusToken(selectedOrder.status);
                               return (
-                                <span className={`px-3 py-1.5 rounded-full text-xs font-bold border shadow-xs inline-flex items-center gap-1.5 ${s.bgLight} ${s.textLight} ${s.borderLight} ${s.bgDark} ${s.textDark} ${s.borderDark}`}>
-                                  <span className="w-2 h-2 rounded-full bg-current opacity-80" />
+                                <span className={`px-3 py-1.5 rounded-full text-xs font-bold border shadow-xs inline-flex items-center gap-1.5 ${s.containerClass}`}>
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${s.dotClass}`} />
                                   <span>{isRtl ? s.labelAr : s.labelEn}</span>
                                 </span>
                               );
@@ -949,9 +908,9 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
 
                             {/* Payment Status Pill */}
                             {(() => {
-                              const p = PAYMENT_STATUS_CONFIG[selectedOrder.paymentStatus] || PAYMENT_STATUS_CONFIG.pending;
+                              const p = getPaymentStatusToken(selectedOrder.paymentStatus);
                               return (
-                                <span className={`px-3 py-1.5 rounded-full text-xs font-bold border shadow-xs inline-flex items-center gap-1.5 ${p.colorClass}`}>
+                                <span className={`px-3 py-1.5 rounded-full text-xs font-bold border shadow-xs inline-flex items-center gap-1.5 ${p.containerClass}`}>
                                   <CreditCard size={13} />
                                   <span>{isRtl ? p.labelAr : p.labelEn}</span>
                                 </span>
@@ -1028,8 +987,8 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                               <span>{isRtl ? 'بدء الطلب' : 'Start'}</span>
                               <span className="font-bold text-brand-600 dark:text-brand-400">
                                 {isRtl
-                                  ? STATUS_CONFIG[selectedOrder.status]?.labelAr
-                                  : STATUS_CONFIG[selectedOrder.status]?.labelEn}
+                                  ? getOrderStatusToken(selectedOrder.status).labelAr
+                                  : getOrderStatusToken(selectedOrder.status).labelEn}
                               </span>
                               <span>{isRtl ? 'اكتمال' : 'Completed'}</span>
                             </div>
@@ -1047,10 +1006,10 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                         <div className={`text-xs flex items-center justify-between pt-2.5 border-t ${
                           darkMode ? 'border-zinc-800 text-zinc-300' : 'border-slate-200 text-slate-700'
                         }`}>
-                          <span className="font-medium text-slate-500 dark:text-zinc-400">
+                          <span className="font-semibold text-slate-600 dark:text-zinc-400">
                             {isRtl ? 'طريقة الدفع:' : 'Payment Method:'}
                           </span>
-                          <span className="font-bold text-slate-900 dark:text-zinc-100">
+                          <span className="font-bold text-slate-950 dark:text-zinc-100">
                             {PAYMENT_METHOD_LABELS[selectedOrder.paymentMethod]
                               ? (isRtl ? PAYMENT_METHOD_LABELS[selectedOrder.paymentMethod].labelAr : PAYMENT_METHOD_LABELS[selectedOrder.paymentMethod].labelEn)
                               : selectedOrder.paymentMethod}
@@ -1062,17 +1021,17 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                       <div className={`p-4 rounded-2xl border space-y-3 shadow-xs ${
                         darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
                       }`}>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-zinc-200 flex items-center gap-2">
                           <User size={15} className="text-brand-500" />
                           <span>{isRtl ? 'بيانات العميل' : 'Customer Information'}</span>
                         </h4>
 
                         <div className="space-y-2 text-xs">
                           <div>
-                            <span className="text-slate-500 dark:text-zinc-400 block text-[11px]">
+                            <span className="text-slate-600 dark:text-zinc-400 block text-xs font-medium">
                               {isRtl ? 'اسم العميل' : 'Customer Name'}
                             </span>
-                            <p className="font-bold text-sm text-slate-900 dark:text-zinc-100">
+                            <p className="font-bold text-base text-slate-950 dark:text-white mt-0.5">
                               {selectedOrder.user?.firstName || selectedOrder.user?.lastName
                                 ? `${selectedOrder.user.firstName || ''} ${selectedOrder.user.lastName || ''}`.trim()
                                 : (isRtl ? 'عميل زائر' : 'Guest Customer')}
@@ -1080,8 +1039,8 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                           </div>
 
                           {selectedOrder.user?.phone && (
-                            <div className="pt-1.5 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between">
-                              <span className="text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                            <div className="pt-2 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between">
+                              <span className="text-slate-600 dark:text-zinc-400 flex items-center gap-1.5 font-medium text-xs">
                                 <Phone size={13} />
                                 <span>{isRtl ? 'رقم الهاتف' : 'Phone'}</span>
                               </span>
@@ -1096,15 +1055,15 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                           )}
 
                           {selectedOrder.user?.email && (
-                            <div className="pt-1.5 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between">
-                              <span className="text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                            <div className="pt-2 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between">
+                              <span className="text-slate-600 dark:text-zinc-400 flex items-center gap-1.5 font-medium text-xs">
                                 <Mail size={13} />
                                 <span>{isRtl ? 'البريد الإلكتروني' : 'Email'}</span>
                               </span>
                               <a
                                 href={`mailto:${selectedOrder.user.email}`}
                                 dir="ltr"
-                                className="font-medium text-slate-800 dark:text-zinc-200 hover:underline truncate max-w-[200px]"
+                                className="font-semibold text-slate-900 dark:text-zinc-200 hover:underline truncate max-w-[200px]"
                               >
                                 {selectedOrder.user.email}
                               </a>
@@ -1261,15 +1220,15 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                       </div>
 
                       {/* 4. Order Items */}
-                      <div className={`p-4 rounded-2xl border space-y-3 shadow-xs ${
-                        darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
+                      <div className={`p-4 rounded-2xl border space-y-3.5 shadow-xs ${
+                        darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-slate-200'
                       }`}>
                         <div className="flex items-center justify-between">
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-zinc-200 flex items-center gap-2">
                             <Package size={15} className="text-brand-500" />
                             <span>{isRtl ? 'منتجات الطلب' : 'Order Items'}</span>
                           </h4>
-                          <span className="text-xs font-bold text-slate-600 dark:text-zinc-300">
+                          <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
                             {selectedOrder.items?.length || 0} {isRtl ? 'منتج' : 'items'}
                           </span>
                         </div>
@@ -1278,28 +1237,18 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                           {selectedOrder.items && selectedOrder.items.length > 0 ? (
                             selectedOrder.items.map((it) => (
                               <div key={it.id} className="py-3 flex items-center justify-between gap-3 text-xs">
-                                <div className="flex items-center gap-3">
-                                  {it.product?.image ? (
-                                    <img
-                                      src={it.product.image}
-                                      alt={it.productName}
-                                      className="w-11 h-11 rounded-lg object-cover border border-slate-200 dark:border-zinc-800 shrink-0"
-                                    />
-                                  ) : (
-                                    <div className="w-11 h-11 rounded-lg bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-400 dark:text-zinc-500 shrink-0">
-                                      <Package size={18} />
-                                    </div>
-                                  )}
-                                  <div>
-                                    <p className="font-bold text-slate-900 dark:text-zinc-100">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <OrderItemThumbnail item={it} darkMode={darkMode} />
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-sm text-slate-950 dark:text-white leading-snug truncate">
                                       {isRtl ? (it.productNameAr || it.productName) : it.productName}
                                     </p>
-                                    <p className="text-xs text-slate-600 dark:text-zinc-400 font-mono mt-0.5">
+                                    <p dir="ltr" className="text-xs text-slate-600 dark:text-zinc-400 font-mono mt-0.5 text-start">
                                       {it.quantity} × {formatPrice(it.unitPrice)}
                                     </p>
                                   </div>
                                 </div>
-                                <div className="font-mono font-bold text-sm text-slate-900 dark:text-zinc-100">
+                                <div dir="ltr" className="font-mono font-black text-sm text-slate-950 dark:text-white shrink-0">
                                   {formatPrice(it.totalPrice)}
                                 </div>
                               </div>
@@ -1312,36 +1261,36 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                         </div>
 
                         {/* Financial Totals Breakdown */}
-                        <div className={`pt-3 border-t text-xs space-y-2 ${
+                        <div className={`pt-3 border-t text-xs space-y-2.5 ${
                           darkMode ? 'border-zinc-800 text-zinc-300' : 'border-slate-200 text-slate-700'
                         }`}>
-                          <div className="flex justify-between">
-                            <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
-                            <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100">{formatPrice(selectedOrder.subtotal)}</span>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-slate-600 dark:text-zinc-400">{isRtl ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
+                            <span dir="ltr" className="font-mono font-bold text-slate-900 dark:text-zinc-100">{formatPrice(selectedOrder.subtotal)}</span>
                           </div>
 
-                          <div className="flex justify-between">
-                            <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'ضريبة القيمة المضافة (15%):' : 'VAT (15%):'}</span>
-                            <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100">{formatPrice(selectedOrder.taxAmount)}</span>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-slate-600 dark:text-zinc-400">{isRtl ? 'ضريبة القيمة المضافة (15%):' : 'VAT (15%):'}</span>
+                            <span dir="ltr" className="font-mono font-bold text-slate-900 dark:text-zinc-100">{formatPrice(selectedOrder.taxAmount)}</span>
                           </div>
 
                           {Number(selectedOrder.shippingFee) > 0 ? (
-                            <div className="flex justify-between">
-                              <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'رسوم التوصيل:' : 'Shipping Fee:'}</span>
-                              <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100">{formatPrice(selectedOrder.shippingFee)}</span>
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium text-slate-600 dark:text-zinc-400">{isRtl ? 'رسوم التوصيل:' : 'Shipping Fee:'}</span>
+                              <span dir="ltr" className="font-mono font-bold text-slate-900 dark:text-zinc-100">{formatPrice(selectedOrder.shippingFee)}</span>
                             </div>
                           ) : (
-                            <div className="flex justify-between">
-                              <span className="text-slate-600 dark:text-zinc-400">{isRtl ? 'رسوم التوصيل:' : 'Shipping Fee:'}</span>
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium text-slate-600 dark:text-zinc-400">{isRtl ? 'رسوم التوصيل:' : 'Shipping Fee:'}</span>
                               <span className="font-bold text-emerald-600 dark:text-emerald-400">{isRtl ? 'مجاني' : 'Free'}</span>
                             </div>
                           )}
 
-                          <div className={`flex justify-between text-base font-black pt-2.5 border-t ${
+                          <div className={`flex justify-between items-center text-base font-black pt-3 border-t ${
                             darkMode ? 'border-zinc-800 text-zinc-100' : 'border-slate-200 text-slate-900'
                           }`}>
-                            <span>{isRtl ? 'الإجمالي الكلي:' : 'Total Amount:'}</span>
-                            <span className="font-mono text-brand-600 dark:text-brand-400 text-lg">
+                            <span className="text-slate-900 dark:text-zinc-100">{isRtl ? 'الإجمالي الكلي:' : 'Total Amount:'}</span>
+                            <span dir="ltr" className="font-mono text-brand-600 dark:text-brand-400 text-lg font-black">
                               {formatPrice(selectedOrder.totalAmount)}
                             </span>
                           </div>
@@ -1353,11 +1302,11 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                         <div className={`p-4 rounded-2xl border text-xs space-y-1.5 shadow-xs ${
                           darkMode ? 'bg-zinc-950/60 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-800'
                         }`}>
-                          <span className="font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                          <span className="font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
                             <FileText size={14} className="text-brand-500" />
                             <span>{isRtl ? 'ملاحظات العميل مع الطلب:' : 'Customer Order Notes:'}</span>
                           </span>
-                          <p className="text-slate-700 dark:text-zinc-300 leading-relaxed font-normal whitespace-pre-line pl-5">
+                          <p className="text-slate-800 dark:text-zinc-200 leading-relaxed font-medium whitespace-pre-line pl-5">
                             {selectedOrder.notes}
                           </p>
                         </div>
@@ -1368,7 +1317,7 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                         <div className={`p-4 rounded-2xl border space-y-3 shadow-xs ${
                           darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'
                         }`}>
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-zinc-200 flex items-center gap-2">
                             <CreditCard size={15} className="text-emerald-500" />
                             <span>{isRtl ? 'سجل العمليات المالية' : 'Payment Transactions'}</span>
                           </h4>
@@ -1456,12 +1405,13 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                 <div className={`p-3 rounded-xl border flex items-center justify-between ${
                   darkMode ? 'bg-zinc-950/50 border-zinc-800' : 'bg-slate-50 border-slate-200'
                 }`}>
-                  <span className="text-slate-500 dark:text-zinc-400 font-medium">{isRtl ? 'الحالة الحالية:' : 'Current Status:'}</span>
+                  <span className="text-slate-600 dark:text-zinc-400 font-semibold">{isRtl ? 'الحالة الحالية:' : 'Current Status:'}</span>
                   {(() => {
-                    const cur = STATUS_CONFIG[selectedOrder.status] || STATUS_CONFIG.pending;
+                    const cur = getOrderStatusToken(selectedOrder.status);
                     return (
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${cur.bgLight} ${cur.textLight} ${cur.borderLight} ${cur.bgDark} ${cur.textDark} ${cur.borderDark}`}>
-                        {isRtl ? cur.labelAr : cur.labelEn}
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-2xs inline-flex items-center gap-1.5 ${cur.containerClass}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cur.dotClass}`} />
+                        <span>{isRtl ? cur.labelAr : cur.labelEn}</span>
                       </span>
                     );
                   })()}
@@ -1469,7 +1419,7 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
 
                 {/* Explanatory Lifecycle context */}
                 <div className="space-y-1.5">
-                  <span className="font-bold text-slate-700 dark:text-zinc-300 block">
+                  <span className="font-bold text-slate-800 dark:text-zinc-200 block text-xs">
                     {isRtl ? 'اختر الحالة التالية المعتمدة:' : 'Select Authorized Next Transition:'}
                   </span>
                   <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-normal">
@@ -1482,7 +1432,7 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                 {/* Transitions Options */}
                 <div className="space-y-2">
                   {getAllowedTransitions(selectedOrder).map((st) => {
-                    const cfg = STATUS_CONFIG[st];
+                    const cfg = getOrderStatusToken(st);
                     const isSelected = targetStatus === st;
                     return (
                       <button
@@ -1524,7 +1474,7 @@ export default function OrdersWorkspace({ lang, darkMode = false }: OrdersWorksp
                             </span>
                           </div>
                         </div>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${cfg.bgLight} ${cfg.textLight} ${cfg.borderLight} ${cfg.bgDark} ${cfg.textDark} ${cfg.borderDark}`}>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border shadow-2xs ${cfg.containerClass}`}>
                           {st}
                         </span>
                       </button>

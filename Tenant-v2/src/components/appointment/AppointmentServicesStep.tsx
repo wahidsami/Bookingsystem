@@ -33,6 +33,7 @@ interface AppointmentServicesStepProps {
   isRtl: boolean;
   boardStartHour?: number;
   slotMinutes?: number;
+  normalEndHour?: number;
   bookingRecoveryMode?: 'chain' | 'modify_professionals' | 'separate_services';
   forceExpandAll?: boolean;
   canonicalServices: ServiceRecord[];
@@ -63,6 +64,7 @@ export default function AppointmentServicesStep({
   isRtl,
   boardStartHour = 9,
   slotMinutes = 5,
+  normalEndHour,
   bookingRecoveryMode = 'chain',
   forceExpandAll = false,
   canonicalServices,
@@ -81,6 +83,7 @@ export default function AppointmentServicesStep({
   onAddPackage,
   onUpdateService,
   onRemoveService,
+  formatMinutesToTime,
 }: AppointmentServicesStepProps) {
 
   const effectiveBundles = useMemo(() => {
@@ -338,6 +341,13 @@ export default function AppointmentServicesStep({
                   const pkgDuration = isParallel
                     ? Math.max(...items.map(it => Number(it.duration || 0)))
                     : (pkg ? pkg.totalDuration : items.reduce((sum, it) => sum + Number(it.duration || 0), 0));
+                  const sharedStartTime = items[0]?.startTime || 0;
+                  const latestBundleEnd = isParallel
+                    ? Math.max(...items.map(it => Number(it.startTime || 0) + Number(it.duration || 0)))
+                    : (items[items.length - 1] ? Number(items[items.length - 1].startTime || 0) + Number(items[items.length - 1].duration || 0) : 0);
+                  const normalClosingMinutes = Math.max(0, Math.round(Number(normalEndHour ?? (boardStartHour + 8)))) * 60;
+                  const bundleAbsoluteEndMinutes = (boardStartHour * 60) + latestBundleEnd;
+                  const exceedsDutyHours = bundleAbsoluteEndMinutes > normalClosingMinutes;
 
                   return (
                     <div key={instanceId} className="bg-white border border-purple-200 rounded-xl p-4 shadow-2xs relative overflow-hidden">
@@ -355,8 +365,19 @@ export default function AppointmentServicesStep({
                             )}
                             <h4 className="font-bold text-slate-900 text-base">{pkgName}</h4>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1 font-semibold">
-                            {pkgPrice} {isRtl ? 'ر.س' : 'SAR'} • {pkgDuration} {isRtl ? (isParallel ? 'دقيقة (متزامن)' : 'دقيقة إجمالية') : (isParallel ? 'min (parallel)' : 'min total')}
+                          <p className="text-xs text-slate-500 mt-1 font-semibold flex flex-wrap items-center gap-2">
+                            <span>{pkgPrice} {isRtl ? 'ر.س' : 'SAR'}</span>
+                            <span>•</span>
+                            <span>{pkgDuration} {isRtl ? (isParallel ? 'دقيقة (متزامن)' : 'دقيقة إجمالية') : (isParallel ? 'min (parallel)' : 'min total')}</span>
+                            <span>•</span>
+                            <span className="font-mono text-purple-700 bg-purple-100/60 px-1.5 py-0.5 rounded">
+                              {formatMinutesToTime(sharedStartTime)} – {formatMinutesToTime(latestBundleEnd)}
+                            </span>
+                            {exceedsDutyHours && (
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-100/80 border border-amber-300 px-1.5 py-0.5 rounded">
+                                {isRtl ? '⚠️ يتجاوز ساعات العمل المعتادة' : '⚠️ Exceeds normal duty hours'}
+                              </span>
+                            )}
                           </p>
                         </div>
                         <button

@@ -66,34 +66,34 @@
 
 /* Centralized BarSpa Semantic Status Badge Utilities (Never Look Disabled) */
 @layer components {
-  /* Active / Confirmed */
+  /* Active / Confirmed / Ready for Pickup */
   .badge-status-confirmed {
-    @apply bg-purple-50 text-[#1D035F] border border-[#A379E2]/40 font-bold dark:bg-[#1D035F]/40 dark:text-[#E7DDFC] dark:border-[#A379E2]/50;
+    @apply bg-purple-50 text-[#1D035F] border border-[#A379E2]/50 font-bold dark:bg-[#1D035F]/40 dark:text-[#E7DDFC] dark:border-[#A379E2]/60;
   }
 
-  /* In-Progress / Processing */
+  /* In-Progress / Processing / Arrived */
   .badge-status-processing {
-    @apply bg-indigo-50 text-indigo-900 border border-indigo-200 font-bold dark:bg-indigo-950/50 dark:text-indigo-200 dark:border-indigo-800;
+    @apply bg-indigo-50 text-indigo-950 border border-indigo-300 font-bold dark:bg-indigo-950/50 dark:text-indigo-200 dark:border-indigo-700/60;
   }
 
-  /* Completed / Fulfilled */
+  /* Completed / Fulfilled / Delivered / Paid */
   .badge-status-completed {
-    @apply bg-emerald-50 text-emerald-900 border border-emerald-300 font-bold dark:bg-emerald-950/50 dark:text-emerald-200 dark:border-emerald-800;
+    @apply bg-emerald-50 text-emerald-950 border border-emerald-300 font-bold dark:bg-emerald-950/50 dark:text-emerald-200 dark:border-emerald-700/60;
   }
 
-  /* Pending / Action Needed */
+  /* Pending / Action Needed / Pending Payment */
   .badge-status-pending {
-    @apply bg-amber-50 text-amber-900 border border-amber-300 font-bold dark:bg-amber-950/50 dark:text-amber-200 dark:border-amber-800;
+    @apply bg-amber-50 text-amber-950 border border-amber-300 font-bold dark:bg-amber-950/50 dark:text-amber-200 dark:border-amber-700/60;
   }
 
-  /* Cancelled / Alert */
+  /* Cancelled / Alert / Refunded / Failed */
   .badge-status-cancelled {
-    @apply bg-rose-50 text-rose-900 border border-rose-300 font-bold dark:bg-rose-950/50 dark:text-rose-200 dark:border-rose-800;
+    @apply bg-rose-50 text-rose-950 border border-rose-300 font-bold dark:bg-rose-950/50 dark:text-rose-200 dark:border-rose-700/60;
   }
 
   /* Shipped / Information */
   .badge-status-shipped {
-    @apply bg-sky-50 text-sky-900 border border-sky-300 font-bold dark:bg-sky-950/50 dark:text-sky-200 dark:border-sky-800;
+    @apply bg-sky-50 text-sky-950 border border-sky-300 font-bold dark:bg-sky-950/50 dark:text-sky-200 dark:border-sky-700/60;
   }
 }
 

@@ -70,13 +70,13 @@ export default function AppointmentServiceRow({
     return assignments.includes(s.id) || assignments.includes(Number(s.id) as any);
   });
 
-  const [draftConfig, setDraftConfig] = useState<Partial<StagedService>>({
-    staffId: '',
-    startTime: 0,
-    duration,
-    discountType: 'none',
-    discountValue: 0
-  });
+  const [draftConfig, setDraftConfig] = useState<Partial<StagedService>>(() => ({
+    staffId: stagedItem?.staffId || '',
+    startTime: stagedItem?.startTime ?? 0,
+    duration: stagedItem?.duration ?? duration,
+    discountType: stagedItem?.discountType ?? 'none',
+    discountValue: stagedItem?.discountValue ?? 0
+  }));
 
   useEffect(() => {
     if (stagedItem) {
@@ -88,7 +88,7 @@ export default function AppointmentServiceRow({
         discountValue: stagedItem.discountValue
       });
     }
-  }, [stagedItem, validStylists.length]);
+  }, [stagedItem?.id, stagedItem?.startTime, stagedItem?.duration, stagedItem?.staffId, stagedItem?.discountType, stagedItem?.discountValue, validStylists.length]);
 
   useEffect(() => {
     if (forceExpanded) {
