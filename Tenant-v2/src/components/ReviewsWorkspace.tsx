@@ -63,14 +63,14 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
     "شكراً جزيلاً لثقتكِ الغالية هيا! يسعدنا جداً أن الخدمة نالت استحسانكِ وننتظر زيارتكِ القادمة بشوق.",
     "مرحباً بكِ، نعتذر بشدة عن أي إزعاج أو تأخير غير مقصود. نسعى دوماً للأفضل وسيتواصل معكِ مدير الفرع فوراً لمعالجة الأمر.",
     "ممتنون جداً لملاحظتكِ الثمينة. تم نقل تعليقكِ لقسم التشغيل لضبط مستوى الصوت والحرارة في غرف الخدمات فوراً.",
-    "شكراً لتقييمكِ الرائع، فخورون بتقديم أرقى مستويات الضيافة والعناية لضيوف صالون رفاه الفاخر."
+    "شكراً لتقييمكِ الرائع، فخورون بتقديم أرقى مستويات الضيافة والعناية لضيوف صالون بارسبا الفاخر."
   ];
 
   const quickReplySuggestionsEn = [
     "Thank you so much for your kind trust! We are thrilled that you enjoyed the service and look forward to your next visit.",
     "Hello! We sincerely apologize for any unintended delay or inconvenience. The branch manager will reach out to you shortly to resolve this.",
     "Thank you for your valuable feedback. We have shared your comments with the operations team to adjust spa room conditions immediately.",
-    "Thank you for the wonderful rating! We are proud to provide the finest luxury care and hospitality to our esteemed REFAH guests."
+    "Thank you for the wonderful rating! We are proud to provide the finest luxury care and hospitality to our esteemed BarSpa guests."
   ];
 
   // Load reviews from API
@@ -250,11 +250,11 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
           </span>
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider">
-              {isRtl ? 'محرك مراقبة وإدارة الآراء والتقييمات' : 'REFAH Brand Protection & Reviews Center'}
+              {isRtl ? 'محرك مراقبة وإدارة الآراء والتقييمات' : 'BarSpa Brand Protection & Reviews Center'}
             </h4>
             <p className="text-[10px] text-zinc-400 mt-0.5">
               {isRtl 
-                ? 'مراجعة آراء ضيوف رفاه، إخفاء التعليقات المسيئة، وتوجيه الردود الموقرة للمحافظة على مكانة الصالون.' 
+                ? 'مراجعة آراء ضيوف بارسبا، إخفاء التعليقات المسيئة، وتوجيه الردود الموقرة للمحافظة على مكانة الصالون.' 
                 : 'Monitor guest reviews, filter low scores, moderate visibility, and write prestigious replies.'}
             </p>
           </div>
@@ -565,7 +565,7 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
             </h4>
             <p className="text-[10px] text-zinc-400 mt-0.5">
               {isRtl 
-                ? 'مراجعة الملاحظات المسجلة للتحقق من تلبيتها معايير الجودة الراقية لرفاه.' 
+                ? 'مراجعة الملاحظات المسجلة للتحقق من تلبيتها معايير الجودة الراقية لبارسبا.' 
                 : 'View, reply inline, and control public visibility of incoming ratings.'}
             </p>
           </div>
@@ -761,7 +761,7 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                               <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-black text-brand-500 uppercase tracking-wider flex items-center gap-1">
                                   <Sparkles size={11} />
-                                  {isRtl ? `صياغة رد موقر من إدارة صالون رفاه على العميل: ${rev.customer}` : `Draft reply to ${rev.customer}`}
+                                  {isRtl ? `صياغة رد موقر من إدارة صالون بارسبا على العميل: ${rev.customer}` : `Draft reply to ${rev.customer}`}
                                 </span>
                                 {hasReply && (
                                   <button
@@ -778,7 +778,7 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                               <textarea
                                 value={tempReplyText}
                                 onChange={(e) => setTempReplyText(e.target.value)}
-                                placeholder={isRtl ? 'اكتب رداً مهذباً وفخماً يناسب هوية ومستوى صالون رفاه الفخم...' : 'Draft a welcoming and prestigious response to represent REFAH salon standards...'}
+                                placeholder={isRtl ? 'اكتب رداً مهذباً وفخماً يناسب هوية ومستوى صالون بارسبا الفخم...' : 'Draft a welcoming and prestigious response to represent BarSpa salon standards...'}
                                 rows={3}
                                 className={`w-full p-3 text-xs rounded-xl border focus:ring-1 focus:ring-brand-500 outline-hidden font-medium transition-all ${
                                   darkMode ? 'bg-zinc-950 border-zinc-850 text-white' : 'bg-white border-neutral-250 text-neutral-800'

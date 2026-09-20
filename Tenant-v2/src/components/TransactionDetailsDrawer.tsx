@@ -88,21 +88,23 @@ export function TransactionDetailsDrawer({
     { label: isRtl ? "الفرع" : "Branch", value: formatValue(transaction.branchLabel || transaction.branchName) },
   ];
 
+  const displayCurrency = isRtl && currencyLabel === "SAR" ? "ر.س" : currencyLabel;
+
   const relatedActions = [
     {
-      label: isRtl ? "Open Appointment" : "Open Appointment",
+      label: isRtl ? "فتح تفاصيل الموعد" : "Open Appointment",
       icon: ArrowUpRight,
       onClick: onOpenAppointment,
       disabled: !transaction.appointmentIdLinked || typeof onOpenAppointment !== "function",
     },
     {
-      label: isRtl ? "Open Invoice" : "Open Invoice",
+      label: isRtl ? "عرض الفاتورة الرسمية" : "Open Invoice",
       icon: Receipt,
       onClick: onOpenInvoice,
       disabled: typeof onOpenInvoice !== "function",
     },
     {
-      label: isRtl ? "Open Customer" : "Open Customer",
+      label: isRtl ? "عرض ملف العميل" : "Open Customer Profile",
       icon: User2,
       onClick: onOpenCustomer,
       disabled: typeof onOpenCustomer !== "function",
@@ -118,11 +120,12 @@ export function TransactionDetailsDrawer({
     >
         <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm" onClick={onClose} />
         <motion.aside
+          dir={isRtl ? "rtl" : "ltr"}
           initial={{ x: isRtl ? -36 : 36, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: isRtl ? -36 : 36, opacity: 0 }}
           transition={{ type: "spring", damping: 26, stiffness: 220 }}
-          className={`absolute top-0 bottom-0 ${isRtl ? "left-0 border-r" : "right-0 border-l"} w-[min(56rem,88vw)] bg-slate-50 border-slate-200 shadow-2xl flex flex-col`}
+          className={`absolute top-0 bottom-0 ${isRtl ? "left-0 border-r" : "right-0 border-l"} w-[min(56rem,88vw)] bg-slate-50 border-slate-200 shadow-2xl flex flex-col font-sans`}
           onClick={(event) => event.stopPropagation()}
         >
           <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
@@ -162,7 +165,7 @@ export function TransactionDetailsDrawer({
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{isRtl ? "المبلغ" : "Amount"}</p>
-                  <p className="mt-2 text-sm font-bold text-slate-900 font-mono">{amount.toFixed(2)} {currencyLabel}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-900 font-mono" dir="ltr">{amount.toFixed(2)} {displayCurrency}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{isRtl ? "الحالة" : "Status"}</p>
@@ -212,7 +215,7 @@ export function TransactionDetailsDrawer({
                         type="button"
                         onClick={action.onClick}
                         disabled={action.disabled}
-                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-amber-200 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-start transition hover:border-amber-200 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <span className="flex items-center gap-2 text-sm font-bold text-slate-900">
                           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm">

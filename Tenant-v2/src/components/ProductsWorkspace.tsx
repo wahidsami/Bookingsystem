@@ -325,7 +325,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
         howToUseAr: 'قم بوضع كمية كافية وتدليكها بلطف على الجلد أو الشعر النظيف بحركات دائرية حتى تمتص بالكامل. يفضل استخدامه مرتين يومياً.',
         featuresEn: prev.featuresEn || '100% Vegan & cruelty-free • Clinically proven cell repair • Sulfate & paraben free',
         featuresAr: prev.featuresAr || 'طبيعي وعضوي ١٠٠٪ • غني بالفيتامينات والمعادن المغذية • خالي من السلفات والبارابين',
-        brand: prev.brand || 'Refah Organics'
+        brand: prev.brand || 'BarSpa Organics'
       }));
       triggerToast('AI Generation completed successfully!', 'تم صياغة تفاصيل ومواصفات المنتج بالذكاء الاصطناعي بنجاح.', 'success');
     }, 1200);
@@ -1130,7 +1130,7 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
                         type="text"
                         value={formData.brand}
                         onChange={e => setFormData(p => ({ ...p, brand: e.target.value }))}
-                        placeholder="e.g. Refah Beauty, La Colline"
+                        placeholder="e.g. BarSpa Beauty, La Colline"
                         className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-indigo-500 rounded-xl p-2.5 text-xs font-semibold text-neutral-800"
                       />
                     </div>

@@ -443,7 +443,7 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
       setSavingSection('working-hours');
       setError(null);
       const workingHours = Object.fromEntries(
-        Object.entries(workingHoursForm).map(([key, day]) => [
+        (Object.entries(workingHoursForm) as [string, WorkingHoursDayState][]).map(([key, day]) => [
           key,
           {
             isOpen: day.isOpen,
@@ -775,7 +775,7 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
                 onClick={() => setActiveTab(tab.key)}
                 className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
                   active
-                    ? 'bg-brand-500 text-white shadow-sm'
+                    ? 'bg-[#1D035F] text-white shadow-md'
                     : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800'
                 }`}
               >

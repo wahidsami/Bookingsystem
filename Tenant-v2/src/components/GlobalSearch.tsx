@@ -196,7 +196,7 @@ export default function GlobalSearch({
     } else if (item.type === 'customer') {
       onNavigate('customers');
     } else if (item.type === 'service') {
-      onNavigate('services');
+      onNavigate('services2');
     }
     onClose();
   };

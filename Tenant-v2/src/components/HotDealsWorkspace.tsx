@@ -1062,7 +1062,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                 {/* Preset professional library */}
                 <div className="md:col-span-7 space-y-3">
                   <label className="text-[11px] font-bold text-zinc-400 block">
-                    {isRtl ? 'أو اختار من مكتبة صالون رفاه الجاهزة للخدمات الاسترخائية الفاخرة:' : 'Or pick from REFAH professional stock assets library:'}
+                    {isRtl ? 'أو اختار من مكتبة صالون بارسبا الجاهزة للخدمات الاسترخائية الفاخرة:' : 'Or pick from BarSpa professional stock assets library:'}
                   </label>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

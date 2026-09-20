@@ -68,7 +68,7 @@ function InvoiceDetailModal({ bill, lang, darkMode, onClose }: { bill: any; lang
   const totalAmount = bill.totalAmount ?? bill.amount ?? 0;
   const subtotal = bill.subtotalAmount ?? bill.amount ?? 0;
   const vat = bill.vatAmount ?? 0;
-  const sellerName = getLocalized(bill.sellerSnapshot?.name || "Refah", lang);
+  const sellerName = getLocalized(bill.sellerSnapshot?.name || "BarSpa", lang);
   const buyerName = getLocalized(bill.buyerSnapshot?.name || bill.tenant?.name, lang);
   const buyerEmail = getLocalized(bill.buyerSnapshot?.email || bill.tenant?.email, lang);
   const lineItems: any[] = bill.lineItemsSnapshot || [];

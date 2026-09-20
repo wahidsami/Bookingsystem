@@ -557,16 +557,16 @@ export default function App() {
     }
 
     if (type === 'navigate' && action?.viewId) {
-      handleSelectView(action.viewId);
+      const target = (action.viewId === 'services' || action.viewId === 'packages') ? 'services2' : action.viewId;
+      handleSelectView(target);
       return;
     }
 
     const targetView =
       type === 'appointment' ? 'appointments' :
       type === 'customer' ? 'customers' :
-      type === 'service' ? 'services' :
+      type === 'service' || type === 'services' || type === 'packages' ? 'services2' :
       type === 'product' ? 'products' :
-      type === 'packages' ? 'packages' :
       'dashboard';
 
     handleSelectView(targetView);

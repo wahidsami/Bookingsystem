@@ -36,8 +36,8 @@ export default function TeamMemberProfileDrawer({ staffId, onClose, isRtl, onRef
         
         if (!found) {
           onToast?.(
-            isRtl ? 'الموظف غير موجود' : 'Employee not found',
-            isRtl ? 'لم يتم العثور على بيانات الموظف' : 'Could not find employee details',
+            'Employee not found',
+            'لم يتم العثور على بيانات الموظف',
             'error'
           );
           onClose();
@@ -61,8 +61,8 @@ export default function TeamMemberProfileDrawer({ staffId, onClose, isRtl, onRef
       } catch (err) {
         console.error(err);
         onToast?.(
-          isRtl ? 'خطأ' : 'Error',
-          isRtl ? 'فشل تحميل بيانات الموظف' : 'Failed to load employee details',
+          'Failed to load employee details',
+          'فشل تحميل بيانات الموظف',
           'error'
         );
         onClose();

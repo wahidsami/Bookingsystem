@@ -460,7 +460,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
           <div className="text-start">
             <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
               <Layout size={14} className="text-brand-500 animate-pulse" />
-              {isRtl ? 'منصة إدارة المحتوى والعرض الذكي' : 'REFAH Smart Content Management Engine'}
+              {isRtl ? 'منصة إدارة المحتوى والعرض الذكي' : 'BarSpa Smart Content Management Engine'}
             </h4>
             <p className="text-[10px] text-zinc-400 mt-0.5">
               {isRtl 
@@ -509,7 +509,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
       {loading ? (
         <div className="p-20 text-center space-y-4">
           <RefreshCw size={36} className="animate-spin text-brand-500 mx-auto" />
-          <p className="text-xs text-zinc-400">{isRtl ? 'جاري قراءة وتوليد إعدادات صفحة الهبوط الفاخرة...' : 'Synchronizing content engines with REFAH public gateway...'}</p>
+          <p className="text-xs text-zinc-400">{isRtl ? 'جاري قراءة وتوليد إعدادات صفحة الهبوط الفاخرة...' : 'Synchronizing content engines with BarSpa public gateway...'}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -756,7 +756,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                 >
                   <div>
                     <span className={`font-black text-xs block ${sectionsVisibility.about ? 'text-brand-400' : 'text-zinc-500'}`}>
-                      {isRtl ? 'قسم قصة صالون رفاه' : 'About Story Block'}
+                      {isRtl ? 'قسم قصة صالون بارسبا' : 'About Story Block'}
                     </span>
                     <span className="text-[10px] text-zinc-400 block mt-0.5">{isRtl ? 'شرح رؤية الصالون وتاريخه الفخم' : 'Prints premium brand heritage details'}</span>
                   </div>
@@ -776,7 +776,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
             }`} id="about-content-panel">
               <div className="flex items-center gap-2 border-b border-zinc-800/40 pb-3">
                 <FileText className="text-brand-500" size={16} />
-                <h3 className="font-extrabold text-sm uppercase tracking-wider">{isRtl ? '٣. محتوى ومقالات قصة وتاريخ صالون رفاه' : '3. Brand Story & About Content'}</h3>
+                <h3 className="font-extrabold text-sm uppercase tracking-wider">{isRtl ? '٣. محتوى ومقالات قصة وتاريخ صالون بارسبا' : '3. Brand Story & About Content'}</h3>
               </div>
 
               <div className="space-y-4 text-xs">
@@ -789,7 +789,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                       required
                       value={aboutTitleAr}
                       onChange={(e) => setAboutTitleAr(e.target.value)}
-                      placeholder="عنوان قصة صالون رفاه..."
+                      placeholder="عنوان قصة صالون بارسبا..."
                       className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden font-bold ${
                         darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200 text-neutral-850'
                       }`}
@@ -804,7 +804,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                       required
                       value={aboutTitleEn}
                       onChange={(e) => setAboutTitleEn(e.target.value)}
-                      placeholder="Story of REFAH..."
+                      placeholder="Story of BarSpa..."
                       className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden font-bold ${
                         darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200 text-neutral-855'
                       }`}
@@ -857,7 +857,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
               <div className="flex items-center justify-between border-b border-zinc-800/40 pb-3 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <Image className="text-brand-500" size={16} />
-                  <h3 className="font-extrabold text-sm uppercase tracking-wider">{isRtl ? '٤. معرض الصور العام لصالون رفاه' : '4. REFAH Public Photo Gallery'}</h3>
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider">{isRtl ? '٤. معرض الصور العام لصالون بارسبا' : '4. BarSpa Public Photo Gallery'}</h3>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold ${
                   gallery.length >= 10 ? 'bg-rose-500/10 text-rose-400' : 'bg-brand-500/10 text-brand-500'
@@ -932,7 +932,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
 
               {/* Gallery Image suggestions */}
               <div className="space-y-2 text-xs">
-                <span className="font-bold text-zinc-500 block">{isRtl ? '💡 صور جاهزة لمعرض الخدمات الراقية لصالون رفاه:' : '💡 Add instant premium preset photos:'}</span>
+                <span className="font-bold text-zinc-500 block">{isRtl ? '💡 صور جاهزة لمعرض الخدمات الراقية لصالون بارسبا:' : '💡 Add instant premium preset photos:'}</span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {galleryPresets.map((preset, idx) => {
                     const isAdded = gallery.includes(preset);
@@ -1040,7 +1040,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     type="email"
                     value={contact.email}
                     onChange={(e) => handleContactChange('email', e.target.value)}
-                    placeholder="prestige@refahsalon.com"
+                    placeholder="prestige@barspasalon.com"
                     className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden ${
                       darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200'
                     }`}
@@ -1057,7 +1057,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     type="url"
                     value={contact.website}
                     onChange={(e) => handleContactChange('website', e.target.value)}
-                    placeholder="https://refahsalon.com"
+                    placeholder="https://barspasalon.com"
                     className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden font-mono ${
                       darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200'
                     }`}
@@ -1074,7 +1074,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     type="text"
                     value={contact.instagram}
                     onChange={(e) => handleContactChange('instagram', e.target.value)}
-                    placeholder="@refah.salon"
+                    placeholder="@barspa.salon"
                     className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden ${
                       darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200'
                     }`}
@@ -1091,7 +1091,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     type="text"
                     value={contact.twitter}
                     onChange={(e) => handleContactChange('twitter', e.target.value)}
-                    placeholder="@refah_salon"
+                    placeholder="@barspa_salon"
                     className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden ${
                       darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200'
                     }`}
@@ -1108,7 +1108,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     type="text"
                     value={contact.tiktok}
                     onChange={(e) => handleContactChange('tiktok', e.target.value)}
-                    placeholder="@refah.tiktok"
+                    placeholder="@barspa.tiktok"
                     className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden ${
                       darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200'
                     }`}
@@ -1142,7 +1142,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     type="text"
                     value={contact.linkedin}
                     onChange={(e) => handleContactChange('linkedin', e.target.value)}
-                    placeholder="company/refah"
+                    placeholder="company/barspa"
                     className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden ${
                       darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200'
                     }`}
@@ -1159,7 +1159,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                     type="text"
                     value={contact.snapchat}
                     onChange={(e) => handleContactChange('snapchat', e.target.value)}
-                    placeholder="@refah.snap"
+                    placeholder="@barspa.snap"
                     className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden ${
                       darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200'
                     }`}
@@ -1244,7 +1244,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                   </div>
                   <div className="bg-zinc-950 border border-zinc-850/80 rounded-md py-0.5 px-3 text-center truncate flex-1 flex items-center justify-center gap-1 font-mono text-[8px]">
                     <Globe size={9} className="text-zinc-600" />
-                    <span>refah.salon.com/live</span>
+                    <span>barspa.salon.com/live</span>
                   </div>
                 </div>
 
@@ -1265,7 +1265,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                         {isRtl ? 'فرع الرياض الفاخر' : 'Riyadh Luxury Branch'}
                       </span>
                       <h4 className="text-sm font-black text-white leading-tight font-serif drop-shadow-md">
-                        {isRtl ? 'صالون رفاه - تجربة تفوق الخيال' : 'REFAH - Luxury Beyond Expectations'}
+                        {isRtl ? 'صالون بارسبا - تجربة تفوق الخيال' : 'BarSpa - Luxury Beyond Expectations'}
                       </h4>
                       <p className="text-[9px] text-zinc-300">
                         {isRtl ? 'المعذر، الرياض • احجز موعدك بنقرة واحدة' : 'Al Ma\'ather, Riyadh • Instant Booking'}
@@ -1275,7 +1275,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
 
                   {/* NAV / HEADING SIMULATOR */}
                   <div className="bg-zinc-900/80 backdrop-blur-md p-2.5 sticky top-0 z-20 border-b border-zinc-850 flex justify-between items-center text-[10px] font-bold">
-                    <span className="text-brand-400 tracking-wider font-extrabold">REFAH PRESTIGE</span>
+                    <span className="text-brand-400 tracking-wider font-extrabold">BARSPA PRESTIGE</span>
                     <button className="bg-brand-500 text-white text-[9px] px-2.5 py-1 rounded-md font-black">
                       {isRtl ? 'احجز الآن' : 'Book Session'}
                     </button>
@@ -1291,7 +1291,7 @@ export default function PageSetupWorkspace({ lang, darkMode = false }: PageSetup
                           {isRtl ? 'من نحن' : 'Our Story'}
                         </span>
                         <h5 className="font-extrabold text-xs text-white">
-                          {isRtl ? aboutTitleAr || 'قصة صالون رفاه' : aboutTitleEn || 'The Story of REFAH'}
+                          {isRtl ? aboutTitleAr || 'قصة صالون بارسبا' : aboutTitleEn || 'The Story of BarSpa'}
                         </h5>
                         <p className="text-[10px] text-zinc-400 leading-relaxed text-justify">
                           {isRtl 

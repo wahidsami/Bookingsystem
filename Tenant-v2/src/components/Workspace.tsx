@@ -3,7 +3,7 @@ import {
   TrendingUp, Users, Calendar, Sparkles, Plus, Search, MapPin,
   Clock, Check, X, ShieldAlert, Award, Star, Gift, Package,
   Receipt, ShoppingBag, CreditCard, ChevronRight, MessageSquare,
-  AlertCircle, Sparkle, ArrowLeft, ArrowRight, Save, Trash2, ShieldCheck, HelpCircle
+  AlertCircle, Sparkle, ArrowLeft, ArrowRight, Save, Trash2, ShieldCheck, HelpCircle, Loader2
 } from 'lucide-react';
 import { Language, ViewType, QuickLaunchRequest } from '../types';
 import { translations, navigationItems } from '../data/translations';
@@ -35,6 +35,7 @@ import SettingsWorkspace from './SettingsWorkspace';
 import SubscriptionWorkspace from './subscription/SubscriptionWorkspace';
 import BillingWorkspace from './subscription/BillingWorkspace';
 import AuditWorkspace from './audit/AuditWorkspace';
+import LoyaltyWorkspace from './LoyaltyWorkspace';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import {
   buildTenantPlanSummary,
@@ -90,6 +91,8 @@ export default function Workspace({
   const [posDiscount, setPosDiscount] = useState(0);
   const [posError, setPosError] = useState<string | null>(null);
   const [posSuccess, setPosSuccess] = useState<string | null>(null);
+  const [posPaymentMethod, setPosPaymentMethod] = useState<'mada' | 'cash' | 'card'>('mada');
+  const [posIsSubmitting, setPosIsSubmitting] = useState(false);
 
   // Local state for Saved Views Input
   const [newViewName, setNewViewName] = useState('');
@@ -164,6 +167,7 @@ export default function Workspace({
   const serviceLimit = planSummary.usage.services?.limit ?? planSummary.packageLimits?.maxServices ?? null;
   const productLimit = planSummary.usage.products?.limit ?? planSummary.packageLimits?.maxProducts ?? null;
   const marketingSmsLimit = planSummary.packageLimits?.smsMarketingCampaigns ?? null;
+  const packageLimit = planSummary.packageLimits?.maxPackages ?? null;
   const currentTenantDisplay = isRtl ? planSummary.planNameAr : planSummary.planNameEn;
 
   useEffect(() => {
@@ -229,13 +233,17 @@ export default function Workspace({
       setPosError(isRtl ? 'السلة فارغة! يرجى إضافة عناصر أولاً.' : 'POS cart is empty! Please add items first.');
       return;
     }
-    setPosSuccess(
-      isRtl
-        ? `تم إتمام عملية الدفع بنجاح بقيمة ${getPosTotal()} ر.س وطباعة الفاتورة والربط مع ZATCA!`
-        : `Payment of ${getPosTotal()} SAR completed successfully. e-Invoice cleared with ZATCA!`
-    );
-    setPosCart([]);
-    setPosDiscount(0);
+    setPosIsSubmitting(true);
+    setPosError(null);
+    setPosSuccess(null);
+    setTimeout(() => {
+      setPosIsSubmitting(false);
+      setPosSuccess(
+        isRtl
+          ? `تم تجهيز الفاتورة بمبلغ ${getPosTotal()} ر.س وطريقة الدفع (${posPaymentMethod === 'mada' ? 'مدى' : posPaymentMethod === 'cash' ? 'نقدي' : 'بطاقة ائتمان'}). ملاحظة: الربط البرمجي لنقاط البيع مع الخادم (POST /tenant/pos/checkout) غير متوفر حالياً.`
+          : `POS receipt prepared for ${getPosTotal()} SAR (${posPaymentMethod.toUpperCase()}). Note: Backend POS checkout integration (POST /tenant/pos/checkout) is not yet available in the API.`
+      );
+    }, 400);
   };
 
   // Reorder Dashboard Widget Logic
@@ -812,31 +820,72 @@ export default function Workspace({
             {posCart.length > 0 && (
               <div className="pt-4 border-t border-neutral-100 dark:border-zinc-800 space-y-3">
                 <div className="flex justify-between text-xs text-neutral-400 font-medium">
-                  <span>{isRtl ? 'المجموع الفرعي' : 'Subtotal'}</span>
-                  <span className="font-mono">{getPosSubtotal()} {t.riyal}</span>
+                  <span>{isRtl ? 'المجموع الفرعي (قبل الضريبة)' : 'Subtotal (excl. VAT)'}</span>
+                  <span className="font-mono">{(getPosTotal() / 1.15).toFixed(2)} {t.riyal}</span>
+                </div>
+
+                <div className="flex justify-between text-xs text-neutral-400 font-medium">
+                  <span>{isRtl ? 'ضريبة القيمة المضافة (15%)' : 'VAT (15%)'}</span>
+                  <span className="font-mono">{(getPosTotal() - (getPosTotal() / 1.15)).toFixed(2)} {t.riyal}</span>
                 </div>
 
                 {/* Simulated quick Discount */}
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-neutral-400 font-medium">{isRtl ? 'خصم ترويجي' : 'Promotional Discount'}</span>
                   <div className="flex gap-1.5">
-                    <button onClick={() => setPosDiscount(50)} className={`px-2 py-0.5 rounded text-[10px] border ${posDiscount === 50 ? 'bg-brand-500 text-white' : 'bg-neutral-50 dark:bg-zinc-800 text-neutral-600 dark:text-zinc-300 border-neutral-200 dark:border-zinc-700'}`}>50 {t.riyal}</button>
-                    <button onClick={() => setPosDiscount(100)} className={`px-2 py-0.5 rounded text-[10px] border ${posDiscount === 100 ? 'bg-brand-500 text-white' : 'bg-neutral-50 dark:bg-zinc-800 text-neutral-600 dark:text-zinc-300 border-neutral-200 dark:border-zinc-700'}`}>100 {t.riyal}</button>
+                    <button onClick={() => setPosDiscount(50)} className={`px-2 py-0.5 rounded text-[10px] border ${posDiscount === 50 ? 'bg-[#1D035F] text-white border-[#1D035F]' : 'bg-neutral-50 dark:bg-zinc-800 text-neutral-600 dark:text-zinc-300 border-neutral-200 dark:border-zinc-700'}`}>50 {t.riyal}</button>
+                    <button onClick={() => setPosDiscount(100)} className={`px-2 py-0.5 rounded text-[10px] border ${posDiscount === 100 ? 'bg-[#1D035F] text-white border-[#1D035F]' : 'bg-neutral-50 dark:bg-zinc-800 text-neutral-600 dark:text-zinc-300 border-neutral-200 dark:border-zinc-700'}`}>100 {t.riyal}</button>
                     <button onClick={() => setPosDiscount(0)} className="text-[10px] text-neutral-400 hover:text-neutral-600">×</button>
+                  </div>
+                </div>
+
+                {/* Payment Method Selector */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[11px] text-neutral-400 font-medium">{isRtl ? 'طريقة الدفع' : 'Payment Method'}</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['mada', 'cash', 'card'] as const).map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setPosPaymentMethod(method)}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
+                          posPaymentMethod === method
+                            ? 'bg-[#1D035F] text-white border-[#1D035F] shadow-xs'
+                            : 'bg-neutral-50 dark:bg-zinc-800 text-neutral-600 dark:text-zinc-300 border-neutral-200 dark:border-zinc-700 hover:bg-neutral-100'
+                        }`}
+                      >
+                        {method === 'mada' ? (isRtl ? 'مدى' : 'Mada') : method === 'cash' ? (isRtl ? 'نقدي' : 'Cash') : (isRtl ? 'بطاقة' : 'Card')}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div className="flex justify-between text-sm md:text-base font-black pt-2 border-t border-dashed border-neutral-100 dark:border-zinc-800">
                   <span>{isRtl ? 'الصافي النهائي للمدفوع' : 'Total Net Payable'}</span>
-                  <span className="font-mono text-brand-600 dark:text-brand-400">{getPosTotal()} {t.riyal}</span>
+                  <span className="font-mono text-[#1D035F] dark:text-[#A78BFA]">{getPosTotal()} {t.riyal}</span>
                 </div>
 
                 <button
                   onClick={handleCompletePayment}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-700 to-brand-600 hover:from-brand-800 hover:to-brand-700 text-white font-bold text-xs md:text-sm text-center shadow hover:shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  disabled={posIsSubmitting}
+                  className="w-full py-2.5 rounded-xl bg-[#1D035F] hover:bg-[#280580] text-white font-bold text-xs md:text-sm text-center shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <CreditCard size={16} />
-                  <span>{isRtl ? 'تسديد الفاتورة عبر Mada' : 'Complete Mada Checkout'}</span>
+                  {posIsSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                  <span>
+                    {posPaymentMethod === 'mada'
+                      ? (isRtl ? 'تسديد الفاتورة عبر Mada' : 'Complete Mada Checkout')
+                      : posPaymentMethod === 'cash'
+                      ? (isRtl ? 'تسجيل الدفع النقدي' : 'Record Cash Payment')
+                      : (isRtl ? 'تسديد الفاتورة عبر البطاقة' : 'Complete Card Checkout')}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setPosCart([]); setPosDiscount(0); setPosSuccess(null); setPosError(null); }}
+                  className="w-full py-1 text-center text-xs text-neutral-400 hover:text-rose-500 transition-colors cursor-pointer"
+                >
+                  {isRtl ? 'إفراغ السلة' : 'Clear Cart'}
                 </button>
               </div>
             )}
@@ -866,7 +915,7 @@ export default function Workspace({
               {isRtl ? 'بوابة التسويق والترويج الشاملة' : 'Integrated Marketing Workspace'}
             </h3>
             <p className="text-xs text-neutral-400 max-w-2xl leading-relaxed">
-              {isRtl ? 'تحكم في عروض صالون رفاه الفاخرة، حملات إشعارات الدفع المباشرة، بطاقات الإهداء، إعداد صفحة الهبوط العامة، ومراجعات العملاء من مكان واحد.' : 'Manage REFAH seasonal campaigns, direct customer push notifications, prestige gift cards, public landing layouts, and client feedback from a single cohesive directory.'}
+              {isRtl ? 'تحكم في عروض صالون بارسبا الفاخرة، حملات إشعارات الدفع المباشرة، بطاقات الإهداء، إعداد صفحة الهبوط العامة، ومراجعات العملاء من مكان واحد.' : 'Manage BarSpa seasonal campaigns, direct customer push notifications, prestige gift cards, public landing layouts, and client feedback from a single cohesive directory.'}
             </p>
           </div>
 
@@ -921,7 +970,7 @@ export default function Workspace({
             {[
               { id: 'marketing-hot-deals', titleAr: 'العروض الساخنة', titleEn: 'Hot Deals', descAr: 'إنشاء عروض ترويجية وخصومات سريعة لرفع الإشغال ومعدل الحجوزات.', descEn: 'Launch seasonal discount offers to fill empty scheduling blocks.', icon: 'Tag', bg: 'from-amber-500/5 hover:from-amber-500/10' },
               { id: 'marketing-notifications', titleAr: 'إشعارات الدفع', titleEn: 'Push Notifications', descAr: 'بث رسائل تذكير وتنبيهات مباشرة لهواتف عملائك المستهدفين.', descEn: 'Broadcast instant alert popups directly to lockscreens of selected segments.', icon: 'Bell', bg: 'from-brand-500/5 hover:from-brand-500/10' },
-              { id: 'marketing-gift-cards', titleAr: 'بطاقات الهدايا', titleEn: 'Gift Cards', descAr: 'إصدار وشحن بطاقات إهداء رقمية فخمة لضيوف رفاه وعائلاتهم.', descEn: 'Configure and print elegant prepaid credits to boost customer loyalty.', icon: 'Gift', bg: 'from-rose-500/5 hover:from-rose-500/10' },
+              { id: 'marketing-gift-cards', titleAr: 'بطاقات الهدايا', titleEn: 'Gift Cards', descAr: 'إصدار وشحن بطاقات إهداء رقمية فخمة لضيوف بارسبا وعائلاتهم.', descEn: 'Configure and print elegant prepaid credits to boost customer loyalty.', icon: 'Gift', bg: 'from-rose-500/5 hover:from-rose-500/10' },
               { id: 'marketing-reviews', titleAr: 'تقييمات العملاء', titleEn: 'Reviews', descAr: 'متابعة أصداء العملاء وتقييماتهم المباشرة والرد الفوري عليها لتعزيز السمعة.', descEn: 'Audit real customer ratings and write prestigious replies to reinforce satisfaction.', icon: 'Star', bg: 'from-yellow-500/5 hover:from-yellow-500/10' },
               { id: 'marketing-page-setup', titleAr: 'إعداد صفحة الهبوط', titleEn: 'Page Setup', descAr: 'تحكم بالهوية البصرية، ألوان الموقع، ومحتوى البانر الموجه للعموم.', descEn: 'Customize site colors, carousel carousels, and visual theme rendered to public clients.', icon: 'Globe', bg: 'from-emerald-500/5 hover:from-emerald-500/10' }
             ].map((module) => {
@@ -962,10 +1011,10 @@ export default function Workspace({
                   {isAccessible && (
                     <button
                       onClick={() => onQuickAction({ type: 'navigate', viewId: module.id })}
-                      className="mt-6 w-full py-2 bg-zinc-950 hover:bg-brand-500 border border-zinc-850 hover:border-brand-400 text-neutral-300 hover:text-white rounded-xl font-bold transition-all text-xs cursor-pointer flex items-center justify-center gap-1"
+                      className="mt-6 w-full py-2 bg-zinc-950 hover:bg-[#1D035F] border border-zinc-850 hover:border-[#6537C0] text-neutral-300 hover:text-white rounded-xl font-bold transition-all text-xs cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      <span>{isRtl ? 'دخول الموديل' : 'Open Workspace'}</span>
-                      {isRtl ? <ArrowLeft size={12} className="rotate-180" /> : <ArrowRight size={12} />}
+                      <span>{isRtl ? 'دخول الموديول' : 'Open Workspace'}</span>
+                      {isRtl ? <ArrowLeft size={14} /> : <ArrowRight size={14} />}
                     </button>
                   )}
                 </div>
@@ -1081,6 +1130,11 @@ export default function Workspace({
       {/* 18. PACKAGES */}
       {view === 'packages' && (
         <PackagesWorkspace lang={lang} />
+      )}
+
+      {/* 19. LOYALTY */}
+      {view === 'loyalty' && (
+        <LoyaltyWorkspace lang={lang} darkMode={darkMode} />
       )}
 
       {/* Save view modal */}

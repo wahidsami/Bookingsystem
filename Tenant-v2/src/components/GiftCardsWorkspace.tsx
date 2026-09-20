@@ -498,10 +498,10 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
           </span>
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider">
-              {isRtl ? 'إدارة بطاقات الهدايا الفاخرة' : 'REFAH Gift Card Authority'}
+              {isRtl ? 'إدارة بطاقات الهدايا الفاخرة' : 'BarSpa Gift Card Authority'}
             </h4>
             <p className="text-[10px] text-zinc-400 mt-0.5">
-              {isRtl ? 'بوابة تصميم وتتبع كوبونات الإهداء ورصيد المحافظ الذكي لصالون رفاه.' : 'Configure pre-paid balance campaigns and monitor redemption metrics.'}
+              {isRtl ? 'بوابة تصميم وتتبع كوبونات الإهداء ورصيد المحافظ الذكي لصالون بارسبا.' : 'Configure pre-paid balance campaigns and monitor redemption metrics.'}
             </p>
           </div>
         </div>
@@ -536,7 +536,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div className="space-y-1.5">
             <span className="text-[10px] font-black text-brand-500 uppercase tracking-widest block">
-              {isRtl ? 'البرنامج المالي والترويجي للمحفظة' : 'REFAH GIFT VOUCHER CAMPAIGNS'}
+              {isRtl ? 'البرنامج المالي والترويجي للمحفظة' : 'BARSPA GIFT VOUCHER CAMPAIGNS'}
             </span>
             <h2 className="text-lg md:text-xl font-extrabold flex items-center gap-2">
               <Gift className="text-brand-500" size={20} />
@@ -544,7 +544,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
             </h2>
             <p className="text-xs text-neutral-400 max-w-xl">
               {isRtl 
-                ? 'قم بتهيئة باقات هدايا جذابة بخصومات حصرية وقيم شحن إضافية (بونص) لزيادة مبيعات الخدمات وولاء الزبائن لصالون رفاه.' 
+                ? 'قم بتهيئة باقات هدايا جذابة بخصومات حصرية وقيم شحن إضافية (بونص) لزيادة مبيعات الخدمات وولاء الزبائن لصالون بارسبا.' 
                 : 'Offer customers customizable gift experiences with beautiful covers, priority discounts, and instant wallet credit bonuses.'}
             </p>
           </div>
@@ -620,7 +620,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
               
               {/* Title */}
               <div className="space-y-1.5">
-                <label className="font-bold text-zinc-400 block">{isRtl ? 'عنوان الباقة (مثلاً: بطاقة الرفاه الفضية)' : 'Package Display Title *'}</label>
+                <label className="font-bold text-zinc-400 block">{isRtl ? 'عنوان الباقة (مثلاً: بطاقة بارسبا الفضية)' : 'Package Display Title *'}</label>
                 <input
                   type="text"
                   required
@@ -820,7 +820,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
                 <div className="space-y-0.5">
                   <span className="font-extrabold text-xs block">{isRtl ? 'حالة التفعيل والبيع الفوري' : 'Active Status & Instant Sale'}</span>
                   <span className="text-[10px] text-zinc-400 block">
-                    {isRtl ? 'إتاحة الباقة للشراء المباشر فوراً لجميع ضيوف رفاه.' : 'Make this package available for online purchase.'}
+                    {isRtl ? 'إتاحة الباقة للشراء المباشر فوراً لجميع ضيوف بارسبا.' : 'Make this package available for online purchase.'}
                   </span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -866,7 +866,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
               <div className="p-12 text-center text-zinc-500 border border-dashed border-zinc-800 rounded-xl space-y-3">
                 <Gift size={36} className="mx-auto text-zinc-700" />
                 <h4 className="font-bold text-xs">{isRtl ? 'لا توجد حزم بطاقات حالية' : 'No configured vouchers'}</h4>
-                <p className="text-[11px] text-zinc-400">{isRtl ? 'قم بإنشاء وتحديد أول باقة إهداء لصالون رفاه.' : 'Create your first luxury prepaid pack now using the builder form.'}</p>
+                <p className="text-[11px] text-zinc-400">{isRtl ? 'قم بإنشاء وتحديد أول باقة إهداء لصالون بارسبا.' : 'Create your first luxury prepaid pack now using the builder form.'}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -891,7 +891,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
                         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent p-4 flex flex-col justify-between text-white text-start">
                           <div className="flex justify-between items-start">
                             <span className="text-[9px] bg-brand-500/90 font-black tracking-widest px-1.5 py-0.5 rounded-sm uppercase">
-                              {isRtl ? 'صالون رفاه الفاخر' : 'REFAH PRESTIGE'}
+                              {isRtl ? 'صالون بارسبا الفاخر' : 'BARSPA PRESTIGE'}
                             </span>
                             <div className="flex gap-1.5">
                               <button
@@ -1094,7 +1094,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
                           <td className="p-3 whitespace-nowrap font-mono text-[10px]">{tx.id}</td>
                           <td className="p-3 whitespace-nowrap font-mono text-[10px]">{new Date(tx.purchasedAt).toLocaleString()}</td>
                           <td className="p-3 font-extrabold">{tx.packageName}</td>
-                          <td className="p-3 whitespace-nowrap font-mono font-bold text-brand-500">{tx.code}</td>
+                          <td className="p-3 whitespace-nowrap font-mono font-bold text-brand-500" dir="ltr">{tx.code}</td>
                           <td className="p-3 truncate max-w-[150px]">
                             <span className="font-bold">{tx.buyerName}</span>
                             <span className="text-zinc-400 mx-1">→</span>
@@ -1182,7 +1182,7 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
                         <tr key={red.id} className={darkMode ? 'text-zinc-300' : 'text-neutral-700'}>
                           <td className="p-3 whitespace-nowrap font-mono text-[10px]">{red.id}</td>
                           <td className="p-3 whitespace-nowrap font-mono text-[10px]">{new Date(red.redeemedAt).toLocaleString()}</td>
-                          <td className="p-3 whitespace-nowrap font-mono font-bold text-emerald-500">{red.code}</td>
+                          <td className="p-3 whitespace-nowrap font-mono font-bold text-emerald-500" dir="ltr">{red.code}</td>
                           <td className="p-3">
                             <span className="font-extrabold block">{red.customerName}</span>
                             <span className="text-[10px] text-zinc-500 block font-mono">{red.customerPhone}</span>

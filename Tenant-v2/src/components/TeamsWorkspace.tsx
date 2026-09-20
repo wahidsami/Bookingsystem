@@ -1157,7 +1157,7 @@ export default function TeamsWorkspace({
       return;
     }
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += `Refah Beauty Salon - Official Teams Payslip\r\n`;
+    csvContent += `BarSpa Beauty & Wellness - Official Teams Payslip\r\n`;
     csvContent += `Employee: ${activeMember.nameEn} (${activeMember.nameAr})\r\n`;
     csvContent += `Position: ${activeMember.roleEn}\r\n`;
     csvContent += `Base Salary: SAR ${activeMember.baseSalary}\r\n`;
@@ -1451,7 +1451,7 @@ export default function TeamsWorkspace({
                   <div>
                     <h2 className="text-base font-black text-neutral-800">{isRtl ? activeMember.nameAr : activeMember.nameEn}</h2>
                     <p className="text-xs text-indigo-600 font-extrabold mt-0.5">{isRtl ? activeMember.roleAr : activeMember.roleEn}</p>
-                    <p className="text-[10px] text-neutral-400 font-bold">{isRtl ? 'تاريخ المباشرة: ' : 'Joined Refah: '} {activeMember.joinedDate}</p>
+                    <p className="text-[10px] text-neutral-400 font-bold">{isRtl ? 'تاريخ المباشرة: ' : 'Joined BarSpa: '} {activeMember.joinedDate}</p>
                   </div>
                 </div>
 
@@ -1862,7 +1862,7 @@ export default function TeamsWorkspace({
                             <p className="font-black text-[10px] uppercase tracking-wider">{isRtl ? 'الالتزام بمكتب العمل السعودي ونظام حماية الأجور (WPS)' : 'Saudi Qiwa & WPS Compliance Note'}</p>
                             <p className="text-[11px] font-medium mt-0.5">
                               {isRtl 
-                                ? 'يتم معالجة مسيرات رواتب موظفي رفاه وصرفها عبر نظام حماية الأجور (WPS) المعتمد لمواءمة متطلبات بوابة قوى وتفادي الغرامات المالية.' 
+                                ? 'يتم معالجة مسيرات رواتب موظفي بارسبا وصرفها عبر نظام حماية الأجور (WPS) المعتمد لمواءمة متطلبات بوابة قوى وتفادي الغرامات المالية.' 
                                 : 'Salary disbursement is logged and aligned with the Ministry of Human Resources Wage Protection requirements via bank payroll proxy portals.'}
                             </p>
                           </div>

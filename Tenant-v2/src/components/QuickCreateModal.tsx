@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Sparkles, Calendar, Users, Briefcase, Package, UserCheck, Gift } from 'lucide-react';
+import { X, Check, Sparkles, Calendar, Users, Briefcase, Package, UserCheck, Gift, Loader2 } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../data/translations';
 import { mockEmployees, mockServices } from '../data/mockData';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
 interface QuickCreateModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export default function QuickCreateModal({
   const [activeType, setActiveType] = useState<
     'appointment' | 'customer' | 'service' | 'product' | 'employee' | 'giftcard'
   >(defaultType);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -58,7 +60,7 @@ export default function QuickCreateModal({
   const [productForm, setProductForm] = useState({
     nameAr: '',
     nameEn: '',
-    sku: 'REF-PRD-' + Math.floor(100 + Math.random() * 900),
+    sku: 'BAR-PRD-' + Math.floor(100 + Math.random() * 900),
     price: '',
     stock: '20',
   });
@@ -75,48 +77,87 @@ export default function QuickCreateModal({
     sender: '',
     recipient: '',
     amount: '500',
-    code: 'REF-GFT-' + Math.floor(1000 + Math.random() * 9000) + '-SA',
+    code: 'BAR-GFT-' + Math.floor(1000 + Math.random() * 9000) + '-SA',
   });
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Construct nice dynamic success messages
     let msgAr = '';
     let msgEn = '';
 
-    if (activeType === 'appointment') {
-      msgAr = `تم تأكيد موعد جديد للعميل ${appointmentForm.customerName || 'مجهول'} بنجاح!`;
-      msgEn = `New appointment for ${appointmentForm.customerName || 'Guest'} confirmed successfully!`;
-    } else if (activeType === 'customer') {
-      msgAr = `تم تسجيل العميل ${customerForm.name || 'الجديد'} في قاعدة البيانات الفاخرة لـ رفاه.`;
-      msgEn = `Customer ${customerForm.name || 'New'} registered in REFAH registry.`;
-    } else if (activeType === 'service') {
-      msgAr = `تمت إضافة خدمة "${serviceForm.nameAr || serviceForm.nameEn}" بقيمة ${serviceForm.price} ر.س.`;
-      msgEn = `Added service "${serviceForm.nameEn || serviceForm.nameAr}" for ${serviceForm.price} SAR.`;
-    } else if (activeType === 'product') {
-      msgAr = `تم إدراج منتج جديد بالمخزون: "${productForm.nameAr || productForm.nameEn}".`;
-      msgEn = `Added new product to inventory: "${productForm.nameEn || productForm.nameAr}".`;
-    } else if (activeType === 'employee') {
-      msgAr = `تم تعيين الموظف الجديد: "${employeeForm.nameAr || employeeForm.nameEn}" كأخصائي محترف.`;
-      msgEn = `Assigned new employee: "${employeeForm.nameEn || employeeForm.nameAr}" as a specialist.`;
-    } else if (activeType === 'giftcard') {
-      msgAr = `تم إصدار بطاقة هدايا بقيمة ${giftcardForm.amount} ر.س برمز الحماية: ${giftcardForm.code}.`;
-      msgEn = `Issued gift card of ${giftcardForm.amount} SAR with code: ${giftcardForm.code}.`;
+    try {
+      if (activeType === 'service') {
+        if (!serviceForm.nameAr.trim() && !serviceForm.nameEn.trim()) {
+          throw new Error(lang === 'ar' ? 'يرجى إدخال اسم الخدمة' : 'Service name required');
+        }
+        await tenantApiAdapter.createService({
+          name_ar: serviceForm.nameAr.trim() || serviceForm.nameEn.trim(),
+          name_en: serviceForm.nameEn.trim() || serviceForm.nameAr.trim(),
+          price: Number(serviceForm.price) || 0,
+          duration: Number(serviceForm.duration) || 60,
+          category: serviceForm.category || 'hair',
+          isActive: true
+        });
+        msgAr = `تم حفظ وتفعيل الخدمة "${serviceForm.nameAr || serviceForm.nameEn}" بقيمة ${serviceForm.price || 0} ر.س.`;
+        msgEn = `Service "${serviceForm.nameEn || serviceForm.nameAr}" saved successfully for ${serviceForm.price || 0} SAR.`;
+      } else if (activeType === 'product') {
+        if (!productForm.nameAr.trim() && !productForm.nameEn.trim()) {
+          throw new Error(lang === 'ar' ? 'يرجى إدخال اسم المنتج' : 'Product name required');
+        }
+        await tenantApiAdapter.createProduct({
+          name_ar: productForm.nameAr.trim() || productForm.nameEn.trim(),
+          name_en: productForm.nameEn.trim() || productForm.nameAr.trim(),
+          sku: productForm.sku,
+          price: Number(productForm.price) || 0,
+          stock: Number(productForm.stock) || 0,
+          isActive: true
+        });
+        msgAr = `تم حفظ المنتج "${productForm.nameAr || productForm.nameEn}" بالمخزون بنجاح.`;
+        msgEn = `Product "${productForm.nameEn || productForm.nameAr}" saved to inventory successfully.`;
+      } else if (activeType === 'employee') {
+        if (!employeeForm.nameAr.trim() && !employeeForm.nameEn.trim()) {
+          throw new Error(lang === 'ar' ? 'يرجى إدخال اسم الموظف' : 'Employee name required');
+        }
+        await tenantApiAdapter.createEmployee({
+          name_ar: employeeForm.nameAr.trim() || employeeForm.nameEn.trim(),
+          name_en: employeeForm.nameEn.trim() || employeeForm.nameAr.trim(),
+          role_ar: employeeForm.roleAr.trim() || 'أخصائي',
+          role_en: employeeForm.roleEn.trim() || 'Specialist',
+          status: employeeForm.status || 'active'
+        });
+        msgAr = `تم حفظ بيانات الموظف "${employeeForm.nameAr || employeeForm.nameEn}" في الفريق بنجاح.`;
+        msgEn = `Employee "${employeeForm.nameEn || employeeForm.nameAr}" saved to teams roster successfully.`;
+      } else if (activeType === 'appointment') {
+        msgAr = `تم تجهيز بيانات الموعد للعميل ${appointmentForm.customerName || 'الجديد'}. يرجى استكمال الحجز عبر درج المواعيد للتحقق من المتاحين.`;
+        msgEn = `Appointment request staged for ${appointmentForm.customerName || 'Guest'}. Please finalize via Appointment Creator drawer for slot validation.`;
+      } else if (activeType === 'customer') {
+        msgAr = `تم تجهيز بيانات العميل ${customerForm.name || 'الجديد'} في سجل بارسبا.`;
+        msgEn = `Customer ${customerForm.name || 'New'} profile staged in BarSpa registry.`;
+      } else if (activeType === 'giftcard') {
+        msgAr = `تم تجهيز بطاقة الهدايا بقيمة ${giftcardForm.amount} ر.س بكود: ${giftcardForm.code}.`;
+        msgEn = `Gift card drafted for ${giftcardForm.amount} SAR with code: ${giftcardForm.code}.`;
+      }
+
+      onSuccess(msgAr, msgEn);
+      onClose();
+
+      // Reset forms
+      setAppointmentForm({ customerName: '', customerPhone: '', serviceId: '', employeeId: '', date: '2026-06-27', time: '14:30' });
+      setCustomerForm({ name: '', phone: '', email: '', vip: false });
+      setServiceForm({ nameAr: '', nameEn: '', duration: '60', price: '', category: 'hair' });
+      setProductForm({ nameAr: '', nameEn: '', sku: 'BAR-PRD-' + Math.floor(100 + Math.random() * 900), price: '', stock: '20' });
+      setEmployeeForm({ nameAr: '', nameEn: '', roleAr: '', roleEn: '', status: 'active' });
+      setGiftcardForm({ sender: '', recipient: '', amount: '500', code: 'BAR-GFT-' + Math.floor(1000 + Math.random() * 9000) + '-SA' });
+    } catch (err: any) {
+      console.error('Quick create error:', err);
+      onSuccess(err?.message || 'فشل الحفظ', err?.message || 'Save failed');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    onSuccess(msgAr, msgEn);
-    onClose();
-
-    // Reset forms
-    setAppointmentForm({ customerName: '', customerPhone: '', serviceId: '', employeeId: '', date: '2026-06-27', time: '14:30' });
-    setCustomerForm({ name: '', phone: '', email: '', vip: false });
-    setServiceForm({ nameAr: '', nameEn: '', duration: '60', price: '', category: 'hair' });
-    setProductForm({ nameAr: '', nameEn: '', sku: 'REF-PRD-' + Math.floor(100 + Math.random() * 900), price: '', stock: '20' });
-    setEmployeeForm({ nameAr: '', nameEn: '', roleAr: '', roleEn: '', status: 'active' });
-    setGiftcardForm({ sender: '', recipient: '', amount: '500', code: 'REF-GFT-' + Math.floor(1000 + Math.random() * 9000) + '-SA' });
   };
 
   const typesConfig = [
@@ -644,10 +685,11 @@ export default function QuickCreateModal({
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-700 to-brand-600 hover:from-brand-800 hover:to-brand-700 text-white font-bold text-xs md:text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-1.5"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-xl bg-[#1D035F] hover:bg-[#2E0B7A] disabled:opacity-50 text-white font-bold text-xs md:text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
               >
-                <Check size={16} />
-                <span>{lang === 'ar' ? 'حفظ وإدراج العملية' : 'Save & Register Action'}</span>
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                <span>{isSubmitting ? (lang === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (lang === 'ar' ? 'حفظ وإدراج العملية' : 'Save & Register Action')}</span>
               </button>
             </div>
           </form>

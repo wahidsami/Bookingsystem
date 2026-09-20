@@ -16,6 +16,7 @@ import {
   normalizeServicePaymentOptions,
   normalizeServiceRecord,
   resolveServiceImageUrl,
+  resolveServiceOrBundleCategory,
   type ServiceDraft,
   type ServiceRecord
 } from '../lib/serviceContract';
@@ -42,6 +43,8 @@ export type TenantCategoryOption = {
   icon?: string | null;
   sortOrder: number;
   isActive: boolean;
+  packages?: any[];
+  services?: any[];
 };
 
 // Canonical service contract with backwards-compatible aliases for display only
@@ -84,7 +87,9 @@ export interface UnifiedBundleItem {
   descriptionAr?: string | null;
   image?: string | null;
   tenantServiceCategoryId?: string | null;
+  tenantCategory?: any;
   price: number;
+  finalPrice: number;
   totalPrice: number;
   duration: number;
   totalDuration: number;
@@ -162,7 +167,9 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
               descriptionEn: cat?.description_en || null,
               icon: cat?.icon || null,
               sortOrder: Number(cat?.sortOrder ?? cat?.sort_order ?? 0),
-              isActive: cat?.isActive !== false
+              isActive: cat?.isActive !== false,
+              packages: cat?.packages || [],
+              services: cat?.services || []
             }))
             .filter((cat: TenantCategoryOption) => cat.id && (cat.labelEn || cat.labelAr))
             .sort((left: TenantCategoryOption, right: TenantCategoryOption) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0) || left.labelEn.localeCompare(right.labelEn))
@@ -370,8 +377,14 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
         descriptionEn: pkg.description_en || pkg.descriptionEn || null,
         descriptionAr: pkg.description_ar || pkg.descriptionAr || null,
         image: pkg.image || null,
-        tenantServiceCategoryId: pkg.tenantServiceCategoryId || null,
+        tenantServiceCategoryId: pkg.tenantServiceCategoryId
+          || pkg.tenant_service_category_id
+          || (typeof pkg.tenantCategory === 'string' ? pkg.tenantCategory : pkg.tenantCategory?.id)
+          || pkg.categoryId
+          || null,
+        tenantCategory: pkg.tenantCategory || null,
         price: rawPrice,
+        finalPrice: rawPrice,
         totalPrice: rawPrice,
         duration: rawDuration,
         totalDuration: rawDuration,
@@ -387,35 +400,18 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
     return [...serviceItems, ...bundleItems];
   }, [services, packages]);
 
-  // Category resolution for catalog items
+  // Category resolution for catalog items using authoritative helper
   const resolveItemCategory = (item: UnifiedCatalogItem) => {
-    if (item.tenantServiceCategoryId) {
-      const match = serviceCategories.find(c => c.id === item.tenantServiceCategoryId);
-      if (match) return match;
-    }
-    if (item.type === 'service') {
-      const legacyVal = `${item.category || item.categoryEn || item.categoryAr || ''}`.trim();
-      const match = serviceCategories.find(c => c.slug === legacyVal || c.id === legacyVal || c.labelEn === legacyVal || c.labelAr === legacyVal);
-      if (match) return match;
-    }
-    return null;
+    return resolveServiceOrBundleCategory(item.rawRecord || item, serviceCategories);
   };
 
   const matchesCategoryValue = (item: UnifiedCatalogItem, categoryId: string) => {
     if (categoryId === 'all') return true;
+    const resolved = resolveItemCategory(item);
     if (categoryId === 'uncategorized') {
-      return !resolveItemCategory(item);
+      return !resolved;
     }
-    if (item.tenantServiceCategoryId === categoryId) return true;
-    const catObj = serviceCategories.find(c => c.id === categoryId || c.slug === categoryId);
-    if (catObj) {
-      if (item.tenantServiceCategoryId === catObj.id) return true;
-      if (item.type === 'service') {
-        const legacyVal = `${item.category || item.categoryEn || item.categoryAr || ''}`.trim();
-        if (legacyVal === catObj.slug || legacyVal === catObj.labelEn || legacyVal === catObj.labelAr) return true;
-      }
-    }
-    return false;
+    return resolved?.id === categoryId || (resolved?.slug && resolved?.slug === categoryId);
   };
 
   // Dynamically calculate category stats (services + bundles)
@@ -424,7 +420,10 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
       ? unifiedItems
       : catId === 'uncategorized'
       ? unifiedItems.filter(item => !resolveItemCategory(item))
-      : unifiedItems.filter(item => resolveItemCategory(item)?.id === catId);
+      : unifiedItems.filter(item => {
+          const res = resolveItemCategory(item);
+          return res?.id === catId || (res?.slug && res?.slug === catId);
+        });
     const serviceCount = matched.filter(i => i.type === 'service').length;
     const bundleCount = matched.filter(i => i.type === 'bundle').length;
     return {
@@ -588,7 +587,18 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
 
   // Open edit form
   const handleOpenEditForm = (srv: EnhancedService) => {
-    const selectedCategoryOption = getServiceCategoryOption(srv);
+    const matchedCategory = resolveServiceOrBundleCategory(srv, serviceCategories);
+    const selectedCategoryOption = matchedCategory ? {
+      id: matchedCategory.id,
+      slug: matchedCategory.slug,
+      labelAr: matchedCategory.labelAr,
+      labelEn: matchedCategory.labelEn,
+    } : {
+      id: 'uncategorized',
+      slug: 'uncategorized',
+      labelAr: isRtl ? 'غير مصنف' : 'Uncategorized',
+      labelEn: 'Uncategorized',
+    };
     const normalizedService = normalizeServiceRecord(srv);
     setSelectedServiceId(normalizedService.id);
     setFormMode('edit');
@@ -1678,7 +1688,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                             onClick={() => setSelectedCategory('all')}
                             className={`flex flex-col px-3 py-2.5 rounded-xl transition-all cursor-pointer text-left rtl:text-right ${
                               active 
-                                ? 'bg-indigo-600 text-white shadow-sm' 
+                                ? 'bg-[#1D035F] text-white shadow-sm' 
                                 : 'text-neutral-600 hover:bg-slate-50 border border-transparent hover:border-slate-200'
                             }`}
                           >
@@ -1687,12 +1697,12 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                                 {isRtl ? 'جميع الفئات' : 'All Categories'}
                               </span>
                               <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full ${
-                                active ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-100 text-neutral-500'
+                                active ? 'bg-[#6537C0] text-white' : 'bg-slate-100 text-neutral-500'
                               }`}>
                                 {allStats.total}
                               </span>
                             </div>
-                            <div className={`text-[9px] font-medium mt-1 flex items-center gap-2 ${active ? 'text-indigo-100' : 'text-neutral-400'}`}>
+                            <div className={`text-[9px] font-medium mt-1 flex items-center gap-2 ${active ? 'text-purple-200' : 'text-neutral-400'}`}>
                               <span>{allStats.serviceCount} {isRtl ? 'خدمات' : 'Services'}</span>
                               <span>•</span>
                               <span>{allStats.bundleCount} {isRtl ? 'باقات' : 'Bundles'}</span>
@@ -1712,7 +1722,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                             key={cat.id}
                             className={`group relative rounded-xl transition-all ${
                               active 
-                                ? 'bg-indigo-600 text-white shadow-sm' 
+                                ? 'bg-[#1D035F] text-white shadow-sm' 
                                 : 'text-neutral-600 hover:bg-slate-50 border border-transparent hover:border-slate-200'
                             }`}
                           >
@@ -1725,12 +1735,12 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                                   {isRtl ? cat.labelAr : cat.labelEn}
                                 </span>
                                 <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full shrink-0 ${
-                                  active ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-100 text-neutral-500'
+                                  active ? 'bg-[#6537C0] text-white' : 'bg-slate-100 text-neutral-500'
                                 }`}>
                                   {stats.total}
                                 </span>
                               </div>
-                              <div className={`text-[9px] font-medium mt-1 flex items-center gap-2 ${active ? 'text-indigo-100' : 'text-neutral-400'}`}>
+                              <div className={`text-[9px] font-medium mt-1 flex items-center gap-2 ${active ? 'text-purple-200' : 'text-neutral-400'}`}>
                                 <span>{stats.serviceCount} {isRtl ? 'خدمات' : 'Services'}</span>
                                 <span>•</span>
                                 <span>{stats.bundleCount} {isRtl ? 'باقات' : 'Bundles'}</span>
@@ -1747,7 +1757,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                                   }}
                                   className={`p-1 rounded-lg text-xs transition ${
                                     active 
-                                      ? 'hover:bg-indigo-700 text-indigo-100' 
+                                      ? 'hover:bg-[#2E0B7A] text-white' 
                                       : 'hover:bg-slate-200 text-neutral-500'
                                   }`}
                                   title={isRtl ? 'تعديل الفئة' : 'Edit category'}
@@ -1771,7 +1781,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                             onClick={() => setSelectedCategory('uncategorized')}
                             className={`flex flex-col px-3 py-2.5 rounded-xl transition-all cursor-pointer text-left rtl:text-right border border-dashed ${
                               active 
-                                ? 'bg-amber-600 text-white border-amber-600 shadow-sm' 
+                                ? 'bg-[#1D035F] text-white border-[#1D035F] shadow-sm' 
                                 : 'text-neutral-500 hover:bg-amber-50/50 border-neutral-300'
                             }`}
                           >
@@ -1780,12 +1790,12 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                                 {isRtl ? 'غير مصنفة' : 'Uncategorized'}
                               </span>
                               <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full ${
-                                active ? 'bg-amber-700 text-amber-100' : 'bg-neutral-100 text-neutral-500'
+                                active ? 'bg-[#6537C0] text-white' : 'bg-neutral-100 text-neutral-500'
                               }`}>
                                 {uncatStats.total}
                               </span>
                             </div>
-                            <div className={`text-[9px] font-medium mt-1 flex items-center gap-2 ${active ? 'text-amber-100' : 'text-neutral-400'}`}>
+                            <div className={`text-[9px] font-medium mt-1 flex items-center gap-2 ${active ? 'text-purple-200' : 'text-neutral-400'}`}>
                               <span>{uncatStats.serviceCount} {isRtl ? 'خدمات' : 'Services'}</span>
                               <span>•</span>
                               <span>{uncatStats.bundleCount} {isRtl ? 'باقات' : 'Bundles'}</span>
@@ -2043,7 +2053,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                 <p className="font-semibold">
                   {isRtl 
                     ? 'الذكاء الاصطناعي متاح لمساعدتك في صياغة بيانات الخدمة ووصفها اللغوي بشكل ثنائي فوراً.'
-                    : 'Refah AI Assistant is online. Select your active section and tap any AI help trigger for instant content enhancement.'}
+                    : 'BarSpa AI Assistant is online. Select your active section and tap any AI help trigger for instant content enhancement.'}
                 </p>
               </div>
             </div>

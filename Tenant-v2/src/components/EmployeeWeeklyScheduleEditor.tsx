@@ -464,7 +464,7 @@ export default function EmployeeWeeklyScheduleEditor({
                   {isRtl ? 'إعداد جدول الأيام والساعات التفصيلي' : 'Configuring Weekly Working Days & Split Shifts'}
                 </span>
                 <span className="text-[10px] bg-slate-100 text-slate-600 font-mono px-2 py-0.5 rounded font-black">
-                  Refah System v1.1
+                  BarSpa System v2.0
                 </span>
               </div>
 

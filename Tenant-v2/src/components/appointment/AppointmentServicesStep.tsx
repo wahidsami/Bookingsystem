@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Search, Package as PackageIcon, Clock, Trash, PlusCircle, Layers } from 'lucide-react';
-import { resolveServiceImageUrl, type ServiceRecord, type ServiceVariantRecord } from '../../lib/serviceContract';
+import { resolveServiceImageUrl, resolveServiceOrBundleCategory, type ServiceRecord, type ServiceVariantRecord } from '../../lib/serviceContract';
 import AppointmentServiceRow from './AppointmentServiceRow';
 
 export interface StagedService {
@@ -41,7 +41,7 @@ interface AppointmentServicesStepProps {
   tenantCategories?: any[];
   stagedServices: StagedService[];
   availableStylists: any[];
-  serviceCategoryTabs: { key: string; labelAr: string; labelEn: string }[];
+  serviceCategoryTabs: { key: string; labelAr: string; labelEn: string; count?: number }[];
   currentServiceCategory: string;
   setCurrentServiceCategory: (key: string) => void;
   serviceSearch: string;
@@ -146,8 +146,14 @@ export default function AppointmentServicesStep({
 
     // Real tenant categories
     (tenantCategories || []).forEach(cat => {
-      const catServices = filteredServices.filter(s => s.tenantServiceCategoryId === cat.id);
-      const catBundles = filteredBundles.filter(b => b.tenantServiceCategoryId === cat.id);
+      const catServices = filteredServices.filter(s => {
+        const resolved = resolveServiceOrBundleCategory(s, tenantCategories);
+        return resolved ? (resolved.id === cat.id || (resolved.slug && resolved.slug === cat.slug)) : false;
+      });
+      const catBundles = filteredBundles.filter(b => {
+        const resolved = resolveServiceOrBundleCategory(b, tenantCategories);
+        return resolved ? (resolved.id === cat.id || (resolved.slug && resolved.slug === cat.slug)) : false;
+      });
 
       const matchesFilter = currentServiceCategory === 'all' || currentServiceCategory === cat.id;
       if (matchesFilter && (catServices.length > 0 || catBundles.length > 0 || currentServiceCategory === cat.id)) {
@@ -162,8 +168,8 @@ export default function AppointmentServicesStep({
     });
 
     // Uncategorized items (pinned last)
-    const uncategorizedServices = filteredServices.filter(s => !s.tenantServiceCategoryId);
-    const uncategorizedBundles = filteredBundles.filter(b => !b.tenantServiceCategoryId);
+    const uncategorizedServices = filteredServices.filter(s => !resolveServiceOrBundleCategory(s, tenantCategories));
+    const uncategorizedBundles = filteredBundles.filter(b => !resolveServiceOrBundleCategory(b, tenantCategories));
 
     const matchesUncategorized = currentServiceCategory === 'all' || currentServiceCategory === 'uncategorized';
     if (matchesUncategorized && (uncategorizedServices.length > 0 || uncategorizedBundles.length > 0 || currentServiceCategory === 'uncategorized')) {
@@ -182,6 +188,35 @@ export default function AppointmentServicesStep({
   const totalMatchingItems = useMemo(() => {
     return categorySections.reduce((acc, s) => acc + s.services.length + s.bundles.length, 0);
   }, [categorySections]);
+
+  const tabCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: 0, uncategorized: 0 };
+    (tenantCategories || []).forEach(c => {
+      counts[c.id] = 0;
+    });
+
+    filteredServices.forEach(s => {
+      counts.all = (counts.all || 0) + 1;
+      const cat = resolveServiceOrBundleCategory(s, tenantCategories);
+      if (cat && cat.id) {
+        counts[cat.id] = (counts[cat.id] || 0) + 1;
+      } else {
+        counts.uncategorized = (counts.uncategorized || 0) + 1;
+      }
+    });
+
+    filteredBundles.forEach(b => {
+      counts.all = (counts.all || 0) + 1;
+      const cat = resolveServiceOrBundleCategory(b, tenantCategories);
+      if (cat && cat.id) {
+        counts[cat.id] = (counts[cat.id] || 0) + 1;
+      } else {
+        counts.uncategorized = (counts.uncategorized || 0) + 1;
+      }
+    });
+
+    return counts;
+  }, [filteredServices, filteredBundles, tenantCategories]);
 
   const handleAddBundleClick = (bundleId: string) => {
     if (onAddBundle) {
@@ -239,18 +274,30 @@ export default function AppointmentServicesStep({
           <div className="flex flex-wrap gap-2">
             {serviceCategoryTabs.map((tab) => {
               const active = currentServiceCategory === tab.key || (!currentServiceCategory && tab.key === 'all');
+              const count = (tab as any).count ?? tabCounts[tab.key];
               return (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setCurrentServiceCategory(tab.key)}
-                  className={`rounded-full border px-4 py-1.5 text-xs font-bold transition cursor-pointer ${
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-bold transition cursor-pointer ${
                     active
-                      ? 'border-primary bg-primary text-white shadow-sm'
+                      ? '!border-[#1D035F] !bg-[#1D035F] !text-white shadow-sm'
                       : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                   }`}
                 >
-                  {isRtl ? tab.labelAr : tab.labelEn}
+                  <span className={active ? '!text-white' : ''}>{isRtl ? tab.labelAr : tab.labelEn}</span>
+                  {count !== undefined && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-mono font-bold transition ${
+                        active
+                          ? '!bg-[#6537C0] !text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -390,7 +437,7 @@ export default function AppointmentServicesStep({
                     {/* Category Heading */}
                     <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#6537C0] shrink-0" />
                         <h3 className="text-base font-bold tracking-tight text-slate-900">
                           {isRtl ? section.labelAr : section.labelEn}
                         </h3>

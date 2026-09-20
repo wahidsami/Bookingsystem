@@ -1220,7 +1220,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                             <td className="px-4 py-3.5 font-mono text-neutral-500 text-[11px] max-w-[150px] truncate">{client.email}</td>
 
                             {/* Phone */}
-                            <td className="px-4 py-3.5 font-mono text-neutral-500 text-[11px]">{client.phone}</td>
+                            <td className="px-4 py-3.5 font-mono text-neutral-500 text-[11px] text-start" dir="ltr">{client.phone}</td>
 
                             {/* Total Bookings */}
                             <td className="px-4 py-3.5 text-center font-bold font-mono">{client.totalBookings}</td>
@@ -1484,9 +1484,10 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                           <label className="text-[10px] text-neutral-400 font-bold uppercase">{isRtl ? 'رقم الجوال' : 'Phone Number'}</label>
                           <input
                             type="text"
+                            dir="ltr"
                             value={editPhone}
                             onChange={(e) => setEditPhone(e.target.value)}
-                            className="w-full bg-neutral-50 hover:bg-neutral-100 focus:bg-white border border-neutral-200 focus:border-amber-400 rounded-xl px-3 py-2 text-xs outline-none"
+                            className="w-full bg-neutral-50 hover:bg-neutral-100 focus:bg-white border border-neutral-200 focus:border-[#1D035F] rounded-xl px-3 py-2 text-xs outline-none font-mono text-start"
                           />
                         </div>
 
@@ -1552,7 +1553,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                           </div>
                           <div>
                             <p className="text-[10px] text-neutral-400 font-bold uppercase">{isRtl ? 'رقم الهاتف' : 'Phone'}</p>
-                            <p className="font-semibold text-neutral-800 mt-0.5">{inspectedCustomer.phone}</p>
+                            <p className="font-semibold text-neutral-800 mt-0.5 font-mono text-start" dir="ltr">{inspectedCustomer.phone}</p>
                           </div>
                         </div>
 
@@ -1858,7 +1859,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                         onClick={() => setActiveSubTab(tab.id as CustomerTab)}
                         className={`text-[11px] px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition-all cursor-pointer ${
                           activeSubTab === tab.id
-                            ? 'bg-zinc-900 text-amber-400 text-white shadow-xs'
+                            ? 'bg-[#1D035F] text-white shadow-xs'
                             : 'text-neutral-500 hover:text-zinc-900'
                         }`}
                       >
@@ -2710,7 +2711,7 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
                       {/* SUBTAB 6: REVIEWS */}
                       {activeSubTab === 'reviews' && (
                         <motion.div key="reviews" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                          <h3 className="text-sm font-black text-neutral-800 uppercase">{isRtl ? 'تقييمات العميل لصالون رفاه' : 'Client Quality Reviews'}</h3>
+                          <h3 className="text-sm font-black text-neutral-800 uppercase">{isRtl ? 'تقييمات العميل لصالون بارسبا' : 'Client Quality Reviews'}</h3>
                           <div className="space-y-3">
                             {inspectedCustomer.reviews.map(rev => (
                               <div key={rev.id} className="border border-neutral-100 p-4 rounded-xl space-y-2 text-xs">

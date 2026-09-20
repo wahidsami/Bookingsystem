@@ -298,7 +298,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
   const dict = {
     ar: {
       title: 'مركز المراسلات الداخلية للطاقم',
-      subtitle: 'تواصل وتنسيق تشغيلي آمن وخاص بأعضاء صالون رفاه الفخم',
+      subtitle: 'تواصل وتنسيق تشغيلي آمن وخاص بأعضاء صالون بارسبا الفخم',
       search: 'البحث في المراسلات...',
       composeBtn: 'إنشاء رسالة',
       all: 'الكل',
@@ -323,7 +323,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
       states: {
         loading: 'جاري تحميل صندوق المراسلات...',
         errorTitle: 'فشل مزامنة المراسلات الداخلية',
-        errorDesc: 'تعذر الاتصال بقاعدة بيانات الاتصال الداخلي لرفاه. يرجى التحقق من الشبكة وإعادة المحاولة.',
+        errorDesc: 'تعذر الاتصال بقاعدة بيانات الاتصال الداخلي لبارسبا. يرجى التحقق من الشبكة وإعادة المحاولة.',
         retryBtn: 'إعادة المحاولة',
         emptyTitle: 'لا توجد رسائل متطابقة',
         emptyDesc: 'لم يتم العثور على أي مراسلات تناسب معايير البحث أو الفلتر أو المجلد المحدد حالياً.',
@@ -335,12 +335,12 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
       },
       toast: {
         deleted: '✨ تم حذف وتصفية الرسالة بنجاح من الصندوق!',
-        sent: '✨ تم بث المراسلة بنجاح في منصة رفاه الداخلية!',
+        sent: '✨ تم بث المراسلة بنجاح في منصة بارسبا الداخلية!',
         replied: '✨ تم إرسال ردك الفوري وتثبيته في سجل المتابعة!'
       },
       composeModal: {
         title: 'إنشاء تعميم أو رسالة داخلية جديدة',
-        desc: 'أرسل تعميماً تشغيلياً أو تنبيهاً فورياً لأعضاء طاقم العمل بخصوص مهام صالون رفاه.',
+        desc: 'أرسل تعميماً تشغيلياً أو تنبيهاً فورياً لأعضاء طاقم العمل بخصوص مهام صالون بارسبا.',
         to: 'المستلم / الفئة المستهدفة',
         allStaff: 'جميع طاقم العمل (بث عام)',
         subjectAr: 'الموضوع بالعربية',
@@ -366,7 +366,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
     },
     en: {
       title: 'Internal Staff Messages',
-      subtitle: 'Secure enterprise workspace & collaboration for REFAH Elite team',
+      subtitle: 'Secure enterprise workspace & collaboration for BarSpa Elite team',
       search: 'Search messages...',
       composeBtn: 'Compose Message',
       all: 'All',
@@ -391,7 +391,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
       states: {
         loading: 'Loading internal staff messages feed...',
         errorTitle: 'System Feed Sync Failed',
-        errorDesc: 'Unable to sync with the REFAH internal communications database. Please verify and reload.',
+        errorDesc: 'Unable to sync with the BarSpa internal communications database. Please verify and reload.',
         retryBtn: 'Retry Connection',
         emptyTitle: 'No messages found',
         emptyDesc: 'There are no active threads in this folder matching your current filter options.',
@@ -1504,7 +1504,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                       ) : (
                         /* Unknown external recipient */
                         <div className="text-center py-2 text-[10px] text-neutral-400 italic font-medium">
-                          {isRtl ? 'جهة خارجية غير مسجلة في شجرة طاقم رفاه' : 'External party outside Refah Staff roster.'}
+                          {isRtl ? 'جهة خارجية غير مسجلة في شجرة طاقم بارسبا' : 'External party outside BarSpa Staff roster.'}
                         </div>
                       )}
                     </div>
@@ -1601,7 +1601,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                       </div>
                     ) : (
                       <p className="text-[10px] text-neutral-400 text-center py-2 italic font-medium bg-neutral-50/50 dark:bg-zinc-950/10 rounded-lg p-3">
-                        {lang === 'ar' ? 'لا توجد تعقيبات أو متابعات بعد من طاقم رفاه.' : 'No replies or team comments registered yet on this Circular.'}
+                        {lang === 'ar' ? 'لا توجد تعقيبات أو متابعات بعد من طاقم بارسبا.' : 'No replies or team comments registered yet on this Circular.'}
                       </p>
                     )}
 

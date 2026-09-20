@@ -470,7 +470,7 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
               {isRtl ? 'بوابة إدارة الإشعارات الفورية' : 'Push Notification Dispatch Gateway'}
             </h4>
             <p className="text-[10px] text-zinc-400 mt-0.5">
-              {isRtl ? 'متصل ومؤمن ومراقب بنظام بث ذكي لصالون رفاه.' : 'Connected, secured, and synced with REFAH enterprise push clusters.'}
+              {isRtl ? 'متصل ومؤمن ومراقب بنظام بث ذكي لصالون بارسبا.' : 'Connected, secured, and synced with BarSpa enterprise push clusters.'}
             </p>
           </div>
         </div>

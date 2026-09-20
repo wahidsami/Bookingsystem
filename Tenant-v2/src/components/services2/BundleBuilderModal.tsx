@@ -248,7 +248,8 @@ export default function BundleBuilderModal({
         (srv.descriptionEn && srv.descriptionEn.toLowerCase().includes(query));
 
       const matchCat = pickerCategory === 'all' ||
-        srv.tenantServiceCategoryId === pickerCategory ||
+        (srv as any).tenantServiceCategoryId === pickerCategory ||
+        (srv as any).categoryId === pickerCategory ||
         srv.category === pickerCategory;
 
       return matchSearch && matchCat;

@@ -140,10 +140,10 @@ export default function AccessSecuritySection({
         <div className="p-5 bg-indigo-50/40 rounded-2xl border border-indigo-100 space-y-4 text-xs font-bold">
           <div className="flex items-center gap-2 text-indigo-900">
             <Lock size={15} />
-            <span>{isRtl ? 'تطبيق الكادر الفني للهواتف (Refah Staff App)' : 'Refah Staff Mobile Application Access'}</span>
+            <span>{isRtl ? 'تطبيق الكادر الفني للهواتف (BarSpa Staff App)' : 'BarSpa Staff Mobile Application Access'}</span>
           </div>
           <p className="text-neutral-600 text-[11px] leading-relaxed font-medium">
-            Because this roster position is flagged as a <strong>Service Provider</strong>, they will log into the Refah mobile app. Set their access passcode below.
+            Because this roster position is flagged as a <strong>Service Provider</strong>, they will log into the BarSpa mobile app. Set their access passcode below.
           </p>
 
           <div className="space-y-1.5 max-w-sm">

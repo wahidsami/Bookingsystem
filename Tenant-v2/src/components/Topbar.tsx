@@ -356,8 +356,18 @@ export default function Topbar({
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          {/* TODO: Re-enable Operations Hub after replacing demo data with real live events. */}
-          {/* Activity Center button hidden for production — contains mock/demo data */}
+          {/* Activity Center Trigger (Live Operations Hub) */}
+          {onOpenActivityCenter && (
+            <button
+              onClick={onOpenActivityCenter}
+              className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
+                darkMode ? 'text-zinc-300 hover:bg-[#12023F]' : 'text-[#1D035F] hover:bg-[#FAF7FD]'
+              }`}
+              title={lang === 'ar' ? 'مركز العمليات والنشاط المباشر' : 'Live Activity & Operations Hub'}
+            >
+              <Activity size={18} />
+            </button>
+          )}
 
           {/* Language Selector Toggle */}
           <button

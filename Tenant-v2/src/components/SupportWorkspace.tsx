@@ -719,7 +719,7 @@ export default function SupportWorkspace({ lang, darkMode = false }: SupportWork
             onClick={() => setSection(chip.id)}
             className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-bold transition-all ${
               section === chip.id
-                ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-300'
+                ? 'border-[#1D035F] bg-[#1D035F] text-white shadow-sm'
                 : darkMode ? 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'
             }`}
           >

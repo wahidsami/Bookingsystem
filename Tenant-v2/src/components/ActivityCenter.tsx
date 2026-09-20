@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Activity, Sparkles, ShoppingBag, Calendar, CheckCircle2, 
@@ -27,6 +27,19 @@ interface ActivityCenterProps {
 
 export default function ActivityCenter({ isOpen, onClose, lang, darkMode = false }: ActivityCenterProps) {
   const isRtl = lang === 'ar';
+
+  // Handle Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
   
   // Base mock activities
   const [activities, setActivities] = useState<ActivityItem[]>([
@@ -197,7 +210,7 @@ export default function ActivityCenter({ isOpen, onClose, lang, darkMode = false
               darkMode ? 'border-zinc-800 bg-zinc-950/45' : 'border-neutral-100 bg-neutral-50/50'
             }`}>
               <div className="flex items-center gap-2.5">
-                <span className={`p-2 rounded-xl shrink-0 ${darkMode ? 'bg-zinc-800 text-brand-400' : 'bg-brand-50 text-brand-600'}`}>
+                <span className={`p-2 rounded-xl shrink-0 ${darkMode ? 'bg-[#1D035F]/60 text-[#A379E2]' : 'bg-[#F3EDFC] text-[#6537C0]'}`}>
                   <Activity size={18} className="animate-pulse" />
                 </span>
                 <div>
@@ -219,9 +232,9 @@ export default function ActivityCenter({ isOpen, onClose, lang, darkMode = false
 
             {/* Quick Interactive Simulation Controls (Enterprise Sandbox) */}
             <div className={`p-4 border-b flex flex-col gap-2 ${
-              darkMode ? 'bg-zinc-950/20 border-zinc-800' : 'bg-brand-50/20 border-neutral-100'
+              darkMode ? 'bg-zinc-950/20 border-zinc-800' : 'bg-[#FAF7FD] border-neutral-100'
             }`}>
-              <span className="text-[9px] font-bold text-brand-600 dark:text-brand-400 uppercase tracking-widest block">
+              <span className="text-[9px] font-bold text-[#6537C0] dark:text-[#A379E2] uppercase tracking-widest block">
                 {isRtl ? '🛠️ أدوات المحاكاة والتحكم الفوري (ساندبوكس)' : '🛠️ ENTERPRISE SIMULATION TOOLS'}
               </span>
               <div className="grid grid-cols-3 gap-2 mt-1">

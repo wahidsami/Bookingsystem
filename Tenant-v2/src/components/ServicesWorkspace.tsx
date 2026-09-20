@@ -1223,7 +1223,7 @@ export default function ServicesWorkspace({ lang, quickLaunchRequest }: Services
                 <p className="font-semibold">
                   {isRtl 
                     ? 'الذكاء الاصطناعي متاح لمساعدتك في صياغة بيانات الخدمة ووصفها اللغوي بشكل ثنائي فوراً.'
-                    : 'Refah AI Assistant is online. Select your active section and tap any AI help trigger for instant content enhancement.'}
+                    : 'BarSpa AI Assistant is online. Select your active section and tap any AI help trigger for instant content enhancement.'}
                 </p>
               </div>
             </div>

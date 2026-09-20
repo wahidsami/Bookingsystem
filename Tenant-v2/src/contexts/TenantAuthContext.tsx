@@ -169,17 +169,19 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       const normalizedUsage = normalizeTenantSubscriptionUsage(usageResult.value);
       setSubscriptionUsage(normalizedUsage);
 
+      const subValue = subscriptionResult.status === 'fulfilled' ? subscriptionResult.value : null;
       const livePackageEntitlements =
         usageResult.value?.limits ||
         usageResult.value?.data?.limits ||
-        subscriptionResult.value?.subscription?.package?.limits ||
+        subValue?.subscription?.package?.limits ||
         null;
       if (livePackageEntitlements) {
         setPackageEntitlements(normalizePackageEntitlements(livePackageEntitlements));
       }
     } else {
       setSubscriptionUsage(null);
-      const fallbackPackageEntitlements = subscriptionResult.value?.subscription?.package?.limits || null;
+      const subValue = subscriptionResult.status === 'fulfilled' ? subscriptionResult.value : null;
+      const fallbackPackageEntitlements = subValue?.subscription?.package?.limits || null;
       if (fallbackPackageEntitlements) {
         setPackageEntitlements(normalizePackageEntitlements(fallbackPackageEntitlements));
       }

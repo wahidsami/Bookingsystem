@@ -509,3 +509,121 @@ export const groupServicesByCategory = (services: any[]) => {
 
   return Array.from(groups.values());
 };
+
+export interface TenantCategoryLike {
+  id: string;
+  slug?: string | null;
+  name_en?: string | null;
+  name_ar?: string | null;
+  nameEn?: string | null;
+  nameAr?: string | null;
+  labelEn?: string | null;
+  labelAr?: string | null;
+  packages?: any[];
+  services?: any[];
+}
+
+/**
+ * Authoritative category resolution for services and bundles.
+ * Mirrors the authoritative resolution logic from Services2Workspace.
+ */
+export const resolveServiceOrBundleCategory = (
+  item: any,
+  categories: TenantCategoryLike[] = []
+): TenantCategoryLike | null => {
+  if (!item || !Array.isArray(categories) || categories.length === 0) {
+    return null;
+  }
+
+  const rawItem = item.rawRecord || item;
+
+  // 1. Direct tenantServiceCategoryId on the item or rawRecord
+  const explicitCatId = item.tenantServiceCategoryId ||
+                        item.tenant_service_category_id ||
+                        (typeof item.tenantCategory === 'string' ? item.tenantCategory : item.tenantCategory?.id) ||
+                        item.categoryId ||
+                        item.category_id ||
+                        rawItem.tenantServiceCategoryId ||
+                        rawItem.tenant_service_category_id ||
+                        (typeof rawItem.tenantCategory === 'string' ? rawItem.tenantCategory : rawItem.tenantCategory?.id) ||
+                        rawItem.categoryId ||
+                        rawItem.category_id;
+
+  if (explicitCatId) {
+    const rawIdStr = String(explicitCatId).trim().toLowerCase();
+    const match = categories.find((c) => {
+      if (!c) return false;
+      const cIdStr = String(c.id || '').trim().toLowerCase();
+      const cSlugStr = String(c.slug || '').trim().toLowerCase();
+      return cIdStr === rawIdStr || (cSlugStr && cSlugStr === rawIdStr);
+    });
+    if (match) return match;
+  }
+
+  // 1b. Match by tenantCategory object slug or name if present
+  const catObjSlug = (typeof item.tenantCategory === 'object' ? item.tenantCategory?.slug : null) ||
+                     (typeof rawItem.tenantCategory === 'object' ? rawItem.tenantCategory?.slug : null);
+  if (catObjSlug) {
+    const rawSlugStr = String(catObjSlug).trim().toLowerCase();
+    const match = categories.find((c) => {
+      if (!c) return false;
+      const cIdStr = String(c.id || '').trim().toLowerCase();
+      const cSlugStr = String(c.slug || '').trim().toLowerCase();
+      return cSlugStr === rawSlugStr || cIdStr === rawSlugStr;
+    });
+    if (match) return match;
+  }
+
+  // 2. Authoritative parent-side relationship: check if cat.packages or cat.services contains this item
+  const itemId = item.id || rawItem.id;
+  if (itemId) {
+    const parentMatch = categories.find((c) => {
+      if (!c) return false;
+      const pkgs = Array.isArray(c.packages) ? c.packages : [];
+      if (pkgs.some((p: any) => p && (p.id === itemId || p.packageId === itemId || p === itemId))) return true;
+      const srvs = Array.isArray(c.services) ? c.services : [];
+      if (srvs.some((s: any) => s && (s.id === itemId || s.serviceId === itemId || s === itemId))) return true;
+      return false;
+    });
+    if (parentMatch) return parentMatch;
+  }
+
+  // 3. For bundles: check if its constituent service items belong to a known category
+  const bundleItems = Array.isArray(item.items) ? item.items : (Array.isArray(rawItem.items) ? rawItem.items : []);
+  if (bundleItems.length > 0) {
+    for (const subItem of bundleItems) {
+      const subSrv = subItem?.service;
+      const subCatId = subSrv?.tenantServiceCategoryId ||
+                       subSrv?.tenant_service_category_id ||
+                       (typeof subSrv?.tenantCategory === 'string' ? subSrv.tenantCategory : subSrv?.tenantCategory?.id) ||
+                       subSrv?.categoryId ||
+                       subItem?.tenantServiceCategoryId ||
+                       subItem?.tenant_service_category_id;
+      if (subCatId) {
+        const rawSubIdStr = String(subCatId).trim().toLowerCase();
+        const match = categories.find((c) => {
+          if (!c) return false;
+          return String(c.id || '').trim().toLowerCase() === rawSubIdStr ||
+                 (c.slug && String(c.slug).trim().toLowerCase() === rawSubIdStr);
+        });
+        if (match) return match;
+      }
+    }
+  }
+
+  // 4. Legacy category string match (services with category: 'hair' / 'massage' / slug)
+  const legacyVal = `${item.category || item.categoryEn || item.categoryAr || rawItem.category || rawItem.categoryEn || rawItem.categoryAr || ''}`.trim().toLowerCase();
+  if (legacyVal && legacyVal !== 'all' && legacyVal !== 'uncategorized' && legacyVal !== 'غير مصنف' && legacyVal !== 'غير مصنفة') {
+    const match = categories.find((c) => {
+      if (!c) return false;
+      const cSlug = String(c.slug || '').trim().toLowerCase();
+      const cId = String(c.id || '').trim().toLowerCase();
+      const cLabelEn = String(c.labelEn || c.name_en || c.nameEn || '').trim().toLowerCase();
+      const cLabelAr = String(c.labelAr || c.name_ar || c.nameAr || '').trim().toLowerCase();
+      return cSlug === legacyVal || cId === legacyVal || cLabelEn === legacyVal || cLabelAr === legacyVal;
+    });
+    if (match) return match;
+  }
+
+  return null;
+};

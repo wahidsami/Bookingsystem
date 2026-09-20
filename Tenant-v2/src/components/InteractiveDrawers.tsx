@@ -15,6 +15,7 @@ import {
   getServiceDisplayName,
   groupServicesByCategory,
   normalizeServiceRecord,
+  resolveServiceOrBundleCategory,
   type ServiceRecord,
   type ServiceVariantRecord
 } from '../lib/serviceContract';
@@ -718,8 +719,8 @@ export default function InteractiveDrawers({
       });
     });
 
-    const hasUncategorizedServices = canonicalServices.some(s => !s.tenantServiceCategoryId);
-    const hasUncategorizedBundles = (services2Bundles || []).some(b => !b.tenantServiceCategoryId);
+    const hasUncategorizedServices = canonicalServices.some(s => !resolveServiceOrBundleCategory(s, tenantCategories));
+    const hasUncategorizedBundles = (services2Bundles || []).some(b => !resolveServiceOrBundleCategory(b, tenantCategories));
     if (hasUncategorizedServices || hasUncategorizedBundles) {
       tabs.push({
         key: 'uncategorized',

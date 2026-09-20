@@ -61,7 +61,7 @@ export default function EmployeeProfileEditor({
           </button>
           <div>
             <span className="text-[9px] uppercase tracking-widest text-amber-400 font-black block">
-              {isRtl ? 'بوابة تعيين وتهيئة الكادر' : 'REFAH TEAM ROSTER CREATOR'}
+              {isRtl ? 'بوابة تعيين وتهيئة الكادر' : 'BARSPA TEAM ROSTER CREATOR'}
             </span>
             <h2 className="text-base font-black">
               {formMode === 'add' 

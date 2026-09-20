@@ -780,7 +780,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           tenantApiAdapter.getCustomers({ limit: 1000 }),
           tenantApiAdapter.getProducts(),
           tenantApiAdapter.getPackages(),
-          tenantApiAdapter.getServices2Bundles(),
+          tenantApiAdapter.getServices2Bundles().catch(() => tenantApiAdapter.getPackages()),
           tenantApiAdapter.getTenantServiceCategories()
         ]);
 
@@ -803,7 +803,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           serviceId: s.id,
           tenantServiceCategoryId: s.tenantServiceCategoryId || null
         })));
-        setServices2Bundles(bundlesRes?.bundles || []);
+        const resolvedBundles = (bundlesRes as any)?.bundles || (bundlesRes as any)?.packages || (pkgRes as any)?.packages || (pkgRes as any)?.bundles || [];
+        setServices2Bundles(resolvedBundles);
+        setServicePackages((pkgRes as any)?.packages || (pkgRes as any)?.bundles || resolvedBundles);
         setTenantCategories(categoriesRes?.categories || []);
 
         const customers = custRes?.customers || (custRes as any)?.data?.customers || [];
@@ -2691,7 +2693,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       setInitialCartTab('products');
       setIsCartDrawerOpen(true);
     } else if (actionType === 'packages') {
-      onQuickAction({ type: 'navigate', viewId: 'packages' });
+      onQuickAction({ type: 'navigate', viewId: 'services2' });
     } else if (actionType === 'shift') {
       if (contextMenu) {
         setSelectedShiftStaffId(contextMenu.staffId);
@@ -3826,8 +3828,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const newItem: CartItem = {
       id: `gc-item-${Date.now()}`,
       type: 'giftcard',
-      nameAr: `بطاقة هدايا فاخرة من ${gcSender || 'عميلة رفاه'} لـ ${gcRecipient || 'شخص عزيز'}`,
-      nameEn: `Luxury Gift Card from ${gcSender || 'REFAH Guest'} to ${gcRecipient || 'Dear Guest'}`,
+      nameAr: `بطاقة هدايا فاخرة من ${gcSender || 'عميلة بارسبا'} لـ ${gcRecipient || 'شخص عزيز'}`,
+      nameEn: `Luxury Gift Card from ${gcSender || 'BarSpa Guest'} to ${gcRecipient || 'Dear Guest'}`,
       price: gcValue,
       quantity: 1,
       skuOrCode: generatedGcCode,
