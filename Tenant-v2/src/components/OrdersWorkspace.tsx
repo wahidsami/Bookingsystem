@@ -77,12 +77,12 @@ const STATUS_CONFIG: Record<OrderFulfillmentStatus, {
   confirmed: {
     labelAr: 'تم التأكيد',
     labelEn: 'Confirmed',
-    bgLight: 'bg-blue-50',
-    textLight: 'text-blue-700',
-    bgDark: 'dark:bg-blue-950/40',
-    textDark: 'dark:text-blue-400',
-    borderLight: 'border-blue-200',
-    borderDark: 'dark:border-blue-800/40'
+    bgLight: 'bg-purple-50',
+    textLight: 'text-[#1D035F]',
+    bgDark: 'dark:bg-[#1D035F]/40',
+    textDark: 'dark:text-[#E7DDFC]',
+    borderLight: 'border-[#A379E2]/40',
+    borderDark: 'dark:border-[#A379E2]/50'
   },
   processing: {
     labelAr: 'قيد التجهيز',
@@ -98,61 +98,61 @@ const STATUS_CONFIG: Record<OrderFulfillmentStatus, {
     labelAr: 'جاهز للاستلام',
     labelEn: 'Ready for Pickup',
     bgLight: 'bg-purple-50',
-    textLight: 'text-purple-700',
-    bgDark: 'dark:bg-purple-950/40',
-    textDark: 'dark:text-purple-400',
-    borderLight: 'border-purple-200',
-    borderDark: 'dark:border-purple-800/40'
+    textLight: 'text-[#1D035F]',
+    bgDark: 'dark:bg-[#1D035F]/40',
+    textDark: 'dark:text-[#E7DDFC]',
+    borderLight: 'border-[#A379E2]/40',
+    borderDark: 'dark:border-[#A379E2]/50'
   },
   shipped: {
     labelAr: 'تم الشحن',
     labelEn: 'Shipped',
-    bgLight: 'bg-cyan-50',
-    textLight: 'text-cyan-700',
-    bgDark: 'dark:bg-cyan-950/40',
-    textDark: 'dark:text-cyan-400',
-    borderLight: 'border-cyan-200',
-    borderDark: 'dark:border-cyan-800/40'
+    bgLight: 'bg-sky-50',
+    textLight: 'text-sky-800',
+    bgDark: 'dark:bg-sky-950/40',
+    textDark: 'dark:text-sky-300',
+    borderLight: 'border-sky-300',
+    borderDark: 'dark:border-sky-800/40'
   },
   delivered: {
     labelAr: 'تم التوصيل',
     labelEn: 'Delivered',
-    bgLight: 'bg-teal-50',
-    textLight: 'text-teal-700',
-    bgDark: 'dark:bg-teal-950/40',
-    textDark: 'dark:text-teal-400',
-    borderLight: 'border-teal-200',
-    borderDark: 'dark:border-teal-800/40'
+    bgLight: 'bg-emerald-50',
+    textLight: 'text-emerald-800',
+    bgDark: 'dark:bg-emerald-950/40',
+    textDark: 'dark:text-emerald-300',
+    borderLight: 'border-emerald-300',
+    borderDark: 'dark:border-emerald-800/40'
   },
   completed: {
     labelAr: 'مكتمل',
     labelEn: 'Completed',
     bgLight: 'bg-emerald-50',
-    textLight: 'text-emerald-700',
+    textLight: 'text-emerald-800',
     bgDark: 'dark:bg-emerald-950/40',
-    textDark: 'dark:text-emerald-400',
-    borderLight: 'border-emerald-200',
+    textDark: 'dark:text-emerald-300',
+    borderLight: 'border-emerald-300',
     borderDark: 'dark:border-emerald-800/40'
   },
   cancelled: {
     labelAr: 'ملغي',
     labelEn: 'Cancelled',
     bgLight: 'bg-rose-50',
-    textLight: 'text-rose-700',
+    textLight: 'text-rose-800',
     bgDark: 'dark:bg-rose-950/40',
-    textDark: 'dark:text-rose-400',
-    borderLight: 'border-rose-200',
+    textDark: 'dark:text-rose-300',
+    borderLight: 'border-rose-300',
     borderDark: 'dark:border-rose-800/40'
   },
   refunded: {
     labelAr: 'مسترجع',
     labelEn: 'Refunded',
-    bgLight: 'bg-neutral-100',
-    textLight: 'text-neutral-700',
-    bgDark: 'dark:bg-zinc-800',
-    textDark: 'dark:text-neutral-300',
-    borderLight: 'border-neutral-200',
-    borderDark: 'dark:border-zinc-700'
+    bgLight: 'bg-rose-50',
+    textLight: 'text-rose-800',
+    bgDark: 'dark:bg-rose-950/40',
+    textDark: 'dark:text-rose-300',
+    borderLight: 'border-rose-300',
+    borderDark: 'dark:border-rose-800/40'
   }
 };
 
@@ -179,12 +179,12 @@ const PAYMENT_STATUS_CONFIG: Record<OrderPaymentStatus, {
   refunded: {
     labelAr: 'مسترجع',
     labelEn: 'Refunded',
-    colorClass: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800/40'
+    colorClass: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/40'
   },
   partially_refunded: {
     labelAr: 'مسترجع جزئياً',
     labelEn: 'Partially Refunded',
-    colorClass: 'bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-zinc-800 dark:text-neutral-300 dark:border-zinc-700'
+    colorClass: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/40'
   }
 };
 

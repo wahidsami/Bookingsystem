@@ -207,6 +207,7 @@ export interface NavigationItem {
   category: 'core' | 'operations' | 'growth' | 'management';
   badgeAr?: string;
   badgeEn?: string;
+  hidden?: boolean;
 }
 
 export interface TabItem {

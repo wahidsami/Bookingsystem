@@ -111,6 +111,7 @@ export default function GlobalSearch({
   });
 
   const matchedNav = navigationItems.filter(item => {
+    if (item.hidden || item.id === 'services' || item.id === 'packages') return false;
     const label = lang === 'ar' ? item.labelAr : item.labelEn;
     return label.toLowerCase().includes(query.toLowerCase());
   });

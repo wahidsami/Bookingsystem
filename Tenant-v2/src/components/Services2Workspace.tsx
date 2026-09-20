@@ -169,8 +169,8 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
         : [];
       setServiceCategories(normalizedCategories);
     } catch (err) {
-      console.error('Failed to load Services 2 data:', err);
-      triggerToast('Failed to sync Services 2 catalog', 'فشل تحميل بيانات خدمات 2', 'error');
+      console.error('Failed to load Services data:', err);
+      triggerToast('Failed to sync Services catalog', 'فشل تحميل بيانات الخدمات', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -820,10 +820,10 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
     }
   };
 
-  // Refresh Services 2 catalog action
+  // Refresh Services catalog action
   const handleRefreshCatalog = async () => {
     setIsRefreshing(true);
-    triggerToast('Synchronizing Services 2 catalog...', 'جاري مزامنة كتالوج الخدمات والباقات...', 'info');
+    triggerToast('Synchronizing Services catalog...', 'جاري مزامنة كتالوج الخدمات والباقات...', 'info');
     await fetchData();
     setIsRefreshing(false);
     triggerToast('Catalog successfully synchronized!', 'تمت مزامنة كتالوج الخدمات والباقات بنجاح.', 'success');
@@ -3323,7 +3323,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                     <h3 className="text-sm font-black text-neutral-900">
                       {selectedBundleForInfo 
                         ? (isRtl ? `تفاصيل الباقة: ${selectedBundleForInfo.nameAr}` : `Bundle: ${selectedBundleForInfo.nameEn}`)
-                        : (isRtl ? 'منشئ الباقات — خدمات 2' : 'Bundle Builder — Services 2')}
+                        : (isRtl ? 'منشئ الباقات — الخدمات' : 'Bundle Builder — Services')}
                     </h3>
                     <span className="text-[10px] text-purple-600 font-bold block">
                       {isRtl ? 'باقة مجمعة من عدة خدمات تحت فئة موحدة' : 'Multi-service bundled offering under unified category'}

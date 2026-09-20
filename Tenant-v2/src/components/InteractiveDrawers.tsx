@@ -163,6 +163,7 @@ interface StagedService {
   packageId?: string;
   packageItemId?: string;
   packageInstanceId?: string;
+  sequenceOrder?: number;
   serviceCategory?: string;
   staffId: string;
   startTime: number;
@@ -2285,8 +2286,8 @@ export default function InteractiveDrawers({
     const newItem: CartItem = {
       id: `gc-item-${Date.now()}`,
       type: 'giftcard',
-      nameAr: `بطاقة هدايا فاخرة من ${gcSender || 'عميلة رفاه'} لـ ${gcRecipient || 'شخص عزيز'}`,
-      nameEn: `Luxury Gift Card from ${gcSender || 'REFAH Guest'} to ${gcRecipient || 'Dear Guest'}`,
+      nameAr: `بطاقة هدايا فاخرة من ${gcSender || 'عميلة بارسبا'} لـ ${gcRecipient || 'شخص عزيز'}`,
+      nameEn: `Luxury Gift Card from ${gcSender || 'BarSpa Guest'} to ${gcRecipient || 'Dear Guest'}`,
       price: gcValue,
       quantity: 1,
       skuOrCode: generatedGcCode,
@@ -2605,7 +2606,7 @@ export default function InteractiveDrawers({
                         <button
                           type="button"
                           onClick={handleContinueAppointmentDraft}
-                          className="rounded-full bg-zinc-950 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-zinc-800"
+                          className="rounded-full bg-[#6537C0] hover:bg-[#532ab0] px-5 py-2.5 text-sm font-bold text-white transition shadow-sm"
                         >
                           {isRtl ? 'متابعة المسودة' : 'Continue'}
                         </button>
@@ -2616,10 +2617,10 @@ export default function InteractiveDrawers({
               </AnimatePresence>
 
               {/* Header */}
-              <div className="p-5 bg-zinc-900 text-white flex items-center justify-between border-b border-zinc-800">
+              <div className="p-5 bg-[#1D035F] text-white flex items-center justify-between border-b border-[#A379E2]/30">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="p-1.5 bg-amber-500/10 rounded-lg text-amber-400">
+                    <span className="p-1.5 bg-[#6537C0] rounded-xl text-white shadow-xs">
                       <CalendarIcon size={16} />
                     </span>
                     <h3 className="text-sm font-bold tracking-tight">
@@ -2635,12 +2636,12 @@ export default function InteractiveDrawers({
                       ? (isEditingBreak
                         ? (isRtl ? 'عدّل أو احذف فترة الحظر الحالية ثم احفظ التغييرات.' : 'Update or delete the selected blocked time.')
                         : (isRtl ? 'أنشئ فترة حظر أو استراحة جديدة للموظفة.' : 'Create a new blocked interval for the stylist.'))
-                      : (isRtl ? 'جدولة الخدمات والخصومات وتخصيص الدفع لعملاء صالون واستجمام رفاه الفاخر' : 'Schedule luxury services, client profiles, and payment allocations')}
+                      : (isRtl ? 'جدولة الخدمات والخصومات وتخصيص الدفع لعملاء بارسبا الفاخر' : 'Schedule luxury services, client profiles, and payment allocations')}
                   </p>
                 </div>
                 <button
                   onClick={() => setIsCreateDrawerOpen(false)}
-                  className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all cursor-pointer"
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all cursor-pointer"
                 >
                   <X size={16} />
                 </button>
@@ -2655,7 +2656,7 @@ export default function InteractiveDrawers({
                   <button
                     onClick={() => setCreateMode('appointment')}
                     className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                      createMode === 'appointment' ? 'bg-zinc-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                      createMode === 'appointment' ? 'bg-[#6537C0] text-white shadow-sm' : 'text-slate-600 hover:text-[#1D035F]'
                     }`}
                   >
                     {isRtl ? 'جدولة موعد عميل' : 'Client Appointment'}
@@ -2666,7 +2667,7 @@ export default function InteractiveDrawers({
                       setCreateStep(1);
                     }}
                     className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                      createMode === 'blocked' ? 'bg-zinc-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                      createMode === 'blocked' ? 'bg-[#6537C0] text-white shadow-sm' : 'text-slate-600 hover:text-[#1D035F]'
                     }`}
                   >
                     {isRtl ? 'حظر فترة زمنية / استراحة' : 'Block Time / Break'}
@@ -2679,16 +2680,16 @@ export default function InteractiveDrawers({
                   {/* Step Progress */}
                   <div className="px-5 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
-                      <button onClick={() => setCreateStep(1)} className={`flex items-center gap-1 font-bold ${createStep === 1 ? 'text-amber-600' : 'text-slate-400'}`}>
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 1 ? 'bg-amber-500 text-zinc-950 font-black' : 'bg-slate-200 text-slate-500'}`}>1</span>
+                      <button onClick={() => setCreateStep(1)} className={`flex items-center gap-1 font-bold ${createStep === 1 ? 'text-[#6537C0]' : 'text-slate-400'}`}>
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 1 ? 'bg-[#6537C0] text-white font-bold' : 'bg-slate-200 text-slate-500'}`}>1</span>
                         <span>{isRtl ? 'بيانات العميل' : 'Identity'}</span>
                       </button>
-                      <button onClick={() => setCreateStep(2)} className={`flex items-center gap-1 font-bold ${createStep === 2 ? 'text-amber-600' : 'text-slate-400'}`}>
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 2 ? 'bg-amber-500 text-zinc-950 font-black' : 'bg-slate-200 text-slate-500'}`}>2</span>
+                      <button onClick={() => setCreateStep(2)} className={`flex items-center gap-1 font-bold ${createStep === 2 ? 'text-[#6537C0]' : 'text-slate-400'}`}>
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 2 ? 'bg-[#6537C0] text-white font-bold' : 'bg-slate-200 text-slate-500'}`}>2</span>
                         <span>{isRtl ? 'المرافقين' : 'Include Guests'}</span>
                       </button>
-                      <button onClick={() => setCreateStep(3)} className={`flex items-center gap-1 font-bold ${createStep === 3 ? 'text-amber-600' : 'text-slate-400'}`}>
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 3 ? 'bg-amber-500 text-zinc-950 font-black' : 'bg-slate-200 text-slate-500'}`}>3</span>
+                      <button onClick={() => setCreateStep(3)} className={`flex items-center gap-1 font-bold ${createStep === 3 ? 'text-[#6537C0]' : 'text-slate-400'}`}>
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 3 ? 'bg-[#6537C0] text-white font-bold' : 'bg-slate-200 text-slate-500'}`}>3</span>
                         <span>{isRtl ? 'الخدمات والجدولة' : 'Services'}</span>
                       </button>
                       <button
@@ -2705,10 +2706,10 @@ export default function InteractiveDrawers({
                         }}
                         disabled={stagedServices.length === 0}
                         className={`flex items-center gap-1 font-bold ${
-                          createStep === 4 ? 'text-amber-600' : 'text-slate-400'
+                          createStep === 4 ? 'text-[#6537C0]' : 'text-slate-400'
                         } ${stagedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 4 ? 'bg-amber-500 text-zinc-950 font-black' : 'bg-slate-200 text-slate-500'}`}>4</span>
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${createStep === 4 ? 'bg-[#6537C0] text-white font-bold' : 'bg-slate-200 text-slate-500'}`}>4</span>
                         <span>{isRtl ? 'الفاتورة والسداد' : 'Invoice'}</span>
                       </button>
                     </div>
@@ -2741,7 +2742,7 @@ export default function InteractiveDrawers({
                                     onClick={() => setCustMode(mode.key)}
                                     className={`inline-flex items-center gap-2 rounded-[18px] px-4 py-2 text-sm font-semibold transition ${
                                       active
-                                        ? 'bg-zinc-950 text-white shadow-sm'
+                                        ? 'bg-[#6537C0] text-white shadow-sm'
                                         : 'text-slate-500 hover:bg-white hover:text-slate-900'
                                     }`}
                                   >
@@ -2768,7 +2769,7 @@ export default function InteractiveDrawers({
                                       value={customerSearch}
                                       onChange={(e) => setCustomerSearch(e.target.value)}
                                       placeholder={isRtl ? 'ابحث باسم العميل أو رقم الجوال...' : 'Search by name or phone...'}
-                                      className={`w-full rounded-2xl border border-slate-200 bg-white py-4 text-base font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
+                                      className={`w-full rounded-2xl border border-slate-200 bg-white py-4 text-base font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-4 focus:ring-[#6537C0]/15 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
                                     />
                                   </div>
                                 </div>
@@ -2788,13 +2789,13 @@ export default function InteractiveDrawers({
                                             onClick={() => setSelectedCustId(customer.id)}
                                             className={`flex w-full items-center gap-4 border-b border-slate-100 px-5 py-4 text-start transition last:border-b-0 ${
                                               active
-                                                ? 'bg-amber-50/80 text-slate-900 ring-1 ring-inset ring-amber-500/20'
+                                                ? 'bg-[#F3EDFC] text-slate-900 ring-1 ring-inset ring-[#6537C0]/30'
                                                 : 'bg-white text-slate-700 hover:bg-slate-50'
                                             }`}
                                           >
                                             <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-base font-bold ${
                                               active
-                                                ? 'border-amber-300 bg-white text-amber-600'
+                                                ? 'border-[#A379E2]/40 bg-[#F3EDFC] text-[#6537C0]'
                                                 : 'border-slate-200 bg-slate-50 text-slate-500'
                                             }`}>
                                               {`${customer?.name || 'U'}`.trim().charAt(0).toUpperCase()}
@@ -2807,7 +2808,7 @@ export default function InteractiveDrawers({
                                             </div>
                                             <div className="flex items-center gap-3">
                                               <span className="shrink-0 text-sm font-mono text-slate-600">{customer?.phone || ''}</span>
-                                              {active ? <Check className="h-5 w-5 shrink-0 text-amber-500" /> : <div className="h-5 w-5" />}
+                                              {active ? <Check className="h-5 w-5 shrink-0 text-[#6537C0]" /> : <div className="h-5 w-5" />}
                                             </div>
                                           </button>
                                         );
@@ -2864,7 +2865,7 @@ export default function InteractiveDrawers({
                                       value={walkinFullName}
                                       onChange={(e) => setWalkinFullName(e.target.value)}
                                       placeholder={isRtl ? 'نورة أحمد' : 'Noura Ahmad'}
-                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
                                     />
                                   </div>
                                   <div>
@@ -2876,7 +2877,7 @@ export default function InteractiveDrawers({
                                       value={walkinPhone}
                                       onChange={(e) => setWalkinPhone(e.target.value)}
                                       placeholder={isRtl ? '+966 50...' : '+966 50...'}
-                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
                                     />
                                   </div>
                                   <div>
@@ -2887,7 +2888,7 @@ export default function InteractiveDrawers({
                                       type="email"
                                       value={walkinEmail}
                                       onChange={(e) => setWalkinEmail(e.target.value)}
-                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
                                     />
                                   </div>
                                   <div>
@@ -2900,7 +2901,7 @@ export default function InteractiveDrawers({
                                         value={walkinDob}
                                         onChange={(e) => setWalkinDob(e.target.value)}
                                         placeholder="12/05/1998"
-                                        className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 ${isRtl ? 'text-right' : 'text-left'}`}
+                                        className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
                                       />
                                       <CalendarIcon className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isRtl ? 'left-4' : 'right-4'}`} />
                                     </div>
@@ -2911,7 +2912,7 @@ export default function InteractiveDrawers({
                                         type="checkbox"
                                         checked={walkinIsVip}
                                         onChange={(e) => setWalkinIsVip(e.target.checked)}
-                                        className="h-5 w-5 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                                        className="h-5 w-5 rounded border-slate-300 accent-[#6537C0]"
                                       />
                                       <span className="text-sm font-bold text-slate-700">
                                         {isRtl ? 'تصنيف كعميل مميز VIP 👑' : 'Categorize as Premium VIP 👑'}
@@ -2934,15 +2935,15 @@ export default function InteractiveDrawers({
                               <p className="font-bold text-slate-800 text-sm">{isRtl ? 'إضافة ضيوف مرافقين للحجز' : 'Include Group Guests'}</p>
                               <p className="text-[10px] text-slate-400">{isRtl ? 'حجز خدمات إضافية لمرافقين في نفس الموعد' : 'Schedule additional treatments for guests in this reservation'}</p>
                             </div>
-                            <div className="flex items-center gap-1.5 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/20">
+                            <div className="flex items-center gap-1.5 bg-[#F3EDFC] px-3 py-1.5 rounded-full border border-[#A379E2]/30">
                               <input
                                 type="checkbox"
                                 id="group-check-step2"
                                 checked={includeGroupGuests}
                                 onChange={(e) => setIncludeGroupGuests(e.target.checked)}
-                                className="rounded text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                                className="rounded accent-[#6537C0] cursor-pointer h-4 w-4"
                               />
-                              <label htmlFor="group-check-step2" className="font-bold text-amber-800 text-[11px] cursor-pointer">
+                              <label htmlFor="group-check-step2" className="font-bold text-[#6537C0] text-[11px] cursor-pointer">
                                 {isRtl ? 'تفعيل حجز المرافقين' : 'Enable Guest Bookings'}
                               </label>
                             </div>
@@ -3003,12 +3004,12 @@ export default function InteractiveDrawers({
                                       className={`p-4 bg-slate-50/50 rounded-xl border transition-all space-y-4 ${
                                         hasValidationError
                                           ? 'border-red-200 bg-red-50/10 focus-within:border-red-400'
-                                          : 'border-slate-200 focus-within:border-amber-400'
+                                          : 'border-slate-200 focus-within:border-[#6537C0]'
                                       }`}
                                     >
                                       <div className="flex items-center justify-between">
                                         <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm" />
+                                          <span className="w-2.5 h-2.5 rounded-full bg-[#6537C0] shadow-sm" />
                                           {isRtl ? `بيانات المرافق ${index + 1}` : `Guest ${index + 1} Profile`}
                                         </span>
                                         {hasValidationError && (
@@ -3028,7 +3029,7 @@ export default function InteractiveDrawers({
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, name: e.target.value } : g))}
                                             placeholder={isRtl ? `الاسم الأول (مثال: سارة)` : `e.g. Guest ${index + 1}`}
                                             className={`w-full bg-white border p-2 rounded-lg text-xs font-semibold focus:outline-none ${
-                                              isNameEmpty ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-amber-400'
+                                              isNameEmpty ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-[#6537C0]'
                                             }`}
                                           />
                                         </div>
@@ -3053,7 +3054,7 @@ export default function InteractiveDrawers({
                                             onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, email: e.target.value } : g))}
                                             placeholder="guest@example.com"
                                             className={`w-full bg-white border p-2 rounded-lg text-xs font-semibold focus:outline-none ${
-                                              isEmailInvalid ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-amber-400'
+                                              isEmailInvalid ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-[#6537C0]'
                                             }`}
                                           />
                                         </div>
@@ -3075,7 +3076,7 @@ export default function InteractiveDrawers({
                                           <button
                                             type="button"
                                             onClick={() => addGuestService(guest.id)}
-                                            className="text-amber-600 hover:text-amber-700 font-bold text-[10px] flex items-center gap-1 cursor-pointer"
+                                            className="text-[#6537C0] hover:text-[#532ab0] font-bold text-[10px] flex items-center gap-1 cursor-pointer"
                                           >
                                             <PlusCircle className="w-3.5 h-3.5" />
                                             <span>{isRtl ? 'إضافة خدمة أخرى' : 'Add Service'}</span>
@@ -3212,8 +3213,8 @@ export default function InteractiveDrawers({
                               </div>
 
                               {/* GUEST PRICING REVIEW / SUMMARY */}
-                              <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3.5 space-y-2">
-                                <p className="text-[10px] font-black text-amber-800 uppercase tracking-wide flex items-center gap-1">
+                              <div className="bg-[#F3EDFC]/60 border border-[#A379E2]/30 rounded-xl p-3.5 space-y-2">
+                                <p className="text-[10px] font-black text-[#1D035F] uppercase tracking-wide flex items-center gap-1">
                                   <span>💳</span>
                                   <span>{isRtl ? 'مراجعة وتفصيل أسعار خدمات الضيوف:' : 'GROUP SESSION PRICING REVIEW'}</span>
                                 </p>
@@ -3236,7 +3237,7 @@ export default function InteractiveDrawers({
                                       </div>
                                     );
                                   })}
-                                  <div className="flex justify-between pt-2.5 mt-2 border-t border-amber-500/20 text-xs font-black text-amber-900">
+                                  <div className="flex justify-between pt-2.5 mt-2 border-t border-[#A379E2]/30 text-xs font-black text-[#1D035F]">
                                     <span>{isRtl ? 'مجموع خدمات المرافقين:' : 'Total Guest Group Cost:'}</span>
                                     <span className="font-mono text-sm">
                                       {guestsList.reduce((acc, g) => acc + (g.isFree ? 0 : (g.services || []).reduce((sum, gs) => sum + (gs.isFree ? 0 : gs.finalPrice), 0)), 0)} SAR
@@ -3421,8 +3422,8 @@ export default function InteractiveDrawers({
                                   ))
                                 )}
                                 {includeGroupGuests && (
-                                  <div className="space-y-1 pl-2.5 border-l-2 border-amber-500/30 pr-2.5">
-                                    <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">{isRtl ? 'تفصيل خدمات الضيوف:' : 'GROUP GUESTS BREAKDOWN'}</p>
+                                  <div className="space-y-1 pl-2.5 border-l-2 border-[#A379E2]/30 pr-2.5">
+                                    <p className="text-[10px] font-bold text-[#1D035F] uppercase tracking-wide">{isRtl ? 'تفصيل خدمات الضيوف:' : 'GROUP GUESTS BREAKDOWN'}</p>
                                     {guestsList.map((g, idx) => {
                                       const guestSub = (g.services || []).reduce((acc, gs) => acc + (g.isFree || gs.isFree ? 0 : toMoney(gs.finalPrice)), 0);
                                       return (
@@ -3454,7 +3455,7 @@ export default function InteractiveDrawers({
                                 <span>{isRtl ? 'الضريبة المضافة ZATCA (15%)' : 'Tax VAT (15%)'}</span>
                                 <span className="font-mono">{toMoney(vat).toFixed(2)} ر.س</span>
                               </div>
-                              <div className="flex justify-between font-black text-amber-600 text-sm border-t pt-1.5">
+                              <div className="flex justify-between font-black text-[#6537C0] text-sm border-t pt-1.5">
                                 <span>{isRtl ? 'المبلغ المستحق النهائي' : 'Grand Total Due'}</span>
                                 <span className="font-mono">{toMoney(total).toFixed(2)} ر.س</span>
                               </div>
@@ -3487,7 +3488,7 @@ export default function InteractiveDrawers({
                                               <p key={gs.id}>• {gs.serviceName} ({gs.finalPrice} SAR)</p>
                                             ))}
                                           </div>
-                                          {g.notes && <p className="text-amber-700 italic text-[9px] mt-0.5 bg-amber-50 px-1 py-0.5 rounded">📝 {g.notes}</p>}
+                                          {g.notes && <p className="text-[#6537C0] italic text-[9px] mt-0.5 bg-[#F3EDFC] px-1 py-0.5 rounded">📝 {g.notes}</p>}
                                         </div>
                                       );
                                     })}
@@ -3579,12 +3580,12 @@ export default function InteractiveDrawers({
                           }
                           setCreateStep(prev => prev + 1);
                         }}
-                        className="py-2 px-5 bg-zinc-950 text-white rounded-xl text-xs font-bold"
+                        className="py-2 px-5 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-bold transition shadow-sm"
                       >
                         {isRtl ? 'التالي' : 'Next Step'}
                       </button>
                     ) : (
-                      <button type="button" onClick={handleConfirmAppointmentCreation} className="py-2 px-5 bg-amber-500 text-zinc-950 font-black rounded-xl text-xs shadow-md">
+                      <button type="button" onClick={handleConfirmAppointmentCreation} className="py-2 px-5 bg-[#6537C0] hover:bg-[#532ab0] text-white font-black rounded-xl text-xs shadow-md transition">
                         {bookingRecoveryMode === 'separate_services' && stagedServices.length > 1
                           ? (isRtl ? `تأكيد ${stagedServices.length} مواعيد منفصلة 🗓️` : 'Schedule separate appointments 🗓️')
                           : (isRtl ? 'تأكيد الحجز والجدولة 🗓️' : 'Schedule Booking 🗓️')}
@@ -3605,7 +3606,7 @@ export default function InteractiveDrawers({
                           const presetTexts = getBlockPresetTexts(presetType);
                           setBlockTitleAr(presetTexts.titleAr);
                           setBlockTitleEn(presetTexts.titleEn);
-                        }} className={`py-1.5 rounded-lg border font-bold ${blockType === type ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-slate-50 text-slate-500'}`}>
+                        }} className={`py-1.5 rounded-lg border font-bold ${blockType === type ? 'bg-[#6537C0] border-[#6537C0] text-white shadow-xs' : 'bg-slate-50 text-slate-500 hover:bg-[#F3EDFC]'}`}>
                           {type}
                         </button>
                       ))}
@@ -3675,7 +3676,7 @@ export default function InteractiveDrawers({
                         {isRtl ? 'حذف الحظر' : 'Delete Block'}
                       </button>
                     )}
-                    <button onClick={handleConfirmBlockSubmit} className="py-2 px-5 bg-zinc-900 text-white font-bold rounded-lg shadow-sm">
+                    <button onClick={handleConfirmBlockSubmit} className="py-2 px-5 bg-[#6537C0] hover:bg-[#532ab0] text-white font-bold rounded-lg shadow-sm transition">
                       {isEditingBreak ? (isRtl ? 'حفظ التغييرات' : 'Save Changes') : (isRtl ? 'تأكيد الحظر' : 'Block Time')}
                     </button>
                   </div>
@@ -3759,10 +3760,10 @@ export default function InteractiveDrawers({
               </AnimatePresence>
 
               {/* Header */}
-              <div className="p-4 bg-amber-500 text-zinc-950 flex items-center justify-between border-b border-amber-600">
+              <div className="p-4 bg-[#1D035F] text-white flex items-center justify-between border-b border-[#A379E2]/30">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="p-1.5 bg-zinc-950/10 rounded-lg text-zinc-950">
+                    <span className="p-1.5 bg-[#6537C0] rounded-xl text-white shadow-xs">
                       <ShoppingBag size={16} />
                     </span>
                     <h3 className="text-sm font-black tracking-tight uppercase">
@@ -3772,7 +3773,7 @@ export default function InteractiveDrawers({
                 </div>
                 <button
                   onClick={() => setIsCartDrawerOpen(false)}
-                  className="p-1 rounded bg-zinc-950/10 hover:bg-zinc-950/20 text-zinc-950 cursor-pointer"
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white cursor-pointer transition"
                 >
                   <X size={16} />
                 </button>
@@ -3783,10 +3784,10 @@ export default function InteractiveDrawers({
                 <div className="w-7/12 border-e border-slate-200 flex flex-col bg-white overflow-hidden">
                   <div className="p-2.5 bg-slate-50 border-b flex items-center justify-between">
                     <div className="flex bg-slate-200 p-1 rounded-lg">
-                      <button onClick={() => setCartTab('products')} className={`px-2.5 py-1 text-xs font-bold rounded-md cursor-pointer ${cartTab === 'products' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600'}`}>
+                      <button onClick={() => setCartTab('products')} className={`px-2.5 py-1 text-xs font-bold rounded-md cursor-pointer ${cartTab === 'products' ? 'bg-[#6537C0] text-white shadow-xs' : 'text-slate-600 hover:text-[#1D035F]'}`}>
                         {isRtl ? 'مستحضرات التجميل 🧴' : 'Cosmetics 🧴'}
                       </button>
-                      <button onClick={() => { setCartTab('giftcards'); handleRegenerateGiftCardCode(); }} className={`px-2.5 py-1 text-xs font-bold rounded-md cursor-pointer ${cartTab === 'giftcards' ? 'bg-zinc-900 text-white shadow-xs' : 'text-slate-600'}`}>
+                      <button onClick={() => { setCartTab('giftcards'); handleRegenerateGiftCardCode(); }} className={`px-2.5 py-1 text-xs font-bold rounded-md cursor-pointer ${cartTab === 'giftcards' ? 'bg-[#6537C0] text-white shadow-xs' : 'text-slate-600 hover:text-[#1D035F]'}`}>
                         {isRtl ? 'بطاقات الهدايا 🎁' : 'Gift Cards 🎁'}
                       </button>
                     </div>
@@ -3803,7 +3804,7 @@ export default function InteractiveDrawers({
                               value={productSearch}
                               onChange={(e) => setProductSearch(e.target.value)}
                               placeholder={isRtl ? 'ابحث باسم المنتج أو SKU...' : 'Search products by name or SKU...'}
-                              className="w-full rounded-xl border border-slate-200 bg-white px-9 py-2 text-xs font-semibold text-slate-700 focus:ring-1 focus:ring-amber-500"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-9 py-2 text-xs font-semibold text-slate-700 focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]"
                             />
                           </div>
                           <div className="flex flex-wrap gap-1.5">
@@ -3814,8 +3815,8 @@ export default function InteractiveDrawers({
                                 onClick={() => setProductCategoryFilter(category.id)}
                                 className={`px-2.5 py-1.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
                                   productCategoryFilter === category.id
-                                    ? 'bg-zinc-950 text-white border-zinc-950'
-                                    : 'bg-white text-slate-600 border-slate-200 hover:border-amber-400'
+                                    ? 'bg-[#6537C0] text-white border-[#6537C0]'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-[#6537C0]'
                                 }`}
                               >
                                 {isRtl ? category.labelAr : category.labelEn}
@@ -3835,7 +3836,7 @@ export default function InteractiveDrawers({
                                   disabled={prod.stock === 0}
                                   onClick={() => handleAddProductToCart(prod)}
                                   className={`group text-left rounded-xl border bg-white overflow-hidden flex flex-col transition-all h-full ${
-                                    prod.stock === 0 ? 'opacity-60 cursor-not-allowed' : 'hover:border-amber-400 hover:shadow-xs cursor-pointer'
+                                    prod.stock === 0 ? 'opacity-60 cursor-not-allowed' : 'hover:border-[#6537C0] hover:shadow-xs cursor-pointer'
                                   }`}
                                 >
                                   <div className="aspect-square bg-slate-50 overflow-hidden relative">
@@ -3847,7 +3848,7 @@ export default function InteractiveDrawers({
                                   <div className="p-2.5 flex-1 flex flex-col justify-between gap-2">
                                     <div className="space-y-1">
                                       <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[8px] font-bold text-amber-600 uppercase truncate">
+                                        <span className="text-[8px] font-bold text-[#6537C0] uppercase truncate">
                                           {isRtl ? prod.categoryAr : prod.categoryEn}
                                         </span>
                                         <span className="text-[8px] font-mono text-slate-400 truncate">{prod.sku || '—'}</span>
@@ -3882,7 +3883,7 @@ export default function InteractiveDrawers({
                         <div className="p-3 bg-slate-50 border rounded-lg space-y-3">
                           <div className="flex justify-between items-center border-b pb-1">
                             <span className="font-black text-slate-800">{isRtl ? 'بطاقات الهدايا النشطة' : 'Available Gift Cards'}</span>
-                            <span className="text-[10px] font-mono font-bold text-amber-600">{giftCardPackages.length}</span>
+                            <span className="text-[10px] font-mono font-bold text-[#6537C0]">{giftCardPackages.length}</span>
                           </div>
 
                           {giftCardPackages.length > 0 ? (
@@ -3894,7 +3895,7 @@ export default function InteractiveDrawers({
                                     key={giftCardPackage.id}
                                     type="button"
                                     onClick={() => handleAddGiftCardPackageToCart(giftCardPackage)}
-                                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-amber-400 hover:bg-amber-50/60"
+                                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-[#6537C0] hover:bg-[#F3EDFC]"
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="min-w-0">
@@ -3904,7 +3905,7 @@ export default function InteractiveDrawers({
                                         </p>
                                       </div>
                                       <div className="shrink-0 text-right">
-                                        <p className="text-[10px] font-bold text-amber-600">
+                                        <p className="text-[10px] font-bold text-[#6537C0]">
                                           {Number(giftCardPackage.priceAmount || 0).toFixed(2)} SAR
                                         </p>
                                         <p className="text-[9px] text-slate-400">{isRtl ? 'اضغط للإضافة' : 'Tap to add'}</p>
@@ -3924,7 +3925,7 @@ export default function InteractiveDrawers({
                         <div className="p-3 bg-slate-50 border rounded-lg space-y-3">
                           <div className="flex justify-between items-center border-b pb-1">
                             <span className="font-black text-slate-800">{isRtl ? 'إصدار بطاقة هدايا جديدة' : 'Voucher Design'}</span>
-                            <span className="text-[10px] font-mono font-bold text-amber-600">{generatedGcCode}</span>
+                            <span className="text-[10px] font-mono font-bold text-[#6537C0]">{generatedGcCode}</span>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
@@ -3940,13 +3941,13 @@ export default function InteractiveDrawers({
                             <label className="text-[10px] text-slate-400 block mb-1">Value Card Amount</label>
                             <div className="grid grid-cols-4 gap-1.5">
                               {[150, 300, 500, 1000].map(v => (
-                                <button key={v} onClick={() => setGcValue(v)} className={`py-1 rounded font-mono font-bold border text-[11px] ${gcValue === v ? 'bg-zinc-950 text-white border-zinc-950' : 'bg-white text-slate-600'}`}>{v} ر.س</button>
+                                <button key={v} onClick={() => setGcValue(v)} className={`py-1 rounded font-mono font-bold border text-[11px] ${gcValue === v ? 'bg-[#6537C0] text-white border-[#6537C0]' : 'bg-white text-slate-600'}`}>{v} ر.س</button>
                               ))}
                             </div>
                           </div>
                           <div className="flex justify-between pt-1">
                             <button type="button" onClick={handleRegenerateGiftCardCode} className="text-[9px] underline text-slate-500">Regenerate Serial</button>
-                            <button type="button" onClick={handleAddGiftCardToCart} className="bg-zinc-950 text-white text-[10px] font-bold py-1.5 px-3 rounded-lg">+ Issue card</button>
+                            <button type="button" onClick={handleAddGiftCardToCart} className="bg-[#6537C0] hover:bg-[#532ab0] text-white text-[10px] font-bold py-1.5 px-3 rounded-lg shadow-xs transition">+ Issue card</button>
                           </div>
                         </div>
                       </div>
@@ -3969,7 +3970,7 @@ export default function InteractiveDrawers({
                         cartItems.map(item => (
                           <div key={item.id} className="p-2 bg-white rounded-lg border text-xs flex justify-between items-center animate-fadeIn shadow-3xs">
                             <div className="min-w-0 flex-1 pr-1">
-                              <span className="text-[8px] font-mono bg-amber-50 text-amber-700 px-1 rounded block w-fit">{item.skuOrCode}</span>
+                              <span className="text-[8px] font-mono bg-[#F3EDFC] text-[#6537C0] px-1 rounded block w-fit">{item.skuOrCode}</span>
                               <h5 className="font-bold truncate mt-0.5">{isRtl ? item.nameAr : item.nameEn}</h5>
                               <p className="text-[9px] text-slate-400">{item.price} SAR</p>
                             </div>
@@ -3991,13 +3992,13 @@ export default function InteractiveDrawers({
                         <div className="flex gap-1.5">
                           <button
                             onClick={() => { setPosCustMode('walkin'); setPosSelectedCustId(''); setPosCustomerSearch(''); }}
-                            className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${posCustMode === 'walkin' ? 'bg-zinc-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                            className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${posCustMode === 'walkin' ? 'bg-[#6537C0] text-white shadow-xs' : 'bg-slate-100 text-slate-500 hover:bg-[#F3EDFC]'}`}
                           >
                             Walk-in
                           </button>
                           <button
                             onClick={() => { setPosCustMode('existing'); setPosSelectedCustId(''); setPosCustomerSearch(''); }}
-                            className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${posCustMode === 'existing' ? 'bg-zinc-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                            className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${posCustMode === 'existing' ? 'bg-[#6537C0] text-white shadow-xs' : 'bg-slate-100 text-slate-500 hover:bg-[#F3EDFC]'}`}
                           >
                             Registered
                           </button>
@@ -4018,7 +4019,7 @@ export default function InteractiveDrawers({
                                 if (!e.target.value) setPosSelectedCustId('');
                               }}
                               placeholder={isRtl ? 'ابحث باسم العميل أو رقم الجوال...' : 'Search by name or phone...'}
-                              className="w-full pl-6 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-medium outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200 transition-all"
+                              className="w-full pl-6 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-medium outline-none focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/15 transition-all"
                             />
                           </div>
 
@@ -4037,15 +4038,15 @@ export default function InteractiveDrawers({
                                   key={c.id}
                                   type="button"
                                   onClick={() => { setPosSelectedCustId(c.id); setPosCustomerSearch(c.name || ''); }}
-                                  className={`w-full text-left px-2.5 py-2 text-[11px] font-medium hover:bg-amber-50 transition-all flex items-center justify-between gap-2 ${
+                                  className={`w-full text-left px-2.5 py-2 text-[11px] font-medium hover:bg-[#F3EDFC] transition-all flex items-center justify-between gap-2 ${
                                     posSelectedCustId === c.id
-                                      ? 'bg-amber-50 border-l-2 border-amber-400 font-bold text-amber-800'
+                                      ? 'bg-[#F3EDFC] border-l-2 border-[#6537C0] font-bold text-[#1D035F]'
                                       : 'text-slate-700'
                                   }`}
                                 >
                                   <span className="truncate">{c.name}</span>
                                   {c.phone && <span className="text-slate-400 text-[9px] font-mono shrink-0">{c.phone}</span>}
-                                  {posSelectedCustId === c.id && <Check size={10} className="text-amber-600 shrink-0" />}
+                                  {posSelectedCustId === c.id && <Check size={10} className="text-[#6537C0] shrink-0" />}
                                 </button>
                               ))
                             }
@@ -4077,13 +4078,13 @@ export default function InteractiveDrawers({
                             <button
                               type="button"
                               onClick={() => setShowWalkinModal(true)}
-                              className="flex flex-col text-left px-3 py-2 bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-lg transition-all w-full"
+                              className="flex flex-col text-left px-3 py-2 bg-slate-50 border border-slate-200 hover:border-[#6537C0] rounded-lg transition-all w-full"
                             >
                               <div className="flex items-center justify-between w-full mb-1">
                                 <span className="text-[10px] font-medium text-slate-500">
                                   {isRtl ? 'بيانات المستلم (زائر)' : 'Recipient Details (Walk-in)'}
                                 </span>
-                                <span className="text-amber-600 text-[10px] font-bold underline">
+                                <span className="text-[#6537C0] text-[10px] font-bold underline">
                                   {posWalkinName ? (isRtl ? 'تعديل' : 'Edit') : (isRtl ? 'إدخال البيانات' : 'Enter Details')}
                                 </span>
                               </div>
@@ -4130,9 +4131,9 @@ export default function InteractiveDrawers({
                               <span>ZATCA VAT (15%)</span>
                               <span className="font-mono font-semibold">{vat.toFixed(2)} SAR</span>
                             </div>
-                            <div className="flex justify-between font-black text-slate-900 border-t pt-1 bg-amber-500/5 px-1 py-0.5 rounded text-xs">
+                            <div className="flex justify-between font-black text-slate-900 border-t pt-1 bg-[#F3EDFC] px-1 py-0.5 rounded text-xs">
                               <span>{isRtl ? 'الصافي النهائي المستحق' : 'Checkout Total'}</span>
-                              <span className="font-mono text-amber-600 font-black">{total.toFixed(2)} SAR</span>
+                              <span className="font-mono text-[#6537C0] font-black">{total.toFixed(2)} SAR</span>
                             </div>
                           </div>
 
@@ -4173,7 +4174,7 @@ export default function InteractiveDrawers({
                                           setPosSplitAmounts(prev => ({ ...prev, card: parseFloat((posRemaining + (prev.card || 0)).toFixed(2)) }));
                                         }
                                       }}
-                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-[#F3EDFC] text-slate-500 rounded text-[9px] font-bold transition-colors"
                                     >
                                       {isRtl ? '+ إضافة' : '+ Add'}
                                     </button>
@@ -4188,7 +4189,7 @@ export default function InteractiveDrawers({
                                           setPosSplitAmounts(prev => ({ ...prev, cash: parseFloat((posRemaining + (prev.cash || 0)).toFixed(2)) }));
                                         }
                                       }}
-                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-[#F3EDFC] text-slate-500 rounded text-[9px] font-bold transition-colors"
                                     >
                                       {isRtl ? '+ إضافة' : '+ Add'}
                                     </button>
@@ -4203,7 +4204,7 @@ export default function InteractiveDrawers({
                                           setPosSplitAmounts(prev => ({ ...prev, wallet: parseFloat((posRemaining + (prev.wallet || 0)).toFixed(2)) }));
                                         }
                                       }}
-                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-[#F3EDFC] text-slate-500 rounded text-[9px] font-bold transition-colors"
                                     >
                                       {isRtl ? '+ إضافة' : '+ Add'}
                                     </button>
@@ -4230,9 +4231,9 @@ export default function InteractiveDrawers({
                             <button
                               onClick={handleProcessPosCheckout}
                               disabled={posCheckoutComplete || cartItems.length === 0 || (posSplitActive && !isPosSplitValid)}
-                              className="w-full mt-2 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-zinc-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
+                              className="w-full mt-2 py-2.5 bg-[#6537C0] hover:bg-[#532ab0] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5"
                             >
-                      <Receipt size={13} className="text-zinc-950" />
+                      <Receipt size={13} className="text-white" />
                       <span>
                         {posCheckoutComplete
                           ? (isRtl ? 'تم التحصيل' : 'Checkout completed')
@@ -4252,7 +4253,7 @@ export default function InteractiveDrawers({
                 <div className="absolute inset-0 z-40 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4">
                   <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-2xl p-5 w-80 font-mono text-xs border space-y-3">
                     <div className="border-t-2 border-b-2 border-dashed border-slate-800 py-3 text-center space-y-1">
-                      <span className="font-black text-sm tracking-widest block">REFAH CRM</span>
+                      <span className="font-black text-sm tracking-widest block">BARSPA CRM</span>
                       <p className="text-[9px] text-zinc-400">Simplified VAT Tax Invoice</p>
                       <p className="text-[8px] text-zinc-400">VAT Registration: 31092813100003</p>
                       <div className="h-px border-b border-dashed my-1" />
@@ -4282,20 +4283,20 @@ export default function InteractiveDrawers({
 
                       {/* Gift card codes section for walk-in receipts */}
                       {completedOrder.items.some((it: any) => it.type === 'giftcard') && (
-                        <div className="mt-2 border border-dashed border-amber-400 rounded p-1.5 bg-amber-50">
-                          <p className="text-[8px] font-black text-amber-800 mb-1 text-center tracking-wider uppercase">
+                        <div className="mt-2 border border-dashed border-[#A379E2]/40 rounded p-1.5 bg-[#F3EDFC]">
+                          <p className="text-[8px] font-black text-[#1D035F] mb-1 text-center tracking-wider uppercase">
                             🎁 {isRtl ? 'رموز بطاقات الهدايا' : 'Gift Card Redemption Codes'}
                           </p>
                           {completedOrder.items
                             .filter((it: any) => it.type === 'giftcard')
                             .map((it: any) => (
                               <div key={it.id} className="flex items-center justify-between py-0.5">
-                                <span className="text-[8px] text-amber-700 truncate flex-1">{it.nameEn}</span>
+                                <span className="text-[8px] text-[#6537C0] truncate flex-1">{it.nameEn}</span>
                                 <span className="text-[9px] font-black font-mono text-zinc-900 ml-1 tracking-widest">{it.skuOrCode}</span>
                               </div>
                             ))
                           }
-                          <p className="text-[7px] text-amber-600 mt-1 text-center">
+                          <p className="text-[7px] text-[#6537C0] mt-1 text-center">
                             {isRtl
                               ? 'احتفظ بهذا الرمز — يمكن استرداده في أي وقت في المركز'
                               : 'Keep this code — present at the center to redeem'}
@@ -4303,10 +4304,10 @@ export default function InteractiveDrawers({
                         </div>
                       )}
 
-                      <p className="text-[8px] text-slate-400 mt-2">شكراً لزيارتكم صالون رفاه الفاخر 🌸 Thank you</p>
+                      <p className="text-[8px] text-slate-400 mt-2">شكراً لزيارتكم بارسبا 🌸 Thank you for visiting BarSpa</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => { addLocalToast('تم محاكاة طباعة الإيصال الورقي الفوري بنجاح!', 'Simulated printed physical receipt successfully!', 'success'); setCompletedOrder(null); }} className="flex-1 py-1.5 bg-zinc-900 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5">
+                      <button onClick={() => { addLocalToast('تم محاكاة طباعة الإيصال الورقي الفوري بنجاح!', 'Simulated printed physical receipt successfully!', 'success'); setCompletedOrder(null); }} className="flex-1 py-1.5 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition">
                         <Printer size={12} />
                         <span>Print</span>
                       </button>
@@ -4351,7 +4352,7 @@ export default function InteractiveDrawers({
                     type="text"
                     value={posWalkinName}
                     onChange={(e) => setPosWalkinName(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/15 outline-none"
                     placeholder={isRtl ? 'أدخل اسم المشتري...' : 'Enter buyer name...'}
                   />
                 </div>
@@ -4363,7 +4364,7 @@ export default function InteractiveDrawers({
                     type="email"
                     value={posWalkinEmail}
                     onChange={(e) => setPosWalkinEmail(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/15 outline-none"
                     placeholder={isRtl ? 'name@example.com' : 'name@example.com'}
                   />
                 </div>
@@ -4375,7 +4376,7 @@ export default function InteractiveDrawers({
                     type="tel"
                     value={posWalkinPhone}
                     onChange={(e) => setPosWalkinPhone(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-200 outline-none"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/15 outline-none"
                     placeholder={isRtl ? '05xxxxxxxx' : '05xxxxxxxx'}
                   />
                 </div>
@@ -4401,7 +4402,7 @@ export default function InteractiveDrawers({
                   }
                   setShowWalkinModal(false);
                 }}
-                className="flex-[2] px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white font-bold rounded-xl text-xs transition-colors"
+                className="flex-[2] px-4 py-2 bg-[#6537C0] hover:bg-[#532ab0] text-white font-bold rounded-xl text-xs transition-colors shadow-sm"
               >
                 {isRtl ? 'حفظ البيانات ومتابعة' : 'Save Details & Continue'}
               </button>
@@ -4448,7 +4449,7 @@ export default function InteractiveDrawers({
               <button
                 type="button"
                 onClick={() => setShowAssignWarning(false)}
-                className="px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-all cursor-pointer"
+                className="px-4 py-2 bg-[#6537C0] text-white rounded-xl text-xs font-bold hover:bg-[#532ab0] transition-all cursor-pointer shadow-sm"
               >
                 {isRtl ? 'تغيير الموظف' : 'Change Employee'}
               </button>
@@ -4500,7 +4501,7 @@ export default function InteractiveDrawers({
                 <button
                   type="button"
                   onClick={() => setBookingErrorDialog(null)}
-                  className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                  className="rounded-xl bg-[#6537C0] hover:bg-[#532ab0] px-4 py-2 text-xs font-bold text-white transition shadow-sm"
                 >
                   {isRtl ? 'حسناً' : 'OK'}
                 </button>
@@ -4553,7 +4554,7 @@ export default function InteractiveDrawers({
                 <button
                   type="button"
                   onClick={bookingHoursDecisionDialog.onExtendHours}
-                  className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-zinc-950 transition hover:bg-amber-400"
+                  className="rounded-xl bg-[#6537C0] hover:bg-[#532ab0] px-4 py-2 text-xs font-bold text-white transition shadow-sm"
                 >
                   {isRtl
                     ? `تمديد الساعات ${bookingHoursDecisionDialog.extensionMinutes} دقيقة`

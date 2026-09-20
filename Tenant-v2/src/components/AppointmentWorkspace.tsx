@@ -224,6 +224,26 @@ const normalizeWorkspaceAppointmentStatus = (status: any): Appointment['status']
   return 'confirmed';
 };
 
+const getSemanticStatusBadgeClass = (status: any): string => {
+  const s = normalizeWorkspaceAppointmentStatus(status);
+  switch (s) {
+    case 'confirmed':
+      return 'badge-status-confirmed';
+    case 'checked_in':
+    case 'in_service':
+      return 'badge-status-processing';
+    case 'completed':
+      return 'badge-status-completed';
+    case 'pending':
+      return 'badge-status-pending';
+    case 'cancelled':
+    case 'no_show':
+      return 'badge-status-cancelled';
+    default:
+      return 'badge-status-confirmed';
+  }
+};
+
 const normalizeGiftCardPackage = (item: any): GiftCardPackage => {
   const title = item?.title || item?.title_en || item?.title_ar || '';
   return {
@@ -5615,7 +5635,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             type="button"
                             onClick={() => handleDayShift(offset)}
                             className={`flex flex-col items-center gap-0.5 rounded-xl p-2 text-[11px] font-bold transition-all ${
-                              isSelected ? 'scale-105 bg-zinc-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'
+                              isSelected ? 'scale-105 bg-[#6537C0] text-white shadow-md' : 'text-slate-500 hover:bg-[#F3EDFC]'
                             }`}
                           >
                             <span className="opacity-70">{day.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'narrow' })}</span>
@@ -5647,7 +5667,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder={isRtl ? 'اسم العميل، الخدمة...' : 'Client, service name...'}
-                          className={`w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-sans outline-none transition-all focus:border-amber-300 focus:ring-1 focus:ring-amber-300 ${isRtl ? 'pr-8 pl-3' : 'pl-8 pr-3'}`}
+                          className={`w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-sans outline-none transition-all focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0] ${isRtl ? 'pr-8 pl-3' : 'pl-8 pr-3'}`}
                         />
                         {searchQuery && (
                           <button
@@ -5691,7 +5711,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             onClick={() => setStatusFilter(opt.id)}
                             className={`rounded-xl border px-2.5 py-2 text-[10px] font-bold transition-all ${
                               statusFilter === opt.id
-                                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                ? 'border-[#6537C0]/30 bg-[#F3EDFC] text-[#6537C0]'
                                 : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
                             }`}
                           >
@@ -5709,7 +5729,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                           setStatusFilter('all');
                           setSearchQuery('');
                         }}
-                        className="w-full rounded-xl bg-slate-100 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition hover:bg-zinc-900 hover:text-white"
+                        className="w-full rounded-xl bg-slate-100 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition hover:bg-[#6537C0] hover:text-white"
                       >
                         {t.clearFilters}
                       </button>
@@ -5743,7 +5763,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       onChange={(event) => updateSchedulerBoardDraft({
                         [field.key]: Number(event.target.value)
                       } as Partial<SchedulerBoardSettings>)}
-                      className="w-full accent-amber-500"
+                      className="w-full accent-[#6537C0]"
                     />
                   </label>
                 ))}
@@ -5766,7 +5786,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       onChange={(event) => updateSchedulerBoardDraft({
                         [field.key]: event.target.checked
                       } as Partial<SchedulerBoardSettings>)}
-                      className="h-4 w-4 accent-amber-500"
+                      className="h-4 w-4 accent-[#6537C0]"
                     />
                   </label>
                 ))}
@@ -5793,7 +5813,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     type="button"
                     disabled={isSchedulerSettingsSaving}
                     onClick={() => void saveSchedulerBoardSettings(schedulerBoardDraft)}
-                    className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-xl bg-[#6537C0] hover:bg-[#532ab0] px-4 py-2 text-xs font-bold text-white transition shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSchedulerSettingsSaving ? (isRtl ? 'جارٍ الحفظ...' : 'Saving...') : (isRtl ? 'حفظ' : 'Save')}
                   </button>
@@ -5863,7 +5883,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   type="checkbox"
                   checked={dragMoveDialog.notifyCustomer}
                   onChange={(event) => setDragMoveDialog((current) => current ? { ...current, notifyCustomer: event.target.checked } : current)}
-                  className="h-4 w-4 accent-amber-500"
+                  className="h-4 w-4 accent-[#6537C0]"
                 />
                 <span>{isRtl ? 'إخطار العميل بالبريد الإلكتروني' : 'Notify customer by email'}</span>
               </label>
@@ -5879,7 +5899,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <button
                   type="button"
                   onClick={() => void confirmSchedulerMove()}
-                  className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                  className="rounded-xl bg-[#6537C0] hover:bg-[#532ab0] px-4 py-2 text-xs font-bold text-white transition shadow-sm"
                 >
                   {isRtl ? 'تأكيد' : 'Confirm'}
                 </button>
@@ -5956,7 +5976,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     openServiceForStaffAssignment(dragConflictDialog.serviceId);
                     setDragConflictDialog(null);
                   }}
-                  className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                  className="rounded-xl bg-[#6537C0] hover:bg-[#532ab0] px-4 py-2 text-xs font-bold text-white transition shadow-sm"
                 >
                   {isRtl ? 'فتح الخدمة' : 'Open Service'}
                 </button>
@@ -6057,37 +6077,32 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               animate={{ x: 0 }}
               exit={{ x: isRtl ? '-100%' : '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-[88vw] bg-slate-50 border-${isRtl ? 'r' : 'l'} border-slate-200 shadow-2xl flex flex-col`}
+              className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-[88vw] max-w-[1400px] bg-[#FAF7FD] border-${isRtl ? 'r' : 'l'} border-[#E7DDFC] shadow-2xl flex flex-col`}
             >
 
               {/* STICKY COMMAND HEADER */}
-              <header className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between z-10 shrink-0 shadow-xs h-16">
+              <header className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-[#E7DDFC] px-6 py-4 flex items-center justify-between z-10 shrink-0 shadow-xs h-16">
                 <div className="flex items-center gap-3">
-                  <span className="p-2 bg-zinc-900 rounded-lg text-amber-400">
+                  <span className="p-2 bg-[#1D035F] rounded-xl text-[#E7DDFC] shadow-xs">
                     <CheckCircle2 size={18} />
                   </span>
                 <div>
-                  <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 leading-none">
+                  <h2 className="text-base font-bold text-[#1D035F] flex items-center gap-2 leading-none font-sans">
                     {isRtl ? 'تفاصيل الحجز وإدارة العميل' : 'APPOINTMENT OPERATIONS CONTROL'}
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                      normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'confirmed' ? 'bg-amber-100 text-amber-700' :
-                        normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'checked_in' ? 'bg-emerald-100 text-emerald-700' :
-                        normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'cancelled' ? 'bg-rose-100 text-rose-700' :
-                        normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'no_show' ? 'bg-slate-100 text-slate-700' :
-                        'bg-zinc-100 text-zinc-700'
-                      }`}>
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase ${getSemanticStatusBadgeClass(activeAppointment.status)}`}>
                         {displayAppointmentStatus(activeAppointment.status) === 'confirmed' ? t.confirmed :
                          displayAppointmentStatus(activeAppointment.status) === 'checked_in' ? t.arrived :
+                         displayAppointmentStatus(activeAppointment.status) === 'in_service' ? (isRtl ? 'بدأت الجلسة' : 'In Service') :
                          displayAppointmentStatus(activeAppointment.status) === 'cancelled' ? (isRtl ? 'ملغي' : 'Cancelled') :
                          displayAppointmentStatus(activeAppointment.status) === 'no_show' ? (isRtl ? 'عدم حضور' : 'No-show') : t.completed}
                       </span>
                       {appointmentDetailsReadOnly && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-600 border border-slate-200">
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase bg-slate-100 text-slate-700 border border-slate-300">
                           {isRtl ? 'وضع قراءة' : 'Read only'}
                         </span>
                       )}
                     </h2>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                    <p className="text-[10px] text-[#A379E2] font-semibold mt-1">
                       {isRtl ? 'رقم الموعد: ' + activeAppointment.id : 'ID: ' + activeAppointment.id}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -6115,7 +6130,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                           void handleAppointmentStatusUpdate(nextStatus);
                         }}
-                        className={`min-w-[170px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60 ${isRtl ? 'text-right' : 'text-left'}`}
+                        className={`min-w-[170px] rounded-xl border border-[#E7DDFC] bg-white px-3 py-1.5 text-xs font-bold text-[#1D035F] outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 disabled:cursor-not-allowed disabled:opacity-60 ${isRtl ? 'text-right' : 'text-left'}`}
                       >
                         {getAppointmentStatusOptions(normalizeWorkspaceAppointmentStatus(activeAppointment.status)).map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
@@ -6127,26 +6142,26 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                 {/* Operations tools */}
                 <div className="flex items-center gap-2">
-                  <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all cursor-pointer" title="Print Invoice">
+                  <button className="p-2 text-slate-500 hover:text-[#1D035F] hover:bg-[#F3EDFC] rounded-xl transition-all cursor-pointer" title="Print Invoice">
                     <Printer size={15} />
                   </button>
-                  <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all cursor-pointer" title="Share Touchpoint">
+                  <button className="p-2 text-slate-500 hover:text-[#1D035F] hover:bg-[#F3EDFC] rounded-xl transition-all cursor-pointer" title="Share Touchpoint">
                     <Share2 size={15} />
                   </button>
                   <button
                     onClick={() => setIsCustomerProfileOpen(true)}
-                    className="px-3 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
+                    className="px-3 py-2 text-xs font-bold text-[#1D035F] bg-[#F3EDFC] hover:bg-[#E7DDFC] rounded-xl transition-all cursor-pointer border border-[#E7DDFC]"
                     title={isRtl ? 'فتح ملف العميل' : 'Open customer profile'}
                   >
                     <div className="flex items-center gap-1.5">
-                      <User size={14} />
+                      <User size={14} className="text-[#6537C0]" />
                       <span>{isRtl ? 'ملف العميل' : 'Customer Profile'}</span>
                     </div>
                   </button>
-                  <div className="h-5 w-px bg-slate-200 mx-1" />
+                  <div className="h-5 w-px bg-[#E7DDFC] mx-1" />
                   <button
                     onClick={() => setDrawerOpen(false)}
-                    className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
+                    className="p-1.5 bg-[#F3EDFC] text-[#1D035F] hover:bg-[#E7DDFC] rounded-xl transition-all cursor-pointer"
                   >
                     <X size={16} />
                   </button>
@@ -6158,17 +6173,17 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                 {/* COLUMN 1: STICKY CUSTOMER PROFILE & OPERATIONS SUMMARY (col-span-3) */}
                 <div className="xl:col-span-3">
-                  <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 sticky top-4">
+                  <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4 sticky top-4">
 
                     {/* Customer Info Card Header */}
-                    <div className="text-center pb-4 border-b border-slate-100">
-                      <div className="w-16 h-16 bg-amber-100 border border-amber-200 rounded-full flex items-center justify-center font-bold text-amber-700 text-xl mx-auto mb-2 select-none shadow-xs">
+                    <div className="text-center pb-4 border-b border-[#FAF7FD]">
+                      <div className="w-16 h-16 bg-[#F3EDFC] border border-[#A379E2]/30 rounded-full flex items-center justify-center font-bold text-[#6537C0] text-xl mx-auto mb-2 select-none shadow-xs">
                         {String(activeAppointment.customerNameEn || activeAppointment.customerNameAr || activeAppointment.id || '').trim().slice(0, 2).toUpperCase()}
                       </div>
-                      <h3 className="font-bold text-slate-800 text-sm leading-tight">
+                      <h3 className="font-bold text-[#1D035F] text-sm leading-tight font-sans">
                         {isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn}
                       </h3>
-                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/50 px-2.5 py-0.5 rounded-full mt-1.5 inline-block">
+                      <span className="text-[10px] font-bold text-[#1D035F] bg-[#F3EDFC] border border-[#A379E2]/40 px-2.5 py-0.5 rounded-full mt-1.5 inline-block">
                         {activeCustomerTier || '—'}
                       </span>
                     </div>
@@ -6176,25 +6191,25 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     {/* Quick Profile fields */}
                     <div className="space-y-3.5 text-xs text-slate-600">
                       <div className="flex items-center gap-2">
-                        <Phone size={13} className="text-slate-400" />
+                        <Phone size={13} className="text-[#A379E2]" />
                         <span className="font-mono">{activeCustomerPhone || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Mail size={13} className="text-slate-400" />
+                        <Mail size={13} className="text-[#A379E2]" />
                         <span className="truncate">{activeCustomerEmail || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MapPin size={13} className="text-slate-400" />
+                        <MapPin size={13} className="text-[#A379E2]" />
                         <span>{activeCustomerBranch || '—'}</span>
                       </div>
                     </div>
 
                     {/* Tag chips with manual add option */}
-                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <div className="pt-3 border-t border-[#FAF7FD] space-y-2">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'الوسوم المميزة' : 'Customer Tags'}</span>
                       <div className="flex flex-wrap gap-1">
                         {activeAppointment.tags.map((tag, idx) => (
-                          <span key={idx} className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">
+                          <span key={idx} className="bg-[#FAF7FD] text-[#1D035F] border border-[#E7DDFC] px-2 py-0.5 rounded-md text-[10px] font-bold">
                             {tag}
                           </span>
                         ))}
@@ -6202,9 +6217,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     </div>
 
                     {/* Sticky notes editor box */}
-                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <div className="pt-3 border-t border-[#FAF7FD] space-y-2">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'تفضيلات وملاحظات خبيرة التجميل' : 'Stylist Notes'}</span>
-                      <div className="bg-amber-50/50 border border-amber-200/40 p-3 rounded-lg text-xs text-amber-900 font-medium leading-relaxed">
+                      <div className="bg-[#FAF7FD] border border-[#E7DDFC] p-3 rounded-xl text-xs text-[#1D035F] font-medium leading-relaxed">
                         {activeAppointment.notes || '—'}
                       </div>
                       {normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'cancelled' && (
@@ -6225,10 +6240,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     </div>
 
                     {/* Wallet Quick Balance card */}
-                    <div className="pt-3 border-t border-slate-100">
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/60 flex items-center justify-between text-xs">
-                        <span className="text-slate-500 font-semibold">{isRtl ? 'رصيد المحفظة النشط:' : 'Active Wallet:'}</span>
-                        <span className="font-mono font-black text-slate-800">{activeCustomerWallet} {t.riyal}</span>
+                    <div className="pt-3 border-t border-[#FAF7FD]">
+                      <div className="bg-[#FAF7FD] p-3 rounded-xl border border-[#E7DDFC] flex items-center justify-between text-xs">
+                        <span className="text-slate-600 font-semibold">{isRtl ? 'رصيد المحفظة النشط:' : 'Active Wallet:'}</span>
+                        <span className="font-mono font-black text-[#1D035F]">{activeCustomerWallet} {t.riyal}</span>
                       </div>
                     </div>
 
@@ -6239,7 +6254,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <div className="xl:col-span-5 space-y-5">
 
                   {/* Sliding Tabs selector header */}
-                  <div className="bg-white p-1 rounded-xl border border-slate-200/60 flex gap-1 shadow-2xs">
+                  <div className="bg-white p-1 rounded-2xl border border-[#E7DDFC] flex gap-1 shadow-2xs">
                     {[
                       { id: 'overview', label: isRtl ? 'الملخص والتحكم' : 'Interactive Hub' },
                       { id: 'timeline', label: isRtl ? 'الخط الزمني' : 'Timeline History' },
@@ -6248,10 +6263,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       <button
                         key={tab.id}
                         onClick={() => setDrawerTab(tab.id as any)}
-                        className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
+                        className={`flex-1 py-2 px-1 rounded-xl text-xs font-bold transition-all text-center cursor-pointer ${
                           drawerTab === tab.id
-                            ? 'bg-zinc-900 text-white'
-                            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                            ? 'bg-[#6537C0] text-white shadow-xs'
+                            : 'text-slate-600 hover:text-[#1D035F] hover:bg-[#FAF7FD]'
                         }`}
                       >
                         {tab.label}
@@ -6264,30 +6279,30 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <div className="space-y-5">
 
                       {/* Active service item banner */}
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+                      <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4">
                         <div className="flex justify-between items-start">
                           <div>
-                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/40 px-2.5 py-0.5 rounded-full uppercase">
+                            <span className="text-[10px] font-bold text-[#6537C0] bg-[#F3EDFC] border border-[#A379E2]/30 px-2.5 py-0.5 rounded-full uppercase">
                               {isRtl ? 'الخدمة الرئيسية النشطة' : 'ACTIVE SERVICE LINE'}
                             </span>
-                            <h4 className="font-bold text-slate-800 text-base mt-2.5 flex items-center gap-1.5">
+                            <h4 className="font-bold text-[#1D035F] text-base mt-2.5 flex items-center gap-1.5 font-sans">
                               {(activeAppointment?.packageId || activeAppointment?.packageSnapshot) && (
-                                <Package size={16} className="text-amber-600 shrink-0" />
+                                <Package size={16} className="text-[#6537C0] shrink-0" />
                               )}
                               <span>{isRtl ? activeServiceSummary.nameAr : activeServiceSummary.nameEn}</span>
                             </h4>
                             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                              <Clock size={12} />
+                              <Clock size={12} className="text-[#A379E2]" />
                               <span>{activeServiceSummary.duration} {t.durationMin} • {isRtl ? 'مع خبيرة التجميل' : 'assigned to'} {isRtl ? liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameAr : liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameEn}</span>
                             </p>
                           </div>
-                          <span className="text-base font-black text-slate-900 font-mono">
+                          <span className="text-base font-black text-[#1D035F] font-mono">
                             {activeServiceSummary.price} {t.riyal}
                           </span>
                         </div>
 
                         {/* Interactive Rebook / Reschedule tool buttons */}
-                        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
+                        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#FAF7FD]">
                           <button
                             onClick={async () => {
                               if (!appointmentDetailsReadOnly) return;
@@ -6298,9 +6313,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                 'info'
                               );
                             }}
-                            className="py-2 border border-slate-200 hover:border-zinc-900 hover:bg-zinc-900 hover:text-white bg-white rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="py-2 border border-[#E7DDFC] hover:border-[#6537C0] hover:bg-[#F3EDFC] hover:text-[#1D035F] bg-white rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
-                            <Undo2 size={13} />
+                            <Undo2 size={13} className="text-[#6537C0]" />
                             <span>{t.rebook}</span>
                           </button>
 
@@ -6341,7 +6356,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                 }
                               }
                             }}
-                            className="py-2 border border-rose-200 hover:border-rose-500 hover:bg-rose-50 bg-white rounded-lg text-xs font-bold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="py-2 border border-rose-200 hover:border-rose-400 hover:bg-rose-50 bg-white rounded-xl text-xs font-bold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                             <Trash size={13} />
                             <span>{isRtl ? 'إلغاء الموعد' : 'Cancel Booking'}</span>
@@ -6391,7 +6406,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   }
                                 }
                               }}
-                              className="py-2 border border-amber-200 hover:border-amber-500 hover:bg-amber-50 bg-white rounded-lg text-xs font-bold text-amber-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                              className="py-2 border border-amber-300 hover:border-amber-400 hover:bg-amber-50 bg-white rounded-xl text-xs font-bold text-amber-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                               <AlertTriangle size={13} />
                               <span>{isRtl ? 'إلغاء متأخر' : 'Late Cancel'}</span>
@@ -6402,12 +6417,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                       {/* GROUP GUESTS SESSION SUMMARY */}
                       {activeAppointment.isGroupBooking && activeAppointment.guestsDetails && (
-                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4 animate-fadeIn">
-                          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                            <span className="p-1.5 bg-amber-50 text-amber-600 rounded-md">
+                        <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4 animate-fadeIn">
+                          <div className="flex items-center gap-2 pb-2 border-b border-[#FAF7FD]">
+                            <span className="p-1.5 bg-[#F3EDFC] text-[#6537C0] rounded-xl">
                               <Users size={14} />
                             </span>
-                            <span className="text-xs font-black text-slate-800">
+                            <span className="text-xs font-black text-[#1D035F]">
                               {isRtl ? `قائمة مرافقي الجلسة الجماعية (${activeAppointment.guestCount || activeAppointment.guestsDetails.length} أشخاص)` : `GROUP GUEST DETAILS (${activeAppointment.guestCount || activeAppointment.guestsDetails.length} Pax)`}
                             </span>
                           </div>
@@ -6416,14 +6431,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             {activeAppointment.guestsDetails.map((guest: any, idx: number) => {
                               const srv = liveServices.find(s => s.id === guest.serviceId);
                               return (
-                                <div key={guest.id || idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200/50 space-y-2 text-xs">
+                                <div key={guest.id || idx} className="p-3 bg-[#FAF7FD] rounded-xl border border-[#E7DDFC] space-y-2 text-xs">
                                   <div className="flex justify-between items-center">
-                                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                    <span className="font-bold text-[#1D035F] flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#6537C0]" />
                                       {guest.name}
                                     </span>
-                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                                      guest.isFree ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase ${
+                                      guest.isFree ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-[#F3EDFC] text-[#1D035F] border border-[#A379E2]/30'
                                     }`}>
                                       {guest.isFree ? (isRtl ? 'خدمة مجانية 🎁' : 'Complimentary 🎁') : `${srv?.price || 0} SAR`}
                                     </span>
@@ -6441,7 +6456,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       </p>
                                     )}
                                     {guest.notes && (
-                                      <div className="bg-amber-50/40 p-2 rounded border border-amber-200/30 text-[10px] text-amber-900 leading-normal">
+                                      <div className="bg-amber-50/50 p-2 rounded-lg border border-amber-200 text-[10px] text-amber-900 leading-normal">
                                         <span className="font-bold">{isRtl ? 'ملاحظة الضيف: ' : 'Guest Note: '}</span>
                                         {guest.notes}
                                       </div>
@@ -6455,12 +6470,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       )}
 
 {!TEMP_HIDE_REASSIGN_UI && (
-                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                            <span className="p-1.5 bg-amber-50 text-amber-600 rounded-md">
+                        <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4">
+                          <div className="flex items-center gap-2 pb-2 border-b border-[#FAF7FD]">
+                            <span className="p-1.5 bg-[#F3EDFC] text-[#6537C0] rounded-xl">
                               <CalendarIcon size={14} />
                             </span>
-                            <span className="text-xs font-black text-slate-800">{isRtl ? 'إعادة التعيين والجدولة الفورية' : 'REASSIGN & RESCHEDULE WORKSPACE'}</span>
+                            <span className="text-xs font-black text-[#1D035F]">{isRtl ? 'إعادة التعيين والجدولة الفورية' : 'REASSIGN & RESCHEDULE WORKSPACE'}</span>
                           </div>
 
                           {/* Status Dropdown */}
@@ -6473,7 +6488,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                 if (appointmentDetailsReadOnly) return;
                                 setRescheduleForm(prev => prev ? { ...prev, status: e.target.value } : null);
                               }}
-                              className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                              className={`w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                             >
                               <option value="pending">{isRtl ? 'قيد الانتظار' : 'Pending'}</option>
                               <option value="confirmed">{isRtl ? 'مؤكد' : 'Confirmed'}</option>
@@ -6495,7 +6510,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                 if (appointmentDetailsReadOnly) return;
                                 setRescheduleForm(prev => prev ? { ...prev, staffId: e.target.value } : null);
                               }}
-                              className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                              className={`w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                             >
                               {liveStylists.map(s => (
                                 <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
@@ -6514,7 +6529,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   if (appointmentDetailsReadOnly) return;
                                   setRescheduleForm(prev => prev ? { ...prev, startTime: parseInt(e.target.value) } : null);
                                 }}
-                                className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                                className={`w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-mono font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                               >
                                 {Array.from({ length: TOTAL_HOURS * (60 / SLOT_MINUTES) }).map((_, idx) => {
                                   const totalMins = idx * SLOT_MINUTES;
@@ -6537,7 +6552,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   if (appointmentDetailsReadOnly) return;
                                   setRescheduleForm(prev => prev ? { ...prev, date: e.target.value } : null);
                                 }}
-                                className={`w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-amber-500 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                                className={`w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                               />
                             </div>
                           </div>
@@ -6643,9 +6658,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                 }
                               }
                             }}
-                            className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="w-full py-2.5 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                           >
-                            <Sparkles size={13} className="text-amber-400" />
+                            <Sparkles size={13} className="text-[#E7DDFC]" />
                             <span>{isRtl ? 'حفظ وإرسال إشعار فوري 💬' : 'Commit Roster & Send Notification 💬'}</span>
                           </button>
                         </div>
@@ -6750,18 +6765,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                 {/* COLUMN 3: FINANCIALS & PAYMENT WORKSPACE (col-span-4) */}
                 <div className="xl:col-span-4 space-y-5">
-                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-1.5">
-                      <CreditCard size={14} className="text-amber-500" />
+                  <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4">
+                    <h3 className="text-xs font-bold text-[#1D035F] uppercase tracking-wider pb-2 border-b border-[#FAF7FD] flex items-center gap-1.5 font-sans">
+                      <CreditCard size={14} className="text-[#6537C0]" />
                       {t.financeSummary}
                     </h3>
 
-                    <div className="space-y-2 border-b border-slate-100 pb-3">
+                    <div className="space-y-2 border-b border-[#FAF7FD] pb-3">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                           {isRtl ? 'بنود الفاتورة المباشرة' : 'LIVE INVOICE LINE ITEMS'}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-500">
+                        <span className="text-[10px] font-bold text-[#6537C0]">
                           {isRtl ? 'خدمة + منتجات' : 'Service + Products'}
                         </span>
                       </div>
@@ -6770,37 +6785,37 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         {activeInvoiceLineItems.length > 0 && (() => {
                           const showQty = activeInvoiceLineItems.some(i => i.type !== 'service');
                           return activeInvoiceLineItems.map((item) => (
-                            <div key={item.id} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-[10px] space-y-1">
+                            <div key={item.id} className="bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2.5 text-[10px] space-y-1">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <p className="font-bold text-slate-800 truncate">
+                                  <p className="font-bold text-[#1D035F] truncate font-sans">
                                     {isRtl ? item.nameAr : item.nameEn}
                                   </p>
                                   <p className="text-slate-400">
                                     {isRtl ? 'الموظفة:' : 'Stylist:'} {isRtl ? item.stylistAr || '—' : item.stylistEn || '—'}
                                   </p>
                                 </div>
-                                <span className="font-black text-slate-800 font-mono">
+                                <span className="font-black text-[#1D035F] font-mono">
                                   {item.subtotal.toFixed(2)} {t.riyal}
                                 </span>
                               </div>
                               <div className={`grid gap-2 text-slate-500 ${showQty ? 'grid-cols-4' : 'grid-cols-3'}`}>
                                 {showQty && (
                                   <div>
-                                    <p className="uppercase text-[9px] font-bold">{isRtl ? 'الكمية' : 'Qty'}</p>
+                                    <p className="uppercase text-[9px] font-bold text-[#A379E2]">{isRtl ? 'الكمية' : 'Qty'}</p>
                                     <p className="font-mono font-bold text-slate-700">{item.quantity}</p>
                                   </div>
                                 )}
                                 <div>
-                                  <p className="uppercase text-[9px] font-bold">{isRtl ? 'سعر الوحدة' : 'Unit'}</p>
+                                  <p className="uppercase text-[9px] font-bold text-[#A379E2]">{isRtl ? 'سعر الوحدة' : 'Unit'}</p>
                                   <p className="font-mono font-bold text-slate-700">{item.unitPrice.toFixed(2)}</p>
                                 </div>
                                 <div>
-                                  <p className="uppercase text-[9px] font-bold">{isRtl ? 'الإجمالي' : 'Subtotal'}</p>
+                                  <p className="uppercase text-[9px] font-bold text-[#A379E2]">{isRtl ? 'الإجمالي' : 'Subtotal'}</p>
                                   <p className="font-mono font-bold text-slate-700">{item.subtotal.toFixed(2)}</p>
                                 </div>
                                 <div>
-                                  <p className="uppercase text-[9px] font-bold">{isRtl ? 'نوع' : 'Type'}</p>
+                                  <p className="uppercase text-[9px] font-bold text-[#A379E2]">{isRtl ? 'نوع' : 'Type'}</p>
                                   <p className="font-mono font-bold text-slate-700">{item.type}</p>
                                 </div>
                               </div>
@@ -6809,7 +6824,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         })()}
 
                         {activeInvoiceLineItems.length === 0 && (
-                          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-[10px]">
+                          <div className="p-3 rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] text-slate-500 text-[10px]">
                             {isRtl ? 'لم يتم تحميل بنود الفاتورة بعد.' : 'Invoice line items are not loaded yet.'}
                           </div>
                         )}
@@ -6820,7 +6835,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                     {/* Apply Gift Card Section */}
                     {activeAppointment.paymentStatus !== 'paid' && (
-                      <div className="border-b border-slate-100 pb-3 space-y-2">
+                      <div className="border-b border-[#FAF7FD] pb-3 space-y-2">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                           {isRtl ? 'تطبيق كوبون / بطاقة هدايا 🎁' : 'APPLY VOUCHER / GIFT CARD 🎁'}
                         </span>
@@ -6830,8 +6845,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             type="text"
                             value={appliedGiftCardCode}
                             onChange={(e) => setAppliedGiftCardCode(e.target.value)}
-                            placeholder={isRtl ? 'مثال: REF-GFT-9844' : 'e.g. REF-GFT-9844'}
-                            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold outline-none uppercase"
+                            placeholder={isRtl ? 'مثال: BAR-GFT-9844' : 'e.g. BAR-GFT-9844'}
+                            className="flex-1 bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-semibold outline-none uppercase focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20"
                           />
                           <button
                             type="button"
@@ -6856,14 +6871,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                 );
                               }
                             }}
-                            className="px-3 py-1.5 bg-zinc-950 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
+                            className="px-3.5 py-1.5 bg-[#1D035F] hover:bg-[#2e098a] text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs"
                           >
                             {isRtl ? 'تطبيق' : 'Apply'}
                           </button>
                         </div>
 
                         {appliedGiftCardAmount > 0 && (
-                          <div className="p-2 bg-emerald-500/10 border border-emerald-500 rounded-lg flex justify-between items-center text-[10px] text-emerald-800">
+                          <div className="p-2 bg-emerald-500/10 border border-emerald-500 rounded-xl flex justify-between items-center text-[10px] text-emerald-800">
                             <span className="font-bold">{isRtl ? 'خصم بطاقة الهدايا نشط ✓' : 'Gift card discount active ✓'}</span>
                             <span className="font-mono font-black">-{appliedGiftCardAmount} {t.riyal}</span>
                           </div>
@@ -6894,7 +6909,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         </div>
                       )}
 
-                      <div className="flex justify-between text-slate-500 border-t pt-1.5 border-dashed">
+                      <div className="flex justify-between text-slate-500 border-t pt-1.5 border-dashed border-[#E7DDFC]">
                         <span>{isRtl ? 'الوعاء الخاضع للضريبة' : 'Taxable Subtotal'}</span>
                         <span className="font-mono font-bold">{activeInvoiceTaxable.toFixed(2)} {t.riyal}</span>
                       </div>
@@ -6904,11 +6919,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <span className="font-mono font-bold">{activeInvoiceVat.toFixed(2)} {t.riyal}</span>
                       </div>
 
-                      <div className="h-px bg-slate-100 border-dashed border-b pt-1" />
+                      <div className="h-px bg-[#FAF7FD] border-dashed border-b border-[#E7DDFC] pt-1" />
 
-                      <div className="flex justify-between text-sm font-black text-slate-900 pt-1">
+                      <div className="flex justify-between text-sm font-black text-[#1D035F] pt-1 font-sans">
                         <span>{isRtl ? 'المبلغ الكلي المستحق' : 'Total Amount Due'}</span>
-                        <span className="font-mono text-amber-600 font-black">{activeInvoiceTotal.toFixed(2)} {t.riyal}</span>
+                        <span className="font-mono text-[#6537C0] font-black">{activeInvoiceTotal.toFixed(2)} {t.riyal}</span>
                       </div>
 
                       <div className="flex justify-between text-slate-500">
@@ -6917,7 +6932,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       </div>
 
                       {splitAmounts.wallet > 0 && (
-                        <div className="flex justify-between text-amber-700 font-semibold">
+                        <div className="flex justify-between text-[#6537C0] font-semibold">
                           <span>{isRtl ? 'خصم/سداد المحفظة' : 'Wallet Deduction'}</span>
                           <span className="font-mono font-black">-{Number(splitAmounts.wallet).toFixed(2)} {t.riyal}</span>
                         </div>
@@ -6933,8 +6948,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                       if (isAlreadyFullyPaid) {
                         return (
-                          <div className="pt-3 border-t border-slate-100 mt-2">
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 flex flex-col items-center justify-center gap-2 text-emerald-800 text-center shadow-sm">
+                          <div className="pt-3 border-t border-[#FAF7FD] mt-2">
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-emerald-800 text-center shadow-sm">
                               <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-1">
                                 <CheckCircle2 size={26} className="text-emerald-600" />
                               </div>
@@ -6948,7 +6963,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       }
                       return (
                         <>
-                          <div className="pt-3 border-t border-slate-100 space-y-3">
+                          <div className="pt-3 border-t border-[#FAF7FD] space-y-3">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                           {isRtl ? 'طريقة الدفع' : 'Payment method'}
@@ -6956,7 +6971,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <select
                           value={selectedPaymentMethod || ''}
                           onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700"
+                          className="w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl px-3 py-2 text-xs font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none"
                         >
                           <option value="">{isRtl ? 'اختر طريقة الدفع' : 'Choose payment method'}</option>
                           {paymentMethodOptions.map((option) => (
@@ -6975,7 +6990,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                               value={giftCardCodeInput}
                               onChange={(e) => setGiftCardCodeInput(e.target.value)}
                               placeholder="XXXX-XXXX-XXXX"
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 uppercase"
+                              className="w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl px-3 py-2 text-xs font-bold text-[#1D035F] uppercase focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none"
                             />
                           </div>
                         )}
@@ -6990,8 +7005,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{t.splitPayments}</span>
                         <button
                           onClick={() => setIsSplitActive(!isSplitActive)}
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded transition-all flex items-center gap-1 cursor-pointer ${
-                            isSplitActive ? 'bg-amber-500 text-zinc-950' : 'bg-slate-100 text-slate-600'
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                            isSplitActive ? 'bg-[#6537C0] text-white shadow-xs' : 'bg-slate-100 text-slate-600'
                           }`}
                         >
                           <Split size={10} />
@@ -7011,7 +7026,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
                             return (
                               <>
-                                <div className={`p-2 rounded-lg border ${isSplitComplete ? 'bg-emerald-50 border-emerald-200' : (hasOverpayment ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200')}`}>
+                                <div className={`p-2 rounded-xl border ${isSplitComplete ? 'bg-emerald-50 border-emerald-200' : (hasOverpayment ? 'bg-rose-50 border-rose-200' : 'bg-[#FAF7FD] border-[#E7DDFC]')}`}>
                                   <div className="flex justify-between text-[10px] mb-1">
                                     <span className="text-slate-500">{isRtl ? 'المطلوب:' : 'Invoice Total:'}</span>
                                     <span className="font-bold font-mono">{totalDue.toFixed(2)}</span>
@@ -7022,7 +7037,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                   </div>
                                   <div className="flex justify-between text-[11px] font-black pt-1 border-t border-slate-200 border-dashed">
                                     <span className={hasOverpayment ? 'text-rose-600' : 'text-slate-700'}>{isRtl ? 'المتبقي:' : 'Remaining Balance:'}</span>
-                                    <span className={`font-mono ${isSplitComplete ? 'text-emerald-600' : (hasOverpayment ? 'text-rose-600' : 'text-amber-600')}`}>
+                                    <span className={`font-mono ${isSplitComplete ? 'text-emerald-600' : (hasOverpayment ? 'text-rose-600' : 'text-[#6537C0]')}`}>
                                       {isSplitComplete ? (isRtl ? 'اكتمل التخصيص' : 'Allocation Complete') : `${remaining.toFixed(2)}`}
                                     </span>
                                   </div>
@@ -7038,11 +7053,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                           setSplitAmounts(prev => ({ ...prev, card: parseFloat((remaining + (prev.card || 0)).toFixed(2)) }));
                                         }
                                       }}
-                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                      className="w-full mb-1 py-1 bg-[#F3EDFC] hover:bg-[#E7DDFC] text-[#6537C0] rounded-lg text-[9px] font-bold transition-colors cursor-pointer"
                                     >
                                       {isRtl ? '+ إضافة' : '+ Add'}
                                     </button>
-                                    <input type="number" placeholder="0" value={splitAmounts.card || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, card: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
+                                    <input type="number" placeholder="0" value={splitAmounts.card || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, card: parseFloat(e.target.value) || 0 }))} className="w-full border border-[#E7DDFC] p-1 rounded-lg font-mono text-center font-bold focus:border-[#6537C0] outline-none" />
                                   </div>
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Cash</label>
@@ -7053,11 +7068,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                           setSplitAmounts(prev => ({ ...prev, cash: parseFloat((remaining + (prev.cash || 0)).toFixed(2)) }));
                                         }
                                       }}
-                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                      className="w-full mb-1 py-1 bg-[#F3EDFC] hover:bg-[#E7DDFC] text-[#6537C0] rounded-lg text-[9px] font-bold transition-colors cursor-pointer"
                                     >
                                       {isRtl ? '+ إضافة' : '+ Add'}
                                     </button>
-                                    <input type="number" placeholder="0" value={splitAmounts.cash || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, cash: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
+                                    <input type="number" placeholder="0" value={splitAmounts.cash || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, cash: parseFloat(e.target.value) || 0 }))} className="w-full border border-[#E7DDFC] p-1 rounded-lg font-mono text-center font-bold focus:border-[#6537C0] outline-none" />
                                   </div>
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Wallet</label>
@@ -7068,11 +7083,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                           setSplitAmounts(prev => ({ ...prev, wallet: parseFloat((remaining + (prev.wallet || 0)).toFixed(2)) }));
                                         }
                                       }}
-                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                      className="w-full mb-1 py-1 bg-[#F3EDFC] hover:bg-[#E7DDFC] text-[#6537C0] rounded-lg text-[9px] font-bold transition-colors cursor-pointer"
                                     >
                                       {isRtl ? '+ إضافة' : '+ Add'}
                                     </button>
-                                    <input type="number" placeholder="0" value={splitAmounts.wallet || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
+                                    <input type="number" placeholder="0" value={splitAmounts.wallet || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))} className="w-full border border-[#E7DDFC] p-1 rounded-lg font-mono text-center font-bold focus:border-[#6537C0] outline-none" />
                                   </div>
                                   <div>
                                     <label className="text-slate-400 block text-center mb-1">Gift</label>
@@ -7083,15 +7098,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                           setSplitAmounts(prev => ({ ...prev, gift: parseFloat((remaining + (prev.gift || 0)).toFixed(2)) }));
                                         }
                                       }}
-                                      className="w-full mb-1 py-1 bg-slate-100 hover:bg-amber-100 text-slate-500 rounded text-[9px] font-bold transition-colors"
+                                      className="w-full mb-1 py-1 bg-[#F3EDFC] hover:bg-[#E7DDFC] text-[#6537C0] rounded-lg text-[9px] font-bold transition-colors cursor-pointer"
                                     >
                                       {isRtl ? '+ إضافة' : '+ Add'}
                                     </button>
-                                    <input type="number" placeholder="0" value={splitAmounts.gift || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, gift: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold" />
+                                    <input type="number" placeholder="0" value={splitAmounts.gift || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, gift: parseFloat(e.target.value) || 0 }))} className="w-full border border-[#E7DDFC] p-1 rounded-lg font-mono text-center font-bold focus:border-[#6537C0] outline-none" />
                                   </div>
                                 </div>
                                 {splitAmounts.gift > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-slate-100">
+                                  <div className="mt-2 pt-2 border-t border-[#FAF7FD]">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                                       {isRtl ? 'رمز بطاقة الهدية' : 'Gift Card Code'}
                                     </label>
@@ -7100,7 +7115,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       value={giftCardCodeInput}
                                       onChange={(e) => setGiftCardCodeInput(e.target.value)}
                                       placeholder="XXXX-XXXX-XXXX"
-                                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 uppercase"
+                                      className="w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl px-3 py-2 text-xs font-bold text-[#1D035F] uppercase focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none"
                                     />
                                   </div>
                                 )}
@@ -7149,13 +7164,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             }
                             setShowPaymentConfirmModal(true);
                           }}
-                          className={`w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold tracking-wider transition-all shadow-md flex items-center justify-center gap-2 ${
+                          className={`w-full py-3 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-bold tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
                             (isSplitActive
                               ? (Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) > 0 && Math.max(0, Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) - ((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0))) === 0 && Math.abs(((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0)) - Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0))) < 0.01)
-                              : selectedPaymentMethod.trim()) ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'
+                              : selectedPaymentMethod.trim()) ? '' : 'cursor-not-allowed opacity-60'
                           }`}
                         >
-                          <CheckCircle2 size={15} className="text-amber-400" />
+                          <CheckCircle2 size={15} className="text-[#E7DDFC]" />
                           <span>{t.checkout}</span>
                         </button>
                     </div>
@@ -7167,13 +7182,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                       {refundableAmount > 0.009 && (
                         <div className="mt-3 space-y-2">
                           <div className="grid grid-cols-2 gap-2 text-[10px]">
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                            <div className="rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3 py-2">
                               <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{isRtl ? 'المبلغ الأصلي' : 'Original Payment'}</p>
-                              <p className="mt-1 font-mono font-black text-slate-800">{originalPaymentAmount.toFixed(2)} {t.riyal}</p>
+                              <p className="mt-1 font-mono font-black text-[#1D035F]">{originalPaymentAmount.toFixed(2)} {t.riyal}</p>
                             </div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                            <div className="rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3 py-2">
                               <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{isRtl ? 'الاسترداد السابق' : 'Already Refunded'}</p>
-                              <p className="mt-1 font-mono font-black text-slate-800">{alreadyRefundedAmount.toFixed(2)} {t.riyal}</p>
+                              <p className="mt-1 font-mono font-black text-[#1D035F]">{alreadyRefundedAmount.toFixed(2)} {t.riyal}</p>
                             </div>
                           </div>
                           <button
@@ -7245,7 +7260,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             </h3>
                           </div>
                         </div>
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#F3EDFC] text-[#6537C0] border border-[#A379E2]/30 shrink-0">
                           {isRtl ? 'ملف العميل الشامل' : 'Lifetime Customer Profile'}
                         </span>
                       </header>
@@ -7262,7 +7277,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                             <section className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4 shadow-xs">
                               <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
                                 <div className="flex items-start gap-3 min-w-0">
-                                  <div className="w-12 h-12 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center font-black text-amber-700 text-base shrink-0">
+                                  <div className="w-12 h-12 rounded-full bg-[#F3EDFC] border border-[#A379E2]/30 flex items-center justify-center font-black text-[#6537C0] text-base shrink-0">
                                     {(activeCustomerName || 'GU').slice(0, 2).toUpperCase()}
                                   </div>
                                   <div className="min-w-0">
@@ -7277,7 +7292,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                     </div>
                                   </div>
                                 </div>
-                                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-[#F3EDFC] text-[#6537C0] border border-[#A379E2]/30 shrink-0">
                                   {isRtl ? 'العميل الحالي' : 'Current customer'}
                                 </span>
                               </div>
@@ -7307,7 +7322,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       if (activeCustomerPhone) window.location.href = `tel:${activeCustomerPhone}`;
                                     },
                                     disabled: !activeCustomerPhone,
-                                    tone: 'bg-zinc-900 text-white'
+                                    tone: 'bg-[#6537C0] hover:bg-[#532ab0] text-white shadow-xs'
                                   },
                                   {
                                     label: isRtl ? 'واتساب' : 'WhatsApp',
@@ -7318,7 +7333,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       window.open(`https://wa.me/${phoneDigits}`, '_blank', 'noopener,noreferrer');
                                     },
                                     disabled: !activeCustomerPhone,
-                                    tone: 'bg-slate-100 text-slate-700'
+                                    tone: 'bg-[#F3EDFC] text-[#1D035F] hover:bg-[#E7DDFC] border border-[#E7DDFC]'
                                   }
                                 ].map((item, idx) => (
                                   <button
@@ -7349,7 +7364,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       {isRtl ? 'بيانات العميل التاريخية الشاملة.' : 'Lifetime customer intelligence and history.'}
                                     </p>
                                   </div>
-                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-[#F3EDFC] text-[#6537C0] border border-[#A379E2]/30 shrink-0">
                                     {isRtl ? 'وضع المشغل' : 'Operator mode'}
                                   </span>
                                 </div>
@@ -7369,8 +7384,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                       onClick={() => setCustomerDrawerTab(tab.id as any)}
                                       className={`text-[11px] px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition-all cursor-pointer ${
                                         customerDrawerTab === tab.id
-                                          ? 'bg-zinc-900 text-amber-400 text-white shadow-xs'
-                                          : 'text-slate-500 hover:text-zinc-900'
+                                          ? 'bg-[#6537C0] text-white shadow-xs'
+                                          : 'text-slate-500 hover:text-[#1D035F]'
                                       }`}
                                     >
                                       {isRtl ? tab.labelAr : tab.labelEn}
@@ -7501,8 +7516,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                               onClick={() => setCustomerAppointmentHistoryFilter(filter.id as any)}
                                               className={`text-[10px] font-bold px-2.5 py-1 rounded-md border transition-all ${
                                                 customerAppointmentHistoryFilter === filter.id
-                                                  ? 'bg-zinc-900 text-white border-zinc-900'
-                                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                                  ? 'bg-[#6537C0] text-white border-[#6537C0]'
+                                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-[#F3EDFC]'
                                               }`}
                                             >
                                               {isRtl ? filter.labelAr : filter.labelEn}
@@ -7559,7 +7574,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                                 key={item.id || `${dateValue || Math.random()}`}
                                                 type="button"
                                                 onClick={() => void openHistoricalAppointmentDetails(item)}
-                                                className="w-full text-left rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 hover:bg-white hover:border-amber-200 transition-all shadow-xs"
+                                                className="w-full text-left rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 hover:bg-white hover:border-[#A379E2]/40 transition-all shadow-xs"
                                               >
                                                 <div className="flex items-start justify-between gap-3">
                                                   <div className="min-w-0 space-y-1">
@@ -7649,7 +7664,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                                                 key={`${referenceNumber}-${idx}`}
                                                 type="button"
                                                 onClick={() => void openCustomerTransactionRecord(item)}
-                                                className="w-full text-left rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 hover:bg-white hover:border-amber-200 transition-all shadow-xs"
+                                                className="w-full text-left rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 hover:bg-white hover:border-[#A379E2]/40 transition-all shadow-xs"
                                               >
                                                 <div className="flex items-start justify-between gap-3">
                                                   <div className="min-w-0 space-y-1">
@@ -7987,7 +8002,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   <div className="flex flex-col gap-3">
                     <button
                       onClick={() => setChainConflictView('date-selection')}
-                      className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors"
+                      className="w-full px-4 py-3 text-sm font-bold text-white bg-[#6537C0] rounded-xl hover:bg-[#532ab0] transition-colors shadow-sm"
                     >
                       {isRtl ? 'البحث عن موعد بديل' : 'Search for alternative time'}
                     </button>
@@ -8152,7 +8167,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <button
                       disabled={chainConflictDialog.isRevalidating}
                       onClick={() => chainConflictDialog.selectedChain && chainConflictDialog.onConfirm(chainConflictDialog.selectedChain)}
-                      className="w-full px-4 py-3 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
+                      className="w-full px-4 py-3 text-sm font-bold text-white bg-[#6537C0] rounded-xl hover:bg-[#532ab0] transition-colors shadow-sm disabled:opacity-50 flex justify-center items-center gap-2"
                     >
                       {chainConflictDialog.isRevalidating && <Loader2 className="w-4 h-4 animate-spin" />}
                       {isRtl ? 'نعم، احجز الموعد' : 'Yes, book this time'}
@@ -8215,7 +8230,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <button
                   type="button"
                   onClick={() => setBookingErrorDialog(null)}
-                  className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                  className="rounded-xl bg-[#6537C0] hover:bg-[#532ab0] px-4 py-2 text-xs font-bold text-white transition shadow-sm"
                 >
                   {isRtl ? 'حسناً' : 'OK'}
                 </button>
@@ -8268,7 +8283,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <button
                   type="button"
                   onClick={bookingHoursDecisionDialog.onExtendHours}
-                  className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-zinc-950 transition hover:bg-amber-400"
+                  className="rounded-xl bg-[#6537C0] hover:bg-[#532ab0] px-4 py-2 text-xs font-bold text-white transition shadow-sm"
                 >
                   {isRtl
                     ? `تمديد الساعات ${bookingHoursDecisionDialog.extensionMinutes} دقيقة`
@@ -8304,18 +8319,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       {/* SIMULATED THERMAL RECEIPT MODAL FOR APPOINTMENT CHECKOUT */}
       <AnimatePresence>
         {showReceiptModal && checkoutReceiptData && (
-          <div className="fixed inset-0 z-[60] bg-slate-900/85 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-zinc-950/80 backdrop-blur-xs flex items-center justify-center p-4">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl p-5 w-80 font-mono text-xs border text-slate-800 space-y-3 shadow-2xl relative"
+              className="bg-white rounded-2xl p-5 w-80 font-mono text-xs border border-[#E7DDFC] text-slate-800 space-y-3 shadow-2xl relative"
             >
-              <div className="border-t-2 border-b-2 border-dashed border-slate-800 py-3 text-center space-y-1">
-                <span className="font-black text-sm tracking-widest block text-zinc-950">REFAH OPERATIONS</span>
-                <p className="text-[9px] text-zinc-400">Simplified VAT Tax Invoice</p>
+              <div className="border-t-2 border-b-2 border-dashed border-[#1D035F] py-3 text-center space-y-1">
+                <span className="font-black text-sm tracking-widest block text-[#1D035F] font-sans">BARSPA OPERATIONS</span>
+                <p className="text-[9px] text-[#A379E2] font-sans">Simplified VAT Tax Invoice</p>
                 <p className="text-[8px] text-zinc-400">VAT Registration: 31092813100003</p>
-                <div className="h-px border-b border-dashed my-1" />
+                <div className="h-px border-b border-dashed my-1 border-[#E7DDFC]" />
 
                 <div className="text-[9px] text-left space-y-0.5 text-slate-600">
                   <p>INV ID: {checkoutReceiptData.orderId}</p>
@@ -8323,7 +8338,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   <p>BUYER: {checkoutReceiptData.customerName}</p>
                 </div>
 
-                <div className="h-px border-b border-dashed my-1" />
+                <div className="h-px border-b border-dashed my-1 border-[#E7DDFC]" />
 
                 {/* Items List */}
                 <div className="space-y-1">
@@ -8342,7 +8357,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   ))}
                 </div>
 
-                <div className="h-px border-b border-dashed my-1" />
+                <div className="h-px border-b border-dashed my-1 border-[#E7DDFC]" />
 
                 {/* Subtotals */}
                 <div className="space-y-0.5 text-[9px] text-left text-slate-600">
@@ -8360,22 +8375,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <span>VAT (15%):</span>
                     <span>{checkoutReceiptData.vat.toFixed(2)} SAR</span>
                   </div>
-                  <div className="flex justify-between font-black text-black text-[11px] border-t border-slate-300 pt-1 mt-1">
+                  <div className="flex justify-between font-black text-[#1D035F] text-[11px] border-t border-slate-300 pt-1 mt-1 font-sans">
                     <span>TOTAL NET:</span>
                     <span>{checkoutReceiptData.total.toFixed(2)} SAR</span>
                   </div>
                 </div>
 
-                <div className="h-px border-b border-dashed my-1.5" />
+                <div className="h-px border-b border-dashed my-1.5 border-[#E7DDFC]" />
 
-                <p className="text-[8px] bg-zinc-950 text-white rounded p-0.5 font-bold tracking-wider">
+                <p className="text-[8px] bg-[#1D035F] text-white rounded-md p-1 font-bold tracking-wider font-sans">
                   PAID IN FULL - CHECKOUT COMPLETE
                 </p>
                 <p className="text-[8px] text-slate-500 italic mt-1">
                   Gateways: {checkoutReceiptData.paymentSummary}
                 </p>
-                <p className="text-[8px] text-slate-400 mt-2">
-                  شكراً لزيارتكم صالون رفاه الفاخر 🌸 Thank you
+                <p className="text-[8px] text-[#6537C0] font-semibold mt-2 font-sans">
+                  شكراً لزيارتكم بارسبا 🌸 Thank you for visiting BarSpa
                 </p>
               </div>
 
@@ -8383,18 +8398,18 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <button
                   type="button"
                   onClick={() => {
-                    addLocalToast('تمت محاكاة طباعة الفاتورة الضريبية الورقية الملكية لـ ZATCA!', 'Simulated royal paper ZATCA simplified invoice print successfully!', 'success');
+                    addLocalToast('تمت محاكاة طباعة الفاتورة الضريبية الورقية لـ BarSpa!', 'Simulated BarSpa simplified invoice print successfully!', 'success');
                     setShowReceiptModal(false);
                   }}
-                  className="flex-1 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  className="flex-1 py-2 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                 >
-                  <Printer size={12} className="text-amber-400" />
+                  <Printer size={12} className="text-[#E7DDFC]" />
                   <span>Print Receipt</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowReceiptModal(false)}
-                  className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600 cursor-pointer"
+                  className="py-2 px-3 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-600 cursor-pointer"
                 >
                   Close
                 </button>
@@ -8419,12 +8434,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.98 }}
               transition={{ type: 'spring', damping: 24, stiffness: 220 }}
-              className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl p-5"
+              className="relative w-full max-w-md rounded-2xl border border-[#E7DDFC] bg-white shadow-2xl p-6"
             >
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-600">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#6537C0] font-sans">
                 {isRtl ? 'تأكيد التحصيل' : 'Confirm Payment'}
               </p>
-              <h3 className="mt-2 text-sm font-black text-slate-900">
+              <h3 className="mt-2 text-base font-black text-[#1D035F] font-sans">
                 {isRtl ? 'هل تريد إتمام الدفع الآن؟' : 'Do you want to collect payment now?'}
               </h3>
               <p className="mt-2 text-xs leading-6 text-slate-600">
@@ -8432,11 +8447,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   ? 'سيتم إرسال عملية الدفع إلى الخادم أولاً، ثم تظهر الفاتورة بعد نجاح الحفظ.'
                   : 'The payment will be sent to the backend first. The receipt appears only after persistence succeeds.'}
               </p>
-              <div className="mt-4 flex items-center justify-end gap-2">
+              <div className="mt-5 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowPaymentConfirmModal(false)}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
                 >
                   {isRtl ? 'إلغاء' : 'Cancel'}
                 </button>
@@ -8446,7 +8461,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     setShowPaymentConfirmModal(false);
                     void handleCheckoutPayment();
                   }}
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800"
+                  className="rounded-xl bg-[#6537C0] hover:bg-[#532ab0] px-4 py-2 text-xs font-bold text-white shadow-sm cursor-pointer"
                 >
                   {isRtl ? 'تأكيد الدفع' : 'Confirm Payment'}
                 </button>
@@ -8501,7 +8516,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                 <div className="space-y-4">
                   <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center gap-2">
-                      <Receipt size={16} className="text-amber-500" />
+                      <Receipt size={16} className="text-[#6537C0]" />
                       <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
                         {isRtl ? 'معلومات القراءة فقط' : 'Read-only information'}
                       </h4>
@@ -8661,45 +8676,45 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       <AnimatePresence>
         {showPaymentRequiredDialog && (
           <div className="fixed inset-0 z-[157] flex items-center justify-center px-4">
-            <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs" onClick={() => setShowPaymentRequiredDialog(false)} />
+            <div className="fixed inset-0 bg-zinc-950/50 backdrop-blur-xs" onClick={() => setShowPaymentRequiredDialog(false)} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-100 flex flex-col gap-4 z-10"
+              className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-[#E7DDFC] flex flex-col gap-4 z-10"
             >
-              <div className="flex items-center gap-2.5 text-amber-600">
-                <span className="p-2 bg-amber-500/10 rounded-xl">
+              <div className="flex items-center gap-2.5 text-[#6537C0]">
+                <span className="p-2 bg-[#F3EDFC] rounded-xl text-[#6537C0]">
                   <AlertTriangle size={20} />
                 </span>
-                <h3 className="font-black text-slate-800 text-sm">
+                <h3 className="font-black text-[#1D035F] text-sm font-sans">
                   {isRtl ? 'مطلوب سداد المبلغ الكلي' : 'Payment Required'}
                 </h3>
               </div>
-              <div className="text-[11px] text-slate-500 leading-relaxed font-semibold">
+              <div className="text-[11px] text-slate-600 leading-relaxed font-medium">
                 {isRtl
                   ? 'لا يمكن تغيير حالة هذا الموعد إلى مكتمل لعدم سداد القيمة الإجمالية بالكامل.'
                   : 'This appointment cannot be marked as Completed because payment has not been fully collected.'}
                 <br />
                 {isRtl ? 'يرجى سداد الفاتورة أولاً.' : 'Please complete the payment first.'}
               </div>
-              <div className="flex items-center justify-end gap-2 pt-1.5 border-t border-slate-55">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDrawerTab('financials');
-                    setShowPaymentRequiredDialog(false);
-                  }}
-                  className="rounded-xl bg-zinc-950 px-3.5 py-2 text-[10px] font-black text-white hover:bg-zinc-800 transition-all cursor-pointer"
-                >
-                  {isRtl ? 'تحصيل المبلغ' : 'Collect Payment'}
-                </button>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#FAF7FD]">
                 <button
                   type="button"
                   onClick={() => setShowPaymentRequiredDialog(false)}
-                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-black text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
                 >
                   {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDrawerTab('overview');
+                    setShowPaymentRequiredDialog(false);
+                  }}
+                  className="rounded-xl bg-[#6537C0] hover:bg-[#532ab0] px-4 py-2 text-xs font-bold text-white transition-all shadow-sm cursor-pointer"
+                >
+                  {isRtl ? 'تحصيل المبلغ' : 'Collect Payment'}
                 </button>
               </div>
             </motion.div>
@@ -8710,32 +8725,42 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       <AnimatePresence>
         {showCancelReasonDialog && (
           <div className="fixed inset-0 z-[157] flex items-center justify-center px-4">
-            <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs" onClick={() => { setShowCancelReasonDialog(false); setCancelReasonText(''); }} />
+            <div className="fixed inset-0 bg-zinc-950/50 backdrop-blur-xs" onClick={() => { setShowCancelReasonDialog(false); setCancelReasonText(''); }} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-100 flex flex-col gap-4 z-10"
+              className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-rose-100 flex flex-col gap-4 z-10"
             >
               <div className="flex items-center gap-2.5 text-rose-600">
-                <span className="p-2 bg-rose-500/10 rounded-xl">
+                <span className="p-2 bg-rose-50 rounded-xl text-rose-600">
                   <Trash size={20} />
                 </span>
-                <h3 className="font-black text-slate-800 text-sm">
+                <h3 className="font-black text-[#1D035F] text-sm font-sans">
                   {isRtl ? 'سبب إلغاء الموعد' : 'Reason for Cancellation'}
                 </h3>
               </div>
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'السبب المبرر للإلغاء' : 'Cancellation Reason Detail'}</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{isRtl ? 'السبب المبرر للإلغاء' : 'Cancellation Reason Detail'}</label>
                 <textarea
                   rows={3}
                   value={cancelReasonText}
                   onChange={(e) => setCancelReasonText(e.target.value)}
                   placeholder={isRtl ? 'اكتب سبب الإلغاء هنا...' : 'Explain the reason for cancellation...'}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold focus:border-rose-500 outline-none"
+                  className="w-full bg-[#FAF7FD] border border-rose-200 rounded-xl p-2.5 text-xs font-medium focus:border-rose-500 outline-none"
                 />
               </div>
-              <div className="flex items-center justify-end gap-2 pt-1.5 border-t border-slate-55">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCancelReasonDialog(false);
+                    setCancelReasonText('');
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  {isRtl ? 'الرجوع' : 'Back'}
+                </button>
                 <button
                   type="button"
                   onClick={async () => {
@@ -8743,19 +8768,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     await handleAppointmentStatusUpdate('cancelled', cancelReasonText);
                     setCancelReasonText('');
                   }}
-                  className="rounded-xl bg-rose-600 px-3.5 py-2 text-[10px] font-black text-white hover:bg-rose-700 transition-all cursor-pointer"
+                  className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs font-bold text-white transition-all shadow-sm cursor-pointer"
                 >
                   {isRtl ? 'إلغاء الموعد' : 'Cancel Appointment'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCancelReasonDialog(false);
-                    setCancelReasonText('');
-                  }}
-                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-black text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
-                >
-                  {isRtl ? 'الرجوع' : 'Back'}
                 </button>
               </div>
             </motion.div>

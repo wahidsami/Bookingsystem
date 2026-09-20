@@ -42,8 +42,10 @@ export default function Sidebar({
     return t.categories[cat as keyof typeof t.categories] || cat;
   };
 
-  // Get matching navigation items that are favorited
-  const favoriteNavItems = navigationItems.filter(item => favoritePages.includes(item.id));
+  // Get matching navigation items that are favorited (excluding legacy hidden workspaces)
+  const favoriteNavItems = navigationItems.filter(
+    item => !item.hidden && item.id !== 'services' && item.id !== 'packages' && favoritePages.includes(item.id)
+  );
 
   return (
     <aside
@@ -141,9 +143,11 @@ export default function Sidebar({
           )}
 
           {categories.map((cat) => {
-            let itemsInCat = navigationItems.filter((i) => i.category === cat);
+            let itemsInCat = navigationItems.filter(
+              (i) => !i.hidden && i.id !== 'services' && i.id !== 'packages' && i.category === cat
+            );
 
-            // Hide packages menu if entitlement is disabled
+            // Hide packages menu if entitlement is disabled (legacy safety)
             if (!hasServicePackages) {
               itemsInCat = itemsInCat.filter((i) => i.id !== 'packages');
             }

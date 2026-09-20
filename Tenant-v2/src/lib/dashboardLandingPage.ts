@@ -35,7 +35,7 @@ export const DASHBOARD_LANDING_PAGE_OPTIONS: DashboardLandingPageOption[] = [
   { value: 'messages', view: 'messages', labelAr: 'الرسائل الداخلية', labelEn: 'Messages' },
   { value: 'pos', view: 'pos', labelAr: 'نقطة البيع', labelEn: 'POS' },
   { value: 'employees', view: 'employees', labelAr: 'الفرق', labelEn: 'Teams' },
-  { value: 'services', view: 'services', labelAr: 'الخدمات', labelEn: 'Services' },
+  { value: 'services', view: 'services2', labelAr: 'الخدمات', labelEn: 'Services' },
   { value: 'products', view: 'products', labelAr: 'المنتجات', labelEn: 'Products' },
   { value: 'inventory', view: 'inventory', labelAr: 'المخزون', labelEn: 'Inventory' },
   { value: 'marketing', view: 'marketing', labelAr: 'التسويق', labelEn: 'Marketing' },
