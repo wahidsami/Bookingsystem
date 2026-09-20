@@ -3,6 +3,8 @@ import { Sparkle, ChevronLeft, ChevronRight, LayoutGrid, Award, Shield, Settings
 import { Language, ViewType, NavigationItem } from '../types';
 import { translations, navigationItems } from '../data/translations';
 import LucideIcon from './LucideIcon';
+import barspaIcon from '../assets/barspa_app_icon.png';
+import barspaLogo from '../assets/barspa_logo.png';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -46,25 +48,23 @@ export default function Sidebar({
   return (
     <aside
       id="main-sidebar"
-      className={`h-screen sticky top-0 shrink-0 bg-zinc-950 text-zinc-300 border-zinc-800 transition-all duration-300 flex flex-col justify-between z-30 shadow-2xl ${
+      className={`h-screen sticky top-0 shrink-0 bg-[#0A0124] text-zinc-300 border-[#1D035F]/60 transition-all duration-300 flex flex-col justify-between z-30 shadow-2xl ${
         isCollapsed ? 'w-20' : 'w-64'
       } ${isRtl ? 'border-l' : 'border-r'}`}
     >
 
       {/* Upper Logo and Collapse Button */}
       <div className="flex flex-col">
-        <div className="p-5 flex items-center justify-between border-b border-zinc-900 h-16 bg-zinc-950/80">
+        <div className="p-4 flex items-center justify-between border-b border-[#1D035F]/60 h-16 bg-[#0A0124]/90 backdrop-blur-md">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center font-bold text-zinc-950 shrink-0 select-none">
-              R
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center p-1 bg-[#1D035F] border border-[#A379E2]/30 shrink-0 select-none overflow-hidden shadow-sm">
+              <img src={barspaIcon} alt="BarSpa" className="w-full h-full object-contain" />
             </div>
             {!isCollapsed && (
-              <div className="flex flex-col">
-                <span className="text-base font-bold tracking-tight text-white font-sans uppercase">
-                  {t.appName} <span className="text-brand-500 text-xs font-normal font-sans ml-0.5 mr-0.5">{lang === 'ar' ? 'رفاه' : ''}</span>
-                </span>
-                <span className="text-[9px] text-zinc-500 font-semibold tracking-wide -mt-0.5 truncate max-w-[150px]">
-                  {lang === 'ar' ? 'المنصة الملكية للصالونات' : 'REFAH BEAUTY PLATFORM'}
+              <div className="flex flex-col min-w-0">
+                <img src={barspaLogo} alt="BarSpa" className="h-6 w-auto object-contain brightness-0 invert opacity-95" />
+                <span className="text-[8.5px] text-[#A379E2] font-semibold tracking-wider -mt-0.5 truncate max-w-[150px] uppercase">
+                  {lang === 'ar' ? 'منصة بارسبا للصالونات' : 'BARSPA BEAUTY PLATFORM'}
                 </span>
               </div>
             )}
@@ -74,7 +74,7 @@ export default function Sidebar({
           {!isCollapsed && (
             <button
               onClick={onToggleCollapse}
-              className="p-1.5 hover:bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors cursor-pointer"
+              className="p-1.5 hover:bg-[#1D035F] rounded-lg text-[#A379E2] hover:text-white transition-colors cursor-pointer"
               title={isCollapsed ? t.expandSidebar : t.collapseSidebar}
             >
               {isRtl ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -84,10 +84,10 @@ export default function Sidebar({
 
         {/* Small inline toggle button when collapsed */}
         {isCollapsed && (
-          <div className="flex justify-center py-4 border-b border-zinc-900 bg-zinc-950/20">
+          <div className="flex justify-center py-3 border-b border-[#1D035F]/60 bg-[#12023F]/30">
             <button
               onClick={onToggleCollapse}
-              className="p-2 bg-zinc-900 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all cursor-pointer"
+              className="p-2 bg-[#12023F] hover:bg-[#1D035F] rounded-xl text-[#A379E2] hover:text-white transition-all cursor-pointer border border-[#1D035F]"
             >
               {isRtl ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
             </button>
@@ -99,9 +99,9 @@ export default function Sidebar({
 
           {/* Favorite Pages Shelf (Personalization Hook) */}
           {favoriteNavItems.length > 0 && (
-            <div className="space-y-1 bg-zinc-900/30 p-2 rounded-xl border border-zinc-900/40">
+            <div className="space-y-1 bg-[#12023F]/60 p-2 rounded-xl border border-[#1D035F]">
               {!isCollapsed && (
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-2 px-2 font-sans flex items-center gap-1.5">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#A379E2] mb-2 px-2 font-sans flex items-center gap-1.5">
                   <Star size={11} fill="currentColor" />
                   <span>{isRtl ? 'المفضلة الفورية' : 'My Saved Favorites'}</span>
                 </h4>
@@ -117,19 +117,19 @@ export default function Sidebar({
                       onClick={() => onSelectView(item.id)}
                       className={`w-full text-start flex items-center justify-between p-2 rounded-lg text-xs md:text-sm transition-colors group relative cursor-pointer border-s-2 ${
                         isActive
-                          ? 'bg-zinc-900 text-white font-bold border-amber-500'
-                          : 'text-zinc-400 hover:text-white hover:bg-zinc-900/40 border-transparent'
+                          ? 'bg-[#1D035F] text-white font-bold border-[#6537C0] shadow-sm'
+                          : 'text-zinc-400 hover:text-white hover:bg-[#12023F]/50 border-transparent'
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <span className={`transition-colors shrink-0 ${isActive ? 'text-amber-500' : 'text-zinc-500 group-hover:text-amber-400'}`}>
+                        <span className={`transition-colors shrink-0 ${isActive ? 'text-[#A379E2]' : 'text-zinc-500 group-hover:text-[#A379E2]'}`}>
                           <LucideIcon name={item.iconName} size={14} />
                         </span>
                         {!isCollapsed && <span className="truncate">{itemLabel}</span>}
                       </div>
 
                       {isCollapsed && (
-                        <span className={`absolute ${isRtl ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap font-sans`}>
+                        <span className={`absolute ${isRtl ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2 bg-[#12023F] border border-[#1D035F] text-white text-[10px] px-2 py-1 rounded shadow-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap font-sans`}>
                           ⭐ {itemLabel}
                         </span>
                       )}
@@ -159,7 +159,7 @@ export default function Sidebar({
               <div key={cat} className="space-y-1">
                 {/* Section title (Hide if collapsed) */}
                 {!isCollapsed && (
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 px-3 font-sans">
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#A379E2]/70 mb-2 px-3 font-sans">
                     {getCategoryLabel(cat)}
                   </h4>
                 )}
@@ -216,14 +216,14 @@ export default function Sidebar({
                             }}
                             className={`w-full text-start flex items-center justify-between p-2.5 rounded-lg text-xs md:text-sm transition-colors group relative cursor-pointer border-s-2 ${
                               isAnyChildActive
-                                ? 'bg-zinc-900 text-white font-medium border-brand-500'
-                                : 'text-zinc-400 hover:text-white hover:bg-zinc-900/50 border-transparent'
+                                ? 'bg-[#1D035F] text-white font-semibold border-[#6537C0] shadow-sm'
+                                : 'text-zinc-400 hover:text-white hover:bg-[#12023F]/60 border-transparent'
                             }`}
                           >
                             <div className="flex items-center gap-3">
                               <span
                                 className={`transition-colors shrink-0 ${
-                                  isAnyChildActive ? 'text-brand-500' : 'text-zinc-500 group-hover:text-zinc-300'
+                                  isAnyChildActive ? 'text-[#A379E2]' : 'text-zinc-500 group-hover:text-zinc-300'
                                 }`}
                               >
                                 <LucideIcon name={item.iconName} size={15} />
@@ -239,7 +239,7 @@ export default function Sidebar({
 
                             {/* Collapsed Tooltip helper */}
                             {isCollapsed && (
-                              <span className={`absolute ${isRtl ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap font-sans`}>
+                              <span className={`absolute ${isRtl ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2 bg-[#0A0124] border border-[#1D035F]/60 text-white text-[10px] px-2 py-1 rounded shadow-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap font-sans`}>
                                 {itemLabel}
                               </span>
                             )}
@@ -247,7 +247,7 @@ export default function Sidebar({
 
                           {/* Render sub-items if expanded & sidebar is not collapsed */}
                           {isOpen && !isCollapsed && (
-                            <div className={`ms-4 border-s border-zinc-800/80 ps-3 space-y-1 mt-1 transition-all`}>
+                            <div className={`ms-4 border-s border-[#1D035F]/60 ps-3 space-y-1 mt-1 transition-all`}>
                               {visibleSubItems.map((sub) => {
                                 const isSubActive = activeView === sub.id;
                                 const subLabel = isRtl ? sub.labelAr : sub.labelEn;
@@ -258,11 +258,11 @@ export default function Sidebar({
                                     onClick={() => onSelectView(sub.id)}
                                     className={`w-full text-start flex items-center gap-2.5 py-2 px-2.5 rounded-md text-xs transition-all relative cursor-pointer ${
                                       isSubActive
-                                        ? 'bg-zinc-900 text-brand-400 font-bold border-s-2 border-brand-400 -ms-[13px] ps-[11px]'
-                                        : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900/20'
+                                        ? 'bg-[#1D035F] text-[#FAF7FD] font-bold border-s-2 border-[#A379E2] -ms-[13px] ps-[11px]'
+                                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#12023F]/40'
                                     }`}
                                   >
-                                    <span className={`shrink-0 ${isSubActive ? 'text-brand-400' : 'text-zinc-600'}`}>
+                                    <span className={`shrink-0 ${isSubActive ? 'text-[#A379E2]' : 'text-zinc-600'}`}>
                                       <LucideIcon name={sub.iconName} size={13} />
                                     </span>
                                     <span className="truncate text-[11px]">{subLabel}</span>
@@ -281,14 +281,14 @@ export default function Sidebar({
                         onClick={() => onSelectView(item.id)}
                         className={`w-full text-start flex items-center justify-between p-2.5 rounded-lg text-xs md:text-sm transition-colors group relative cursor-pointer border-s-2 ${
                           isActive
-                            ? 'bg-zinc-900 text-white font-medium border-brand-500'
-                            : 'text-zinc-400 hover:text-white hover:bg-zinc-900/50 border-transparent'
+                            ? 'bg-[#1D035F] text-white font-semibold border-[#6537C0] shadow-sm'
+                            : 'text-zinc-400 hover:text-white hover:bg-[#12023F]/60 border-transparent'
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           <span
                             className={`transition-colors shrink-0 ${
-                              isActive ? 'text-brand-500' : 'text-zinc-500 group-hover:text-zinc-300'
+                              isActive ? 'text-[#A379E2]' : 'text-zinc-500 group-hover:text-zinc-300'
                             }`}
                           >
                             <LucideIcon name={item.iconName} size={15} />
@@ -303,7 +303,7 @@ export default function Sidebar({
                               ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                               : badge === 'Alert' || badge === 'تنبيه'
                               ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                              : 'bg-brand-500/10 text-brand-400 border border-brand-500/20'
+                              : 'bg-[#6537C0]/20 text-[#D0BFF8] border border-[#6537C0]/30'
                           }`}>
                             {badge}
                           </span>
@@ -311,7 +311,7 @@ export default function Sidebar({
 
                         {/* Collapsed Tooltip helper */}
                         {isCollapsed && (
-                          <span className={`absolute ${isRtl ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap font-sans`}>
+                          <span className={`absolute ${isRtl ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2 bg-[#0A0124] border border-[#1D035F]/60 text-white text-[10px] px-2 py-1 rounded shadow-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap font-sans`}>
                             {itemLabel}
                           </span>
                         )}
@@ -326,24 +326,24 @@ export default function Sidebar({
       </div>
 
       {/* Lower Profile / Footer */}
-      <div className="p-4 border-t border-zinc-900 bg-zinc-950/40">
+      <div className="p-4 border-t border-[#1D035F]/50 bg-[#070119]">
         {!isCollapsed ? (
           <div className="space-y-3">
             {/* System compliance */}
-            <div className="p-2.5 bg-zinc-900 border border-zinc-800/60 rounded-xl flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <div className="p-2.5 bg-[#12023F]/60 border border-[#1D035F]/70 rounded-xl flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
               <div className="min-w-0">
-                <p className="text-[10px] font-bold text-zinc-400 uppercase leading-none">
+                <p className="text-[10px] font-bold text-zinc-300 uppercase leading-none">
                   {lang === 'ar' ? 'الربط المعتمد' : 'ZATCA INTEGRATED'}
                 </p>
-                <p className="text-[9px] text-zinc-500 leading-none mt-1">
+                <p className="text-[9px] text-zinc-400 leading-none mt-1">
                   {lang === 'ar' ? 'المرحلة ٢ - الفاتورة الإلكترونية' : 'Saudi e-Invoicing Phase 2'}
                 </p>
               </div>
             </div>
 
             {/* Saudi Arabia context indicator */}
-            <p className="text-[10px] text-zinc-500 text-center flex items-center justify-center gap-1 font-sans">
+            <p className="text-[10px] text-zinc-400 text-center flex items-center justify-center gap-1 font-sans">
               <span>{t.saudiArabia}</span>
               <span>🇸🇦</span>
               <span>•</span>
@@ -351,7 +351,7 @@ export default function Sidebar({
             </p>
           </div>
         ) : (
-          <div className="flex justify-center text-zinc-500">
+          <div className="flex justify-center text-zinc-400">
             <span>🇸🇦</span>
           </div>
         )}

@@ -16,8 +16,8 @@ const PROFILE_AVATAR_SRC = `data:image/svg+xml;charset=UTF-8,${encodeURIComponen
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="User avatar">
     <defs>
       <linearGradient id="avatarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#f59e0b" />
-        <stop offset="100%" stop-color="#ec4899" />
+        <stop offset="0%" stop-color="#6537C0" />
+        <stop offset="100%" stop-color="#1D035F" />
       </linearGradient>
     </defs>
     <rect width="96" height="96" rx="24" fill="url(#avatarGradient)" />
@@ -220,7 +220,7 @@ export default function Topbar({
 
   return (
     <header className={`sticky top-0 z-40 border-b flex flex-col w-full h-auto transition-colors duration-200 ${
-      darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-800'
+      darkMode ? 'bg-[#0A0124] border-[#1D035F]/60 text-zinc-100' : 'bg-white/95 backdrop-blur-md border-[#E7DDFC] text-[#1D035F]'
     }`}>
       
       {/* Top Row: Navigation and Utilities */}
@@ -238,13 +238,13 @@ export default function Topbar({
             onClick={onOpenSearch}
             className="relative max-w-xs w-full hidden sm:block cursor-pointer group"
           >
-            <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-brand-500 transition-colors`} size={15} />
-            <div className={`w-full ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} py-1.5 border-0 rounded-full text-xs font-sans transition-all flex justify-between items-center ${
-              darkMode ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-400' : 'bg-slate-100 hover:bg-slate-200/60 text-slate-500'
+            <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-[#6537C0] transition-colors`} size={15} />
+            <div className={`w-full ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} py-1.5 border rounded-full text-xs font-sans transition-all flex justify-between items-center ${
+              darkMode ? 'bg-[#12023F]/50 hover:bg-[#1D035F]/50 border-[#1D035F]/70 text-zinc-400' : 'bg-[#FAF7FD] hover:bg-[#F3EDFC] border-[#E7DDFC] text-slate-600'
             }`}>
               <span className="truncate">{t.searchPlaceholder.split('...')[0]}...</span>
               <kbd className={`hidden lg:inline-block px-1.5 py-0.5 border rounded text-[9px] font-mono shadow-xs ${
-                darkMode ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : 'bg-white border-slate-200/60 text-slate-400'
+                darkMode ? 'bg-[#0A0124] border-[#1D035F] text-zinc-400' : 'bg-white border-[#E7DDFC] text-slate-500'
               }`}>
                 Ctrl + K
               </kbd>
@@ -257,10 +257,10 @@ export default function Topbar({
           
           {/* Active branch / tenant display */}
           <div className="hidden lg:flex flex-col text-end font-sans">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none">
-              {lang === 'ar' ? 'الفرع الفاخر النشط' : 'PREMIUM OUTLET'}
+            <span className="text-[10px] font-bold text-[#A379E2] uppercase tracking-wider leading-none">
+              {lang === 'ar' ? 'الفرع النشط' : 'ACTIVE OUTLET'}
             </span>
-            <span className={`text-xs font-bold leading-none mt-1 ${darkMode ? 'text-zinc-200' : 'text-slate-800'}`}>
+            <span className={`text-xs font-bold leading-none mt-1 ${darkMode ? 'text-zinc-200' : 'text-[#1D035F]'}`}>
               {currentTenant}
             </span>
           </div>
@@ -273,7 +273,7 @@ export default function Topbar({
                 setIsNotificationsOpen(false);
                 setIsProfileOpen(false);
               }}
-              className="px-4 py-2 rounded-lg bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 text-white font-medium text-xs md:text-sm shadow-md hover:bg-zinc-800 dark:hover:bg-white transition-all flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-[#6537C0] hover:bg-[#5527B0] text-white font-medium text-xs md:text-sm shadow-sm shadow-[#6537C0]/25 transition-all flex items-center gap-2 cursor-pointer"
             >
               <Plus size={15} className="shrink-0" />
               <span className="hidden sm:inline">{t.quickCreate}</span>
@@ -286,46 +286,46 @@ export default function Topbar({
                 ref={quickCreateMenuRef}
                 dir={isRtl ? 'rtl' : 'ltr'}
                 className={`rounded-2xl shadow-xl border p-2 space-y-0.5 text-start ${
-                  darkMode ? 'bg-zinc-800 border-zinc-700 text-zinc-200' : 'bg-white border-neutral-100 text-neutral-800'
+                  darkMode ? 'bg-[#0A0124] border-[#1D035F] text-zinc-200' : 'bg-white border-[#E7DDFC] text-[#1D035F]'
                 }`}
                 style={quickCreateMenuStyle}
               >
-                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider p-2">
-                  {lang === 'ar' ? 'إجراء تشغيل فوري' : 'SELECT CORE ENTITY'}
+                <p className="text-[10px] font-bold text-[#A379E2] uppercase tracking-wider p-2">
+                  {lang === 'ar' ? 'إجراء تشغيل فوري' : 'QUICK ACTION'}
                 </p>
                 <button
                   onClick={() => handleQuickCreateClick('appointment')}
-                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-neutral-100/30 text-xs md:text-sm font-semibold transition-all"
+                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FAF7FD] dark:hover:bg-[#12023F] text-xs md:text-sm font-semibold transition-all cursor-pointer"
                 >
                   {t.quickActions.newAppointment}
                 </button>
                 <button
                   onClick={() => handleQuickCreateClick('customer')}
-                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-neutral-100/30 text-xs md:text-sm font-semibold transition-all"
+                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FAF7FD] dark:hover:bg-[#12023F] text-xs md:text-sm font-semibold transition-all cursor-pointer"
                 >
                   {t.quickActions.newCustomer}
                 </button>
                 <button
                   onClick={() => handleQuickCreateClick('service')}
-                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-neutral-100/30 text-xs md:text-sm font-semibold transition-all"
+                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FAF7FD] dark:hover:bg-[#12023F] text-xs md:text-sm font-semibold transition-all cursor-pointer"
                 >
                   {t.quickActions.newService}
                 </button>
                 <button
                   onClick={() => handleQuickCreateClick('product')}
-                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-neutral-100/30 text-xs md:text-sm font-semibold transition-all"
+                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FAF7FD] dark:hover:bg-[#12023F] text-xs md:text-sm font-semibold transition-all cursor-pointer"
                 >
                   {t.quickActions.newProduct}
                 </button>
                 <button
                   onClick={() => handleQuickCreateClick('employee')}
-                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-neutral-100/30 text-xs md:text-sm font-semibold transition-all"
+                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FAF7FD] dark:hover:bg-[#12023F] text-xs md:text-sm font-semibold transition-all cursor-pointer"
                 >
                   {t.quickActions.newEmployee}
                 </button>
                 <button
                   onClick={() => handleQuickCreateClick('giftcard')}
-                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-neutral-100/30 text-xs md:text-sm font-semibold transition-all"
+                  className="w-full text-start px-3 py-2 rounded-xl hover:bg-[#FAF7FD] dark:hover:bg-[#12023F] text-xs md:text-sm font-semibold transition-all cursor-pointer"
                 >
                   {t.quickActions.newGiftCard}
                 </button>
@@ -335,12 +335,12 @@ export default function Topbar({
           </div>
 
           {/* Divider */}
-          <div className="w-px h-6 bg-neutral-200 dark:bg-zinc-700 mx-1 hidden sm:block" />
+          <div className="w-px h-6 bg-[#E7DDFC] dark:bg-[#1D035F]/60 mx-1 hidden sm:block" />
 
           {/* Global Search Mobile Button */}
           <button 
             onClick={onOpenSearch}
-            className={`p-2 rounded-xl sm:hidden cursor-pointer ${darkMode ? 'text-zinc-300 hover:bg-zinc-800' : 'text-neutral-500 hover:bg-neutral-100'}`}
+            className={`p-2 rounded-xl sm:hidden cursor-pointer ${darkMode ? 'text-zinc-300 hover:bg-[#12023F]' : 'text-slate-600 hover:bg-[#FAF7FD]'}`}
           >
             <Search size={18} />
           </button>
@@ -349,7 +349,7 @@ export default function Topbar({
           <button
             onClick={onToggleDarkMode}
             className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
-              darkMode ? 'text-amber-400 hover:bg-zinc-800' : 'text-neutral-600 hover:bg-neutral-100'
+              darkMode ? 'text-[#A379E2] hover:bg-[#12023F]' : 'text-[#1D035F] hover:bg-[#FAF7FD]'
             }`}
             title={lang === 'ar' ? 'تبديل المظهر' : 'Toggle Theme (Shortcut: D)'}
           >
@@ -363,7 +363,7 @@ export default function Topbar({
           <button
             onClick={onToggleLang}
             className={`p-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer ${
-              darkMode ? 'text-zinc-300 hover:bg-zinc-800' : 'text-neutral-600 hover:bg-neutral-100'
+              darkMode ? 'text-zinc-300 hover:bg-[#12023F]' : 'text-[#1D035F] hover:bg-[#FAF7FD]'
             }`}
             title={lang === 'ar' ? 'English' : 'العربية'}
           >
@@ -382,12 +382,12 @@ export default function Topbar({
                 setIsQuickCreateOpen(false);
               }}
               className={`p-2 rounded-xl relative transition-all cursor-pointer ${
-                darkMode ? 'text-zinc-300 hover:bg-zinc-800' : 'text-neutral-600 hover:bg-neutral-100'
+                darkMode ? 'text-zinc-300 hover:bg-[#12023F]' : 'text-[#1D035F] hover:bg-[#FAF7FD]'
               }`}
             >
               <Bell size={18} />
               {/* Floating Pulse Dot */}
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-brand-600" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#6537C0]" />
             </button>
 
             {/* Notification Center Dropdown */}
@@ -408,10 +408,10 @@ export default function Topbar({
                 setIsQuickCreateOpen(false);
               }}
               className={`flex items-center gap-2 p-1 rounded-xl transition-all cursor-pointer ${
-                darkMode ? 'hover:bg-zinc-800' : 'hover:bg-neutral-100'
+                darkMode ? 'hover:bg-[#12023F]' : 'hover:bg-[#FAF7FD]'
               }`}
             >
-              <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-neutral-200 dark:border-zinc-700">
+              <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-[#E7DDFC] dark:border-[#1D035F]">
                 <img
                   src={PROFILE_AVATAR_SRC}
                   alt="User Portrait"

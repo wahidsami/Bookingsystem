@@ -18,7 +18,7 @@ import TenantLoginScreen from './TenantLoginScreen';
 import { PublicLandingFramework } from './public/LandingFramework';
 import PublicRegistrationWizard from './public/PublicRegistrationWizard';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
-import refahLogo from '../assets/RifahNewLogoColor.png';
+import barspaLogo from '../assets/barspa_logo.png';
 
 type PublicRoute = 'landing' | 'login' | 'register' | 'forgot-password' | 'reset-password' | 'register-success' | 'payment';
 
@@ -75,26 +75,20 @@ function PublicPageFrame({
   const isRtl = lang === 'ar';
 
   return (
-    <div dir={isRtl ? 'rtl' : 'ltr'} className="min-h-screen relative overflow-hidden bg-zinc-950 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.2),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(244,114,182,0.16),_transparent_24%),linear-gradient(135deg,_rgba(9,9,11,0.98),_rgba(24,24,27,0.92))]" />
+    <div dir={isRtl ? 'rtl' : 'ltr'} className="min-h-screen relative overflow-hidden bg-[#FAF7FD] text-[#1D035F]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(231,221,252,0.6),_transparent_50%),radial-gradient(circle_at_bottom_right,_rgba(163,121,226,0.1),_transparent_40%)]" />
       <div className="relative z-10 min-h-screen flex flex-col">
         <header className="px-4 md:px-8 py-5">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl shadow-2xl">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-3xl border border-[#E7DDFC] bg-white/90 px-6 py-4 backdrop-blur-xl shadow-xs">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-amber-200">
-                <Sparkles size={18} />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-amber-200/80">Refah</p>
-                <h1 className="text-lg font-black text-white">{isRtl ? 'تجربة عامة قابلة للتوسعة' : 'Extensible public experience'}</h1>
-              </div>
+              <img src={barspaLogo} alt="BarSpa" className="h-9 w-auto object-contain" />
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onToggleLang}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] px-4 py-2.5 text-sm font-semibold text-[#1D035F] transition hover:bg-[#F3EDFC] cursor-pointer"
               >
                 <Globe size={16} />
                 <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
@@ -106,35 +100,35 @@ function PublicPageFrame({
         <main className="flex-1 px-4 pb-8 md:px-8 md:pb-10">
           <div className="mx-auto grid max-w-7xl gap-6 xl:grid-cols-[1.02fr_0.98fr]">
             <section className="space-y-6">
-              <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 md:p-8 backdrop-blur-2xl shadow-2xl">
-                <p className="text-xs uppercase tracking-[0.26em] text-amber-200/70">{isRtl ? 'تجربة الزوار' : 'Public visitor experience'}</p>
-                <h2 className="mt-3 text-3xl md:text-4xl font-black leading-tight">{title}</h2>
-                <p className="mt-4 max-w-2xl text-sm md:text-base leading-7 text-zinc-300">{subtitle}</p>
+              <div className="rounded-[2rem] border border-[#E7DDFC] bg-white p-6 md:p-8 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.26em] text-[#6537C0] font-bold">{isRtl ? 'بوابة بارسبا' : 'BarSpa Portal'}</p>
+                <h2 className="mt-3 text-3xl md:text-4xl font-black leading-tight text-[#1D035F]">{title}</h2>
+                <p className="mt-4 max-w-2xl text-sm md:text-base leading-7 text-slate-600">{subtitle}</p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
                 {[
                   [ShieldCheck, isRtl ? 'اتصال حي' : 'Live only'],
                   [KeyRound, isRtl ? 'مصادقة حقيقية' : 'Canonical auth'],
-                  [CheckCircle2, isRtl ? 'قابل للتوسعة' : 'Framework first']
+                  [CheckCircle2, isRtl ? 'معتمد وموثوق' : 'Verified by design']
                 ].map(([Icon, label]) => (
-                  <div key={label as string} className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
-                    <Icon size={18} className="text-amber-300" />
-                    <p className="mt-3 text-sm font-semibold text-white">{label as string}</p>
+                  <div key={label as string} className="rounded-[1.5rem] border border-[#E7DDFC] bg-white p-5 shadow-xs">
+                    <Icon size={18} className="text-[#6537C0]" />
+                    <p className="mt-3 text-sm font-semibold text-[#1D035F]">{label as string}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="rounded-[1.75rem] border border-white/10 bg-black/25 p-6 backdrop-blur-xl">
+              <div className="rounded-[1.75rem] border border-[#E7DDFC] bg-[#FAF7FD] p-6">
                 <div className="grid gap-3 md:grid-cols-2">
                   {[
-                    isRtl ? 'إطار عام مفصول عن اللوحة' : 'Separate public shell from dashboard',
-                    isRtl ? 'سهولة إضافة أقسام جديدة لاحقاً' : 'Easy to add sections later',
-                    isRtl ? 'روابط تسجيل ودخول وخدمات الاسترداد' : 'Login, register and recovery flows',
-                    isRtl ? 'متوافق مع V2 من حيث الهوية' : 'Aligned with V2 visual identity'
+                    isRtl ? 'حماية مشددة لبيانات الصالون' : 'Enterprise data protection',
+                    isRtl ? 'ربط آمن ومعتمد مع ZATCA' : 'Secure ZATCA compliance',
+                    isRtl ? 'استعادة سريعة وسلسة لكلمة المرور' : 'Fast, reliable access recovery',
+                    isRtl ? 'متوافق مع أعلى معايير الخصوصية' : 'Full privacy & security standard'
                   ].map((item) => (
-                    <div key={item} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-200">
-                      <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-400" />
+                    <div key={item} className="flex items-start gap-3 rounded-2xl border border-[#E7DDFC] bg-white px-4 py-3 text-sm text-slate-700 shadow-xs">
+                      <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-500" />
                       <span>{item}</span>
                     </div>
                   ))}
@@ -170,7 +164,7 @@ function PublicAuthShell({
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className={`rounded-[1.75rem] border border-white/10 bg-zinc-950/80 p-5 md:p-6 shadow-2xl backdrop-blur-xl ${isRtl ? 'text-right' : 'text-left'}`}
+        className={`rounded-[1.75rem] border border-[#E7DDFC] bg-white p-6 md:p-8 shadow-xl ${isRtl ? 'text-right' : 'text-left'}`}
       >
         {children}
       </motion.div>
@@ -223,31 +217,31 @@ function ForgotPasswordScreen({
         <button
           type="button"
           onClick={() => onNavigate('/login')}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-400 hover:text-white transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#1D035F] transition-colors cursor-pointer"
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={16} className={isRtl ? 'rotate-180' : ''} />
           <span>{isRtl ? 'العودة لتسجيل الدخول' : 'Back to sign in'}</span>
         </button>
 
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-zinc-300">{isRtl ? 'البريد الإلكتروني' : 'Email'}</span>
+          <span className="text-sm font-medium text-[#1D035F]">{isRtl ? 'البريد الإلكتروني' : 'Email'}</span>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             type="email"
             autoComplete="email"
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0 placeholder:text-zinc-600"
+            className="w-full rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] px-4 py-3 text-[#1D035F] outline-none ring-0 placeholder:text-slate-400 focus:border-[#6537C0] focus:bg-white transition-colors"
             placeholder="admin@example.com"
           />
         </label>
 
-        {message ? <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{message}</div> : null}
-        {error ? <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div> : null}
+        {message ? <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">{message}</div> : null}
+        {error ? <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-800">{error}</div> : null}
 
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#6537C0] hover:bg-[#1D035F] px-5 py-3 text-sm font-bold text-white shadow-md shadow-[#6537C0]/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
           {loading ? <LoaderCircle size={16} className="animate-spin" /> : <Mail size={16} />}
           <span>{isRtl ? 'إرسال رابط الاستعادة' : 'Send reset link'}</span>
@@ -306,50 +300,50 @@ function ResetPasswordScreen({
         <button
           type="button"
           onClick={() => onNavigate('/login')}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-400 hover:text-white transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#1D035F] transition-colors cursor-pointer"
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={16} className={isRtl ? 'rotate-180' : ''} />
           <span>{isRtl ? 'العودة لتسجيل الدخول' : 'Back to sign in'}</span>
         </button>
 
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-zinc-300">{isRtl ? 'رمز الاستعادة' : 'Reset token'}</span>
+          <span className="text-sm font-medium text-[#1D035F]">{isRtl ? 'رمز الاستعادة' : 'Reset token'}</span>
           <input
             value={token}
             readOnly
-            className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none ring-0"
+            className="w-full rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] px-4 py-3 text-[#1D035F] outline-none ring-0 font-mono text-sm"
           />
         </label>
 
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-zinc-300">{isRtl ? 'كلمة المرور الجديدة' : 'New password'}</span>
+          <span className="text-sm font-medium text-[#1D035F]">{isRtl ? 'كلمة المرور الجديدة' : 'New password'}</span>
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             type="password"
             autoComplete="new-password"
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0"
+            className="w-full rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] px-4 py-3 text-[#1D035F] outline-none ring-0 placeholder:text-slate-400 focus:border-[#6537C0] focus:bg-white transition-colors"
           />
         </label>
 
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-zinc-300">{isRtl ? 'تأكيد كلمة المرور' : 'Confirm password'}</span>
+          <span className="text-sm font-medium text-[#1D035F]">{isRtl ? 'تأكيد كلمة المرور' : 'Confirm password'}</span>
           <input
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             type="password"
             autoComplete="new-password"
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none ring-0"
+            className="w-full rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] px-4 py-3 text-[#1D035F] outline-none ring-0 placeholder:text-slate-400 focus:border-[#6537C0] focus:bg-white transition-colors"
           />
         </label>
 
-        {message ? <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{message}</div> : null}
-        {error ? <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div> : null}
+        {message ? <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">{message}</div> : null}
+        {error ? <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-800">{error}</div> : null}
 
         <button
           type="submit"
           disabled={loading || !token}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#6537C0] hover:bg-[#1D035F] px-5 py-3 text-sm font-bold text-white shadow-md shadow-[#6537C0]/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
           {loading ? <LoaderCircle size={16} className="animate-spin" /> : <Unlock size={16} />}
           <span>{isRtl ? 'حفظ كلمة المرور' : 'Save password'}</span>
@@ -466,7 +460,9 @@ function PaymentGatewayScreen({
           gatewayStatus: success ? 'authorized' : 'declined',
           paymentFailureReason: success
             ? undefined
-            : 'Simulated test payment failure from the Refah test gateway',
+            : (isRtl
+                ? 'فشل دفع تجريبي مصطنع من بوابة BarSpa التجريبية'
+                : 'Simulated test payment failure from the BarSpa test gateway'),
           idempotencyKey: success
             ? `public_payment_link:${billPaymentToken}:success`
             : `public_payment_link:${billPaymentToken}:failed:${Date.now()}`
@@ -574,46 +570,46 @@ function PaymentGatewayScreen({
       subtitle={isRtl ? 'بوابة اختبار آمنة لإكمال تفعيل حساب المنشأة.' : 'Secure test gateway to finish activating the tenant account.'}
     >
       <div className="space-y-5">
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-amber-200">
+            <div className="rounded-2xl border border-[#D0BFF8] bg-[#FAF7FD] p-3 text-[#6537C0]">
               <ShieldCheck size={18} />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-amber-200/70">Refah</p>
-              <p className="text-sm font-semibold text-white">{isRtl ? 'بوابة الدفع التجريبية' : 'Test payment gateway'}</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-[#6537C0] font-bold">BarSpa</p>
+              <p className="text-sm font-semibold text-[#1D035F]">{isRtl ? 'بوابة الدفع التجريبية' : 'Test payment gateway'}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onToggleLang}
-            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+            className="rounded-2xl border border-[#E7DDFC] bg-white px-4 py-2 text-sm font-semibold text-[#1D035F] transition hover:bg-[#FAF7FD] cursor-pointer"
           >
             <Globe size={16} className="inline-block" /> <span className="ms-2">{isRtl ? 'English' : 'العربية'}</span>
           </button>
         </div>
 
-        <div className="rounded-[1.75rem] border border-white/10 bg-black/25 p-6 shadow-2xl">
+        <div className="rounded-[1.75rem] border border-[#E7DDFC] bg-white p-6 shadow-xl">
           <div className="mb-5 flex items-center justify-center">
-            <img src="/RifahNewLogoWhite.png" alt="Refah" className="h-12 w-auto object-contain" />
+            <img src={barspaLogo} alt="BarSpa" className="h-10 w-auto object-contain" />
           </div>
 
-          <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+          <div className="space-y-4 rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-zinc-400">{isRtl ? 'الباقة' : 'Package'}</p>
-                <p className="mt-1 text-lg font-bold text-white">{session.packageName}</p>
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{isRtl ? 'الباقة' : 'Package'}</p>
+                <p className="mt-1 text-lg font-bold text-[#1D035F]">{session.packageName}</p>
               </div>
               <div className="text-end">
-                <p className="text-xs uppercase tracking-[0.22em] text-zinc-400">{isRtl ? 'المبلغ' : 'Amount'}</p>
-                <p className="mt-1 text-3xl font-black text-amber-300">
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{isRtl ? 'المبلغ' : 'Amount'}</p>
+                <p className="mt-1 text-3xl font-black text-[#1D035F]">
                   {session.amount.toLocaleString()} {session.currency}
                 </p>
               </div>
             </div>
 
             {session.paymentDueAt ? (
-              <p className="text-sm text-zinc-300">
+              <p className="text-sm text-slate-600">
                 {isRtl ? 'آخر موعد للسداد' : 'Payment due'}:{' '}
                 {new Date(session.paymentDueAt).toLocaleString(isRtl ? 'ar-SA' : 'en-GB', {
                   dateStyle: 'medium',
@@ -622,7 +618,7 @@ function PaymentGatewayScreen({
               </p>
             ) : null}
 
-          <p className="text-sm leading-7 text-zinc-300">
+          <p className="text-sm leading-7 text-slate-600">
             {isPublicBillLink
               ? (isRtl
                   ? 'هذه صفحة دفع آمنة لرابط الفاتورة المرسل بالبريد الإلكتروني.'
@@ -634,19 +630,19 @@ function PaymentGatewayScreen({
         </div>
 
           {alreadyPaid ? (
-            <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
               {isRtl ? 'هذه الفاتورة مدفوعة بالفعل.' : 'This invoice has already been paid.'}
             </div>
           ) : null}
 
           {resultMessage ? (
-            <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
               {resultMessage}
             </div>
           ) : null}
 
           {error ? (
-            <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-800">
               {error}
             </div>
           ) : null}
@@ -656,7 +652,7 @@ function PaymentGatewayScreen({
               type="button"
               disabled={paying || alreadyPaid}
               onClick={() => handlePay(true)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#6537C0] hover:bg-[#1D035F] px-5 py-3 text-sm font-bold text-white shadow-md shadow-[#6537C0]/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
             >
               {paying ? <LoaderCircle size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
               <span>{isRtl ? 'دفع الآن (نجاح تجريبي)' : 'Pay now (test success)'}</span>
@@ -666,7 +662,7 @@ function PaymentGatewayScreen({
               type="button"
               disabled={paying || alreadyPaid}
               onClick={() => handlePay(false)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] hover:bg-[#F3EDFC] px-5 py-3 text-sm font-semibold text-[#1D035F] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
             >
               <span>{isRtl ? 'محاكاة فشل الدفع' : 'Simulate payment failure'}</span>
             </button>
@@ -676,7 +672,7 @@ function PaymentGatewayScreen({
             <button
               type="button"
               onClick={() => onNavigate(backHref || '/', { replace: true })}
-              className="text-sm font-semibold text-zinc-300 transition hover:text-white"
+              className="text-sm font-semibold text-slate-500 hover:text-[#1D035F] transition-colors cursor-pointer"
             >
               {isRtl ? 'العودة' : 'Back'}
             </button>
@@ -705,26 +701,26 @@ function RegistrationSuccessScreen({
       subtitle={isRtl ? 'تم استلام المستندات الخاصة بك وهي الآن قيد المراجعة.' : 'Documents Received. Waiting for Approval.'}
     >
       <div className="space-y-5 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300">
-          <CheckCircle2 size={28} />
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-emerald-500/20 bg-emerald-50 text-emerald-600">
+          <CheckCircle2 size={32} />
         </div>
-        <p className="text-sm leading-7 text-zinc-300">
+        <p className="text-sm leading-7 text-slate-600">
           {isRtl
-            ? 'ستتلقى رسالة بريد إلكتروني بمجرد مراجعة حسابك.'
-            : 'You will receive an email once your account has been reviewed.'}
+            ? 'ستتلقى رسالة بريد إلكتروني بمجرد مراجعة حسابك وتفعيله.'
+            : 'You will receive an email once your account has been reviewed and activated.'}
         </p>
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center pt-2">
           <button
             type="button"
             onClick={() => onNavigate('/login')}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#6537C0] hover:bg-[#1D035F] px-6 py-3 text-sm font-bold text-white shadow-md shadow-[#6537C0]/25 transition hover:-translate-y-0.5 cursor-pointer"
           >
             {isRtl ? 'تسجيل الدخول' : 'Sign in'}
           </button>
           <button
             type="button"
             onClick={() => onNavigate('/')}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] hover:bg-[#F3EDFC] px-6 py-3 text-sm font-semibold text-[#1D035F] transition hover:-translate-y-0.5 cursor-pointer"
           >
             {isRtl ? 'العودة للرئيسية' : 'Back to home'}
           </button>
@@ -782,43 +778,48 @@ export default function PublicExperience({
   }
 
   return (
-    <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen relative overflow-hidden bg-zinc-950 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.2),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(244,114,182,0.16),_transparent_24%),linear-gradient(135deg,_rgba(9,9,11,0.98),_rgba(24,24,27,0.92))]" />
+    <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen relative overflow-x-hidden bg-[#FAF7FD] text-[#1D035F] selection:bg-[#E7DDFC] selection:text-[#1D035F]">
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(231,221,252,0.6),_transparent_50%),radial-gradient(circle_at_bottom_right,_rgba(163,121,226,0.08),_transparent_40%)]" />
       <div className="relative z-10 min-h-screen flex flex-col">
-        <div className="px-4 pb-8 pt-4 md:px-8 md:pb-10">
-          <div className="mx-auto max-w-7xl">
-            <div className="mb-5 flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl shadow-2xl">
-              <div className="flex items-center">
-                <img src={refahLogo} alt="Refah" className="h-10 w-auto object-contain" />
-              </div>
+        <header className="px-4 py-4 md:px-8">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-[#E7DDFC] bg-white/90 px-6 py-3.5 backdrop-blur-md shadow-xs">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('/')}>
+              <img src={barspaLogo} alt="BarSpa" className="h-9 w-auto object-contain" />
+            </div>
 
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={onToggleLang}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3.5 py-2 text-xs font-bold text-[#1D035F] transition hover:bg-[#F3EDFC] cursor-pointer"
               >
-                <Globe size={16} />
-                <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
+                <Globe size={15} />
+                <span>{lang === 'ar' ? 'EN' : 'العربية'}</span>
               </button>
-            </div>
-            <PublicLandingFramework lang={lang} onNavigate={onNavigate} />
-            <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 px-6 py-5 text-center backdrop-blur-xl sm:flex-row sm:text-start">
-              <p className="max-w-3xl text-sm leading-7 text-zinc-300">
-                {lang === 'ar'
-                  ? 'هل تريد متابعة رحلة الزيارة؟ يمكنك التسجيل أو تسجيل الدخول ثم الانتقال مباشرة إلى الواجهة الحية.'
-                  : 'Ready to continue the visit journey? Register or sign in to move directly into the live workspace.'}
-              </p>
+              <button
+                type="button"
+                onClick={() => onNavigate('/login')}
+                className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-[#E7DDFC] bg-white px-4 py-2 text-xs font-bold text-[#1D035F] transition hover:bg-[#FAF7FD] cursor-pointer"
+              >
+                <span>{lang === 'ar' ? 'تسجيل الدخول' : 'Sign in'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => onNavigate('/register')}
-                className="inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#6537C0] px-4 py-2 text-xs font-bold text-white shadow-sm shadow-[#6537C0]/25 transition hover:bg-[#1D035F] cursor-pointer"
               >
-                {lang === 'ar' ? 'ابدأ التسجيل' : 'Start registration'}
-                <ArrowRight size={16} />
+                <span>{lang === 'ar' ? 'ابدأ الآن' : 'Get started'}</span>
+                <ArrowRight size={14} className={lang === 'ar' ? 'rotate-180' : ''} />
               </button>
             </div>
           </div>
-        </div>
+        </header>
+
+        <main className="flex-1 px-4 pb-12 pt-2 md:px-8">
+          <div className="mx-auto max-w-7xl space-y-10">
+            <PublicLandingFramework lang={lang} onNavigate={onNavigate} />
+          </div>
+        </main>
       </div>
     </div>
   );

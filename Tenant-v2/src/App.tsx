@@ -59,6 +59,15 @@ export default function App() {
     refreshUser
   } = useTenantAuth();
   const [lang, setLang] = useState<Language>('ar');
+  const isRtl = lang === 'ar';
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+      document.documentElement.lang = isRtl ? 'ar' : 'en';
+    }
+  }, [isRtl]);
+
   const [currentPath, setCurrentPath] = useState<string>(() =>
     typeof window !== 'undefined' ? window.location.pathname : '/'
   );
@@ -132,7 +141,14 @@ export default function App() {
   // Sync personalizations to localStorage
   useEffect(() => {
     localStorage.setItem('refah-dark-mode', String(darkMode));
-    const root = document.getElementById('refah-app-shell');
+    if (typeof document !== 'undefined') {
+      if (darkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+    const root = document.getElementById('barspa-app-shell');
     if (root) {
       if (darkMode) {
         root.classList.add('dark');
@@ -388,7 +404,7 @@ export default function App() {
           c.includes('العليا')
             ? 'La Colline Luxury Spa - Olaya Riyadh'
             : c.includes('الكورنيش')
-            ? 'REFAH Beauty & Spa - Corniche Jeddah'
+            ? 'BarSpa Beauty & Spa - Corniche Jeddah'
             : 'Royal Bridal Salon - Khobar Branch'
         );
       } else {
@@ -396,7 +412,7 @@ export default function App() {
           c.includes('Olaya')
             ? 'سبا لا كولين الفاخر - فرع العليا الرياض'
             : c.includes('Corniche')
-            ? 'مركز تجميل واستجمام رفاه - فرع الكورنيش جدة'
+            ? 'مركز تجميل واستجمام بارسبا - فرع الكورنيش جدة'
             : 'صالون العروس الملكي - فرع الخبر'
         );
       }
@@ -604,8 +620,6 @@ export default function App() {
     navigateToPath('/dashboard', { replace: true });
   };
 
-  const isRtl = lang === 'ar';
-
   if (authLoading) {
     return (
       <div
@@ -640,9 +654,9 @@ export default function App() {
     <div
       dir={isRtl ? 'rtl' : 'ltr'}
       className={`min-h-screen flex overflow-hidden font-sans relative transition-colors duration-200 ${
-        darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-800'
+        darkMode ? 'bg-[#0A0124] text-zinc-100' : 'bg-[#FAF7FD] text-[#1D035F]'
       }`}
-      id="refah-app-shell"
+      id="barspa-app-shell"
     >
 
       {/* Sidebar (dark luxury layout with favoritePages) */}
@@ -684,7 +698,7 @@ export default function App() {
 
         {/* Content View area (bright clean layout) */}
         <main className={`flex-1 overflow-y-auto p-6 md:p-8 transition-colors duration-200 ${
-          darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-800'
+          darkMode ? 'bg-[#0A0124] text-zinc-100' : 'bg-[#FAF7FD] text-slate-800'
         }`}>
           <Workspace
             view={activeView}
@@ -744,13 +758,13 @@ export default function App() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
               className={`border shadow-xl p-4 rounded-xl flex items-start gap-3 text-start relative overflow-hidden transition-colors ${
-                darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-800'
+                darkMode ? 'bg-[#0A0124] border-[#1D035F] text-zinc-100' : 'bg-white border-[#E7DDFC] text-[#1D035F]'
               }`}
             >
               {/* Luxury Accent stripe */}
-              <div className={`absolute top-0 bottom-0 w-1 bg-brand-500 ${isRtl ? 'right-0' : 'left-0'}`} />
+              <div className={`absolute top-0 bottom-0 w-1 bg-[#6537C0] ${isRtl ? 'right-0' : 'left-0'}`} />
 
-              <span className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${toast.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-brand-500/10 text-brand-500'}`}>
+              <span className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${toast.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[#6537C0]/10 text-[#6537C0]'}`}>
                 {toast.type === 'success' ? <Check size={14} /> : <Info size={14} />}
               </span>
 
@@ -762,7 +776,7 @@ export default function App() {
 
               <button
                 onClick={() => removeToast(toast.id)}
-                className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400 hover:text-neutral-600 transition-colors"
+                className="p-1 hover:bg-[#FAF7FD] dark:hover:bg-[#12023F] rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-200 transition-colors cursor-pointer"
               >
                 <X size={12} />
               </button>

@@ -8,9 +8,11 @@ export interface PublicLandingSectionProps {
 
 export type PublicLandingSectionComponentKey =
   | 'hero'
+  | 'trust'
+  | 'capabilities'
   | 'value-props'
   | 'experience-flow'
-  | 'trust'
+  | 'cta-banner'
   | 'footer';
 
 export interface LandingSectionConfig {

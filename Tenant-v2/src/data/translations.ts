@@ -243,7 +243,7 @@ export const recentItems: RecentItem[] = [
 
 export const translations = {
   ar: {
-    appName: 'رفاه',
+    appName: 'بارسبا',
     appSubtitle: 'النظام الفاخر لإدارة مراكز التجميل والاستجمام',
     tenantName: 'سبا لا كولين الفاخر',
     searchPlaceholder: 'البحث السريع عن عميل، موعد، فاتورة أو خدمة... (Ctrl + K)',
@@ -253,7 +253,7 @@ export const translations = {
     profile: 'الملف الشخصي',
     collapseSidebar: 'طي القائمة',
     expandSidebar: 'توسيع القائمة',
-    allRightsReserved: 'جميع الحقوق محفوظة © رفاه ٢٠٢٦',
+    allRightsReserved: 'جميع الحقوق محفوظة © بارسبا ٢٠٢٦',
     categories: {
       core: 'الرئيسية والتشغيل',
       operations: 'الخدمات والموارد',
@@ -288,14 +288,14 @@ export const translations = {
     businessSettings: 'إعدادات المنشأة',
     switchTenant: 'تبديل الفرع',
     emptyWorkspaceTitle: '{name}',
-    emptyWorkspaceSubtitle: 'استعراض وإدارة جميع التفاصيل والمعطيات المتعلقة بقسم {name} لصالون رفاه.',
+    emptyWorkspaceSubtitle: 'استعراض وإدارة جميع التفاصيل والمعطيات المتعلقة بقسم {name} لصالون بارسبا.',
     viewDetails: 'عرض التفاصيل',
     saasExpiry: 'ينتهي اشتراك باقة Premium في غضون ٢٤٠ يوماً',
     welcomeBack: 'مرحباً بك مجدداً، أحمد',
     todayDate: 'السبت، ٢٧ يونيو ٢٠٢٦',
   },
   en: {
-    appName: 'REFAH',
+    appName: 'BarSpa',
     appSubtitle: 'The Premium Platform for Beauty Salons & Wellness Spas',
     tenantName: 'La Colline Luxury Spa',
     searchPlaceholder: 'Quick search for customers, appointments, bills, or services... (Ctrl + K)',
@@ -305,7 +305,7 @@ export const translations = {
     profile: 'Profile',
     collapseSidebar: 'Collapse Sidebar',
     expandSidebar: 'Expand Sidebar',
-    allRightsReserved: 'All rights reserved © REFAH 2026',
+    allRightsReserved: 'All rights reserved © BarSpa 2026',
     categories: {
       core: 'Core & Operations',
       operations: 'Services & Resources',

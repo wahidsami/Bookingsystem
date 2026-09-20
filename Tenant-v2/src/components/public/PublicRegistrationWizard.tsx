@@ -4,6 +4,7 @@ import type { Language } from '../../types';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
 import PublicWizardEngine, { type PublicWizardStepDefinition } from './PublicWizardEngine';
 import PublicFileUploadField from './PublicFileUploadField';
+import barspaLogo from '../../assets/barspa_logo.png';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -152,13 +153,13 @@ function Field({
   return (
     <label className="block space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-zinc-200">
-          {label} {required ? <span className="text-rose-400">*</span> : null}
+        <span className="text-sm font-semibold text-[#1D035F]">
+          {label} {required ? <span className="text-rose-500">*</span> : null}
         </span>
-        {hint ? <span className="text-[11px] text-zinc-500">{hint}</span> : null}
+        {hint ? <span className="text-[11px] text-zinc-400">{hint}</span> : null}
       </div>
       {children}
-      {error ? <p className="text-xs text-rose-300">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-500">{error}</p> : null}
     </label>
   );
 }
@@ -173,10 +174,10 @@ const wizardStepDefinitions = (isRtl: boolean): PublicWizardStepDefinition[] => 
 ];
 
 const premiumFieldClass =
-  'w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-zinc-500 transition focus:border-amber-300/50 focus:bg-white/10 focus:ring-2 focus:ring-amber-300/20';
+  'w-full rounded-2xl border border-[#E7DDFC] bg-white px-4 py-3 text-sm text-[#1D035F] outline-none ring-0 placeholder:text-zinc-400 transition focus:border-[#6537C0] focus:bg-white focus:ring-2 focus:ring-[#6537C0]/20 shadow-sm';
 
 const premiumSelectClass =
-  'w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-white outline-none transition focus:border-amber-300/50 focus:ring-2 focus:ring-amber-300/20';
+  'w-full rounded-2xl border border-[#E7DDFC] bg-white px-4 py-3 text-sm text-[#1D035F] outline-none shadow-sm transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/20';
 
 export default function PublicRegistrationWizard({ lang, onNavigate }: PublicRegistrationWizardProps) {
   const isRtl = lang === 'ar';
@@ -420,18 +421,18 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
                 return (
                   <label
                     key={type.value}
-                    className={`group flex min-h-[88px] cursor-pointer items-center gap-3 rounded-[1.5rem] border px-4 py-4 transition ${
+                    className={`group flex min-h-[84px] cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3.5 transition ${
                       checked
-                        ? 'border-amber-300/70 bg-amber-400/10 text-white shadow-[0_14px_40px_rgba(251,191,36,0.12)]'
-                        : 'border-white/10 bg-white/5 text-zinc-300 hover:-translate-y-0.5 hover:bg-white/10'
+                        ? 'border-[#6537C0] bg-[#FAF7FD] text-[#1D035F] shadow-sm ring-1 ring-[#6537C0]/30'
+                        : 'border-[#E7DDFC] bg-white text-zinc-700 hover:border-[#A379E2]/60 hover:bg-[#FAF7FD]'
                     }`}
                   >
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${checked ? 'border-amber-300/40 bg-amber-400/15 text-amber-100' : 'border-white/10 bg-black/20 text-zinc-300'}`}>
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${checked ? 'border-[#6537C0]/30 bg-[#E7DDFC]/40 text-[#6537C0]' : 'border-[#E7DDFC] bg-[#FAF7FD] text-zinc-600'}`}>
                       <span>{type.emoji}</span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold text-white">{type.label}</span>
+                        <span className="text-sm font-semibold text-[#1D035F]">{type.label}</span>
                         <input
                           type="checkbox"
                           checked={checked}
@@ -441,10 +442,10 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
                               : [...formData.businessType, type.value];
                             handleFieldChange('businessType', next);
                           }}
-                          className="h-4 w-4 rounded border-white/20 bg-zinc-950 text-amber-400 accent-amber-400"
+                          className="h-4 w-4 rounded border-[#E7DDFC] text-[#6537C0] accent-[#6537C0]"
                         />
                       </div>
-                      <p className="mt-1 text-[11px] leading-5 text-zinc-400">{type.note}</p>
+                      <p className="mt-1 text-[11px] leading-5 text-zinc-500">{type.note}</p>
                     </div>
                   </label>
                 );
@@ -512,7 +513,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             </select>
           </Field>
           <Field label={isRtl ? 'الدولة' : 'Country'}>
-            <input value={formData.country} disabled className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white/80 opacity-90" />
+            <input value={formData.country} disabled className="w-full rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] px-4 py-3 text-sm text-zinc-500 font-medium" />
           </Field>
         </div>
       );
@@ -605,14 +606,16 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
     if (currentStep === 5) {
       return (
         <div className="space-y-5">
-          <div className="flex flex-wrap gap-2 border-b border-white/10 pb-2">
+          <div className="flex flex-wrap gap-2 border-b border-[#E7DDFC] pb-3">
             {(['monthly', 'sixMonth', 'annual'] as const).map((period) => (
               <button
                 key={period}
                 type="button"
                 onClick={() => setSelectedTab(period)}
-                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                  selectedTab === period ? 'border border-amber-300/40 bg-amber-400/10 text-amber-100' : 'border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'
+                className={`rounded-full px-5 py-2.5 text-sm font-semibold transition ${
+                  selectedTab === period
+                    ? 'border border-[#6537C0] bg-[#6537C0] text-white shadow-sm'
+                    : 'border border-[#E7DDFC] bg-white text-zinc-600 hover:bg-[#FAF7FD] hover:text-[#1D035F]'
                 }`}
               >
                 {period === 'monthly'
@@ -625,8 +628,8 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
           </div>
 
           {packagesLoading ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-8 text-center text-zinc-300">
-              <LoaderCircle size={18} className="mx-auto mb-3 animate-spin text-amber-300" />
+            <div className="rounded-2xl border border-[#E7DDFC] bg-white px-6 py-12 text-center text-zinc-600 shadow-sm">
+              <LoaderCircle size={24} className="mx-auto mb-3 animate-spin text-[#6537C0]" />
               {isRtl ? 'جارٍ تحميل الباقات...' : 'Loading subscription packages...'}
             </div>
           ) : (
@@ -647,35 +650,35 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
                         selectedBillingPeriod: selectedTab
                       }))
                     }
-                    className={`rounded-[1.75rem] border p-5 text-start transition ${
+                    className={`rounded-2xl border p-5 text-start transition ${
                       selected
-                        ? 'border-amber-300/70 bg-amber-400/10 shadow-[0_18px_45px_rgba(251,191,36,0.12)]'
-                        : 'border-white/10 bg-white/5 hover:-translate-y-0.5 hover:bg-white/10'
+                        ? 'border-[#6537C0] bg-[#FAF7FD] shadow-[0_12px_32px_rgba(101,55,192,0.12)] ring-2 ring-[#6537C0]/30'
+                        : 'border-[#E7DDFC] bg-white hover:-translate-y-0.5 hover:border-[#A379E2]/50 hover:shadow-md'
                     }`}
                   >
                     {pkg?.isFeatured ? (
-                      <div className="mb-3 inline-flex rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold text-amber-200">
+                      <div className="mb-3 inline-flex rounded-full border border-[#6537C0]/20 bg-[#6537C0]/10 px-3 py-1 text-[11px] font-semibold text-[#6537C0]">
                         {isRtl ? 'الأكثر شعبية' : 'Most popular'}
                       </div>
                     ) : null}
                     <div className="space-y-2">
-                      <h3 className="text-lg font-bold text-white">{pkg?.name || (isRtl ? 'باقة' : 'Plan')}</h3>
-                      <p className="text-sm leading-6 text-zinc-300">{pkg?.description || ''}</p>
-                      <p className="text-3xl font-black text-white">
-                        <span className="text-sm font-medium text-zinc-400">SAR</span> {Number(price || 0).toFixed(2)}
+                      <h3 className="text-lg font-bold text-[#1D035F]">{pkg?.name || (isRtl ? 'باقة' : 'Plan')}</h3>
+                      <p className="text-sm leading-6 text-zinc-600">{pkg?.description || ''}</p>
+                      <p className="text-3xl font-black text-[#1D035F]">
+                        <span className="text-sm font-medium text-zinc-500">SAR</span> {Number(price || 0).toFixed(2)}
                       </p>
                       {savings > 0 ? (
-                        <p className="text-xs font-semibold text-emerald-300">
+                        <p className="text-xs font-semibold text-emerald-600">
                           {isRtl ? 'توفير' : 'Save'} SAR {Number(savings).toFixed(2)}
                         </p>
                       ) : null}
                     </div>
-                    <div className="mt-4 grid gap-2 text-xs text-zinc-400">
-                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الحد الأقصى للحجوزات' : 'Bookings limit'}: {pkg?.limits?.maxBookingsPerMonth === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : `${pkg?.limits?.maxBookingsPerMonth ?? 0}/mo`}</div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الفرق' : 'Staff'}: {pkg?.limits?.maxStaff === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxStaff ?? 0}</div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الخدمات' : 'Services'}: {pkg?.limits?.maxServices === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxServices ?? 0}</div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'الباقات' : 'Packages'}: {pkg?.limits?.maxPackages === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxPackages ?? 0}</div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">{isRtl ? 'العمولة' : 'Commission'}: {pkg?.platformCommission ?? 0}%</div>
+                    <div className="mt-4 grid gap-2 text-xs text-zinc-600">
+                      <div className="rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3 py-2">{isRtl ? 'الحد الأقصى للحجوزات' : 'Bookings limit'}: {pkg?.limits?.maxBookingsPerMonth === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : `${pkg?.limits?.maxBookingsPerMonth ?? 0}/mo`}</div>
+                      <div className="rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3 py-2">{isRtl ? 'الفرق' : 'Staff'}: {pkg?.limits?.maxStaff === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxStaff ?? 0}</div>
+                      <div className="rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3 py-2">{isRtl ? 'الخدمات' : 'Services'}: {pkg?.limits?.maxServices === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxServices ?? 0}</div>
+                      <div className="rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3 py-2">{isRtl ? 'الباقات' : 'Packages'}: {pkg?.limits?.maxPackages === -1 ? (isRtl ? 'غير محدود' : 'Unlimited') : pkg?.limits?.maxPackages ?? 0}</div>
+                      <div className="rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3 py-2">{isRtl ? 'العمولة' : 'Commission'}: {pkg?.platformCommission ?? 0}%</div>
                     </div>
                   </button>
                 );
@@ -683,61 +686,61 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             </div>
           )}
 
-          {errors.selectedPackageId ? <p className="text-sm text-rose-300">{errors.selectedPackageId}</p> : null}
+          {errors.selectedPackageId ? <p className="text-sm text-rose-500">{errors.selectedPackageId}</p> : null}
         </div>
       );
     }
 
     return (
       <div className="space-y-5">
-        <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
-          <h3 className="text-xl font-bold text-white">{isRtl ? 'اتفاقية الخدمة' : 'Service agreement'}</h3>
-          <p className="mt-2 text-sm leading-7 text-zinc-300">
+        <div className="rounded-2xl border border-[#E7DDFC] bg-white p-5 shadow-sm">
+          <h3 className="text-xl font-bold text-[#1D035F]">{isRtl ? 'اتفاقية الخدمة' : 'Service agreement'}</h3>
+          <p className="mt-2 text-sm leading-7 text-zinc-600">
             {isRtl
               ? 'هذا ملخص مرئي للاتفاقية. سيبقى المحتوى القانوني كما هو في backend الإنتاج.'
               : 'A visual agreement summary. The legal content remains owned by the production backend.'}
           </p>
         </div>
 
-        <label className="flex items-start gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
+        <label className="flex items-start gap-3 rounded-2xl border border-[#E7DDFC] bg-white p-5 shadow-sm cursor-pointer hover:border-[#6537C0] transition">
           <input
             type="checkbox"
             checked={formData.acceptedServiceAgreement}
             onChange={handleChange}
             name="acceptedServiceAgreement"
-            className="mt-1 h-4 w-4 rounded border-white/20 bg-zinc-950 text-amber-400 focus:ring-amber-400/50"
+            className="mt-1 h-4 w-4 rounded border-[#E7DDFC] text-[#6537C0] accent-[#6537C0]"
           />
-          <span className="text-sm leading-7 text-zinc-200">
+          <span className="text-sm leading-7 text-zinc-700">
             {isRtl
-              ? 'أوافق على اتفاقية الخدمة وشروط الاشتراك.'
-              : 'I agree to the service agreement and subscription terms.'}
+              ? 'أوافق على اتفاقية الخدمة وشروط الاشتراك في منصة بارسبا.'
+              : 'I agree to the BarSpa service agreement and subscription terms.'}
           </span>
         </label>
 
-        {errors.acceptedServiceAgreement ? <p className="text-sm text-rose-300">{errors.acceptedServiceAgreement}</p> : null}
+        {errors.acceptedServiceAgreement ? <p className="text-sm text-rose-500">{errors.acceptedServiceAgreement}</p> : null}
       </div>
     );
   })();
 
   return (
-    <div dir={isRtl ? 'rtl' : 'ltr'} className="relative min-h-screen overflow-hidden bg-zinc-950 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.2),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(244,114,182,0.16),_transparent_24%),linear-gradient(135deg,_rgba(9,9,11,0.98),_rgba(24,24,27,0.92))]" />
+    <div dir={isRtl ? 'rtl' : 'ltr'} className="relative min-h-screen overflow-hidden bg-[#FAF7FD] text-zinc-900 font-['Cairo',_'Montserrat',_sans-serif]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(101,55,192,0.08),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(163,121,226,0.08),_transparent_35%)] pointer-events-none" />
       <div className="relative z-10 min-h-screen">
         <header className="px-4 pt-5 md:px-8">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 rounded-full border border-white/10 bg-white/5 px-4 py-3 shadow-2xl backdrop-blur-xl">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 rounded-full border border-[#E7DDFC] bg-white/95 px-4 py-3 shadow-sm backdrop-blur-xl">
             <button
               type="button"
               onClick={() => onNavigate('/')}
-              className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-amber-300/40 hover:bg-white/10"
+              className="inline-flex items-center gap-3 rounded-full px-2 py-1 transition hover:opacity-85"
             >
-              <img src="/RifahNewLogoWhite.png" alt="Rifah" className="h-9 w-auto sm:h-10" />
+              <img src={barspaLogo} alt="BarSpa" className="h-9 w-auto sm:h-10 object-contain" />
             </button>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => onNavigate('/')}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-full border border-[#E7DDFC] bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-[#FAF7FD] hover:text-[#1D035F]"
               >
                 <House size={16} />
                 <span>{isRtl ? 'الرئيسية' : 'Home'}</span>
@@ -745,7 +748,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
               <button
                 type="button"
                 onClick={() => onNavigate('/login')}
-                className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:bg-amber-400/20"
+                className="inline-flex items-center gap-2 rounded-full bg-[#6537C0] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1D035F] shadow-sm"
               >
                 <LogIn size={16} />
                 <span>{isRtl ? 'تسجيل الدخول' : 'Login'}</span>
@@ -756,14 +759,17 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
 
         <main className="px-4 pb-10 pt-6 md:px-8">
           <div className="mx-auto flex max-w-5xl flex-col gap-6">
-            <section className="rounded-[1.5rem] border border-white/10 bg-white/5 px-5 py-4 shadow-[0_16px_45px_rgba(0,0,0,0.18)] backdrop-blur-xl md:px-6 md:py-5">
-              <h2 className="text-2xl font-black leading-tight text-white md:text-[2rem]">
-                {isRtl ? 'ابدأ التسجيل بثقة' : 'Start registration with confidence'}
+            <section className="rounded-3xl border border-[#E7DDFC] bg-white px-6 py-6 shadow-sm backdrop-blur-xl md:px-8 md:py-7">
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#E7DDFC]/50 px-3 py-1 text-xs font-semibold text-[#6537C0] mb-3">
+                <span>{isRtl ? 'بوابة شركاء بارسبا' : 'BarSpa Partner Portal'}</span>
+              </div>
+              <h2 className="text-2xl font-black leading-tight text-[#1D035F] md:text-[2.25rem]">
+                {isRtl ? 'انضم إلى شبكة صالونات وسبا بارسبا' : 'Join the BarSpa Luxury Beauty Network'}
               </h2>
-              <p className="mt-2 max-w-xl text-sm leading-7 text-zinc-300 md:text-[0.98rem]">
+              <p className="mt-2 max-w-xl text-sm leading-7 text-zinc-600 md:text-[0.98rem]">
                 {isRtl
-                  ? 'أكمل بيانات منشأتك وابدأ الإعداد بخطوات واضحة وسريعة.'
-                  : 'Tell us about your business and complete setup in a calm, guided flow.'}
+                  ? 'أكمل بيانات منشأتك وابدأ رحلة إدارة الحجوزات، المبيعات، وفريق العمل بأعلى معايير الفخامة.'
+                  : 'Tell us about your business and start managing appointments, sales, and staff with luxury excellence.'}
               </p>
             </section>
 

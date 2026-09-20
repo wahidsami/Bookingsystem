@@ -19,21 +19,21 @@ export default function Breadcrumbs({ view, lang }: BreadcrumbsProps) {
   const ArrowIcon = isRtl ? ChevronLeft : ChevronRight;
 
   return (
-    <nav className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold font-sans py-1">
-      <div className="flex items-center gap-1 hover:text-slate-600 cursor-pointer">
-        <Home size={13} className="text-slate-400" />
+    <nav className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-[#A379E2]/70 font-semibold font-sans py-1">
+      <div className="flex items-center gap-1 hover:text-[#6537C0] dark:hover:text-white cursor-pointer transition-colors">
+        <Home size={13} className="text-slate-400 dark:text-[#A379E2]/70" />
         <span>{t.breadcrumbHome}</span>
       </div>
       
       {activeItem && (
         <>
-          <ArrowIcon size={12} className="text-slate-300 mx-0.5" />
-          <span className="hover:text-slate-600 cursor-pointer">
+          <ArrowIcon size={12} className="text-[#E7DDFC] dark:text-[#1D035F] mx-0.5" />
+          <span className="hover:text-[#6537C0] dark:hover:text-white cursor-pointer transition-colors">
             {getCategoryLabel(activeItem.category)}
           </span>
           
-          <ArrowIcon size={12} className="text-slate-300 mx-0.5" />
-          <span className="text-slate-900 font-bold">
+          <ArrowIcon size={12} className="text-[#E7DDFC] dark:text-[#1D035F] mx-0.5" />
+          <span className="text-[#1D035F] dark:text-[#FAF7FD] font-bold">
             {isRtl ? activeItem.labelAr : activeItem.labelEn}
           </span>
         </>

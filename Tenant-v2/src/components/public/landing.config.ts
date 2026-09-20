@@ -11,20 +11,24 @@ const DEFAULT_LANDING_CONFIGURATION: Record<Language, LandingPageConfiguration> 
     variant: 'default',
     sections: [
       { id: 'hero', componentKey: 'hero', enabled: true, order: 10, visibility: 'public', analyticsId: 'landing.hero' },
-      { id: 'value-props', componentKey: 'value-props', enabled: true, order: 20, visibility: 'public', analyticsId: 'landing.value-props' },
-      { id: 'experience-flow', componentKey: 'experience-flow', enabled: true, order: 30, visibility: 'public', analyticsId: 'landing.experience-flow' },
-      { id: 'trust', componentKey: 'trust', enabled: true, order: 40, visibility: 'public', analyticsId: 'landing.trust' },
-      { id: 'footer', componentKey: 'footer', enabled: true, order: 50, visibility: 'public', analyticsId: 'landing.footer' }
+      { id: 'trust', componentKey: 'trust', enabled: true, order: 20, visibility: 'public', analyticsId: 'landing.trust' },
+      { id: 'capabilities', componentKey: 'capabilities', enabled: true, order: 30, visibility: 'public', analyticsId: 'landing.capabilities' },
+      { id: 'value-props', componentKey: 'value-props', enabled: true, order: 40, visibility: 'public', analyticsId: 'landing.value-props' },
+      { id: 'experience-flow', componentKey: 'experience-flow', enabled: true, order: 50, visibility: 'public', analyticsId: 'landing.experience-flow' },
+      { id: 'cta-banner', componentKey: 'cta-banner', enabled: true, order: 60, visibility: 'public', analyticsId: 'landing.cta-banner' },
+      { id: 'footer', componentKey: 'footer', enabled: true, order: 70, visibility: 'public', analyticsId: 'landing.footer' }
     ]
   },
   en: {
     variant: 'default',
     sections: [
       { id: 'hero', componentKey: 'hero', enabled: true, order: 10, visibility: 'public', analyticsId: 'landing.hero' },
-      { id: 'value-props', componentKey: 'value-props', enabled: true, order: 20, visibility: 'public', analyticsId: 'landing.value-props' },
-      { id: 'experience-flow', componentKey: 'experience-flow', enabled: true, order: 30, visibility: 'public', analyticsId: 'landing.experience-flow' },
-      { id: 'trust', componentKey: 'trust', enabled: true, order: 40, visibility: 'public', analyticsId: 'landing.trust' },
-      { id: 'footer', componentKey: 'footer', enabled: true, order: 50, visibility: 'public', analyticsId: 'landing.footer' }
+      { id: 'trust', componentKey: 'trust', enabled: true, order: 20, visibility: 'public', analyticsId: 'landing.trust' },
+      { id: 'capabilities', componentKey: 'capabilities', enabled: true, order: 30, visibility: 'public', analyticsId: 'landing.capabilities' },
+      { id: 'value-props', componentKey: 'value-props', enabled: true, order: 40, visibility: 'public', analyticsId: 'landing.value-props' },
+      { id: 'experience-flow', componentKey: 'experience-flow', enabled: true, order: 50, visibility: 'public', analyticsId: 'landing.experience-flow' },
+      { id: 'cta-banner', componentKey: 'cta-banner', enabled: true, order: 60, visibility: 'public', analyticsId: 'landing.cta-banner' },
+      { id: 'footer', componentKey: 'footer', enabled: true, order: 70, visibility: 'public', analyticsId: 'landing.footer' }
     ]
   }
 };

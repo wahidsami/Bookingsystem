@@ -222,14 +222,14 @@ export default function GlobalSearch({
         transition={{ duration: 0.15, ease: 'easeOut' }}
         className={`relative w-full max-w-2xl rounded-2xl shadow-2xl border overflow-hidden flex flex-col max-h-[500px] transition-colors duration-200 ${
           darkMode 
-            ? 'bg-zinc-900 border-zinc-800 text-zinc-100' 
-            : 'bg-white border-neutral-100 text-neutral-800'
+            ? 'bg-[#0A0124] border-[#1D035F] text-zinc-100' 
+            : 'bg-white border-[#E7DDFC] text-[#1D035F]'
         }`}
         id="search-panel"
       >
         {/* Search header with Terminal / Command style */}
         <div className={`flex items-center px-4 py-4 border-b transition-colors ${
-          darkMode ? 'border-zinc-800 bg-zinc-900/50' : 'border-neutral-100 bg-neutral-50/50'
+          darkMode ? 'border-[#1D035F]/60 bg-[#0A0124]' : 'border-[#E7DDFC] bg-[#FAF7FD]'
         }`}>
           <Search className="text-zinc-400 shrink-0 mx-2" size={20} />
           <input
@@ -244,12 +244,12 @@ export default function GlobalSearch({
             }}
           />
           <div className="flex items-center gap-2">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${darkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-neutral-100 text-neutral-400'}`}>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${darkMode ? 'bg-[#12023F] text-[#A379E2]' : 'bg-[#E7DDFC]/60 text-[#1D035F]'}`}>
               ⌘K
             </span>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-neutral-200/50 rounded-lg text-neutral-400 hover:text-neutral-600 transition-colors"
+              className="p-1 hover:bg-[#FAF7FD] dark:hover:bg-[#12023F] rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-200 transition-colors"
             >
               <X size={16} />
             </button>
@@ -261,7 +261,7 @@ export default function GlobalSearch({
           
           {totalItemsCount === 0 && (
             <div className="p-8 text-center">
-              <span className={`inline-block p-3 rounded-full mb-2 ${darkMode ? 'bg-zinc-800 text-zinc-500' : 'bg-neutral-100 text-neutral-400'}`}>
+              <span className={`inline-block p-3 rounded-full mb-2 ${darkMode ? 'bg-[#12023F] text-[#A379E2]' : 'bg-[#FAF7FD] text-[#6537C0]'}`}>
                 <Terminal size={24} />
               </span>
               <p className="text-sm font-semibold">
@@ -278,7 +278,7 @@ export default function GlobalSearch({
               {/* Commands Group */}
               {filteredCommands.length > 0 && (
                 <div>
-                  <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-3 mb-1.5">
+                  <h3 className="text-[10px] font-bold text-[#A379E2] uppercase tracking-widest px-3 mb-1.5">
                     {isRtl ? 'أوامر النظام السريعة' : 'Instant System Commands'}
                   </h3>
                   <div className="space-y-0.5">
@@ -294,20 +294,20 @@ export default function GlobalSearch({
                           className={`w-full text-start flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${
                             isFocused 
                               ? darkMode 
-                                ? 'bg-zinc-800 text-white font-medium' 
-                                : 'bg-brand-50/70 text-brand-900 font-medium'
-                              : 'hover:bg-neutral-100/30 text-neutral-500'
+                                ? 'bg-[#1D035F] text-white font-medium' 
+                                : 'bg-[#F3EDFC] text-[#1D035F] font-medium'
+                              : 'hover:bg-[#FAF7FD] dark:hover:bg-[#12023F]/50 text-neutral-500 dark:text-zinc-400'
                           }`}
                         >
                           <div className="flex items-center gap-3">
                             <span className={`p-1.5 rounded-lg shrink-0 ${
                               isFocused 
-                                ? 'bg-brand-500 text-white' 
-                                : darkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-neutral-100 text-neutral-500'
+                                ? 'bg-[#6537C0] text-white' 
+                                : darkMode ? 'bg-[#12023F] text-[#A379E2]' : 'bg-[#FAF7FD] text-[#6537C0]'
                             }`}>
                               <Icon size={14} />
                             </span>
-                            <span className={`text-xs md:text-sm ${isFocused ? 'text-neutral-900 dark:text-white font-bold' : ''}`}>
+                            <span className={`text-xs md:text-sm ${isFocused ? 'text-[#1D035F] dark:text-white font-bold' : ''}`}>
                               {isRtl ? cmd.labelAr : cmd.labelEn}
                             </span>
                           </div>
@@ -316,14 +316,14 @@ export default function GlobalSearch({
                             {cmd.shortcut && (
                               <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
                                 isFocused 
-                                  ? 'bg-white/20 text-brand-700 dark:text-brand-300' 
-                                  : darkMode ? 'bg-zinc-800 text-zinc-500' : 'bg-neutral-100 text-neutral-400'
+                                  ? 'bg-[#6537C0]/20 text-[#6537C0] dark:text-[#A379E2]' 
+                                  : darkMode ? 'bg-[#12023F] text-zinc-500' : 'bg-neutral-100 text-neutral-400'
                               }`}>
                                 {cmd.shortcut}
                               </span>
                             )}
                             {isFocused && (
-                              <CornerDownLeft size={10} className="text-brand-500 opacity-85 shrink-0" />
+                              <CornerDownLeft size={10} className="text-[#6537C0] opacity-85 shrink-0" />
                             )}
                           </div>
                         </button>
@@ -336,7 +336,7 @@ export default function GlobalSearch({
               {/* Modules Group */}
               {matchedNav.length > 0 && (
                 <div>
-                  <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-3 mb-1.5">
+                  <h3 className="text-[10px] font-bold text-[#A379E2] uppercase tracking-widest px-3 mb-1.5">
                     {isRtl ? 'الأقسام والصفحات' : 'Go to Modules'}
                   </h3>
                   <div className="space-y-0.5">
@@ -351,25 +351,25 @@ export default function GlobalSearch({
                           className={`w-full text-start flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${
                             isFocused 
                               ? darkMode 
-                                ? 'bg-zinc-800 text-white font-medium' 
-                                : 'bg-brand-50/70 text-brand-900 font-medium'
-                              : 'hover:bg-neutral-100/30 text-neutral-500'
+                                ? 'bg-[#1D035F] text-white font-medium' 
+                                : 'bg-[#F3EDFC] text-[#1D035F] font-medium'
+                              : 'hover:bg-[#FAF7FD] dark:hover:bg-[#12023F]/50 text-neutral-500 dark:text-zinc-400'
                           }`}
                         >
                           <div className="flex items-center gap-3">
                             <span className={`p-1.5 rounded-lg shrink-0 ${
                               isFocused 
-                                ? 'bg-brand-500 text-white' 
-                                : darkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-neutral-100 text-neutral-500'
+                                ? 'bg-[#6537C0] text-white' 
+                                : darkMode ? 'bg-[#12023F] text-[#A379E2]' : 'bg-[#FAF7FD] text-[#6537C0]'
                             }`}>
                               <LucideIcon name={item.iconName} size={14} />
                             </span>
-                            <span className={`text-xs md:text-sm ${isFocused ? 'text-neutral-900 dark:text-white font-bold' : ''}`}>
+                            <span className={`text-xs md:text-sm ${isFocused ? 'text-[#1D035F] dark:text-white font-bold' : ''}`}>
                               {isRtl ? item.labelAr : item.labelEn}
                             </span>
                           </div>
                           {isFocused && (
-                            <CornerDownLeft size={10} className="text-brand-500 opacity-85 shrink-0" />
+                            <CornerDownLeft size={10} className="text-[#6537C0] opacity-85 shrink-0" />
                           )}
                         </button>
                       );
@@ -381,7 +381,7 @@ export default function GlobalSearch({
               {/* Customers Group */}
               {matchedCustomers.length > 0 && (
                 <div>
-                  <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-3 mb-1.5">
+                  <h3 className="text-[10px] font-bold text-[#A379E2] uppercase tracking-widest px-3 mb-1.5">
                     {isRtl ? 'سجل العملاء' : 'Customers Matching'}
                   </h3>
                   <div className="space-y-0.5">
@@ -396,17 +396,17 @@ export default function GlobalSearch({
                           className={`w-full text-start flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${
                             isFocused 
                               ? darkMode 
-                                ? 'bg-zinc-800 text-white' 
-                                : 'bg-brand-50/70 text-brand-900 font-medium'
-                              : 'hover:bg-neutral-100/30 text-neutral-500'
+                                ? 'bg-[#1D035F] text-white' 
+                                : 'bg-[#F3EDFC] text-[#1D035F] font-medium'
+                              : 'hover:bg-[#FAF7FD] dark:hover:bg-[#12023F]/50 text-neutral-500 dark:text-zinc-400'
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
+                            <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
                               <Users size={14} />
                             </span>
                             <div className="min-w-0">
-                              <p className={`text-xs md:text-sm font-semibold truncate ${isFocused ? 'text-neutral-900 dark:text-white' : ''}`}>
+                              <p className={`text-xs md:text-sm font-semibold truncate ${isFocused ? 'text-[#1D035F] dark:text-white' : ''}`}>
                                 {cust.name}
                               </p>
                               <p className="text-[10px] text-zinc-400 truncate font-mono">
@@ -414,7 +414,7 @@ export default function GlobalSearch({
                               </p>
                             </div>
                           </div>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${isFocused ? 'bg-emerald-500 text-white' : 'bg-neutral-100 text-neutral-500 dark:bg-zinc-800'}`}>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${isFocused ? 'bg-emerald-500 text-white' : 'bg-neutral-100 text-neutral-500 dark:bg-[#12023F] dark:text-zinc-400'}`}>
                             {cust.totalSpent}
                           </span>
                         </button>
@@ -427,7 +427,7 @@ export default function GlobalSearch({
               {/* Services Group */}
               {matchedServices.length > 0 && (
                 <div>
-                  <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-3 mb-1.5">
+                  <h3 className="text-[10px] font-bold text-[#A379E2] uppercase tracking-widest px-3 mb-1.5">
                     {isRtl ? 'قائمة الخدمات الفاخرة' : 'Services Catalog'}
                   </h3>
                   <div className="space-y-0.5">
@@ -442,17 +442,17 @@ export default function GlobalSearch({
                           className={`w-full text-start flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${
                             isFocused 
                               ? darkMode 
-                                ? 'bg-zinc-800 text-white' 
-                                : 'bg-brand-50/70 text-brand-900 font-medium'
-                              : 'hover:bg-neutral-100/30 text-neutral-500'
+                                ? 'bg-[#1D035F] text-white' 
+                                : 'bg-[#F3EDFC] text-[#1D035F] font-medium'
+                              : 'hover:bg-[#FAF7FD] dark:hover:bg-[#12023F]/50 text-neutral-500 dark:text-zinc-400'
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className="p-1.5 rounded-lg bg-rose-50 text-rose-600 shrink-0">
+                            <span className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 shrink-0">
                               <Sparkles size={14} />
                             </span>
                             <div className="min-w-0">
-                              <p className={`text-xs md:text-sm font-semibold truncate ${isFocused ? 'text-neutral-900 dark:text-white' : ''}`}>
+                              <p className={`text-xs md:text-sm font-semibold truncate ${isFocused ? 'text-[#1D035F] dark:text-white' : ''}`}>
                                 {isRtl ? srv.nameAr : srv.nameEn}
                               </p>
                               <p className="text-[10px] text-zinc-400">
@@ -460,7 +460,7 @@ export default function GlobalSearch({
                               </p>
                             </div>
                           </div>
-                          <span className="text-xs font-bold font-mono text-brand-600 dark:text-brand-400">
+                          <span className="text-xs font-bold font-mono text-[#6537C0] dark:text-[#A379E2]">
                             {srv.price} {isRtl ? 'ر.س' : 'SAR'}
                           </span>
                         </button>
@@ -476,24 +476,24 @@ export default function GlobalSearch({
 
         {/* Footer info with hotkeys */}
         <div className={`px-4 py-3 border-t flex flex-wrap justify-between items-center text-[10px] text-zinc-400 transition-colors ${
-          darkMode ? 'border-zinc-800 bg-zinc-900/50' : 'border-neutral-100 bg-neutral-50/50'
+          darkMode ? 'border-[#1D035F]/60 bg-[#070119]' : 'border-[#E7DDFC] bg-[#FAF7FD]'
         }`}>
           <div className="flex items-center gap-3.5">
             <span className="flex items-center gap-1.5">
-              <kbd className="px-1 py-0.5 bg-neutral-100 dark:bg-zinc-800 border border-neutral-300 dark:border-zinc-700 rounded text-zinc-500 font-mono shadow-xs text-[9px]">↑↓</kbd> 
+              <kbd className="px-1 py-0.5 bg-white dark:bg-[#12023F] border border-[#E7DDFC] dark:border-[#1D035F] rounded text-zinc-500 dark:text-zinc-300 font-mono shadow-xs text-[9px]">↑↓</kbd> 
               <span>{isRtl ? 'للتنقل' : 'to navigate'}</span>
             </span>
             <span className="flex items-center gap-1.5">
-              <kbd className="px-1 py-0.5 bg-neutral-100 dark:bg-zinc-800 border border-neutral-300 dark:border-zinc-700 rounded text-zinc-500 font-mono shadow-xs text-[9px]">Enter</kbd> 
+              <kbd className="px-1 py-0.5 bg-white dark:bg-[#12023F] border border-[#E7DDFC] dark:border-[#1D035F] rounded text-zinc-500 dark:text-zinc-300 font-mono shadow-xs text-[9px]">Enter</kbd> 
               <span>{isRtl ? 'للتحديد' : 'to select'}</span>
             </span>
             <span className="flex items-center gap-1.5">
-              <kbd className="px-1 py-0.5 bg-neutral-100 dark:bg-zinc-800 border border-neutral-300 dark:border-zinc-700 rounded text-zinc-500 font-mono shadow-xs text-[9px]">Esc</kbd> 
+              <kbd className="px-1 py-0.5 bg-white dark:bg-[#12023F] border border-[#E7DDFC] dark:border-[#1D035F] rounded text-zinc-500 dark:text-zinc-300 font-mono shadow-xs text-[9px]">Esc</kbd> 
               <span>{isRtl ? 'للإغلاق' : 'to close'}</span>
             </span>
           </div>
           <div className="mt-1 sm:mt-0 font-sans tracking-wide">
-            {isRtl ? 'محرك أوامر رفاه السريع' : 'REFAH command control engine'}
+            {isRtl ? 'محرك أوامر بارسبا السريع' : 'BarSpa Command Control Engine'}
           </div>
         </div>
       </motion.div>

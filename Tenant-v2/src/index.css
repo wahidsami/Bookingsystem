@@ -1,24 +1,99 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
-  
-  --color-brand-50: #fffbeb;
-  --color-brand-100: #fef3c7;
-  --color-brand-200: #fde68a;
-  --color-brand-300: #fcd34d;
-  --color-brand-400: #fbbf24;
-  --color-brand-500: #f59e0b;
-  --color-brand-600: #d97706;
-  --color-brand-700: #b45309;
-  --color-brand-800: #92400e;
-  --color-brand-900: #18181b;
-  --color-brand-950: #09090b;
+  --font-cairo: "Cairo", Tahoma, Arial, sans-serif;
+  --font-montserrat: "Montserrat", system-ui, sans-serif;
+  --font-sans: "Cairo", "Montserrat", system-ui, sans-serif;
+
+  /* BarSpa Brand Purple Scale */
+  --color-brand-50: #FAF7FD;
+  --color-brand-100: #F3EDFC;
+  --color-brand-200: #E7DDFC;
+  --color-brand-300: #D0BFF8;
+  --color-brand-400: #A379E2;
+  --color-brand-500: #6537C0;
+  --color-brand-600: #5527B0;
+  --color-brand-700: #451C90;
+  --color-brand-800: #1D035F;
+  --color-brand-900: #12023F;
+  --color-brand-950: #0A0124;
+
+  /* BarSpa Named Color Tokens */
+  --color-barspa-primary: #6537C0;
+  --color-barspa-deep: #1D035F;
+  --color-barspa-soft: #A379E2;
+  --color-barspa-light: #E7DDFC;
 }
 
 @layer base {
+  :root {
+    --barspa-bg: #FFFFFF;
+    --barspa-surface: #FFFFFF;
+    --barspa-surface-soft: #FAF7FD;
+    --barspa-surface-lavender: #F3EDFC;
+    --barspa-border: #E7DDFC;
+    --barspa-text-primary: #1D035F;
+    --barspa-text-secondary: #475569;
+    --barspa-text-muted: #64748B;
+  }
+
+  .dark {
+    --barspa-bg: #0A0124;
+    --barspa-surface: #12023F;
+    --barspa-surface-soft: #1D035F;
+    --barspa-surface-lavender: #291068;
+    --barspa-border: #3B1B85;
+    --barspa-text-primary: #FAF7FD;
+    --barspa-text-secondary: #E7DDFC;
+    --barspa-text-muted: #A379E2;
+  }
+
+  /* Locale-aware body typography */
+  [dir="rtl"] body {
+    font-family: var(--font-cairo);
+  }
+
+  [dir="ltr"] body {
+    font-family: var(--font-montserrat);
+  }
+
   body {
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Centralized BarSpa Semantic Status Badge Utilities (Never Look Disabled) */
+@layer components {
+  /* Active / Confirmed */
+  .badge-status-confirmed {
+    @apply bg-purple-50 text-[#1D035F] border border-[#A379E2]/40 font-bold dark:bg-[#1D035F]/40 dark:text-[#E7DDFC] dark:border-[#A379E2]/50;
+  }
+
+  /* In-Progress / Processing */
+  .badge-status-processing {
+    @apply bg-indigo-50 text-indigo-900 border border-indigo-200 font-bold dark:bg-indigo-950/50 dark:text-indigo-200 dark:border-indigo-800;
+  }
+
+  /* Completed / Fulfilled */
+  .badge-status-completed {
+    @apply bg-emerald-50 text-emerald-900 border border-emerald-300 font-bold dark:bg-emerald-950/50 dark:text-emerald-200 dark:border-emerald-800;
+  }
+
+  /* Pending / Action Needed */
+  .badge-status-pending {
+    @apply bg-amber-50 text-amber-900 border border-amber-300 font-bold dark:bg-amber-950/50 dark:text-amber-200 dark:border-amber-800;
+  }
+
+  /* Cancelled / Alert */
+  .badge-status-cancelled {
+    @apply bg-rose-50 text-rose-900 border border-rose-300 font-bold dark:bg-rose-950/50 dark:text-rose-200 dark:border-rose-800;
+  }
+
+  /* Shipped / Information */
+  .badge-status-shipped {
+    @apply bg-sky-50 text-sky-900 border border-sky-300 font-bold dark:bg-sky-950/50 dark:text-sky-200 dark:border-sky-800;
   }
 }
 
@@ -33,10 +108,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.2);
+  background: rgba(163, 121, 226, 0.25);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.4);
+  background: rgba(101, 55, 192, 0.5);
 }
