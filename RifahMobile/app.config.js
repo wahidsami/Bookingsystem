@@ -4,35 +4,35 @@ const updateUrl = easProjectId ? `https://u.expo.dev/${easProjectId}` : undefine
 
 module.exports = {
   expo: {
-    name: 'Refah Staff',
+    name: 'BarSpa',
     slug: 'refah-mobile',
     scheme: 'com.refah.mobile',
-    version: '1.0.0',
+    version: '2.0.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
+    icon: './assets/barspa_app_icon.png',
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     splash: {
-      image: './assets/splash-icon.png',
+      image: './assets/barspa_logo.png',
       resizeMode: 'contain',
-      backgroundColor: '#8B5CF6',
+      backgroundColor: '#FAF9FC',
     },
     assetBundlePatterns: ['**/*'],
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.refah.mobile',
-      buildNumber: '1.0.0',
+      buildNumber: '2.0.0',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#8B5CF6',
+        foregroundImage: './assets/barspa_adaptive_icon.png',
+        backgroundColor: '#FFFFFF',
       },
       package: 'com.refah.mobile',
-      versionCode: 1,
+      versionCode: 3,
       edgeToEdgeEnabled: false,
       predictiveBackGestureEnabled: false,
       config: {
@@ -48,9 +48,7 @@ module.exports = {
       ar: './locales/ar.json',
       en: './locales/en.json',
     },
-    runtimeVersion: {
-      policy: 'appVersion',
-    },
+    runtimeVersion: '2.0.0',
     ...(updateUrl ? {
       updates: {
         url: updateUrl,

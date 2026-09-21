@@ -13,6 +13,7 @@ import { ProfileScreen } from '../screens/ProfileScreen';
 import { BrowseScreen } from '../screens/BrowseScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { SavedAddressesScreen } from '../screens/SavedAddressesScreen';
 import { InfoPageScreen } from '../screens/InfoPageScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { NotificationDetailScreen } from '../screens/NotificationDetailScreen';
@@ -24,15 +25,15 @@ import { ServiceDetailsScreen } from '../screens/ServiceDetailsScreen';
 import { ServiceBrowserScreen } from '../screens/ServiceBrowserScreen';
 import { ProductDetailsScreen } from '../screens/ProductDetailsScreen';
 import { WalletBalanceDetailsScreen } from '../screens/WalletBalanceDetailsScreen';
+import { TenantWalletDetailsScreen } from '../screens/TenantWalletDetailsScreen';
 import { CentersBalanceScreen } from '../screens/CentersBalanceScreen';
 import { AppointmentDetailsScreen } from '../screens/AppointmentDetailsScreen';
-import { BookingStaffSelectionScreen } from '../screens/BookingStaffSelectionScreen';
-import { BookingStaffPerServiceScreen } from '../screens/BookingStaffPerServiceScreen';
-import { BookingDateTimeSelectionScreen } from '../screens/BookingDateTimeSelectionScreen';
-import { BookingReviewScreen } from '../screens/BookingReviewScreen';
-import { BookingPaymentMethodScreen } from '../screens/BookingPaymentMethodScreen';
+import { PurchaseDetailsScreen } from '../screens/PurchaseDetailsScreen';
 
-const Stack = createNativeStackNavigator();
+import { SearchScreen } from '../screens/SearchScreen';
+import { RootStackParamList } from './routes';
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
     return (
@@ -43,6 +44,7 @@ export function RootNavigator() {
             }}
         >
             <Stack.Screen name="Tabs" component={TabNavigator} />
+            <Stack.Screen name="Search" component={SearchScreen} />
             <Stack.Screen name="Tenant" component={TenantScreen} />
             <Stack.Screen name="Booking" component={BookingJourneyScreen} />
             <Stack.Screen name="MyPurchases" component={PurchasesScreen} />
@@ -55,6 +57,7 @@ export function RootNavigator() {
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Browse" component={BrowseScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
             <Stack.Screen name="InfoPage" component={InfoPageScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="NotificationDetail" component={NotificationDetailScreen} />
@@ -66,13 +69,10 @@ export function RootNavigator() {
             <Stack.Screen name="Review" component={ReviewScreen} />
             <Stack.Screen name="Gifts" component={GiftsScreen} />
             <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
-            <Stack.Screen name="BookingStaffSelection" component={BookingStaffSelectionScreen} />
-            <Stack.Screen name="BookingStaffPerServiceScreen" component={BookingStaffPerServiceScreen} />
-            <Stack.Screen name="BookingDateTimeSelection" component={BookingDateTimeSelectionScreen} />
-            <Stack.Screen name="BookingReviewScreen" component={BookingReviewScreen} />
-            <Stack.Screen name="BookingPaymentMethodScreen" component={BookingPaymentMethodScreen} />
             <Stack.Screen name="WalletBalanceDetails" component={WalletBalanceDetailsScreen} />
+            <Stack.Screen name="TenantWalletDetails" component={TenantWalletDetailsScreen} />
             <Stack.Screen name="CentersBalance" component={CentersBalanceScreen} />
+            <Stack.Screen name="PurchaseDetails" component={PurchaseDetailsScreen} />
         </Stack.Navigator>
     );
 }

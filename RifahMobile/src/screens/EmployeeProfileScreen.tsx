@@ -119,11 +119,11 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.heroHeader, { paddingTop: topInset + 8 }]}>
+      <View style={[styles.heroHeader, isRTL && styles.rowRTL, { paddingTop: topInset + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.glassButton}>
           <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={22} color={colors.text} />
         </TouchableOpacity>
-        <View style={styles.heroActions}>
+        <View style={[styles.heroActions, isRTL && styles.rowRTL]}>
           <TouchableOpacity style={styles.glassButton}>
             <AppIcon name="share" size={18} color={colors.text} />
           </TouchableOpacity>
@@ -142,7 +142,7 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
           <Text style={styles.name}>{provider.name}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
           {provider.experience ? (
-            <View style={styles.experiencePill}>
+            <View style={[styles.experiencePill, isRTL && styles.rowRTL]}>
               <AppIcon name="sparkles" size={13} color={colors.primary} />
               <Text style={styles.experienceText}>{isRTL ? `الخبرة: ${provider.experience}` : `Experience: ${provider.experience}`}</Text>
             </View>
@@ -152,7 +152,7 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
         <View style={styles.statsCard}>
           <View style={styles.statBlock}>
             <Text style={styles.statValue}>{displayRating}</Text>
-            <View style={styles.starsRow}>
+            <View style={[styles.starsRow, isRTL && styles.rowRTL]}>
               {Array.from({ length: 5 }).map((_, index) => (
                 <Text key={`overall-star-${index}`} style={[styles.star, index < Math.round(Number(displayRating)) ? styles.starActive : null]}>★</Text>
               ))}
@@ -168,15 +168,15 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
 
         {provider.bio ? (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>{isRTL ? 'نبذة' : 'About'}</Text>
-            <Text style={styles.bioText}>{provider.bio}</Text>
+            <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{isRTL ? 'نبذة' : 'About'}</Text>
+            <Text style={[styles.bioText, isRTL && styles.rtlText]}>{provider.bio}</Text>
           </View>
         ) : null}
 
         {Array.isArray(provider.skills) && provider.skills.length > 0 ? (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>{isRTL ? 'المهارات' : 'Skills'}</Text>
-            <View style={styles.skillsWrap}>
+            <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{isRTL ? 'المهارات' : 'Skills'}</Text>
+            <View style={[styles.skillsWrap, isRTL && styles.rowRTL]}>
               {provider.skills.map((skill: string, index: number) => (
                 <View key={`${skill}-${index}`} style={styles.skillChip}>
                   <Text style={styles.skillChipText}>{skill}</Text>
@@ -187,10 +187,10 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
         ) : null}
 
         <View style={styles.sectionCard}>
-          <View style={styles.reviewsHeaderRow}>
-            <Text style={styles.sectionTitle}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
+          <View style={[styles.reviewsHeaderRow, isRTL && styles.rowRTL]}>
+            <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
             {hasEligibleBookingForReview ? (
-              <TouchableOpacity style={styles.writeReviewButton} onPress={openProviderReviewPrompt}>
+              <TouchableOpacity style={[styles.writeReviewButton, isRTL && styles.rowRTL]} onPress={openProviderReviewPrompt}>
                 <AppIcon name="star" size={14} color="#FFFFFF" />
                 <Text style={styles.writeReviewButtonText}>{isRTL ? 'إضافة تقييم' : 'Write Review'}</Text>
               </TouchableOpacity>
@@ -199,17 +199,17 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
           {loading ? (
             <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
           ) : reviews.length === 0 ? (
-            <Text style={styles.emptyText}>{isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.'}</Text>
+            <Text style={[styles.emptyText, isRTL && styles.rtlText]}>{isRTL ? 'لا توجد تقييمات منشورة بعد.' : 'No published reviews yet.'}</Text>
           ) : (
             reviews.map((review) => (
               <View key={review.id} style={styles.reviewCard}>
-                <View style={styles.reviewHeader}>
-                  <Text style={styles.reviewAuthor}>
+                <View style={[styles.reviewHeader, isRTL && styles.rowRTL]}>
+                  <Text style={[styles.reviewAuthor, isRTL && styles.rtlText]}>
                     {review.customerName && review.customerName.toLowerCase() !== 'valued customer'
                       ? review.customerName
                       : (isRTL ? 'عميل موثّق' : 'Verified Customer')}
                   </Text>
-                  <View style={styles.starsRow}>
+                  <View style={[styles.starsRow, isRTL && styles.rowRTL]}>
                     {Array.from({ length: 5 }).map((_, index) => (
                       <Text
                         key={`${review.id}-star-${index}`}
@@ -220,11 +220,11 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
                     ))}
                   </View>
                 </View>
-                {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+                {review.comment ? <Text style={[styles.reviewComment, isRTL && styles.rtlText]}>{review.comment}</Text> : null}
                 {review.staffReply ? (
-                  <View style={styles.replyBox}>
-                    <Text style={styles.replyLabel}>{replyLabel}</Text>
-                    <Text style={styles.replyText}>{review.staffReply}</Text>
+                  <View style={[styles.replyBox, isRTL && styles.replyBoxRTL]}>
+                    <Text style={[styles.replyLabel, isRTL && styles.rtlText]}>{replyLabel}</Text>
+                    <Text style={[styles.replyText, isRTL && styles.rtlText]}>{review.staffReply}</Text>
                   </View>
                 ) : null}
               </View>
@@ -527,5 +527,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '800'
-  }
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
+  },
+  rtlText: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  replyBoxRTL: {
+    borderLeftWidth: 0,
+    borderRightWidth: 2.5,
+    borderRightColor: '#6E34DB',
+  },
 });

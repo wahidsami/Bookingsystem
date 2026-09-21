@@ -1,4 +1,5 @@
 import React from 'react';
+import { View } from 'react-native';
 
 import BellIcon from '../../assets/icons/icon_bell.svg';
 import SearchIcon from '../../assets/icons/icon_search.svg';
@@ -103,12 +104,21 @@ type IconName =
   | 'account_balance_wallet'
   | 'receipt_long'
   | 'verified_user'
+  | 'chevron_right'
+  | 'chevron_left'
+  | 'gift'
+  | 'calendar_today'
+  | 'shopping_bag'
+  | 'map_pin'
+  | 'alert_circle'
+  | 'refresh'
   | 'check';
 
-type Props = {
+export type AppIconProps = {
   name: IconName;
   size?: number;
   color?: string;
+  style?: any;
 };
 
 const iconMap = {
@@ -165,10 +175,25 @@ const iconMap = {
   account_balance_wallet: WalletIcon,
   receipt_long: FileIcon,
   verified_user: UserIcon,
+  chevron_right: ArrowForwardIcon,
+  chevron_left: ArrowBackIcon,
+  gift: SparklesIcon,
+  calendar_today: CalendarIcon,
+  shopping_bag: CartIcon,
+  map_pin: LocationIcon,
+  alert_circle: WarningIcon,
+  refresh: ArrowForwardIcon,
   check: CheckIcon,
 } as const;
 
-export function AppIcon({ name, size = 22, color = '#7F50D2' }: Props) {
-  const Icon = iconMap[name] || WarningIcon;
+export function AppIcon({ name, size = 22, color = '#7F50D2', style }: AppIconProps) {
+  const Icon = (iconMap as any)[name] || WarningIcon;
+  if (style) {
+    return (
+      <View style={style}>
+        <Icon width={size} height={size} color={color} />
+      </View>
+    );
+  }
   return <Icon width={size} height={size} color={color} />;
 }

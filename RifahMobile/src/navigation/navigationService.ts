@@ -1,6 +1,25 @@
 import { createNavigationContainerRef } from '@react-navigation/native';
+import { RootStackParamList } from './routes';
 
-export const navigationRef = createNavigationContainerRef<any>();
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+export const navigateToSearch = (query?: string): boolean => {
+    if (!navigationRef.isReady()) {
+        return false;
+    }
+
+    navigationRef.navigate('Search', query ? { query } : undefined);
+    return true;
+};
+
+export const navigateToTenant = (tenantId: string, slug?: string, tenant?: any): boolean => {
+    if (!tenantId || !navigationRef.isReady()) {
+        return false;
+    }
+
+    navigationRef.navigate('Tenant', { tenantId, slug, tenant });
+    return true;
+};
 
 export const navigateToNotifications = (): boolean => {
     if (!navigationRef.isReady()) {
@@ -34,7 +53,7 @@ export const navigateToWalletBalanceDetails = (): boolean => {
         return false;
     }
 
-    navigationRef.navigate('WalletBalanceDetails');
+    navigationRef.navigate('Gifts');
     return true;
 };
 

@@ -39,6 +39,8 @@ export function PaymentSuccessScreen({ route, navigation }: any) {
     }, [clearCart]);
 
     const appointmentId = route.params?.appointmentId || route.params?.bookingId || null;
+    const orderId = route.params?.orderId || null;
+    const isProductOrder = Boolean(orderId) || route.params?.checkoutType === 'product';
     const summary: PaymentSuccessSummary = route.params?.paymentSummary || {};
     const participants = Array.isArray(summary.participants) ? summary.participants : [];
 
@@ -56,114 +58,161 @@ export function PaymentSuccessScreen({ route, navigation }: any) {
                     <View style={styles.heroIcon}>
                         <AppIcon name="verified_user" size={30} color={colors.primary} />
                     </View>
-                    <Text style={styles.heroTitle}>{isRTL ? 'تم تأكيد الزيارة' : 'Visit Confirmed'}</Text>
+                    <Text style={styles.heroTitle}>
+                        {isProductOrder
+                            ? (isRTL ? 'تم تأكيد الطلب' : 'Order Confirmed')
+                            : (isRTL ? 'تم تأكيد الزيارة' : 'Visit Confirmed')}
+                    </Text>
                     <Text style={styles.heroSubtitle}>
-                        {isRTL
-                            ? 'تم حفظ الحجز بنجاح. إليكِ الملخص النهائي.'
-                            : 'Your booking has been confirmed. Here is the final summary.'}
+                        {isProductOrder
+                            ? (isRTL
+                                ? 'تم تأكيد طلبك بنجاح. إليك ملخص الطلب.'
+                                : 'Your order has been confirmed. Here is your order summary.')
+                            : (isRTL
+                                ? 'تم حفظ الحجز بنجاح. إليكِ الملخص النهائي.'
+                                : 'Your booking has been confirmed. Here is the final summary.')}
                     </Text>
                 </View>
 
                 <View style={styles.summaryCard}>
-                    <Text style={styles.sectionTitle}>{isRTL ? 'تفاصيل الزيارة' : 'Visit details'}</Text>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
+                        {isProductOrder
+                            ? (isRTL ? 'تفاصيل الطلب' : 'Order details')
+                            : (isRTL ? 'تفاصيل الزيارة' : 'Visit details')}
+                    </Text>
                     <View>
+                        {isProductOrder && orderId ? (
+                            <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                                <Text style={[styles.summaryLabel, isRTL && styles.rtlText]}>{isRTL ? 'رقم الطلب' : 'Order ID'}</Text>
+                                <Text style={[styles.summaryValue, isRTL && styles.valueLtrAlign]}>{String(orderId).slice(0, 10)}</Text>
+                            </View>
+                        ) : null}
                         {summary.date ? (
-                            <View style={styles.summaryRow}>
-                                <Text style={styles.summaryLabel}>{isRTL ? 'التاريخ' : 'Date'}</Text>
-                                <Text style={styles.summaryValue}>{summary.date}</Text>
+                            <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                                <Text style={[styles.summaryLabel, isRTL && styles.rtlText]}>{isRTL ? 'التاريخ' : 'Date'}</Text>
+                                <Text style={[styles.summaryValue, isRTL && styles.valueLtrAlign]}>{summary.date}</Text>
                             </View>
                         ) : null}
                         {summary.time ? (
-                            <View style={styles.summaryRow}>
-                                <Text style={styles.summaryLabel}>{isRTL ? 'الوقت' : 'Time'}</Text>
-                                <Text style={styles.summaryValue}>{summary.time}</Text>
+                            <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                                <Text style={[styles.summaryLabel, isRTL && styles.rtlText]}>{isRTL ? 'الوقت' : 'Time'}</Text>
+                                <Text style={[styles.summaryValue, isRTL && styles.valueLtrAlign]}>{summary.time}</Text>
                             </View>
                         ) : null}
                         {summary.salon ? (
-                            <View style={styles.summaryRow}>
-                                <Text style={styles.summaryLabel}>{isRTL ? 'الصالون' : 'Salon'}</Text>
-                                <Text style={styles.summaryValue}>{summary.salon}</Text>
+                            <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                                <Text style={[styles.summaryLabel, isRTL && styles.rtlText]}>{isProductOrder ? (isRTL ? 'المتجر' : 'Store') : (isRTL ? 'الصالون' : 'Salon')}</Text>
+                                <Text style={[styles.summaryValue, isRTL && styles.valueLtrAlign]}>{summary.salon}</Text>
                             </View>
                         ) : null}
-                        {summary.employee ? (
-                            <View style={styles.summaryRow}>
-                                <Text style={styles.summaryLabel}>{isRTL ? 'الموظف' : 'Employee'}</Text>
-                                <Text style={styles.summaryValue}>{summary.employee}</Text>
+                        {!isProductOrder && summary.employee ? (
+                            <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                                <Text style={[styles.summaryLabel, isRTL && styles.rtlText]}>{isRTL ? 'الموظف' : 'Employee'}</Text>
+                                <Text style={[styles.summaryValue, isRTL && styles.valueLtrAlign]}>{summary.employee}</Text>
                             </View>
                         ) : null}
                     </View>
                 </View>
 
-                <View style={styles.summaryCard}>
-                    <Text style={styles.sectionTitle}>{isRTL ? 'المشاركون' : 'Participants'}</Text>
-                    {formattedParticipants.map((participant, index) => (
-                        <View key={`${participant.name}-${index}`} style={styles.participantRow}>
-                            <View style={styles.participantBadge}>
-                                <AppIcon name={index === 0 ? 'verified_user' : 'user'} size={12} color={colors.primary} />
-                                <Text style={styles.participantBadgeText}>{participant.name}</Text>
+                {!isProductOrder && (
+                    <View style={styles.summaryCard}>
+                        <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{isRTL ? 'المشاركون' : 'Participants'}</Text>
+                        {formattedParticipants.map((participant, index) => (
+                            <View key={`${participant.name}-${index}`} style={[styles.participantRow, isRTL && { alignItems: 'flex-end' }]}>
+                                <View style={[styles.participantBadge, isRTL && styles.rowRTL, isRTL && { alignSelf: 'flex-end' }]}>
+                                    <AppIcon name={index === 0 ? 'verified_user' : 'user'} size={12} color={colors.primary} />
+                                    <Text style={styles.participantBadgeText}>{participant.name}</Text>
+                                </View>
+                                <Text style={[styles.participantServices, isRTL && styles.rtlText]}>
+                                    {participant.services.length > 0
+                                        ? participant.services.join(' · ')
+                                        : (isRTL ? 'الخدمة الأساسية' : 'Primary service')}
+                                </Text>
                             </View>
-                            <Text style={styles.participantServices}>
-                                {participant.services.length > 0
-                                    ? participant.services.join(' · ')
-                                    : (isRTL ? 'الخدمة الأساسية' : 'Primary service')}
-                            </Text>
-                        </View>
-                    ))}
-                </View>
+                        ))}
+                    </View>
+                )}
 
                 <View style={styles.summaryCard}>
-                    <Text style={styles.sectionTitle}>{isRTL ? 'الملخص المالي' : 'Payment summary'}</Text>
-                    <View style={styles.amountRow}>
-                        <Text style={styles.amountLabel}>{isRTL ? 'المجموع الفرعي' : 'Subtotal'}</Text>
-                        <Text style={styles.amountValue}>{formatRiyal(Number(summary.subtotal || 0), isRTL ? 'ar' : 'en')}</Text>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{isRTL ? 'الملخص المالي' : 'Payment summary'}</Text>
+                    <View style={[styles.amountRow, isRTL && styles.rowRTL]}>
+                        <Text style={[styles.amountLabel, isRTL && styles.rtlText]}>{isRTL ? 'المجموع الفرعي' : 'Subtotal'}</Text>
+                        <Text style={[styles.amountValue, isRTL && styles.valueLtrAlign]}>{formatRiyal(Number(summary.subtotal || 0), isRTL ? 'ar' : 'en')}</Text>
                     </View>
-                    <View style={styles.amountRow}>
-                        <Text style={styles.amountLabel}>{isRTL ? 'الضريبة' : 'Tax'}</Text>
-                        <Text style={styles.amountValue}>
+                    <View style={[styles.amountRow, isRTL && styles.rowRTL]}>
+                        <Text style={[styles.amountLabel, isRTL && styles.rtlText]}>{isRTL ? 'الضريبة' : 'Tax'}</Text>
+                        <Text style={[styles.amountValue, isRTL && styles.valueLtrAlign]}>
                             {Number(summary.tax || 0) > 0
                                 ? formatRiyal(Number(summary.tax || 0), isRTL ? 'ar' : 'en')
                                 : (isRTL ? 'غير متاح' : 'Unavailable')}
                         </Text>
                     </View>
-                    {summary.deposit !== undefined ? (
-                        <View style={styles.amountRow}>
-                            <Text style={styles.amountLabel}>{isRTL ? 'العربون' : 'Deposit'}</Text>
-                            <Text style={styles.amountValue}>
+                    {!isProductOrder && summary.deposit !== undefined ? (
+                        <View style={[styles.amountRow, isRTL && styles.rowRTL]}>
+                            <Text style={[styles.amountLabel, isRTL && styles.rtlText]}>{isRTL ? 'العربون' : 'Deposit'}</Text>
+                            <Text style={[styles.amountValue, isRTL && styles.valueLtrAlign]}>
                                 {summary.deposit === null
                                     ? (isRTL ? 'غير متاح' : 'Unavailable')
                                     : formatRiyal(Number(summary.deposit || 0), isRTL ? 'ar' : 'en')}
                             </Text>
                         </View>
                     ) : null}
-                    {summary.remaining !== undefined ? (
-                        <View style={styles.amountRow}>
-                            <Text style={styles.amountLabel}>{isRTL ? 'المتبقي' : 'Remaining'}</Text>
-                            <Text style={styles.amountValue}>
+                    {!isProductOrder && summary.remaining !== undefined ? (
+                        <View style={[styles.amountRow, isRTL && styles.rowRTL]}>
+                            <Text style={[styles.amountLabel, isRTL && styles.rtlText]}>{isRTL ? 'المتبقي' : 'Remaining'}</Text>
+                            <Text style={[styles.amountValue, isRTL && styles.valueLtrAlign]}>
                                 {summary.remaining === null
                                     ? (isRTL ? 'غير متاح' : 'Unavailable')
                                     : formatRiyal(Number(summary.remaining || 0), isRTL ? 'ar' : 'en')}
                             </Text>
                         </View>
                     ) : null}
-                    <View style={[styles.amountRow, styles.totalRow]}>
-                        <Text style={styles.totalLabel}>{isRTL ? 'الإجمالي' : 'Total'}</Text>
-                        <Text style={styles.totalValue}>{formatRiyal(Number(summary.total || 0), isRTL ? 'ar' : 'en')}</Text>
+                    <View style={[styles.amountRow, styles.totalRow, isRTL && styles.rowRTL]}>
+                        <Text style={[styles.totalLabel, isRTL && styles.rtlText]}>{isRTL ? 'الإجمالي' : 'Total'}</Text>
+                        <Text style={[styles.totalValue, isRTL && styles.valueLtrAlign]}>{formatRiyal(Number(summary.total || 0), isRTL ? 'ar' : 'en')}</Text>
                     </View>
                 </View>
             </ScrollView>
 
-            <View style={styles.footer}>
-                <TouchableOpacity
-                    style={styles.primaryButton}
-                    onPress={() => {
-                        navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'Tabs', params: { screen: 'Home' } }],
-                        });
-                    }}
-                >
-                    <Text style={styles.primaryButtonText}>{isRTL ? 'العودة للرئيسية' : 'Go Home'}</Text>
-                </TouchableOpacity>
+            <View style={[styles.footer, isRTL && styles.rowRTL]}>
+                {isProductOrder ? (
+                    <>
+                        <TouchableOpacity
+                            style={styles.secondaryButton}
+                            onPress={() => {
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'Tabs', params: { screen: 'Home' } }],
+                                });
+                            }}
+                        >
+                            <Text style={styles.secondaryButtonText}>{isRTL ? 'متابعة التسوق' : 'Continue Shopping'}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.primaryButton}
+                            onPress={() => {
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'Tabs', params: { screen: 'Purchases' } }],
+                                });
+                            }}
+                        >
+                            <Text style={styles.primaryButtonText}>{isRTL ? 'عرض طلباتي' : 'View My Orders'}</Text>
+                        </TouchableOpacity>
+                    </>
+                ) : (
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={() => {
+                            navigation.reset({
+                                index: 0,
+                                routes: [{ name: 'Tabs', params: { screen: 'Home' } }],
+                            });
+                        }}
+                    >
+                        <Text style={styles.primaryButtonText}>{isRTL ? 'العودة للرئيسية' : 'Go Home'}</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -349,5 +398,15 @@ const styles = StyleSheet.create({
         fontSize: fontSize.sm,
         color: '#FFFFFF',
         fontWeight: '900',
+    },
+    rowRTL: {
+        flexDirection: 'row-reverse',
+    },
+    rtlText: {
+        textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    valueLtrAlign: {
+        textAlign: 'left',
     },
 });

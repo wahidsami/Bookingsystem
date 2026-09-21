@@ -2,7 +2,7 @@
 export const authTranslations = {
     en: {
         // Welcome Screen
-        welcomeTitle: 'Welcome to Refah',
+        welcomeTitle: 'Welcome to BarSpa',
         welcomeSubtitle: 'Your beauty & wellness companion',
         loginButton: 'Login',
         registerButton: 'Register',
@@ -21,7 +21,7 @@ export const authTranslations = {
 
         // Register
         createAccount: 'Create Account',
-        registerSubtitle: 'Join Refah today',
+        registerSubtitle: 'Join BarSpa today',
         firstName: 'First Name',
         lastName: 'Last Name',
         phone: 'Phone Number',
@@ -73,7 +73,7 @@ export const authTranslations = {
     },
     ar: {
         // Welcome Screen
-        welcomeTitle: 'مرحباً بك في رفاه',
+        welcomeTitle: '\u200Fمرحباً بك في \u2066BarSpa\u2069\u200F',
         welcomeSubtitle: 'رفيقك في الجمال والعافية',
         loginButton: 'تسجيل الدخول',
         registerButton: 'إنشاء حساب',
@@ -92,7 +92,7 @@ export const authTranslations = {
 
         // Register
         createAccount: 'إنشاء حساب',
-        registerSubtitle: 'انضم إلى رفاه اليوم',
+        registerSubtitle: 'انضم إلى \u2066BarSpa\u2069 اليوم',
         firstName: 'الاسم الأول',
         lastName: 'اسم العائلة',
         phone: 'رقم الهاتف',

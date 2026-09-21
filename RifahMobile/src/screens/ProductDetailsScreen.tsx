@@ -39,11 +39,11 @@ export function ProductDetailsScreen({ route, navigation }: any) {
     return (
         <View style={styles.container}>
             <ScrollView contentContainerStyle={{ paddingBottom: Math.max(scrollBottomPadding, 28) }}>
-                <View style={[styles.topBar, { paddingTop: topInset + 6 }]}>
+                <View style={[styles.topBar, isRTL && styles.rowReverse, { paddingTop: topInset + 6 }]}>
                     <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
                         <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
                     </TouchableOpacity>
-                    <View style={styles.topActions}>
+                    <View style={[styles.topActions, isRTL && styles.rowReverse]}>
                         <TouchableOpacity style={styles.iconBtn}>
                             <AppIcon name="share" size={18} color={colors.text} />
                         </TouchableOpacity>
@@ -51,7 +51,7 @@ export function ProductDetailsScreen({ route, navigation }: any) {
                 </View>
 
                 <Image source={{ uri: images[activeImageIndex] }} style={styles.heroImage} />
-                <Text style={styles.imageCounter}>{activeImageIndex + 1}/{images.length}</Text>
+                <Text style={[styles.imageCounter, isRTL && styles.imageCounterRTL]}>{activeImageIndex + 1}/{images.length}</Text>
 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbRow}>
                     {images.map((uri: string, index: number) => (
@@ -66,8 +66,8 @@ export function ProductDetailsScreen({ route, navigation }: any) {
                 </ScrollView>
 
                 <View style={styles.contentCard}>
-                    <Text style={styles.title}>{productName}</Text>
-                    <View style={styles.metaRow}>
+                    <Text style={[styles.title, isRTL && styles.textRTL]}>{productName}</Text>
+                    <View style={[styles.metaRow, isRTL && styles.rowReverse]}>
                         <View style={[styles.chip, product.stock > 0 ? styles.chipSuccess : styles.chipMuted]}>
                             <Text style={[styles.chipText, product.stock > 0 ? styles.chipTextSuccess : null]}>
                                 {product.stock > 0 ? (isRTL ? 'متوفر' : 'In stock') : (isRTL ? 'غير متوفر' : 'Out of stock')}
@@ -78,21 +78,21 @@ export function ProductDetailsScreen({ route, navigation }: any) {
 
                     {description ? (
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>{isRTL ? 'عن المنتج' : 'About this product'}</Text>
-                            <Text style={styles.description}>{description}</Text>
+                            <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{isRTL ? 'عن المنتج' : 'About this product'}</Text>
+                            <Text style={[styles.description, isRTL && styles.textRTL]}>{description}</Text>
                         </View>
                     ) : null}
 
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>{isRTL ? 'تفاصيل' : 'Details'}</Text>
-                        <Text style={styles.detailItem}>{isRTL ? 'الفئة' : 'Category'}: {product.category || (isRTL ? 'عام' : 'General')}</Text>
-                        <Text style={styles.detailItem}>{isRTL ? 'الكمية المتاحة' : 'Available stock'}: {product.stock}</Text>
-                        {tenant?.name ? <Text style={styles.detailItem}>{isRTL ? 'المركز' : 'Center'}: {tenant.name}</Text> : null}
+                        <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{isRTL ? 'تفاصيل' : 'Details'}</Text>
+                        <Text style={[styles.detailItem, isRTL && styles.textRTL]}>{isRTL ? 'الفئة' : 'Category'}: {product.category || (isRTL ? 'عام' : 'General')}</Text>
+                        <Text style={[styles.detailItem, isRTL && styles.textRTL]}>{isRTL ? 'الكمية المتاحة' : 'Available stock'}: {product.stock}</Text>
+                        {tenant?.name ? <Text style={[styles.detailItem, isRTL && styles.textRTL]}>{isRTL ? 'المركز' : 'Center'}: {tenant.name}</Text> : null}
                     </View>
 
-                    <View style={styles.qtyRow}>
-                        <Text style={styles.sectionTitle}>{isRTL ? 'الكمية' : 'Quantity'}</Text>
-                        <View style={styles.qtyControl}>
+                    <View style={[styles.qtyRow, isRTL && styles.rowReverse]}>
+                        <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{isRTL ? 'الكمية' : 'Quantity'}</Text>
+                        <View style={[styles.qtyControl, isRTL && styles.rowReverse]}>
                             <TouchableOpacity style={styles.qtyBtn} onPress={() => setQty((q) => Math.max(1, q - 1))}>
                                 <AppIcon name="minus" size={16} color={colors.primary} />
                             </TouchableOpacity>
@@ -120,6 +120,8 @@ export function ProductDetailsScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F7F6FB' },
+    rowReverse: { flexDirection: 'row-reverse' },
+    textRTL: { textAlign: 'right' },
     topBar: { paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     topActions: { flexDirection: 'row', gap: 10 },
     iconBtn: {
@@ -130,6 +132,10 @@ const styles = StyleSheet.create({
     imageCounter: {
         position: 'absolute', right: 16, top: 314, backgroundColor: 'rgba(0,0,0,0.45)',
         color: '#FFF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, overflow: 'hidden',
+    },
+    imageCounterRTL: {
+        right: undefined,
+        left: 16,
     },
     thumbRow: { paddingHorizontal: 16, paddingTop: 10, gap: 10 },
     thumbWrap: { borderRadius: 12, borderWidth: 1, borderColor: '#E6E0F7', padding: 2 },

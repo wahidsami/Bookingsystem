@@ -10,29 +10,30 @@ import {
     Alert,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
+import { colors, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
-import { api, Order, getImageUrl } from '../api/client';
+import { api, Order, OrderItem, getImageUrl, orderNeedsPayment } from '../api/client';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { GuestView } from '../components/GuestView';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { orderNeedsPayment } from '../api/client';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
-import { LinearGradient } from 'expo-linear-gradient';
+import { CustomerSubpageHeader } from '../components/ui/CustomerSubpageHeader';
+import { usePopup } from '../contexts/PopupContext';
 
 export function PurchasesScreen({ navigation, route }: any) {
     const { t, language } = useLanguage();
     const isRTL = language === 'ar';
     const { showLogin, isAuthenticated } = useAppSession();
-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { scrollBottomPadding } = useScreenSafeArea();
+    const { confirm, showDialog } = usePopup();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+    const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
     const deepLinkOrderId = `${route?.params?.orderId || ''}`.trim();
 
     const loadOrders = React.useCallback(async () => {
@@ -46,11 +47,11 @@ export function PurchasesScreen({ navigation, route }: any) {
             if (deepLinkOrderId) {
                 const matchedOrder = data.find((item) => item.id === deepLinkOrderId || item.orderNumber === deepLinkOrderId);
                 if (matchedOrder) {
-                    setExpandedOrderId(matchedOrder.id);
+                    navigation.navigate('PurchaseDetails', { purchaseId: matchedOrder.id });
                 }
             }
         } catch (error: any) {
-            if (error.status === 401 || error.message?.includes('unauthorized') || error.message?.includes('Invalid or expired token')) {
+            if (error?.status === 401 || error?.message?.includes('unauthorized') || error?.message?.includes('Invalid or expired token')) {
                 showLogin();
             } else {
                 console.error('Failed to load orders:', error);
@@ -59,7 +60,7 @@ export function PurchasesScreen({ navigation, route }: any) {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [deepLinkOrderId, isAuthenticated, showLogin]);
+    }, [deepLinkOrderId, isAuthenticated, navigation, showLogin]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -73,153 +74,219 @@ export function PurchasesScreen({ navigation, route }: any) {
     };
 
     const handleCancel = async (id: string) => {
-        Alert.alert(
-            t('cancelOrder'),
-            t('cancelOrderConfirm'),
-            [
-                { text: t('no'), style: 'cancel' },
-                {
-                    text: t('yes'),
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            const success = await api.cancelOrder(id);
-                            if (success) {
-                                loadOrders();
-                                Alert.alert(t('success'), t('orderCancelled'));
-                            }
-                        } catch (error) {
-                            Alert.alert(t('error'), t('failedToCancelOrder'));
-                        }
-                    },
-                },
-            ]
-        );
+        const confirmed = await confirm({
+            title: isRTL ? 'إلغاء الطلب' : 'Cancel Order',
+            message: isRTL ? 'هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟' : 'Are you sure you want to cancel this order?',
+            confirmText: isRTL ? 'نعم، إلغاء' : 'Yes, Cancel',
+            cancelText: isRTL ? 'لا' : 'No',
+            variant: 'destructive',
+        });
+
+        if (!confirmed) return;
+
+        try {
+            setCancellingOrderId(id);
+            const success = await api.cancelOrder(id);
+            if (success) {
+                await loadOrders();
+                await showDialog({
+                    title: isRTL ? 'تم الإلغاء' : 'Cancelled',
+                    message: isRTL ? 'تم إلغاء الطلب بنجاح' : 'Order has been cancelled successfully.',
+                    variant: 'success',
+                    confirmText: isRTL ? 'حسنًا' : 'OK',
+                });
+            }
+        } catch (error) {
+            await showDialog({
+                title: isRTL ? 'خطأ' : 'Error',
+                message: isRTL ? 'تعذر إلغاء الطلب. يرجى المحاولة مرة أخرى.' : 'Failed to cancel order. Please try again.',
+                variant: 'error',
+                confirmText: isRTL ? 'حسنًا' : 'OK',
+            });
+        } finally {
+            setCancellingOrderId(null);
+        }
+    };
+
+    const getItemImage = (orderItem: OrderItem): string | null => {
+        if (orderItem.productImage) return orderItem.productImage;
+        if (orderItem.Product?.images && orderItem.Product.images.length > 0) return orderItem.Product.images[0];
+        if (orderItem.product?.images && orderItem.product.images.length > 0) return orderItem.product.images[0];
+        return null;
+    };
+
+    const getItemName = (orderItem: OrderItem): string => {
+        if (isRTL) {
+            return orderItem.productNameAr || orderItem.Product?.name_ar || orderItem.product?.name_ar || orderItem.productName || orderItem.Product?.name_en || orderItem.product?.name_en || (isRTL ? 'منتج' : 'Product');
+        }
+        return orderItem.productName || orderItem.Product?.name_en || orderItem.product?.name_en || orderItem.productNameAr || orderItem.Product?.name_ar || orderItem.product?.name_ar || 'Product';
     };
 
     const renderOrderCard = ({ item }: { item: Order }) => {
-        const isArabic = language === 'ar';
         const dateDate = new Date(item.createdAt);
-        const isExpanded = expandedOrderId === item.id;
-        const visibleItems = isExpanded ? item.items : item.items.slice(0, 1);
-
-        const firstItem = item.items[0];
-        const firstItemName = firstItem 
-            ? (isArabic ? firstItem.Product?.name_ar || firstItem.product?.name_ar : firstItem.Product?.name_en || firstItem.product?.name_en)
-            : '';
-        const extraItemsCount = item.items.length - 1;
-        const titleStr = extraItemsCount > 0 
-            ? `${firstItemName} (+ ${extraItemsCount} ${t('moreItems')})`
-            : firstItemName;
-
-        const dateStr = format(dateDate, 'd MMM yyyy', { locale: isArabic ? ar : enUS });
+        const dateStr = format(dateDate, 'd MMM yyyy', { locale: isRTL ? ar : enUS });
+        const statusConfig = getOrderStatusColor(item.status);
+        const paymentConfig = getPaymentStatusInfo(item.paymentStatus, isRTL);
+        const firstItem = item.items?.[0];
+        const extraItemsCount = Math.max(0, (item.items?.length || 0) - 1);
+        const firstItemImage = firstItem ? getItemImage(firstItem) : null;
+        const firstItemName = firstItem ? getItemName(firstItem) : (isRTL ? 'طلب منتجات' : 'Products Order');
+        const canCancel = ['pending', 'confirmed'].includes(item.status);
+        const needsPayment = orderNeedsPayment(item);
 
         return (
             <TouchableOpacity
-                activeOpacity={0.95}
-                style={[styles.card, !isExpanded && styles.compactCard]}
-                onPress={() => setExpandedOrderId((prev) => (prev === item.id ? null : item.id))}
+                activeOpacity={0.9}
+                style={styles.card}
+                onPress={() => navigation.navigate('PurchaseDetails', { purchaseId: item.id })}
             >
-                {/* Header: Tenant Info & Status (Compact for both) */}
-                <View style={[styles.cardHeader, !isExpanded && styles.compactCardHeader]}>
-                    <View style={styles.salonInfo}>
+                {/* Store Header & Status */}
+                <View style={[styles.cardHeader, isRTL && styles.rowReverse]}>
+                    <View style={[styles.storeInfo, isRTL && styles.rowReverse]}>
                         {item.tenant?.logo ? (
                             <Image
                                 source={{ uri: getImageUrl(item.tenant.logo) }}
-                                style={styles.salonLogo}
+                                style={styles.storeLogo}
                             />
                         ) : (
-                            <View style={[styles.salonLogo, styles.placeholderLogo]}>
+                            <View style={[styles.storeLogo, styles.placeholderLogo]}>
                                 <Text style={styles.placeholderText}>
                                     {item.tenant?.name?.charAt(0) || 'S'}
                                 </Text>
                             </View>
                         )}
-                        <Text style={styles.salonName} numberOfLines={1}>{item.tenant?.name || 'Store Name'}</Text>
+                        <View style={[styles.storeNameContainer, isRTL && styles.alignEnd]}>
+                            <Text style={[styles.storeName, isRTL && styles.cairoBold]} numberOfLines={1}>
+                                {item.tenant?.name || (isRTL ? 'المتجر' : 'Store')}
+                            </Text>
+                            <View style={[styles.orderRefRow, isRTL && styles.rowReverse]}>
+                                <Text style={styles.orderNumberText}>
+                                    #{(item.orderNumber || item.id.slice(0, 8)).toUpperCase()}
+                                </Text>
+                                <Text style={styles.orderDot}>•</Text>
+                                <Text style={styles.orderDateText}>{dateStr}</Text>
+                            </View>
+                        </View>
                     </View>
-                    <View style={[
-                        styles.statusBadge,
-                        { backgroundColor: getStatusColor(item.status) + '20' }
-                    ]}>
-                        <Text style={[
-                            styles.statusText,
-                            { color: getStatusColor(item.status) }
-                        ]}>
-                            {getStatusText(item.status, language)}
+
+                    <View style={[styles.headerBadgesCol, isRTL && styles.alignStart]}>
+                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg, borderColor: statusConfig.border }]}>
+                            <Text style={[styles.statusText, { color: statusConfig.text }, isRTL && styles.cairoBold]}>
+                                {getOrderStatusText(item.status, item.deliveryType, isRTL)}
+                            </Text>
+                        </View>
+                        <View style={[styles.fulfillmentBadge, isRTL && styles.rowReverse]}>
+                            <AppIcon
+                                name={item.deliveryType === 'pickup' ? 'storefront' : 'location'}
+                                size={11}
+                                color="#6D28D9"
+                            />
+                            <Text style={[styles.fulfillmentBadgeText, isRTL && styles.cairoMedium]}>
+                                {item.deliveryType === 'pickup'
+                                    ? (isRTL ? 'استلام' : 'Pickup')
+                                    : (isRTL ? 'توصيل' : 'Delivery')}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Items Preview */}
+                <View style={[styles.itemPreviewRow, isRTL && styles.rowReverse]}>
+                    {firstItemImage ? (
+                        <Image
+                            source={{ uri: getImageUrl(firstItemImage) }}
+                            style={styles.itemThumbnail}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View style={[styles.itemThumbnail, styles.placeholderThumbnail]}>
+                            <AppIcon name="shopping_bag" size={24} color="#7C3AED" />
+                        </View>
+                    )}
+
+                    <View style={[styles.itemMeta, isRTL && styles.alignEnd]}>
+                        <Text style={[styles.itemName, isRTL && styles.cairoMedium]} numberOfLines={2}>
+                            {firstItemName}
+                        </Text>
+                        <View style={[styles.qtyAndExtraRow, isRTL && styles.rowReverse]}>
+                            {firstItem && (
+                                <Text style={styles.itemQty}>
+                                    {isRTL ? `الكمية: ${firstItem.quantity}` : `Qty: ${firstItem.quantity}`}
+                                </Text>
+                            )}
+                            {extraItemsCount > 0 && (
+                                <View style={styles.extraBadge}>
+                                    <Text style={[styles.extraBadgeText, isRTL && styles.cairoMedium]}>
+                                        {isRTL ? `+${extraItemsCount} منتجات إضافية` : `+${extraItemsCount} more items`}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+
+                {/* Divider */}
+                <View style={styles.divider} />
+
+                {/* Footer: Payment & Total Amount */}
+                <View style={[styles.cardFooter, isRTL && styles.rowReverse]}>
+                    <View style={styles.paymentStatusRow}>
+                        <View style={[styles.paymentBadge, { backgroundColor: paymentConfig.bg }]}>
+                            <Text style={[styles.paymentBadgeText, { color: paymentConfig.color }, isRTL && styles.cairoMedium]}>
+                                {paymentConfig.text}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={[styles.totalPriceBlock, isRTL ? styles.alignStart : styles.alignEnd]}>
+                        <Text style={[styles.totalLabel, isRTL && styles.cairoRegular]}>
+                            {isRTL ? 'إجمالي الطلب' : 'Total'}
+                        </Text>
+                        <Text style={[styles.totalAmount, isRTL && styles.cairoBold]}>
+                            {formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}
                         </Text>
                     </View>
                 </View>
 
-                {isExpanded ? (
-                    /* EXPANDED VIEW: Preserve all existing layout */
-                    <>
-                        <View style={styles.cardBody}>
-                            <Text style={styles.orderId}>#{(item.orderNumber || item.id.slice(0, 8)).toUpperCase()}</Text>
-                            <View style={styles.dateTimeRow}>
-                                <AppIcon name="bookings" size={16} color={colors.primary} />
-                                <Text style={styles.dateTimeText}>
-                                    {format(dateDate, 'eeee, d MMMM yyyy', { locale: isArabic ? ar : enUS })}
-                                </Text>
-                            </View>
-
-                            <View style={styles.itemsContainer}>
-                                {visibleItems.map((orderItem, index) => (
-                                    <Text key={index} style={styles.itemText}>
-                                        • {isArabic ? orderItem.Product?.name_ar || orderItem.product?.name_ar : orderItem.Product?.name_en || orderItem.product?.name_en} (x{orderItem.quantity})
+                {/* Actions */}
+                {(needsPayment || canCancel) && (
+                    <View style={[styles.actionsContainer, isRTL && { justifyContent: 'flex-start', flexDirection: 'row-reverse' }]}>
+                        {canCancel && (
+                            <TouchableOpacity
+                                style={styles.cancelBtn}
+                                onPress={(e) => {
+                                    e.stopPropagation && e.stopPropagation();
+                                    handleCancel(item.id);
+                                }}
+                                disabled={cancellingOrderId === item.id}
+                            >
+                                {cancellingOrderId === item.id ? (
+                                    <ActivityIndicator size="small" color="#DC2626" />
+                                ) : (
+                                    <Text style={[styles.cancelBtnText, isRTL && styles.cairoMedium]}>
+                                        {isRTL ? 'إلغاء الطلب' : 'Cancel Order'}
                                     </Text>
-                                ))}
-                                <Text style={styles.viewDetailsText}>
-                                    {isArabic ? 'إخفاء التفاصيل' : 'Hide details'}
+                                )}
+                            </TouchableOpacity>
+                        )}
+                        {needsPayment && (
+                            <TouchableOpacity
+                                style={[styles.payBtn, isRTL && styles.rowReverse]}
+                                onPress={(e) => {
+                                    e.stopPropagation && e.stopPropagation();
+                                    navigation.navigate('Payment', {
+                                        orderId: item.id,
+                                        amount: Number(item.totalAmount),
+                                        tenantId: item.tenantId,
+                                    });
+                                }}
+                            >
+                                <AppIcon name="card" size={16} color="#FFFFFF" />
+                                <Text style={[styles.payBtnText, isRTL && styles.cairoBold]}>
+                                    {isRTL ? 'ادفع الآن' : 'Pay Now'}
                                 </Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.cardFooter}>
-                            <View style={styles.priceBlock}>
-                                <Text style={styles.price}>{formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
-                                <Text style={styles.totalHint}>{language === 'ar' ? 'إجمالي الطلب' : 'Order total'}</Text>
-                            </View>
-                            <View style={styles.actions}>
-                                {orderNeedsPayment(item) && (
-                                    <TouchableOpacity
-                                        style={styles.payButton}
-                                        onPress={(e) => {
-                                            e.stopPropagation && e.stopPropagation();
-                                            navigation.navigate('Payment', {
-                                                orderId: item.id,
-                                                amount: Number(item.totalAmount),
-                                                tenantId: item.tenantId,
-                                            });
-                                        }}
-                                    >
-                                        <Text style={styles.payButtonText}>{t('payNow')}</Text>
-                                    </TouchableOpacity>
-                                )}
-                                {['pending', 'confirmed'].includes(item.status) && (
-                                    <TouchableOpacity
-                                        style={styles.cancelButton}
-                                        onPress={(e) => {
-                                            e.stopPropagation && e.stopPropagation();
-                                            handleCancel(item.id);
-                                        }}
-                                    >
-                                        <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
-                    </>
-                ) : (
-                    /* COMPACT VIEW */
-                    <View style={styles.compactBody}>
-                        <Text style={styles.compactTitle} numberOfLines={2}>{titleStr}</Text>
-                        <View style={styles.compactFooterRow}>
-                            <View style={styles.compactDateTimeRow}>
-                                <AppIcon name="clock" size={14} color={colors.primary} />
-                                <Text style={styles.dateTimeText}>{dateStr}</Text>
-                            </View>
-                            <Text style={styles.compactPrice}>{formatRiyal(Number(item.totalAmount || 0), isRTL ? 'ar' : 'en')}</Text>
-                        </View>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 )}
             </TouchableOpacity>
@@ -228,120 +295,180 @@ export function PurchasesScreen({ navigation, route }: any) {
 
     if (!isAuthenticated && !loading) {
         return (
-            <>
-                <LinearGradient
-                    colors={['#F5F0FF', '#FFFFFF']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[styles.header, { paddingTop: spacing.xl + topInset }]}
-                >
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => navigation.goBack()}
-                    >
-                        <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{t('myPurchases' as any)}</Text>
-                </LinearGradient>
+            <View style={styles.container}>
+                <CustomerSubpageHeader
+                    title={isRTL ? 'مشترياتي' : 'My Purchases'}
+                    showBack={Boolean(navigation?.canGoBack && navigation.canGoBack())}
+                />
                 <GuestView
                     type="orders"
                     onLoginPress={showLogin}
                 />
-            </>
+            </View>
         );
     }
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={['#F5F0FF', '#FFFFFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
-            >
-                {/* Back Button */}
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('myPurchases')}</Text>
-            </LinearGradient>
+            <CustomerSubpageHeader
+                title={isRTL ? 'مشترياتي' : 'My Purchases'}
+                showBack={Boolean(navigation?.canGoBack && navigation.canGoBack())}
+            />
 
-            {/* List */}
             {orders.length > 0 ? (
                 <FlatList
                     data={orders}
                     renderItem={renderOrderCard}
                     keyExtractor={(item) => item.id}
-                    contentContainerStyle={[styles.listContent, { paddingBottom: scrollBottomPadding }]}
+                    contentContainerStyle={[styles.listContent, { paddingBottom: scrollBottomPadding + 24 }]}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#7C3AED']} tintColor="#7C3AED" />
                     }
                 />
-            ) : (
+            ) : !loading ? (
                 <View style={styles.emptyContainer}>
-                    <AppIcon name="purchases" size={64} color={colors.textSecondary} />
-                    <Text style={styles.emptyText}>{t('noOrders')}</Text>
+                    <View style={styles.emptyIconCircle}>
+                        <AppIcon name="shopping_bag" size={48} color="#7C3AED" />
+                    </View>
+                    <Text style={[styles.emptyTitle, isRTL && styles.cairoBold]}>
+                        {isRTL ? 'لا توجد مشتريات بعد' : 'No purchases yet'}
+                    </Text>
+                    <Text style={[styles.emptySubtitle, isRTL && styles.cairoRegular]}>
+                        {isRTL ? 'ستظهر جميع طلباتك ومشترياتك هنا فور إتمامها' : 'All your orders and purchases will appear here.'}
+                    </Text>
                     <TouchableOpacity
-                        style={styles.bookButton}
+                        style={styles.refreshButton}
                         onPress={handleRefresh}
+                        activeOpacity={0.8}
                     >
-                        <Text style={styles.bookButtonText}>{t('refresh')}</Text>
+                        <AppIcon name="refresh" size={18} color="#FFFFFF" />
+                        <Text style={[styles.refreshButtonText, isRTL && styles.cairoBold]}>
+                            {isRTL ? 'تحديث' : 'Refresh'}
+                        </Text>
                     </TouchableOpacity>
                 </View>
-            )}
+            ) : null}
 
-            {loading && (
+            {loading && !refreshing && (
                 <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="large" color={colors.primary} />
+                    <ActivityIndicator size="large" color="#7C3AED" />
                 </View>
             )}
         </View>
     );
 }
 
-const getStatusColor = (status: string) => {
-    switch (status) {
-        case 'delivered': return colors.success;
-        case 'shipped': return colors.info;
-        case 'processing': return colors.primary;
-        case 'pending': return colors.warning;
-        case 'cancelled': return colors.error;
-        default: return colors.textSecondary;
+const getOrderStatusColor = (status: string) => {
+    const s = `${status || ''}`.trim().toLowerCase();
+    switch (s) {
+        case 'delivered':
+        case 'completed':
+        case 'confirmed':
+            return { bg: '#ECFDF5', text: '#059669', border: '#A7F3D0' };
+        case 'shipped':
+        case 'ready_for_pickup':
+        case 'processing':
+            return { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' };
+        case 'pending':
+            return { bg: '#FFFBEB', text: '#D97706', border: '#FDE68A' };
+        case 'cancelled':
+        case 'refunded':
+            return { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' };
+        default:
+            return { bg: '#F3F4F6', text: '#6B7280', border: '#E5E7EB' };
     }
 };
 
-const getStatusText = (status: string, language: 'ar' | 'en') => {
-    const normalized = `${status || ''}`.trim().toLowerCase();
-    if (language === 'ar') {
-        switch (normalized) {
-            case 'pending': return 'قيد الانتظار';
-            case 'confirmed': return 'مؤكد';
-            case 'processing': return 'قيد المعالجة';
-            case 'ready_for_pickup': return 'جاهز للاستلام';
-            case 'shipped': return 'تم الشحن';
+const getOrderStatusText = (status: string, deliveryType: string | undefined, isAr: boolean) => {
+    const s = `${status || ''}`.trim().toLowerCase();
+    const isPickup = deliveryType === 'pickup';
+
+    if (isAr) {
+        if (isPickup) {
+            switch (s) {
+                case 'pending': return 'تم استلام الطلب';
+                case 'confirmed': return 'تم تأكيد الطلب';
+                case 'processing': return 'جاري تجهيز الطلب';
+                case 'ready_for_pickup': return 'الطلب جاهز للاستلام';
+                case 'completed': return 'تم الاستلام';
+                case 'cancelled': return 'تم إلغاء الطلب';
+                case 'refunded': return 'تم استرداد الطلب';
+                default: return status;
+            }
+        }
+        switch (s) {
+            case 'pending': return 'تم استلام الطلب';
+            case 'confirmed': return 'تم تأكيد الطلب';
+            case 'processing': return 'جاري تجهيز الطلب';
+            case 'shipped': return 'تم تسليم الطلب للتوصيل';
             case 'delivered': return 'تم التوصيل';
-            case 'completed': return 'مكتمل';
-            case 'cancelled': return 'ملغي';
-            case 'refunded': return 'مسترد';
+            case 'completed': return 'اكتمل الطلب';
+            case 'cancelled': return 'تم إلغاء الطلب';
+            case 'refunded': return 'تم استرداد الطلب';
             default: return status;
         }
     }
 
-    switch (normalized) {
-        case 'pending': return 'Pending';
-        case 'confirmed': return 'Confirmed';
-        case 'processing': return 'Processing';
-        case 'ready_for_pickup': return 'Ready for Pickup';
-        case 'shipped': return 'Shipped';
+    if (isPickup) {
+        switch (s) {
+            case 'pending': return 'Order Received';
+            case 'confirmed': return 'Order Confirmed';
+            case 'processing': return 'Preparing Order';
+            case 'ready_for_pickup': return 'Ready for Pickup';
+            case 'completed': return 'Picked Up';
+            case 'cancelled': return 'Order Cancelled';
+            case 'refunded': return 'Order Refunded';
+            default: return status;
+        }
+    }
+    switch (s) {
+        case 'pending': return 'Order Received';
+        case 'confirmed': return 'Order Confirmed';
+        case 'processing': return 'Preparing Order';
+        case 'shipped': return 'Handed to Delivery';
         case 'delivered': return 'Delivered';
-        case 'completed': return 'Completed';
-        case 'cancelled': return 'Cancelled';
-        case 'refunded': return 'Refunded';
+        case 'completed': return 'Order Completed';
+        case 'cancelled': return 'Order Cancelled';
+        case 'refunded': return 'Order Refunded';
         default: return status;
     }
+};
+
+const getPaymentStatusInfo = (paymentStatus: string, isAr: boolean) => {
+    const raw = `${paymentStatus || ''}`.trim().toLowerCase();
+    if (raw === 'paid' || raw === 'completed' || raw === 'successful') {
+        return {
+            text: isAr ? 'مدفوع' : 'Paid',
+            color: '#059669',
+            bg: '#ECFDF5',
+        };
+    }
+    if (raw === 'partially_paid' || raw === 'deposit_paid') {
+        return {
+            text: isAr ? 'مدفوع جزئياً' : 'Partially Paid',
+            color: '#2563EB',
+            bg: '#EFF6FF',
+        };
+    }
+    if (raw === 'refunded') {
+        return {
+            text: isAr ? 'مسترد' : 'Refunded',
+            color: '#DC2626',
+            bg: '#FEF2F2',
+        };
+    }
+    if (raw === 'failed') {
+        return {
+            text: isAr ? 'فشل الدفع' : 'Failed',
+            color: '#DC2626',
+            bg: '#FEF2F2',
+        };
+    }
+    return {
+        text: isAr ? 'بانتظار الدفع' : 'Payment Pending',
+        color: '#D97706',
+        bg: '#FFFBEB',
+    };
 };
 
 const styles = StyleSheet.create({
@@ -349,253 +476,295 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F7F6FB',
     },
-    header: {
-        padding: spacing.xl,
-        backgroundColor: colors.surface,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
+    rowReverse: {
+        flexDirection: 'row-reverse',
     },
-    backButton: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-        borderWidth: 1,
-        borderColor: '#E8E1FA',
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
+    alignEnd: {
+        alignItems: 'flex-end',
     },
-    headerTitle: {
-        fontSize: 32,
-        fontWeight: '800',
-        color: '#14153C',
+    alignStart: {
+        alignItems: 'flex-start',
     },
     listContent: {
-        padding: spacing.lg,
-        gap: spacing.md,
-    },
-    compactCard: {
-        padding: 12,
-        borderRadius: 16,
-        shadowRadius: 8,
-    },
-    compactCardHeader: {
-        paddingBottom: 8,
-        marginBottom: 8,
-    },
-    compactBody: {
-        marginTop: 4,
-    },
-    compactTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#171840',
-        marginBottom: 6,
-    },
-    compactFooterRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    compactDateTimeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    compactPrice: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: colors.primary,
+        paddingTop: spacing.md,
+        paddingHorizontal: spacing.md,
     },
     card: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 22,
-        padding: spacing.lg,
-        shadowColor: '#1A1440',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 14,
-        elevation: 2,
+        borderRadius: 20,
+        padding: spacing.md + 2,
         marginBottom: spacing.md,
         borderWidth: 1,
-        borderColor: '#ECE7FA',
+        borderColor: '#E9DDFD',
+        shadowColor: '#2E1065',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 2,
     },
     cardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.md,
-        paddingBottom: spacing.sm,
+        paddingBottom: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#ECE7FA',
+        borderBottomColor: '#F0EAFB',
     },
-    salonInfo: {
+    storeInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
+        gap: 10,
+        flex: 1,
     },
-    salonLogo: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+    storeLogo: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
     },
     placeholderLogo: {
-        backgroundColor: colors.primary + '20',
+        backgroundColor: '#F3E8FF',
         alignItems: 'center',
         justifyContent: 'center',
     },
     placeholderText: {
-        color: colors.primary,
+        color: '#7C3AED',
         fontWeight: '700',
-    },
-    salonName: {
         fontSize: 15,
+    },
+    storeNameContainer: {
+        flex: 1,
+    },
+    storeName: {
+        fontSize: 14,
         fontWeight: '700',
-        color: '#1A1A44',
+        color: '#1D035F',
+    },
+    orderRefRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 2,
+        gap: 6,
+    },
+    orderNumberText: {
+        fontSize: 11,
+        color: '#7C3AED',
+        fontWeight: '600',
+    },
+    orderDot: {
+        fontSize: 10,
+        color: colors.textSecondary,
+    },
+    orderDateText: {
+        fontSize: 11,
+        color: colors.textSecondary,
+    },
+    headerBadgesCol: {
+        alignItems: 'flex-end',
+        gap: 4,
     },
     statusBadge: {
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: 10,
         paddingVertical: 4,
-        borderRadius: 12,
+        borderRadius: 999,
+        borderWidth: 1,
     },
     statusText: {
         fontSize: 11,
         fontWeight: '700',
     },
-    cardBody: {
-        marginBottom: spacing.md,
-    },
-    orderId: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: colors.primary,
-        marginBottom: spacing.xs,
-    },
-    dateTimeRow: {
+    fulfillmentBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
-        marginBottom: spacing.sm,
+        gap: 3,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+        backgroundColor: '#F3E8FF',
     },
-    dateIcon: {
-        fontSize: 16,
+    fulfillmentBadgeText: {
+        fontSize: 10,
+        color: '#6D28D9',
+        fontWeight: '600',
     },
-    dateTimeText: {
-        fontSize: 14,
-        color: '#6E7596',
+    itemPreviewRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        gap: 12,
     },
-    itemsContainer: {
-        marginTop: spacing.xs,
+    itemThumbnail: {
+        width: 54,
+        height: 54,
+        borderRadius: 12,
+        backgroundColor: '#F7F4FF',
     },
-    itemText: {
-        fontSize: 14,
-        color: '#1D1E49',
-        marginBottom: 2,
+    placeholderThumbnail: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#EAE1FA',
     },
-    moreItemsText: {
+    itemMeta: {
+        flex: 1,
+    },
+    itemName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.text,
+        lineHeight: 18,
+    },
+    qtyAndExtraRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+        gap: 8,
+    },
+    itemQty: {
         fontSize: 12,
-        color: '#6E7596',
-        fontStyle: 'italic',
-        marginTop: 2,
+        color: colors.textSecondary,
+        fontWeight: '500',
     },
-    viewDetailsText: {
-        marginTop: spacing.xs,
-        fontSize: 12,
-        fontWeight: '700',
-        color: colors.primary,
+    extraBadge: {
+        backgroundColor: '#F5EEFF',
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    extraBadgeText: {
+        fontSize: 10,
+        color: '#7C3AED',
+        fontWeight: '600',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#F0EAFB',
+        marginVertical: 4,
     },
     cardFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        marginTop: spacing.sm,
-        paddingTop: spacing.sm,
-        borderTopWidth: 1,
-        borderTopColor: colors.border + '40',
-        gap: spacing.sm,
+        alignItems: 'center',
+        paddingTop: 8,
     },
-    priceBlock: {
-        flex: 1,
-        gap: 2,
-    },
-    price: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: colors.primary,
-    },
-    actions: {
+    paymentStatusRow: {
         flexDirection: 'row',
-        gap: spacing.sm,
         alignItems: 'center',
-        flexWrap: 'wrap',
+    },
+    paymentBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    paymentBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    totalPriceBlock: {
+        alignItems: 'flex-end',
+    },
+    totalLabel: {
+        fontSize: 10,
+        color: colors.textSecondary,
+    },
+    totalAmount: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#7C3AED',
+    },
+    actionsContainer: {
+        flexDirection: 'row',
         justifyContent: 'flex-end',
-    },
-    payButton: {
-        minWidth: 96,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        backgroundColor: '#6D31D9',
-        borderRadius: 12,
         alignItems: 'center',
-        justifyContent: 'center',
+        gap: 8,
+        marginTop: 10,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#F0EAFB',
     },
-    payButtonText: {
-        color: colors.textInverse,
-        fontSize: fontSize.sm,
-        fontWeight: '600',
-    },
-    cancelButton: {
-        minWidth: 96,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+    cancelBtn: {
         borderWidth: 1,
-        borderColor: colors.error,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
+        borderColor: '#FECACA',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: '#FEF2F2',
     },
-    cancelButtonText: {
-        color: colors.error,
-        fontSize: fontSize.sm,
-        fontWeight: '600',
-    },
-    totalHint: {
+    cancelBtnText: {
         fontSize: 12,
-        color: '#6E7596',
+        color: '#DC2626',
         fontWeight: '600',
+    },
+    payBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        backgroundColor: '#7C3AED',
+    },
+    payBtnText: {
+        fontSize: 12,
+        color: '#FFFFFF',
+        fontWeight: '700',
     },
     emptyContainer: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: spacing.xl,
-    },
-    emptyIcon: {
-        fontSize: 64,
-        marginBottom: spacing.lg,
-    },
-    emptyText: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1A1A44',
-        marginBottom: spacing.xs,
-    },
-    bookButton: {
-        marginTop: spacing.lg,
         paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.md,
-        backgroundColor: colors.primary,
-        borderRadius: 12,
+        marginTop: 60,
     },
-    bookButtonText: {
-        color: colors.textInverse,
-        fontWeight: '600',
+    emptyIconCircle: {
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        backgroundColor: '#F5EEFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    emptyTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#1D035F',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        fontSize: 13,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 20,
+    },
+    refreshButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#7C3AED',
+        borderRadius: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+    },
+    refreshButtonText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '700',
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        backgroundColor: 'rgba(247, 246, 251, 0.7)',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    cairoBold: {
+        fontFamily: 'Cairo-Bold',
+    },
+    cairoMedium: {
+        fontFamily: 'Cairo-Medium',
+    },
+    cairoRegular: {
+        fontFamily: 'Cairo-Regular',
     },
 });

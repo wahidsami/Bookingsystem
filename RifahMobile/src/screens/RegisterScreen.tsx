@@ -15,6 +15,7 @@ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import GoogleIcon from '../../assets/icons/icon_google_brand.svg';
+import AppleIcon from '../../assets/icons/icon_apple_brand.svg';
 import EyeOpenIcon from '../../assets/icons/icon_eye_open.svg';
 import EyeClosedIcon from '../../assets/icons/icon_eye_closed.svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -133,29 +134,24 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <LinearGradient
-                colors={['#FFFFFF', '#F8F2FF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
-            />
             <ScrollView
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: spacing.xl + topInset,
-                        paddingBottom: scrollBottomPadding,
+                        paddingTop: spacing.lg + topInset,
+                        paddingBottom: scrollBottomPadding + 20,
                     }
                 ]}
                 keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
             >
                 {/* Header with Logo */}
                 <View style={styles.header}>
                     <View style={styles.logoContainer}>
                         <Image
-                            source={require('../../assets/refahlogo.png')}
+                            source={require('../../assets/barspa_logo.png')}
                             style={styles.logo}
                             resizeMode="contain"
                         />
@@ -175,145 +171,185 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
                     </View>
                 ) : null}
 
-                {/* Form */}
+                {/* Form Card */}
                 <View style={styles.formCard}>
-                <View style={styles.form}>
-                    {/* Name Fields */}
-                    <View style={styles.row}>
-                        <View style={[styles.inputGroup, styles.halfWidth]}>
-                            <Text style={styles.label}>{t('firstName')} *</Text>
-                            <TextInput
-                                style={[styles.input, isRTL && styles.rtlInput]}
-                                value={formData.firstName}
-                                onChangeText={(text) => setFormData({ ...formData, firstName: text })}
-                                placeholder="Ahmed"
-                                editable={!loading}
-                            />
+                    <View style={styles.form}>
+                        {/* Name Fields */}
+                        <View style={[styles.row, isRTL && styles.rowRTL]}>
+                            <View style={[styles.inputGroup, styles.halfWidth]}>
+                                <Text style={[styles.label, isRTL && styles.rtlText]}>{t('firstName')} *</Text>
+                                <TextInput
+                                    style={[styles.input, isRTL && styles.rtlInput]}
+                                    value={formData.firstName}
+                                    onChangeText={(text) => setFormData({ ...formData, firstName: text })}
+                                    placeholder="Ahmed"
+                                    placeholderTextColor="#9E98B0"
+                                    editable={!loading}
+                                />
+                            </View>
+                            <View style={[styles.inputGroup, styles.halfWidth]}>
+                                <Text style={[styles.label, isRTL && styles.rtlText]}>{t('lastName')} *</Text>
+                                <TextInput
+                                    style={[styles.input, isRTL && styles.rtlInput]}
+                                    value={formData.lastName}
+                                    onChangeText={(text) => setFormData({ ...formData, lastName: text })}
+                                    placeholder="Al-Saud"
+                                    placeholderTextColor="#9E98B0"
+                                    editable={!loading}
+                                />
+                            </View>
                         </View>
-                        <View style={[styles.inputGroup, styles.halfWidth]}>
-                            <Text style={styles.label}>{t('lastName')} *</Text>
+
+                        {/* Email */}
+                        <View style={styles.inputGroup}>
+                            <Text style={[styles.label, isRTL && styles.rtlText]}>{t('email')} *</Text>
                             <TextInput
-                                style={[styles.input, isRTL && styles.rtlInput]}
-                                value={formData.lastName}
-                                onChangeText={(text) => setFormData({ ...formData, lastName: text })}
-                                placeholder="Al-Saud"
-                                editable={!loading}
-                            />
-                        </View>
-                    </View>
-
-                    {/* Email */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>{t('email')} *</Text>
-                        <TextInput
-                            style={[styles.input, isRTL && styles.rtlInput]}
-                            value={formData.email}
-                            onChangeText={(text) => setFormData({ ...formData, email: text })}
-                            placeholder="ahmed@example.com"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!loading}
-                        />
-                    </View>
-
-                    {/* Phone */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>{t('phone')} *</Text>
-                        <TextInput
-                            style={[styles.input, isRTL && styles.rtlInput]}
-                            value={formData.phone}
-                            onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                            placeholder="+966 50 123 4567"
-                            keyboardType="phone-pad"
-                            editable={!loading}
-                        />
-                        <Text style={styles.hint}>Saudi format: +966XXXXXXXXX or 05XXXXXXXX</Text>
-                    </View>
-
-                    {/* Password */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>{t('password')} *</Text>
-                        <View style={styles.passwordContainer}>
-                            <TextInput
-                                style={[styles.input, styles.passwordInput, isRTL && styles.rtlInput]}
-                                value={formData.password}
-                                onChangeText={(text) => setFormData({ ...formData, password: text })}
-                                placeholder="••••••••"
-                                secureTextEntry={!showPassword}
+                                style={[styles.input, isRTL && styles.emailInputRtl]}
+                                value={formData.email}
+                                onChangeText={(text) => setFormData({ ...formData, email: text })}
+                                placeholder="ahmed@example.com"
+                                placeholderTextColor="#9E98B0"
+                                keyboardType="email-address"
                                 autoCapitalize="none"
+                                autoCorrect={false}
                                 editable={!loading}
                             />
-                            <TouchableOpacity
-                                style={styles.eyeButton}
-                                onPress={() => setShowPassword(!showPassword)}
-                            >
-                                {showPassword ? (
-                                    <EyeOpenIcon width={20} height={20} color={colors.textSecondary} />
-                                ) : (
-                                    <EyeClosedIcon width={20} height={20} color={colors.textSecondary} />
-                                )}
-                            </TouchableOpacity>
                         </View>
-                        <Text style={styles.hint}>Min 8 chars, 1 uppercase, 1 lowercase, 1 number</Text>
-                    </View>
 
-                    {/* Confirm Password */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>{t('confirmPassword')} *</Text>
-                        <View style={styles.passwordContainer}>
+                        {/* Phone */}
+                        <View style={styles.inputGroup}>
+                            <Text style={[styles.label, isRTL && styles.rtlText]}>{t('phone')} *</Text>
                             <TextInput
-                                style={[styles.input, styles.passwordInput, isRTL && styles.rtlInput]}
-                                value={formData.confirmPassword}
-                                onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
-                                placeholder="••••••••"
-                                secureTextEntry={!showConfirmPassword}
-                                autoCapitalize="none"
+                                style={[styles.input, isRTL && styles.phoneInputRtl]}
+                                value={formData.phone}
+                                onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                                placeholder="+966 50 123 4567"
+                                placeholderTextColor="#9E98B0"
+                                keyboardType="phone-pad"
                                 editable={!loading}
                             />
-                            <TouchableOpacity
-                                style={styles.eyeButton}
-                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                            >
-                                {showConfirmPassword ? (
-                                    <EyeOpenIcon width={20} height={20} color={colors.textSecondary} />
-                                ) : (
-                                    <EyeClosedIcon width={20} height={20} color={colors.textSecondary} />
-                                )}
-                            </TouchableOpacity>
+                            <Text style={[styles.hint, isRTL && styles.rtlText]}>
+                                {isRTL ? 'الصيغة السعودية: +966XXXXXXXXX أو 05XXXXXXXX' : 'Saudi format: +966XXXXXXXXX or 05XXXXXXXX'}
+                            </Text>
                         </View>
-                    </View>
 
-                    {/* Register Button */}
-                    <TouchableOpacity
-                        style={[styles.registerButton, loading && styles.registerButtonDisabled]}
-                        onPress={handleRegister}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color={colors.textInverse} />
-                        ) : (
-                            <Text style={styles.registerButtonText}>{t('createAccountButton')}</Text>
-                        )}
-                    </TouchableOpacity>
+                        {/* Password */}
+                        <View style={styles.inputGroup}>
+                            <Text style={[styles.label, isRTL && styles.rtlText]}>{t('password')} *</Text>
+                            <View style={styles.passwordContainer}>
+                                <TextInput
+                                    style={[styles.input, isRTL ? styles.passwordInputRtl : styles.passwordInputLtr, isRTL && styles.rtlInput]}
+                                    value={formData.password}
+                                    onChangeText={(text) => setFormData({ ...formData, password: text })}
+                                    placeholder="••••••••"
+                                    placeholderTextColor="#9E98B0"
+                                    secureTextEntry={!showPassword}
+                                    autoCapitalize="none"
+                                    editable={!loading}
+                                />
+                                <TouchableOpacity
+                                    style={[styles.eyeButton, isRTL ? styles.eyeButtonRtl : styles.eyeButtonLtr]}
+                                    onPress={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? (
+                                        <EyeOpenIcon width={20} height={20} color="#716B88" />
+                                    ) : (
+                                        <EyeClosedIcon width={20} height={20} color="#716B88" />
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={[styles.hint, isRTL && styles.rtlText]}>
+                                {isRTL ? 'على الأقل 8 خانات، حرف كبير، حرف صغير، ورقم' : 'Min 8 chars, 1 uppercase, 1 lowercase, 1 number'}
+                            </Text>
+                        </View>
 
-                    <TouchableOpacity
-                        style={[styles.googleButton, loading && styles.registerButtonDisabled]}
-                        onPress={onGoogleSignIn}
-                        disabled={loading}
-                    >
-                        <GoogleIcon width={20} height={20} style={styles.leadingIcon} />
-                        <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
-                    </TouchableOpacity>
+                        {/* Confirm Password */}
+                        <View style={styles.inputGroup}>
+                            <Text style={[styles.label, isRTL && styles.rtlText]}>{t('confirmPassword')} *</Text>
+                            <View style={styles.passwordContainer}>
+                                <TextInput
+                                    style={[styles.input, isRTL ? styles.passwordInputRtl : styles.passwordInputLtr, isRTL && styles.rtlInput]}
+                                    value={formData.confirmPassword}
+                                    onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
+                                    placeholder="••••••••"
+                                    placeholderTextColor="#9E98B0"
+                                    secureTextEntry={!showConfirmPassword}
+                                    autoCapitalize="none"
+                                    editable={!loading}
+                                />
+                                <TouchableOpacity
+                                    style={[styles.eyeButton, isRTL ? styles.eyeButtonRtl : styles.eyeButtonLtr]}
+                                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                >
+                                    {showConfirmPassword ? (
+                                        <EyeOpenIcon width={20} height={20} color="#716B88" />
+                                    ) : (
+                                        <EyeClosedIcon width={20} height={20} color="#716B88" />
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
 
-                    {/* Login Link */}
-                    <View style={styles.loginContainer}>
-                        <Text style={styles.loginText}>{t('hasAccount')} </Text>
-                        <TouchableOpacity onPress={onGoToLogin}>
-                            <Text style={styles.loginLink}>{t('signIn')}</Text>
+                        {/* Register Button */}
+                        <TouchableOpacity
+                            style={[styles.registerButton, loading && styles.registerButtonDisabled]}
+                            onPress={handleRegister}
+                            disabled={loading}
+                            activeOpacity={0.85}
+                        >
+                            <LinearGradient
+                                colors={['#6537C0', '#5028A4']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.gradientFill}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.registerButtonText}>{t('createAccountButton')}</Text>
+                                )}
+                            </LinearGradient>
                         </TouchableOpacity>
+
+                        {/* Social Divider */}
+                        <View style={styles.dividerRow}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>
+                                {isRTL ? 'أو التسجيل باستخدام' : 'or continue with'}
+                            </Text>
+                            <View style={styles.dividerLine} />
+                        </View>
+
+                        {/* Google Button */}
+                        <TouchableOpacity
+                            style={[styles.socialButton, isRTL && styles.rowRTL]}
+                            onPress={onGoogleSignIn}
+                            disabled={loading}
+                            activeOpacity={0.85}
+                        >
+                            <GoogleIcon width={20} height={20} style={[styles.leadingIcon, isRTL ? styles.leadingIconRtl : styles.leadingIconLtr]} />
+                            <Text style={styles.socialButtonText}>{t('continueWithGoogle')}</Text>
+                        </TouchableOpacity>
+
+                        {/* Apple Button (Informational / Coming Soon) */}
+                        <TouchableOpacity
+                            style={[styles.socialButton, styles.appleButtonDisabled, isRTL && styles.rowRTL]}
+                            disabled={true}
+                        >
+                            <AppleIcon width={20} height={20} style={[styles.leadingIcon, isRTL ? styles.leadingIconRtl : styles.leadingIconLtr]} />
+                            <Text style={styles.appleButtonText}>
+                                Continue with Apple {isRTL ? '(قريباً)' : '(Coming Soon)'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Login Link */}
+                        <View style={[styles.loginContainer, isRTL && styles.rowRTL]}>
+                            <Text style={styles.loginText}>{t('hasAccount')} </Text>
+                            <TouchableOpacity onPress={onGoToLogin}>
+                                <Text style={styles.loginLink}>{t('signIn')}</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                </View>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -323,162 +359,232 @@ export function RegisterScreen({ onRegisterSuccess, onBackToWelcome, onGoToLogin
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F4FF',
+        backgroundColor: '#FAF9FC',
     },
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: spacing.lg,
+        alignItems: 'center',
     },
     header: {
-        marginBottom: spacing.xl,
+        marginBottom: spacing.lg,
         alignItems: 'center',
-        marginTop: spacing.lg,
+        marginTop: spacing.md,
+        width: '100%',
+        maxWidth: 440,
     },
     logoContainer: {
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
         alignItems: 'center',
     },
     logo: {
-        width: 110,
-        height: 110,
+        width: 170,
+        height: 95,
     },
     title: {
-        fontSize: fontSize.xxxl,
+        fontSize: 22,
         fontWeight: '700',
-        color: colors.text,
-        marginBottom: spacing.xs,
+        color: '#1D035F',
+        marginBottom: 6,
         textAlign: 'center',
+    },
+    subtitle: {
+        fontSize: 14,
+        color: '#716B88',
+        textAlign: 'center',
+        lineHeight: 20,
     },
     rtlText: {
         writingDirection: 'rtl',
     },
     errorContainer: {
+        width: '100%',
+        maxWidth: 440,
         backgroundColor: '#FEE2E2',
         borderWidth: 1,
         borderColor: '#FCA5A5',
         borderRadius: 14,
         padding: spacing.md,
-        marginBottom: spacing.lg,
-    },
-    subtitle: {
-        fontSize: fontSize.md,
-        color: colors.textSecondary,
-        textAlign: 'center',
+        marginBottom: spacing.md,
     },
     errorText: {
         color: colors.error,
         fontSize: fontSize.sm,
     },
     form: {
-        flex: 1,
+        width: '100%',
     },
     formCard: {
+        width: '100%',
+        maxWidth: 440,
         borderRadius: 24,
         borderWidth: 1,
-        borderColor: '#E9DDFD',
-        backgroundColor: '#FFFFFFEB',
-        padding: spacing.lg,
-        shadowColor: '#2E1065',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.08,
+        borderColor: '#E7DDFC',
+        backgroundColor: '#FFFFFF',
+        padding: 24,
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
         shadowRadius: 16,
-        elevation: 2,
+        elevation: 3,
     },
     row: {
         flexDirection: 'row',
         gap: spacing.md,
     },
+    rowRTL: {
+        flexDirection: 'row-reverse',
+    },
     inputGroup: {
-        marginBottom: spacing.md,
+        marginBottom: 14,
     },
     halfWidth: {
         flex: 1,
     },
     label: {
-        fontSize: fontSize.md,
+        fontSize: 13,
         fontWeight: '600',
-        color: colors.text,
-        marginBottom: spacing.xs,
+        color: '#1D035F',
+        marginBottom: 6,
     },
     input: {
         borderWidth: 1,
-        borderColor: '#E9DDFD',
+        borderColor: '#E7DDFC',
         borderRadius: 14,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
-        fontSize: fontSize.md,
-        color: colors.text,
-        backgroundColor: '#FAFAFF',
-        minHeight: 48,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: '#1D035F',
+        backgroundColor: '#FAF9FC',
+        minHeight: 50,
     },
     rtlInput: {
         textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    emailInputRtl: {
+        textAlign: 'left',
+        writingDirection: 'ltr',
+    },
+    phoneInputRtl: {
+        textAlign: 'left',
+        writingDirection: 'ltr',
     },
     hint: {
-        fontSize: fontSize.xs,
-        color: colors.textTertiary,
-        marginTop: spacing.xs,
+        fontSize: 11,
+        color: '#716B88',
+        marginTop: 4,
     },
     passwordContainer: {
         position: 'relative',
     },
-    passwordInput: {
+    passwordInputLtr: {
         paddingRight: 50,
+        paddingLeft: 16,
+    },
+    passwordInputRtl: {
+        paddingLeft: 50,
+        paddingRight: 16,
     },
     eyeButton: {
         position: 'absolute',
-        right: spacing.md,
-        top: spacing.md,
-        padding: spacing.xs,
+        top: 14,
+        padding: 4,
+    },
+    eyeButtonLtr: {
+        right: 14,
+    },
+    eyeButtonRtl: {
+        left: 14,
     },
     registerButton: {
-        backgroundColor: '#7C3AED',
         borderRadius: 16,
-        paddingVertical: spacing.md + 2,
+        overflow: 'hidden',
+        minHeight: 52,
+        marginTop: 6,
+        shadowColor: '#6537C0',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 4,
+    },
+    gradientFill: {
+        flex: 1,
+        justifyContent: 'center',
         alignItems: 'center',
-        marginTop: spacing.lg,
-        minHeight: 48,
+        paddingVertical: 14,
     },
     registerButtonDisabled: {
         opacity: 0.6,
     },
     registerButtonText: {
-        color: colors.textInverse,
-        fontSize: fontSize.xl,
+        color: '#FFFFFF',
+        fontSize: 16,
         fontWeight: '700',
+        letterSpacing: 0.3,
     },
-    googleButton: {
-        borderWidth: 1,
-        borderColor: '#DDD6FE',
+    dividerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 16,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#E7DDFC',
+    },
+    dividerText: {
+        marginHorizontal: 12,
+        fontSize: 12,
+        color: '#9E98B0',
+        fontWeight: '500',
+    },
+    socialButton: {
+        borderWidth: 1.5,
+        borderColor: '#E7DDFC',
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        paddingVertical: spacing.md + 2,
+        paddingVertical: 13,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
-        marginTop: spacing.sm,
-        minHeight: 48,
+        marginBottom: 10,
+        minHeight: 50,
     },
-    leadingIcon: {
-        marginRight: spacing.sm,
+    appleButtonDisabled: {
+        opacity: 0.75,
+        backgroundColor: '#FAF9FC',
     },
-    googleButtonText: {
-        color: colors.text,
-        fontSize: fontSize.lg,
-        fontWeight: '700',
+    leadingIcon: {},
+    leadingIconLtr: {
+        marginRight: 8,
+    },
+    leadingIconRtl: {
+        marginLeft: 8,
+    },
+    socialButtonText: {
+        color: '#1D035F',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    appleButtonText: {
+        color: '#1D035F',
+        fontSize: 14,
+        fontWeight: '600',
     },
     loginContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: spacing.lg,
+        alignItems: 'center',
+        marginTop: 16,
     },
     loginText: {
-        color: colors.textSecondary,
-        fontSize: fontSize.md,
+        color: '#716B88',
+        fontSize: 14,
     },
     loginLink: {
-        color: colors.primary,
-        fontSize: fontSize.md,
+        color: '#6537C0',
+        fontSize: 14,
         fontWeight: '700',
     },
 });

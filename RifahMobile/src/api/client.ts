@@ -240,6 +240,7 @@ export interface Service {
     finalPrice?: number;
     paymentOptions?: Array<'at-center' | 'online-full' | 'booking-fee'>;
     allowReschedule?: boolean;
+    tenantServiceCategoryId?: string | null;
     variants?: ServiceVariant[];
     employees?: Staff[];
     image?: string;
@@ -256,6 +257,52 @@ export interface ServiceVariant {
     duration: number;
     finalPrice: number;
     isActive: boolean;
+    name_en?: string;
+    name_ar?: string;
+    nameEn?: string;
+    nameAr?: string;
+    price?: number;
+    rawPrice?: number;
+}
+
+export interface ServiceCategoryFull {
+    id: string;
+    slug: string;
+    name_en: string;
+    name_ar: string;
+    icon?: string | null;
+    sortOrder?: number;
+}
+
+export interface ServiceBundleItem {
+    id: string;
+    packageId: string;
+    serviceId: string;
+    variantId?: string | null;
+    sequenceOrder: number;
+    defaultStaffId?: string | null;
+    service: Service;
+}
+
+export interface ServiceBundle {
+    id: string;
+    tenantId: string;
+    tenantServiceCategoryId?: string | null;
+    name_en: string;
+    name_ar: string;
+    description_en?: string | null;
+    description_ar?: string | null;
+    image?: string | null;
+    scheduleType: 'sequence' | 'parallel';
+    pricingType: 'service' | 'custom' | 'discount' | 'free';
+    discountPercentage?: number | null;
+    customPrice?: number | null;
+    totalPrice: number;
+    totalDuration: number;
+    allowOnlineBooking: boolean;
+    isActive: boolean;
+    items: ServiceBundleItem[];
+    tenantCategory?: ServiceCategoryFull | null;
 }
 
 export interface Product {
@@ -397,6 +444,11 @@ export interface OrderItem {
     productId: string;
     quantity: number;
     price: number;
+    unitPrice?: number;
+    totalPrice?: number;
+    productName?: string;
+    productNameAr?: string;
+    productImage?: string;
     Product?: {
         name_en: string;
         name_ar: string;
@@ -416,22 +468,27 @@ export interface Order {
     platformUserId: string;
     items: OrderItem[];
     totalAmount: number;
+    subtotal?: number;
+    shippingFee?: number;
+    taxAmount?: number;
+    deliveryType?: 'pickup' | 'delivery' | string;
+    pickupDate?: string;
+    notes?: string;
     status: 'pending' | 'confirmed' | 'processing' | 'ready_for_pickup' | 'shipped' | 'delivered' | 'completed' | 'cancelled' | 'refunded';
     paymentStatus: string;
     paymentMethod: string;
     createdAt: string;
-    shippingAddress?: {
-        street?: string;
-        city?: string;
-        district?: string;
-        building?: string;
-        floor?: string;
-        apartment?: string;
-        phone?: string;
-        notes?: string;
-    };
+    paidAt?: string;
+    trackingNumber?: string;
+    estimatedDeliveryDate?: string;
+    deliveredAt?: string;
+    cancelledAt?: string;
+    cancellationReason?: string;
+    shippingAddress?: any;
     tenant?: {
+        id?: string;
         name: string;
+        slug?: string;
         logo?: string;
     };
 }
@@ -630,10 +687,14 @@ export const normalizeServiceVariant = (variant: unknown): ServiceVariant | null
     const description = toStringValue(source.description).trim();
     const duration = toNumber(source.duration, 30);
     const finalPrice = toNumber(source.finalPrice ?? source.price);
+    const rawPrice = toNumber(source.rawPrice ?? source.basePrice ?? finalPrice);
     const isActive = source.isActive === undefined || source.isActive === null
         ? true
         : toBoolean(source.isActive, true);
     const id = toOptionalString(source.id);
+    const name_en = toOptionalString(source.name_en ?? source.nameEn);
+    const name_ar = toOptionalString(source.name_ar ?? source.nameAr);
+
     const fallbackPayload = JSON.stringify({
         description: description.toLowerCase(),
         duration,
@@ -648,10 +709,29 @@ export const normalizeServiceVariant = (variant: unknown): ServiceVariant | null
 
     return {
         id: id || `variant-${Math.abs(fallbackHash).toString(36)}`,
-        description,
+        description: description || name_en || name_ar || '',
         duration,
         finalPrice,
         isActive,
+        name_en: name_en || undefined,
+        name_ar: name_ar || undefined,
+        nameEn: name_en || undefined,
+        nameAr: name_ar || undefined,
+        price: finalPrice,
+        rawPrice,
+    };
+};
+
+export const normalizeServiceCategory = (cat: unknown): ServiceCategoryFull | null => {
+    if (!cat || typeof cat !== 'object') return null;
+    const s = cat as Record<string, unknown>;
+    return {
+        id: toStringValue(s.id),
+        slug: toStringValue(s.slug),
+        name_en: toStringValue(s.name_en || s.slug, 'Category'),
+        name_ar: toStringValue(s.name_ar || s.name_en || s.slug, 'تصنيف'),
+        icon: toOptionalString(s.icon),
+        sortOrder: toNumber(s.sortOrder, 0),
     };
 };
 
@@ -663,6 +743,7 @@ export const normalizeService = (service: Partial<Service> | null | undefined): 
     description_en: toStringValue(service?.description_en),
     description_ar: toStringValue(service?.description_ar),
     category: toStringValue(service?.category, 'General'),
+    tenantServiceCategoryId: toOptionalString((service as Partial<Service> & { tenantServiceCategoryId?: unknown }).tenantServiceCategoryId),
     duration: toNumber(service?.duration),
     basePrice: toNumber(service?.basePrice),
     minPrice: toNumber((service as Partial<Service> & { minPrice?: number }).minPrice),
@@ -694,6 +775,45 @@ export const normalizeService = (service: Partial<Service> | null | undefined): 
         : [],
 });
 
+export const normalizeServiceBundle = (bundle: unknown): ServiceBundle | null => {
+    if (!bundle || typeof bundle !== 'object') return null;
+    const b = bundle as Record<string, unknown>;
+    const rawItems = Array.isArray(b.items) ? b.items : [];
+    const items: ServiceBundleItem[] = rawItems.map((rawItem, idx) => {
+        const itemObj = (rawItem && typeof rawItem === 'object') ? (rawItem as Record<string, unknown>) : {};
+        return {
+            id: toStringValue(itemObj.id || `item-${idx}`),
+            packageId: toStringValue(itemObj.packageId || b.id),
+            serviceId: toStringValue(itemObj.serviceId || (itemObj.service as any)?.id),
+            variantId: toOptionalString(itemObj.variantId),
+            sequenceOrder: toNumber(itemObj.sequenceOrder, idx + 1),
+            defaultStaffId: toOptionalString(itemObj.defaultStaffId),
+            service: normalizeService(itemObj.service as Partial<Service>),
+        };
+    });
+
+    return {
+        id: toStringValue(b.id),
+        tenantId: toStringValue(b.tenantId),
+        tenantServiceCategoryId: toOptionalString(b.tenantServiceCategoryId),
+        name_en: toStringValue(b.name_en || b.nameEn, 'Bundle'),
+        name_ar: toStringValue(b.name_ar || b.nameAr, 'باقة'),
+        description_en: toOptionalString(b.description_en || b.descriptionEn),
+        description_ar: toOptionalString(b.description_ar || b.descriptionAr),
+        image: toOptionalString(b.image),
+        scheduleType: (b.scheduleType as 'sequence' | 'parallel') || 'sequence',
+        pricingType: (b.pricingType as ServiceBundle['pricingType']) || 'service',
+        discountPercentage: b.discountPercentage !== undefined && b.discountPercentage !== null ? toNumber(b.discountPercentage) : null,
+        customPrice: b.customPrice !== undefined && b.customPrice !== null ? toNumber(b.customPrice) : null,
+        totalPrice: toNumber(b.totalPrice),
+        totalDuration: toNumber(b.totalDuration),
+        allowOnlineBooking: toBoolean(b.allowOnlineBooking, true),
+        isActive: toBoolean(b.isActive, true),
+        items,
+        tenantCategory: b.tenantCategory ? normalizeServiceCategory(b.tenantCategory) : null,
+    };
+};
+
 export const normalizeProduct = (product: Partial<Product> | null | undefined): Product => ({
     id: toStringValue(product?.id),
     tenantId: toOptionalString(product?.tenantId),
@@ -712,13 +832,31 @@ export const normalizeProduct = (product: Partial<Product> | null | undefined): 
     isAvailable: toBoolean(product?.isAvailable, true),
 });
 
+export interface UserAddress {
+    id: string;
+    platformUserId?: string;
+    title: string;
+    street: string;
+    city: string;
+    building?: string;
+    floor?: string;
+    apartment?: string;
+    phone?: string;
+    notes?: string;
+    isDefault?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
 export const normalizeStaff = (staff: Partial<Staff> | null | undefined): Staff => ({
     id: toStringValue(staff?.id),
     name: toStringValue(staff?.name, 'Staff'),
+    name_en: toOptionalString(staff?.name_en),
+    name_ar: toOptionalString(staff?.name_ar),
     role: toOptionalString(staff?.role),
     specialty: toOptionalString(staff?.specialty),
-    avatar: toOptionalString(staff?.avatar || staff?.image),
-    image: toOptionalString(staff?.image || staff?.avatar),
+    avatar: toOptionalString(staff?.avatar || staff?.image || (staff as any)?.photo),
+    image: toOptionalString(staff?.image || staff?.avatar || (staff as any)?.photo),
     bio: toOptionalString(staff?.bio),
     experience: toOptionalString(staff?.experience),
     rating: toNumber(staff?.rating),
@@ -827,19 +965,28 @@ const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Boo
 };
 
 const normalizeOrderItem = (item: Partial<OrderItem> | null | undefined): OrderItem => {
-    const normalizedProductNameEn = toStringValue(item?.Product?.name_en || item?.product?.name_en);
-    const normalizedProductNameAr = toStringValue(item?.Product?.name_ar || item?.product?.name_ar);
-    const normalizedImages = Array.isArray(item?.Product?.images)
-        ? item!.Product!.images!.map((image) => toStringValue(image)).filter(Boolean)
-        : Array.isArray(item?.product?.images)
-            ? item!.product!.images!.map((image) => toStringValue(image)).filter(Boolean)
-            : [];
+    const rawItem = item as any;
+    const normalizedProductNameEn = toStringValue(rawItem?.Product?.name_en || rawItem?.product?.name_en || rawItem?.productName);
+    const normalizedProductNameAr = toStringValue(rawItem?.Product?.name_ar || rawItem?.product?.name_ar || rawItem?.productNameAr);
+    const rawImages = rawItem?.Product?.images || rawItem?.product?.images || (rawItem?.productImage ? [rawItem.productImage] : (rawItem?.product?.image ? [rawItem.product.image] : []));
+    const normalizedImages = Array.isArray(rawImages)
+        ? rawImages.map((image) => toStringValue(image)).filter(Boolean)
+        : [];
+
+    const unitPrice = toNumber(rawItem?.unitPrice || rawItem?.price || rawItem?.productPrice);
+    const quantity = toNumber(rawItem?.quantity, 1);
+    const totalPrice = toNumber(rawItem?.totalPrice || (unitPrice * quantity));
 
     return {
-        id: toStringValue(item?.id),
-        productId: toStringValue(item?.productId),
-        quantity: toNumber(item?.quantity),
-        price: toNumber(item?.price),
+        id: toStringValue(rawItem?.id),
+        productId: toStringValue(rawItem?.productId),
+        quantity,
+        price: unitPrice,
+        unitPrice,
+        totalPrice,
+        productName: normalizedProductNameEn,
+        productNameAr: normalizedProductNameAr,
+        productImage: toOptionalString(rawItem?.productImage) || normalizedImages[0],
         Product: normalizedProductNameEn || normalizedProductNameAr ? {
             name_en: normalizedProductNameEn,
             name_ar: normalizedProductNameAr,
@@ -853,23 +1000,35 @@ const normalizeOrderItem = (item: Partial<OrderItem> | null | undefined): OrderI
     };
 };
 
-const normalizeOrder = (order: Partial<Order> | null | undefined): Order => ({
-    id: toStringValue(order?.id),
-    orderNumber: toOptionalString(order?.orderNumber),
-    tenantId: toStringValue(order?.tenantId),
-    platformUserId: toStringValue(order?.platformUserId),
-    items: Array.isArray(order?.items) ? order.items.map((item) => normalizeOrderItem(item)) : [],
-    totalAmount: toNumber(order?.totalAmount),
-    status: (order?.status as Order['status']) || 'pending',
-    paymentStatus: toStringValue(order?.paymentStatus),
-    paymentMethod: toStringValue(order?.paymentMethod),
-    createdAt: toStringValue(order?.createdAt),
-    shippingAddress: order?.shippingAddress,
-    tenant: order?.tenant ? {
-        name: toStringValue(order.tenant.name, 'Refah'),
-        logo: toOptionalString(order.tenant.logo),
-    } : undefined,
-});
+const normalizeOrder = (order: Partial<Order> | null | undefined): Order => {
+    const rawOrder = order as any;
+    return {
+        id: toStringValue(rawOrder?.id),
+        orderNumber: toOptionalString(rawOrder?.orderNumber),
+        tenantId: toStringValue(rawOrder?.tenantId),
+        platformUserId: toStringValue(rawOrder?.platformUserId),
+        items: Array.isArray(rawOrder?.items) ? rawOrder.items.map((item: any) => normalizeOrderItem(item)) : [],
+        totalAmount: toNumber(rawOrder?.totalAmount),
+        subtotal: rawOrder?.subtotal !== undefined ? toNumber(rawOrder?.subtotal) : undefined,
+        shippingFee: rawOrder?.shippingFee !== undefined ? toNumber(rawOrder?.shippingFee) : undefined,
+        taxAmount: rawOrder?.taxAmount !== undefined ? toNumber(rawOrder?.taxAmount) : undefined,
+        deliveryType: toOptionalString(rawOrder?.deliveryType),
+        pickupDate: toOptionalString(rawOrder?.pickupDate),
+        notes: toOptionalString(rawOrder?.notes),
+        status: (rawOrder?.status as Order['status']) || 'pending',
+        paymentStatus: toStringValue(rawOrder?.paymentStatus),
+        paymentMethod: toStringValue(rawOrder?.paymentMethod),
+        createdAt: toStringValue(rawOrder?.createdAt),
+        paidAt: toOptionalString(rawOrder?.paidAt),
+        shippingAddress: rawOrder?.shippingAddress,
+        tenant: rawOrder?.tenant ? {
+            id: toOptionalString(rawOrder.tenant.id),
+            name: toStringValue(rawOrder.tenant.name, 'Refah'),
+            slug: toOptionalString(rawOrder.tenant.slug),
+            logo: toOptionalString(rawOrder.tenant.logo),
+        } : undefined,
+    };
+};
 
 const normalizeHotDeal = (deal: Partial<HotDeal> | null | undefined): HotDeal => ({
     id: toStringValue(deal?.id),
@@ -1224,6 +1383,35 @@ class ApiClient {
         return normalizeUser(response.user);
     }
 
+    /**
+     * Customer Saved Addresses (backed by /api/v1/addresses)
+     */
+    async getAddresses(): Promise<UserAddress[]> {
+        const response = await this.get<{ success: boolean; addresses: UserAddress[] }>('/addresses');
+        return response.addresses || [];
+    }
+
+    async createAddress(data: Omit<UserAddress, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserAddress> {
+        const response = await this.post<{ success: boolean; address: UserAddress }>('/addresses', data);
+        return response.address;
+    }
+
+    async updateAddress(id: string, data: Partial<UserAddress>): Promise<UserAddress> {
+        const response = await this.put<{ success: boolean; address: UserAddress }>(`/addresses/${id}`, data);
+        return response.address;
+    }
+
+    async deleteAddress(id: string): Promise<{ success: boolean; message?: string }> {
+        const response = await this.request(`/addresses/${id}`, {
+            method: 'DELETE',
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: 'Request failed' }));
+            throw new Error(error.message || `HTTP ${response.status}`);
+        }
+        return response.json();
+    }
+
     async registerPushToken(data: {
         token: string;
         platform: string;
@@ -1499,10 +1687,168 @@ class ApiClient {
         return this.post<{ success: boolean; transaction: any }>('/payments/process', data);
     }
 
-    async getWalletBalance(tenantId?: string): Promise<number> {
-        const query = tenantId ? `?tenantId=${tenantId}` : '';
-        const response = await this.get<{ success: boolean; walletBalance: number }>(`/payments/wallet/balance${query}`);
+    async getWalletBalance(tenantId: string): Promise<number> {
+        if (!tenantId) {
+            throw new Error('tenantId is required to fetch tenant wallet balance');
+        }
+        const response = await this.get<{ success: boolean; walletBalance: number }>(`/payments/wallet/balance?tenantId=${encodeURIComponent(tenantId)}`);
         return toNumber(response.walletBalance, 0);
+    }
+
+    async getWalletSummary(): Promise<{
+        success: boolean;
+        summary: {
+            paymentSourcePriority?: string[];
+            tenantGiftBalances: Array<{
+                sourceType: string;
+                tenantId: string;
+                tenantName?: string | null;
+                tenantNameEn?: string | null;
+                tenantNameAr?: string | null;
+                tenantLogo?: string | null;
+                tenantAddress?: string | null;
+                tenantCity?: string | null;
+                balance: number;
+                currency: string;
+                updatedAt?: string;
+            }>;
+        };
+    }> {
+        return this.get('/users/wallet/summary');
+    }
+
+    async getTenantWallet(tenantId: string, limit: number = 50): Promise<{
+        success: boolean;
+        tenantId: string;
+        balance: number;
+        ledger: Array<{
+            id: string;
+            platformUserId: string;
+            tenantId: string;
+            type: string;
+            direction: 'credit' | 'debit';
+            amount: number;
+            currency: string;
+            balanceBefore: number;
+            balanceAfter: number;
+            referenceType?: string | null;
+            referenceId?: string | null;
+            metadata?: Record<string, any>;
+            createdAt: string;
+        }>;
+    }> {
+        return this.get(`/users/tenant-gifts/wallet?tenantId=${encodeURIComponent(tenantId)}&limit=${limit}`);
+    }
+
+    async rechargeTenantWallet(payload: {
+        tenantId: string;
+        amount: number;
+        payment: {
+            cardNumber: string;
+            expiryDate: string;
+            cvv: string;
+            cardholderName?: string;
+        };
+        idempotencyKey?: string;
+    }): Promise<{
+        success: boolean;
+        message?: string;
+        rechargeAmount: number;
+        balanceBefore: number;
+        balanceAfter: number;
+        currency: string;
+        transactionId: string;
+        settlementId: string;
+        tenant: {
+            id: string;
+            name: string;
+            name_en?: string;
+            name_ar?: string;
+        };
+    }> {
+        return this.post('/users/tenant-wallet/recharge', payload, {
+            headers: payload.idempotencyKey ? { 'Idempotency-Key': payload.idempotencyKey } : undefined
+        });
+    }
+
+    async refundTenantWalletRecharge(payload: {
+        transactionId: string;
+        reason?: string;
+    }): Promise<{
+        success: boolean;
+        message?: string;
+        refundAmount: number;
+        balanceBefore: number;
+        balanceAfter: number;
+        currency: string;
+        transactionId: string;
+    }> {
+        return this.post('/users/tenant-wallet/refund', payload);
+    }
+
+    async getTenantGiftHistory(): Promise<{
+        success: boolean;
+        transactions: Array<{
+            id: string;
+            tenantId: string;
+            packageId?: string;
+            senderPlatformUserId?: string;
+            recipientPlatformUserId?: string;
+            recipientEmail?: string;
+            recipientPhone?: string;
+            purchaseAmount: number;
+            creditAmount: number;
+            bonusAmount: number;
+            totalCreditAmount: number;
+            status: string;
+            deliveryChannel: string;
+            claimedAt?: string;
+            expiresAt?: string;
+            createdAt: string;
+            package?: any;
+            tenant?: { id: string; name: string; name_en?: string; name_ar?: string; logo?: string };
+        }>;
+    }> {
+        return this.get('/users/tenant-gifts/history');
+    }
+
+    async claimTenantGiftByToken(token: string): Promise<{
+        success: boolean;
+        message?: string;
+        walletBalance?: number;
+        transaction?: any;
+    }> {
+        return this.post('/users/tenant-gifts/claim', { token });
+    }
+
+    async claimTenantGiftByCode(code: string): Promise<{
+        success: boolean;
+        message?: string;
+        walletBalance?: number;
+        transaction?: any;
+    }> {
+        return this.post('/users/tenant-gifts/claim', { code });
+    }
+
+    async claimTenantGift(tokenOrCode: string): Promise<{
+        success: boolean;
+        message?: string;
+        walletBalance?: number;
+        transaction?: any;
+    }> {
+        const trimmed = `${tokenOrCode || ''}`.trim();
+        if (trimmed.toUpperCase().startsWith('TN-') || trimmed.length < 32) {
+            return this.claimTenantGiftByCode(trimmed);
+        }
+        return this.claimTenantGiftByToken(trimmed);
+    }
+
+    async getReceivedTenantGifts(status?: string): Promise<{
+        success: boolean;
+        gifts: any[];
+    }> {
+        const query = status ? `?status=${encodeURIComponent(status)}` : '';
+        return this.get(`/users/tenant-gifts/received${query}`);
     }
 
     async getEligiblePaymentSources(params: {
@@ -1598,7 +1944,7 @@ class ApiClient {
      * Get trending tenants (most bookings / activity)
      */
     async getTrendingTenants(limit: number = 8): Promise<Tenant[]> {
-        const response = await this.get<{ success: boolean; tenants: Tenant[] }>('/featured-tenants');
+        const response = await this.get<{ success: boolean; tenants: Tenant[] }>(`/public/tenants/trending?limit=${limit}`);
         return (response.tenants || []).map((tenant) => normalizeTenant(tenant)).slice(0, limit);
     }
 
@@ -1704,6 +2050,7 @@ export const getServicePrice = (
         ?? service.minPrice
         ?? service.maxPrice
         ?? service.rawPrice
+        ?? (service.variants && service.variants.length > 0 ? service.variants[0]?.finalPrice : undefined)
         ?? 0;
     return toNumber(candidate);
 };
@@ -1737,3 +2084,12 @@ export const orderNeedsPayment = (order: Pick<Order, 'paymentMethod' | 'paymentS
 
 // Export singleton instance
 export const api = new ApiClient(API_BASE_URL);
+
+export const getPublicServiceCategories = (tenantId: string) =>
+    api.get<{ success: boolean; categories: any[] }>(`/public/tenant/${tenantId}/service-categories`);
+
+export const getPublicBundles = (tenantId: string, tenantServiceCategoryId?: string) =>
+    api.get<{ success: boolean; bundles: any[] }>(
+        `/public/tenant/${tenantId}/bundles${tenantServiceCategoryId ? `?tenantServiceCategoryId=${tenantServiceCategoryId}` : ''}`
+    );
+

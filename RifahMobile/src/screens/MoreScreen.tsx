@@ -1,97 +1,152 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Linking, View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { UserAvatar } from '../components/UserAvatar';
-import { colors, spacing, fontSize } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { api, PublicAppContent } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
 import * as Notifications from 'expo-notifications';
-import { LinearGradient } from 'expo-linear-gradient';
 
 interface MoreScreenProps {
     navigation?: any;
 }
 
 export function MoreScreen({ navigation }: MoreScreenProps) {
-    const { t, language } = useLanguage();
+    const { t, language, isRTL } = useLanguage();
     const { isAuthenticated, logout, showLogin, user } = useAppSession();
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
     const [appContent, setAppContent] = useState<PublicAppContent | null>(null);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
 
     useFocusEffect(
-        React.useCallback(() => {
+        useCallback(() => {
             api.getCustomerAppContent()
                 .then(setAppContent)
                 .catch(() => setAppContent(null));
 
             if (isAuthenticated) {
                 api.getNotifications(1, 1)
-                    .then((response) => { setNotificationUnreadCount(response.unreadCount || 0); Notifications.setBadgeCountAsync(response.unreadCount || 0); })
+                    .then((response) => {
+                        const unread = response.unreadCount || 0;
+                        setNotificationUnreadCount(unread);
+                        Notifications.setBadgeCountAsync(unread);
+                    })
                     .catch(() => setNotificationUnreadCount(0));
             } else {
                 setNotificationUnreadCount(0);
             }
-
         }, [isAuthenticated])
     );
 
-    const menuItems = [
-        { id: 'profile', icon: 'profile', label: t('profile'), action: () => navigation?.navigate('Profile') },
-        { id: 'myAppointments', icon: 'bookings', label: t('myAppointments'), action: () => navigation?.navigate('Appointments') },
-        { id: 'gifts', icon: 'sparkles', label: language === 'ar' ? 'الهدايا والمحفظة' : 'Gifts & Wallet', action: () => navigation?.navigate('Gifts') },
-        { id: 'browse', icon: 'search', label: t('browseSalons'), action: () => navigation?.navigate('Browse') },
-        { id: 'myPurchases', icon: 'purchases', label: t('myPurchases'), action: () => navigation?.navigate('Purchases') },
+    const accountItems = [
+        {
+            id: 'profile',
+            icon: 'profile' as const,
+            label: t('profile'),
+            subtitle: isRTL ? 'معلوماتك الشخصية وتفاصيل الحساب' : 'Personal information & account details',
+            action: () => navigation?.navigate('Profile'),
+            requiresAuth: true,
+        },
+        {
+            id: 'myAppointments',
+            icon: 'bookings' as const,
+            label: t('myAppointments'),
+            subtitle: isRTL ? 'مواعيدك القادمة والسابقة' : 'Upcoming and past bookings',
+            action: () => navigation?.navigate('Appointments'),
+            requiresAuth: true,
+        },
+        {
+            id: 'gifts',
+            icon: 'sparkles' as const,
+            label: isRTL ? 'الهدايا والمحفظة' : 'Gifts & Wallet',
+            subtitle: isRTL ? 'رصيد المحفظة وبطاقات الهدايا' : 'Wallet balance and gift cards',
+            action: () => navigation?.navigate('Gifts'),
+            requiresAuth: true,
+        },
+        {
+            id: 'myPurchases',
+            icon: 'purchases' as const,
+            label: t('myPurchases'),
+            subtitle: isRTL ? 'طلبات المنتجات ومشترياتك' : 'Product orders and purchases',
+            action: () => navigation?.navigate('Purchases'),
+            requiresAuth: true,
+        },
         {
             id: 'notifications',
-            icon: 'bell',
-            label: notificationUnreadCount > 0
-                ? `${t('notifications')} (${notificationUnreadCount})`
-                : t('notifications'),
+            icon: 'bell' as const,
+            label: t('notifications'),
+            subtitle: notificationUnreadCount > 0
+                ? (isRTL ? `${notificationUnreadCount} إشعارات جديدة` : `${notificationUnreadCount} new notifications`)
+                : (isRTL ? 'تحديثات المواعيد والعروض' : 'Booking updates and offers'),
+            badge: notificationUnreadCount > 0 ? notificationUnreadCount : undefined,
             action: () => {
                 setNotificationUnreadCount(0);
                 navigation?.navigate('Notifications');
-            }
+            },
+            requiresAuth: true,
+        },
+        {
+            id: 'savedAddresses',
+            icon: 'location' as const,
+            label: t('savedAddresses'),
+            subtitle: isRTL ? 'عناوين التوصيل والاستلام' : 'Delivery addresses',
+            action: () => navigation?.navigate('SavedAddresses'),
+            requiresAuth: true,
         },
     ];
 
-    const settingsItems = [
-        { id: 'settings', icon: 'settings', label: t('settings'), action: () => navigation?.navigate('Settings') },
+    const preferencesItems = [
         {
-            id: 'savedAddresses',
-            icon: 'location',
-            label: t('savedAddresses'),
-            action: () => navigation?.navigate('EditProfile'),
+            id: 'settings',
+            icon: 'settings' as const,
+            label: t('settings'),
+            subtitle: isRTL ? 'اللغة وإدارة الحساب' : 'Language & account settings',
+            action: () => navigation?.navigate('Settings'),
+            requiresAuth: false,
+        },
+        {
+            id: 'browse',
+            icon: 'search' as const,
+            label: t('browseSalons'),
+            subtitle: isRTL ? 'استكشف الصالونات والخدمات' : 'Explore salons and services',
+            action: () => navigation?.navigate('Browse'),
+            requiresAuth: false,
         },
     ];
 
     const supportItems = [
         {
             id: 'helpSupport',
-            icon: 'message',
+            icon: 'message' as const,
             label: appContent?.support?.help_support?.[
                 language === 'ar' ? 'titleAr' : 'titleEn'
             ] || t('helpSupport'),
+            subtitle: isRTL ? 'تواصل معنا للحصول على المساعدة' : 'Get in touch for assistance',
             action: () => navigation?.navigate('InfoPage', { pageType: 'support' }),
         },
         {
-            id: 'aboutRefah',
-            icon: 'sparkles',
-            label: appContent?.legal?.about_refah?.[
-                language === 'ar' ? 'titleAr' : 'titleEn'
-            ] || t('aboutRefah'),
+            id: 'aboutBarSpa',
+            icon: 'sparkles' as const,
+            label: (() => {
+                const rawTitle = appContent?.legal?.about_refah?.[language === 'ar' ? 'titleAr' : 'titleEn'];
+                if (rawTitle && !rawTitle.toLowerCase().includes('vanilla') && !rawTitle.includes('فانيلا')) {
+                    return rawTitle;
+                }
+                return t('aboutBarSpa');
+            })(),
+            subtitle: isRTL ? 'تعرف على منصة BarSpa وخدماتها' : 'Learn more about BarSpa platform',
             action: () => navigation?.navigate('InfoPage', { pageType: 'about' }),
         },
         {
             id: 'privacyTerms',
-            icon: 'file',
+            icon: 'file' as const,
             label: appContent?.legal?.privacy_terms?.[
                 language === 'ar' ? 'titleAr' : 'titleEn'
             ] || t('privacyTerms'),
+            subtitle: isRTL ? 'الشروط والأحكام وسياسة الخصوصية' : 'Terms of service & privacy notice',
             action: () => navigation?.navigate('InfoPage', { pageType: 'privacy' }),
         },
     ];
@@ -117,80 +172,241 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
             await logout();
             return;
         }
-
         showLogin();
     };
 
+    const handleItemPress = (item: { id: string; action?: () => void; requiresAuth?: boolean }) => {
+        if (item.requiresAuth && !isAuthenticated) {
+            showLogin();
+            return;
+        }
+        if (item.action) {
+            item.action();
+        }
+    };
+
+    const fullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
+
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <LinearGradient
-                colors={['#8B5CF6', '#7C3AED']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
-            >
-                <View style={styles.userInfo}>
-                    <UserAvatar
-                        firstName={user?.firstName}
-                        lastName={user?.lastName}
-                        profileImage={user?.profileImage}
-                        size={60}
-                        backgroundColor={colors.textInverse}
-                        textColor={colors.primary}
-                    />
-                    <View>
-                        <Text style={styles.userName}>{user ? `${user.firstName} ${user.lastName}` : t('guestTitle')}</Text>
-                        <Text style={styles.userEmail}>{user?.email || t('welcome')}</Text>
-                    </View>
-                </View>
-            </LinearGradient>
-
             <ScrollView
                 style={styles.content}
-                contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
+                contentContainerStyle={{
+                    paddingTop: topInset + 16,
+                    paddingBottom: scrollBottomPadding + 24,
+                    paddingHorizontal: 16,
+                }}
+                showsVerticalScrollIndicator={false}
             >
-                {/* Menu Items */}
-                <View style={styles.menuSection}>
-                    {menuItems.map((item) => (
-                        <TouchableOpacity
-                            key={item.id}
-                            style={styles.menuItem}
-                            onPress={() => {
-                                if (item.id !== 'browse' && !isAuthenticated) {
-                                    showLogin();
-                                    return;
-                                }
-
-                                if (item.action) {
-                                    item.action();
-                                }
-                            }}
-                        >
-                            <View style={styles.menuItemLeft}>
-                                <AppIcon name={item.icon as any} size={22} color={colors.primary} />
-                                <Text style={styles.menuLabel}>{item.label}</Text>
+                {/* 1. Profile Hero Card */}
+                {isAuthenticated && user ? (
+                    <TouchableOpacity
+                        style={styles.heroCard}
+                        onPress={() => navigation?.navigate('Profile')}
+                        activeOpacity={0.88}
+                        accessibilityLabel={isRTL ? 'الملف الشخصي' : 'Profile'}
+                    >
+                        <View style={[styles.heroRow, isRTL && styles.rowRTL]}>
+                            <View style={styles.avatarContainer}>
+                                <UserAvatar
+                                    firstName={user.firstName}
+                                    lastName={user.lastName}
+                                    profileImage={user.profileImage}
+                                    size={64}
+                                    backgroundColor="#F1ECFD"
+                                    textColor="#6537C0"
+                                />
+                                <View style={styles.avatarBadge}>
+                                    <AppIcon name="check" size={12} color="#FFFFFF" />
+                                </View>
                             </View>
-                            <Text style={styles.menuArrow}>›</Text>
+
+                            <View style={[styles.heroMeta, isRTL && styles.alignRTL]}>
+                                <Text style={[styles.heroName, isRTL && styles.textRTL]}>
+                                    {fullName || t('profile')}
+                                </Text>
+                                <Text style={[styles.heroEmail, isRTL && styles.textRTL]} numberOfLines={1}>
+                                    {user.email || user.phone || ''}
+                                </Text>
+                                <View style={[styles.editBadge, isRTL && styles.rowRTL]}>
+                                    <AppIcon name="user" size={12} color="#6537C0" />
+                                    <Text style={styles.editBadgeText}>
+                                        {isRTL ? 'عرض الملف الشخصي' : 'View Profile'}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.heroArrowWrap}>
+                                <AppIcon
+                                    name={isRTL ? 'arrow_back' : 'arrow_forward'}
+                                    size={18}
+                                    color="#A379E2"
+                                />
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+                ) : (
+                    <View style={styles.guestHeroCard}>
+                        <View style={styles.guestIconWrap}>
+                            <AppIcon name="profile" size={32} color="#6537C0" />
+                        </View>
+                        <Text style={[styles.guestHeroTitle, isRTL && styles.textRTL]}>
+                            {isRTL ? 'مرحباً بك في BarSpa' : 'Welcome to BarSpa'}
+                        </Text>
+                        <Text style={[styles.guestHeroSubtitle, isRTL && styles.textRTL]}>
+                            {isRTL
+                                ? 'سجّل الدخول للوصول إلى مواعيدك، المحفظة وتفاصيل الحساب'
+                                : 'Sign in to manage your appointments, wallet and saved addresses'}
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.guestLoginBtn}
+                            onPress={showLogin}
+                            activeOpacity={0.85}
+                        >
+                            <AppIcon name="lock" size={18} color="#FFFFFF" />
+                            <Text style={styles.guestLoginBtnText}>
+                                {isRTL ? 'تسجيل الدخول / حساب جديد' : 'Sign In / Register'}
+                            </Text>
                         </TouchableOpacity>
-                    ))}
+                    </View>
+                )}
+
+                {/* 2. Account & Activity Section */}
+                <View style={[styles.sectionHeaderRow, isRTL && styles.rowRTL]}>
+                    <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
+                        {isRTL ? 'حسابي ونشاطي' : 'Account & Activity'}
+                    </Text>
+                </View>
+                <View style={styles.groupCard}>
+                    {accountItems.map((item, index) => {
+                        const isLast = index === accountItems.length - 1;
+                        return (
+                            <TouchableOpacity
+                                key={item.id}
+                                style={[styles.itemRow, !isLast && styles.itemDivider, isRTL && styles.rowRTL]}
+                                onPress={() => handleItemPress(item)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.iconCircle}>
+                                    <AppIcon name={item.icon} size={20} color="#6537C0" />
+                                </View>
+                                <View style={[styles.itemTextContainer, isRTL && styles.alignRTL]}>
+                                    <Text style={[styles.itemTitle, isRTL && styles.textRTL]}>
+                                        {item.label}
+                                    </Text>
+                                    <Text style={[styles.itemSubtitle, isRTL && styles.textRTL]} numberOfLines={1}>
+                                        {item.subtitle}
+                                    </Text>
+                                </View>
+                                {item.badge !== undefined ? (
+                                    <View style={styles.badgeContainer}>
+                                        <Text style={styles.badgeText}>{item.badge}</Text>
+                                    </View>
+                                ) : (
+                                    <AppIcon
+                                        name={isRTL ? 'arrow_back' : 'arrow_forward'}
+                                        size={18}
+                                        color="#C4B5FD"
+                                    />
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
+                {/* 3. Preferences & Settings */}
+                <View style={[styles.sectionHeaderRow, isRTL && styles.rowRTL]}>
+                    <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
+                        {isRTL ? 'التفضيلات' : 'Preferences'}
+                    </Text>
+                </View>
+                <View style={styles.groupCard}>
+                    {preferencesItems.map((item, index) => {
+                        const isLast = index === preferencesItems.length - 1;
+                        return (
+                            <TouchableOpacity
+                                key={item.id}
+                                style={[styles.itemRow, !isLast && styles.itemDivider, isRTL && styles.rowRTL]}
+                                onPress={() => handleItemPress(item)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.iconCircle}>
+                                    <AppIcon name={item.icon} size={20} color="#6537C0" />
+                                </View>
+                                <View style={[styles.itemTextContainer, isRTL && styles.alignRTL]}>
+                                    <Text style={[styles.itemTitle, isRTL && styles.textRTL]}>
+                                        {item.label}
+                                    </Text>
+                                    <Text style={[styles.itemSubtitle, isRTL && styles.textRTL]} numberOfLines={1}>
+                                        {item.subtitle}
+                                    </Text>
+                                </View>
+                                <AppIcon
+                                    name={isRTL ? 'arrow_back' : 'arrow_forward'}
+                                    size={18}
+                                    color="#C4B5FD"
+                                />
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                {/* 4. Support & Legal */}
+                <View style={[styles.sectionHeaderRow, isRTL && styles.rowRTL]}>
+                    <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
+                        {isRTL ? 'الدعم والمعلومات' : 'Support & Legal'}
+                    </Text>
+                </View>
+                <View style={styles.groupCard}>
+                    {supportItems.map((item, index) => {
+                        const isLast = index === supportItems.length - 1;
+                        return (
+                            <TouchableOpacity
+                                key={item.id}
+                                style={[styles.itemRow, !isLast && styles.itemDivider, isRTL && styles.rowRTL]}
+                                onPress={item.action}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.iconCircle}>
+                                    <AppIcon name={item.icon} size={20} color="#6537C0" />
+                                </View>
+                                <View style={[styles.itemTextContainer, isRTL && styles.alignRTL]}>
+                                    <Text style={[styles.itemTitle, isRTL && styles.textRTL]}>
+                                        {item.label}
+                                    </Text>
+                                    <Text style={[styles.itemSubtitle, isRTL && styles.textRTL]} numberOfLines={1}>
+                                        {item.subtitle}
+                                    </Text>
+                                </View>
+                                <AppIcon
+                                    name={isRTL ? 'arrow_back' : 'arrow_forward'}
+                                    size={18}
+                                    color="#C4B5FD"
+                                />
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                {/* 5. Social Links */}
                 {socialLinks.length > 0 && (
                     <>
-                        <View style={styles.sectionHeaderWrap}>
-                            <Text style={styles.sectionHeaderText}>{t('followRefah')}</Text>
+                        <View style={[styles.sectionHeaderRow, isRTL && styles.rowRTL]}>
+                            <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
+                                {t('followBarSpa')}
+                            </Text>
                         </View>
-
                         <View style={styles.socialCard}>
-                            <View style={styles.socialRow}>
+                            <View style={[styles.socialRow, isRTL && styles.rowRTL]}>
                                 {socialLinks.map((item) => (
                                     <TouchableOpacity
                                         key={`${item.key}-${item.iconKey}`}
-                                        style={styles.socialIconButton}
+                                        style={styles.socialBtn}
                                         onPress={() => Linking.openURL(item.url)}
+                                        activeOpacity={0.7}
+                                        accessibilityLabel={item.key}
                                     >
-                                        <AppIcon name={getSocialIcon(item.iconKey)} size={24} color={colors.primary} />
+                                        <AppIcon name={getSocialIcon(item.iconKey)} size={20} color="#6537C0" />
                                     </TouchableOpacity>
                                 ))}
                             </View>
@@ -198,63 +414,28 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
                     </>
                 )}
 
-                <View style={styles.sectionHeaderWrap}>
-                    <Text style={styles.sectionHeaderText}>{t('settings')}</Text>
-                </View>
-
-                <View style={styles.menuSection}>
-                    {settingsItems.map((item) => (
-                        <TouchableOpacity
-                            key={item.id}
-                            style={styles.menuItem}
-                            onPress={() => {
-                                if (!isAuthenticated) {
-                                    showLogin();
-                                    return;
-                                }
-
-                                void item.action();
-                            }}
-                        >
-                            <View style={styles.menuItemLeft}>
-                                <AppIcon name={item.icon as any} size={22} color={colors.primary} />
-                                <Text style={styles.menuLabel}>{item.label}</Text>
-                            </View>
-                            <Text style={styles.menuArrow}>›</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                <View style={styles.sectionHeaderWrap}>
-                    <Text style={styles.sectionHeaderText}>{t('supportAndLegal')}</Text>
-                </View>
-
-                <View style={styles.menuSection}>
-                    {supportItems.map((item) => (
-                        <TouchableOpacity
-                            key={item.id}
-                            style={styles.menuItem}
-                            onPress={item.action}
-                        >
-                            <View style={styles.menuItemLeft}>
-                                <AppIcon name={item.icon as any} size={22} color={colors.primary} />
-                                <Text style={styles.menuLabel}>{item.label}</Text>
-                            </View>
-                            <Text style={styles.menuArrow}>›</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Logout Button */}
-                <TouchableOpacity style={styles.logoutButton} onPress={handleAuthAction}>
-                    <AppIcon name={isAuthenticated ? 'logout' : 'lock'} size={20} color={colors.error} />
-                    <Text style={styles.logoutText}>{isAuthenticated ? t('logout') : t('loginNow')}</Text>
+                {/* 6. Auth CTA Button */}
+                <TouchableOpacity
+                    style={[styles.authBtn, isAuthenticated ? styles.logoutBtn : styles.loginBtn, isRTL && styles.rowRTL]}
+                    onPress={handleAuthAction}
+                    activeOpacity={0.8}
+                >
+                    <AppIcon
+                        name={isAuthenticated ? 'logout' : 'lock'}
+                        size={18}
+                        color={isAuthenticated ? '#DC2626' : '#6537C0'}
+                    />
+                    <Text style={[styles.authBtnText, isAuthenticated ? styles.logoutText : styles.loginText]}>
+                        {isAuthenticated ? t('logout') : t('loginNow')}
+                    </Text>
                 </TouchableOpacity>
 
-                {/* App Info */}
-                <View style={styles.appInfo}>
-                    <Text style={styles.appInfoText}>Refah v1.0.0</Text>
-                    <Text style={styles.appInfoText}>© 2024 Refah Platform</Text>
+                {/* 7. App Info Footer */}
+                <View style={styles.appFooter}>
+                    <Text style={styles.appFooterVersion}>BarSpa v2.0.0</Text>
+                    <Text style={styles.appFooterCopyright}>
+                        {isRTL ? '© ٢٠٢٤ منصة BarSpa. جميع الحقوق محفوظة.' : '© 2024 BarSpa Platform. All rights reserved.'}
+                    </Text>
                 </View>
             </ScrollView>
         </View>
@@ -264,139 +445,298 @@ export function MoreScreen({ navigation }: MoreScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F4FF',
-    },
-    header: {
-        backgroundColor: colors.primary,
-        padding: spacing.xl,
-    },
-    userInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-    },
-    userName: {
-        fontSize: fontSize.lg,
-        fontWeight: '700',
-        color: colors.textInverse,
-        marginBottom: 4,
-    },
-    userEmail: {
-        fontSize: fontSize.sm,
-        color: colors.textInverse,
-        opacity: 0.9,
+        backgroundColor: '#FAF9FC',
     },
     content: {
         flex: 1,
     },
-    menuSection: {
+    // Hero Profile Card
+    heroCard: {
         backgroundColor: '#FFFFFF',
-        marginTop: spacing.md,
-        marginHorizontal: spacing.md,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: '#E9DDFD',
-        overflow: 'hidden',
-        shadowColor: '#2E1065',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
+        borderColor: '#E7DDFC',
+        padding: 16,
+        marginBottom: 20,
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
         elevation: 2,
     },
-    menuItem: {
+    heroRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: spacing.lg,
-        paddingHorizontal: spacing.lg,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3E8FF',
     },
-    menuItemLeft: {
-        flexDirection: 'row',
+    rowRTL: {
+        flexDirection: 'row-reverse',
+    },
+    alignRTL: {
+        alignItems: 'flex-end',
+    },
+    textRTL: {
+        textAlign: 'right',
+    },
+    avatarContainer: {
+        position: 'relative',
+    },
+    avatarBadge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#10B981',
         alignItems: 'center',
-        gap: spacing.md,
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
     },
-    menuLabel: {
-        fontSize: fontSize.md,
-        color: colors.text,
-        fontWeight: '500',
+    heroMeta: {
+        flex: 1,
+        marginHorizontal: 14,
     },
-    menuSubLabel: {
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
-        marginTop: 2,
-    },
-    menuArrow: {
-        fontSize: 24,
-        color: colors.textSecondary,
-    },
-    sectionHeaderWrap: {
-        paddingHorizontal: spacing.lg,
-        paddingTop: spacing.xl,
-        paddingBottom: spacing.sm,
-    },
-    sectionHeaderText: {
-        fontSize: fontSize.sm,
+    heroName: {
+        fontSize: 18,
         fontWeight: '700',
-        color: '#6B7280',
-        textTransform: 'uppercase',
+        color: '#1D035F',
+        fontFamily: 'Cairo-Bold',
+        marginBottom: 2,
     },
-    socialCard: {
+    heroEmail: {
+        fontSize: 13,
+        color: '#6B7280',
+        fontFamily: 'Cairo-Regular',
+        marginBottom: 6,
+    },
+    editBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: '#F1ECFD',
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        gap: 4,
+    },
+    editBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#6537C0',
+        fontFamily: 'Cairo-Bold',
+    },
+    heroArrowWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#FAF8FE',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    // Guest Hero Card
+    guestHeroCard: {
         backgroundColor: '#FFFFFF',
-        marginHorizontal: spacing.lg,
-        marginTop: spacing.sm,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: '#E9DDFD',
-        padding: spacing.lg,
-        shadowColor: '#2E1065',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.06,
-        shadowRadius: 14,
+        borderColor: '#E7DDFC',
+        padding: 20,
+        alignItems: 'center',
+        marginBottom: 20,
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 2,
+    },
+    guestIconWrap: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#F1ECFD',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    guestHeroTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1D035F',
+        fontFamily: 'Cairo-Bold',
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    guestHeroSubtitle: {
+        fontSize: 13,
+        color: '#6B7280',
+        fontFamily: 'Cairo-Regular',
+        textAlign: 'center',
+        lineHeight: 18,
+        marginBottom: 16,
+        paddingHorizontal: 12,
+    },
+    guestLoginBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#6537C0',
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        gap: 8,
+        width: '100%',
+    },
+    guestLoginBtnText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        fontFamily: 'Cairo-Bold',
+    },
+    // Section Header
+    sectionHeaderRow: {
+        marginBottom: 8,
+        paddingHorizontal: 4,
+    },
+    sectionTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#7C3AED',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        fontFamily: 'Cairo-Bold',
+    },
+    // Group Card
+    groupCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        marginBottom: 20,
+        overflow: 'hidden',
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 8,
         elevation: 1,
+    },
+    itemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+    },
+    itemDivider: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#F5F0FF',
+    },
+    iconCircle: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#F1ECFD',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    itemTextContainer: {
+        flex: 1,
+        marginHorizontal: 12,
+    },
+    itemTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1D035F',
+        fontFamily: 'Cairo-Bold',
+    },
+    itemSubtitle: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 2,
+        fontFamily: 'Cairo-Regular',
+    },
+    badgeContainer: {
+        backgroundColor: '#6537C0',
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        minWidth: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    badgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    // Social Card
+    socialCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        padding: 16,
+        marginBottom: 20,
     },
     socialRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: spacing.md,
+        gap: 12,
+        justifyContent: 'center',
     },
-    socialIconButton: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
-        backgroundColor: '#F5F3FF',
+    socialBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F1ECFD',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#DDD6FE',
+        borderColor: '#E7DDFC',
     },
-    logoutButton: {
+    // Auth Button
+    authBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: spacing.sm,
-        backgroundColor: '#FEE2E2',
-        marginHorizontal: spacing.lg,
-        marginTop: spacing.xl,
-        padding: spacing.lg,
-        borderRadius: 12,
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 16,
+        marginBottom: 24,
+    },
+    logoutBtn: {
+        backgroundColor: '#FEF2F2',
         borderWidth: 1,
-        borderColor: '#FCA5A5',
+        borderColor: '#FECACA',
+    },
+    loginBtn: {
+        backgroundColor: '#F1ECFD',
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+    },
+    authBtnText: {
+        fontSize: 15,
+        fontWeight: '700',
+        fontFamily: 'Cairo-Bold',
     },
     logoutText: {
-        fontSize: fontSize.md,
-        fontWeight: '600',
-        color: colors.error,
+        color: '#DC2626',
     },
-    appInfo: {
+    loginText: {
+        color: '#6537C0',
+    },
+    // App Footer
+    appFooter: {
         alignItems: 'center',
-        padding: spacing.xl,
+        paddingBottom: 16,
         gap: 4,
     },
-    appInfoText: {
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
+    appFooterVersion: {
+        fontSize: 12,
+        color: '#9CA3AF',
+        fontFamily: 'Cairo-Bold',
+    },
+    appFooterCopyright: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        fontFamily: 'Cairo-Regular',
     },
 });
-

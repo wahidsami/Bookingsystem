@@ -52,7 +52,7 @@ export function HotDealDetailScreen() {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={[styles.header, { paddingTop: spacing.lg + topInset }]}>
+            <View style={[styles.header, isRTL && styles.rowRTL, { paddingTop: spacing.lg + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                     <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
@@ -78,7 +78,7 @@ export function HotDealDetailScreen() {
 
                 {/* Tenant Card */}
                 {deal.tenant && (
-                    <View style={styles.tenantCard}>
+                    <View style={[styles.tenantCard, isRTL && styles.rowRTL]}>
                         {logoUrl ? (
                             <Image source={{ uri: logoUrl }} style={styles.tenantLogo} resizeMode="contain" />
                         ) : (
@@ -86,15 +86,15 @@ export function HotDealDetailScreen() {
                                 <Text style={styles.tenantLogoLetter}>{(tenantName || '?').charAt(0)}</Text>
                             </View>
                         )}
-                        <Text style={styles.tenantName}>{tenantName}</Text>
+                        <Text style={[styles.tenantName, isRTL && styles.rtlText]}>{tenantName}</Text>
                     </View>
                 )}
 
                 {/* Pricing */}
                 <View style={styles.pricingCard}>
-                    <View style={styles.priceRow}>
-                        <View>
-                            <Text style={styles.priceLabel}>{t('discountedPriceLabel')}</Text>
+                    <View style={[styles.priceRow, isRTL && styles.rowRTL]}>
+                        <View style={isRTL && { alignItems: 'flex-end' }}>
+                            <Text style={[styles.priceLabel, isRTL && styles.rtlText]}>{t('discountedPriceLabel')}</Text>
                             <Text style={styles.discountedPrice}>{formatRiyal(deal.discountedPrice, isRTL ? 'ar' : 'en')}</Text>
                         </View>
                         <View style={styles.savingsBadge}>
@@ -105,7 +105,7 @@ export function HotDealDetailScreen() {
                             </Text>
                         </View>
                     </View>
-                    <Text style={styles.originalPrice}>
+                    <Text style={[styles.originalPrice, isRTL && styles.rtlText]}>
                         {t('originalPriceLabel')} {formatRiyal(deal.originalPrice, isRTL ? 'ar' : 'en')}
                     </Text>
                 </View>
@@ -113,21 +113,21 @@ export function HotDealDetailScreen() {
                 {/* Details */}
                 <View style={styles.detailsCard}>
                     {validUntil && (
-                        <View style={styles.detailRow}>
+                        <View style={[styles.detailRow, isRTL && styles.rowRTL]}>
                             <AppIcon name="bookings" size={20} color={colors.textSecondary} />
-                            <Text style={styles.detailText}>{t('validUntilLabel')} {validUntil}</Text>
+                            <Text style={[styles.detailText, isRTL && styles.rtlText]}>{t('validUntilLabel')} {validUntil}</Text>
                         </View>
                     )}
                     {spotsLeft !== null && (
-                        <View style={styles.detailRow}>
+                        <View style={[styles.detailRow, isRTL && styles.rowRTL]}>
                             <AppIcon name="user" size={20} color={colors.textSecondary} />
-                            <Text style={styles.detailText}>{spotsLeft} {t('spotsRemainingLabel')}</Text>
+                            <Text style={[styles.detailText, isRTL && styles.rtlText]}>{spotsLeft} {t('spotsRemainingLabel')}</Text>
                         </View>
                     )}
                     {deal.service?.duration && (
-                        <View style={styles.detailRow}>
+                        <View style={[styles.detailRow, isRTL && styles.rowRTL]}>
                             <AppIcon name="clock" size={20} color={colors.textSecondary} />
-                            <Text style={styles.detailText}>{deal.service.duration} {t('minSessionLabel')}</Text>
+                            <Text style={[styles.detailText, isRTL && styles.rtlText]}>{deal.service.duration} {t('minSessionLabel')}</Text>
                         </View>
                     )}
                 </View>
@@ -135,15 +135,15 @@ export function HotDealDetailScreen() {
                 {/* Description */}
                 {description ? (
                     <View style={styles.descCard}>
-                        <Text style={styles.descTitle}>{t('aboutThisDealLabel')}</Text>
-                        <Text style={styles.descText}>{description}</Text>
+                        <Text style={[styles.descTitle, isRTL && styles.rtlText]}>{t('aboutThisDealLabel')}</Text>
+                        <Text style={[styles.descText, isRTL && styles.rtlText]}>{description}</Text>
                     </View>
                 ) : null}
 
                 {/* CTA */}
                 {deal.tenant && (
                     <TouchableOpacity
-                        style={styles.ctaButton}
+                        style={[styles.ctaButton, isRTL && styles.rowRTL]}
                         activeOpacity={0.85}
                         onPress={() =>
                             navigation.navigate('Tenant', {
@@ -313,4 +313,11 @@ const styles = StyleSheet.create({
         }),
     },
     ctaText: { fontSize: fontSize.lg, fontWeight: '700', color: colors.textInverse },
+    rowRTL: {
+        flexDirection: 'row-reverse',
+    },
+    rtlText: {
+        textAlign: 'right',
+        writingDirection: 'rtl',
+    },
 });

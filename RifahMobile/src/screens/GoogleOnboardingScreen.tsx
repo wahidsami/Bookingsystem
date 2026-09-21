@@ -89,7 +89,8 @@ const normalizePhoneForApi = (value: string) => {
 
 export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingScreenProps) {
     const { topInset, scrollBottomPadding } = useScreenSafeArea();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
+    const isRTL = language === 'ar';
     const googleClientId = getGoogleWebClientId();
     const googleAndroidClientId = getGoogleAndroidClientId();
     const googleIosClientId = getGoogleIosClientId();
@@ -334,7 +335,7 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
     })();
 
     return (
-        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <LinearGradient
                 colors={['#FFFFFF', '#F8F2FF']}
                 start={{ x: 0, y: 0 }}
@@ -345,24 +346,24 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
                 contentContainerStyle={[styles.scrollContent, { paddingTop: spacing.xl + topInset, paddingBottom: scrollBottomPadding }]}
                 keyboardShouldPersistTaps="handled"
             >
-                <TouchableOpacity style={styles.backButton} onPress={onBack}>
-                    <Text style={styles.backButtonText}>← {t('back')}</Text>
+                <TouchableOpacity style={[styles.backButton, isRTL && { alignSelf: 'flex-end' }]} onPress={onBack}>
+                    <Text style={styles.backButtonText}>{isRTL ? `${t('back')} →` : `← ${t('back')}`}</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.title}>{t('googleOnboardingTitle')}</Text>
-                <Text style={styles.subtitle}>
+                <Text style={[styles.title, isRTL && styles.rtlText]}>{t('googleOnboardingTitle')}</Text>
+                <Text style={[styles.subtitle, isRTL && styles.rtlText]}>
                     {t('stepOf').replace('{{current}}', String(currentStep)).replace('{{total}}', String(totalSteps))}
                 </Text>
 
                 {error ? (
                     <View style={styles.errorContainer}>
-                        <Text style={styles.errorText}>{error}</Text>
+                        <Text style={[styles.errorText, isRTL && styles.rtlText]}>{error}</Text>
                     </View>
                 ) : null}
 
                 {step === 'google' ? (
                     <View style={styles.card}>
-                        <Text style={styles.infoText}>{t('signInWithGoogleFirst')}</Text>
+                        <Text style={[styles.infoText, isRTL && styles.rtlText]}>{t('signInWithGoogleFirst')}</Text>
                         <TouchableOpacity
                             style={[styles.primaryButton, (loading || !request || !canStartGoogle) && styles.disabledButton]}
                             disabled={loading || !request || !canStartGoogle}
@@ -375,12 +376,12 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
                 {step === 'phone' ? (
                     <View style={styles.card}>
-                        <Text style={styles.label}>{t('googleEmailLabel')}</Text>
-                        <TextInput style={[styles.input, styles.readOnlyInput]} value={email} editable={false} />
+                        <Text style={[styles.label, isRTL && styles.rtlText]}>{t('googleEmailLabel')}</Text>
+                        <TextInput style={[styles.input, styles.readOnlyInput, isRTL && styles.phoneInputRtl]} value={email} editable={false} />
 
-                        <Text style={styles.label}>{t('mobileNumberLabel')}</Text>
+                        <Text style={[styles.label, isRTL && styles.rtlText]}>{t('mobileNumberLabel')}</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, isRTL && styles.phoneInputRtl]}
                             value={phone}
                             onChangeText={setPhone}
                             keyboardType="phone-pad"
@@ -396,12 +397,12 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
                 {step === 'otp' ? (
                     <View style={styles.card}>
-                        <Text style={styles.infoText}>{t('phoneLabel')}: {phone}</Text>
-                        {otpHint ? <Text style={styles.hintText}>{otpHint}</Text> : null}
+                        <Text style={[styles.infoText, isRTL && styles.rtlText]}>{t('phoneLabel')}: {phone}</Text>
+                        {otpHint ? <Text style={[styles.hintText, isRTL && styles.rtlText]}>{otpHint}</Text> : null}
 
-                        <Text style={styles.label}>{t('otpCodeLabel')}</Text>
+                        <Text style={[styles.label, isRTL && styles.rtlText]}>{t('otpCodeLabel')}</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, isRTL && styles.phoneInputRtl]}
                             value={otp}
                             onChangeText={setOtp}
                             keyboardType="number-pad"
@@ -417,11 +418,11 @@ export function GoogleOnboardingScreen({ onSuccess, onBack }: GoogleOnboardingSc
 
                 {step === 'name' ? (
                     <View style={styles.card}>
-                        <Text style={styles.infoText}>{t('completeAccountDetails')}</Text>
-                        <Text style={styles.label}>{t('firstName')}</Text>
-                        <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} editable={!loading} />
-                        <Text style={styles.label}>{t('lastName')}</Text>
-                        <TextInput style={styles.input} value={lastName} onChangeText={setLastName} editable={!loading} />
+                        <Text style={[styles.infoText, isRTL && styles.rtlText]}>{t('completeAccountDetails')}</Text>
+                        <Text style={[styles.label, isRTL && styles.rtlText]}>{t('firstName')}</Text>
+                        <TextInput style={[styles.input, isRTL && styles.rtlInput]} value={firstName} onChangeText={setFirstName} editable={!loading} />
+                        <Text style={[styles.label, isRTL && styles.rtlText]}>{t('lastName')}</Text>
+                        <TextInput style={[styles.input, isRTL && styles.rtlInput]} value={lastName} onChangeText={setLastName} editable={!loading} />
 
                         <TouchableOpacity
                             style={[styles.primaryButton, loading && styles.disabledButton]}
@@ -489,4 +490,16 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: { color: colors.textInverse, fontWeight: '700', fontSize: fontSize.md },
     disabledButton: { opacity: 0.6 },
+    rtlText: {
+        textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    rtlInput: {
+        textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    phoneInputRtl: {
+        textAlign: 'left',
+        writingDirection: 'ltr',
+    },
 });

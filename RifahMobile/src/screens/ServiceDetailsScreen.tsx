@@ -122,7 +122,7 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
     const handleShare = async () => {
         try {
             await Share.share({
-                message: `${serviceName} - ${tenant?.name || 'Refah'}\n${description}`,
+                message: `${serviceName} - ${tenant?.name || 'BarSpa'}\n${description}`,
             });
         } catch {}
     };
@@ -189,11 +189,11 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
             <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: Math.max(scrollBottomPadding, 120) }}>
                 <ImageBackground source={{ uri: heroUri }} style={styles.hero}>
                     <LinearGradient colors={['rgba(0,0,0,0.12)', 'rgba(0,0,0,0.52)']} style={styles.heroShade}>
-                        <View style={[styles.heroTopRow, { marginTop: topInset + 6 }]}>
+                        <View style={[styles.heroTopRow, isRTL && styles.rowRTL, { marginTop: topInset + 6 }]}>
                             <TouchableOpacity style={styles.glassButton} onPress={() => navigation.goBack()}>
                                 <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={20} color={colors.text} />
                             </TouchableOpacity>
-                            <View style={styles.heroActions}>
+                            <View style={[styles.heroActions, isRTL && styles.rowRTL]}>
                                 <TouchableOpacity style={styles.glassButton} onPress={handleShare}>
                                     <AppIcon name="share" size={18} color={colors.text} />
                                 </TouchableOpacity>
@@ -212,19 +212,19 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                         </View>
                     ) : (
                         <>
-                            <Text style={styles.title}>{serviceName}</Text>
-                            <Text style={styles.subtitle}>{description || (isRTL ? 'تفاصيل الخدمة ستتوفر قريباً.' : 'Service details will appear soon.')}</Text>
+                            <Text style={[styles.title, isRTL && styles.rtlText]}>{serviceName}</Text>
+                            <Text style={[styles.subtitle, isRTL && styles.rtlText]}>{description || (isRTL ? 'تفاصيل الخدمة ستتوفر قريباً.' : 'Service details will appear soon.')}</Text>
 
-                            <View style={styles.chipsRow}>
-                                <View style={styles.chip}>
+                            <View style={[styles.chipsRow, isRTL && styles.rowRTL]}>
+                                <View style={[styles.chip, isRTL && styles.rowRTL]}>
                                     <AppIcon name="clock" size={14} color={colors.primary} />
                                     <Text style={styles.chipText}>{effectiveDuration} {isRTL ? 'دقيقة' : 'min'}</Text>
                                 </View>
-                                <View style={styles.chip}>
+                                <View style={[styles.chip, isRTL && styles.rowRTL]}>
                                     <AppIcon name="cash" size={14} color={colors.primary} />
                                     <Text style={styles.chipText}>{formatRiyal(effectivePrice, isRTL ? 'ar' : 'en')}</Text>
                                 </View>
-                                <View style={styles.chip}>
+                                <View style={[styles.chip, isRTL && styles.rowRTL]}>
                                     <AppIcon name="card" size={14} color={colors.primary} />
                                     <Text style={styles.chipText}>{isRTL ? 'دفع بالمركز' : 'Pay at center'}</Text>
                                 </View>
@@ -232,18 +232,18 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
 
                             {activeVariants.length > 0 ? (
                                 <View style={styles.section}>
-                                    <Text style={styles.sectionTitle}>{isRTL ? 'اختر النسخة' : 'Choose a variant'}</Text>
+                                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{isRTL ? 'الخيارات المتاحة' : 'Available Options'}</Text>
                                     {activeVariants.map((variant: ServiceVariant) => {
                                         const isSelected = variant.id === selectedVariant?.id;
                                         return (
                                             <TouchableOpacity
                                                 key={variant.id}
-                                                style={[styles.variantCard, isSelected ? styles.variantCardSelected : null]}
+                                                style={[styles.variantCard, isRTL && styles.rowRTL, isSelected ? styles.variantCardSelected : null]}
                                                 onPress={() => setSelectedVariantId(variant.id)}
                                             >
-                                                <View style={styles.variantMain}>
-                                                    <Text style={styles.variantName}>{variant.description || (isRTL ? 'نسخة' : 'Variant')}</Text>
-                                                    <Text style={styles.variantMeta}>
+                                                <View style={[styles.variantMain, isRTL && styles.variantMainRTL]}>
+                                                    <Text style={[styles.variantName, isRTL && styles.rtlText]}>{variant.description || (isRTL ? 'نسخة' : 'Variant')}</Text>
+                                                    <Text style={[styles.variantMeta, isRTL && styles.rtlText]}>
                                                         {(variant.duration || resolvedService.duration)} {isRTL ? 'دقيقة' : 'min'} • {formatRiyal(getServicePrice(resolvedService, variant), isRTL ? 'ar' : 'en')}
                                                     </Text>
                                                 </View>
@@ -290,8 +290,8 @@ export function ServiceDetailsScreen({ route, navigation }: any) {
                 </View>
             </ScrollView>
 
-            <View style={[styles.stickyBar, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>
-                <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Booking')}>
+            <View style={[styles.stickyBar, isRTL && styles.rowRTL, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>
+                <TouchableOpacity style={[styles.cartBtn, isRTL && styles.rowRTL]} onPress={() => navigation.navigate('Booking')}>
                     <AppIcon name="bookings" size={16} color={colors.primary} />
                     <Text style={styles.cartBtnText}>{isRTL ? 'السلة' : 'Basket'}</Text>
                 </TouchableOpacity>
@@ -422,4 +422,14 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primary,
     },
     bookBtnText: { color: '#FFF', fontSize: 18, fontWeight: '800' },
+    rowRTL: {
+        flexDirection: 'row-reverse',
+    },
+    rtlText: {
+        textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    variantMainRTL: {
+        alignItems: 'flex-end',
+    },
 });

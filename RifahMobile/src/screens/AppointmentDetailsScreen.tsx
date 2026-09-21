@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, ImageBackground, Linking, Modal, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, Modal, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Image } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { Booking, SlotItem, bookingNeedsPayment, getBookingOutstandingAmount } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -11,7 +11,7 @@ import { ar, enUS } from 'date-fns/locale';
 import { formatRiyal } from '../utils/currency';
 import { api } from '../api/client';
 import { getImageUrl } from '../api/client';
-import { LinearGradient } from 'expo-linear-gradient';
+import { CustomerSubpageHeader } from '../components/ui/CustomerSubpageHeader';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { parseGroupGuestFromNotes } from '../utils/groupGuest';
 
@@ -85,9 +85,27 @@ const getStatusText = (status: string, language?: string) => {
   }
 };
 
+const getStatusBgColor = (status: string) => {
+  const s = String(status || '').toLowerCase();
+  if (['confirmed', 'checked_in', 'checkedin'].includes(s)) return '#ECFDF5';
+  if (['pending'].includes(s)) return '#FFFBEB';
+  if (['in_service', 'inservice', 'completed'].includes(s)) return '#EFF6FF';
+  if (['cancelled', 'no_show', 'noshow'].includes(s)) return '#FEF2F2';
+  return '#F3F4F6';
+};
+
+const getStatusTextColor = (status: string) => {
+  const s = String(status || '').toLowerCase();
+  if (['confirmed', 'checked_in', 'checkedin'].includes(s)) return '#059669';
+  if (['pending'].includes(s)) return '#D97706';
+  if (['in_service', 'inservice', 'completed'].includes(s)) return '#2563EB';
+  if (['cancelled', 'no_show', 'noshow'].includes(s)) return '#DC2626';
+  return '#6B7280';
+};
+
 export function AppointmentDetailsScreen({ route, navigation }: any) {
-  const { language } = useLanguage();
-  const { topInset, scrollBottomPadding } = useScreenSafeArea();
+  const { language, isRTL } = useLanguage();
+  const { scrollBottomPadding } = useScreenSafeArea();
   const initialGroup = route?.params?.bookingGroup as BookingGroup | undefined;
   const activeTab = (route?.params?.activeTab as 'upcoming' | 'completed' | 'no_show' | 'cancelled' | undefined) || 'upcoming';
   const [group] = useState<BookingGroup | null>(initialGroup || null);
@@ -405,120 +423,247 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
   if (!group || !representative) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', padding: spacing.lg }]}>
-        <Text style={styles.emptyText}>{language === 'ar' ? 'تعذر تحميل تفاصيل الموعد.' : 'Unable to load appointment details.'}</Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Browse')}>
-          <Text style={styles.primaryBtnText}>{language === 'ar' ? 'تصفح الخدمات' : 'Browse Services'}</Text>
-        </TouchableOpacity>
+      <View style={[styles.container, { flex: 1 }]}>
+        <CustomerSubpageHeader
+          title={language === 'ar' ? 'تفاصيل الموعد' : 'Appointment Details'}
+          onBack={() => navigation.goBack()}
+        />
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>{language === 'ar' ? 'تعذر تحميل تفاصيل الموعد.' : 'Unable to load appointment details.'}</Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Browse')}>
+            <Text style={styles.primaryBtnText}>{language === 'ar' ? 'تصفح الخدمات' : 'Browse Services'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ paddingBottom: scrollBottomPadding + spacing.lg }}>
-        <ImageBackground source={tenantHeroUri ? { uri: tenantHeroUri } : undefined} style={[styles.hero, { paddingTop: topInset + spacing.sm }]} imageStyle={styles.heroImage}>
-          <LinearGradient colors={tenantHeroUri ? ['rgba(38,12,89,0.82)', 'rgba(93,47,153,0.35)'] : ['#3B0E74', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-          <View style={styles.heroTopBar}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.heroButton}>
-              <AppIcon name="arrow_back" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.heroButton}>
-              <AppIcon name="share" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.heroTitle}>{language === 'ar' ? 'تفاصيل الموعد' : 'Appointment Details'}</Text>
-          <Text style={styles.heroSubTitle}>{language === 'ar' ? 'تجربتك الصحية القادمة بانتظارك' : 'Your wellness experience awaits'}</Text>
-        </ImageBackground>
-
+      <CustomerSubpageHeader
+        title={language === 'ar' ? 'تفاصيل الموعد' : 'Appointment Details'}
+        onBack={() => navigation.goBack()}
+      />
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding + spacing.xl }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.contentWrap}>
+          {/* Summary Card */}
           <View style={styles.summaryCard}>
-          <Text style={styles.label}>{language === 'ar' ? 'رقم الحجز' : 'Booking No.'}</Text>
-          <Text style={styles.bookingNumber} numberOfLines={1}>{getBookingNumber(representative)}</Text>
-          <View style={styles.pillsRow}>
-            <View style={[styles.pill, styles.statusPill]}><Text style={styles.statusPillText}>{getStatusText(group.status, language)}</Text></View>
-            <View style={[styles.pill, styles.paymentPill]}><Text style={styles.paymentPillText}>{getPaymentStatusText(representative)}</Text></View>
-          </View>
-          <Text style={styles.metaText}>{group.tenant?.name || '-'}</Text>
-          <Text style={styles.metaText}>
-            {format(new Date(group.startTime), 'eeee, d MMMM yyyy, h:mm a', { locale: language === 'ar' ? ar : enUS })}
-          </Text>
+            <View style={[styles.summaryTopRow, isRTL && styles.rowReverse]}>
+              {tenantHeroUri ? (
+                <Image source={{ uri: tenantHeroUri }} style={styles.salonThumb} resizeMode="cover" />
+              ) : (
+                <View style={styles.salonThumbPlaceholder}>
+                  <AppIcon name="storefront" size={20} color="#7C3AED" />
+                </View>
+              )}
+              <View style={[styles.summaryTopInfo, isRTL && styles.alignEnd]}>
+                <Text style={[styles.salonName, isRTL && styles.textRTL]} numberOfLines={1}>
+                  {group.tenant?.name || representative.tenant?.name || '-'}
+                </Text>
+                {((group.tenant as any)?.city || (group.tenant as any)?.address) && (
+                  <View style={[styles.locationRow, isRTL && styles.rowReverse]}>
+                    <AppIcon name="location" size={12} color={colors.textSecondary} />
+                    <Text style={[styles.locationText, isRTL && styles.textRTL]} numberOfLines={1}>
+                      {[(group.tenant as any)?.city, (group.tenant as any)?.address].filter(Boolean).join(' - ')}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.refBadge}>
+                <Text style={styles.refBadgeLabel}>{language === 'ar' ? 'رقم الحجز' : 'Ref'}</Text>
+                <Text style={styles.refBadgeText} numberOfLines={1}>
+                  #{getBookingNumber(representative)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={[styles.appointmentTimeRow, isRTL && styles.rowReverse]}>
+              <View style={styles.timeIconWrap}>
+                <AppIcon name="event" size={18} color="#7C3AED" />
+              </View>
+              <View style={[styles.timeInfoWrap, isRTL && styles.alignEnd]}>
+                <Text style={[styles.appointmentDateText, isRTL && styles.textRTL]}>
+                  {format(new Date(group.startTime), 'eeee, d MMMM yyyy', { locale: language === 'ar' ? ar : enUS })}
+                </Text>
+                <Text style={[styles.appointmentTimeText, isRTL && styles.textRTL]}>
+                  {format(new Date(group.startTime), 'h:mm a', { locale: language === 'ar' ? ar : enUS })}
+                </Text>
+              </View>
+              <View style={[styles.pillsContainer, isRTL && styles.alignStart]}>
+                <View style={[styles.statusChip, { backgroundColor: getStatusBgColor(group.status) }]}>
+                  <Text style={[styles.statusChipText, { color: getStatusTextColor(group.status) }]}>
+                    {getStatusText(group.status, language)}
+                  </Text>
+                </View>
+                <View style={styles.paymentChip}>
+                  <Text style={styles.paymentChipText}>
+                    {getPaymentStatusText(representative)}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
 
-          <View style={styles.metricsGrid}>
-          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text><Text style={styles.metricValue} numberOfLines={1}>{group.items.length}</Text></View>
-          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text><Text style={styles.metricValue} numberOfLines={1}>{formatRiyal(group.totalPrice, language)}</Text></View>
-          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text><Text style={styles.metricValue} numberOfLines={1}>{formatRiyal(group.payableNowTotal, language)}</Text></View>
-          <View style={styles.metricCell}><Text style={styles.metricLabel} numberOfLines={1}>{language === 'ar' ? 'أول موعد' : 'First Appt.'}</Text><Text style={styles.metricValueSmall} numberOfLines={1}>{format(new Date(group.startTime), 'd MMM, h:mm a', { locale: language === 'ar' ? ar : enUS })}</Text></View>
+          {/* Metrics Grid */}
+          <View style={[styles.metricsGrid, isRTL && styles.rowReverse]}>
+            <View style={styles.metricCell}>
+              <Text style={styles.metricLabel}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text>
+              <Text style={styles.metricValue}>{group.items.length}</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricCell}>
+              <Text style={styles.metricLabel}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text>
+              <Text style={styles.metricValue}>{formatRiyal(group.totalPrice, language)}</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricCell}>
+              <Text style={styles.metricLabel}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text>
+              <Text style={[styles.metricValue, { color: Number(group.payableNowTotal || 0) > 0.009 ? '#7C3AED' : colors.text }]}>
+                {formatRiyal(group.payableNowTotal, language)}
+              </Text>
+            </View>
           </View>
 
+          {/* Guest Card */}
           {guest ? (
             <View style={styles.guestCard}>
-              <Text style={styles.sectionTitle}>{language === 'ar' ? 'بيانات الضيف' : 'Guest Information'}</Text>
-              <Text style={styles.guestName}>{guest.fullName}</Text>
-              {!!guest.phone && <Text style={styles.guestPhone}>{guest.phone}</Text>}
-              {!!guest.email && <Text style={styles.guestPhone}>{guest.email}</Text>}
-              {!!guest.birthDate && <Text style={styles.guestPhone}>{guest.birthDate}</Text>}
+              <View style={[styles.cardHeaderRow, isRTL && styles.rowReverse]}>
+                <AppIcon name="user" size={16} color="#7C3AED" />
+                <Text style={[styles.sectionTitleSmall, isRTL && styles.textRTL]}>{language === 'ar' ? 'بيانات الضيف' : 'Guest Information'}</Text>
+              </View>
+              <Text style={[styles.guestName, isRTL && styles.textRTL]}>{guest.fullName}</Text>
+              {!!guest.phone && (
+                <View style={[styles.guestDetailRow, isRTL && styles.rowReverse]}>
+                  <AppIcon name="phone" size={13} color={colors.textSecondary} />
+                  <Text style={styles.guestPhone}>{guest.phone}</Text>
+                </View>
+              )}
+              {!!guest.email && (
+                <View style={[styles.guestDetailRow, isRTL && styles.rowReverse]}>
+                  <AppIcon name="mail" size={13} color={colors.textSecondary} />
+                  <Text style={styles.guestPhone}>{guest.email}</Text>
+                </View>
+              )}
+              {!!guest.birthDate && (
+                <View style={[styles.guestDetailRow, isRTL && styles.rowReverse]}>
+                  <AppIcon name="event" size={13} color={colors.textSecondary} />
+                  <Text style={styles.guestPhone}>{guest.birthDate}</Text>
+                </View>
+              )}
             </View>
           ) : null}
 
+          {/* Services Section */}
+          <View style={[styles.servicesHeaderRow, isRTL && styles.rowReverse]}>
+            <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{language === 'ar' ? 'الخدمات المحجوزة' : 'Booked Services'}</Text>
+            {group.items.length > 1 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{group.items.length} {language === 'ar' ? 'خدمات' : 'services'}</Text>
+              </View>
+            )}
+          </View>
+
+          {group.items.map((booking, index) => (
+            <View key={booking.id} style={styles.serviceCard}>
+              <View style={[styles.serviceHeaderRow, isRTL && styles.rowReverse]}>
+                <View style={styles.serviceIndexPill}>
+                  <Text style={styles.serviceIndexText}>
+                    {language === 'ar' ? `خدمة ${index + 1}` : `Service ${index + 1}`}
+                  </Text>
+                </View>
+                <Text style={styles.servicePriceText}>{formatRiyal(Number(booking.price || 0), language)}</Text>
+              </View>
+
+              <Text style={[styles.serviceName, isRTL && styles.textRTL]}>{getServiceName(booking)}</Text>
+              {!!booking.serviceVariantName && (
+                <Text style={[styles.serviceVariant, isRTL && styles.textRTL]}>{booking.serviceVariantName}</Text>
+              )}
+
+              <View style={styles.serviceMetaGrid}>
+                <View style={[styles.serviceMetaRow, isRTL && styles.rowReverse]}>
+                  <AppIcon name="clock" size={14} color="#6B7280" />
+                  <Text style={[styles.serviceMetaText, isRTL && styles.textRTL]}>
+                    {format(new Date(booking.startTime), 'PPP p', { locale: language === 'ar' ? ar : enUS })}
+                  </Text>
+                </View>
+                <View style={[styles.serviceMetaRow, isRTL && styles.rowReverse]}>
+                  <AppIcon name="user" size={14} color="#6B7280" />
+                  <Text style={[styles.serviceMetaText, isRTL && styles.textRTL]}>
+                    {language === 'ar' ? 'المقدم: ' : 'Provider: '}{getStaffName(booking)}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.serviceChipsRow, isRTL && styles.rowReverse]}>
+                <View style={[styles.statusChipMini, { backgroundColor: getStatusBgColor(booking.status) }]}>
+                  <Text style={[styles.statusChipMiniText, { color: getStatusTextColor(booking.status) }]}>
+                    {getStatusText(booking.status, language)}
+                  </Text>
+                </View>
+                <View style={styles.paymentChipMini}>
+                  <Text style={styles.paymentChipMiniText}>
+                    {getPaymentStatusText(booking)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
+
+          {/* Payment Summary */}
           <View style={styles.paymentSummaryCard}>
-            <Text style={styles.sectionTitle}>{language === 'ar' ? 'ملخص الدفع' : 'Payment Summary'}</Text>
-            <View style={styles.paymentRow}>
+            <Text style={[styles.sectionTitleSmall, isRTL && styles.textRTL]}>{language === 'ar' ? 'ملخص الدفع' : 'Payment Summary'}</Text>
+            <View style={[styles.paymentRow, isRTL && styles.rowReverse]}>
               <Text style={styles.paymentLabel}>{language === 'ar' ? 'الإجمالي' : 'Subtotal'}</Text>
               <Text style={styles.paymentValue}>{formatRiyal(subtotalAmount, language)}</Text>
             </View>
-            <View style={styles.paymentRow}>
+            <View style={[styles.paymentRow, isRTL && styles.rowReverse]}>
               <Text style={styles.paymentLabel}>{language === 'ar' ? 'المدفوع' : 'Paid'}</Text>
               <Text style={styles.paymentValue}>- {formatRiyal(paidAmount, language)}</Text>
             </View>
-            <View style={styles.paymentRow}>
+            <View style={styles.divider} />
+            <View style={[styles.paymentRow, isRTL && styles.rowReverse]}>
               <Text style={styles.paymentDueLabel}>{language === 'ar' ? 'المطلوب الآن' : 'Payable Now'}</Text>
               <Text style={styles.paymentDueValue}>{formatRiyal(Number(group.payableNowTotal || 0), language)}</Text>
             </View>
             {!!representative.paymentMethod && (
-              <Text style={styles.paymentMethodHint}>
-                {language === 'ar' ? 'طريقة الدفع' : 'Payment method'}: {getPaymentMethodLabel(representative.paymentMethod)}
-              </Text>
+              <View style={[styles.paymentMethodRow, isRTL && styles.rowReverse]}>
+                <AppIcon name="card" size={13} color={colors.textSecondary} />
+                <Text style={styles.paymentMethodHint}>
+                  {language === 'ar' ? 'طريقة الدفع' : 'Payment method'}: {getPaymentMethodLabel(representative.paymentMethod)}
+                </Text>
+              </View>
             )}
           </View>
 
-          <Text style={styles.sectionTitle}>{language === 'ar' ? 'الخدمات' : 'Services'}</Text>
-          {group.items.map((booking, index) => (
-            <View key={booking.id} style={styles.serviceCard}>
-            <Text style={styles.serviceIndex}>{language === 'ar' ? `الخدمة ${index + 1}` : `Service ${index + 1}`}</Text>
-            <Text style={styles.serviceName} numberOfLines={2}>{getServiceName(booking)}</Text>
-            {!!booking.serviceVariantName && <Text style={styles.serviceVariant} numberOfLines={1}>{booking.serviceVariantName}</Text>}
-            <Text style={styles.rowText} numberOfLines={2}>{format(new Date(booking.startTime), 'PPP p', { locale: language === 'ar' ? ar : enUS })}</Text>
-            <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الموظف' : 'Provider'}: {getStaffName(booking)}</Text>
-            <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الحالة' : 'Status'}: {getStatusText(booking.status, language)}</Text>
-            <Text style={styles.rowText} numberOfLines={1}>{language === 'ar' ? 'الدفع' : 'Payment'}: {getPaymentStatusText(booking)}</Text>
-            <Text style={styles.priceText} numberOfLines={1}>{formatRiyal(Number(booking.price || 0), language)}</Text>
-            </View>
-          ))} 
-
+          {/* Activity Timeline */}
           {appointmentTimeline.length > 0 && (
             <View style={styles.timelineCard}>
-              <Text style={styles.sectionTitle}>{language === 'ar' ? 'سجل التغييرات' : 'Activity Timeline'}</Text>
+              <Text style={[styles.sectionTitleSmall, isRTL && styles.textRTL]}>{language === 'ar' ? 'سجل التغييرات' : 'Activity Timeline'}</Text>
               {appointmentTimeline.slice(0, 8).map((event) => (
-                <View key={event.id} style={styles.timelineRow}>
+                <View key={event.id} style={[styles.timelineRow, isRTL && styles.rowReverse]}>
                   <View style={[styles.timelineDot, event.type === 'cancelled' ? styles.timelineDotDanger : styles.timelineDotPrimary]} />
-                  <View style={styles.timelineBody}>
-                    <Text style={styles.timelineTitle}>{event.title}</Text>
-                    <Text style={styles.timelineSub}>{event.subtitle}</Text>
-                    <Text style={styles.timelineTime}>
-                      {formatTimelineDateTime(event.at, language)}
-                    </Text>
+                  <View style={[styles.timelineBody, isRTL && styles.alignEnd]}>
+                    <View style={[styles.timelineHeaderRow, isRTL && styles.rowReverse]}>
+                      <Text style={[styles.timelineTitle, isRTL && styles.textRTL]}>{event.title}</Text>
+                      <Text style={styles.timelineTime}>{event.at}</Text>
+                    </View>
+                    <Text style={[styles.timelineSub, isRTL && styles.textRTL]}>{event.subtitle}</Text>
                   </View>
                 </View>
               ))}
             </View>
           )}
 
+          {/* Actions Card */}
           <View style={styles.primaryActionCard}>
             {Number(group.payableNowTotal || 0) > 0.009 && activeTab === 'upcoming' && (
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={[styles.primaryBtn, isRTL && styles.rowReverse]}
                 onPress={() =>
                   navigation.navigate('Payment', {
                     appointmentId: representative.id,
@@ -554,47 +699,49 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
                   })
                 }
               >
+                <AppIcon name="card" size={18} color="#FFFFFF" />
                 <Text style={styles.primaryBtnText}>{language === 'ar' ? 'ادفع الآن' : 'Pay Now'}</Text>
               </TouchableOpacity>
             )}
 
-            <View style={styles.secondaryActions}>
+            <View style={[styles.secondaryActions, isRTL && styles.rowReverse]}>
               {(representative.Service?.allowReschedule || representative.service?.allowReschedule) &&
               ['confirmed', 'pending'].includes(representative.status) &&
               activeTab === 'upcoming' ? (
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => openRescheduleChoice(representative)}>
+                <TouchableOpacity style={[styles.secondaryBtn, isRTL && styles.rowReverse]} onPress={() => openRescheduleChoice(representative)}>
+                  <AppIcon name="refresh" size={16} color="#7C3AED" />
                   <Text style={styles.secondaryBtnText} numberOfLines={1}>{language === 'ar' ? 'إعادة جدولة' : 'Reschedule'}</Text>
                 </TouchableOpacity>
-              ) : (
-                <View style={styles.secondaryBtnPlaceholder} />
-              )}
+              ) : null}
 
               {['confirmed', 'pending'].includes(representative.status) && activeTab === 'upcoming' ? (
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelBookingTarget(representative)}>
+                <TouchableOpacity style={[styles.cancelBtn, isRTL && styles.rowReverse]} onPress={() => setCancelBookingTarget(representative)}>
+                  <AppIcon name="close" size={16} color="#DC2626" />
                   <Text style={styles.cancelBtnText} numberOfLines={1}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
                 </TouchableOpacity>
-              ) : (
-                <View style={styles.secondaryBtnPlaceholder} />
-              )}
+              ) : null}
             </View>
 
             {activeTab === 'upcoming' && group?.status !== 'cancelled' ? (
-              <TouchableOpacity style={styles.addServiceBtn} onPress={handleAddService}>
+              <TouchableOpacity style={[styles.addServiceBtn, isRTL && styles.rowReverse]} onPress={handleAddService}>
+                <AppIcon name="plus" size={16} color="#7C3AED" />
                 <Text style={styles.addServiceBtnText}>{language === 'ar' ? 'إضافة خدمة' : 'Add service'}</Text>
               </TouchableOpacity>
             ) : null}
 
             <TouchableOpacity
-              style={styles.contactBtn}
+              style={[styles.contactBtn, isRTL && styles.rowReverse]}
               onPress={handleContactCenter}
             >
+              <AppIcon name="message" size={16} color="#4B5563" />
               <Text style={styles.contactBtnText}>
                 {language === 'ar' ? 'واتساب / الاتصال بالمركز' : 'WhatsApp / Call Center'}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.policyNote}>
+          {/* Policy Note */}
+          <View style={[styles.policyNote, isRTL && styles.rowReverse]}>
             <AppIcon name="info" size={16} color={colors.textSecondary} />
             <Text style={styles.policyText}>
               {language === 'ar'
@@ -748,107 +895,536 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAF8FC' },
-  hero: { minHeight: 240, paddingHorizontal: spacing.md, paddingBottom: spacing.lg, justifyContent: 'space-between', backgroundColor: '#5B21B6' },
-  heroImage: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
-  heroTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  heroButton: {
+  container: { flex: 1, backgroundColor: '#F8F9FC' },
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  scrollContent: { paddingTop: spacing.md },
+  contentWrap: { paddingHorizontal: spacing.md, gap: spacing.md },
+  summaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E8ECF2',
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  summaryTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  salonThumb: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8ECF2',
+  },
+  salonThumbPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#F3EEFF',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
   },
-  heroTitle: { fontSize: 32, fontWeight: '800', color: '#FFFFFF' },
-  heroSubTitle: { fontSize: 12, color: 'rgba(255,255,255,0.9)' },
-  contentWrap: { paddingHorizontal: spacing.md, marginTop: -38, gap: spacing.md },
-  summaryCard: { borderRadius: 24, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
-  label: { color: colors.textSecondary, fontSize: 10 },
-  bookingNumber: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: 4 },
-  pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm, marginBottom: spacing.sm },
-  pill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  statusPill: { backgroundColor: '#E7F6ED' },
-  statusPillText: { color: '#1D7E49', fontSize: 10, fontWeight: '700' },
-  paymentPill: { backgroundColor: '#EFE7FF' },
-  paymentPillText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  metaText: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
-  metricsGrid: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, flexDirection: 'row', flexWrap: 'wrap' },
-  metricCell: { width: '50%', paddingVertical: spacing.sm, paddingRight: spacing.sm, minHeight: 56, justifyContent: 'center' },
-  metricLabel: { fontSize: 10, color: colors.textSecondary },
-  metricValue: { marginTop: 3, fontSize: 13, fontWeight: '800', color: colors.text },
-  metricValueSmall: { marginTop: 3, fontSize: 11, fontWeight: '700', color: colors.text },
-  sectionTitle: { fontSize: fontSize.sm, fontWeight: '800', color: colors.text, marginBottom: spacing.sm, marginTop: spacing.xs },
-  guestCard: { borderRadius: 20, backgroundColor: '#F4EEFF', borderWidth: 1, borderColor: '#E6DAFD', padding: spacing.md, marginBottom: spacing.md },
-  guestName: { fontSize: 14, color: colors.text, fontWeight: '700' },
-  guestPhone: { fontSize: 11, color: colors.textSecondary, marginTop: 4 },
-  paymentSummaryCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
-  paymentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
-  paymentLabel: { color: colors.textSecondary, fontSize: 11 },
-  paymentValue: { color: colors.text, fontSize: 11, fontWeight: '700' },
-  paymentDueLabel: { color: colors.primary, fontSize: 12, fontWeight: '800' },
-  paymentDueValue: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  paymentMethodHint: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: 10 },
-  timelineCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md },
-  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: 1, borderTopColor: '#F2ECFC' },
-  timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
-  timelineDotPrimary: { backgroundColor: colors.primary },
+  summaryTopInfo: {
+    flex: 1,
+  },
+  salonName: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 2,
+  },
+  locationText: {
+    fontFamily: 'Cairo-Regular',
+    fontSize: 11,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  refBadge: {
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  refBadgeLabel: {
+    fontFamily: 'Cairo-Regular',
+    fontSize: 9,
+    color: '#7C3AED',
+  },
+  refBadgeText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 12,
+    color: '#7C3AED',
+    fontWeight: '700',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: spacing.sm,
+  },
+  appointmentTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  timeIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#F3EEFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeInfoWrap: {
+    flex: 1,
+  },
+  appointmentDateText: {
+    fontFamily: 'Cairo-SemiBold',
+    fontSize: 13,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  appointmentTimeText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 14,
+    color: '#7C3AED',
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  pillsContainer: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  statusChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusChipText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  paymentChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#F3EEFF',
+  },
+  paymentChipText: {
+    fontFamily: 'Cairo-Medium',
+    fontSize: 10,
+    color: '#7C3AED',
+    fontWeight: '600',
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8ECF2',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  metricCell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  metricDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#F1F5F9',
+  },
+  metricLabel: {
+    fontFamily: 'Cairo-Regular',
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  metricValue: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 13,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  guestCard: {
+    backgroundColor: '#FAF9FE',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    padding: spacing.md,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  guestName: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  guestDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: 4,
+  },
+  guestPhone: {
+    fontFamily: 'Cairo-Regular',
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  servicesHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
+  sectionTitle: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 17,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  sectionTitleSmall: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  countBadge: {
+    backgroundColor: '#F3EEFF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  countBadgeText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 11,
+    color: '#7C3AED',
+    fontWeight: '700',
+  },
+  serviceCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E8ECF2',
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  serviceHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  serviceIndexPill: {
+    backgroundColor: '#F3EEFF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  serviceIndexText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 10,
+    color: '#7C3AED',
+    fontWeight: '700',
+  },
+  servicePriceText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 15,
+    color: '#7C3AED',
+    fontWeight: '700',
+  },
+  serviceName: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 15,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  serviceVariant: {
+    fontFamily: 'Cairo-Regular',
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  serviceMetaGrid: {
+    marginTop: spacing.sm,
+    gap: 4,
+  },
+  serviceMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  serviceMetaText: {
+    fontFamily: 'Cairo-Regular',
+    fontSize: 12,
+    color: '#4B5563',
+  },
+  serviceChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  statusChipMini: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  statusChipMiniText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  paymentChipMini: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+  },
+  paymentChipMiniText: {
+    fontFamily: 'Cairo-Regular',
+    fontSize: 10,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  paymentSummaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E8ECF2',
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  paymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  paymentLabel: {
+    fontFamily: 'Cairo-Regular',
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  paymentValue: {
+    fontFamily: 'Cairo-SemiBold',
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  paymentDueLabel: {
+    fontFamily: 'Cairo-Bold',
+    color: '#7C3AED',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  paymentDueValue: {
+    fontFamily: 'Cairo-Bold',
+    color: '#7C3AED',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  paymentMethodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: spacing.xs,
+  },
+  paymentMethodHint: {
+    fontFamily: 'Cairo-Regular',
+    color: colors.textSecondary,
+    fontSize: 11,
+  },
+  timelineCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E8ECF2',
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+  },
+  timelineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 5,
+  },
+  timelineDotPrimary: { backgroundColor: '#7C3AED' },
   timelineDotDanger: { backgroundColor: colors.error },
   timelineBody: { flex: 1 },
-  timelineTitle: { color: colors.text, fontSize: 11, fontWeight: '700' },
-  timelineSub: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
-  timelineTime: { color: '#7B7F98', fontSize: 9, marginTop: 2 },
-  serviceCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, overflow: 'hidden' },
-  serviceIndex: { fontSize: 10, color: colors.primary, fontWeight: '700' },
-  serviceName: { marginTop: 2, fontSize: 16, fontWeight: '800', color: colors.text },
-  serviceVariant: { marginTop: 2, fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
-  rowText: { marginTop: 3, fontSize: 11, color: '#4B5072', flexShrink: 1 },
-  priceText: { marginTop: spacing.sm, fontSize: 16, color: colors.primary, fontWeight: '800' },
-  actionsWrap: { marginTop: spacing.sm, gap: spacing.sm },
-  primaryBtn: { minHeight: 48, borderRadius: 14, backgroundColor: '#6D28D9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
-  primaryBtnText: { color: '#FFFFFF', fontWeight: '700' },
+  timelineTitle: { fontFamily: 'Cairo-SemiBold', color: colors.text, fontSize: 12, fontWeight: '600' },
+  timelineSub: { fontFamily: 'Cairo-Regular', color: colors.textSecondary, fontSize: 11, marginTop: 1 },
+  timelineTime: { fontFamily: 'Cairo-Regular', color: '#9CA3AF', fontSize: 10, marginTop: 1 },
+  timelineHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
+  },
+  primaryActionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E8ECF2',
+    padding: spacing.md,
+    gap: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  primaryBtn: {
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: '#7C3AED',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  primaryBtnText: { fontFamily: 'Cairo-Bold', color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
   secondaryActions: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
-  secondaryBtn: { flex: 1, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: spacing.sm },
-  secondaryBtnText: { color: colors.primary, fontWeight: '700', fontSize: 12, textAlign: 'center' },
-  cancelBtn: { flex: 1, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: colors.error, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: spacing.sm },
-  cancelBtnText: { color: colors.error, fontWeight: '700', fontSize: 12, textAlign: 'center' },
-  primaryActionCard: { borderRadius: 20, borderWidth: 1, borderColor: '#E8DDF8', backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
-  secondaryBtnPlaceholder: { flex: 1 },
-  addServiceBtn: { minHeight: 46, borderRadius: 14, backgroundColor: '#6D28D9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
-  addServiceBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
-  contactBtn: { minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: '#D7DAEA', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  contactBtnText: { color: '#4B5072', fontWeight: '700' },
-  policyNote: { marginBottom: spacing.md, borderRadius: 14, borderWidth: 1, borderColor: '#E8EAF4', backgroundColor: '#FFFFFF', padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  policyText: { flex: 1, color: colors.textSecondary, fontSize: 10, lineHeight: 16 },
-  emptyText: { color: colors.textSecondary, marginBottom: spacing.md, textAlign: 'center' },
+  secondaryBtn: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#7C3AED',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FAF5FF',
+    paddingHorizontal: spacing.sm,
+  },
+  secondaryBtnText: { fontFamily: 'Cairo-Bold', color: '#7C3AED', fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  cancelBtn: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: spacing.sm,
+  },
+  cancelBtnText: { fontFamily: 'Cairo-Bold', color: '#DC2626', fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  addServiceBtn: {
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E9DDFD',
+    backgroundColor: '#FBF9FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+  },
+  addServiceBtnText: { fontFamily: 'Cairo-Bold', color: '#7C3AED', fontWeight: '700', fontSize: 13 },
+  contactBtn: {
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  contactBtnText: { fontFamily: 'Cairo-SemiBold', color: '#4B5563', fontWeight: '600', fontSize: 13 },
+  policyNote: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    padding: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  policyText: { flex: 1, fontFamily: 'Cairo-Regular', color: colors.textSecondary, fontSize: 11, lineHeight: 17 },
+  emptyText: { fontFamily: 'Cairo-Medium', color: colors.textSecondary, marginBottom: spacing.md, textAlign: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(18, 13, 33, 0.55)', justifyContent: 'center', paddingHorizontal: spacing.sm },
   modalCard: {
     marginHorizontal: spacing.md,
-    borderRadius: 20,
+    borderRadius: 24,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E9DDFD',
     padding: spacing.md,
-    shadowColor: '#1F123F',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 16,
+    shadowColor: '#2E1065',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
     elevation: 8,
   },
   modalCardLarge: { maxHeight: '72%' },
   modalScrollContent: { paddingBottom: spacing.sm },
-  modalTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
-  modalHint: { color: colors.textSecondary, fontSize: 10, marginBottom: spacing.sm },
+  modalTitle: { fontFamily: 'Cairo-Bold', fontSize: fontSize.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+  modalHint: { fontFamily: 'Cairo-Regular', color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm },
   reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  reasonChip: { borderWidth: 1, borderColor: '#D8C7FA', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF', minWidth: 96 },
-  reasonChipActive: { borderColor: colors.primary, backgroundColor: '#F3E8FF' },
-  reasonChipText: { color: colors.text, fontSize: 10, fontWeight: '600' },
-  reasonChipTextActive: { color: colors.primary },
-  reasonChipMeta: { marginTop: 2, color: colors.textSecondary, fontSize: 9, fontWeight: '600' },
-  reasonChipMetaActive: { color: colors.primary },
-  modalInput: { borderWidth: 1, borderColor: '#E9DDFD', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: '#FAFAFF', color: colors.text, marginBottom: spacing.sm },
+  reasonChip: { borderWidth: 1, borderColor: '#E9DDFD', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF', minWidth: 96 },
+  reasonChipActive: { borderColor: '#7C3AED', backgroundColor: '#F5EEFF' },
+  reasonChipText: { fontFamily: 'Cairo-Regular', color: colors.text, fontSize: 11, fontWeight: '600' },
+  reasonChipTextActive: { color: '#7C3AED', fontFamily: 'Cairo-Bold' },
+  reasonChipMeta: { marginTop: 2, fontFamily: 'Cairo-Regular', color: colors.textSecondary, fontSize: 9, fontWeight: '600' },
+  reasonChipMetaActive: { color: '#7C3AED' },
+  modalInput: { borderWidth: 1, borderColor: '#E9DDFD', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: '#F7F4FF', color: colors.text, marginBottom: spacing.sm, fontFamily: 'Cairo-Regular' },
   modalDatePickerButton: {
     minHeight: 46,
     borderWidth: 1,
@@ -857,7 +1433,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     marginBottom: spacing.sm,
-    backgroundColor: '#FAFAFF',
+    backgroundColor: '#F7F4FF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -865,12 +1441,17 @@ const styles = StyleSheet.create({
   modalDatePickerText: {
     color: colors.text,
     fontSize: 14,
+    fontFamily: 'Cairo-SemiBold',
     fontWeight: '600',
   },
-  modalErrorText: { color: colors.error, fontSize: 10, marginBottom: spacing.sm, fontWeight: '600' },
+  modalErrorText: { fontFamily: 'Cairo-Regular', color: colors.error, fontSize: 11, marginBottom: spacing.sm, fontWeight: '600' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, flexWrap: 'wrap' },
-  modalCancel: { minWidth: 96, borderWidth: 1, borderColor: '#D8C7FA', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: '#F4EEFF' },
-  modalCancelText: { color: colors.textSecondary, fontWeight: '600', fontSize: 12 },
-  modalSave: { minWidth: 96, backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, alignItems: 'center' },
-  modalSaveText: { color: colors.textInverse, fontWeight: '700', fontSize: 12 },
+  modalCancel: { minWidth: 96, borderWidth: 1, borderColor: '#E9DDFD', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  modalCancelText: { fontFamily: 'Cairo-SemiBold', color: colors.textSecondary, fontWeight: '600', fontSize: 12 },
+  modalSave: { minWidth: 96, backgroundColor: '#7C3AED', borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, alignItems: 'center' },
+  modalSaveText: { fontFamily: 'Cairo-Bold', color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
+  rowReverse: { flexDirection: 'row-reverse' },
+  alignEnd: { alignItems: 'flex-end' },
+  alignStart: { alignItems: 'flex-start' },
+  textRTL: { textAlign: 'right' },
 });

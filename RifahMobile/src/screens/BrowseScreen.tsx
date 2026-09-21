@@ -207,6 +207,7 @@ export function BrowseScreen({ route, navigation }: any) {
             <View style={styles.chipsSection}>
                 <FlatList
                     horizontal
+                    inverted={isRTL}
                     showsHorizontalScrollIndicator={false}
                     data={categories}
                     keyExtractor={(item) => item.id}
@@ -216,7 +217,7 @@ export function BrowseScreen({ route, navigation }: any) {
                         const iconName = CATEGORY_ICON_MAP[item.slug?.toLowerCase?.()] || 'sparkles';
                         return (
                             <TouchableOpacity
-                                style={[styles.chip, active ? styles.chipActive : styles.chipInactive]}
+                                style={[styles.chip, isRTL && styles.rowRTL, active ? styles.chipActive : styles.chipInactive]}
                                 onPress={() => setActiveCategory((prev) => prev === item.slug ? null : item.slug)}
                                 activeOpacity={0.9}
                             >
@@ -430,6 +431,9 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     tenantCardRowRtl: {
+        flexDirection: 'row-reverse',
+    },
+    rowRTL: {
         flexDirection: 'row-reverse',
     },
     tenantImageWrap: {

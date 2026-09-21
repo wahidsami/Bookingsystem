@@ -124,25 +124,22 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
 
         const spacer = <View key="spacer" style={{ flex: 1 }} />;
 
-        // In Arabic layout picture: 
-        // "Next" (التالي) is on the physical LEFT.
-        // "Previous" (السابق) is on the physical RIGHT.
-        const physicalLeftButton = language === 'ar' ? nextButton : prevButton;
-        const physicalRightButton = language === 'ar' ? prevButton : nextButton;
-
+        // In RTL: Next (التالي) is on physical LEFT, Previous (السابق) is on physical RIGHT
+        // With flexDirection: 'row', index 0 is physical LEFT, index 2 is physical RIGHT
         if (isRTL) {
-            return [physicalRightButton, spacer, physicalLeftButton];
+            return [nextButton, spacer, prevButton];
         }
 
-        // If not natively RTL, standard Left-to-Right layout applies
-        return [physicalLeftButton, spacer, physicalRightButton];
+        // In LTR: Previous is on physical LEFT, Next is on physical RIGHT
+        return [prevButton, spacer, nextButton];
     };
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
 
             {/* Top Navigation - Skip */}
-            <View style={[styles.topNav, isRTL && styles.topNavRtl]}>
+            <View style={[styles.topNav, isRTL ? styles.topNavRtl : styles.topNavLtr]}>
+                <View style={{ flex: 1 }} />
                 <TouchableOpacity
                     onPress={onComplete}
                     style={styles.skipButton}
@@ -150,7 +147,6 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
                 >
                     <Text style={styles.skipText}>{t('skip')}</Text>
                 </TouchableOpacity>
-                <View style={{ flex: 1 }} />
             </View>
 
             {/* Main Swiper Content */}
@@ -209,7 +205,7 @@ export function OnboardingScreens({ onComplete, onBackToLanguage }: OnboardingSc
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
     },
     topNav: {
         width: '100%',
@@ -220,6 +216,9 @@ const styles = StyleSheet.create({
     },
     topNavRtl: {
         flexDirection: 'row-reverse',
+    },
+    topNavLtr: {
+        flexDirection: 'row',
     },
     skipButton: {
         justifyContent: 'center',
@@ -242,13 +241,13 @@ const styles = StyleSheet.create({
         width: '100%',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: clamp(8, SCREEN_HEIGHT * 0.02, 16),
-        marginBottom: clamp(12, SCREEN_HEIGHT * 0.018, 20),
-        height: clamp(220, SCREEN_HEIGHT * 0.38, 320),
+        marginTop: clamp(6, SCREEN_HEIGHT * 0.015, 14),
+        marginBottom: clamp(10, SCREEN_HEIGHT * 0.016, 18),
+        height: clamp(250, SCREEN_HEIGHT * 0.42, 360),
     },
     imageFrame: {
-        width: clamp(220, SCREEN_WIDTH * 0.72, 320),
-        height: clamp(220, SCREEN_WIDTH * 0.72, 320),
+        width: clamp(250, SCREEN_WIDTH * 0.82, 360),
+        height: clamp(250, SCREEN_WIDTH * 0.82, 360),
         borderRadius: 999,
         overflow: 'hidden',
         alignItems: 'center',
@@ -265,14 +264,16 @@ const styles = StyleSheet.create({
     },
     textCard: {
         width: '100%',
-        backgroundColor: colors.background,
-        borderRadius: 20,
+        backgroundColor: '#FFFFFFEB',
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: '#E9DDFD',
         paddingHorizontal: clamp(14, SCREEN_WIDTH * 0.05, 22),
         paddingVertical: clamp(12, SCREEN_HEIGHT * 0.016, 18),
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
+        shadowColor: '#2E1065',
+        shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.08,
-        shadowRadius: 14,
+        shadowRadius: 16,
         elevation: 4,
     },
     title: {
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
         width: '100%',
         position: 'absolute',
         bottom: 0,
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F4FF',
     },
     navButton: {
         height: 44,
@@ -342,7 +343,7 @@ const styles = StyleSheet.create({
     getStartedButton: {
         backgroundColor: colors.primary,
         paddingHorizontal: 24,
-        borderRadius: 999,
+        borderRadius: 16, // Match BarSpa LoginScreen
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,

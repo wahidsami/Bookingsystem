@@ -24,8 +24,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { AppIcon } from '../components/AppIcon';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
-import { LinearGradient } from 'expo-linear-gradient';
+import { CustomerSubpageHeader } from '../components/ui/CustomerSubpageHeader';
 import { parseGroupGuestFromNotes } from '../utils/groupGuest';
+import { usePopup } from '../contexts/PopupContext';
 
 interface BookingGroup {
     key: string;
@@ -43,7 +44,8 @@ export function BookingsScreen({ navigation }: any) {
     const { t, language } = useLanguage();
     const isRTL = language === 'ar';
     const { showLogin, isAuthenticated } = useAppSession();
-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { scrollBottomPadding } = useScreenSafeArea();
+    const { confirm, showDialog } = usePopup();
     const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'no_show' | 'cancelled'>('upcoming');
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
@@ -127,28 +129,35 @@ export function BookingsScreen({ navigation }: any) {
     }, [bookings]);
 
     const handleCancel = async (id: string) => {
-        Alert.alert(
-            t('cancelBooking'),
-            t('cancelBookingConfirm'),
-            [
-                { text: t('no'), style: 'cancel' },
-                {
-                    text: t('yes'),
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            const success = await api.cancelBooking(id);
-                            if (success) {
-                                loadBookings();
-                                Alert.alert(t('success'), t('bookingCancelled'));
-                            }
-                        } catch (error) {
-                            Alert.alert(t('error'), t('failedToCancel'));
-                        }
-                    },
-                },
-            ]
-        );
+        const confirmed = await confirm({
+            title: t('cancelBooking'),
+            message: t('cancelBookingConfirm'),
+            confirmText: t('yes'),
+            cancelText: t('no'),
+            variant: 'destructive',
+        });
+
+        if (!confirmed) return;
+
+        try {
+            const success = await api.cancelBooking(id);
+            if (success) {
+                loadBookings();
+                await showDialog({
+                    title: t('success'),
+                    message: t('bookingCancelled'),
+                    variant: 'success',
+                    confirmText: isRTL ? 'حسنًا' : 'OK',
+                });
+            }
+        } catch (error) {
+            await showDialog({
+                title: t('error'),
+                message: t('failedToCancel'),
+                variant: 'error',
+                confirmText: isRTL ? 'حسنًا' : 'OK',
+            });
+        }
     };
 
     const getBookingNumber = (booking: Booking) =>
@@ -215,20 +224,17 @@ export function BookingsScreen({ navigation }: any) {
     const renderBookingCard = ({ item }: { item: BookingGroup }) => {
         const isArabic = language === 'ar';
         const representative = item.items[0];
-        const groupGuest = parseGroupGuestFromNotes(representative.notes);
         const dateDate = new Date(item.startTime);
         const serviceCount = item.items.length;
         const hasCompletedReview = reviewedAppointmentIds.has(representative.id);
         const canLeaveReview = item.status === 'completed' && !hasCompletedReview;
-
         const isRescheduled = item.items.some((booking) => hasRescheduleAudit(booking));
-        
-        const serviceNameStr = serviceCount > 1
-            ? (language === 'ar' ? `${serviceCount} خدمات` : `${serviceCount} services`)
-            : getServiceName(representative);
-            
+        const bookingRefNumber = getBookingNumber(representative);
+
+        const primaryServiceName = getServiceName(representative);
         const dateStr = format(dateDate, 'd MMM yyyy', { locale: isArabic ? ar : enUS });
         const timeStr = format(dateDate, 'h:mm a', { locale: isArabic ? ar : enUS });
+        const hasOutstanding = item.payableNowTotal > 0.009;
 
         return (
             <TouchableOpacity
@@ -237,13 +243,14 @@ export function BookingsScreen({ navigation }: any) {
                 onPress={() => navigation.navigate('AppointmentDetails', { bookingGroup: item, activeTab })}
             >
                 {isRescheduled && activeTab === 'upcoming' ? (
-                    <View style={styles.rescheduledRibbon}>
+                    <View style={[styles.rescheduledRibbon, isArabic && styles.rescheduledRibbonRTL]}>
                         <Text style={styles.rescheduledRibbonText}>{language === 'ar' ? 'أعيد جدولته' : 'Rescheduled'}</Text>
                     </View>
                 ) : null}
-                {/* Header: Salon Info & Status */}
-                <View style={styles.cardHeader}>
-                    <View style={styles.salonInfo}>
+
+                {/* Header: Tenant Info, Booking Reference & Status */}
+                <View style={[styles.cardHeader, isArabic && styles.rowReverse]}>
+                    <View style={[styles.salonInfo, isArabic && styles.salonInfoRTL]}>
                         {item.tenant?.logo ? (
                             <Image
                                 source={{ uri: getImageUrl(item.tenant.logo) }}
@@ -256,122 +263,182 @@ export function BookingsScreen({ navigation }: any) {
                                 </Text>
                             </View>
                         )}
-                        <Text style={styles.salonName} numberOfLines={1}>{item.tenant?.name || 'Salon Name'}</Text>
+                        <View style={[styles.salonTextWrap, isArabic && styles.alignEnd]}>
+                            <Text style={[styles.salonName, isArabic && styles.cairoBold]} numberOfLines={1}>
+                                {item.tenant?.name || (language === 'ar' ? 'المركز' : 'Center')}
+                            </Text>
+                            <Text style={styles.bookingRefText}>#{bookingRefNumber}</Text>
+                        </View>
                     </View>
-                    <View style={[
-                        styles.statusBadge,
-                        { backgroundColor: getStatusColor(item.status) + '20' }
-                    ]}>
-                        <Text style={[
-                            styles.statusText,
-                            { color: getStatusColor(item.status) }
-                        ]}>
+
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusBgColor(item.status) }]}>
+                        <Text style={[styles.statusText, { color: getStatusTextColor(item.status) }, isArabic && styles.cairoBold]}>
                             {getStatusText(item.status, t, language)}
                         </Text>
                     </View>
                 </View>
 
-                {/* Body: Service & Time Info */}
+                {/* Body: Multi-Service Badge & Service Names */}
                 <View style={styles.cardBody}>
-                    <Text style={styles.serviceName} numberOfLines={2}>
-                        {serviceNameStr}
-                    </Text>
-                    <View style={styles.dateTimeRow}>
-                        <AppIcon name="clock" size={14} color={colors.primary} />
-                        <Text style={styles.dateTimeText}>
+                    {serviceCount > 1 ? (
+                        <View style={styles.multiServiceContainer}>
+                            <View style={[styles.multiServiceBadge, isArabic && styles.multiServiceBadgeRTL]}>
+                                <AppIcon name="sparkles" size={13} color="#7C3AED" />
+                                <Text style={[styles.multiServiceBadgeText, isArabic && styles.cairoBold]}>
+                                    {serviceCount} {language === 'ar' ? 'خدمات' : 'Services'}
+                                </Text>
+                            </View>
+                            <View style={styles.serviceList}>
+                                {item.items.map((svcBooking, idx) => (
+                                    <View key={svcBooking.id || idx} style={[styles.serviceListItem, isArabic && styles.rowReverse]}>
+                                        <Text style={styles.serviceListBullet}>•</Text>
+                                        <Text style={[styles.serviceListText, isArabic && styles.cairoRegular]} numberOfLines={1}>
+                                            {getServiceName(svcBooking)}
+                                        </Text>
+                                        {svcBooking.Staff?.name ? (
+                                            <Text style={styles.serviceListStaff} numberOfLines={1}>
+                                                ({svcBooking.Staff.name})
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    ) : (
+                        <Text style={[styles.serviceName, isArabic && styles.cairoBold]} numberOfLines={2}>
+                            {primaryServiceName}
+                        </Text>
+                    )}
+
+                    {/* Date & Time Row */}
+                    <View style={[styles.dateTimeRow, isArabic && styles.rowReverse]}>
+                        <AppIcon name="clock" size={14} color="#7C3AED" />
+                        <Text style={[styles.dateTimeText, isArabic && styles.cairoRegular]}>
                             {dateStr} • {timeStr}
                         </Text>
                     </View>
-                    {representative.Staff && (
-                        <View style={styles.staffRow}>
-                            <Text style={styles.staffLabel}>{t('specialist')}: </Text>
-                            <Text style={styles.staffName} numberOfLines={1}>{representative.Staff.name}</Text>
+
+                    {/* Specialist Row (Single service fallback) */}
+                    {serviceCount === 1 && representative.Staff && (
+                        <View style={[styles.staffRow, isArabic && styles.rowReverse]}>
+                            <AppIcon name="profile" size={13} color="#6E7596" />
+                            <Text style={[styles.staffLabel, isArabic && styles.cairoRegular]}>{t('specialist')}: </Text>
+                            <Text style={[styles.staffName, isArabic && styles.cairoBold]} numberOfLines={1}>
+                                {representative.Staff.name}
+                            </Text>
                         </View>
                     )}
                 </View>
 
-                {/* Footer: Contextual Actions Only */}
-                {(canLeaveReview || hasCompletedReview) && (
-                    <View style={styles.cardFooter}>
-                        <View style={styles.actions}>
-                            {canLeaveReview ? (
-                                <TouchableOpacity
-                                    style={styles.reviewButton}
-                                    onPress={(e) => {
-                                        e.stopPropagation(); // prevent navigation
-                                        setReviewBooking(representative);
-                                    }}
-                                >
-                                    <AppIcon name="star" size={12} color={colors.textInverse} />
-                                    <Text style={styles.reviewButtonText}>{t('leaveReview')}</Text>
-                                </TouchableOpacity>
-                            ) : hasCompletedReview ? (
-                                <View style={[styles.reviewButton, styles.reviewedButton]}>
-                                    <AppIcon name="star" size={12} color={colors.accentDark} />
-                                    <Text style={[styles.reviewButtonText, styles.reviewedButtonText]}>{language === 'ar' ? 'تم التقييم' : 'Reviewed'}</Text>
-                                </View>
-                            ) : null}
-                        </View>
+                {/* Footer: Price, Payment State & Contextual Action */}
+                <View style={[styles.cardFooter, isArabic && styles.rowReverse]}>
+                    <View style={[styles.priceBlock, isArabic && styles.alignEnd]}>
+                        <Text style={[styles.priceLabel, isArabic && styles.cairoRegular]}>
+                            {language === 'ar' ? 'الإجمالي' : 'Total'}
+                        </Text>
+                        <Text style={[styles.price, isArabic && styles.cairoBold]}>
+                            {formatRiyal(item.totalPrice, language)}
+                        </Text>
                     </View>
-                )}
+
+                    <View style={[styles.footerRight, isArabic && styles.rowReverse]}>
+                        {hasOutstanding && activeTab === 'upcoming' ? (
+                            <View style={styles.dueBadge}>
+                                <Text style={[styles.dueBadgeText, isArabic && styles.cairoBold]}>
+                                    {language === 'ar' ? 'بانتظار الدفع' : 'Payment Due'}
+                                </Text>
+                            </View>
+                        ) : null}
+
+                        {canLeaveReview ? (
+                            <TouchableOpacity
+                                style={styles.reviewButton}
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    setReviewBooking(representative);
+                                }}
+                            >
+                                <AppIcon name="star" size={13} color="#FFFFFF" />
+                                <Text style={[styles.reviewButtonText, isArabic && styles.cairoBold]}>
+                                    {t('leaveReview')}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : hasCompletedReview ? (
+                            <View style={styles.reviewedBadge}>
+                                <AppIcon name="star" size={13} color="#059669" />
+                                <Text style={[styles.reviewedBadgeText, isArabic && styles.cairoBold]}>
+                                    {language === 'ar' ? 'تم التقييم' : 'Reviewed'}
+                                </Text>
+                            </View>
+                        ) : null}
+                    </View>
+                </View>
             </TouchableOpacity>
         );
     };
 
     if (!isAuthenticated && !loading) {
         return (
-            <>
-                <LinearGradient
-                    colors={['#F5F0FF', '#FFFFFF']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[styles.header, { paddingTop: spacing.xl + topInset }]}
-                >
-                    <Text style={styles.headerTitle}>{t('bookings')}</Text>
-                </LinearGradient>
+            <View style={styles.container}>
+                <CustomerSubpageHeader
+                    title={language === 'ar' ? 'المواعيد' : 'Appointments'}
+                    showBack={Boolean(navigation?.canGoBack && navigation.canGoBack())}
+                />
                 <GuestView
                     type="bookings"
                     onLoginPress={showLogin}
                 />
-            </>
+            </View>
         );
     }
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={['#F5F0FF', '#FFFFFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.header, { paddingTop: spacing.xl + topInset }]}
-            >
-                <Text style={styles.headerTitle}>{t('bookings')}</Text>
-            </LinearGradient>
+            <CustomerSubpageHeader
+                title={language === 'ar' ? 'المواعيد' : 'Appointments'}
+                showBack={Boolean(navigation?.canGoBack && navigation.canGoBack())}
+            />
 
             {/* Tabs */}
-            <View style={styles.tabsContainer}>
-                <TouchableOpacity style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]} onPress={() => setActiveTab('upcoming')}>
+            <View style={[styles.tabsContainer, isRTL && styles.rowReverse]}>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
+                    onPress={() => setActiveTab('upcoming')}
+                >
                     <Text style={[
                         styles.tabText,
-                        activeTab === 'upcoming' && styles.activeTabText
+                        activeTab === 'upcoming' && styles.activeTabText,
+                        language === 'ar' && styles.cairoBold,
                     ]}>{t('upcoming')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.tab, activeTab === 'completed' && styles.activeTab]} onPress={() => setActiveTab('completed')}>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'completed' && styles.activeTab]}
+                    onPress={() => setActiveTab('completed')}
+                >
                     <Text style={[
                         styles.tabText,
-                        activeTab === 'completed' && styles.activeTabText
+                        activeTab === 'completed' && styles.activeTabText,
+                        language === 'ar' && styles.cairoBold,
                     ]}>{language === 'ar' ? 'مكتمل' : 'Completed'}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.tab, activeTab === 'no_show' && styles.activeTab]} onPress={() => setActiveTab('no_show')}>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'no_show' && styles.activeTab]}
+                    onPress={() => setActiveTab('no_show')}
+                >
                     <Text style={[
                         styles.tabText,
-                        activeTab === 'no_show' && styles.activeTabText
+                        activeTab === 'no_show' && styles.activeTabText,
+                        language === 'ar' && styles.cairoBold,
                     ]}>{language === 'ar' ? 'لم يحضر' : 'No Show'}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.tab, activeTab === 'cancelled' && styles.activeTab]} onPress={() => setActiveTab('cancelled')}>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'cancelled' && styles.activeTab]}
+                    onPress={() => setActiveTab('cancelled')}
+                >
                     <Text style={[
                         styles.tabText,
-                        activeTab === 'cancelled' && styles.activeTabText
+                        activeTab === 'cancelled' && styles.activeTabText,
+                        language === 'ar' && styles.cairoBold,
                     ]}>{language === 'ar' ? 'ملغي' : 'Canceled'}</Text>
                 </TouchableOpacity>
             </View>
@@ -389,21 +456,30 @@ export function BookingsScreen({ navigation }: any) {
                 />
             ) : (
                 <View style={styles.emptyContainer}>
-                    <AppIcon name="bookings" size={64} color={colors.textSecondary} />
-                    <Text style={styles.emptyText}>
+                    <View style={styles.emptyIconCircle}>
+                        <AppIcon name="bookings" size={40} color="#7C3AED" />
+                    </View>
+                    <Text style={[styles.emptyTitle, language === 'ar' && styles.cairoBold]}>
+                        {language === 'ar' ? 'لا توجد مواعيد بعد' : 'No appointments yet'}
+                    </Text>
+                    <Text style={[styles.emptySubtitle, language === 'ar' && styles.cairoRegular]}>
                         {activeTab === 'upcoming'
-                            ? t('noUpcomingBookings')
+                            ? (language === 'ar' ? 'ليس لديك أي مواعيد قادمة في الوقت الحالي' : 'You have no upcoming appointments')
                             : activeTab === 'completed'
-                                ? (language === 'ar' ? 'لا توجد مواعيد مكتملة' : 'No completed bookings')
+                                ? (language === 'ar' ? 'لا توجد مواعيد مكتملة سابقة' : 'No completed appointments found')
                                 : activeTab === 'no_show'
-                                    ? (language === 'ar' ? 'لا توجد مواعيد لم يحضرها العميل' : 'No no-show bookings')
-                                    : (language === 'ar' ? 'لا توجد مواعيد ملغاة' : 'No canceled bookings')}
+                                    ? (language === 'ar' ? 'لا توجد مواعيد لم يتم حضورها' : 'No missed appointments')
+                                    : (language === 'ar' ? 'لا توجد مواعيد ملغاة' : 'No cancelled appointments')}
                     </Text>
                     <TouchableOpacity
-                        style={styles.bookButton}
+                        style={styles.refreshButton}
                         onPress={handleRefresh}
+                        activeOpacity={0.8}
                     >
-                        <Text style={styles.bookButtonText}>{t('refresh')}</Text>
+                        <AppIcon name="refresh" size={16} color="#FFFFFF" />
+                        <Text style={[styles.refreshButtonText, language === 'ar' && styles.cairoBold]}>
+                            {t('refresh')}
+                        </Text>
                     </TouchableOpacity>
                 </View>
             )}
@@ -476,6 +552,42 @@ export function BookingsScreen({ navigation }: any) {
     );
 }
 
+const getStatusBgColor = (status: string) => {
+    switch (status) {
+        case 'confirmed':
+        case 'checked_in':
+            return '#ECFDF5';
+        case 'in_service':
+        case 'completed':
+            return '#EFF6FF';
+        case 'pending':
+            return '#FFFBEB';
+        case 'cancelled':
+        case 'no_show':
+            return '#FEF2F2';
+        default:
+            return '#F3F4F6';
+    }
+};
+
+const getStatusTextColor = (status: string) => {
+    switch (status) {
+        case 'confirmed':
+        case 'checked_in':
+            return '#059669';
+        case 'in_service':
+        case 'completed':
+            return '#2563EB';
+        case 'pending':
+            return '#D97706';
+        case 'cancelled':
+        case 'no_show':
+            return '#DC2626';
+        default:
+            return '#6B7280';
+    }
+};
+
 const getStatusColor = (status: string) => {
     switch (status) {
         case 'confirmed': return colors.success;
@@ -517,167 +629,223 @@ const getStatusText = (status: string, _t: any, language?: string) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F6FB',
+        backgroundColor: '#F7F4FF',
     },
-    header: {
-        padding: spacing.xl,
-        backgroundColor: colors.background,
+    rowReverse: {
+        flexDirection: 'row-reverse',
     },
-    headerTitle: {
-        fontSize: 32,
-        fontWeight: '800',
-        color: '#14153C',
+    alignEnd: {
+        alignItems: 'flex-end',
+    },
+    salonInfoRTL: {
+        flexDirection: 'row-reverse',
+    },
+    multiServiceBadgeRTL: {
+        alignSelf: 'flex-end',
+        flexDirection: 'row-reverse',
+    },
+    rescheduledRibbonRTL: {
+        right: undefined,
+        left: 12,
+    },
+    cairoBold: {
+        fontFamily: 'Cairo-Bold',
+    },
+    cairoRegular: {
+        fontFamily: 'Cairo-Regular',
     },
     tabsContainer: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
         paddingHorizontal: spacing.md,
-        paddingBottom: 8,
-        backgroundColor: colors.background,
-        marginBottom: 6,
+        paddingVertical: 10,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E9DDFD',
         gap: 6,
     },
     tab: {
         flex: 1,
-        paddingVertical: spacing.sm,
+        paddingVertical: 8,
         alignItems: 'center',
+        justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#E7DFFA',
+        borderColor: '#E9DDFD',
         borderRadius: 999,
         backgroundColor: '#FFFFFF',
     },
     activeTab: {
-        borderColor: '#C4ABFB',
+        borderColor: '#7C3AED',
         backgroundColor: '#F5EEFF',
     },
     tabText: {
-        fontSize: fontSize.sm,
+        fontSize: 12,
         color: colors.textSecondary,
         fontWeight: '600',
     },
     activeTabText: {
-        color: colors.primary,
+        color: '#7C3AED',
         fontWeight: '700',
     },
     listContent: {
-        padding: 12,
-        gap: spacing.md,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.xl,
     },
     card: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 12,
-        shadowColor: '#1A1440',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 2,
-        marginBottom: 8,
+        borderRadius: 20,
+        padding: spacing.md + 2,
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.md,
+        overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#ECE7FA',
+        borderColor: '#E9DDFD',
+        shadowColor: '#2E1065',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 2,
         position: 'relative',
     },
     rescheduledRibbon: {
         position: 'absolute',
-        top: 12,
+        top: 10,
         right: 12,
         zIndex: 10,
         borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        backgroundColor: '#E8F1FF',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        backgroundColor: '#EFF6FF',
         borderWidth: 1,
-        borderColor: '#C8DDFE',
+        borderColor: '#BFDBFE',
     },
     rescheduledRibbonText: {
-        fontSize: 9,
-        color: '#2E5FA8',
+        fontSize: 10,
+        color: '#2563EB',
         fontWeight: '700',
     },
     cardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
-        paddingBottom: 8,
+        marginBottom: 10,
+        paddingBottom: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#EDE8FA',
+        borderBottomColor: '#F0EAFB',
     },
     salonInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 10,
+        flex: 1,
     },
     salonLogo: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
     },
     placeholderLogo: {
-        backgroundColor: colors.primary + '20',
+        backgroundColor: '#F3E8FF',
         alignItems: 'center',
         justifyContent: 'center',
     },
     placeholderText: {
-        color: colors.primary,
+        color: '#7C3AED',
         fontWeight: '700',
+        fontSize: 14,
+    },
+    salonTextWrap: {
+        flex: 1,
     },
     salonName: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '700',
         color: '#1A1A44',
     },
+    bookingRefText: {
+        fontSize: 11,
+        color: '#7C3AED',
+        fontWeight: '600',
+        marginTop: 1,
+    },
     statusBadge: {
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 4,
-        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 10,
     },
     statusText: {
-        fontSize: 9,
+        fontSize: 11,
         fontWeight: '700',
     },
     cardBody: {
         marginBottom: 8,
     },
-    bookingNumberLabel: {
-        fontSize: fontSize.xs,
-        color: colors.primary,
-        fontWeight: '700',
-        marginBottom: spacing.xs,
-        letterSpacing: 0.8,
-    },
     serviceName: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#171840',
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#12133A',
+        marginBottom: 8,
+    },
+    multiServiceContainer: {
+        marginBottom: 8,
+    },
+    multiServiceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 5,
+        backgroundColor: '#F5EEFF',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
         marginBottom: 6,
     },
-    variantLabel: {
-        fontSize: fontSize.sm,
+    multiServiceBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#7C3AED',
+    },
+    serviceList: {
+        gap: 3,
+        marginBottom: 4,
+    },
+    serviceListItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    serviceListBullet: {
+        fontSize: 12,
+        color: '#7C3AED',
+    },
+    serviceListText: {
+        fontSize: 13,
+        color: '#374151',
         fontWeight: '600',
-        color: colors.primary,
-        marginBottom: 6,
+        flexShrink: 1,
+    },
+    serviceListStaff: {
+        fontSize: 11,
+        color: '#6B7280',
     },
     dateTimeRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        marginBottom: 2,
-    },
-    dateIcon: {
-        fontSize: 16,
+        marginTop: 4,
     },
     dateTimeText: {
-        fontSize: 12,
-        color: '#6E7596',
+        fontSize: 13,
+        color: '#4B5563',
     },
     staffRow: {
         flexDirection: 'row',
-        marginTop: spacing.sm,
+        alignItems: 'center',
+        marginTop: 6,
+        gap: 4,
     },
     staffLabel: {
         fontSize: 12,
-        color: '#6E7596',
+        color: '#6B7280',
     },
     staffName: {
         fontSize: 12,
@@ -687,118 +855,114 @@ const styles = StyleSheet.create({
     cardFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        marginTop: spacing.sm,
-        gap: 6,
+        alignItems: 'center',
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F0EAFB',
     },
     priceBlock: {
-        flex: 1,
-        gap: 2,
+        gap: 1,
+    },
+    priceLabel: {
+        fontSize: 10,
+        color: '#9CA3AF',
+        fontWeight: '600',
     },
     price: {
-        fontSize: 20,
+        fontSize: 17,
         fontWeight: '800',
-        color: colors.primary,
+        color: '#7C3AED',
     },
-    actions: {
+    footerRight: {
         flexDirection: 'row',
-        gap: 6,
         alignItems: 'center',
+        gap: 8,
     },
-    payButton: {
-        minWidth: 120,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        backgroundColor: '#6D31D9',
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
+    dueBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: '#FEF3C7',
     },
-    payButtonText: {
-        color: colors.textInverse,
-        fontSize: fontSize.sm,
-        fontWeight: '600',
-    },
-    dueNowText: {
+    dueBadgeText: {
         fontSize: 11,
-        color: '#6E7596',
-        fontWeight: '600',
-    },
-    cancelButton: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
-        borderWidth: 1,
-        borderColor: colors.error,
-        borderRadius: 12,
-    },
-    cancelButtonText: {
-        color: colors.error,
-        fontSize: fontSize.sm,
-        fontWeight: '600',
-    },
-    rescheduleButton: {
-        marginTop: spacing.sm,
-        backgroundColor: colors.primary,
-        borderRadius: 12,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
-        alignItems: 'center',
-    },
-    rescheduleButtonText: {
-        color: colors.textInverse,
-        fontSize: fontSize.sm,
-        fontWeight: '600',
+        fontWeight: '700',
+        color: '#D97706',
     },
     reviewButton: {
-        marginTop: spacing.sm,
-        backgroundColor: colors.primary,
-        borderRadius: 12,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
-        alignItems: 'center',
-        justifyContent: 'center',
         flexDirection: 'row',
-        gap: spacing.xs,
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#7C3AED',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
     },
     reviewButtonText: {
-        color: colors.textInverse,
-        fontSize: fontSize.sm,
-        fontWeight: '600',
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
     },
-    reviewedButton: {
-        backgroundColor: `${colors.success}1A`,
+    reviewedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#ECFDF5',
         borderWidth: 1,
-        borderColor: colors.accentLight,
+        borderColor: '#A7F3D0',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
     },
-    reviewedButtonText: {
-        color: colors.accentDark,
+    reviewedBadgeText: {
+        color: '#059669',
+        fontSize: 12,
+        fontWeight: '700',
     },
     emptyContainer: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: spacing.xl,
+        paddingVertical: 60,
+        paddingHorizontal: spacing.xl,
     },
-    emptyIcon: {
-        fontSize: 64,
-        marginBottom: spacing.lg,
+    emptyIconCircle: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#F5EEFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.md,
     },
-    emptyText: {
+    emptyTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1A1A44',
-        marginBottom: spacing.xs,
+        color: '#1D035F',
+        marginBottom: 6,
+        textAlign: 'center',
     },
-    bookButton: {
-        marginTop: spacing.lg,
-        paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.md,
-        backgroundColor: colors.primary,
-        borderRadius: borderRadius.md,
+    emptySubtitle: {
+        fontSize: 13,
+        color: '#6B7280',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: spacing.lg,
     },
-    bookButtonText: {
-        color: colors.textInverse,
-        fontWeight: '600',
+    refreshButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#7C3AED',
+        borderRadius: 12,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm + 2,
+    },
+    refreshButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
@@ -820,14 +984,14 @@ const styles = StyleSheet.create({
         width: '90%',
         alignSelf: 'center',
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        borderRadius: 24,
         borderWidth: 1,
         borderColor: '#E9DDFD',
-        padding: 12,
+        padding: spacing.lg,
         marginBottom: spacing.xl,
-        shadowColor: '#1F123F',
+        shadowColor: '#2E1065',
         shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.18,
+        shadowOpacity: 0.1,
         shadowRadius: 18,
         elevation: 8,
     },
@@ -842,7 +1006,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: '#FAFAFF',
+        backgroundColor: '#F7F4FF',
         color: colors.text,
         marginBottom: 6,
     },
@@ -855,11 +1019,11 @@ const styles = StyleSheet.create({
     },
     rescheduleCancelBtn: {
         borderWidth: 1,
-        borderColor: '#D8C7FA',
+        borderColor: '#E9DDFD',
         borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: '#F4EEFF',
+        backgroundColor: '#FFFFFF',
     },
     rescheduleCancelText: {
         color: colors.textSecondary,
@@ -869,10 +1033,10 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        backgroundColor: colors.primary,
+        backgroundColor: '#7C3AED',
     },
     rescheduleSaveText: {
-        color: colors.textInverse,
+        color: '#FFFFFF',
         fontWeight: '700',
     },
 });

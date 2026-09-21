@@ -6,7 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { formatRiyal } from '../utils/currency';
 import { useCart } from '../contexts/CartContext';
 import { AppIcon } from '../components/AppIcon';
-import { api, getImageUrl, Tenant } from '../api/client';
+import { api, getImageUrl, Tenant, UserAddress } from '../api/client';
 import { useAppSession } from '../contexts/AppSessionContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 
@@ -35,6 +35,11 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
     const [district, setDistrict] = useState('');
     const [street, setStreet] = useState('');
     const [building, setBuilding] = useState('');
+
+    // Saved Addresses State
+    const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
+    const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+    const [useManualAddress, setUseManualAddress] = useState(false);
 
     const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
     const [paymentMethod, setPaymentMethod] = useState<'cash-on-delivery' | 'online'>('online');
@@ -79,6 +84,47 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
         };
     }, [isAuthenticated, refreshSession, user]);
 
+    const fetchSavedAddresses = async () => {
+        if (!isAuthenticated) return;
+        try {
+            const list = await api.getAddresses();
+            setSavedAddresses(list);
+            if (list.length > 0) {
+                setSelectedAddressId((prev) => {
+                    if (prev && list.some((a) => a.id === prev)) return prev;
+                    const def = list.find((a) => a.isDefault) || list[0];
+                    if (def) {
+                        setStreet(def.street || '');
+                        setCity(def.city || '');
+                        setBuilding(def.building || '');
+                        if (def.phone) setCustomerPhone((p) => p || def.phone || '');
+                        return def.id;
+                    }
+                    return null;
+                });
+            }
+        } catch (e) {
+            console.warn('Failed to load saved addresses in Cart', e);
+        }
+    };
+
+    useEffect(() => {
+        fetchSavedAddresses();
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchSavedAddresses();
+        });
+        return unsubscribe;
+    }, [navigation, isAuthenticated]);
+
+    const handleSelectAddress = (addr: UserAddress) => {
+        setSelectedAddressId(addr.id);
+        setStreet(addr.street || '');
+        setCity(addr.city || '');
+        setBuilding(addr.building || '');
+        if (addr.phone) setCustomerPhone(addr.phone);
+        setUseManualAddress(false);
+    };
+
     // Calculations
     const deliveryFee = deliveryMethod === 'express' ? 50 : (cartTotal >= 200 ? 0 : 25);
     const tax = cartTotal * 0.15;
@@ -98,7 +144,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
     };
 
     const handleCheckout = async () => {
-        const itemTenantIds = Array.from(new Set(cartItems.map((item) => item.product.tenantId).filter(Boolean)));
+        const itemTenantIds = Array.from(new Set(cartItems.map((item) => item.product?.tenantId).filter(Boolean)));
         const checkoutTenantId = tenant?.id || cartTenantId || itemTenantIds[0];
 
         if (!checkoutTenantId) {
@@ -119,8 +165,46 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
             return;
         }
 
-        if (!customerName || !customerEmail || !customerPhone || !city || !district || !street) {
-            Alert.alert('Missing Details', 'Please fill in all required fields (Name, Email, Phone, City, District, Street).');
+        let shippingPayload: any = null;
+        if (!useManualAddress && selectedAddressId) {
+            const chosen = savedAddresses.find((a) => a.id === selectedAddressId);
+            if (chosen) {
+                shippingPayload = {
+                    title: chosen.title,
+                    street: chosen.street,
+                    city: chosen.city,
+                    building: chosen.building,
+                    floor: chosen.floor,
+                    apartment: chosen.apartment,
+                    phone: chosen.phone || customerPhone,
+                    notes: chosen.notes || '',
+                };
+            }
+        }
+
+        if (!shippingPayload) {
+            if (!city.trim() || !street.trim()) {
+                Alert.alert(
+                    isRTL ? 'بيانات العنوان ناقصة' : 'Missing Address',
+                    isRTL ? 'يرجى اختيار عنوان محفوظ أو إدخال المدينة والشارع' : 'Please select a saved address or enter City and Street.'
+                );
+                return;
+            }
+            shippingPayload = {
+                city: city.trim(),
+                district: district.trim() || city.trim(),
+                street: street.trim(),
+                building: building.trim(),
+                phone: customerPhone,
+                notes: '',
+            };
+        }
+
+        if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
+            Alert.alert(
+                isRTL ? 'بيانات شخصية ناقصة' : 'Missing Details',
+                isRTL ? 'يرجى إكمال الاسم والبريد الإلكتروني ورقم الجوال' : 'Please fill in Name, Email, and Phone Number.'
+            );
             return;
         }
 
@@ -132,14 +216,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
             })),
             paymentMethod: paymentMethod === 'online' ? 'online' : 'cash_on_delivery',
             deliveryType: 'delivery',
-            shippingAddress: {
-                city,
-                district,
-                street,
-                building,
-                phone: customerPhone,
-                notes: '',
-            },
+            shippingAddress: shippingPayload,
             notes: `${customerName} | ${customerEmail}`,
         };
 
@@ -159,6 +236,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                     orderId: res.order.id,
                     amount: Number(res.order.totalAmount),
                     tenantId: checkoutTenantId,
+                    checkoutType: 'product',
                 });
                 return;
             }
@@ -193,7 +271,7 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
-            <View style={[styles.header, { paddingTop: spacing.md + topInset }]}>
+            <View style={[styles.header, isRTL && styles.rowRTL, { paddingTop: spacing.md + topInset }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
@@ -203,46 +281,50 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
 
             <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}>
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{labels.orderItems}</Text>
-                    {cartItems.map(item => (
-                        <View key={item.product.id} style={styles.cartItem}>
-                            <Image
-                                source={{ uri: item.product.images?.length ? getImageUrl(item.product.images[0]) : 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?q=80&w=600&auto=format&fit=crop' }}
-                                style={styles.itemImage}
-                            />
-                            <View style={styles.itemInfo}>
-                                <Text style={styles.itemName} numberOfLines={2}>{isRTL ? item.product.name_ar : item.product.name_en}</Text>
-                                <Text style={styles.itemPrice}>{formatRiyal(item.product.price, isRTL ? 'ar' : 'en')}</Text>
-                                <View style={styles.qtyControls}>
-                                    <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.product.id, item.quantity - 1)}>
-                                        <AppIcon name="minus" size={18} color={colors.text} />
-                                    </TouchableOpacity>
-                                    <Text style={styles.qtyText}>{item.quantity}</Text>
-                                    <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.product.id, item.quantity + 1)}>
-                                        <AppIcon name="plus" size={18} color={colors.text} />
-                                    </TouchableOpacity>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{labels.orderItems}</Text>
+                    {cartItems.map((item, idx) => {
+                        if (!item?.product) return null;
+                        const prod = item.product;
+                        return (
+                            <View key={prod.id || `cart-item-${idx}`} style={[styles.cartItem, isRTL && styles.rowRTL]}>
+                                <Image
+                                    source={{ uri: prod.images?.length ? getImageUrl(prod.images[0]) : 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?q=80&w=600&auto=format&fit=crop' }}
+                                    style={styles.itemImage}
+                                />
+                                <View style={[styles.itemInfo, isRTL && styles.itemInfoRTL]}>
+                                    <Text style={[styles.itemName, isRTL && styles.rtlText]} numberOfLines={2}>{isRTL ? (prod.name_ar || prod.name_en) : (prod.name_en || prod.name_ar)}</Text>
+                                    <Text style={[styles.itemPrice, isRTL && styles.rtlText]}>{formatRiyal(prod.price || 0, isRTL ? 'ar' : 'en')}</Text>
+                                    <View style={[styles.qtyControls, isRTL && styles.rowRTL]}>
+                                        <TouchableOpacity style={styles.qtyBtn} onPress={() => prod.id && updateQuantity(prod.id, item.quantity - 1)}>
+                                            <AppIcon name="minus" size={18} color={colors.text} />
+                                        </TouchableOpacity>
+                                        <Text style={styles.qtyText}>{item.quantity}</Text>
+                                        <TouchableOpacity style={styles.qtyBtn} onPress={() => prod.id && updateQuantity(prod.id, item.quantity + 1)}>
+                                            <AppIcon name="plus" size={18} color={colors.text} />
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
+                                <TouchableOpacity onPress={() => prod.id && removeFromCart(prod.id)} style={styles.removeBtn}>
+                                    <AppIcon name="delete" size={20} color={colors.error} />
+                                </TouchableOpacity>
                             </View>
-                            <TouchableOpacity onPress={() => removeFromCart(item.product.id)} style={styles.removeBtn}>
-                                <AppIcon name="delete" size={20} color={colors.error} />
-                            </TouchableOpacity>
-                        </View>
-                    ))}
+                        );
+                    })}
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{labels.personalInfo}</Text>
-                    <Text style={styles.fieldLabel}>{isRTL ? 'الاسم الكامل *' : 'Full Name *'}</Text>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{labels.personalInfo}</Text>
+                    <Text style={[styles.fieldLabel, isRTL && styles.rtlText]}>{isRTL ? 'الاسم الكامل *' : 'Full Name *'}</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, isRTL && styles.rtlInput]}
                         placeholder={isRTL ? 'ادخل الاسم الكامل' : 'Enter full name'}
                         placeholderTextColor={colors.textSecondary}
                         value={customerName}
                         onChangeText={setCustomerName}
                     />
-                    <Text style={styles.fieldLabel}>{isRTL ? 'البريد الإلكتروني *' : 'Email Address *'}</Text>
+                    <Text style={[styles.fieldLabel, isRTL && styles.rtlText]}>{isRTL ? 'البريد الإلكتروني *' : 'Email Address *'}</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, isRTL && styles.emailInputRtl]}
                         placeholder={isRTL ? 'ادخل البريد الإلكتروني' : 'Enter email address'}
                         placeholderTextColor={colors.textSecondary}
                         keyboardType="email-address"
@@ -250,9 +332,9 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                         value={customerEmail}
                         onChangeText={setCustomerEmail}
                     />
-                    <Text style={styles.fieldLabel}>{isRTL ? 'رقم الجوال *' : 'Phone Number *'}</Text>
+                    <Text style={[styles.fieldLabel, isRTL && styles.rtlText]}>{isRTL ? 'رقم الجوال *' : 'Phone Number *'}</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, isRTL && styles.phoneInputRtl]}
                         placeholder={isRTL ? 'ادخل رقم الجوال' : 'Enter phone number'}
                         placeholderTextColor={colors.textSecondary}
                         keyboardType="phone-pad"
@@ -262,105 +344,214 @@ export function CartScreen({ route, navigation }: CartScreenProps) {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{labels.shippingAddress}</Text>
-                    <View style={styles.row}>
-                        <View style={[styles.flexField, { marginRight: spacing.sm }]}>
-                            <Text style={styles.fieldLabel}>{isRTL ? 'المدينة *' : 'City *'}</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder={isRTL ? 'المدينة' : 'City'}
-                                placeholderTextColor={colors.textSecondary}
-                                value={city}
-                                onChangeText={setCity}
-                            />
-                        </View>
-                        <View style={styles.flexField}>
-                            <Text style={styles.fieldLabel}>{isRTL ? 'الحي *' : 'District *'}</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder={isRTL ? 'الحي' : 'District'}
-                                placeholderTextColor={colors.textSecondary}
-                                value={district}
-                                onChangeText={setDistrict}
-                            />
-                        </View>
+                    <View style={[styles.sectionHeaderRow, isRTL && styles.rowRTL]}>
+                        <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{labels.shippingAddress}</Text>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('SavedAddresses')}
+                            style={[styles.manageAddressesBtn, isRTL && styles.rowRTL]}
+                        >
+                            <Text style={styles.manageAddressesText}>
+                                {isRTL ? 'إدارة العناوين' : 'Manage Addresses'}
+                            </Text>
+                            <AppIcon name={isRTL ? 'arrow_back' : 'arrow_forward'} size={14} color={colors.primary} />
+                        </TouchableOpacity>
                     </View>
-                    <Text style={styles.fieldLabel}>{isRTL ? 'اسم الشارع *' : 'Street Name *'}</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder={isRTL ? 'الشارع' : 'Street name'}
-                        placeholderTextColor={colors.textSecondary}
-                        value={street}
-                        onChangeText={setStreet}
-                    />
-                    <Text style={styles.fieldLabel}>{isRTL ? 'المبنى / الشقة' : 'Building / Apartment'}</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder={isRTL ? 'المبنى أو الشقة' : 'Building or apartment'}
-                        placeholderTextColor={colors.textSecondary}
-                        value={building}
-                        onChangeText={setBuilding}
-                    />
+
+                    {savedAddresses.length > 0 && !useManualAddress ? (
+                        <View style={styles.addressListContainer}>
+                            {savedAddresses.map((addr) => {
+                                const isSelected = selectedAddressId === addr.id;
+                                return (
+                                    <TouchableOpacity
+                                        key={addr.id}
+                                        style={[
+                                            styles.savedAddressCard,
+                                            isRTL && styles.rowRTL,
+                                            isSelected && styles.savedAddressCardSelected,
+                                        ]}
+                                        onPress={() => handleSelectAddress(addr)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={[styles.radioIndicator, isSelected && styles.radioIndicatorSelected]}>
+                                            {isSelected && <View style={styles.radioIndicatorActive} />}
+                                        </View>
+                                        <View style={[styles.savedAddressContent, isRTL && { alignItems: 'flex-end' }]}>
+                                            <View style={[styles.savedAddressTitleRow, isRTL && styles.rowRTL]}>
+                                                <Text style={[styles.savedAddressTitle, isSelected && styles.savedAddressTitleSelected]}>
+                                                    {addr.title}
+                                                </Text>
+                                                {addr.isDefault && (
+                                                    <View style={styles.addressDefaultTag}>
+                                                        <Text style={styles.addressDefaultTagText}>
+                                                            {isRTL ? 'الافتراضي' : 'Default'}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text style={[styles.savedAddressDetails, isRTL && styles.rtlText]}>
+                                                {addr.street}, {addr.city}
+                                                {addr.building ? ` - ${isRTL ? 'مبنى' : 'Bldg'} ${addr.building}` : ''}
+                                                {addr.apartment ? ` | ${isRTL ? 'شقة' : 'Apt'} ${addr.apartment}` : ''}
+                                            </Text>
+                                            {addr.phone ? (
+                                                <Text style={styles.savedAddressPhone}>📞 {addr.phone}</Text>
+                                            ) : null}
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                            <TouchableOpacity
+                                style={styles.addOrManualToggle}
+                                onPress={() => setUseManualAddress(true)}
+                            >
+                                <Text style={styles.addOrManualToggleText}>
+                                    {isRTL ? '+ إدخال عنوان يدوي مخصص' : '+ Enter a different address manually'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <View>
+                            {savedAddresses.length > 0 && (
+                                <TouchableOpacity
+                                    style={styles.chooseSavedBtn}
+                                    onPress={() => setUseManualAddress(false)}
+                                >
+                                    <Text style={styles.chooseSavedBtnText}>
+                                        {isRTL ? '→ استخدام أحد العناوين المحفوظة' : '← Use a saved address instead'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                            {savedAddresses.length === 0 && (
+                                <View style={[styles.noAddressBanner, isRTL && styles.rowRTL]}>
+                                    <AppIcon name="location" size={24} color={colors.primary} />
+                                    <View style={[{ flex: 1, marginHorizontal: spacing.sm }, isRTL && { alignItems: 'flex-end' }]}>
+                                        <Text style={[styles.noAddressTitle, isRTL && styles.rtlText]}>
+                                            {isRTL ? 'لا توجد عناوين محفوظة' : 'No saved addresses'}
+                                        </Text>
+                                        <Text style={[styles.noAddressSubtitle, isRTL && styles.rtlText]}>
+                                            {isRTL ? 'أضف عنوانك لتسريع عملية الطلب' : 'Save your address for faster checkout'}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.quickAddAddressBtn}
+                                        onPress={() => navigation.navigate('SavedAddresses')}
+                                    >
+                                        <Text style={styles.quickAddAddressText}>{isRTL ? 'إضافة' : 'Add'}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                            <View style={styles.row}>
+                                <View style={[styles.flexField, { marginRight: spacing.sm }]}>
+                                    <Text style={styles.fieldLabel}>{isRTL ? 'المدينة *' : 'City *'}</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder={isRTL ? 'المدينة' : 'City'}
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={city}
+                                        onChangeText={setCity}
+                                    />
+                                </View>
+                                <View style={styles.flexField}>
+                                    <Text style={styles.fieldLabel}>{isRTL ? 'الحي *' : 'District *'}</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder={isRTL ? 'الحي' : 'District'}
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={district}
+                                        onChangeText={setDistrict}
+                                    />
+                                </View>
+                            </View>
+                            <Text style={styles.fieldLabel}>{isRTL ? 'اسم الشارع *' : 'Street Name *'}</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder={isRTL ? 'الشارع' : 'Street name'}
+                                placeholderTextColor={colors.textSecondary}
+                                value={street}
+                                onChangeText={setStreet}
+                            />
+                            <Text style={styles.fieldLabel}>{isRTL ? 'المبنى / الشقة' : 'Building / Apartment'}</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder={isRTL ? 'المبنى أو الشقة' : 'Building or apartment'}
+                                placeholderTextColor={colors.textSecondary}
+                                value={building}
+                                onChangeText={setBuilding}
+                            />
+                        </View>
+                    )}
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{labels.deliveryMethod}</Text>
-                    <View style={styles.methodOptions}>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{labels.deliveryMethod}</Text>
+                    <View style={[styles.methodOptions, isRTL && styles.rowRTL]}>
                         <TouchableOpacity
                             style={[styles.methodOption, deliveryMethod === 'standard' && styles.methodOptionActive]}
                             onPress={() => setDeliveryMethod('standard')}
                         >
                             <AppIcon name="bicycle" size={24} color={deliveryMethod === 'standard' ? colors.primary : colors.textSecondary} />
-                            <Text style={[styles.methodLabel, deliveryMethod === 'standard' && styles.methodLabelActive]}>Standard</Text>
-                            <Text style={styles.methodDesc}>(2-3 days)</Text>
+                            <Text style={[styles.methodLabel, deliveryMethod === 'standard' && styles.methodLabelActive]}>
+                                {isRTL ? 'توصيل عادي' : 'Standard'}
+                            </Text>
+                            <Text style={styles.methodDesc}>
+                                {isRTL ? '(خلال 2-3 أيام)' : '(2-3 days)'}
+                            </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.methodOption, deliveryMethod === 'express' && styles.methodOptionActive]}
                             onPress={() => setDeliveryMethod('express')}
                         >
                             <AppIcon name="rocket" size={24} color={deliveryMethod === 'express' ? colors.primary : colors.textSecondary} />
-                            <Text style={[styles.methodLabel, deliveryMethod === 'express' && styles.methodLabelActive]}>Express</Text>
-                            <Text style={styles.methodDesc}>(Same day)</Text>
+                            <Text style={[styles.methodLabel, deliveryMethod === 'express' && styles.methodLabelActive]}>
+                                {isRTL ? 'توصيل سريع' : 'Express'}
+                            </Text>
+                            <Text style={styles.methodDesc}>
+                                {isRTL ? '(خلال نفس اليوم)' : '(Same day)'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{labels.paymentMethod}</Text>
-                    <View style={styles.methodOptions}>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{labels.paymentMethod}</Text>
+                    <View style={[styles.methodOptions, isRTL && styles.rowRTL]}>
                         <TouchableOpacity
                             style={[styles.methodOption, paymentMethod === 'online' && styles.methodOptionActive]}
                             onPress={() => setPaymentMethod('online')}
                         >
                             <AppIcon name="card" size={24} color={paymentMethod === 'online' ? colors.primary : colors.textSecondary} />
-                            <Text style={[styles.methodLabel, paymentMethod === 'online' && styles.methodLabelActive]}>Credit Card</Text>
+                            <Text style={[styles.methodLabel, paymentMethod === 'online' && styles.methodLabelActive]}>
+                                {isRTL ? 'بطاقة بنكية' : 'Credit Card'}
+                            </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.methodOption, paymentMethod === 'cash-on-delivery' && styles.methodOptionActive]}
                             onPress={() => setPaymentMethod('cash-on-delivery')}
                         >
                             <AppIcon name="cash" size={24} color={paymentMethod === 'cash-on-delivery' ? colors.primary : colors.textSecondary} />
-                            <Text style={[styles.methodLabel, paymentMethod === 'cash-on-delivery' && styles.methodLabelActive]}>Cash on Delivery</Text>
+                            <Text style={[styles.methodLabel, paymentMethod === 'cash-on-delivery' && styles.methodLabelActive]}>
+                                {isRTL ? 'دفع عند الاستلام' : 'Cash on Delivery'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 <View style={[styles.section, styles.summarySection]}>
-                    <Text style={styles.sectionTitle}>{labels.orderSummary}</Text>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Subtotal</Text>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{labels.orderSummary}</Text>
+                    <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                        <Text style={styles.summaryLabel}>{isRTL ? 'المجموع الفرعي' : 'Subtotal'}</Text>
                         <Text style={styles.summaryValue}>{formatRiyal(cartTotal, isRTL ? 'ar' : 'en')}</Text>
                     </View>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Delivery</Text>
+                    <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                        <Text style={styles.summaryLabel}>{isRTL ? 'التوصيل' : 'Delivery'}</Text>
                         <Text style={styles.summaryValue}>{formatRiyal(deliveryFee, isRTL ? 'ar' : 'en')}</Text>
                     </View>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>VAT (15%)</Text>
+                    <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                        <Text style={styles.summaryLabel}>{isRTL ? 'ضريبة القيمة المضافة (15%)' : 'VAT (15%)'}</Text>
                         <Text style={styles.summaryValue}>{formatRiyal(tax, isRTL ? 'ar' : 'en')}</Text>
                     </View>
-                    <View style={[styles.summaryRow, styles.totalRow]}>
-                        <Text style={styles.totalLabel}>Total</Text>
+                    <View style={[styles.summaryRow, styles.totalRow, isRTL && styles.rowRTL]}>
+                        <Text style={styles.totalLabel}>{isRTL ? 'الإجمالي' : 'Total'}</Text>
                         <Text style={styles.totalValue}>{formatRiyal(finalTotal, isRTL ? 'ar' : 'en')}</Text>
                     </View>
                 </View>
@@ -598,5 +789,167 @@ const styles = StyleSheet.create({
         color: colors.textInverse,
         fontSize: fontSize.lg,
         fontWeight: 'bold',
+    },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    manageAddressesBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+    },
+    manageAddressesText: {
+        fontSize: fontSize.sm,
+        fontWeight: '600',
+        color: colors.primary,
+    },
+    addressListContainer: {
+        gap: spacing.sm,
+    },
+    savedAddressCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        padding: spacing.md,
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: '#EDE9FE',
+        backgroundColor: '#FAF9FE',
+        gap: spacing.sm,
+    },
+    savedAddressCardSelected: {
+        borderColor: colors.primary,
+        backgroundColor: '#F5EEFF',
+    },
+    radioIndicator: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: '#C4B5FD',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    radioIndicatorSelected: {
+        borderColor: colors.primary,
+    },
+    radioIndicatorActive: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: colors.primary,
+    },
+    savedAddressContent: {
+        flex: 1,
+    },
+    savedAddressTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        marginBottom: 2,
+    },
+    savedAddressTitle: {
+        fontSize: fontSize.md,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    savedAddressTitleSelected: {
+        color: colors.primary,
+    },
+    addressDefaultTag: {
+        backgroundColor: colors.primary + '18',
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 6,
+    },
+    addressDefaultTagText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: colors.primary,
+    },
+    savedAddressDetails: {
+        fontSize: fontSize.sm,
+        color: colors.textSecondary,
+        lineHeight: 18,
+    },
+    savedAddressPhone: {
+        fontSize: fontSize.xs,
+        color: '#6B7280',
+        marginTop: 2,
+    },
+    addOrManualToggle: {
+        paddingVertical: spacing.sm,
+        alignItems: 'center',
+    },
+    addOrManualToggleText: {
+        fontSize: fontSize.sm,
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    chooseSavedBtn: {
+        paddingVertical: spacing.xs,
+        marginBottom: spacing.sm,
+    },
+    chooseSavedBtnText: {
+        fontSize: fontSize.sm,
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    noAddressBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F3E8FF',
+        borderRadius: 14,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+    },
+    noAddressTitle: {
+        fontSize: fontSize.sm,
+        fontWeight: '700',
+        color: '#5B21B6',
+    },
+    noAddressSubtitle: {
+        fontSize: fontSize.xs,
+        color: '#6B7280',
+    },
+    quickAddAddressBtn: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    quickAddAddressText: {
+        color: '#FFFFFF',
+        fontSize: fontSize.xs,
+        fontWeight: '700',
+    },
+    rowRTL: {
+        flexDirection: 'row-reverse',
+    },
+    rtlText: {
+        textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    rtlInput: {
+        textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    emailInputRtl: {
+        textAlign: 'left',
+        writingDirection: 'ltr',
+    },
+    phoneInputRtl: {
+        textAlign: 'left',
+        writingDirection: 'ltr',
+    },
+    itemInfoRTL: {
+        alignItems: 'flex-end',
+        marginRight: spacing.md,
+        marginLeft: 0,
     },
 });

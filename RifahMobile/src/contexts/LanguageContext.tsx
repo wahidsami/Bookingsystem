@@ -30,22 +30,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     };
 
     const setLanguage = async (lang: Language) => {
-        const nextRTL = lang === 'ar';
-        const currentRTL = I18nManager.isRTL;
         await saveLanguage(lang);
         setLanguageState(lang);
-
-        // Ensure full layout direction parity across all screens/components.
-        // A reload is required when direction changes so native/layout caches are rebuilt.
-        if (currentRTL !== nextRTL) {
-            I18nManager.allowRTL(true);
-            I18nManager.forceRTL(nextRTL);
-            try {
-                await Updates.reloadAsync();
-            } catch {
-                // Fallback path: state already updated; direction-sensitive styles still use isRTL.
-            }
-        }
     };
 
     const t = (key: TranslationKey): string => {
@@ -56,7 +42,15 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!hydrated) return;
-        I18nManager.allowRTL(true);
+        // Keep native coordinate system uniform so explicit JS mirroring is 100% predictable
+        try {
+            if (I18nManager.isRTL) {
+                I18nManager.allowRTL(false);
+                I18nManager.forceRTL(false);
+            }
+        } catch {
+            // Ignore if native manager is not accessible
+        }
     }, [hydrated]);
 
     return (
@@ -69,7 +63,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 export function useLanguage() {
     const context = useContext(LanguageContext);
     if (!context) {
-        throw new Error('useLanguage must be used within LanguageProvider');
+        throw new Error('useLanguage must be used within a LanguageProvider');
     }
     return context;
 }

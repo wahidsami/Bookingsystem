@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText as Text } from '../ThemedText';
-import { colors, spacing, fontSize, borderRadius } from '../../theme/colors';
+import { colors, spacing } from '../../theme/colors';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { formatRiyal } from '../../utils/currency';
 import { api, HotDeal, getImageUrl } from '../../api/client';
 import { SkeletonCard } from './SkeletonCard';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width * 0.75;
+const CARD_WIDTH = width - spacing.lg * 2;
 
 interface HotDealsCarouselProps {
     navigation: any;
@@ -40,7 +41,8 @@ export function HotDealsCarousel({ navigation }: HotDealsCarouselProps) {
             <View style={styles.container}>
                 <FlatList
                     horizontal
-                    data={[1, 2, 3]}
+                    inverted={isRTL}
+                    data={[1, 2]}
                     renderItem={() => <SkeletonCard variant="deal" />}
                     keyExtractor={(_, i) => `sk-${i}`}
                     showsHorizontalScrollIndicator={false}
@@ -61,11 +63,7 @@ export function HotDealsCarousel({ navigation }: HotDealsCarouselProps) {
     }
 
     if (deals.length === 0) {
-        return (
-            <View style={styles.errorContainer}>
-                <Text style={styles.retryText}>{t('noHotDealsAvailable')}</Text>
-            </View>
-        );
+        return null; // Gracefully hide when no deals exist
     }
 
     const renderDeal = ({ item }: { item: HotDeal }) => {
@@ -76,39 +74,63 @@ export function HotDealsCarousel({ navigation }: HotDealsCarouselProps) {
         const savePct = item.originalPrice > 0
             ? Math.round(((item.originalPrice - item.discountedPrice) / item.originalPrice) * 100)
             : item.discountValue;
-        const logoUrl = getImageUrl(item.tenant?.logo);
         const imageUrl = getImageUrl(item.image);
 
         return (
             <TouchableOpacity
-                style={styles.card}
-                activeOpacity={0.85}
+                style={[
+                    styles.card,
+                    isRTL ? styles.cardRTL : styles.cardLTR,
+                    { width: deals.length > 1 ? width * 0.85 : CARD_WIDTH }
+                ]}
+                activeOpacity={0.88}
                 onPress={() => navigation.navigate('HotDealDetail', { deal: item })}
             >
+                {/* Background Deal Image */}
                 {imageUrl ? (
                     <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-                ) : null}
-                <View style={[styles.cardContent, imageUrl ? styles.cardOverlay : styles.cardSolidBg]}>
-                    {/* Discount badge */}
-                    <View style={styles.saveBadge}>
-                        <Text style={styles.saveBadgeText}>-{savePct}%</Text>
-                    </View>
+                ) : (
+                    <View style={[StyleSheet.absoluteFillObject, styles.placeholderBg]} />
+                )}
 
-                    {/* Tenant logo */}
-                    {logoUrl ? (
-                        <Image source={{ uri: logoUrl }} style={styles.tenantLogo} resizeMode="contain" />
-                    ) : (
-                        <View style={styles.tenantLogoPlaceholder}>
-                            <Text style={styles.tenantLogoLetter}>{(tenantName || '?').charAt(0)}</Text>
+                {/* Dark Vignette Overlay for legible text hierarchy */}
+                <LinearGradient
+                    colors={['transparent', 'rgba(29, 3, 95, 0.45)', 'rgba(29, 3, 95, 0.92)']}
+                    locations={[0, 0.45, 1]}
+                    style={StyleSheet.absoluteFillObject}
+                />
+
+                {/* Top Discount Badge (-25%) */}
+                <View style={[styles.saveBadge, isRTL ? { left: spacing.md } : { right: spacing.md }]}>
+                    <Text style={styles.saveBadgeText}>-{savePct}%</Text>
+                </View>
+
+                {/* Essential Information on the Card */}
+                <View style={[styles.cardInfo, isRTL && styles.cardInfoRTL]}>
+                    <Text style={styles.dealTag}>
+                        {isRTL ? 'عرض خاص' : 'HOT DEAL'}
+                    </Text>
+                    <Text style={styles.dealTitle} numberOfLines={1}>
+                        {tenantName || title}
+                    </Text>
+                    {tenantName && title && tenantName !== title ? (
+                        <Text style={styles.dealSubtitle} numberOfLines={1}>
+                            {title}
+                        </Text>
+                    ) : null}
+
+                    {/* Pricing Row */}
+                    <View style={[styles.priceRow, isRTL && styles.priceRowRTL]}>
+                        <View style={styles.discountedPriceContainer}>
+                            <Text style={styles.discountedPrice}>
+                                {formatRiyal(item.discountedPrice, isRTL ? 'ar' : 'en')}
+                            </Text>
                         </View>
-                    )}
-
-                    <Text style={styles.dealTitle} numberOfLines={2}>{title}</Text>
-                    <Text style={styles.tenantName} numberOfLines={1}>{tenantName}</Text>
-
-                    <View style={styles.priceRow}>
-                        <Text style={styles.discountedPrice}>{formatRiyal(item.discountedPrice, isRTL ? 'ar' : 'en')}</Text>
-                        <Text style={styles.originalPrice}>{formatRiyal(item.originalPrice, isRTL ? 'ar' : 'en')}</Text>
+                        {item.originalPrice > item.discountedPrice ? (
+                            <Text style={styles.originalPrice}>
+                                {formatRiyal(item.originalPrice, isRTL ? 'ar' : 'en')}
+                            </Text>
+                        ) : null}
                     </View>
                 </View>
             </TouchableOpacity>
@@ -119,12 +141,13 @@ export function HotDealsCarousel({ navigation }: HotDealsCarouselProps) {
         <View style={styles.container}>
             <FlatList
                 horizontal
+                inverted={isRTL}
                 data={deals}
                 renderItem={renderDeal}
                 keyExtractor={item => item.id}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.listContent}
-                snapToInterval={CARD_WIDTH + spacing.md}
+                snapToInterval={(deals.length > 1 ? width * 0.85 : CARD_WIDTH) + spacing.md}
                 decelerationRate="fast"
             />
         </View>
@@ -133,98 +156,116 @@ export function HotDealsCarousel({ navigation }: HotDealsCarouselProps) {
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: spacing.sm,
+        marginBottom: spacing.xs,
     },
     listContent: {
         paddingHorizontal: spacing.lg,
     },
     card: {
-        width: CARD_WIDTH,
-        height: 180,
-        borderRadius: borderRadius.xl,
-        marginRight: spacing.md,
+        height: 176,
+        borderRadius: 16,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(231, 221, 252, 0.6)',
+        backgroundColor: '#1D035F',
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 4,
+        position: 'relative',
     },
-    cardContent: {
-        flex: 1,
-        padding: spacing.lg,
-        justifyContent: 'flex-end',
+    cardLTR: {
+        marginRight: spacing.md,
     },
-    cardSolidBg: {
-        backgroundColor: colors.primary,
+    cardRTL: {
+        marginLeft: spacing.md,
     },
-    cardOverlay: {
-        backgroundColor: 'rgba(0,0,0,0.5)',
+    cardInfoRTL: {
+        alignItems: 'flex-end',
+    },
+    placeholderBg: {
+        backgroundColor: '#2D1470',
     },
     saveBadge: {
         position: 'absolute',
         top: spacing.md,
-        right: spacing.md,
-        backgroundColor: '#EF4444',
-        paddingHorizontal: spacing.sm,
+        backgroundColor: '#FF4D4F',
+        paddingHorizontal: 9,
         paddingVertical: 4,
-        borderRadius: borderRadius.sm,
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+        elevation: 2,
     },
     saveBadgeText: {
-        color: '#FFF',
-        fontSize: fontSize.xs,
+        color: '#FFFFFF',
+        fontSize: 12,
         fontWeight: '800',
+        letterSpacing: 0.2,
     },
-    tenantLogo: {
-        width: 40,
-        height: 40,
-        borderRadius: 8,
-        marginBottom: spacing.sm,
+    cardInfo: {
+        position: 'absolute',
+        bottom: spacing.md,
+        left: spacing.md,
+        right: spacing.md,
     },
-    tenantLogoPlaceholder: {
-        width: 40,
-        height: 40,
-        borderRadius: 8,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: spacing.sm,
-    },
-    tenantLogoLetter: {
-        color: '#FFF',
-        fontSize: fontSize.lg,
+    dealTag: {
+        fontSize: 11,
         fontWeight: '700',
+        color: 'rgba(231, 221, 252, 0.9)',
+        letterSpacing: 0.8,
+        marginBottom: 2,
+        textTransform: 'uppercase',
     },
     dealTitle: {
-        fontSize: fontSize.md,
+        fontSize: 18,
         fontWeight: '700',
-        color: '#FFF',
-        marginBottom: 2,
+        color: '#FFFFFF',
+        lineHeight: 22,
     },
-    tenantName: {
-        fontSize: fontSize.xs,
-        color: 'rgba(255,255,255,0.8)',
-        marginBottom: spacing.sm,
+    dealSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.8)',
+        marginTop: 2,
     },
     priceRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'baseline',
         gap: spacing.sm,
+        marginTop: 6,
+    },
+    priceRowRTL: {
+        flexDirection: 'row-reverse',
+    },
+    discountedPriceContainer: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
     },
     discountedPrice: {
-        fontSize: fontSize.lg,
+        fontSize: 20,
         fontWeight: '800',
-        color: '#FFF',
+        color: '#FFFFFF',
     },
     originalPrice: {
-        fontSize: fontSize.sm,
-        color: 'rgba(255,255,255,0.6)',
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.6)',
         textDecorationLine: 'line-through',
+        fontWeight: '500',
     },
     errorContainer: {
         alignItems: 'center',
         padding: spacing.md,
     },
     retryButton: {
-        backgroundColor: colors.backgroundGray,
+        backgroundColor: '#FAF9FC',
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.sm,
-        borderRadius: borderRadius.md,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
     },
     retryText: {
         color: colors.primary,

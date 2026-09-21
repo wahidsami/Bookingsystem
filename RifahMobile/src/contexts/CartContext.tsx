@@ -38,10 +38,26 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             const storedCart = await AsyncStorage.getItem(CART_STORAGE_KEY);
             if (storedCart) {
-                setCartItems(JSON.parse(storedCart));
+                const parsed = JSON.parse(storedCart);
+                if (Array.isArray(parsed)) {
+                    const validItems = parsed.filter(item =>
+                        item &&
+                        item.product &&
+                        typeof item.product.id === 'string' &&
+                        typeof item.quantity === 'number' &&
+                        item.quantity > 0
+                    );
+                    setCartItems(validItems);
+                    if (validItems.length !== parsed.length) {
+                        saveCart(validItems);
+                    }
+                    return;
+                }
             }
+            setCartItems([]);
         } catch (error) {
             console.error('Failed to load cart from storage:', error);
+            setCartItems([]);
         }
     };
 
@@ -54,19 +70,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const addToCart = (product: Product, quantity: number = 1): CartAddResult => {
-        const currentTenantId = cartItems[0]?.product.tenantId || null;
+        if (!product || !product.id) return { success: false };
+        const currentTenantId = cartItems[0]?.product?.tenantId || null;
         if (currentTenantId && product.tenantId && currentTenantId !== product.tenantId) {
             return { success: false, reason: 'different_tenant' };
         }
 
         setCartItems(prev => {
-            const existingItem = prev.find(item => item.product.id === product.id);
+            const existingItem = prev.find(item => item?.product?.id === product.id);
             let updatedCart;
 
             if (existingItem) {
                 updatedCart = prev.map(item =>
-                    item.product.id === product.id
-                        ? { ...item, quantity: item.quantity + quantity }
+                    item?.product?.id === product.id
+                        ? { ...item, quantity: (Number(item.quantity) || 1) + quantity }
                         : item
                 );
             } else {
@@ -82,7 +99,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const removeFromCart = (productId: string) => {
         setCartItems(prev => {
-            const updatedCart = prev.filter(item => item.product.id !== productId);
+            const updatedCart = prev.filter(item => item?.product?.id !== productId);
             saveCart(updatedCart);
             return updatedCart;
         });
@@ -91,13 +108,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updateQuantity = (productId: string, quantity: number) => {
         setCartItems(prev => {
             if (quantity <= 0) {
-                const updatedCart = prev.filter(item => item.product.id !== productId);
+                const updatedCart = prev.filter(item => item?.product?.id !== productId);
                 saveCart(updatedCart);
                 return updatedCart;
             }
 
             const updatedCart = prev.map(item =>
-                item.product.id === productId
+                item?.product?.id === productId
                     ? { ...item, quantity }
                     : item
             );
@@ -112,16 +129,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const cartTotal = cartItems.reduce(
-        (total, item) => total + (item.product.price * item.quantity),
+        (total, item) => total + ((Number(item?.product?.price) || 0) * (Number(item?.quantity) || 1)),
         0
     );
 
     const itemCount = cartItems.reduce(
-        (count, item) => count + item.quantity,
+        (count, item) => count + (Number(item?.quantity) || 0),
         0
     );
 
-    const cartTenantId = cartItems[0]?.product.tenantId || null;
+    const cartTenantId = cartItems[0]?.product?.tenantId || null;
 
     return (
         <CartContext.Provider

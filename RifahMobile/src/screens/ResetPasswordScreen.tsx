@@ -63,7 +63,7 @@ export function ResetPasswordScreen({ token, onBackToLogin }: ResetPasswordScree
     };
 
     return (
-        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <LinearGradient
                 colors={['#FFFFFF', '#F8F2FF']}
                 start={{ x: 0, y: 0 }}
@@ -80,8 +80,8 @@ export function ResetPasswordScreen({ token, onBackToLogin }: ResetPasswordScree
                 ]}
                 keyboardShouldPersistTaps="handled"
             >
-                <TouchableOpacity style={styles.backButton} onPress={onBackToLogin}>
-                    <Text style={styles.backButtonText}>← {t('signIn')}</Text>
+                <TouchableOpacity style={[styles.backButton, isRTL && { alignSelf: 'flex-end' }]} onPress={onBackToLogin}>
+                    <Text style={styles.backButtonText}>{isRTL ? `${t('signIn')} →` : `← ${t('signIn')}`}</Text>
                 </TouchableOpacity>
 
                 <Text style={[styles.title, isRTL && styles.rtlText]}>{t('resetPasswordTitle')}</Text>
@@ -101,7 +101,7 @@ export function ResetPasswordScreen({ token, onBackToLogin }: ResetPasswordScree
 
                 <View style={styles.formCard}>
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>{t('newPassword')}</Text>
+                    <Text style={[styles.label, isRTL && styles.rtlText]}>{t('newPassword')}</Text>
                     <TextInput
                         style={[styles.input, isRTL && styles.rtlInput]}
                         value={password}
@@ -112,7 +112,7 @@ export function ResetPasswordScreen({ token, onBackToLogin }: ResetPasswordScree
                 </View>
 
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>{t('confirmPassword')}</Text>
+                    <Text style={[styles.label, isRTL && styles.rtlText]}>{t('confirmPassword')}</Text>
                     <TextInput
                         style={[styles.input, isRTL && styles.rtlInput]}
                         value={confirmPassword}

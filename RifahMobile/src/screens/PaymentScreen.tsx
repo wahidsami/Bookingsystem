@@ -125,9 +125,9 @@ export function PaymentScreen({ route, navigation }: any) {
         }];
 
     const renderSummaryRow = (label: string, value: string, emphasized?: boolean) => (
-        <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, emphasized ? styles.summaryLabelEmphasized : null]}>{label}</Text>
-            <Text style={[styles.summaryValue, emphasized ? styles.summaryValueEmphasized : null]}>{value}</Text>
+        <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+            <Text style={[styles.summaryLabel, isRTL && styles.rtlText, emphasized ? styles.summaryLabelEmphasized : null]}>{label}</Text>
+            <Text style={[styles.summaryValue, isRTL && styles.valueLtrAlign, emphasized ? styles.summaryValueEmphasized : null]}>{value}</Text>
         </View>
     );
 
@@ -173,6 +173,7 @@ export function PaymentScreen({ route, navigation }: any) {
                     setWalletBalance(latest);
                 }
 
+                const isProdOrder = Boolean(orderId) || route.params?.checkoutType === 'product';
                 navigation.reset({
                     index: 0,
                     routes: [
@@ -182,6 +183,7 @@ export function PaymentScreen({ route, navigation }: any) {
                                 appointmentId,
                                 orderId,
                                 bookingSessionId,
+                                checkoutType: isProdOrder ? 'product' : 'service',
                                 paymentSummary: {
                                     ...paymentSummary,
                                     total: paymentSummary.total ?? amountValue,
@@ -208,89 +210,110 @@ export function PaymentScreen({ route, navigation }: any) {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.container}
         >
-            <View style={[styles.header, { paddingTop: spacing.xl + topInset }]}>
+            <View style={[styles.header, { paddingTop: spacing.xl + topInset }, isRTL && { flexDirection: 'row-reverse' }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
+                    <Text style={styles.backButtonText}>{isRTL ? '→' : '←'}</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{t('payment')}</Text>
             </View>
 
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}>
-                <View style={styles.summaryContainer}>
-                    <View style={styles.summaryHeader}>
-                        <Text style={styles.summaryTitle}>{isRTL ? 'مراجعة الزيارة' : 'Review your visit'}</Text>
-                        <Text style={styles.summarySubtitle}>
-                            {isRTL
-                                ? 'تأكدي من التفاصيل قبل إتمام الدفع.'
-                                : 'Review the details before completing payment.'}
-                        </Text>
-                    </View>
-
-                    <View style={styles.summaryCard}>
-                        {renderSummaryRow(isRTL ? 'العميلة الأساسية' : 'Primary Customer', paymentSummary.primaryCustomer || (isRTL ? 'غير متوفر' : 'Unavailable'))}
-                        {summaryParticipants.map((participant, index) => (
-                            <View key={`${participant.name}-${index}`} style={styles.participantCard}>
-                                <View style={styles.participantBadge}>
-                                    <AppIcon name={index === 0 ? 'verified_user' : 'user'} size={12} color={colors.primary} />
-                                    <Text style={styles.participantBadgeText}>{participant.name}</Text>
+                {(() => {
+                    const isProductOrder = Boolean(orderId) || route.params?.checkoutType === 'product';
+                    return (
+                        <>
+                            <View style={styles.summaryContainer}>
+                                <View style={styles.summaryHeader}>
+                                    <Text style={styles.summaryTitle}>
+                                        {isProductOrder
+                                            ? (isRTL ? 'مراجعة الطلب' : 'Review your order')
+                                            : (isRTL ? 'مراجعة الزيارة' : 'Review your visit')}
+                                    </Text>
+                                    <Text style={styles.summarySubtitle}>
+                                        {isProductOrder
+                                            ? (isRTL ? 'تأكد من تفاصيل الطلب قبل إتمام الدفع.' : 'Review your order details before completing payment.')
+                                            : (isRTL ? 'تأكدي من التفاصيل قبل إتمام الدفع.' : 'Review the details before completing payment.')}
+                                    </Text>
                                 </View>
-                                <Text style={styles.participantServices}>
-                                    {participant.services.length > 0
-                                        ? participant.services.join(' · ')
-                                        : (isRTL ? 'خدمات أساسية' : 'Primary service')}
+
+                                <View style={styles.summaryCard}>
+                                    {isProductOrder ? (
+                                        <>
+                                            {orderId ? renderSummaryRow(isRTL ? 'رقم الطلب' : 'Order ID', String(orderId).slice(0, 10)) : null}
+                                            {paymentSummary.salon ? renderSummaryRow(isRTL ? 'المتجر' : 'Store', paymentSummary.salon) : null}
+                                            {route.params?.shippingCity ? renderSummaryRow(isRTL ? 'مدينة التوصيل' : 'Delivery City', route.params.shippingCity) : null}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {renderSummaryRow(isRTL ? 'العميلة الأساسية' : 'Primary Customer', paymentSummary.primaryCustomer || (isRTL ? 'غير متوفر' : 'Unavailable'))}
+                                            {summaryParticipants.map((participant, index) => (
+                                                <View key={`${participant.name}-${index}`} style={styles.participantCard}>
+                                                    <View style={styles.participantBadge}>
+                                                        <AppIcon name={index === 0 ? 'verified_user' : 'user'} size={12} color={colors.primary} />
+                                                        <Text style={styles.participantBadgeText}>{participant.name}</Text>
+                                                    </View>
+                                                    <Text style={styles.participantServices}>
+                                                        {participant.services.length > 0
+                                                            ? participant.services.join(' · ')
+                                                            : (isRTL ? 'خدمات أساسية' : 'Primary service')}
+                                                    </Text>
+                                                </View>
+                                            ))}
+                                            {paymentSummary.date ? renderSummaryRow(isRTL ? 'التاريخ' : 'Date', paymentSummary.date) : null}
+                                            {paymentSummary.time ? renderSummaryRow(isRTL ? 'الوقت' : 'Time', paymentSummary.time) : null}
+                                            {paymentSummary.employee ? renderSummaryRow(isRTL ? 'الموظف' : 'Employee', paymentSummary.employee) : null}
+                                            {paymentSummary.salon ? renderSummaryRow(isRTL ? 'الصالون' : 'Salon', paymentSummary.salon) : null}
+                                        </>
+                                    )}
+                                </View>
+                            </View>
+
+                            <View style={styles.amountContainer}>
+                                <Text style={styles.amountLabel}>
+                                    {isProductOrder
+                                        ? (isRTL ? 'إجمالي الطلب' : 'Order Total')
+                                        : (paymentChoice === 'booking-fee'
+                                            ? (isRTL ? 'المبلغ المطلوب الآن' : 'Due Now')
+                                            : t('totalAmount'))}
+                                </Text>
+                                <Text style={styles.amountValue}>{formatRiyal(amountValue, isRTL ? 'ar' : 'en')}</Text>
+                                {!isProductOrder && paymentChoice === 'booking-fee' ? (
+                                    <Text style={styles.amountHint}>
+                                        {isRTL ? 'هذا هو عربون الحجز المطلوب لتأكيد الموعد.' : 'This is the booking fee required to confirm your appointment.'}
+                                    </Text>
+                                ) : null}
+                                <Text style={styles.amountHint}>
+                                    {isRTL ? `رصيد المحفظة: ${formatRiyal(walletBalance, 'ar')}` : `Wallet balance: ${formatRiyal(walletBalance, 'en')}`}
                                 </Text>
                             </View>
-                        ))}
-                        {paymentSummary.date ? renderSummaryRow(isRTL ? 'التاريخ' : 'Date', paymentSummary.date) : null}
-                        {paymentSummary.time ? renderSummaryRow(isRTL ? 'الوقت' : 'Time', paymentSummary.time) : null}
-                        {paymentSummary.employee ? renderSummaryRow(isRTL ? 'الموظف' : 'Employee', paymentSummary.employee) : null}
-                        {paymentSummary.salon ? renderSummaryRow(isRTL ? 'الصالون' : 'Salon', paymentSummary.salon) : null}
-                    </View>
-                </View>
 
-                <View style={styles.amountContainer}>
-                    <Text style={styles.amountLabel}>
-                        {paymentChoice === 'booking-fee'
-                            ? (isRTL ? 'المبلغ المطلوب الآن' : 'Due Now')
-                            : t('totalAmount')}
-                    </Text>
-                    <Text style={styles.amountValue}>{formatRiyal(amountValue, isRTL ? 'ar' : 'en')}</Text>
-                    {paymentChoice === 'booking-fee' ? (
-                        <Text style={styles.amountHint}>
-                            {isRTL ? 'هذا هو عربون الحجز المطلوب لتأكيد الموعد.' : 'This is the booking fee required to confirm your appointment.'}
-                        </Text>
-                    ) : null}
-                    <Text style={styles.amountHint}>
-                        {isRTL ? `رصيد المحفظة: ${formatRiyal(walletBalance, 'ar')}` : `Wallet balance: ${formatRiyal(walletBalance, 'en')}`}
-                    </Text>
-                </View>
-
-                <View style={styles.breakdownCard}>
-                    <Text style={styles.breakdownTitle}>{isRTL ? 'الملخص المالي' : 'Payment summary'}</Text>
-                    {renderSummaryRow(isRTL ? 'المجموع الفرعي' : 'Subtotal', formatRiyal(Number(paymentSummary.subtotal ?? amountValue), isRTL ? 'ar' : 'en'))}
-                    {renderSummaryRow(
-                        isRTL ? 'الضريبة' : 'Tax',
-                        Number(paymentSummary.tax ?? 0) > 0
-                            ? formatRiyal(Number(paymentSummary.tax || 0), isRTL ? 'ar' : 'en')
-                            : (isRTL ? 'غير متوفر' : 'Unavailable')
-                    )}
-                    {paymentSummary.deposit !== undefined ? renderSummaryRow(
-                        isRTL ? 'العربون' : 'Deposit',
-                        paymentSummary.deposit === null
-                            ? (isRTL ? 'غير متوفر' : 'Unavailable')
-                            : formatRiyal(Number(paymentSummary.deposit || 0), isRTL ? 'ar' : 'en')
-                    ) : null}
-                    {paymentSummary.remaining !== undefined ? renderSummaryRow(
-                        isRTL ? 'المتبقي' : 'Remaining',
-                        paymentSummary.remaining === null
-                            ? (isRTL ? 'غير متوفر' : 'Unavailable')
-                            : formatRiyal(Number(paymentSummary.remaining || 0), isRTL ? 'ar' : 'en')
-                    ) : null}
-                    {renderSummaryRow(isRTL ? 'الإجمالي' : 'Total', formatRiyal(Number(paymentSummary.total ?? amountValue), isRTL ? 'ar' : 'en'), true)}
-                </View>
+                            <View style={styles.breakdownCard}>
+                                <Text style={styles.breakdownTitle}>{isRTL ? 'الملخص المالي' : 'Payment summary'}</Text>
+                                {renderSummaryRow(isRTL ? 'المجموع الفرعي' : 'Subtotal', formatRiyal(Number(paymentSummary.subtotal ?? amountValue), isRTL ? 'ar' : 'en'))}
+                                {Number(paymentSummary.tax ?? 0) > 0 ? renderSummaryRow(
+                                    isRTL ? 'الضريبة (15%)' : 'Tax (15%)',
+                                    formatRiyal(Number(paymentSummary.tax || 0), isRTL ? 'ar' : 'en')
+                                ) : null}
+                                {!isProductOrder && paymentSummary.deposit !== undefined ? renderSummaryRow(
+                                    isRTL ? 'العربون' : 'Deposit',
+                                    paymentSummary.deposit === null
+                                        ? (isRTL ? 'غير متوفر' : 'Unavailable')
+                                        : formatRiyal(Number(paymentSummary.deposit || 0), isRTL ? 'ar' : 'en')
+                                ) : null}
+                                {!isProductOrder && paymentSummary.remaining !== undefined ? renderSummaryRow(
+                                    isRTL ? 'المتبقي' : 'Remaining',
+                                    paymentSummary.remaining === null
+                                        ? (isRTL ? 'غير متوفر' : 'Unavailable')
+                                        : formatRiyal(Number(paymentSummary.remaining || 0), isRTL ? 'ar' : 'en')
+                                ) : null}
+                                {renderSummaryRow(isRTL ? 'الإجمالي' : 'Total', formatRiyal(Number(paymentSummary.total ?? amountValue), isRTL ? 'ar' : 'en'), true)}
+                            </View>
+                        </>
+                    );
+                })()}
 
                 <View style={styles.methodOptions}>
                     <TouchableOpacity
@@ -338,9 +361,9 @@ export function PaymentScreen({ route, navigation }: any) {
 
                         <View style={styles.form}>
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>{t('cardNumber')}</Text>
+                                <Text style={[styles.label, isRTL && styles.rtlText]}>{t('cardNumber')}</Text>
                                 <TextInput
-                                    style={[styles.input, isRTL && styles.rtlText]}
+                                    style={[styles.input, isRTL && styles.numericInputRtl]}
                                     placeholder="0000 0000 0000 0000"
                                     value={cardNumber}
                                     onChangeText={setCardNumber}
@@ -349,11 +372,11 @@ export function PaymentScreen({ route, navigation }: any) {
                                 />
                             </View>
 
-                            <View style={styles.row}>
-                                <View style={[styles.inputGroup, { flex: 1, marginRight: spacing.md }]}>
-                                    <Text style={styles.label}>{t('expiryDate')}</Text>
+                            <View style={[styles.row, isRTL && { flexDirection: 'row-reverse' }]}>
+                                <View style={[styles.inputGroup, { flex: 1, marginRight: isRTL ? 0 : spacing.md, marginLeft: isRTL ? spacing.md : 0 }]}>
+                                    <Text style={[styles.label, isRTL && styles.rtlText]}>{t('expiryDate')}</Text>
                                     <TextInput
-                                        style={[styles.input, isRTL && styles.rtlText]}
+                                        style={[styles.input, isRTL && styles.numericInputRtl]}
                                         placeholder="MM/YY"
                                         value={expiryDate}
                                         onChangeText={setExpiryDate}
@@ -361,9 +384,9 @@ export function PaymentScreen({ route, navigation }: any) {
                                     />
                                 </View>
                                 <View style={[styles.inputGroup, { flex: 1 }]}>
-                                    <Text style={styles.label}>{t('cvv')}</Text>
+                                    <Text style={[styles.label, isRTL && styles.rtlText]}>{t('cvv')}</Text>
                                     <TextInput
-                                        style={[styles.input, isRTL && styles.rtlText]}
+                                        style={[styles.input, isRTL && styles.numericInputRtl]}
                                         placeholder="123"
                                         value={cvv}
                                         onChangeText={setCvv}
@@ -375,7 +398,7 @@ export function PaymentScreen({ route, navigation }: any) {
                             </View>
 
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>{t('cardholderName')}</Text>
+                                <Text style={[styles.label, isRTL && styles.rtlText]}>{t('cardholderName')}</Text>
                                 <TextInput
                                     style={[styles.input, isRTL && styles.rtlText]}
                                     placeholder="John Doe"
@@ -653,6 +676,11 @@ const styles = StyleSheet.create({
     },
     rtlText: {
         textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    numericInputRtl: {
+        textAlign: 'right',
+        writingDirection: 'ltr',
     },
     row: {
         flexDirection: 'row',
@@ -671,5 +699,11 @@ const styles = StyleSheet.create({
     },
     disabledButton: {
         opacity: 0.7,
+    },
+    rowRTL: {
+        flexDirection: 'row-reverse',
+    },
+    valueLtrAlign: {
+        textAlign: 'left',
     },
 });

@@ -56,7 +56,7 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
             <LinearGradient
                 colors={['#FFFFFF', '#F8F2FF']}
@@ -75,11 +75,11 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
                 keyboardShouldPersistTaps="handled"
             >
                 <TouchableOpacity
-                    style={styles.backButton}
+                    style={[styles.backButton, isRTL && { alignSelf: 'flex-end' }]}
                     onPress={onBackToLogin}
                     accessibilityLabel={t('backToLogin')}
                 >
-                    <Text style={styles.backButtonText}>← {t('signIn')}</Text>
+                    <Text style={styles.backButtonText}>{isRTL ? `${t('signIn')} →` : `← ${t('signIn')}`}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.header}>
@@ -102,9 +102,9 @@ export function ForgotPasswordScreen({ onBackToLogin, onBackToWelcome }: ForgotP
                 <View style={styles.formCard}>
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>{t('email')}</Text>
+                        <Text style={[styles.label, isRTL && styles.rtlText]}>{t('email')}</Text>
                         <TextInput
-                            style={[styles.input, isRTL && styles.rtlInput]}
+                            style={[styles.input, isRTL && styles.emailInputRtl]}
                             value={email}
                             onChangeText={setEmail}
                             placeholder="ahmed@example.com"
@@ -234,6 +234,11 @@ const styles = StyleSheet.create({
     },
     rtlInput: {
         textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    emailInputRtl: {
+        textAlign: 'left',
+        writingDirection: 'ltr',
     },
     submitButton: {
         backgroundColor: '#7C3AED',

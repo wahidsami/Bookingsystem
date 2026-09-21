@@ -7,10 +7,12 @@ import { borderRadius, colors, fontSize, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 
+import { CustomerSubpageHeader } from '../components/ui/CustomerSubpageHeader';
+
 export function ReviewScreen({ route, navigation }: any) {
   const { appointmentId } = route.params || {};
   const { isRTL } = useLanguage();
-  const { topInset, scrollBottomPadding } = useScreenSafeArea();
+  const { scrollBottomPadding } = useScreenSafeArea();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [appointment, setAppointment] = useState<Booking | null>(null);
@@ -89,29 +91,26 @@ export function ReviewScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: topInset + spacing.sm }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <AppIcon name="arrow_back" size={22} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isRTL ? 'تقييم الموعد' : 'Appointment Review'}</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <CustomerSubpageHeader
+        title={isRTL ? 'تقييم الموعد' : 'Appointment Review'}
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: scrollBottomPadding + spacing.lg }}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.lg }} />
         ) : !appointment ? (
-          <Text style={styles.emptyText}>{isRTL ? 'تعذر تحميل بيانات الموعد.' : 'Unable to load appointment details.'}</Text>
+          <Text style={[styles.emptyText, isRTL && { textAlign: 'right' }]}>{isRTL ? 'تعذر تحميل بيانات الموعد.' : 'Unable to load appointment details.'}</Text>
         ) : (
           <View style={styles.card}>
-            <Text style={styles.title}>{isRTL ? 'كيف كانت تجربتك؟' : 'How was your experience?'}</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, isRTL && { textAlign: 'right' }]}>{isRTL ? 'كيف كانت تجربتك؟' : 'How was your experience?'}</Text>
+            <Text style={[styles.subtitle, isRTL && { textAlign: 'right' }]}>
               {isRTL
                 ? `قيّم الخدمة مع ${appointment.Staff?.name || appointment.staff?.name || '-'} في ${appointment.tenant?.name || '-'}`
                 : `Rate your service with ${appointment.Staff?.name || appointment.staff?.name || '-'} at ${appointment.tenant?.name || '-'}`}
             </Text>
 
-            <View style={styles.starsRow}>
+            <View style={[styles.starsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity
                   key={star}
@@ -126,7 +125,7 @@ export function ReviewScreen({ route, navigation }: any) {
             </View>
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
               multiline
               numberOfLines={4}
               value={comment}

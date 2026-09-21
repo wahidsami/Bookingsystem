@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -7,23 +7,23 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { AppIcon } from '../components/AppIcon';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { CustomerNotification, api, getImageUrl } from '../api/client';
-import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
-import { LinearGradient } from 'expo-linear-gradient';
+import { CustomerSubpageHeader } from '../components/ui/CustomerSubpageHeader';
+import { AppIcon } from '../components/AppIcon';
 import * as Notifications from 'expo-notifications';
+import { getLocalizedNotification } from '../utils/notificationLocalization';
 
 interface NotificationsScreenProps {
     navigation: any;
 }
 
 export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
-    const { language } = useLanguage();
-    const { topInset, scrollBottomPadding } = useScreenSafeArea();
+    const { language, isRTL } = useLanguage();
+    const { scrollBottomPadding } = useScreenSafeArea();
     const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -38,12 +38,12 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
             if (unreadItems.length > 0) {
                 await Promise.allSettled(unreadItems.map((item) => api.markNotificationRead(item.id)));
                 setNotifications((prev) =>
-                    prev.map((item) => (item.readAt ? item : { ...item, readAt: new Date().toISOString() }))
+                    prev.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() }))
                 );
                 setUnreadCount(0);
+                await Notifications.setBadgeCountAsync(0);
             }
-        } catch (error) {
-            console.warn('Failed to load notifications:', error);
+        } catch {
             setNotifications([]);
             setUnreadCount(0);
         } finally {
@@ -51,10 +51,6 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
             setRefreshing(false);
         }
     }, []);
-
-    useEffect(() => {
-        loadNotifications();
-    }, [loadNotifications]);
 
     useFocusEffect(
         useCallback(() => {
@@ -73,7 +69,7 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
         }
 
         try {
-            return new Date(value).toLocaleString(language === 'ar' ? 'ar' : 'en');
+            return new Date(value).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US');
         } catch {
             return value;
         }
@@ -81,41 +77,55 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
 
     const renderItem = ({ item }: { item: CustomerNotification }) => {
         const imageUrl = getImageUrl(item.imageUrl);
+        const isUnread = !item.readAt;
+        const localized = getLocalizedNotification(item, isRTL);
+
         return (
             <TouchableOpacity
-                style={[styles.card, !item.readAt && styles.cardUnread]}
+                style={[
+                    styles.card,
+                    isUnread && styles.cardUnread,
+                    isUnread && isRTL && styles.cardUnreadRTL,
+                ]}
                 onPress={() => navigation.navigate('NotificationDetail', { notificationId: item.id })}
+                activeOpacity={0.75}
             >
-                <View style={styles.cardHeader}>
-                    <View style={styles.cardTitleWrap}>
-                        <Text style={styles.cardTitle}>{item.title}</Text>
-                        <Text style={styles.cardDate}>{formatDateTime(item.sentAt || item.createdAt)}</Text>
+                <View style={[styles.cardHeader, isRTL && styles.rowRTL]}>
+                    <View style={styles.iconCircle}>
+                        <AppIcon name="bell" size={18} color="#6537C0" />
                     </View>
-                    {!item.readAt ? (
-                        <View style={styles.unreadWrap}>
-                            <View style={styles.unreadDot} />
-                            <Text style={styles.unreadLabel}>{language === 'ar' ? 'غير مقروء' : 'Unread'}</Text>
-                        </View>
-                    ) : null}
+                    <View style={[styles.cardTitleWrap, isRTL && styles.alignRTL]}>
+                        <Text style={[styles.cardTitle, isRTL && styles.textRTL]}>{localized.title}</Text>
+                        <Text style={[styles.cardDate, isRTL && styles.textRTL]}>
+                            {formatDateTime(item.sentAt || item.createdAt)}
+                        </Text>
+                    </View>
+                    {isUnread && (
+                        <View style={styles.unreadDot} />
+                    )}
                 </View>
-                <Text style={styles.cardBody} numberOfLines={3}>{item.body}</Text>
-                <View style={styles.cardFooter}>
-                    <View style={styles.linkBadge}>
-                        <AppIcon name="bell" size={14} color={colors.primary} />
+
+                <Text style={[styles.cardBody, isRTL && styles.textRTL]} numberOfLines={3}>
+                    {localized.body}
+                </Text>
+
+                <View style={[styles.cardFooter, isRTL && styles.rowRTL]}>
+                    <View style={[styles.linkBadge, isRTL && styles.rowRTL]}>
+                        <AppIcon name="sparkles" size={12} color="#6537C0" />
                         <Text style={styles.linkBadgeText}>
                             {item.linkType === 'service'
                                 ? (language === 'ar' ? 'خدمة' : 'Service')
                                 : item.linkType === 'tenant'
                                     ? (language === 'ar' ? 'منشأة' : 'Tenant')
-                                    : (language === 'ar' ? 'إشعار' : 'Notification')}
+                                    : (language === 'ar' ? 'إشعار عام' : 'General')}
                         </Text>
                     </View>
-                    {imageUrl ? (
-                        <View style={styles.imageBadge}>
-                            <AppIcon name="image" size={14} color={colors.textSecondary} />
+                    {Boolean(imageUrl) && (
+                        <View style={[styles.imageBadge, isRTL && styles.rowRTL]}>
+                            <AppIcon name="image" size={12} color="#6B7280" />
                             <Text style={styles.imageBadgeText}>{language === 'ar' ? 'صورة' : 'Image'}</Text>
                         </View>
-                    ) : null}
+                    )}
                 </View>
             </TouchableOpacity>
         );
@@ -123,48 +133,47 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={['#F5F0FF', '#FFFFFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.header, { paddingTop: spacing.lg + topInset }]}
-            >
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-                    <AppIcon name={language === 'ar' ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
-                </TouchableOpacity>
-                <View style={styles.headerContent}>
-                    <Text style={styles.headerTitle}>{language === 'ar' ? 'الإشعارات' : 'Notifications'}</Text>
-                    <Text style={styles.headerSubtitle}>
-                        {language === 'ar'
-                            ? `غير المقروءة: ${unreadCount}`
-                            : `Unread: ${unreadCount}`}
-                    </Text>
-                </View>
-                <View style={styles.headerButtonSpacer} />
-            </LinearGradient>
+            <CustomerSubpageHeader
+                title={language === 'ar' ? 'الإشعارات' : 'Notifications'}
+                subtitle={
+                    unreadCount > 0
+                        ? (language === 'ar' ? `${unreadCount} غير مقروء` : `${unreadCount} unread`)
+                        : undefined
+                }
+                onBack={() => navigation.goBack()}
+            />
 
             {loading ? (
                 <View style={styles.loadingWrap}>
-                    <ActivityIndicator color={colors.primary} />
+                    <ActivityIndicator color="#6537C0" size="large" />
                 </View>
             ) : (
                 <FlatList
                     data={notifications}
                     keyExtractor={(item) => item.id}
-                    contentContainerStyle={[styles.listContent, { paddingBottom: scrollBottomPadding }]}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+                    contentContainerStyle={[
+                        styles.listContent,
+                        { paddingBottom: scrollBottomPadding + 24 }
+                    ]}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6537C0" />
+                    }
                     renderItem={renderItem}
-                    ListEmptyComponent={(
+                    ListEmptyComponent={
                         <View style={styles.emptyWrap}>
-                            <AppIcon name="notifications_off" size={40} color={colors.textTertiary} />
-                            <Text style={styles.emptyTitle}>{language === 'ar' ? 'لا توجد إشعارات بعد' : 'No notifications yet'}</Text>
-                            <Text style={styles.emptyBody}>
+                            <View style={styles.emptyIconWrap}>
+                                <AppIcon name="bell" size={36} color="#A379E2" />
+                            </View>
+                            <Text style={[styles.emptyTitle, isRTL && styles.textRTL]}>
+                                {language === 'ar' ? 'لا توجد إشعارات بعد' : 'No notifications yet'}
+                            </Text>
+                            <Text style={[styles.emptyBody, isRTL && styles.textRTL]}>
                                 {language === 'ar'
-                                    ? 'ستظهر هنا العروض والإشعارات التي ترسلها المنشآت التي تتابعها.'
-                                    : 'Offers and announcements from your salons will appear here.'}
+                                    ? 'ستظهر هنا تحديثات المواعيد، والعروض الخاصة بالصالونات التي تتابعها.'
+                                    : 'Booking updates and special offers from your salons will appear here.'}
                             </Text>
                         </View>
-                    )}
+                    }
                 />
             )}
         </View>
@@ -174,161 +183,154 @@ export function NotificationsScreen({ navigation }: NotificationsScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F6FB',
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingBottom: spacing.md,
-        backgroundColor: colors.background,
-    },
-    headerButton: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#E8E1FA',
-    },
-    headerButtonSpacer: {
-        width: 40,
-    },
-    headerContent: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 30,
-        fontWeight: '800',
-        color: '#14153C',
-    },
-    headerSubtitle: {
-        fontSize: 13,
-        color: '#6E7596',
-        marginTop: 4,
+        backgroundColor: '#FAF9FC',
     },
     loadingWrap: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
     },
+    rowRTL: {
+        flexDirection: 'row-reverse',
+    },
+    alignRTL: {
+        alignItems: 'flex-end',
+    },
+    textRTL: {
+        textAlign: 'right',
+    },
     listContent: {
-        padding: spacing.lg,
-        gap: spacing.md,
+        padding: 16,
     },
     card: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 20,
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#ECE7FA',
-        padding: spacing.lg,
-        shadowColor: '#1A1440',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 14,
-        elevation: 2,
+        borderColor: '#E7DDFC',
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 6,
+        elevation: 1,
     },
     cardUnread: {
-        borderColor: '#C7B2FB',
-        backgroundColor: '#F8F3FF',
+        backgroundColor: '#FDFCFF',
+        borderColor: '#C4B5FD',
+        borderLeftWidth: 4,
+        borderLeftColor: '#6537C0',
+    },
+    cardUnreadRTL: {
+        borderLeftWidth: 1,
+        borderLeftColor: '#C4B5FD',
+        borderRightWidth: 4,
+        borderRightColor: '#6537C0',
     },
     cardHeader: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: spacing.sm,
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    iconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F1ECFD',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     cardTitleWrap: {
         flex: 1,
-        gap: 4,
+        marginHorizontal: 10,
     },
     cardTitle: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#171840',
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1D035F',
+        fontFamily: 'Cairo-Bold',
     },
     cardDate: {
-        fontSize: 12,
-        color: '#6E7596',
+        fontSize: 11,
+        color: '#6B7280',
+        fontFamily: 'Cairo-Regular',
+        marginTop: 2,
     },
     unreadDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: colors.primary,
-        marginTop: 4,
-    },
-    unreadWrap: {
-        alignItems: 'flex-end',
-        gap: 4,
-    },
-    unreadLabel: {
-        fontSize: 12,
-        color: '#C2410C',
-        fontWeight: '700',
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#6537C0',
     },
     cardBody: {
-        marginTop: spacing.sm,
-        fontSize: 15,
-        color: '#5B6384',
-        lineHeight: 22,
+        fontSize: 13,
+        color: '#4B5563',
+        fontFamily: 'Cairo-Regular',
+        lineHeight: 19,
+        marginBottom: 12,
     },
     cardFooter: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: spacing.sm,
-        marginTop: spacing.md,
+        alignItems: 'center',
+        gap: 8,
     },
     linkBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 6,
-        borderRadius: 999,
-        backgroundColor: '#EEE6FF',
+        gap: 4,
+        backgroundColor: '#F1ECFD',
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
     },
     linkBadgeText: {
-        fontSize: fontSize.xs,
-        color: colors.primaryDark,
+        fontSize: 11,
         fontWeight: '600',
+        color: '#6537C0',
+        fontFamily: 'Cairo-Bold',
     },
     imageBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 6,
-        borderRadius: 999,
-        backgroundColor: '#F4F5FA',
+        gap: 4,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
     },
     imageBadgeText: {
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
-        fontWeight: '600',
+        fontSize: 11,
+        color: '#6B7280',
+        fontFamily: 'Cairo-Regular',
     },
     emptyWrap: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: spacing.xxl,
-        paddingHorizontal: spacing.lg,
+        paddingVertical: 60,
+        paddingHorizontal: 24,
+    },
+    emptyIconWrap: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: '#F1ECFD',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
     },
     emptyTitle: {
-        marginTop: spacing.md,
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#1A1A44',
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#1D035F',
+        fontFamily: 'Cairo-Bold',
+        marginBottom: 6,
+        textAlign: 'center',
     },
     emptyBody: {
-        marginTop: spacing.sm,
-        fontSize: 15,
-        color: '#6E7596',
+        fontSize: 13,
+        color: '#6B7280',
+        fontFamily: 'Cairo-Regular',
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 20,
     },
 });
-

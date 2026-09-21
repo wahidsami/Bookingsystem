@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+dist/
+web-build/
+scratch/
+.eas-inspect-archive/
+android/app/build/
+android/.gradle/
+*.log

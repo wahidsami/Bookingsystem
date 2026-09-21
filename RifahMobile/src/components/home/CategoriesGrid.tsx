@@ -8,10 +8,23 @@ import { SkeletonCard } from './SkeletonCard';
 import { AppIcon } from '../AppIcon';
 
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = (width - spacing.lg * 2 - spacing.md * 2) / 3;
+const ITEM_WIDTH = (width - spacing.lg * 2) / 4;
 
 interface CategoriesGridProps {
     navigation: any;
+}
+
+function getCategoryIcon(slug?: string, name?: string): any {
+    const s = (slug || name || '').toLowerCase();
+    if (s.includes('barber')) return 'user';
+    if (s.includes('beauty')) return 'sparkles';
+    if (s.includes('salon')) return 'sparkles';
+    if (s.includes('spa')) return 'sparkles';
+    if (s.includes('massage')) return 'sparkles';
+    if (s.includes('nail')) return 'star';
+    if (s.includes('hair')) return 'sparkles';
+    if (s.includes('skin') || s.includes('care')) return 'sparkles';
+    return 'folder';
 }
 
 export function CategoriesGrid({ navigation }: CategoriesGridProps) {
@@ -27,7 +40,8 @@ export function CategoriesGrid({ navigation }: CategoriesGridProps) {
         setError(false);
         try {
             const data = await api.getCategories();
-            setCategories(data.slice(0, 6)); // Show 6 (2 rows x 3 cols)
+            // Render the actual categories returned by the backend in a 4-column grid
+            setCategories(data);
         } catch {
             setError(true);
         } finally {
@@ -38,7 +52,7 @@ export function CategoriesGrid({ navigation }: CategoriesGridProps) {
     if (loading) {
         return (
             <View style={styles.grid}>
-                {[1, 2, 3, 4, 5, 6].map(i => (
+                {[1, 2, 3, 4].map(i => (
                     <SkeletonCard key={i} variant="category" />
                 ))}
             </View>
@@ -58,33 +72,39 @@ export function CategoriesGrid({ navigation }: CategoriesGridProps) {
     if (categories.length === 0) {
         return (
             <View style={styles.errorContainer}>
-                <Text style={styles.retryText}>{t('noCategoriesAvailable')}</Text>
+                <Text style={styles.emptyText}>{t('noCategoriesAvailable')}</Text>
             </View>
         );
     }
 
     return (
-        <View style={styles.grid}>
-            {categories.map(category => (
-                <TouchableOpacity
-                    key={category.id}
-                    style={styles.item}
-                    activeOpacity={0.7}
-                    onPress={() =>
-                        navigation.navigate('Browse', {
-                            category: category.slug,
-                            title: isRTL ? category.name_ar : category.name_en,
-                        })
-                    }
-                >
-                    <View style={styles.circle}>
-                        <AppIcon name="folder" size={28} color={colors.primary} />
-                    </View>
-                    <Text style={styles.label} numberOfLines={1}>
-                        {isRTL ? category.name_ar : category.name_en}
-                    </Text>
-                </TouchableOpacity>
-            ))}
+        <View style={[styles.grid, isRTL && styles.gridRTL]}>
+            {categories.map(category => {
+                const iconName = getCategoryIcon(category.slug, category.name_en);
+                const categoryTitle = isRTL ? category.name_ar || category.name_en : category.name_en || category.name_ar;
+
+                return (
+                    <TouchableOpacity
+                        key={category.id}
+                        style={styles.item}
+                        activeOpacity={0.75}
+                        onPress={() =>
+                            navigation.navigate('Browse', {
+                                category: category.slug,
+                                title: categoryTitle,
+                            })
+                        }
+                    >
+                        {/* Stitch 56x56 rounded-2xl square icon container */}
+                        <View style={styles.squareContainer}>
+                            <AppIcon name={iconName} size={24} color="#6537C0" />
+                        </View>
+                        <Text style={styles.label} numberOfLines={1}>
+                            {categoryTitle}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
         </View>
     );
 }
@@ -94,37 +114,53 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         paddingHorizontal: spacing.lg,
-        gap: spacing.md,
+    },
+    gridRTL: {
+        flexDirection: 'row-reverse',
     },
     item: {
         width: ITEM_WIDTH,
         alignItems: 'center',
-        marginBottom: spacing.sm,
+        marginBottom: spacing.md,
     },
-    circle: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: '#F3E8FF',
+    squareContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        backgroundColor: '#FAF9FC',
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.xs,
+        marginBottom: 6,
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
     },
     label: {
-        fontSize: fontSize.xs,
-        fontWeight: '600',
-        color: colors.text,
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#1D035F',
         textAlign: 'center',
+        paddingHorizontal: 2,
     },
     errorContainer: {
         alignItems: 'center',
         padding: spacing.md,
     },
+    emptyText: {
+        color: 'rgba(29, 3, 95, 0.6)',
+        fontSize: fontSize.sm,
+    },
     retryButton: {
-        backgroundColor: colors.backgroundGray,
+        backgroundColor: '#FAF9FC',
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.sm,
-        borderRadius: borderRadius.md,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
     },
     retryText: {
         color: colors.primary,

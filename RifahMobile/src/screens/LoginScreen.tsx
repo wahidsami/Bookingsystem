@@ -78,35 +78,30 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <LinearGradient
-                colors={['#FFFFFF', '#F8F2FF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
-            />
             <ScrollView
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: spacing.xl + topInset,
-                        paddingBottom: scrollBottomPadding,
+                        paddingTop: spacing.lg + topInset,
+                        paddingBottom: scrollBottomPadding + 20,
                     }
                 ]}
                 keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
             >
                 {/* Header with Logo */}
                 <View style={styles.header}>
                     <View style={styles.logoContainer}>
                         <Image
-                            source={require('../../assets/refahlogo.png')}
+                            source={require('../../assets/barspa_logo.png')}
                             style={styles.logo}
                             resizeMode="contain"
                         />
                     </View>
                     <Text style={[styles.title, isRTL && styles.rtlText]}>
-                        Sign in to your Account
+                        {isRTL ? 'تسجيل الدخول إلى حسابك' : 'Sign in to your Account'}
                     </Text>
                     <Text style={[styles.subtitle, isRTL && styles.rtlText]}>
                         {t('welcomeSubtitle')}
@@ -120,274 +115,358 @@ export function LoginScreen({ onLoginSuccess, onBackToWelcome, onGoToRegister, o
                     </View>
                 ) : null}
 
-                {/* Form */}
+                {/* Form Card */}
                 <View style={styles.formCard}>
-                <View style={styles.form}>
-                    {/* Email */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>{t('email')}</Text>
-                        <TextInput
-                            style={[styles.input, isRTL && styles.rtlInput]}
-                            value={email}
-                            onChangeText={setEmail}
-                            placeholder="ahmed@example.com"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!loading}
-                            accessibilityLabel={t('email')}
-                        />
-                    </View>
-
-                    {/* Password */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>{t('password')}</Text>
-                        <View style={styles.passwordContainer}>
+                    <View style={styles.form}>
+                        {/* Email */}
+                        <View style={styles.inputGroup}>
+                            <Text style={[styles.label, isRTL && styles.rtlText]}>{t('email')}</Text>
                             <TextInput
-                                style={[styles.input, styles.passwordInput, isRTL && styles.rtlInput]}
-                                value={password}
-                                onChangeText={setPassword}
-                                placeholder="••••••••"
-                                secureTextEntry={!showPassword}
+                                style={[styles.input, isRTL && styles.emailInputRtl]}
+                                value={email}
+                                onChangeText={setEmail}
+                                placeholder="ahmed@example.com"
+                                placeholderTextColor="#9E98B0"
+                                keyboardType="email-address"
                                 autoCapitalize="none"
                                 autoCorrect={false}
                                 editable={!loading}
-                                accessibilityLabel={t('password')}
+                                accessibilityLabel={t('email')}
                             />
-                            <TouchableOpacity
-                                style={styles.eyeButton}
-                                onPress={() => setShowPassword(!showPassword)}
+                        </View>
+
+                        {/* Password */}
+                        <View style={styles.inputGroup}>
+                            <Text style={[styles.label, isRTL && styles.rtlText]}>{t('password')}</Text>
+                            <View style={styles.passwordContainer}>
+                                <TextInput
+                                    style={[styles.input, isRTL ? styles.passwordInputRtl : styles.passwordInputLtr, isRTL && styles.rtlInput]}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    placeholder="••••••••"
+                                    placeholderTextColor="#9E98B0"
+                                    secureTextEntry={!showPassword}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    editable={!loading}
+                                    accessibilityLabel={t('password')}
+                                />
+                                <TouchableOpacity
+                                    style={[styles.eyeButton, isRTL ? styles.eyeButtonRtl : styles.eyeButtonLtr]}
+                                    onPress={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? (
+                                        <EyeOpenIcon width={20} height={20} color="#716B88" />
+                                    ) : (
+                                        <EyeClosedIcon width={20} height={20} color="#716B88" />
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Forgot Password */}
+                        <TouchableOpacity
+                            style={[styles.forgotPasswordButton, isRTL && styles.forgotPasswordRtl]}
+                            onPress={onForgotPassword}
+                        >
+                            <Text style={styles.forgotPasswordText}>{t('forgotPassword')}</Text>
+                        </TouchableOpacity>
+
+                        {/* Login Button */}
+                        <TouchableOpacity
+                            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+                            onPress={handleLogin}
+                            disabled={loading}
+                            activeOpacity={0.85}
+                            accessibilityLabel={t('signIn')}
+                        >
+                            <LinearGradient
+                                colors={['#6537C0', '#5028A4']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.gradientFill}
                             >
-                                {showPassword ? (
-                                    <EyeOpenIcon width={20} height={20} color={colors.textSecondary} />
+                                {loading ? (
+                                    <ActivityIndicator color="#FFFFFF" />
                                 ) : (
-                                    <EyeClosedIcon width={20} height={20} color={colors.textSecondary} />
+                                    <Text style={styles.loginButtonText}>{t('signIn')}</Text>
                                 )}
+                            </LinearGradient>
+                        </TouchableOpacity>
+
+                        {/* Social Divider */}
+                        <View style={styles.dividerRow}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>
+                                {isRTL ? 'أو المتابعة باستخدام' : 'or continue with'}
+                            </Text>
+                            <View style={styles.dividerLine} />
+                        </View>
+
+                        {/* Google Button */}
+                        <TouchableOpacity
+                            style={[styles.socialButton, isRTL && styles.rowRTL]}
+                            onPress={onGoogleSignIn}
+                            disabled={loading}
+                            activeOpacity={0.85}
+                        >
+                            <GoogleIcon width={20} height={20} style={isRTL ? styles.leadingIconRtl : styles.leadingIconLtr} />
+                            <Text style={styles.socialButtonText}>{t('continueWithGoogle')}</Text>
+                        </TouchableOpacity>
+
+                        {/* Apple Button (Informational / Coming Soon) */}
+                        <TouchableOpacity
+                            style={[styles.socialButton, styles.appleButtonDisabled, isRTL && styles.rowRTL]}
+                            disabled={true}
+                        >
+                            <AppleIcon width={20} height={20} style={isRTL ? styles.leadingIconRtl : styles.leadingIconLtr} />
+                            <Text style={styles.appleButtonText}>
+                                Continue with Apple {isRTL ? '(قريباً)' : '(Coming Soon)'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Register Link */}
+                        <View style={[styles.registerContainer, isRTL && styles.rowRTL]}>
+                            <Text style={styles.registerText}>{t('noAccount')} </Text>
+                            <TouchableOpacity onPress={onGoToRegister}>
+                                <Text style={styles.registerLink}>{t('registerButton')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
-
-                    {/* Forgot Password */}
-                    <TouchableOpacity style={styles.forgotPasswordButton} onPress={onForgotPassword}>
-                        <Text style={styles.forgotPasswordText}>{t('forgotPassword')}</Text>
-                    </TouchableOpacity>
-
-                    {/* Login Button */}
-                    <TouchableOpacity
-                        style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-                        onPress={handleLogin}
-                        disabled={loading}
-                        accessibilityLabel={t('signIn')}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color={colors.textInverse} />
-                        ) : (
-                            <Text style={styles.loginButtonText}>{t('signIn')}</Text>
-                        )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.googleButton, loading && styles.loginButtonDisabled]}
-                        onPress={onGoogleSignIn}
-                        disabled={loading}
-                    >
-                        <GoogleIcon width={20} height={20} style={styles.leadingIcon} />
-                        <Text style={styles.googleButtonText}>{t('continueWithGoogle')}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.appleButton} disabled={true}>
-                        <AppleIcon width={20} height={20} style={styles.leadingIcon} />
-                        <Text style={styles.appleButtonText}>Continue with Apple</Text>
-                    </TouchableOpacity>
-
-                    {/* Register Link */}
-                    <View style={styles.registerContainer}>
-                        <Text style={styles.registerText}>{t('noAccount')} </Text>
-                        <TouchableOpacity onPress={onGoToRegister}>
-                            <Text style={styles.registerLink}>{t('registerButton')}</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
                 </View>
             </ScrollView>
-        </KeyboardAvoidingView >
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F4FF',
+        backgroundColor: '#FAF9FC',
     },
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: spacing.lg,
+        alignItems: 'center',
     },
     header: {
         marginBottom: spacing.lg,
         alignItems: 'center',
-        marginTop: spacing.lg,
+        marginTop: spacing.md,
+        width: '100%',
+        maxWidth: 440,
     },
     logoContainer: {
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
         alignItems: 'center',
     },
     logo: {
-        width: 110,
-        height: 110,
+        width: 170,
+        height: 95,
     },
     title: {
-        fontSize: fontSize.xxxl,
+        fontSize: 22,
         fontWeight: '700',
-        color: colors.text,
-        marginBottom: spacing.xs,
+        color: '#1D035F',
+        marginBottom: 6,
         textAlign: 'center',
     },
     subtitle: {
-        fontSize: fontSize.md,
-        color: colors.textSecondary,
+        fontSize: 14,
+        color: '#716B88',
         textAlign: 'center',
+        lineHeight: 20,
     },
     rtlText: {
         writingDirection: 'rtl',
     },
     errorContainer: {
+        width: '100%',
+        maxWidth: 440,
         backgroundColor: '#FEE2E2',
         borderWidth: 1,
         borderColor: '#FCA5A5',
         borderRadius: 14,
         padding: spacing.md,
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
     },
     errorText: {
         color: colors.error,
         fontSize: fontSize.sm,
     },
     form: {
-        flex: 1,
+        width: '100%',
     },
     formCard: {
+        width: '100%',
+        maxWidth: 440,
         borderRadius: 24,
         borderWidth: 1,
-        borderColor: '#E9DDFD',
-        backgroundColor: '#FFFFFFEB',
-        padding: spacing.lg,
-        shadowColor: '#2E1065',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.08,
+        borderColor: '#E7DDFC',
+        backgroundColor: '#FFFFFF',
+        padding: 24,
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
         shadowRadius: 16,
-        elevation: 2,
+        elevation: 3,
     },
     inputGroup: {
-        marginBottom: spacing.lg,
+        marginBottom: 16,
     },
     label: {
-        fontSize: fontSize.md,
+        fontSize: 13,
         fontWeight: '600',
-        color: colors.text,
-        marginBottom: spacing.xs,
+        color: '#1D035F',
+        marginBottom: 6,
     },
     input: {
         borderWidth: 1,
-        borderColor: '#E9DDFD',
+        borderColor: '#E7DDFC',
         borderRadius: 14,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
-        fontSize: fontSize.md,
-        color: colors.text,
-        backgroundColor: '#FAFAFF',
-        minHeight: 48,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: '#1D035F',
+        backgroundColor: '#FAF9FC',
+        minHeight: 50,
     },
     rtlInput: {
         textAlign: 'right',
+        writingDirection: 'rtl',
+    },
+    emailInputRtl: {
+        textAlign: 'left',
+        writingDirection: 'ltr',
     },
     passwordContainer: {
         position: 'relative',
     },
-    passwordInput: {
+    passwordInputLtr: {
         paddingRight: 50,
+        paddingLeft: 16,
+    },
+    passwordInputRtl: {
+        paddingLeft: 50,
+        paddingRight: 16,
     },
     eyeButton: {
         position: 'absolute',
-        right: spacing.md,
-        top: spacing.md,
-        padding: spacing.xs,
+        top: 14,
+        padding: 4,
+    },
+    eyeButtonLtr: {
+        right: 14,
+    },
+    eyeButtonRtl: {
+        left: 14,
     },
     forgotPasswordButton: {
         alignSelf: 'flex-end',
-        marginBottom: spacing.lg,
+        marginBottom: 20,
+    },
+    forgotPasswordRtl: {
+        alignSelf: 'flex-start',
     },
     forgotPasswordText: {
-        color: colors.primary,
-        fontSize: fontSize.sm,
+        color: '#6537C0',
+        fontSize: 13,
         fontWeight: '600',
     },
     loginButton: {
-        backgroundColor: '#7C3AED',
         borderRadius: 16,
-        paddingVertical: spacing.md + 2,
+        overflow: 'hidden',
+        minHeight: 52,
+        shadowColor: '#6537C0',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 4,
+    },
+    gradientFill: {
+        flex: 1,
+        justifyContent: 'center',
         alignItems: 'center',
-        marginTop: spacing.md,
-        minHeight: 48,
+        paddingVertical: 14,
     },
     loginButtonDisabled: {
         opacity: 0.6,
     },
     loginButtonText: {
-        color: colors.textInverse,
-        fontSize: fontSize.xl,
+        color: '#FFFFFF',
+        fontSize: 16,
         fontWeight: '700',
+        letterSpacing: 0.3,
     },
-    googleButton: {
-        borderWidth: 1,
-        borderColor: '#DDD6FE',
+    dividerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 18,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#E7DDFC',
+    },
+    dividerText: {
+        marginHorizontal: 12,
+        fontSize: 12,
+        color: '#9E98B0',
+        fontWeight: '500',
+    },
+    socialButton: {
+        borderWidth: 1.5,
+        borderColor: '#E7DDFC',
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        paddingVertical: spacing.md + 2,
+        paddingVertical: 13,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
-        marginTop: spacing.sm,
-        minHeight: 48,
+        marginBottom: 10,
+        minHeight: 50,
+    },
+    appleButtonDisabled: {
+        opacity: 0.75,
+        backgroundColor: '#FAF9FC',
     },
     leadingIcon: {
-        marginRight: spacing.sm,
+        marginRight: 8,
     },
-    googleButtonText: {
-        color: colors.text,
-        fontSize: fontSize.lg,
-        fontWeight: '700',
+    leadingIconLtr: {
+        marginRight: 8,
+        marginLeft: 0,
     },
-    appleButton: {
-        borderWidth: 1,
-        borderColor: '#DDD6FE',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        paddingVertical: spacing.md + 2,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        marginTop: spacing.sm,
-        minHeight: 48,
-        opacity: 0.7,
+    leadingIconRtl: {
+        marginRight: 0,
+        marginLeft: 8,
+    },
+    socialButtonText: {
+        color: '#1D035F',
+        fontSize: 14,
+        fontWeight: '600',
     },
     appleButtonText: {
-        color: colors.text,
-        fontSize: fontSize.lg,
-        fontWeight: '700',
+        color: '#1D035F',
+        fontSize: 14,
+        fontWeight: '600',
     },
     registerContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: spacing.lg,
+        alignItems: 'center',
+        marginTop: 18,
+    },
+    rowRTL: {
+        flexDirection: 'row-reverse',
     },
     registerText: {
-        color: colors.textSecondary,
-        fontSize: fontSize.md,
+        color: '#716B88',
+        fontSize: 14,
     },
     registerLink: {
-        color: colors.primary,
-        fontSize: fontSize.md,
+        color: '#6537C0',
+        fontSize: 14,
         fontWeight: '700',
     },
 });

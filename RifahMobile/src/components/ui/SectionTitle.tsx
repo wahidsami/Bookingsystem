@@ -1,0 +1,71 @@
+import React from 'react';
+import { View, StyleSheet, ViewProps, TouchableOpacity } from 'react-native';
+import { ThemedText } from '../ThemedText';
+import { colors, spacing, typography } from '../../theme';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { AppIcon } from '../AppIcon';
+
+export interface SectionTitleProps extends ViewProps {
+    title: string;
+    actionLabel?: string;
+    onActionPress?: () => void;
+}
+
+export function SectionTitle({
+    title,
+    actionLabel,
+    onActionPress,
+    style,
+    ...props
+}: SectionTitleProps) {
+    const { isRTL } = useLanguage();
+
+    return (
+        <View style={[styles.container, isRTL && styles.containerRTL, style]} {...props}>
+            <ThemedText style={[typography.sectionTitle, { color: colors.textPrimary }, isRTL && styles.textRTL]}>
+                {title}
+            </ThemedText>
+            
+            {actionLabel && onActionPress && (
+                <TouchableOpacity 
+                    style={[styles.actionContainer, isRTL && styles.actionContainerRTL]} 
+                    onPress={onActionPress}
+                    activeOpacity={0.7}
+                >
+                    <ThemedText style={[typography.bodyStrong, { color: colors.brandPrimary }]}>
+                        {actionLabel}
+                    </ThemedText>
+                    <AppIcon 
+                        name={isRTL ? "arrow_back" : "arrow_forward"} 
+                        size={16} 
+                        color={colors.brandPrimary} 
+                    />
+                </TouchableOpacity>
+            )}
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+    },
+    containerRTL: {
+        flexDirection: 'row-reverse',
+    },
+    actionContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
+    actionContainerRTL: {
+        flexDirection: 'row-reverse',
+    },
+    textRTL: {
+        textAlign: 'right',
+    },
+});

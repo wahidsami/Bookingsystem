@@ -158,8 +158,12 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                         services: items.map((item) => language === 'ar'
                             ? (item.service.name_ar || item.service.name_en)
                             : (item.service.name_en || item.service.name_ar)),
-                        date: items[0] ? format(new Date(items[0].startTime), 'PPP', { locale: isRTL ? ar : enUS }) : undefined,
-                        time: items[0] ? format(new Date(items[0].startTime), 'p', { locale: isRTL ? ar : enUS }) : undefined,
+                        date: (items[0]?.startTime && !isNaN(new Date(items[0].startTime).getTime()))
+                            ? format(new Date(items[0].startTime), 'PPP', { locale: isRTL ? ar : enUS })
+                            : undefined,
+                        time: (items[0]?.startTime && !isNaN(new Date(items[0].startTime).getTime()))
+                            ? format(new Date(items[0].startTime), 'p', { locale: isRTL ? ar : enUS })
+                            : undefined,
                         employee: items[0]?.staff?.name || items[0]?.staff?.name_en || items[0]?.staff?.name_ar || (language === 'ar' ? 'أي متخصص' : 'Any specialist'),
                         salon: cartTenant?.name || (language === 'ar' ? 'الصالون' : 'Salon'),
                         subtotal: totalPrice,
@@ -212,9 +216,19 @@ export function ServiceBookingCartScreen({ navigation }: any) {
         }
     };
 
-    const formatDateTime = (value: string) => {
+    const formatDateTime = (value?: string | null) => {
+        if (!value || typeof value !== 'string' || !value.trim()) {
+            return language === 'ar' ? 'بانتظار تحديد الموعد' : 'Schedule pending';
+        }
         const date = new Date(value);
-        return format(date, 'PPP p', { locale: isRTL ? ar : enUS });
+        if (isNaN(date.getTime())) {
+            return language === 'ar' ? 'بانتظار تحديد الموعد' : 'Schedule pending';
+        }
+        try {
+            return format(date, 'PPP p', { locale: isRTL ? ar : enUS });
+        } catch {
+            return language === 'ar' ? 'بانتظار تحديد الموعد' : 'Schedule pending';
+        }
     };
 
     const openTenant = () => {
@@ -249,21 +263,30 @@ export function ServiceBookingCartScreen({ navigation }: any) {
         );
     }
 
+    const hasUnscheduled = items.some((item) => !item.startTime || isNaN(new Date(item.startTime).getTime()));
+
+    const handleContinueToSchedule = () => {
+        navigation.navigate('Booking', {
+            tenantId: cartTenantId || items[0]?.tenantId,
+            tenant: cartTenant,
+        });
+    };
+
     return (
         <KeyboardAvoidingView
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
-            <View style={[styles.header, { paddingTop: spacing.md + topInset }]}>
+            <View style={[styles.header, { paddingTop: spacing.md + topInset }, isRTL && styles.rowRTL]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={24} color={colors.text} />
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle}>
+                    <Text style={[styles.headerTitle, { textAlign: isRTL ? 'right' : 'left' }]}>
                         {language === 'ar' ? 'سلة الحجز' : 'Booking Cart'}
                     </Text>
-                    <Text style={styles.headerSubtitle}>
+                    <Text style={[styles.headerSubtitle, { textAlign: isRTL ? 'right' : 'left' }]}>
                         {itemCount} {language === 'ar' ? 'خدمة محفوظة' : 'service items saved'}
                     </Text>
                 </View>
@@ -274,20 +297,20 @@ export function ServiceBookingCartScreen({ navigation }: any) {
 
             <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}>
                 <View style={styles.summaryCard}>
-                    <Text style={styles.summaryTitle}>
+                    <Text style={[styles.summaryTitle, { textAlign: isRTL ? 'right' : 'left' }]}>
                         {language === 'ar' ? 'ملخص الدفع' : 'Payment Summary'}
                     </Text>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>{language === 'ar' ? 'إجمالي الخدمات' : 'Total services'}</Text>
+                    <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                        <Text style={[styles.summaryLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{language === 'ar' ? 'إجمالي الخدمات' : 'Total services'}</Text>
                         <Text style={styles.summaryValue}>{formatRiyal(totalPrice, isRTL ? 'ar' : 'en')}</Text>
                     </View>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>{language === 'ar' ? 'المطلوب الآن' : 'Due now'}</Text>
+                    <View style={[styles.summaryRow, isRTL && styles.rowRTL]}>
+                        <Text style={[styles.summaryLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{language === 'ar' ? 'المطلوب الآن' : 'Due now'}</Text>
                         <Text style={styles.summaryValue}>{formatRiyal(payableNowTotal, isRTL ? 'ar' : 'en')}</Text>
                     </View>
                     {groupedByPayment.map((group) => (
-                        <View key={group.paymentMethod} style={styles.paymentGroupRow}>
-                            <Text style={styles.summaryLabel}>
+                        <View key={group.paymentMethod} style={[styles.paymentGroupRow, isRTL && styles.rowRTL]}>
+                            <Text style={[styles.summaryLabel, { textAlign: isRTL ? 'right' : 'left' }]}>
                                 {group.paymentMethod === 'at-center'
                                     ? (language === 'ar' ? 'الدفع عند المركز' : 'Pay at center')
                                     : group.paymentMethod === 'online-full'
@@ -313,7 +336,7 @@ export function ServiceBookingCartScreen({ navigation }: any) {
 
                     return (
                         <View key={item.id} style={styles.itemCard}>
-                            <View style={styles.itemHeader}>
+                            <View style={[styles.itemHeader, isRTL && styles.rowRTL]}>
                                 <View style={styles.itemThumbWrap}>
                                     {item.service.finalPrice ? (
                                         <View style={styles.itemThumb}>
@@ -326,51 +349,45 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                                     )}
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.itemTitle}>{serviceName}</Text>
-                                    {!!variantLabel && <Text style={styles.itemMeta}>{variantLabel}</Text>}
-                                    <Text style={styles.itemMeta}>{staffLabel}</Text>
+                                    <Text style={[styles.itemTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{serviceName}</Text>
+                                    {!!variantLabel && <Text style={[styles.itemMeta, { textAlign: isRTL ? 'right' : 'left' }]}>{variantLabel}</Text>}
+                                    <Text style={[styles.itemMeta, { textAlign: isRTL ? 'right' : 'left' }]}>{staffLabel}</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.removeButton}>
                                     <AppIcon name="delete" size={18} color={colors.error} />
                                 </TouchableOpacity>
                             </View>
 
-                            <View style={styles.itemActionRow}>
+                            <View style={[styles.itemActionRow, isRTL && styles.rowRTL, isRTL && { justifyContent: 'flex-start' }]}>
                                 <TouchableOpacity
-                                    style={styles.editButton}
-                                    onPress={() => navigation.navigate('Booking', {
-                                        service: item.service,
-                                        tenant: cartTenant,
-                                        selectedStaff: item.staff || undefined,
-                                        selectedVariant: item.variant || undefined,
-                                        startTime: item.startTime,
-                                        endTime: item.startTime,
-                                        notes: item.notes || '',
-                                        paymentMethod: item.paymentMethod,
-                                        cartItemId: item.id,
-                                    })}
+                                    style={[styles.editButton, isRTL && styles.rowRTL]}
+                                    onPress={handleContinueToSchedule}
                                 >
-                                    <AppIcon name="settings" size={14} color={colors.primary} />
-                                    <Text style={styles.editButtonText}>{language === 'ar' ? 'تعديل' : 'Edit'}</Text>
+                                    <AppIcon name="clock" size={14} color={colors.primary} />
+                                    <Text style={styles.editButtonText}>
+                                        {!item.startTime
+                                            ? (language === 'ar' ? 'تحديد الموعد' : 'Schedule')
+                                            : (language === 'ar' ? 'تعديل الموعد' : 'Edit Schedule')}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
 
                             <View style={styles.itemDetails}>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'الموعد' : 'Time'}</Text>
-                                    <Text style={styles.detailValue}>{formatDateTime(item.startTime)}</Text>
+                                <View style={[styles.detailRow, isRTL && styles.rowRTL]}>
+                                    <Text style={[styles.detailLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{language === 'ar' ? 'الموعد' : 'Time'}</Text>
+                                    <Text style={[styles.detailValue, { textAlign: isRTL ? 'left' : 'right' }]}>{formatDateTime(item.startTime)}</Text>
                                 </View>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'نوع الدفع' : 'Payment'}</Text>
-                                    <Text style={styles.detailValue}>{paymentLabel}</Text>
+                                <View style={[styles.detailRow, isRTL && styles.rowRTL]}>
+                                    <Text style={[styles.detailLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{language === 'ar' ? 'نوع الدفع' : 'Payment'}</Text>
+                                    <Text style={[styles.detailValue, { textAlign: isRTL ? 'left' : 'right' }]}>{paymentLabel}</Text>
                                 </View>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text>
-                                    <Text style={styles.detailValue}>{formatRiyal(item.totalPrice, isRTL ? 'ar' : 'en')}</Text>
+                                <View style={[styles.detailRow, isRTL && styles.rowRTL]}>
+                                    <Text style={[styles.detailLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Text>
+                                    <Text style={[styles.detailValue, { textAlign: isRTL ? 'left' : 'right' }]}>{formatRiyal(item.totalPrice, isRTL ? 'ar' : 'en')}</Text>
                                 </View>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>{language === 'ar' ? 'يدفع الآن' : 'Due now'}</Text>
-                                    <Text style={styles.detailValue}>{formatRiyal(item.payableNowAmount, isRTL ? 'ar' : 'en')}</Text>
+                                <View style={[styles.detailRow, isRTL && styles.rowRTL]}>
+                                    <Text style={[styles.detailLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{language === 'ar' ? 'يدفع الآن' : 'Due now'}</Text>
+                                    <Text style={[styles.detailValue, { textAlign: isRTL ? 'left' : 'right' }]}>{formatRiyal(item.payableNowAmount, isRTL ? 'ar' : 'en')}</Text>
                                 </View>
                             </View>
                         </View>
@@ -378,15 +395,23 @@ export function ServiceBookingCartScreen({ navigation }: any) {
                 })}
             </ScrollView>
 
-            <View style={[styles.footer, { paddingBottom: bottomInset }]}>
+            <View style={[styles.footer, { paddingBottom: bottomInset }, isRTL && styles.rowRTL]}>
                 <TouchableOpacity style={[styles.secondaryButton, loading && styles.disabledButton]} onPress={openTenant} disabled={loading}>
                     <Text style={styles.secondaryButtonText}>{language === 'ar' ? 'إضافة خدمة أخرى' : 'Add More Services'}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.primaryButton, loading && styles.disabledButton]} onPress={handleCheckout} disabled={loading}>
+                <TouchableOpacity
+                    style={[styles.primaryButton, loading && styles.disabledButton]}
+                    onPress={hasUnscheduled ? handleContinueToSchedule : handleCheckout}
+                    disabled={loading}
+                >
                     {loading ? (
                         <ActivityIndicator color={colors.textInverse} />
                     ) : (
-                        <Text style={styles.primaryButtonText}>{language === 'ar' ? 'تأكيد الحجز' : 'Confirm Booking'}</Text>
+                        <Text style={styles.primaryButtonText}>
+                            {hasUnscheduled
+                                ? (language === 'ar' ? 'متابعة وتحديد الموعد' : 'Continue to Schedule')
+                                : (language === 'ar' ? 'تأكيد الحجز' : 'Confirm Booking')}
+                        </Text>
                     )}
                 </TouchableOpacity>
             </View>
@@ -395,6 +420,9 @@ export function ServiceBookingCartScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+    rowRTL: {
+        flexDirection: 'row-reverse',
+    },
     container: {
         flex: 1,
         backgroundColor: colors.background,

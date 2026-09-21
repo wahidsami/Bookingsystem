@@ -38,61 +38,61 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
 
     return (
         <View style={styles.container}>
-
-            {/* Top Half: Logo Area */}
-            <View style={styles.topHalf}>
+            {/* Top Section: Brand Logo */}
+            <View style={styles.logoSection}>
                 <Image
-                    source={require('../../assets/splash-icon.png')}
+                    source={require('../../assets/barspa_logo.png')}
                     style={styles.logo}
                     resizeMode="contain"
                 />
             </View>
 
-            {/* Bottom Half: Interactions */}
-            <View style={[styles.bottomHalf, { paddingBottom: bottomInset }]}>
-                <View style={styles.bottomContent}>
-
-                    {/* Text Instructions */}
+            {/* Bottom Section: Instructions & Language Buttons */}
+            <View style={[styles.bottomSection, { paddingBottom: Math.max(bottomInset, 32) }]}>
+                <View style={styles.contentCard}>
+                    {/* Header Instructions */}
                     <View style={styles.textContainer}>
-                        <Text style={styles.englishText}>Please select your language</Text>
-                        <Text style={styles.arabicText}>برجاء إختيار اللغة</Text>
+                        <Text style={styles.titleEnglish}>Choose Your Language</Text>
+                        <Text style={styles.titleArabic}>اختر لغتك المفضلة</Text>
+                        <Text style={styles.subtitleEnglish}>Select a language to get started with BarSpa</Text>
+                        <Text style={styles.subtitleArabic}>يرجى تحديد لغة التطبيق للمتابعة</Text>
                     </View>
 
-                    {/* Primary Actions (Pill Buttons) */}
+                    {/* Language Option Buttons */}
                     <View style={styles.actionsContainer}>
+                        {/* English Button */}
                         <TouchableOpacity
-                            style={[styles.pillButton, styles.englishButtonWrapper]}
+                            style={[styles.languageButton, styles.primaryButton]}
                             onPress={() => handleSelect('en')}
-                            activeOpacity={0.8}
+                            activeOpacity={0.85}
+                            disabled={isSelecting}
                         >
                             <LinearGradient
-                                colors={[colors.primary, colors.primaryDark]}
+                                colors={['#6537C0', '#5028A4']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.gradientFill}
                             >
-                                <Text style={styles.buttonText}>English</Text>
+                                <Text style={styles.primaryButtonText}>English</Text>
+                                <Text style={styles.primarySubText}>Continue in English</Text>
                             </LinearGradient>
                         </TouchableOpacity>
 
+                        {/* Arabic Button */}
                         <TouchableOpacity
-                            style={[styles.pillButton, styles.arabicButtonWrapper]}
+                            style={[styles.languageButton, styles.secondaryButton]}
                             onPress={() => handleSelect('ar')}
-                            activeOpacity={0.8}
+                            activeOpacity={0.85}
+                            disabled={isSelecting}
                         >
-                            <LinearGradient
-                                colors={[colors.secondary, colors.secondaryDark]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.gradientFill}
-                            >
-                                <Text style={styles.buttonText}>العربية</Text>
-                            </LinearGradient>
+                            <View style={styles.secondaryButtonFill}>
+                                <Text style={styles.secondaryButtonText}>العربية</Text>
+                                <Text style={styles.secondarySubText}>المتابعة باللغة العربية</Text>
+                            </View>
                         </TouchableOpacity>
                     </View>
                 </View>
             </View>
-
         </View>
     );
 }
@@ -100,85 +100,140 @@ export function LanguageSelection({ onLanguageSelect }: LanguageSelectionProps) 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#FAF9FC',
     },
-    topHalf: {
-        flex: 1,
+    logoSection: {
+        flex: 1.1,
         justifyContent: 'center',
         alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        paddingTop: clamp(32, SCREEN_HEIGHT * 0.08, 64),
     },
     logo: {
-        width: clamp(140, SCREEN_WIDTH * 0.45, 240),
-        height: clamp(140, SCREEN_WIDTH * 0.45, 240),
+        width: clamp(180, SCREEN_WIDTH * 0.55, 260),
+        height: clamp(100, SCREEN_WIDTH * 0.32, 150),
     },
-    bottomHalf: {
-        flex: 1,
-        justifyContent: 'center',
+    bottomSection: {
+        flex: 1.2,
+        justifyContent: 'flex-start',
         alignItems: 'center',
+        paddingHorizontal: clamp(20, SCREEN_WIDTH * 0.06, 32),
     },
-    bottomContent: {
+    contentCard: {
         width: '100%',
-        maxWidth: 480, // Max width for content capping
-        paddingHorizontal: clamp(16, SCREEN_WIDTH * 0.06, 40),
+        maxWidth: 420,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        paddingHorizontal: clamp(20, SCREEN_WIDTH * 0.06, 28),
+        paddingVertical: clamp(24, SCREEN_HEIGHT * 0.035, 36),
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+        elevation: 3,
         alignItems: 'center',
     },
     textContainer: {
         width: '100%',
         alignItems: 'center',
-        marginBottom: clamp(24, SCREEN_HEIGHT * 0.04, 48),
+        marginBottom: clamp(20, SCREEN_HEIGHT * 0.03, 28),
     },
-    englishText: {
-        fontSize: 18,
-        fontWeight: '500', // Medium
-        color: colors.textPrimary,
-        marginBottom: 8,
+    titleEnglish: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1D035F',
         textAlign: 'center',
+        letterSpacing: 0.2,
     },
-    arabicText: {
-        fontSize: 18,
-        fontWeight: '700', // Bold/Semi-bold
-        color: colors.textPrimary,
+    titleArabic: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1D035F',
         textAlign: 'center',
+        marginTop: 4,
+        writingDirection: 'rtl',
+    },
+    subtitleEnglish: {
+        fontSize: 13,
+        fontWeight: '400',
+        color: '#716B88',
+        textAlign: 'center',
+        marginTop: 8,
+    },
+    subtitleArabic: {
+        fontSize: 13,
+        fontWeight: '400',
+        color: '#716B88',
+        textAlign: 'center',
+        marginTop: 2,
         writingDirection: 'rtl',
     },
     actionsContainer: {
         width: '100%',
-        alignItems: 'center',
+        gap: 14,
     },
-    pillButton: {
-        width: Math.min(SCREEN_WIDTH * 0.76, 420),
-        height: clamp(48, SCREEN_HEIGHT * 0.07, 60),
-        borderRadius: 999, // Pill shape
+    languageButton: {
+        width: '100%',
+        minHeight: 58,
+        borderRadius: 16,
         overflow: 'hidden',
-        marginBottom: 16,
-
-        // Shadow/Elevation
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 5,
     },
-    englishButtonWrapper: {
-        shadowColor: colors.primary,
-    },
-    arabicButtonWrapper: {
-        shadowColor: colors.secondary,
+    primaryButton: {
+        shadowColor: '#6537C0',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 4,
     },
     gradientFill: {
         flex: 1,
-        justifyContent: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
-        width: '100%',
-        height: '100%',
+        justifyContent: 'space-between',
+        paddingHorizontal: 22,
+        paddingVertical: 14,
     },
-    buttonText: {
-        color: colors.textInverse,
-        fontSize: 18,
+    primaryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 17,
         fontWeight: '700',
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
+    },
+    primarySubText: {
+        color: 'rgba(255, 255, 255, 0.85)',
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    secondaryButton: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1.5,
+        borderColor: '#E7DDFC',
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    secondaryButtonFill: {
+        flex: 1,
+        flexDirection: 'row-reverse',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 22,
+        paddingVertical: 14,
+    },
+    secondaryButtonText: {
+        color: '#6537C0',
+        fontSize: 17,
+        fontWeight: '700',
+        writingDirection: 'rtl',
+    },
+    secondarySubText: {
+        color: '#716B88',
+        fontSize: 12,
+        fontWeight: '500',
+        writingDirection: 'rtl',
     },
 });
 

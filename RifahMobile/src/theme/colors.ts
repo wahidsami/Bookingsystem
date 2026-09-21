@@ -1,15 +1,34 @@
 /**
- * Refah Mobile Single Source of Truth for App Colors.
+ * BarSpa Customer App 2.0 — Centralized Design System Colors
+ * 
+ * Sourced directly from Stitch Customer 2.0 prototypes:
+ * - brand.purple: #6537C0
+ * - brand.deep:   #1D035F
+ * - brand.soft:   #A379E2
+ * - brand.lavender: #E7DDFC
+ * - brand.bg:     #FAF9FC
+ * - brand.surface: #FFFFFF
+ * - brand.muted:  #716B88
+ * - brand.border: #E7DDFC
  *
- * To rebrand or fine-tune visuals, start here first.
- * Keep compatibility aliases (`primary`, `text`, `border`...) so old screens
- * continue to work while we migrate to semantic tokens gradually.
+ * Fully backward-compatible with legacy aliases so existing screens continue working.
  */
+
 const palette = {
     brand: {
-        300: '#A78BFA',
-        500: '#8B5CF6',
-        600: '#7C3AED',
+        purple: '#6537C0', // Royal violet
+        deep: '#1D035F',   // Midnight purple
+        soft: '#A379E2',   // Medium accent purple
+        lavender: '#E7DDFC', // Light lavender pill/border
+        bg: '#FAF9FC',     // Lavender-tinted canvas
+        surface: '#FFFFFF', // Pure white
+        muted: '#716B88',  // Muted body text
+        border: '#E7DDFC',
+        borderLight: 'rgba(231, 221, 252, 0.4)',
+        // Legacy numerical mappings
+        300: '#E7DDFC',
+        500: '#6537C0',
+        600: '#1D035F',
     },
     pink: {
         500: '#EC4899',
@@ -23,46 +42,60 @@ const palette = {
     },
     blue: {
         500: '#3B82F6',
+        400: '#60A5FA',
+        600: '#2563EB',
     },
     orange: {
         500: '#F59E0B',
+        400: '#FBBF24',
+        600: '#D97706',
     },
     red: {
-        500: '#EF4444',
+        500: '#FF4D4F',
+        400: '#F87171',
+        600: '#DC2626',
     },
     slate: {
-        900: '#1F2937',
-        500: '#6B7280',
+        900: '#1D035F',
+        800: '#2D1470',
+        500: '#716B88',
         400: '#9CA3AF',
         300: '#D1D5DB',
-        200: '#E5E7EB',
-        50: '#F9FAFB',
+        200: '#E7DDFC',
+        100: '#F4F3F6',
+        50: '#FAF9FC',
     },
     white: '#FFFFFF',
     black: '#000000',
 };
 
 export const colors = {
-    // Brand
-    brandPrimary: palette.brand[500],
-    brandPrimaryLight: palette.brand[300],
-    brandPrimaryDark: palette.brand[600],
+    // Stitch 2.0 Brand Namespace
+    brand: palette.brand,
 
-    // Semantic surface/background
-    background: palette.white,
-    backgroundMuted: palette.slate[50],
-    surface: palette.white,
-    surfaceAlt: palette.slate[50],
+    // Brand Core
+    brandPrimary: palette.brand.purple,
+    brandPrimaryLight: palette.brand.lavender,
+    brandPrimaryDark: palette.brand.deep,
+    brandPrimarySoft: palette.brand.soft,
 
-    // Semantic text
-    textPrimary: palette.slate[900],
-    textSecondary: palette.slate[500],
+    // Semantic Surface & Background
+    background: palette.brand.bg,
+    backgroundMuted: palette.brand.bg,
+    surface: palette.brand.surface,
+    surfaceAlt: palette.brand.bg,
+    surfaceLavender: palette.brand.lavender,
+    surfaceMuted: palette.slate[100],
+
+    // Semantic Text
+    textPrimary: palette.brand.deep,
+    textSecondary: palette.brand.muted,
     textTertiary: palette.slate[400],
     textInverse: palette.white,
 
-    // Semantic border
-    borderSubtle: palette.slate[200],
-    borderStrong: palette.slate[300],
+    // Semantic Border
+    borderSubtle: palette.brand.border,
+    borderStrong: '#D1C4E9',
 
     // Status
     success: palette.green[500],
@@ -79,45 +112,52 @@ export const colors = {
     secondaryDark: palette.pink[600],
 
     // Overlay
-    overlay: 'rgba(0, 0, 0, 0.5)',
-    overlayLight: 'rgba(0, 0, 0, 0.3)',
+    overlay: 'rgba(29, 3, 95, 0.5)',
+    overlayLight: 'rgba(29, 3, 95, 0.25)',
 
     // Compatibility aliases (legacy usage across screens)
-    primary: palette.brand[500],
-    primaryLight: palette.brand[300],
-    primaryDark: palette.brand[600],
-    backgroundGray: palette.slate[50],
-    text: palette.slate[900],
-    border: palette.slate[200],
-    borderDark: palette.slate[300],
+    primary: palette.brand.purple,
+    primaryLight: palette.brand.lavender,
+    primaryDark: palette.brand.deep,
+    backgroundGray: palette.brand.bg,
+    text: palette.brand.deep,
+    border: palette.brand.border,
+    borderDark: '#D1C4E9',
 };
 
 export const spacing = {
     xs: 4,
     sm: 8,
-    md: 16,
-    lg: 24,
-    xl: 32,
-    xxl: 40,
+    md: 12,
+    base: 16,
+    lg: 20,
+    xl: 24,
+    xxl: 32,
+    xxxl: 40,
 };
 
 export const borderRadius = {
+    xs: 4,
     sm: 8,
     md: 12,
     lg: 16,
-    xl: 24,
+    xl: 20,
+    xxl: 24,
     full: 9999,
+    pill: 9999,
 };
 
 export const fontSize = {
+    xxs: 10,
     xs: 12,
-    sm: 14,
-    md: 16,
+    sm: 13,
+    md: 15,
+    base: 16,
     lg: 18,
     xl: 20,
     xxl: 24,
     xxxl: 32,
-    huge: 48,
+    huge: 40,
 };
 
 export const fontWeight = {
@@ -129,24 +169,24 @@ export const fontWeight = {
 
 export const shadows = {
     sm: {
-        shadowColor: '#000',
+        shadowColor: '#1D035F',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
         elevation: 2,
     },
     md: {
-        shadowColor: '#000',
+        shadowColor: '#1D035F',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
         elevation: 4,
     },
     lg: {
-        shadowColor: '#000',
+        shadowColor: '#1D035F',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
         elevation: 8,
     },
 };

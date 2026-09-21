@@ -8,36 +8,42 @@ import { useLanguage } from '../contexts/LanguageContext';
  */
 export function ThemedText({ style, ...props }: TextProps) {
     const { language } = useLanguage();
-
-    if (language !== 'ar') {
-        // For English, use default system font
-        return <RNText {...props} style={style} />;
-    }
-
-    // For Arabic, handle Cairo font with weight mapping
     const flatStyle = (StyleSheet.flatten(style) || {}) as TextStyle;
 
-    // Map fontWeight to appropriate Cairo font variant
-    let fontFamily = 'Cairo-Regular';
-    const weight = flatStyle.fontWeight;
+    // Preserve caller's custom fontFamily if provided (e.g. 'SaudiRiyalSymbol' or 'Cairo-Bold')
+    let fontFamily = flatStyle.fontFamily;
+    if (!fontFamily) {
+        fontFamily = 'Cairo-Regular';
+        const weight = flatStyle.fontWeight;
 
-    if (weight === 'bold' || weight === '700' || weight === '800' || weight === '900') {
-        fontFamily = 'Cairo-Bold';
-    } else if (weight === '600') {
-        fontFamily = 'Cairo-SemiBold';
-    } else if (weight === '500') {
-        fontFamily = 'Cairo-Medium';
-    } else if (weight === '300' || weight === '200' || weight === '100') {
-        fontFamily = 'Cairo-Light';
+        if (weight === 'bold' || weight === '700' || weight === '800' || weight === '900') {
+            fontFamily = 'Cairo-Bold';
+        } else if (weight === '600') {
+            fontFamily = 'Cairo-SemiBold';
+        } else if (weight === '500') {
+            fontFamily = 'Cairo-Medium';
+        } else if (weight === '300' || weight === '200' || weight === '100') {
+            fontFamily = 'Cairo-Light';
+        }
     }
 
-    // Remove fontWeight from style to prevent conflicts
     const { fontWeight: _, ...styleWithoutWeight } = flatStyle;
 
+    if (language === 'ar') {
+        const textAlign = flatStyle.textAlign || 'right';
+        return (
+            <RNText
+                {...props}
+                style={[{ writingDirection: 'rtl' }, styleWithoutWeight, { fontFamily, textAlign }]}
+            />
+        );
+    }
+
+    const textAlign = flatStyle.textAlign || 'left';
     return (
         <RNText
             {...props}
-            style={[styleWithoutWeight, { fontFamily }]}
+            style={[{ writingDirection: 'ltr' }, styleWithoutWeight, { fontFamily, textAlign }]}
         />
     );
 }
@@ -47,14 +53,17 @@ export function ThemedText({ style, ...props }: TextProps) {
  */
 export function ThemedTextBold({ style, ...props }: TextProps) {
     const { language } = useLanguage();
+    const flatStyle = (StyleSheet.flatten(style) || {}) as TextStyle;
 
-    const fontFamily = language === 'ar' ? 'Cairo-Bold' : undefined;
-    const fontWeight: any = language === 'en' ? 'bold' : undefined;
+    const fontFamily = flatStyle.fontFamily || 'Cairo-Bold';
+    const writingDirection = language === 'ar' ? 'rtl' : 'ltr';
+    const textAlign = language === 'ar' ? (flatStyle.textAlign || 'right') : (flatStyle.textAlign || 'left');
+    const { fontWeight: _, ...styleWithoutWeight } = flatStyle;
 
     return (
         <RNText
             {...props}
-            style={[{ fontFamily, fontWeight }, style]}
+            style={[styleWithoutWeight, { fontFamily, writingDirection, textAlign }]}
         />
     );
 }

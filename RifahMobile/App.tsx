@@ -31,15 +31,20 @@ type PendingDeepLink =
   | { kind: 'review'; appointmentId: string }
   | { kind: 'profile' };
 
-// Load Cairo fonts
+// Load Cairo fonts and Saudi Riyal Symbol font
 const loadFonts = async () => {
-  await Font.loadAsync({
-    'Cairo-Regular': require('./assets/fonts/Cairo-Regular.ttf'),
-    'Cairo-Light': require('./assets/fonts/Cairo-Light.ttf'),
-    'Cairo-Medium': require('./assets/fonts/Cairo-Medium.ttf'),
-    'Cairo-SemiBold': require('./assets/fonts/Cairo-SemiBold.ttf'),
-    'Cairo-Bold': require('./assets/fonts/Cairo-Bold.ttf'),
-  });
+  try {
+    await Font.loadAsync({
+      'Cairo-Regular': require('./assets/fonts/Cairo-Regular.ttf'),
+      'Cairo-Light': require('./assets/fonts/Cairo-Light.ttf'),
+      'Cairo-Medium': require('./assets/fonts/Cairo-Medium.ttf'),
+      'Cairo-SemiBold': require('./assets/fonts/Cairo-SemiBold.ttf'),
+      'Cairo-Bold': require('./assets/fonts/Cairo-Bold.ttf'),
+      'SaudiRiyalSymbol': require('./assets/fonts/saudiriyalsymbol.ttf'),
+    });
+  } catch (error) {
+    console.warn('Font loading error:', error);
+  }
 
   // Set Cairo as default font for Text component
   const DefaultText = Text as any;

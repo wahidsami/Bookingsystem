@@ -5,6 +5,7 @@ import { colors, spacing, fontSize, borderRadius } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
 import { AppIcon } from './AppIcon';
 import { api, Booking } from '../api/client';
+import { sessionManager } from '../services/SessionManager';
 
 const { width } = Dimensions.get('window');
 
@@ -30,22 +31,28 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
         }
 
         try {
-            setSubmitting(true);
-            const payload = {
+            const sessionUser = await sessionManager.getUser();
+            const realSessionName = [sessionUser?.firstName, sessionUser?.lastName].filter(Boolean).join(' ').trim();
+            const appointmentUserName = [((appointment as any).user?.firstName || ''), ((appointment as any).user?.lastName || '')]
+                .filter(Boolean)
+                .join(' ')
+                .trim();
+            const legacyCustomerName = [((appointment as any).legacyCustomer?.firstName || ''), ((appointment as any).legacyCustomer?.lastName || '')]
+                .filter(Boolean)
+                .join(' ')
+                .trim();
+            const resolvedCustomerName = realSessionName || appointmentUserName || legacyCustomerName;
+
+            const payload: Record<string, any> = {
                 tenantId: appointment.tenantId,
                 staffId: appointment.staffId,
                 appointmentId: appointment.id,
                 rating,
                 comment,
-                customerName:
-                    [((appointment as any).user?.firstName || ''), ((appointment as any).user?.lastName || '')]
-                        .join(' ')
-                        .trim()
-                    || [((appointment as any).legacyCustomer?.firstName || ''), ((appointment as any).legacyCustomer?.lastName || '')]
-                        .join(' ')
-                        .trim()
-                    || (isRTL ? 'عميل موثّق' : 'Verified Customer')
             };
+            if (resolvedCustomerName) {
+                payload.customerName = resolvedCustomerName;
+            }
 
             const res = await api.post<{ success: boolean; message?: string }>(`/users/reviews`, payload);
             if (res.success) {
@@ -81,18 +88,22 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <View style={styles.modalContent}>
-                    <View style={styles.header}>
-                        <Text style={styles.title}>How was your experience?</Text>
+                    <View style={[styles.header, isRTL && styles.rowReverse]}>
+                        <Text style={[styles.title, isRTL && styles.textRTL]}>
+                            {isRTL ? 'كيف كانت تجربتك؟' : 'How was your experience?'}
+                        </Text>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                             <AppIcon name="close" size={24} color={colors.textSecondary} />
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.subtitle}>
-                        Rate your appointment with {appointment.Staff?.name} at {appointment.tenant?.name}.
+                    <Text style={[styles.subtitle, isRTL && styles.textRTL]}>
+                        {isRTL
+                            ? `قيّم موعدك مع ${appointment.Staff?.name || ''} في ${appointment.tenant?.name || ''}.`
+                            : `Rate your appointment with ${appointment.Staff?.name || ''} at ${appointment.tenant?.name || ''}.`}
                     </Text>
 
-                    <View style={styles.starsContainer}>
+                    <View style={[styles.starsContainer, isRTL && styles.rowReverse]}>
                         {[1, 2, 3, 4, 5].map((star) => (
                             <TouchableOpacity key={star} activeOpacity={0.8} onPressIn={() => setRating(star)} onPress={() => setRating(star)}>
                                 <AppIcon
@@ -110,8 +121,8 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
                     </Text>
 
                     <TextInput
-                        style={styles.input}
-                        placeholder="Share details of your experience (optional)"
+                        style={[styles.input, isRTL && styles.inputRTL]}
+                        placeholder={isRTL ? 'شاركنا تفاصيل تجربتك (اختياري)' : 'Share details of your experience (optional)'}
                         multiline
                         numberOfLines={4}
                         value={comment}
@@ -127,7 +138,7 @@ export function ReviewPromptModal({ visible, onClose, appointment, onSuccess }: 
                         {submitting ? (
                             <ActivityIndicator color="white" />
                         ) : (
-                            <Text style={styles.submitText}>Submit Review</Text>
+                            <Text style={styles.submitText}>{isRTL ? 'إرسال التقييم' : 'Submit Review'}</Text>
                         )}
                     </TouchableOpacity>
                 </View>
@@ -148,6 +159,15 @@ const styles = StyleSheet.create({
         borderTopRightRadius: borderRadius.xl,
         padding: spacing.xl,
         paddingBottom: Platform.OS === 'ios' ? 40 : spacing.xl,
+    },
+    rowReverse: {
+        flexDirection: 'row-reverse',
+    },
+    textRTL: {
+        textAlign: 'right',
+    },
+    inputRTL: {
+        textAlign: 'right',
     },
     header: {
         flexDirection: 'row',

@@ -11,7 +11,7 @@ interface TopProvidersSectionProps {
 }
 
 export function TopProvidersSection({ navigation }: TopProvidersSectionProps) {
-    const { t } = useLanguage();
+    const { t, isRTL } = useLanguage();
     const [providers, setProviders] = useState<Staff[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -33,6 +33,7 @@ export function TopProvidersSection({ navigation }: TopProvidersSectionProps) {
         return (
             <FlatList
                 horizontal
+                inverted={isRTL}
                 data={[1, 2, 3, 4]}
                 renderItem={() => <SkeletonCard variant="provider" />}
                 keyExtractor={(_, i) => `sk-${i}`}
@@ -52,12 +53,12 @@ export function TopProvidersSection({ navigation }: TopProvidersSectionProps) {
 
     const renderProvider = ({ item }: { item: Staff }) => {
         const avatarUrl = item.avatar ? getImageUrl(item.avatar) : undefined;
-        const initials = item.name?.charAt(0)?.toUpperCase() || '?';
+        const initials = item.name?.trim()?.charAt(0)?.toUpperCase() || '?';
 
         return (
             <TouchableOpacity
-                style={styles.card}
-                activeOpacity={0.7}
+                style={[styles.card, isRTL ? styles.cardRTL : styles.cardLTR]}
+                activeOpacity={0.75}
                 onPress={() => navigation?.navigate('EmployeeProfile', { provider: item })}
             >
                 {avatarUrl ? (
@@ -69,8 +70,8 @@ export function TopProvidersSection({ navigation }: TopProvidersSectionProps) {
                 )}
                 <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
                 <View style={styles.ratingRow}>
-                    <Text style={styles.star}>⭐</Text>
-                    <Text style={styles.ratingText}>{item.rating?.toFixed(1) || '—'}</Text>
+                    <Text style={styles.star}>★</Text>
+                    <Text style={styles.ratingText}>{item.rating ? item.rating.toFixed(1) : '5.0'}</Text>
                 </View>
             </TouchableOpacity>
         );
@@ -80,6 +81,7 @@ export function TopProvidersSection({ navigation }: TopProvidersSectionProps) {
         <View style={styles.sectionContainer}>
             <FlatList
                 horizontal
+                inverted={isRTL}
                 data={providers}
                 renderItem={renderProvider}
                 keyExtractor={item => item.id}
@@ -92,9 +94,9 @@ export function TopProvidersSection({ navigation }: TopProvidersSectionProps) {
 
 const styles = StyleSheet.create({
     sectionContainer: {
-        backgroundColor: colors.backgroundGray,
-        paddingVertical: spacing.md,
-        marginBottom: spacing.xl,
+        backgroundColor: 'transparent',
+        paddingVertical: spacing.xs,
+        marginBottom: spacing.md,
     },
     listContent: {
         paddingHorizontal: spacing.lg,
@@ -104,58 +106,70 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.md,
     },
     emptyStateText: {
-        color: colors.textSecondary,
+        color: 'rgba(29, 3, 95, 0.6)',
         fontSize: fontSize.sm,
     },
     card: {
-        width: 100,
+        width: 96,
         alignItems: 'center',
-        marginRight: spacing.md,
-        backgroundColor: '#FFF',
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.sm,
-        borderRadius: borderRadius.lg,
+        backgroundColor: '#FFFFFF',
+        padding: 10,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: 'rgba(231, 221, 252, 0.7)',
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 10,
+        elevation: 2,
+    },
+    cardLTR: {
+        marginRight: spacing.md,
+    },
+    cardRTL: {
+        marginLeft: spacing.md,
     },
     avatar: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        marginBottom: spacing.xs,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        marginBottom: 8,
     },
     avatarPlaceholder: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: colors.primary,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#6537C0',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.xs,
+        marginBottom: 8,
     },
     avatarText: {
-        color: '#FFF',
-        fontSize: fontSize.lg,
+        color: '#FFFFFF',
+        fontSize: 18,
         fontWeight: '700',
     },
     name: {
-        fontSize: fontSize.xs,
-        fontWeight: '600',
-        color: colors.text,
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#1D035F',
         textAlign: 'center',
+        width: '100%',
         marginBottom: 2,
     },
     ratingRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 2,
+        gap: 3,
+        marginTop: 2,
     },
     star: {
         fontSize: 12,
+        color: '#F59E0B',
     },
     ratingText: {
-        fontSize: fontSize.xs,
-        color: colors.textSecondary,
+        fontSize: 12,
+        color: 'rgba(29, 3, 95, 0.8)',
         fontWeight: '600',
     },
 });
