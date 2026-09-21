@@ -925,3 +925,43 @@ exports.getAnalyticsDrilldown = async (req, res) => {
     res.status(500).json(errorResponse('Failed to fetch analytics drilldown', error.message));
   }
 };
+
+exports.getSettlementsReport = async (req, res) => {
+  try {
+    const tenantSettlementService = require('../services/tenantSettlementService');
+    const { tenantId, startDate, endDate, status, settlementPeriod } = req.query;
+    const report = await tenantSettlementService.getSuperAdminSettlementReport({
+      tenantId,
+      startDate,
+      endDate,
+      status,
+      settlementPeriod
+    });
+    res.json(successResponse('Settlements report retrieved', report));
+  } catch (error) {
+    console.error('Error fetching settlements report:', error);
+    res.status(500).json(errorResponse('Failed to fetch settlements report', error.message));
+  }
+};
+
+exports.getSettlementTransactions = async (req, res) => {
+  try {
+    const tenantSettlementService = require('../services/tenantSettlementService');
+    const tenantId = req.params.tenantId || req.query.tenantId;
+    const { limit, offset, sourceType, status } = req.query;
+    if (!tenantId) {
+      return res.status(400).json(errorResponse('tenantId is required'));
+    }
+    const result = await tenantSettlementService.getSuperAdminTenantTransactions(tenantId, {
+      limit,
+      offset,
+      sourceType,
+      status
+    });
+    res.json(successResponse('Settlement transactions retrieved', result));
+  } catch (error) {
+    console.error('Error fetching settlement transactions:', error);
+    res.status(500).json(errorResponse('Failed to fetch settlement transactions', error.message));
+  }
+};
+

@@ -34,7 +34,9 @@ module.exports = (sequelize, DataTypes) => {
                 'tenant_gift_credit',
                 'tenant_gift_redeem_debit',
                 'tenant_gift_refund_credit',
-                'tenant_gift_admin_adjustment'
+                'tenant_gift_admin_adjustment',
+                'tenant_wallet_card_recharge',
+                'tenant_wallet_card_recharge_refund'
             ),
             allowNull: false
         },

@@ -60,8 +60,9 @@ router.get('/financial/customer-invoices/:id/invoice-pdf', requirePermission('fi
 router.get('/financial/customer-invoices/:id/receipt-pdf', requirePermission('financial', 'view'), customerInvoiceController.getAdminReceiptPdf);
 router.get('/financial/top-employees', adminFinancialController.getTopEmployees);
 router.get('/financial/transactions/:tenantId', adminFinancialController.getTransactionDetails);
-router.get('/financial/employee-metrics/:tenantId', adminFinancialController.getTenantEmployeeMetrics);
 router.get('/financial/drilldown', requirePermission('financial', 'view'), adminFinancialController.getAnalyticsDrilldown);
+router.get('/financial/settlements', adminFinancialController.getSettlementsReport);
+router.get('/financial/settlements/:tenantId/transactions', adminFinancialController.getSettlementTransactions);
 
 // ===== DASHBOARD STATS =====
 router.get('/stats/dashboard', adminStatsController.getDashboardStats);

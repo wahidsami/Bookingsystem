@@ -5,6 +5,7 @@ const paymentMethodController = require('../controllers/paymentMethodController'
 const reviewController = require('../controllers/reviewController');
 const userGiftController = require('../controllers/userGiftController');
 const userTenantGiftController = require('../controllers/userTenantGiftController');
+const userTenantWalletController = require('../controllers/userTenantWalletController');
 const customerInvoiceController = require('../controllers/customerInvoiceController');
 const userWalletSummaryController = require('../controllers/userWalletSummaryController');
 const { authenticateUser } = require('../middleware/authUser');
@@ -53,6 +54,7 @@ router.delete('/payment-methods/:id', authenticateUser, paymentMethodController.
 
 // Gifts & wallet packages
 router.get('/wallet/summary', authenticateUser, userWalletSummaryController.getWalletSummary);
+router.get('/wallet-summary', authenticateUser, userWalletSummaryController.getWalletSummary);
 router.get('/gifts/packages', authenticateUser, userGiftController.getGiftPackages);
 router.post('/gifts/recharge', authenticateUser, userGiftController.rechargeFromGiftPackage);
 router.get('/gifts/recipient-check', authenticateUser, userGiftController.checkGiftRecipient);
@@ -67,8 +69,13 @@ router.get('/tenant-gifts/recipient-check', authenticateUser, userTenantGiftCont
 router.post('/tenant-gifts/send', authenticateUser, userTenantGiftController.sendGift);
 router.post('/tenant-gifts/claim', authenticateUser, userTenantGiftController.claimGift);
 router.get('/tenant-gifts/history', authenticateUser, userTenantGiftController.listMyTenantGiftTransactions);
+router.get('/tenant-gifts/received', authenticateUser, userTenantGiftController.getReceivedTenantGifts);
 router.get('/tenant-gifts/wallet', authenticateUser, userTenantGiftController.getTenantWalletBalance);
 router.get('/tenant-gifts/claim/open', userTenantGiftController.openGiftClaimLink);
+
+// Direct Tenant Wallet Card Recharge
+router.post('/tenant-wallet/recharge', authenticateUser, userTenantWalletController.rechargeTenantWallet);
+router.post('/tenant-wallet/refund', authenticateUser, userTenantWalletController.refundTenantWalletRecharge);
 
 // Customer commerce invoices
 router.get('/invoices', authenticateUser, customerInvoiceController.listUserInvoices);

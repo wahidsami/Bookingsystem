@@ -200,6 +200,7 @@ router.patch('/appointments/:id/reassign-reschedule', tenantAppointmentControlle
 // Financial management
 router.get('/financial/overview', tenantFinancialController.getFinancialOverview);
 router.get('/financial/ledger', tenantFinancialController.getFinancialLedger);
+router.get('/financial/settlement-summary', tenantFinancialController.getSettlementSummary);
 router.get('/financial/landing-summary', tenantFinancialController.getLandingSummary);
 router.get('/financial/employees', tenantFinancialController.getEmployeeRevenue);
 router.get('/financial/employees/:id', tenantFinancialController.getEmployeeFinancialDetails);

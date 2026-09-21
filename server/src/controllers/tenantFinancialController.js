@@ -2491,3 +2491,31 @@ exports.getEmployeeFinancialDetails = async (req, res) => {
     }
 };
 
+exports.getSettlementSummary = async (req, res) => {
+    try {
+        const tenantSettlementService = require('../services/tenantSettlementService');
+        const tenantId = req.tenantId;
+        if (!tenantId) {
+            return res.status(400).json({ success: false, message: 'Tenant identification required' });
+        }
+        const { startDate, endDate, period } = req.query;
+        const summary = await tenantSettlementService.getTenantSettlementSummary(tenantId, {
+            startDate,
+            endDate,
+            period
+        });
+        res.json({
+            success: true,
+            ...summary
+        });
+    } catch (error) {
+        console.error('Get tenant settlement summary error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch settlement summary',
+            error: error.message
+        });
+    }
+};
+
+
