@@ -31,6 +31,63 @@ const generateGiftCode = (prefix = 'TN') => {
     return `${prefix}-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
 };
 
+const IDEMPOTENCY_HEADER = 'x-idempotency-key';
+const IDEMPOTENCY_MAX_LENGTH = 191;
+const IDEMPOTENCY_PROCESSING_TTL_MS = 2 * 60 * 1000;
+
+const normalizeIdempotencyKey = (value) => {
+    const raw = `${value || ''}`.trim();
+    if (!raw) return null;
+    return raw.slice(0, IDEMPOTENCY_MAX_LENGTH);
+};
+
+const buildPayloadHash = (payload) => {
+    return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+};
+
+const reserveIdempotency = async (platformUserId, idempotencyKey, requestHash) => {
+    if (!idempotencyKey) return { record: null, replayed: false };
+
+    let record = await db.PaymentIdempotencyKey.findOne({
+        where: { platformUserId, idempotencyKey }
+    });
+
+    if (record) {
+        if (record.requestHash !== requestHash) {
+            const err = new Error('This idempotency key was already used with different request data.');
+            err.statusCode = 409;
+            throw err;
+        }
+        if (record.status === 'completed' && record.responsePayload) {
+            return { record, replayed: true, responsePayload: record.responsePayload };
+        }
+        const isStillProcessing = record.status === 'processing'
+            && (Date.now() - new Date(record.updatedAt).getTime()) < IDEMPOTENCY_PROCESSING_TTL_MS;
+        if (isStillProcessing) {
+            const err = new Error('Request is already being processed. Please wait a moment and retry.');
+            err.statusCode = 409;
+            throw err;
+        }
+        await record.update({
+            status: 'processing',
+            responsePayload: null,
+            errorMessage: null,
+            requestHash
+        });
+        return { record, replayed: false };
+    }
+
+    record = await db.PaymentIdempotencyKey.create({
+        platformUserId,
+        idempotencyKey,
+        requestHash,
+        status: 'processing',
+        responsePayload: null,
+        errorMessage: null
+    });
+    return { record, replayed: false };
+};
+
 const validateGiftPaymentPayload = (payload = {}) => {
     const cardNumber = normalize(payload.cardNumber).replace(/[\s-]/g, '');
     const expiryDate = normalize(payload.expiryDate);
@@ -122,18 +179,15 @@ exports.checkTenantGiftRecipient = async (req, res) => {
             exists: true,
             recipient: {
                 id: recipient.id,
-                firstName: recipient.firstName,
-                lastName: recipient.lastName,
-                fullName: `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim(),
-                email: recipient.email,
-                phone: recipient.phone,
+                name: `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || 'Refah Customer',
+                email: recipient.email || null,
+                phone: recipient.phone || null,
                 profileImage: recipient.profileImage || null
-            },
-            normalized: { email: email || null, phone: phone || null }
+            }
         });
     } catch (error) {
         console.error('Check tenant gift recipient error:', error);
-        res.status(500).json({ success: false, message: 'Failed to check recipient' });
+        res.status(500).json({ success: false, message: 'Failed to verify recipient' });
     }
 };
 
@@ -168,241 +222,317 @@ const createPaymentTransaction = async ({
 };
 
 exports.purchaseForSelf = async (req, res) => {
-    const tx = await db.sequelize.transaction();
+    const senderId = req.userId;
+    const { tenantId, packageId } = req.body || {};
+    const idempotencyKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_HEADER] || req.body?.idempotencyKey);
+    let idempotencyRecord = null;
+
     try {
-        const senderId = req.userId;
-        const { tenantId, packageId } = req.body || {};
         const paymentPayload = validateGiftPaymentPayload(req.body || {});
         if (!tenantId || !packageId) throw new Error('tenantId and packageId are required');
 
-        const giftPackage = await findActiveTenantPackage(tenantId, packageId);
-        if (!giftPackage) {
-            await tx.rollback();
-            return res.status(404).json({ success: false, message: 'Gift package not found or inactive' });
+        if (idempotencyKey) {
+            const requestHash = buildPayloadHash({
+                senderId,
+                tenantId,
+                packageId,
+                cardLast4: paymentPayload.cardNumber.slice(-4)
+            });
+            const { record, replayed, responsePayload } = await reserveIdempotency(senderId, idempotencyKey, requestHash);
+            if (replayed) {
+                res.setHeader('x-idempotency-replayed', 'true');
+                return res.json(responsePayload);
+            }
+            idempotencyRecord = record;
         }
-        const packageTitle = giftPackage.title || giftPackage.title_en || giftPackage.title_ar || 'Tenant gift card';
 
-        const purchaseAmount = Number(giftPackage.priceAmount || 0);
-        const totalCredit = Number(giftPackage.walletCreditAmount || 0) + Number(giftPackage.bonusAmount || 0);
+        const tx = await db.sequelize.transaction();
+        try {
+            const giftPackage = await findActiveTenantPackage(tenantId, packageId);
+            if (!giftPackage) {
+                await tx.rollback();
+                if (idempotencyRecord) {
+                    await idempotencyRecord.update({ status: 'failed', errorMessage: 'Gift package not found or inactive' }).catch(() => undefined);
+                }
+                return res.status(404).json({ success: false, message: 'Gift package not found or inactive' });
+            }
+            const packageTitle = giftPackage.title || giftPackage.title_en || giftPackage.title_ar || 'Tenant gift card';
 
-        const paymentTransaction = await createPaymentTransaction({
-            platformUserId: senderId,
-            tenantId,
-            amount: purchaseAmount,
-            cardNumber: paymentPayload.cardNumber,
-            cardholderName: paymentPayload.cardholderName,
-            giftFlow: 'tenant_self_recharge',
-            packageId: giftPackage.id,
-            transaction: tx
-        });
+            const purchaseAmount = Number(giftPackage.priceAmount || 0);
+            const totalCredit = Number(giftPackage.walletCreditAmount || 0) + Number(giftPackage.bonusAmount || 0);
 
-        const giftTx = await db.TenantGiftCardTransaction.create({
-            tenantId,
-            packageId: giftPackage.id,
-            senderPlatformUserId: senderId,
-            recipientPlatformUserId: senderId,
-            purchaseAmount: giftPackage.priceAmount,
-            creditAmount: giftPackage.walletCreditAmount,
-            bonusAmount: giftPackage.bonusAmount,
-            totalCreditAmount: totalCredit,
-            status: 'redeemed',
-            deliveryChannel: 'in_app',
-            claimedAt: new Date(),
-            metadata: { flow: 'self_recharge', paymentTransactionId: paymentTransaction.id }
-        }, { transaction: tx });
+            const paymentTransaction = await createPaymentTransaction({
+                platformUserId: senderId,
+                tenantId,
+                amount: purchaseAmount,
+                cardNumber: paymentPayload.cardNumber,
+                cardholderName: paymentPayload.cardholderName,
+                giftFlow: 'tenant_self_recharge',
+                packageId: giftPackage.id,
+                transaction: tx
+            });
 
-        const walletResult = await tenantWalletService.creditTenantWallet({
-            platformUserId: senderId,
-            tenantId,
-            amount: totalCredit,
-            type: 'tenant_gift_credit',
-            referenceType: 'tenant_gift_card_transaction',
-            referenceId: giftTx.id,
-            metadata: { packageId: giftPackage.id, packageTitle },
-            transaction: tx
-        });
+            const giftTx = await db.TenantGiftCardTransaction.create({
+                tenantId,
+                packageId: giftPackage.id,
+                senderPlatformUserId: senderId,
+                recipientPlatformUserId: senderId,
+                purchaseAmount: giftPackage.priceAmount,
+                creditAmount: giftPackage.walletCreditAmount,
+                bonusAmount: giftPackage.bonusAmount,
+                totalCreditAmount: totalCredit,
+                status: 'redeemed',
+                deliveryChannel: 'in_app',
+                claimedAt: new Date(),
+                metadata: { flow: 'self_recharge', paymentTransactionId: paymentTransaction.id }
+            }, { transaction: tx });
 
-        await tenantGiftSettlementService.createPendingSettlement({
-            tenantId,
-            transactionId: giftTx.id,
-            packageId: giftPackage.id,
-            grossAmount: purchaseAmount,
-            platformFeeAmount: 0,
-            metadata: { paymentTransactionId: paymentTransaction.id },
-            transaction: tx
-        });
+            const walletResult = await tenantWalletService.creditTenantWallet({
+                platformUserId: senderId,
+                tenantId,
+                amount: totalCredit,
+                type: 'tenant_gift_credit',
+                referenceType: 'tenant_gift_card_transaction',
+                referenceId: giftTx.id,
+                metadata: { packageId: giftPackage.id, packageTitle },
+                transaction: tx
+            });
 
-        await tx.commit();
-        res.json({
-            success: true,
-            message: 'Tenant gift wallet recharged successfully',
-            walletBalance: walletResult.balanceAfter,
-            transaction: giftTx
-        });
+            await tenantGiftSettlementService.createPendingSettlement({
+                tenantId,
+                transactionId: giftTx.id,
+                packageId: giftPackage.id,
+                grossAmount: purchaseAmount,
+                platformFeeAmount: 0,
+                metadata: { paymentTransactionId: paymentTransaction.id },
+                transaction: tx
+            });
+
+            await tx.commit();
+
+            const finalResponse = {
+                success: true,
+                message: 'Tenant gift wallet recharged successfully',
+                walletBalance: walletResult.balanceAfter,
+                transaction: giftTx
+            };
+
+            if (idempotencyRecord) {
+                await idempotencyRecord.update({
+                    status: 'completed',
+                    responsePayload: finalResponse
+                }).catch(() => undefined);
+            }
+
+            return res.json(finalResponse);
+        } catch (innerError) {
+            await tx.rollback();
+            throw innerError;
+        }
     } catch (error) {
-        await tx.rollback();
+        if (idempotencyRecord) {
+            await idempotencyRecord.update({
+                status: 'failed',
+                errorMessage: error.message
+            }).catch(() => undefined);
+        }
         console.error('Tenant self purchase gift error:', error);
-        res.status(400).json({ success: false, message: error.message || 'Failed to complete purchase' });
+        return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Failed to complete purchase' });
     }
 };
 
 exports.sendGift = async (req, res) => {
-    const tx = await db.sequelize.transaction();
+    const senderId = req.userId;
+    const { tenantId, packageId, recipientEmail, recipientPhone, message } = req.body || {};
+    const idempotencyKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_HEADER] || req.body?.idempotencyKey);
+    let idempotencyRecord = null;
+
     try {
-        const senderId = req.userId;
-        const { tenantId, packageId, recipientEmail, recipientPhone, message } = req.body || {};
         const paymentPayload = validateGiftPaymentPayload(req.body || {});
         const email = normalize(recipientEmail).toLowerCase();
         const phone = normalizePhone(recipientPhone);
         if (!tenantId || !packageId) throw new Error('tenantId and packageId are required');
         if (!email && !phone) throw new Error('recipientEmail or recipientPhone is required');
 
-        const giftPackage = await findActiveTenantPackage(tenantId, packageId);
-        if (!giftPackage) {
-            await tx.rollback();
-            return res.status(404).json({ success: false, message: 'Gift package not found or inactive' });
-        }
-        const packageTitle = giftPackage.title || giftPackage.title_en || giftPackage.title_ar || 'Tenant gift card';
-
-        const sender = await db.PlatformUser.findByPk(senderId, { transaction: tx });
-        if (!sender) throw new Error('Sender not found');
-
-        const recipient = await db.PlatformUser.findOne({
-            where: buildRecipientWhere({ email, phone }),
-            transaction: tx
-        });
-
-        const purchaseAmount = Number(giftPackage.priceAmount || 0);
-        const totalCredit = Number(giftPackage.walletCreditAmount || 0) + Number(giftPackage.bonusAmount || 0);
-        const claimToken = crypto.randomBytes(24).toString('hex');
-        const expiresAt = new Date(Date.now() + (CLAIM_EXPIRY_HOURS * 60 * 60 * 1000));
-
-        const paymentTransaction = await createPaymentTransaction({
-            platformUserId: senderId,
-            tenantId,
-            amount: purchaseAmount,
-            cardNumber: paymentPayload.cardNumber,
-            cardholderName: paymentPayload.cardholderName,
-            giftFlow: 'tenant_send_gift',
-            packageId: giftPackage.id,
-            transaction: tx
-        });
-
-        const isRecipientRegistered = !!recipient?.id;
-        if (!isRecipientRegistered && !email) {
-            throw new Error('Recipient email is required for users without an account');
-        }
-        let createdGiftCode = null;
-        if (!isRecipientRegistered) {
-            for (let attempt = 0; attempt < 5; attempt += 1) {
-                const candidate = generateGiftCode('TN');
-                const exists = await db.GiftCardCode.findOne({ where: { code: candidate }, transaction: tx });
-                if (!exists) {
-                    createdGiftCode = await db.GiftCardCode.create({
-                        code: candidate,
-                        scopeType: 'tenant_scoped',
-                        tenantId,
-                        sourceGiftCardTransactionId: null,
-                        sourceTenantGiftCardTransactionId: null,
-                        initialAmount: totalCredit,
-                        remainingAmount: totalCredit,
-                        currency: 'SAR',
-                        recipientEmail: email || null,
-                        recipientPhone: phone || null,
-                        status: 'issued',
-                        expiresAt,
-                        metadata: {
-                            packageId: giftPackage.id,
-                            packageTitle,
-                            senderPlatformUserId: senderId
-                        }
-                    }, { transaction: tx });
-                    break;
-                }
-            }
-            if (!createdGiftCode) {
-                throw new Error('Failed to generate unique tenant gift code');
-            }
-        }
-
-        const giftTx = await db.TenantGiftCardTransaction.create({
-            tenantId,
-            packageId: giftPackage.id,
-            senderPlatformUserId: senderId,
-            recipientPlatformUserId: recipient?.id || null,
-            recipientEmail: email || null,
-            recipientPhone: phone || null,
-            purchaseAmount: giftPackage.priceAmount,
-            creditAmount: giftPackage.walletCreditAmount,
-            bonusAmount: giftPackage.bonusAmount,
-            totalCreditAmount: totalCredit,
-            status: isRecipientRegistered ? 'sent_completed_auto_wallet' : 'sent_pending_external_redeem',
-            deliveryChannel: isRecipientRegistered ? 'in_app' : 'email',
-            claimToken: isRecipientRegistered ? null : claimToken,
-            claimedAt: isRecipientRegistered ? new Date() : null,
-            expiresAt,
-            deliveryMode: isRecipientRegistered ? 'auto_wallet' : 'external_code',
-            giftCardCodeId: createdGiftCode?.id || null,
-            recipientResolvedPlatformUserId: recipient?.id || null,
-            metadata: {
-                senderMessage: normalize(message) || null,
-                paymentTransactionId: paymentTransaction.id,
-                externalRedeemCode: createdGiftCode?.code || null
-            }
-        }, { transaction: tx });
-
-        if (createdGiftCode?.id) {
-            createdGiftCode.sourceTenantGiftCardTransactionId = giftTx.id;
-            await createdGiftCode.save({ transaction: tx });
-        }
-
-        if (isRecipientRegistered) {
-            await tenantWalletService.creditTenantWallet({
-                platformUserId: recipient.id,
+        if (idempotencyKey) {
+            const requestHash = buildPayloadHash({
+                senderId,
                 tenantId,
-                amount: totalCredit,
-                type: 'tenant_gift_credit',
-                referenceType: 'tenant_gift_card_transaction',
-                referenceId: giftTx.id,
-                metadata: {
-                    senderId: sender.id,
-                    senderName: `${sender.firstName || ''} ${sender.lastName || ''}`.trim()
-                },
+                packageId,
+                email,
+                phone,
+                cardLast4: paymentPayload.cardNumber.slice(-4)
+            });
+            const { record, replayed, responsePayload } = await reserveIdempotency(senderId, idempotencyKey, requestHash);
+            if (replayed) {
+                res.setHeader('x-idempotency-replayed', 'true');
+                return res.json(responsePayload);
+            }
+            idempotencyRecord = record;
+        }
+
+        const tx = await db.sequelize.transaction();
+        try {
+            const giftPackage = await findActiveTenantPackage(tenantId, packageId);
+            if (!giftPackage) {
+                await tx.rollback();
+                if (idempotencyRecord) {
+                    await idempotencyRecord.update({ status: 'failed', errorMessage: 'Gift package not found or inactive' }).catch(() => undefined);
+                }
+                return res.status(404).json({ success: false, message: 'Gift package not found or inactive' });
+            }
+            const packageTitle = giftPackage.title || giftPackage.title_en || giftPackage.title_ar || 'Tenant gift card';
+
+            const sender = await db.PlatformUser.findByPk(senderId, { transaction: tx });
+            if (!sender) throw new Error('Sender not found');
+
+            const recipient = await db.PlatformUser.findOne({
+                where: buildRecipientWhere({ email, phone }),
                 transaction: tx
             });
-        }
 
-        await tenantGiftSettlementService.createPendingSettlement({
-            tenantId,
-            transactionId: giftTx.id,
-            packageId: giftPackage.id,
-            grossAmount: purchaseAmount,
-            platformFeeAmount: 0,
-            metadata: { paymentTransactionId: paymentTransaction.id },
-            transaction: tx
-        });
+            const purchaseAmount = Number(giftPackage.priceAmount || 0);
+            const totalCredit = Number(giftPackage.walletCreditAmount || 0) + Number(giftPackage.bonusAmount || 0);
+            const claimToken = crypto.randomBytes(24).toString('hex');
+            const expiresAt = new Date(Date.now() + (CLAIM_EXPIRY_HOURS * 60 * 60 * 1000));
 
-        await tx.commit();
+            const paymentTransaction = await createPaymentTransaction({
+                platformUserId: senderId,
+                tenantId,
+                amount: purchaseAmount,
+                cardNumber: paymentPayload.cardNumber,
+                cardholderName: paymentPayload.cardholderName,
+                giftFlow: 'tenant_send_gift',
+                packageId: giftPackage.id,
+                transaction: tx
+            });
 
-        const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Someone';
-        if (isRecipientRegistered) {
-            try {
-                await notificationOrchestrator.notifyCustomer({
-                    tenantId,
-                    platformUserId: recipient.id,
-                    eventType: 'gift_card_received',
-                    title: 'You received a gift card',
-                    body: `${senderName} sent you ${totalCredit.toFixed(2)} SAR for this center.`,
-                    data: { type: 'tenant_gift_card_received', giftTransactionId: giftTx.id, tenantId }
-                });
-            } catch (notifyError) {
-                console.warn('Tenant gift push notification failed:', notifyError.message);
+            const isRecipientRegistered = !!recipient?.id;
+            if (!isRecipientRegistered && !email) {
+                throw new Error('Recipient email is required for users without an account');
+            }
+            let createdGiftCode = null;
+            if (!isRecipientRegistered) {
+                for (let attempt = 0; attempt < 5; attempt += 1) {
+                    const candidate = generateGiftCode('TN');
+                    const exists = await db.GiftCardCode.findOne({ where: { code: candidate }, transaction: tx });
+                    if (!exists) {
+                        createdGiftCode = await db.GiftCardCode.create({
+                            code: candidate,
+                            scopeType: 'tenant_scoped',
+                            tenantId,
+                            sourceGiftCardTransactionId: null,
+                            sourceTenantGiftCardTransactionId: null,
+                            initialAmount: totalCredit,
+                            remainingAmount: totalCredit,
+                            currency: 'SAR',
+                            recipientEmail: email || null,
+                            recipientPhone: phone || null,
+                            status: 'issued',
+                            expiresAt,
+                            metadata: {
+                                packageId: giftPackage.id,
+                                packageTitle,
+                                senderPlatformUserId: senderId
+                            }
+                        }, { transaction: tx });
+                        break;
+                    }
+                }
+                if (!createdGiftCode) {
+                    throw new Error('Failed to generate unique tenant gift code');
+                }
             }
 
-            if (email) {
+            const giftTx = await db.TenantGiftCardTransaction.create({
+                tenantId,
+                packageId: giftPackage.id,
+                senderPlatformUserId: senderId,
+                recipientPlatformUserId: recipient?.id || null,
+                recipientEmail: email || null,
+                recipientPhone: phone || null,
+                purchaseAmount: giftPackage.priceAmount,
+                creditAmount: giftPackage.walletCreditAmount,
+                bonusAmount: giftPackage.bonusAmount,
+                totalCreditAmount: totalCredit,
+                status: isRecipientRegistered ? 'sent_completed_auto_wallet' : 'sent_pending_external_redeem',
+                deliveryChannel: isRecipientRegistered ? 'in_app' : 'email',
+                claimToken: isRecipientRegistered ? null : claimToken,
+                claimedAt: isRecipientRegistered ? new Date() : null,
+                expiresAt,
+                deliveryMode: isRecipientRegistered ? 'auto_wallet' : 'external_code',
+                giftCardCodeId: createdGiftCode?.id || null,
+                recipientResolvedPlatformUserId: recipient?.id || null,
+                metadata: {
+                    senderMessage: normalize(message) || null,
+                    paymentTransactionId: paymentTransaction.id,
+                    externalRedeemCode: createdGiftCode?.code || null
+                }
+            }, { transaction: tx });
+
+            if (createdGiftCode?.id) {
+                createdGiftCode.sourceTenantGiftCardTransactionId = giftTx.id;
+                await createdGiftCode.save({ transaction: tx });
+            }
+
+            if (isRecipientRegistered) {
+                await tenantWalletService.creditTenantWallet({
+                    platformUserId: recipient.id,
+                    tenantId,
+                    amount: totalCredit,
+                    type: 'tenant_gift_credit',
+                    referenceType: 'tenant_gift_card_transaction',
+                    referenceId: giftTx.id,
+                    metadata: {
+                        senderId: sender.id,
+                        senderName: `${sender.firstName || ''} ${sender.lastName || ''}`.trim()
+                    },
+                    transaction: tx
+                });
+            }
+
+            await tenantGiftSettlementService.createPendingSettlement({
+                tenantId,
+                transactionId: giftTx.id,
+                packageId: giftPackage.id,
+                grossAmount: purchaseAmount,
+                platformFeeAmount: 0,
+                metadata: { paymentTransactionId: paymentTransaction.id },
+                transaction: tx
+            });
+
+            await tx.commit();
+
+            const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Someone';
+            if (isRecipientRegistered) {
+                try {
+                    await notificationOrchestrator.notifyCustomer({
+                        tenantId,
+                        platformUserId: recipient.id,
+                        eventType: 'gift_card_received',
+                        title: 'You received a gift card',
+                        body: `${senderName} sent you ${totalCredit.toFixed(2)} SAR for this center.`,
+                        data: { type: 'tenant_gift_card_received', giftTransactionId: giftTx.id, tenantId }
+                    });
+                } catch (notifyError) {
+                    console.warn('Tenant gift push notification failed:', notifyError.message);
+                }
+
+                if (email) {
+                    const claimLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/users/tenant-gifts/claim/open?token=${encodeURIComponent(claimToken)}`;
+                    const code = createdGiftCode?.code || '';
+                    sendTenantGiftClaimEmail({
+                        to: email,
+                        senderName,
+                        totalCredit,
+                        code,
+                        claimLink
+                    }).catch(() => undefined);
+                }
+            } else if (email) {
                 const claimLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/users/tenant-gifts/claim/open?token=${encodeURIComponent(claimToken)}`;
                 const code = createdGiftCode?.code || '';
-                await sendTenantGiftClaimEmail({
+                sendTenantGiftClaimEmail({
                     to: email,
                     senderName,
                     totalCredit,
@@ -410,30 +540,37 @@ exports.sendGift = async (req, res) => {
                     claimLink
                 }).catch(() => undefined);
             }
-        } else if (email) {
-            const claimLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/users/tenant-gifts/claim/open?token=${encodeURIComponent(claimToken)}`;
-            const code = createdGiftCode?.code || '';
-            await sendTenantGiftClaimEmail({
-                to: email,
-                senderName,
-                totalCredit,
-                code,
-                claimLink
+
+            const finalResponse = {
+                success: true,
+                message: isRecipientRegistered
+                    ? 'Gift sent and credited successfully'
+                    : 'Gift sent to recipient email with redeem code.',
+                transaction: giftTx,
+                externalRedeemCode: createdGiftCode?.code || null
+            };
+
+            if (idempotencyRecord) {
+                await idempotencyRecord.update({
+                    status: 'completed',
+                    responsePayload: finalResponse
+                }).catch(() => undefined);
+            }
+
+            return res.json(finalResponse);
+        } catch (innerError) {
+            await tx.rollback();
+            throw innerError;
+        }
+    } catch (error) {
+        if (idempotencyRecord) {
+            await idempotencyRecord.update({
+                status: 'failed',
+                errorMessage: error.message
             }).catch(() => undefined);
         }
-
-        res.json({
-            success: true,
-            message: isRecipientRegistered
-                ? 'Gift sent and credited successfully'
-                : 'Gift sent to recipient email with redeem code.',
-            transaction: giftTx,
-            externalRedeemCode: createdGiftCode?.code || null
-        });
-    } catch (error) {
-        await tx.rollback();
         console.error('Tenant send gift error:', error);
-        res.status(400).json({ success: false, message: error.message || 'Failed to send gift' });
+        return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Failed to send gift' });
     }
 };
 
@@ -441,35 +578,110 @@ exports.claimGift = async (req, res) => {
     const tx = await db.sequelize.transaction();
     try {
         const platformUserId = req.userId;
-        const token = normalize(req.body?.token);
-        if (!token) throw new Error('token is required');
+        const rawCode = normalize(req.body?.code);
+        const rawToken = normalize(req.body?.token);
 
-        const giftTx = await db.TenantGiftCardTransaction.findOne({
-            where: {
-                claimToken: token,
-                status: {
-                    [Op.in]: ['sent_pending_claim', 'sent_pending_external_redeem']
-                }
-            },
-            transaction: tx,
-            lock: tx.LOCK.UPDATE
-        });
-        if (!giftTx) {
+        if (!rawCode && !rawToken) {
             await tx.rollback();
-            return res.status(404).json({ success: false, message: 'Gift claim not found' });
+            return res.status(400).json({ success: false, message: 'voucher code or claim token is required' });
         }
+
+        let giftTx = null;
+        let giftCode = null;
+
+        if (rawCode) {
+            // Path 1: Human-readable voucher code (e.g. TN-XXXX-XXXX-XXXX)
+            giftCode = await db.GiftCardCode.findOne({
+                where: { code: rawCode },
+                transaction: tx,
+                lock: tx.LOCK.UPDATE
+            });
+
+            if (!giftCode) {
+                await tx.rollback();
+                return res.status(404).json({ success: false, message: 'Voucher code not found' });
+            }
+
+            if (giftCode.status === 'redeemed' || Number(giftCode.remainingAmount || 0) <= 0) {
+                await tx.rollback();
+                return res.status(400).json({ success: false, message: 'Voucher code already redeemed' });
+            }
+
+            const giftTxId = giftCode.sourceTenantGiftCardTransactionId;
+            if (giftTxId) {
+                giftTx = await db.TenantGiftCardTransaction.findOne({
+                    where: {
+                        id: giftTxId,
+                        status: { [Op.in]: ['sent_pending_claim', 'sent_pending_external_redeem'] }
+                    },
+                    transaction: tx,
+                    lock: tx.LOCK.UPDATE
+                });
+            } else {
+                giftTx = await db.TenantGiftCardTransaction.findOne({
+                    where: {
+                        giftCardCodeId: giftCode.id,
+                        status: { [Op.in]: ['sent_pending_claim', 'sent_pending_external_redeem'] }
+                    },
+                    transaction: tx,
+                    lock: tx.LOCK.UPDATE
+                });
+            }
+
+            if (!giftTx) {
+                await tx.rollback();
+                return res.status(404).json({ success: false, message: 'Associated gift transaction not found or already claimed' });
+            }
+        } else if (rawToken) {
+            // Path 2: Internal 48-char claim token
+            giftTx = await db.TenantGiftCardTransaction.findOne({
+                where: {
+                    claimToken: rawToken,
+                    status: {
+                        [Op.in]: ['sent_pending_claim', 'sent_pending_external_redeem']
+                    }
+                },
+                transaction: tx,
+                lock: tx.LOCK.UPDATE
+            });
+
+            if (!giftTx) {
+                await tx.rollback();
+                return res.status(404).json({ success: false, message: 'Gift claim not found or already redeemed' });
+            }
+
+            if (giftTx.giftCardCodeId) {
+                giftCode = await db.GiftCardCode.findByPk(giftTx.giftCardCodeId, {
+                    transaction: tx,
+                    lock: tx.LOCK.UPDATE
+                });
+            }
+        }
+
+        // Check expiration
         if (giftTx.expiresAt && new Date(giftTx.expiresAt).getTime() < Date.now()) {
             giftTx.status = 'expired';
             await giftTx.save({ transaction: tx });
+            if (giftCode) {
+                giftCode.status = 'expired';
+                await giftCode.save({ transaction: tx });
+            }
             await tx.commit();
             return res.status(410).json({ success: false, message: 'Gift claim expired' });
         }
 
         giftTx.recipientPlatformUserId = platformUserId;
+        giftTx.recipientResolvedPlatformUserId = platformUserId;
         giftTx.status = 'redeemed';
         giftTx.claimedAt = new Date();
         giftTx.claimToken = null;
         await giftTx.save({ transaction: tx });
+
+        if (giftCode) {
+            giftCode.remainingAmount = 0;
+            giftCode.status = 'redeemed';
+            await giftCode.save({ transaction: tx });
+        }
 
         const walletResult = await tenantWalletService.creditTenantWallet({
             platformUserId,
@@ -478,15 +690,54 @@ exports.claimGift = async (req, res) => {
             type: 'tenant_gift_credit',
             referenceType: 'tenant_gift_card_transaction',
             referenceId: giftTx.id,
+            metadata: {
+                flow: rawCode ? 'voucher_code_claim' : 'claim_token_claim',
+                voucherCode: giftCode?.code || null
+            },
             transaction: tx
         });
 
         await tx.commit();
-        res.json({ success: true, message: 'Gift claimed successfully', walletBalance: walletResult.balanceAfter, transaction: giftTx });
+        return res.json({
+            success: true,
+            message: 'Gift claimed successfully',
+            walletBalance: walletResult.balanceAfter,
+            transaction: giftTx
+        });
     } catch (error) {
         await tx.rollback();
         console.error('Tenant gift claim error:', error);
-        res.status(400).json({ success: false, message: error.message || 'Failed to claim gift' });
+        return res.status(400).json({ success: false, message: error.message || 'Failed to claim gift' });
+    }
+};
+
+exports.getReceivedTenantGifts = async (req, res) => {
+    try {
+        const platformUserId = req.userId;
+        const { status } = req.query || {};
+        const where = {
+            [Op.or]: [
+                { recipientPlatformUserId: platformUserId },
+                { recipientResolvedPlatformUserId: platformUserId }
+            ]
+        };
+        if (status) {
+            where.status = status;
+        }
+        const rows = await db.TenantGiftCardTransaction.findAll({
+            where,
+            include: [
+                { model: db.TenantGiftCardPackage, as: 'package', required: false },
+                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'name_en', 'name_ar', 'logo'], required: false },
+                { model: db.PlatformUser, as: 'sender', attributes: ['id', 'firstName', 'lastName', 'email', 'phone'], required: false },
+                { model: db.GiftCardCode, as: 'giftCode', attributes: ['id', 'code', 'status', 'expiresAt'], required: false }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+        return res.json({ success: true, gifts: rows, data: rows });
+    } catch (error) {
+        console.error('List received tenant gifts error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to load received tenant gifts' });
     }
 };
 
