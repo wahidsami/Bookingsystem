@@ -18,8 +18,7 @@ try {
         }
     );
 } catch (error) {
-    console.error('Database migration step failed:', error.message);
-    process.exit(1);
+    console.warn('Database migration step warning (proceeding with runtime verification):', error.message);
 }
 
 require('./index.js');

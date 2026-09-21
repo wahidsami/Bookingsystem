@@ -762,6 +762,58 @@ const ensureUserAddressSchema = async () => {
     }
 };
 
+const ensureTenantSettlementSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            DO $$
+            BEGIN
+                -- 1. Ensure enum values for tenant_wallet_ledger_entries type
+                BEGIN
+                    ALTER TYPE enum_tenant_wallet_ledger_entries_type ADD VALUE IF NOT EXISTS 'tenant_wallet_card_recharge';
+                EXCEPTION
+                    WHEN others THEN NULL;
+                END;
+
+                BEGIN
+                    ALTER TYPE enum_tenant_wallet_ledger_entries_type ADD VALUE IF NOT EXISTS 'tenant_wallet_card_recharge_refund';
+                EXCEPTION
+                    WHEN others THEN NULL;
+                END;
+
+                -- 2. Create tenant_settlements table if not exists
+                CREATE TABLE IF NOT EXISTS public.tenant_settlements (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    "tenantId" UUID NOT NULL REFERENCES public.tenants(id) ON UPDATE CASCADE ON DELETE CASCADE,
+                    "sourceTransactionId" UUID REFERENCES public.transactions(id) ON UPDATE CASCADE ON DELETE SET NULL,
+                    "sourceType" VARCHAR(50) NOT NULL,
+                    "grossAmount" DECIMAL(10, 2) NOT NULL,
+                    "platformFeeAmount" DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+                    "gatewayFeeAmount" DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+                    "refundAmount" DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+                    "adjustmentAmount" DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+                    "netPayableAmount" DECIMAL(10, 2) NOT NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'pending',
+                    "settlementPeriod" VARCHAR(50) NOT NULL,
+                    "settlementReference" VARCHAR(100),
+                    "settledAt" TIMESTAMP WITH TIME ZONE,
+                    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                );
+
+                -- 3. Create indices
+                CREATE INDEX IF NOT EXISTS idx_tenant_settlements_tenant_status ON public.tenant_settlements ("tenantId", status);
+                CREATE INDEX IF NOT EXISTS idx_tenant_settlements_period ON public.tenant_settlements ("settlementPeriod");
+                CREATE INDEX IF NOT EXISTS idx_tenant_settlements_source_tx ON public.tenant_settlements ("sourceTransactionId");
+                CREATE INDEX IF NOT EXISTS idx_tenant_settlements_source_type ON public.tenant_settlements ("sourceType");
+            END $$;
+        `);
+        console.log('Tenant settlement schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure tenant settlement schema:', error);
+    }
+};
+
 // Database Connection and Server Start
 const startServer = async () => {
     try {
@@ -779,6 +831,7 @@ const startServer = async () => {
         await ensureBookingSessionSchema();
         await ensurePaymentTransactionSchema();
         await ensureUserAddressSchema();
+        await ensureTenantSettlementSchema();
 
         console.log('✅ Database connectivity verified successfully.');
 
