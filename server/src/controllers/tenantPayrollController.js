@@ -1,5 +1,6 @@
 const db = require('../models');
 const { Op } = require('sequelize');
+const { sanitizeReviewCustomerIdentity } = require('./reviewController');
 
 exports.getAllReviews = async (req, res) => {
     try {
@@ -18,20 +19,30 @@ exports.getAllReviews = async (req, res) => {
 
         const reviews = await db.Review.findAll({
             where,
-            include: [{ model: db.Staff, as: 'staff', attributes: ['id', 'name'] }],
+            include: [
+                { model: db.Staff, as: 'staff', attributes: ['id', 'name'] },
+                {
+                    model: db.PlatformUser,
+                    as: 'platformUser',
+                    attributes: ['id', 'firstName', 'lastName'],
+                    required: false
+                }
+            ],
             order: [['createdAt', 'DESC']]
         });
 
-        const avgRating = reviews.length > 0
-            ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
+        const sanitizedReviews = reviews.map(sanitizeReviewCustomerIdentity);
+
+        const avgRating = sanitizedReviews.length > 0
+            ? (sanitizedReviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / sanitizedReviews.length).toFixed(1)
             : null;
 
         res.status(200).json({
             success: true,
             data: {
-                reviews,
+                reviews: sanitizedReviews,
                 avgRating,
-                total: reviews.length
+                total: sanitizedReviews.length
             }
         });
     } catch (error) {

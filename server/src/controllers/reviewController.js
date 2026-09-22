@@ -24,6 +24,43 @@ const recalculateStaffRating = async (staffId) => {
     );
 };
 
+const isGenericCustomerName = (name) => {
+    if (!name || typeof name !== 'string') return true;
+    const trimmed = name.trim();
+    if (!trimmed) return true;
+    const lower = trimmed.toLowerCase();
+    return (
+        lower === 'verified customer' ||
+        trimmed === 'عميل موثّق' ||
+        lower === 'customer' ||
+        trimmed === 'عميل' ||
+        lower === 'valued customer' ||
+        trimmed === 'عميل مميز'
+    );
+};
+
+const resolveRealCustomerName = (user) => {
+    if (!user) return null;
+    const parts = [user.firstName, user.lastName]
+        .filter(part => Boolean(part && typeof part === 'string' && part.trim().length > 0 && part.trim().toLowerCase() !== 'undefined'));
+    const fullName = parts.join(' ').trim();
+    return fullName.length > 0 ? fullName : null;
+};
+
+const sanitizeReviewCustomerIdentity = (reviewInstanceOrJson) => {
+    const json = (reviewInstanceOrJson && typeof reviewInstanceOrJson.toJSON === 'function')
+        ? reviewInstanceOrJson.toJSON()
+        : { ...reviewInstanceOrJson };
+
+    if (isGenericCustomerName(json.customerName)) {
+        const realName = resolveRealCustomerName(json.platformUser);
+        if (realName) {
+            json.customerName = realName;
+        }
+    }
+    return json;
+};
+
 exports.createCustomerReview = async (req, res) => {
     try {
         const platformUserId = req.userId;
@@ -104,14 +141,26 @@ exports.createCustomerReview = async (req, res) => {
         }
 
         const user = await db.PlatformUser.findByPk(platformUserId);
-        const fallbackCustomerName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Customer';
+        const resolvedRealName = resolveRealCustomerName(user);
+        const fallbackCustomerName = user?.email || 'Customer';
+
+        // Identity is strictly sourced from authenticated PlatformUser when available.
+        // Client-supplied customerName is not trusted if the user has a real name in their profile.
+        let finalCustomerName;
+        if (resolvedRealName) {
+            finalCustomerName = resolvedRealName;
+        } else if (customerName && typeof customerName === 'string' && !isGenericCustomerName(customerName) && customerName.trim()) {
+            finalCustomerName = customerName.trim();
+        } else {
+            finalCustomerName = fallbackCustomerName;
+        }
 
         const review = await db.Review.create({
             tenantId,
             appointmentId,
             staffId: resolvedStaffId,
             platformUserId,
-            customerName: (typeof customerName === 'string' && customerName.trim()) ? customerName.trim() : fallbackCustomerName,
+            customerName: finalCustomerName,
             rating: Math.round(parsedRating),
             comment: typeof comment === 'string' ? comment.trim() : null,
             isVisible: true
@@ -214,20 +263,28 @@ exports.getTenantPublicReviews = async (req, res) => {
                     as: 'staff',
                     attributes: ['id', 'name', 'photo'],
                     required: false
+                },
+                {
+                    model: db.PlatformUser,
+                    as: 'platformUser',
+                    attributes: ['id', 'firstName', 'lastName'],
+                    required: false
                 }
             ],
             order: [['createdAt', 'DESC']],
             limit
         });
 
-        const total = reviews.length;
+        const sanitizedReviews = reviews.map(sanitizeReviewCustomerIdentity);
+
+        const total = sanitizedReviews.length;
         const avgRating = total > 0
-            ? Number((reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / total).toFixed(1))
+            ? Number((sanitizedReviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / total).toFixed(1))
             : null;
 
         return res.json({
             success: true,
-            reviews,
+            reviews: sanitizedReviews,
             summary: {
                 total,
                 avgRating
@@ -253,18 +310,28 @@ exports.getStaffPublicReviews = async (req, res) => {
                 staffId,
                 isVisible: true
             },
+            include: [
+                {
+                    model: db.PlatformUser,
+                    as: 'platformUser',
+                    attributes: ['id', 'firstName', 'lastName'],
+                    required: false
+                }
+            ],
             order: [['createdAt', 'DESC']],
             limit
         });
 
-        const total = reviews.length;
+        const sanitizedReviews = reviews.map(sanitizeReviewCustomerIdentity);
+
+        const total = sanitizedReviews.length;
         const avgRating = total > 0
-            ? Number((reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / total).toFixed(1))
+            ? Number((sanitizedReviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / total).toFixed(1))
             : null;
 
         return res.json({
             success: true,
-            reviews,
+            reviews: sanitizedReviews,
             summary: {
                 total,
                 avgRating
@@ -279,3 +346,7 @@ exports.getStaffPublicReviews = async (req, res) => {
         });
     }
 };
+
+exports.isGenericCustomerName = isGenericCustomerName;
+exports.resolveRealCustomerName = resolveRealCustomerName;
+exports.sanitizeReviewCustomerIdentity = sanitizeReviewCustomerIdentity;
