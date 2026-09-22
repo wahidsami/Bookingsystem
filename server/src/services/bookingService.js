@@ -775,6 +775,27 @@ class BookingService {
                     if (!servicePackage) throw new Error('Package not found or unauthorized');
                     if (!servicePackage.isActive) throw new Error('Package is not active');
 
+                    // Enforce Safety Rule: Backend validation that all package items are currently active
+                    const activePackageItems = await db.ServicePackageItem.findAll({
+                        where: { packageId: servicePackage.id, isActive: true },
+                        transaction: finalTransaction
+                    });
+
+                    for (const pItem of packageItems) {
+                        if (pItem.packageItemId) {
+                            const validActiveItem = activePackageItems.find(item => item.id === pItem.packageItemId);
+                            if (!validActiveItem) {
+                                throw new Error(`Package item ${pItem.packageItemId} is inactive or does not belong to package ${servicePackage.id}`);
+                            }
+                        } else {
+                            const matchingActiveItem = activePackageItems.find(item => item.serviceId === pItem.serviceId);
+                            if (!matchingActiveItem) {
+                                throw new Error(`Service ${pItem.serviceId} is not a current active item of package ${servicePackage.id}`);
+                            }
+                            pItem.packageItemId = matchingActiveItem.id;
+                        }
+                    }
+
                     const packageTotalPrice = Number(servicePackage.totalPrice || 0);
 
                     // Fetch services for pro-rata calculation

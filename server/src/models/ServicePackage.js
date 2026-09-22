@@ -11,7 +11,10 @@ module.exports = (sequelize, DataTypes) => {
 
             ServicePackage.hasMany(models.ServicePackageItem, {
                 foreignKey: 'packageId',
-                as: 'items'
+                as: 'items',
+                scope: {
+                    isActive: true
+                }
             });
 
             ServicePackage.hasMany(models.Appointment, {

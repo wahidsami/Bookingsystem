@@ -62,6 +62,12 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: 0,
             comment: 'Order of execution in the package'
+        },
+        isActive: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+            comment: 'Soft deletion/status for historical integrity'
         }
     }, {
         sequelize,

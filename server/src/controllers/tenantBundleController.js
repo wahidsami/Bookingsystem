@@ -1,5 +1,5 @@
 const db = require('../models');
-const { ServicePackage, ServicePackageItem, Service, Staff, TenantServiceCategory } = db;
+const { ServicePackage, ServicePackageItem, Service, Staff, TenantServiceCategory, Appointment } = db;
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -474,9 +474,9 @@ exports.updateBundle = async (req, res) => {
         // Check if items are provided to replace
         const items = req.body.items ? parseItemsPayload(req.body.items) : null;
         if (Array.isArray(items) && items.length > 0) {
-            // Delete existing items
-            await ServicePackageItem.destroy({
-                where: { packageId: bundle.id },
+            // Load existing active items for this package
+            const existingItems = await ServicePackageItem.findAll({
+                where: { packageId: bundle.id, isActive: true },
                 transaction
             });
 
@@ -493,19 +493,92 @@ exports.updateBundle = async (req, res) => {
             bundle.totalPrice = pricing.effectiveTotalPrice;
             bundle.totalDuration = pricing.totalDuration;
 
-            const packageItems = items.map((item, index) => ({
-                packageId: bundle.id,
-                serviceId: item.serviceId,
-                variantId: item.variantId || null,
-                defaultStaffId: item.defaultStaffId || null,
-                sequenceOrder: item.sequenceOrder !== undefined ? Number(item.sequenceOrder) : index
+            // In-place reconciliation to preserve historical ServicePackageItem IDs and appointment FK integrity
+            // SAFETY: Operates exclusively on currently active package items.
+            // Inactive historical items are never matched, reactivated, or deleted.
+            const matchedExistingIds = new Set();
+            const itemPlans = items.map((item, index) => ({
+                rawItem: item,
+                targetSequenceOrder: item.sequenceOrder !== undefined ? Number(item.sequenceOrder) : index,
+                matchedExisting: null
             }));
 
-            await ServicePackageItem.bulkCreate(packageItems, { transaction });
+            // Pass 1: Incoming item with a valid existing active package-item ID
+            // Match and update that exact existing row in place
+            for (const plan of itemPlans) {
+                const rawId = plan.rawItem.id;
+                if (rawId) {
+                    const found = existingItems.find(e => e.id === rawId && !matchedExistingIds.has(e.id));
+                    if (found) {
+                        plan.matchedExisting = found;
+                        matchedExistingIds.add(found.id);
+                    }
+                }
+            }
+
+            // Pass 2: Incoming item without an ID matches only against an unmatched existing active row
+            // when the serviceId + variantId combination is unambiguous
+            for (const plan of itemPlans) {
+                if (!plan.matchedExisting) {
+                    const targetServiceId = plan.rawItem.serviceId;
+                    const targetVariantId = plan.rawItem.variantId || null;
+
+                    const candidateMatches = existingItems.filter(e =>
+                        !matchedExistingIds.has(e.id) &&
+                        e.serviceId === targetServiceId &&
+                        (e.variantId || null) === targetVariantId
+                    );
+
+                    if (candidateMatches.length === 1) {
+                        plan.matchedExisting = candidateMatches[0];
+                        matchedExistingIds.add(candidateMatches[0].id);
+                    }
+                }
+            }
+
+            // Execute in-place updates for matched items or create new items (Rule 3)
+            for (const plan of itemPlans) {
+                if (plan.matchedExisting) {
+                    plan.matchedExisting.serviceId = plan.rawItem.serviceId;
+                    plan.matchedExisting.variantId = plan.rawItem.variantId || null;
+                    plan.matchedExisting.defaultStaffId = plan.rawItem.defaultStaffId || null;
+                    plan.matchedExisting.sequenceOrder = plan.targetSequenceOrder;
+                    plan.matchedExisting.isActive = true;
+                    await plan.matchedExisting.save({ transaction });
+                } else {
+                    await ServicePackageItem.create({
+                        packageId: bundle.id,
+                        serviceId: plan.rawItem.serviceId,
+                        variantId: plan.rawItem.variantId || null,
+                        defaultStaffId: plan.rawItem.defaultStaffId || null,
+                        sequenceOrder: plan.targetSequenceOrder,
+                        isActive: true
+                    }, { transaction });
+                }
+            }
+
+            // Removed items: For existing active package items missing from incoming list
+            const unmatchedExisting = existingItems.filter(e => !matchedExistingIds.has(e.id));
+            for (const orphan of unmatchedExisting) {
+                const appointmentCount = await Appointment.count({
+                    where: { packageItemId: orphan.id },
+                    transaction
+                });
+
+                if (appointmentCount === 0) {
+                    // Safe to delete because no appointments reference it
+                    await orphan.destroy({ transaction });
+                } else {
+                    // Referenced by existing appointments; NEVER delete to preserve historical FK references
+                    // Deactivate so it is excluded from current bundle reads, UI, and future bookings
+                    orphan.isActive = false;
+                    await orphan.save({ transaction });
+                }
+            }
         } else if (pricingType !== undefined || customPrice !== undefined || discountPercentage !== undefined) {
-            // Recalculate price on existing items if pricing parameters changed
+            // Recalculate price on existing active items if pricing parameters changed
             const existingItems = await ServicePackageItem.findAll({
-                where: { packageId: bundle.id },
+                where: { packageId: bundle.id, isActive: true },
                 transaction
             });
 
