@@ -143,18 +143,26 @@ export default function ServiceResourceRequirementsSection({
   };
 
   return (
-    <div className="pt-6 border-t border-slate-200 dark:border-zinc-800 space-y-4">
+    <div className={`pt-6 border-t ${darkMode ? 'border-zinc-800' : 'border-slate-200'} space-y-4`}>
       {/* Section Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-300 border border-brand-100 dark:border-brand-800/40 flex items-center justify-center">
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
+            darkMode
+              ? 'bg-brand-950/60 text-brand-300 border-brand-800/40'
+              : 'bg-brand-50 text-brand-600 border-brand-100'
+          }`}>
             <Boxes size={16} />
           </div>
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-zinc-100">
+            <h4 className={`text-xs font-bold uppercase tracking-wider ${
+              darkMode ? 'text-zinc-100' : 'text-slate-900'
+            }`}>
               {isRtl ? 'الموارد والغرف المطلوبة' : 'Resource & Room Requirements'}
             </h4>
-            <span className="text-xs text-slate-500 dark:text-zinc-400 block mt-0.5 font-normal">
+            <span className={`text-xs block mt-0.5 font-normal ${
+              darkMode ? 'text-zinc-400' : 'text-slate-500'
+            }`}>
               {isRtl
                 ? 'تخصيص الغرف أو الأجهزة المطلوبة لتنفيذ الخدمة دون تضارب'
                 : 'Require physical rooms or specialized equipment for automatic allocation'}
@@ -164,27 +172,31 @@ export default function ServiceResourceRequirementsSection({
       </div>
 
       {/* Question Toggle: Does this service require resources? */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-2xs space-y-4">
+      <div className={`p-5 rounded-2xl border shadow-2xs space-y-4 ${
+        darkMode ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+      }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-0.5">
-            <span className="text-xs font-bold text-slate-900 dark:text-white block">
+            <span className={`text-xs font-bold block ${darkMode ? 'text-white' : 'text-slate-900'}`}>
               {isRtl ? 'هل تتطلب هذه الخدمة موارد أو غرفاً خاصة؟' : 'Does this service require resources?'}
             </span>
-            <span className="text-xs text-slate-500 dark:text-zinc-400 block font-normal">
+            <span className={`text-xs block font-normal ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
               {isRtl
                 ? 'مثل غرفة مساج، كرسي بديكير، أو جهاز ليزر مخصص أثناء تنفيذ الجلسة'
                 : 'e.g. Dedicated massage suite, pedicure chair, or laser device during the appointment'}
             </span>
           </div>
 
-          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-800 rounded-xl border border-slate-200 dark:border-zinc-700 shrink-0">
+          <div className={`flex items-center gap-1 p-1 rounded-xl border shrink-0 ${
+            darkMode ? 'bg-zinc-800 border-zinc-700' : 'bg-slate-100 border-slate-200'
+          }`}>
             <button
               type="button"
               onClick={() => handleToggleRequiresResources(false)}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 !requiresResources
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 dark:text-zinc-300 dark:hover:text-white'
+                  ? darkMode ? 'bg-zinc-800 text-white shadow-2xs' : 'bg-slate-900 text-white shadow-2xs'
+                  : darkMode ? 'text-zinc-300 hover:text-white' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
               {isRtl ? 'لا' : 'No'}
@@ -195,7 +207,7 @@ export default function ServiceResourceRequirementsSection({
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 requiresResources
                   ? 'bg-brand-500 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 dark:text-zinc-300 dark:hover:text-white'
+                  : darkMode ? 'text-zinc-300 hover:text-white' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
               {isRtl ? 'نعم' : 'Yes'}
@@ -205,21 +217,25 @@ export default function ServiceResourceRequirementsSection({
 
         {/* When Yes: Resource Requirements List */}
         {requiresResources && (
-          <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-3">
+          <div className={`pt-4 border-t space-y-3 ${darkMode ? 'border-zinc-800' : 'border-slate-100'}`}>
             {isLoadingTypes ? (
-              <p className="text-xs text-slate-500 dark:text-zinc-400 font-semibold py-2">
+              <p className={`text-xs font-semibold py-2 ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
                 {isRtl ? 'جارٍ تحميل فئات الموارد...' : 'Loading resource pools...'}
               </p>
             ) : availableTypes.length === 0 ? (
               /* Empty state if tenant has no resource types */
-              <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 space-y-1.5">
+              <div className={`p-4 rounded-xl border space-y-1.5 ${
+                darkMode ? 'bg-amber-950/30 border-amber-800/60 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'
+              }`}>
                 <div className="flex items-center gap-2">
                   <AlertCircle size={16} />
                   <span className="text-xs font-bold">
                     {isRtl ? 'لا توجد موارد مضافة بعد' : 'No Resource Pools Available'}
                   </span>
                 </div>
-                <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300 font-normal">
+                <p className={`text-xs leading-relaxed font-normal ${
+                  darkMode ? 'text-amber-300' : 'text-amber-800'
+                }`}>
                   {isRtl
                     ? 'لم يتم إنشاء أي فئات موارد لصالونك حتى الآن. يمكنك التوجه إلى قسم "الموارد" في القائمة الجانبية لإضافة فئات وغرف مثل (غرف المساج، أجهزة الليزر).'
                     : 'No resource pools have been created for your salon yet. Head to the "Resources" workspace in the sidebar to create pools like Massage Rooms or Laser Devices.'}
@@ -227,7 +243,9 @@ export default function ServiceResourceRequirementsSection({
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider px-2">
+                <div className={`flex items-center justify-between text-xs font-bold uppercase tracking-wider px-2 ${
+                  darkMode ? 'text-zinc-400' : 'text-slate-500'
+                }`}>
                   <span>{isRtl ? 'فئة المورد المطلوبة' : 'Required Resource Pool'}</span>
                   <span className="w-24 text-center">{isRtl ? 'العدد' : 'Quantity'}</span>
                 </div>
@@ -235,7 +253,9 @@ export default function ServiceResourceRequirementsSection({
                 {requirements.map((req, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-3 p-3 bg-slate-50/80 dark:bg-zinc-800/60 rounded-xl border border-slate-200 dark:border-zinc-700 shadow-2xs"
+                    className={`flex items-center gap-3 p-3 rounded-xl border shadow-2xs ${
+                      darkMode ? 'bg-zinc-800/60 border-zinc-700' : 'bg-slate-50/80 border-slate-200'
+                    }`}
                   >
                     {/* Resource Type Dropdown */}
                     <div className="flex-1 min-w-0">
@@ -244,7 +264,11 @@ export default function ServiceResourceRequirementsSection({
                         onChange={(e) =>
                           handleUpdateRequirementRow(index, 'resourceTypeId', e.target.value)
                         }
-                        className={`w-full p-2.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:border-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 text-slate-900 shadow-2xs transition outline-none cursor-pointer dark:bg-zinc-800 dark:border-zinc-700 dark:text-white`}
+                        className={`w-full p-2.5 text-xs font-semibold rounded-xl border shadow-2xs transition outline-none cursor-pointer ${
+                          darkMode
+                            ? 'bg-zinc-800 border-zinc-700 text-white focus:border-brand-400'
+                            : 'border-slate-300 bg-white hover:border-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 text-slate-900'
+                        }`}
                       >
                         <option value="">
                           {isRtl ? 'اختر فئة المورد...' : 'Select resource type...'}
@@ -268,7 +292,11 @@ export default function ServiceResourceRequirementsSection({
                         onChange={(e) =>
                           handleUpdateRequirementRow(index, 'quantity', e.target.value)
                         }
-                        className={`w-full p-2.5 text-xs font-bold text-center rounded-xl border border-slate-300 bg-white hover:border-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 text-slate-900 shadow-2xs transition outline-none dark:bg-zinc-800 dark:border-zinc-700 dark:text-white`}
+                        className={`w-full p-2.5 text-xs font-bold text-center rounded-xl border shadow-2xs transition outline-none ${
+                          darkMode
+                            ? 'bg-zinc-800 border-zinc-700 text-white focus:border-brand-400'
+                            : 'border-slate-300 bg-white hover:border-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 text-slate-900'
+                        }`}
                       />
                     </div>
 
@@ -276,7 +304,11 @@ export default function ServiceResourceRequirementsSection({
                     <button
                       type="button"
                       onClick={() => handleRemoveRequirementRow(index)}
-                      className="p-2.5 rounded-xl border border-slate-200 hover:border-rose-200 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:text-rose-400 dark:hover:bg-rose-950/30 shadow-2xs transition cursor-pointer shrink-0"
+                      className={`p-2.5 rounded-xl border shadow-2xs transition cursor-pointer shrink-0 ${
+                        darkMode
+                          ? 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-rose-400 hover:bg-rose-950/30'
+                          : 'border-slate-200 hover:border-rose-200 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600'
+                      }`}
                       title={isRtl ? 'حذف هذا الشرط' : 'Remove requirement'}
                     >
                       <Trash2 size={15} />
@@ -289,7 +321,11 @@ export default function ServiceResourceRequirementsSection({
                   <button
                     type="button"
                     onClick={handleAddRequirementRow}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-brand-200/80 bg-brand-50/70 hover:bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:border-brand-800/60 dark:text-brand-300 dark:hover:bg-brand-900/50 text-xs font-bold shadow-2xs transition cursor-pointer"
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-bold shadow-2xs transition cursor-pointer ${
+                      darkMode
+                        ? 'bg-brand-950/40 border-brand-800/60 text-brand-300 hover:bg-brand-900/50'
+                        : 'border-brand-200/80 bg-brand-50/70 hover:bg-brand-100 text-brand-700'
+                    }`}
                   >
                     <Plus size={14} />
                     <span>
