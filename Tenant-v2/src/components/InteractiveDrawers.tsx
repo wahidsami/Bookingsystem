@@ -1374,6 +1374,13 @@ export default function InteractiveDrawers({
     setBlockType(emptyDraft.blockType as 'Break' | 'Lunch' | 'Meeting');
     setBlockIsRecurring(Boolean(emptyDraft.blockIsRecurring));
     setBlockEndDate(emptyDraft.blockEndDate as string);
+    setExpandedServiceIds({});
+    setConflictDialog(null);
+    setBookingRecoveryMode('chain');
+    removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+    setAppointmentDraftPending(false);
+    setShowAppointmentDraftPrompt(false);
+    suppressAppointmentDraftPersistenceRef.current = true;
   };
 
   const restoreCartDraft = (snapshot: CartDraftSnapshot | null) => {
@@ -2111,7 +2118,7 @@ export default function InteractiveDrawers({
         const pkgGroup = groupedPackages.get(packageId);
         if (item.notes) pkgGroup.notes.push(item.notes);
 
-        const effectiveStaffId = item.isExplicitStaff ? item.staffId : (item.resolvedStaffId || item.staffId || null);
+        const effectiveStaffId = item.isExplicitStaff ? item.staffId : null;
         pkgGroup.packageItems.push({
           serviceId: resolvedServiceId,
           variantId: variant?.id || undefined,
@@ -2127,7 +2134,7 @@ export default function InteractiveDrawers({
             : undefined)
         });
       } else {
-        const effectiveStaffId = item.isExplicitStaff ? item.staffId : (item.resolvedStaffId || item.staffId || null);
+        const effectiveStaffId = item.isExplicitStaff ? item.staffId : null;
         items.push({
           serviceId: resolvedServiceId,
           staffId: effectiveStaffId,
@@ -2200,7 +2207,7 @@ export default function InteractiveDrawers({
 
     const formattedItems = [
       ...standaloneItems.map(i => {
-        const effectiveStaffId = i.isExplicitStaff ? i.staffId : (i.resolvedStaffId || i.staffId || null);
+        const effectiveStaffId = i.isExplicitStaff ? i.staffId : null;
         return {
           ...i,
           staffId: effectiveStaffId,
@@ -2214,7 +2221,7 @@ export default function InteractiveDrawers({
         itemType: 'package',
         packageId: children[0].packageId,
         packageItems: children.map(c => {
-          const effectiveStaffId = c.isExplicitStaff ? c.staffId : (c.resolvedStaffId || c.staffId || null);
+          const effectiveStaffId = c.isExplicitStaff ? c.staffId : null;
           return {
             packageItemId: c.packageItemId,
             serviceId: c.serviceId,
@@ -2233,7 +2240,7 @@ export default function InteractiveDrawers({
       items: formattedItems,
       skipAdvanceValidation: true,
       overtimeApproval: allowExtendedHours || itemsToSubmit.some(i => i.overtimeApproval?.approved) ? { approved: true } : undefined,
-      staffId: resolvedPrimaryStaffId,
+      staffId: finalStaged.some(i => i.isExplicitStaff) ? (finalStaged.find(i => i.isExplicitStaff)?.staffId || null) : null,
       startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
       notes: sessionNotes || [
         ...finalStaged.map(s => s.notes),

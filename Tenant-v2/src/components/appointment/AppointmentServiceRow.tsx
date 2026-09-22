@@ -50,16 +50,21 @@ export default function AppointmentServiceRow({
   onRemoveService,
   children
 }: AppointmentServiceRowProps) {
-  const isVariantRow = Boolean(variant);
+  const effectiveVariantId = stagedItem?.variantId || variant?.id;
+  const activeVariant = variant || (effectiveVariantId ? (service.variants || []).find((v: any) => v.id === effectiveVariantId) : null);
+  const isVariantRow = Boolean(activeVariant);
   const serviceName = getServiceDisplayName(service, isRtl ? 'ar' : 'en');
+  const variantName = isRtl
+    ? (activeVariant?.name_ar || activeVariant?.nameAr || activeVariant?.name_en || activeVariant?.nameEn || activeVariant?.description || '')
+    : (activeVariant?.name_en || activeVariant?.nameEn || activeVariant?.name_ar || activeVariant?.nameAr || activeVariant?.description || '');
   const title = isVariantRow
-    ? `${serviceName} - ${variant?.nameEn || variant?.nameAr || variant?.description || ''}`.trim() || serviceName
+    ? `${serviceName} - ${variantName}`.trim() || serviceName
     : serviceName;
   const price = isVariantRow
-    ? Number(variant?.finalPrice ?? variant?.price ?? service.finalPrice ?? service.price ?? 0)
+    ? Number(activeVariant?.finalPrice ?? activeVariant?.rawPrice ?? activeVariant?.price ?? service.finalPrice ?? service.price ?? 0)
     : Number(getServiceDisplayPrice(service) || 0);
   const duration = isVariantRow
-    ? Number(variant?.duration ?? service.duration ?? 0)
+    ? Number(activeVariant?.duration ?? service.duration ?? 0)
     : Number(service.duration || 0);
 
   const isAdded = Boolean(stagedItem);
@@ -75,7 +80,9 @@ export default function AppointmentServiceRow({
     startTime: stagedItem?.startTime ?? 0,
     duration: stagedItem?.duration ?? duration,
     discountType: stagedItem?.discountType ?? 'none',
-    discountValue: stagedItem?.discountValue ?? 0
+    discountValue: stagedItem?.discountValue ?? 0,
+    variantId: stagedItem?.variantId ?? variant?.id,
+    basePrice: stagedItem?.basePrice ?? price
   }));
 
   useEffect(() => {
@@ -85,10 +92,22 @@ export default function AppointmentServiceRow({
         startTime: stagedItem.startTime,
         duration: stagedItem.duration,
         discountType: stagedItem.discountType,
-        discountValue: stagedItem.discountValue
+        discountValue: stagedItem.discountValue,
+        variantId: stagedItem.variantId,
+        basePrice: stagedItem.basePrice
       });
     }
-  }, [stagedItem?.id, stagedItem?.startTime, stagedItem?.duration, stagedItem?.staffId, stagedItem?.discountType, stagedItem?.discountValue, validStylists.length]);
+  }, [
+    stagedItem?.id,
+    stagedItem?.startTime,
+    stagedItem?.duration,
+    stagedItem?.staffId,
+    stagedItem?.discountType,
+    stagedItem?.discountValue,
+    stagedItem?.variantId,
+    stagedItem?.basePrice,
+    validStylists.length
+  ]);
 
   useEffect(() => {
     if (forceExpanded) {
@@ -228,7 +247,7 @@ export default function AppointmentServiceRow({
           selectedDate={selectedDate}
           serviceId={service.id}
           service={service}
-          variantId={variant?.id || stagedItem?.variantId}
+          variantId={activeVariant?.id || draftConfig.variantId || variant?.id || stagedItem?.variantId}
           isRtl={isRtl}
           boardStartHour={boardStartHour}
           slotMinutes={slotMinutes}

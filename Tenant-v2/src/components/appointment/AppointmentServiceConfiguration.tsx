@@ -45,10 +45,35 @@ export default function AppointmentServiceConfiguration({
   const listRef = useRef<HTMLDivElement>(null);
   const selectedItemRef = useRef<HTMLButtonElement>(null);
 
+  const effectiveVariantId = draftConfig.variantId || variantId;
+
+  const availableVariants = useMemo(() => {
+    return Array.isArray(service?.variants) ? service.variants : [];
+  }, [service?.variants]);
+
+  const activeVariant = useMemo(() => {
+    if (!effectiveVariantId) return null;
+    return availableVariants.find((v: any) => v.id === effectiveVariantId) || null;
+  }, [availableVariants, effectiveVariantId]);
+
+  const handleVariantChange = (newVariantId: string) => {
+    const selected = availableVariants.find((v: any) => v.id === newVariantId);
+    if (!selected) return;
+    const newDuration = Number(selected.duration || service?.duration || 30);
+    const newPrice = Number(selected.finalPrice ?? selected.rawPrice ?? selected.price ?? service?.finalPrice ?? service?.price ?? 0);
+    setDraftConfig(c => ({
+      ...c,
+      variantId: selected.id,
+      duration: newDuration,
+      basePrice: newPrice,
+      finalPrice: newPrice
+    }));
+  };
+
   const validation = useEarlyAvailabilityValidation({
     tenantId,
     serviceId,
-    variantId,
+    variantId: effectiveVariantId,
     staffId: draftConfig.staffId,
     dateKey: selectedDate,
     tenantTimezone,
@@ -61,9 +86,9 @@ export default function AppointmentServiceConfiguration({
     tenantTimezone,
     dateKey: selectedDate,
     serviceId,
-    variantId,
+    variantId: effectiveVariantId,
     staffId: draftConfig.staffId,
-    duration: Math.max(1, Number(draftConfig.duration || service?.duration || 60)),
+    duration: Math.max(1, Number(draftConfig.duration || activeVariant?.duration || service?.duration || 60)),
     bufferBefore: Number(service?.bufferBefore || 0),
     bufferAfter: Number(service?.bufferAfter || 0),
     boardStartHour,
@@ -120,6 +145,47 @@ export default function AppointmentServiceConfiguration({
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">
       <div className="space-y-5">
+        {/* Service Variant Selector / Information */}
+        {availableVariants.length > 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {isRtl ? 'البديل / الخيار المحدد' : 'Service Variant'}
+              </span>
+              {activeVariant && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-[11px] font-bold text-purple-700">
+                  <span>{isRtl ? (activeVariant.name_ar || activeVariant.nameAr || activeVariant.name_en || activeVariant.nameEn) : (activeVariant.name_en || activeVariant.nameEn || activeVariant.name_ar || activeVariant.nameAr)}</span>
+                  <span>•</span>
+                  <span>{activeVariant.duration || service?.duration} {isRtl ? 'دقيقة' : 'min'}</span>
+                  <span>•</span>
+                  <span dir="ltr">{Number(activeVariant.finalPrice ?? activeVariant.rawPrice ?? activeVariant.price ?? 0).toFixed(2)} SAR</span>
+                </span>
+              )}
+            </div>
+
+            {availableVariants.length > 1 && (
+              <select
+                value={effectiveVariantId || ''}
+                onChange={(e) => handleVariantChange(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary shadow-sm"
+              >
+                {availableVariants.map((v: any) => {
+                  const vName = isRtl
+                    ? (v.name_ar || v.nameAr || v.name_en || v.nameEn)
+                    : (v.name_en || v.nameEn || v.name_ar || v.nameAr);
+                  const vPrice = Number(v.finalPrice ?? v.rawPrice ?? v.price ?? 0);
+                  const vDuration = Number(v.duration || service?.duration || 0);
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {vName} — {vDuration} {isRtl ? 'دقيقة' : 'min'} ({vPrice.toFixed(2)} SAR)
+                    </option>
+                  );
+                })}
+              </select>
+            )}
+          </div>
+        )}
+
         <div className="grid gap-4 md:grid-cols-2">
           {/* Team Member */}
           <label className="block">
@@ -179,33 +245,76 @@ export default function AppointmentServiceConfiguration({
                   </button>
                 </div>
               )}
-              {validation.status === 'unavailable' && validation.diagnostic && (
-                <div className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 mt-1 mb-2">
-                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                  <div>
-                    <span className="font-semibold text-amber-800">
-                      {isRtl ? 'الموظف غير متاح.' : 'Unavailable at this time.'}
-                    </span>
-                    <span className="ml-1 opacity-90 block mt-0.5">
-                      {validation.diagnostic.reasonType === 'staff_break' && (isRtl ? 'الموظف لديه استراحة في هذا الوقت' : 'Staff break')}
-                      {validation.diagnostic.reasonType === 'time_off' && (isRtl ? 'الموظف غير متاح بسبب إجازة/وقت محجوز' : 'Time off')}
-                      {validation.diagnostic.reasonType === 'existing_booking' && (isRtl ? 'الموظف لديه حجز آخر في هذا الوقت' : 'Existing booking')}
-                      {validation.diagnostic.reasonType === 'before_tenant_open' && (isRtl ? 'الموعد يبدأ قبل ساعات عمل المركز' : 'Appointment starts before center hours')}
-                      {validation.diagnostic.reasonType === 'after_tenant_close' && (isRtl ? 'الموعد سيتجاوز ساعات عمل المركز' : 'Appointment exceeds center hours')}
-                      {validation.diagnostic.reasonType === 'tenant_closed' && (isRtl ? 'المركز مغلق في هذا اليوم' : 'Center is closed on this day')}
-                      {validation.diagnostic.reasonType === 'no_employee_duty' && (isRtl ? 'الموظف ليس لديه دوام في هذا اليوم' : 'Employee has no duty on this day')}
-                      {validation.diagnostic.reasonType === 'before_employee_duty' && (isRtl ? 'الموظف خارج ساعات عمله — يبدأ دوامه لاحقاً' : 'Outside employee duty hours')}
-                      {validation.diagnostic.reasonType === 'after_employee_duty' && (isRtl ? 'الموعد سيتجاوز ساعات عمل الموظف' : 'Appointment exceeds employee duty')}
-                      {validation.diagnostic.reasonType === 'outside_working_hours' && (isRtl ? 'خارج أوقات العمل' : 'Outside working hours')}
-                      {validation.diagnostic.reasonType === 'blocked_time' && (isRtl ? 'وقت محجوز' : 'Blocked time')}
-                      {(!validation.diagnostic.reasonType || validation.diagnostic.reasonType === 'unavailable') && (isRtl ? 'غير متوفر' : 'Unavailable')}
-                      {validation.diagnostic.startTime && validation.diagnostic.endTime && (
-                        ` (${new Date(validation.diagnostic.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${new Date(validation.diagnostic.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`
+              {validation.status === 'unavailable' && validation.diagnostic && (() => {
+                const diag = validation.diagnostic;
+                const structuredMsg = isRtl
+                  ? (diag.messageAr || diag.message)
+                  : (diag.message || diag.messageAr);
+                const guidance = isRtl
+                  ? (diag.actionableGuidanceAr || diag.actionableGuidance)
+                  : (diag.actionableGuidance || diag.actionableGuidanceAr);
+
+                // Fallback title: ONLY say employee is unavailable if it's truly a staff reason
+                const isStaffReason = [
+                  'staff_break',
+                  'time_off',
+                  'existing_booking',
+                  'no_employee_duty',
+                  'before_employee_duty',
+                  'after_employee_duty',
+                  'staff_unavailable'
+                ].includes(diag.reasonType || diag.conflictType || '');
+
+                const fallbackTitle = isStaffReason
+                  ? (isRtl ? 'الموظف غير متاح في هذا الوقت.' : 'Staff is unavailable at this time.')
+                  : (isRtl ? 'الوقت المحدد غير متاح.' : 'Unavailable at this time.');
+
+                return (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-900 mt-1 mb-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <div className="space-y-1">
+                      {structuredMsg ? (
+                        <p className="font-semibold leading-snug text-amber-950">
+                          {structuredMsg}
+                        </p>
+                      ) : (
+                        <div>
+                          <span className="font-semibold text-amber-900">
+                            {fallbackTitle}
+                          </span>
+                          <span className="ml-1 opacity-90 block mt-0.5">
+                            {diag.reasonType === 'staff_break' && (isRtl ? 'الموظف لديه استراحة في هذا الوقت' : 'Staff break')}
+                            {diag.reasonType === 'time_off' && (isRtl ? 'الموظف غير متاح بسبب إجازة/وقت محجوز' : 'Time off')}
+                            {diag.reasonType === 'existing_booking' && (isRtl ? 'الموظف لديه حجز آخر في هذا الوقت' : 'Existing booking')}
+                            {diag.reasonType === 'before_tenant_open' && (isRtl ? 'الموعد يبدأ قبل ساعات عمل المركز' : 'Appointment starts before center hours')}
+                            {diag.reasonType === 'after_tenant_close' && (isRtl ? 'الموعد سيتجاوز ساعات عمل المركز' : 'Appointment exceeds center hours')}
+                            {diag.reasonType === 'tenant_closed' && (isRtl ? 'المركز مغلق في هذا اليوم' : 'Center is closed on this day')}
+                            {diag.reasonType === 'no_employee_duty' && (isRtl ? 'الموظف ليس لديه دوام في هذا اليوم' : 'Employee has no duty on this day')}
+                            {diag.reasonType === 'before_employee_duty' && (isRtl ? 'الموظف خارج ساعات عمله — يبدأ دوامه لاحقاً' : 'Outside employee duty hours')}
+                            {diag.reasonType === 'after_employee_duty' && (isRtl ? 'الموعد سيتجاوز ساعات عمل الموظف' : 'Appointment exceeds employee duty')}
+                            {diag.reasonType === 'outside_working_hours' && (isRtl ? 'خارج أوقات العمل' : 'Outside working hours')}
+                            {diag.reasonType === 'blocked_time' && (isRtl ? 'وقت محجوز' : 'Blocked time')}
+                            {diag.reasonType === 'resource_occupied' && (isRtl ? 'المورد المطلوب مشغول حالياً بموعد آخر' : 'Required resource is currently occupied')}
+                            {diag.reasonType === 'resource_pool_exhausted' && (isRtl ? 'جميع الموارد من هذا النوع مشغولة' : 'All resources of this type are occupied')}
+                            {diag.reasonType === 'resource_unconfigured' && (isRtl ? 'المورد المطلوب غير مهيأ في النظام' : 'Required resource is not configured')}
+                            {diag.reasonType === 'insufficient_total_capacity' && (isRtl ? 'السعة الإجمالية للمورد غير كافية' : 'Insufficient resource capacity')}
+                            {(!diag.reasonType || diag.reasonType === 'unavailable') && (isRtl ? 'غير متوفر' : 'Unavailable')}
+                            {diag.startTime && diag.endTime && (
+                              ` (${new Date(diag.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${new Date(diag.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`
+                            )}
+                          </span>
+                        </div>
                       )}
-                    </span>
+
+                      {guidance && (
+                        <p className="text-[10.5px] font-medium text-amber-800/90 pt-0.5">
+                          {guidance}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
 

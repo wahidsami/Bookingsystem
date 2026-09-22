@@ -32,8 +32,8 @@ export function useEarlyAvailabilityValidation({
   const [result, setResult] = useState<EarlyValidationResult>({ status: 'idle' });
 
   useEffect(() => {
-    // 5. "Any Professional": Skip named-professional validation when no specific staff member is selected.
-    if (!staffId || !serviceId || !dateKey || !tenantId) {
+    // If essential prerequisites are missing, keep idle
+    if (!serviceId || !dateKey || !tenantId) {
       setResult({ status: 'idle' });
       return;
     }
@@ -72,9 +72,21 @@ export function useEarlyAvailabilityValidation({
         }
       } catch (err) {
         if (isMounted) {
+          const payload = (err as any)?.payload;
+          const decision = payload?.decision || payload || { reasonType: 'unknown' };
+          const diagnostic: AvailabilityDiagnostic = {
+            ...decision,
+            conflictType: payload?.conflictType || decision?.conflictType || decision?.reasonType,
+            message: payload?.message || decision?.message,
+            messageAr: payload?.messageAr || decision?.messageAr,
+            actionableGuidance: payload?.actionableGuidance || decision?.actionableGuidance,
+            actionableGuidanceAr: payload?.actionableGuidanceAr || decision?.actionableGuidanceAr,
+            conflicts: payload?.conflicts || decision?.conflicts,
+            conflictDetails: payload?.conflictDetails || decision?.conflictDetails,
+          };
           setResult({
             status: 'unavailable',
-            diagnostic: (err as any)?.payload?.decision || { reasonType: 'unknown' }
+            diagnostic
           });
         }
       }

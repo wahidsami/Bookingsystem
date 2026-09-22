@@ -19,6 +19,13 @@ export interface AvailabilityDiagnostic {
   reasonStartTime?: string | null;
   reasonEndTime?: string | null;
   workingHoursEnd?: string | null;
+  conflictType?: string | null;
+  message?: string | null;
+  messageAr?: string | null;
+  actionableGuidance?: string | null;
+  actionableGuidanceAr?: string | null;
+  conflicts?: any[] | null;
+  conflictDetails?: any | null;
 }
 
 export interface ConflictCard {
