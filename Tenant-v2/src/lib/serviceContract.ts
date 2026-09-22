@@ -22,6 +22,19 @@ export type ServiceVariantRecord = {
   price?: number;
 };
 
+export type ServiceResourceRequirementRecord = {
+  id?: string;
+  resourceTypeId: string;
+  variantId?: string | null;
+  quantity: number;
+  resourceType?: {
+    id: string;
+    name_en: string;
+    name_ar: string;
+    is_active: boolean;
+  };
+};
+
 export type ServiceRecord = {
   id: string;
   tenantId?: string;
@@ -46,6 +59,7 @@ export type ServiceRecord = {
   taxRate: number;
   commissionRate: number;
   variants: ServiceVariantRecord[];
+  resourceRequirements?: ServiceResourceRequirementRecord[];
   paymentOptions: ServicePaymentOption[];
   hasOffer: boolean;
   offerDiscountPct?: number;
@@ -93,6 +107,7 @@ export type ServiceDraft = {
   taxRate?: number;
   commissionRate?: number;
   variants: ServiceVariantRecord[];
+  resourceRequirements: ServiceResourceRequirementRecord[];
   hasOffer: boolean;
   offerDiscountPct?: number;
   offerDetails?: string | null;
@@ -305,6 +320,26 @@ export const normalizeServiceRecord = (service: any): ServiceRecord => {
   const rawPrice = toNumber(service?.rawPrice ?? service?.basePrice ?? 0, 0);
   const priceType = normalizeServicePriceType(service?.priceType);
   const targetGender = normalizeServiceTargetGender(service?.targetGender);
+  const rawRequirements = parseJsonArray(service?.resourceRequirements || service?.requirements);
+  const resourceRequirements: ServiceResourceRequirementRecord[] = rawRequirements
+    .map((item: any) => {
+      if (!item || (!item.resourceTypeId && !item.resource_type_id)) return null;
+      const resourceTypeId = toStringValue(item.resourceTypeId || item.resource_type_id).trim();
+      if (!resourceTypeId) return null;
+      return {
+        id: item.id ? toStringValue(item.id).trim() : undefined,
+        resourceTypeId,
+        variantId: item.variantId || item.variant_id ? toStringValue(item.variantId || item.variant_id).trim() : null,
+        quantity: Math.max(1, Math.round(toNumber(item.quantity, 1))),
+        resourceType: item.resourceType ? {
+          id: toStringValue(item.resourceType.id).trim(),
+          name_en: toStringValue(item.resourceType.name_en).trim(),
+          name_ar: toStringValue(item.resourceType.name_ar).trim(),
+          is_active: Boolean(item.resourceType.is_active)
+        } : undefined
+      };
+    })
+    .filter(Boolean) as ServiceResourceRequirementRecord[];
 
   return {
     id: toStringValue(service?.id ?? '', '').trim(),
@@ -330,6 +365,7 @@ export const normalizeServiceRecord = (service: any): ServiceRecord => {
     taxRate: toNumber(service?.taxRate, 15),
     commissionRate: toNumber(service?.commissionRate, 10),
     variants,
+    resourceRequirements,
     paymentOptions: normalizeServicePaymentOptions(service?.paymentOptions),
     hasOffer: toBoolean(service?.hasOffer || service?.offerDiscountPct, false),
     offerDiscountPct: service?.offerDiscountPct !== undefined && service?.offerDiscountPct !== null
@@ -386,6 +422,7 @@ export const createEmptyServiceDraft = (defaultCategory?: ServiceCategoryOption 
   finalPrice: 0,
   price: 0,
   variants: [],
+  resourceRequirements: [],
   hasOffer: false,
   offerDiscountPct: 0,
   offerDetails: null,
@@ -445,6 +482,15 @@ export const buildServicePayload = (draft: Partial<ServiceDraft>) => {
     duration: Math.max(0, Math.round(toNumber(draft.duration, 30))),
     includes: Array.isArray(draft.includes) ? draft.includes : [],
     variants: normalizedVariants,
+    resourceRequirements: Array.isArray(draft.resourceRequirements)
+      ? draft.resourceRequirements
+          .filter((r) => Boolean(r && (r.resourceTypeId || (r as any).resource_type_id)))
+          .map((r) => ({
+            resourceTypeId: toStringValue(r.resourceTypeId || (r as any).resource_type_id).trim(),
+            variantId: r.variantId || (r as any).variant_id || null,
+            quantity: Math.max(1, Math.round(toNumber(r.quantity, 1)))
+          }))
+      : [],
     paymentOptions: normalizeServicePaymentOptions(draft.paymentOptions),
     employeeAssignments: Array.isArray(draft.employeeAssignments) ? draft.employeeAssignments : [],
     hasOffer: Boolean(draft.hasOffer),

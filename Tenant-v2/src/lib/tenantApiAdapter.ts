@@ -2,7 +2,7 @@ import { API_BASE_URL, API_ORIGIN } from './apiConfig';
 import { normalizeEmployeeAvatarCollection } from './employeeImage';
 import { normalizeServiceCollection, normalizeServiceRecord } from './serviceContract';
 import { normalizeProductCollection, normalizeProductRecord } from './productContract';
-import type { TenantOrdersResponse, TenantOrderDetailResponse, TenantOrder } from '../types';
+import type { TenantOrdersResponse, TenantOrderDetailResponse, TenantOrder, TenantResourceType, TenantResourceInstance } from '../types';
 
 export { API_BASE_URL, API_ORIGIN } from './apiConfig';
 
@@ -1840,6 +1840,81 @@ class TenantApiAdapter {
     notes?: string;
   }): Promise<{ success: boolean; message?: string; order: TenantOrder }> {
     return this.patch(`/tenant/orders/${id}/payment`, data);
+  }
+
+  // ─── Resource Foundation Management (Phase 1C) ───────────────────
+  async getResourceTypes(params?: {
+    isActive?: boolean;
+    search?: string;
+  }): Promise<{ success: boolean; resourceTypes: TenantResourceType[]; total: number }> {
+    const q = new URLSearchParams();
+    if (params?.isActive !== undefined) q.set('isActive', String(params.isActive));
+    if (params?.search && params.search.trim()) q.set('search', params.search.trim());
+    const qs = q.toString();
+    return this.get(`/tenant/resource-types${qs ? `?${qs}` : ''}`);
+  }
+
+  async getResourceType(id: string): Promise<{ success: boolean; resourceType: TenantResourceType }> {
+    return this.get(`/tenant/resource-types/${id}`);
+  }
+
+  async createResourceType(data: {
+    name_en: string;
+    name_ar: string;
+    is_active?: boolean;
+  }): Promise<{ success: boolean; message?: string; resourceType: TenantResourceType }> {
+    return this.post('/tenant/resource-types', data);
+  }
+
+  async updateResourceType(id: string, data: {
+    name_en?: string;
+    name_ar?: string;
+    is_active?: boolean;
+  }): Promise<{ success: boolean; message?: string; resourceType: TenantResourceType }> {
+    return this.put(`/tenant/resource-types/${id}`, data);
+  }
+
+  async deleteResourceType(id: string): Promise<{ success: boolean; message?: string; deactivated?: boolean }> {
+    return this.delete(`/tenant/resource-types/${id}`);
+  }
+
+  async getResources(params?: {
+    resourceTypeId?: string;
+    isActive?: boolean;
+    search?: string;
+  }): Promise<{ success: boolean; resources: TenantResourceInstance[]; total: number }> {
+    const q = new URLSearchParams();
+    if (params?.resourceTypeId) q.set('resourceTypeId', params.resourceTypeId);
+    if (params?.isActive !== undefined) q.set('isActive', String(params.isActive));
+    if (params?.search && params.search.trim()) q.set('search', params.search.trim());
+    const qs = q.toString();
+    return this.get(`/tenant/resources${qs ? `?${qs}` : ''}`);
+  }
+
+  async getResource(id: string): Promise<{ success: boolean; resource: TenantResourceInstance }> {
+    return this.get(`/tenant/resources/${id}`);
+  }
+
+  async createResource(data: {
+    resourceTypeId: string;
+    name_en: string;
+    name_ar: string;
+    is_active?: boolean;
+  }): Promise<{ success: boolean; message?: string; resource: TenantResourceInstance }> {
+    return this.post('/tenant/resources', data);
+  }
+
+  async updateResource(id: string, data: {
+    resourceTypeId?: string;
+    name_en?: string;
+    name_ar?: string;
+    is_active?: boolean;
+  }): Promise<{ success: boolean; message?: string; resource: TenantResourceInstance }> {
+    return this.put(`/tenant/resources/${id}`, data);
+  }
+
+  async deleteResource(id: string): Promise<{ success: boolean; message?: string; deactivated?: boolean }> {
+    return this.delete(`/tenant/resources/${id}`);
   }
 }
 

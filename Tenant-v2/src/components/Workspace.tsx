@@ -21,6 +21,7 @@ import CustomersWorkspace from './CustomersWorkspace';
 import TeamsWorkspace from './TeamsWorkspace';
 import ServicesWorkspace from './ServicesWorkspace';
 import Services2Workspace from './Services2Workspace';
+import ResourcesWorkspace from './ResourcesWorkspace';
 import ProductsWorkspace from './ProductsWorkspace';
 import OrdersWorkspace from './OrdersWorkspace';
 import HotDealsWorkspace from './HotDealsWorkspace';
@@ -878,6 +879,11 @@ export default function Workspace({
       {/* 5B. SERVICES 2 */}
       {view === 'services2' && (
         <Services2Workspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
+      )}
+
+      {/* 5C. RESOURCES (PHASE 1C) */}
+      {view === 'resources' && (
+        <ResourcesWorkspace lang={lang} darkMode={darkMode} />
       )}
 
       {/* 6. PRODUCTS */}

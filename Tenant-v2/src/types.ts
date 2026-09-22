@@ -14,6 +14,7 @@ export type ViewType =
   | 'appointments'
   | 'customers'
   | 'employees'
+  | 'resources'
   | 'services'
   | 'services2'
   | 'packages'
@@ -281,4 +282,47 @@ export interface Employee {
   avatar: string;
   rating: number;
   status: 'active' | 'break' | 'off';
+}
+
+export interface TenantResourceInstance {
+  id: string;
+  tenantId?: string;
+  resourceTypeId: string;
+  name_en: string;
+  name_ar: string;
+  is_active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  resourceType?: {
+    id: string;
+    name_en: string;
+    name_ar: string;
+    is_active: boolean;
+  };
+}
+
+export interface TenantResourceType {
+  id: string;
+  tenantId?: string;
+  name_en: string;
+  name_ar: string;
+  is_active: boolean;
+  resourcesCount?: number;
+  activeResourcesCount?: number;
+  resources?: TenantResourceInstance[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ServiceResourceRequirementDraft {
+  id?: string;
+  resourceTypeId: string;
+  variantId?: string | null;
+  quantity: number;
+  resourceType?: {
+    id: string;
+    name_en: string;
+    name_ar: string;
+    is_active: boolean;
+  };
 }

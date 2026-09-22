@@ -5,7 +5,7 @@ import {
   Clock, Users, Heart, Info, Calendar, Coffee, Tag, MapPin, 
   Sparkle, Upload, Edit, Eye, Filter, SlidersHorizontal, Search, CheckSquare, Square,
   Activity, RotateCw, AlertTriangle, Image, Package, FolderPlus, ChevronDown, ChevronLeft, ChevronRight, Layers,
-  Globe, CheckCircle2, MoreVertical
+  Globe, CheckCircle2, MoreVertical, Boxes
 } from 'lucide-react';
 import { Language, Employee, Product, QuickLaunchRequest } from '../types';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
@@ -27,6 +27,7 @@ import {
   getTenantPlanUsageCount
 } from '../lib/tenantSubscription';
 import BundleBuilderModal from './services2/BundleBuilderModal';
+import ServiceResourceRequirementsSection from './services2/ServiceResourceRequirementsSection';
 
 interface Services2WorkspaceProps {
   lang: Language;
@@ -611,6 +612,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
       categoryAr: selectedCategoryOption.labelAr,
       includes: [...(srv.includes || [])],
       variants: Array.isArray(normalizedService.variants) ? normalizedService.variants.map((v) => ({ ...v })) : [],
+      resourceRequirements: Array.isArray(normalizedService.resourceRequirements) ? normalizedService.resourceRequirements.map((r) => ({ ...r })) : [],
       paymentOptions: normalizeServicePaymentOptions(srv.paymentOptions),
       employeeAssignments: [...(srv.employeeAssignments || [])],
       employeeCommissions: srv.employeeCommissions ? { ...srv.employeeCommissions } : {}
@@ -1229,6 +1231,19 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                   <Users size={12} className="text-indigo-500" />
                   <span>{(item.employeeAssignments || []).length} {isRtl ? 'أخصائيات معتمدات' : 'specialists'}</span>
                 </span>
+                {Array.isArray(item.rawRecord?.resourceRequirements) && item.rawRecord.resourceRequirements.length > 0 && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-neutral-300" />
+                    <span className="flex items-center gap-1 text-indigo-600" title={isRtl ? 'الموارد المطلوبة' : 'Required Resources'}>
+                      <Boxes size={12} />
+                      <span>
+                        {item.rawRecord.resourceRequirements
+                          .map((r: any) => `${isRtl ? r.resourceType?.name_ar || r.resourceType?.name_en || 'مورد' : r.resourceType?.name_en || r.resourceType?.name_ar || 'Resource'} × ${r.quantity}`)
+                          .join(', ')}
+                      </span>
+                    </span>
+                  </>
+                )}
               </div>
 
               {/* Offer / Gift labels */}
@@ -3005,6 +3020,14 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                           </div>
 
                         </div>
+
+                        {/* 4) Resource & Room Requirements (Phase 1C) */}
+                        <ServiceResourceRequirementsSection
+                          lang={lang}
+                          requirements={formData.resourceRequirements || []}
+                          onChange={(reqs) => setFormData(p => ({ ...p, resourceRequirements: reqs }))}
+                          darkMode={false}
+                        />
 
                       </div>
                     </div>
