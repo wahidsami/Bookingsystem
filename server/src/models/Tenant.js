@@ -33,6 +33,17 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'tenantId',
                 as: 'supportCategories'
             });
+
+            // Resource Foundation
+            Tenant.hasMany(models.ResourceType, {
+                foreignKey: 'tenantId',
+                as: 'resourceTypes'
+            });
+
+            Tenant.hasMany(models.Resource, {
+                foreignKey: 'tenantId',
+                as: 'resources'
+            });
         }
     }
     Tenant.init({

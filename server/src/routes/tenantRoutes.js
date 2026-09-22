@@ -13,6 +13,7 @@ const tenantServiceController = require('../controllers/tenantServiceController'
 const tenantPackageController = require('../controllers/tenantPackageController');
 const tenantServiceCategoryController = require('../controllers/tenantServiceCategoryController');
 const tenantBundleController = require('../controllers/tenantBundleController');
+const tenantResourceController = require('../controllers/tenantResourceController');
 const tenantAppointmentController = require('../controllers/tenantAppointmentController');
 const tenantFinancialController = require('../controllers/tenantFinancialController');
 const tenantCustomerController = require('../controllers/tenantCustomerController');
@@ -183,6 +184,19 @@ router.put(
     tenantBundleController.updateBundle
 );
 router.delete('/services2/bundles/:id', tenantBundleController.deleteBundle);
+
+// Resource Foundation: Resource Types & Resources
+router.get('/resource-types', tenantResourceController.getResourceTypes);
+router.get('/resource-types/:id', tenantResourceController.getResourceType);
+router.post('/resource-types', tenantResourceController.createResourceType);
+router.put('/resource-types/:id', tenantResourceController.updateResourceType);
+router.delete('/resource-types/:id', tenantResourceController.deleteResourceType);
+
+router.get('/resources', tenantResourceController.getResources);
+router.get('/resources/:id', tenantResourceController.getResource);
+router.post('/resources', tenantResourceController.createResource);
+router.put('/resources/:id', tenantResourceController.updateResource);
+router.delete('/resources/:id', tenantResourceController.deleteResource);
 
 // Appointment management
 router.get('/appointments', tenantAppointmentController.getAppointments);

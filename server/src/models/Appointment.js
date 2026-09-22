@@ -50,6 +50,11 @@ module.exports = (sequelize, DataTypes) => {
                 as: 'servicePackageItem',
                 required: false
             });
+            // Resource Foundation: Actual resource allocations
+            Appointment.hasMany(models.AppointmentResource, {
+                foreignKey: 'appointmentId',
+                as: 'appointmentResources'
+            });
         }
 
         /**

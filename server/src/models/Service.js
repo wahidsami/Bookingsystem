@@ -36,6 +36,12 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'tenantServiceCategoryId',
                 as: 'tenantCategory'
             });
+
+            // Resource Foundation: Requirements for resources
+            Service.hasMany(models.ServiceResourceRequirement, {
+                foreignKey: 'serviceId',
+                as: 'resourceRequirements'
+            });
         }
 
         /**

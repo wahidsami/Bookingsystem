@@ -297,6 +297,112 @@ async function getTenantSettings(tenantId) {
     };
 }
 
+const serviceResourceRequirementsInclude = {
+    model: db.ServiceResourceRequirement,
+    as: 'resourceRequirements',
+    required: false,
+    include: [
+        {
+            model: db.ResourceType,
+            as: 'resourceType',
+            attributes: ['id', 'name_en', 'name_ar', 'is_active']
+        }
+    ]
+};
+
+function parseServiceResourceRequirements(input) {
+    if (!input) {
+        return [];
+    }
+    try {
+        const parsed = typeof input === 'string' ? JSON.parse(input) : input;
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+async function validateAndBuildServiceResourceRequirements(serviceId, rawRequirements, variantsArray, tenantId, transaction) {
+    if (!rawRequirements || rawRequirements.length === 0) {
+        return { valid: true, rows: [] };
+    }
+
+    const seenKeys = new Set();
+    const rows = [];
+    const resourceTypeIds = new Set();
+
+    for (const req of rawRequirements) {
+        if (!req || typeof req !== 'object') {
+            return { valid: false, message: 'Invalid resource requirement format' };
+        }
+
+        const resourceTypeId = `${req.resourceTypeId ?? ''}`.trim();
+        if (!resourceTypeId) {
+            return { valid: false, message: 'Resource type ID is required for each requirement' };
+        }
+
+        // Quantity validation: Mandatory Safeguard #4 (integer >= 1, reject 0, negative, decimal, non-numeric)
+        const qtyRaw = req.quantity !== undefined && req.quantity !== null ? req.quantity : 1;
+        const qtyNum = Number(qtyRaw);
+        if (!Number.isInteger(qtyNum) || qtyNum < 1) {
+            return { valid: false, message: 'Requirement quantity must be an integer greater than or equal to 1' };
+        }
+
+        // Variant validation: Mandatory Safeguard #3
+        let variantId = req.variantId !== undefined && req.variantId !== null ? `${req.variantId}`.trim() : null;
+        if (variantId === '') {
+            variantId = null;
+        }
+
+        if (variantId !== null) {
+            const variantExists = Array.isArray(variantsArray) && variantsArray.some(v => String(v.id) === String(variantId));
+            if (!variantExists) {
+                return {
+                    valid: false,
+                    message: `Variant ID "${variantId}" does not exist in the service variants list`
+                };
+            }
+        }
+
+        // Duplicate validation: Mandatory Safeguard #2 (serviceId + variantId + resourceTypeId)
+        const compositeKey = `${resourceTypeId}:${variantId || 'null'}`;
+        if (seenKeys.has(compositeKey)) {
+            return {
+                valid: false,
+                message: 'Duplicate resource requirement detected for resource type and variant combination'
+            };
+        }
+        seenKeys.add(compositeKey);
+        resourceTypeIds.add(resourceTypeId);
+
+        rows.push({
+            serviceId,
+            resourceTypeId,
+            variantId,
+            quantity: qtyNum
+        });
+    }
+
+    // Verify all resourceTypeIds belong to the authenticated tenant
+    const uniqueTypeIds = Array.from(resourceTypeIds);
+    const validTypes = await db.ResourceType.findAll({
+        where: {
+            id: { [Op.in]: uniqueTypeIds },
+            tenantId
+        },
+        transaction
+    });
+
+    if (validTypes.length !== uniqueTypeIds.length) {
+        return {
+            valid: false,
+            message: 'One or more selected resource types do not exist or do not belong to your salon'
+        };
+    }
+
+    return { valid: true, rows };
+}
+
 /**
  * Get all active service categories for tenant service forms.
  * GET /api/v1/tenant/services/categories
@@ -372,7 +478,8 @@ exports.getServices = async (req, res) => {
                     model: db.TenantServiceCategory,
                     as: 'tenantCategory',
                     attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
-                }
+                },
+                serviceResourceRequirementsInclude
             ],
             order: [['createdAt', 'DESC']]
         });
@@ -421,7 +528,8 @@ exports.getService = async (req, res) => {
                     model: db.TenantServiceCategory,
                     as: 'tenantCategory',
                     attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
-                }
+                },
+                serviceResourceRequirementsInclude
             ]
         });
 
@@ -485,7 +593,8 @@ exports.createService = async (req, res) => {
             isActive = true,
             availableInCenter = true,
             availableHomeVisit = false,
-            allowReschedule = false
+            allowReschedule = false,
+            resourceRequirements
         } = req.body;
 
         // Validation
@@ -634,7 +743,29 @@ exports.createService = async (req, res) => {
             await db.ServiceEmployee.bulkCreate(buildServiceEmployeeRows(service.id, selectedEmployeeAssignments), { transaction });
         }
 
-        // Reload service with employees and tenant category
+        // Process Resource Requirements
+        const rawRequirements = parseServiceResourceRequirements(resourceRequirements);
+        const validatedRequirements = await validateAndBuildServiceResourceRequirements(
+            service.id,
+            rawRequirements,
+            variantsArray,
+            tenantId,
+            transaction
+        );
+
+        if (!validatedRequirements.valid) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: validatedRequirements.message
+            });
+        }
+
+        if (validatedRequirements.rows.length > 0) {
+            await db.ServiceResourceRequirement.bulkCreate(validatedRequirements.rows, { transaction });
+        }
+
+        // Reload service with employees, tenant category, and resource requirements
         await service.reload({
             include: [
                 {
@@ -650,7 +781,8 @@ exports.createService = async (req, res) => {
                     model: db.TenantServiceCategory,
                     as: 'tenantCategory',
                     attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
-                }
+                },
+                serviceResourceRequirementsInclude
             ],
             transaction
         });
@@ -718,7 +850,8 @@ exports.updateService = async (req, res) => {
             isActive,
             availableInCenter,
             availableHomeVisit,
-            allowReschedule
+            allowReschedule,
+            resourceRequirements
         } = req.body;
 
         // Find service
@@ -900,7 +1033,37 @@ exports.updateService = async (req, res) => {
             }
         }
 
-        // Reload service with employees and tenant category
+        // Update resource requirements if provided
+        if (resourceRequirements !== undefined) {
+            const rawRequirements = parseServiceResourceRequirements(resourceRequirements);
+            const validatedRequirements = await validateAndBuildServiceResourceRequirements(
+                service.id,
+                rawRequirements,
+                variantsArray,
+                tenantId,
+                transaction
+            );
+
+            if (!validatedRequirements.valid) {
+                await transaction.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: validatedRequirements.message
+                });
+            }
+
+            // Remove existing requirements
+            await db.ServiceResourceRequirement.destroy({
+                where: { serviceId: service.id },
+                transaction
+            });
+
+            if (validatedRequirements.rows.length > 0) {
+                await db.ServiceResourceRequirement.bulkCreate(validatedRequirements.rows, { transaction });
+            }
+        }
+
+        // Reload service with employees, tenant category, and resource requirements
         await service.reload({
             include: [
                 {
@@ -916,7 +1079,8 @@ exports.updateService = async (req, res) => {
                     model: db.TenantServiceCategory,
                     as: 'tenantCategory',
                     attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
-                }
+                },
+                serviceResourceRequirementsInclude
             ],
             transaction
         });
