@@ -192,10 +192,10 @@ const evaluateScheduling = async (req, res) => {
     });
     try {
         const { tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId } = req.body || {};
-        if (!tenantId || !serviceId || !staffId || !startTime) {
+        if (!tenantId || !serviceId || !startTime) {
             return res.status(400).json({
                 success: false,
-                message: 'tenantId, serviceId, staffId, and startTime are required'
+                message: 'tenantId, serviceId, and startTime are required'
             });
         }
 
@@ -205,11 +205,12 @@ const evaluateScheduling = async (req, res) => {
         }
 
         const resolvedDuration = Number(duration) > 0 ? Number(duration) : Number(service.duration || 30);
+        const normalizedStaffId = (staffId && staffId !== 'any' && staffId !== 'auto') ? staffId : null;
         const decision = await bookingService.evaluateSchedulingRequest({
             tenantId,
             serviceId,
             variantId,
-            staffId,
+            staffId: normalizedStaffId,
             startTime,
             duration: resolvedDuration,
             overtimeApproval,
@@ -219,8 +220,23 @@ const evaluateScheduling = async (req, res) => {
         // TEMP UAT DEBUG — REMOVE AFTER AVAILABILITY ROOT CAUSE IS CONFIRMED
         console.info('evaluateSchedulingDecision', { decision });
 
-        return res.status(decision.valid ? 200 : 409).json({
-            success: decision.valid,
+        if (!decision.valid) {
+            return res.status(409).json({
+                success: false,
+                conflict: true,
+                code: decision.code || 'SCHEDULING_CONFLICT',
+                message: decision.message,
+                messageAr: decision.messageAr,
+                actionableGuidance: decision.actionableGuidance,
+                actionableGuidanceAr: decision.actionableGuidanceAr,
+                conflicts: decision.conflicts,
+                conflictDetails: decision.conflictDetails,
+                decision
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
             decision
         });
     } catch (error) {

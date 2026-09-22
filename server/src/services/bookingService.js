@@ -293,14 +293,20 @@ class BookingService {
                 throw new Error('Staff selection is required. Please select a staff member.');
             }
             // Auto-assign best available staff
-            finalStaffId = await this._selectBestAvailableStaff(tenantId, serviceId, startTime, finalTransaction);
+            const candidateDuration = normalizeNumber(duration, 0) > 0
+                ? normalizeNumber(duration, 0)
+                : (serviceVariant?.duration || service.duration || 30);
+            finalStaffId = await this._selectBestAvailableStaff(tenantId, serviceId, startTime, finalTransaction, {
+                variantId,
+                duration: candidateDuration
+            });
             if (!finalStaffId) {
                 throw new Error('No available staff for this service at the selected time');
             }
         }
 
         // Validate staff exists, is active, and can perform service
-        const staff = await db.Staff.findByPk(finalStaffId, { transaction: finalTransaction });
+        let staff = await db.Staff.findByPk(finalStaffId, { transaction: finalTransaction });
         if (!staff) throw new Error('Staff not found');
         if (staff.tenantId !== tenantId) {
             throw new Error('Staff does not belong to this tenant');
@@ -360,7 +366,7 @@ class BookingService {
         }
 
         // ========== CONFLICT DETECTION ==========
-        const schedulingDecision = await this.evaluateSchedulingRequest({
+        let schedulingDecision = await this.evaluateSchedulingRequest({
             tenantId,
             serviceId,
             variantId,
@@ -369,6 +375,33 @@ class BookingService {
             duration: resolvedDuration,
             overtimeApproval
         }, finalTransaction);
+
+        // If auto_assigned mode and the tentatively selected staff has a staff conflict,
+        // re-run candidate selection across other eligible staff!
+        if (!schedulingDecision.valid && finalAssignmentMode === 'auto_assigned' && !customerSelectedSpecificStaff) {
+            const hasResourceConflict = schedulingDecision.conflicts?.some(c => c.entityType === 'resource');
+            if (!hasResourceConflict) {
+                const altStaffId = await this._selectBestAvailableStaff(tenantId, serviceId, start, finalTransaction, {
+                    variantId,
+                    duration: resolvedDuration,
+                    excludeStaffIds: [finalStaffId]
+                });
+                if (altStaffId) {
+                    finalStaffId = altStaffId;
+                    staff = await db.Staff.findByPk(finalStaffId, { transaction: finalTransaction });
+                    schedulingDecision = await this.evaluateSchedulingRequest({
+                        tenantId,
+                        serviceId,
+                        variantId,
+                        staffId: finalStaffId,
+                        startTime: start,
+                        duration: resolvedDuration,
+                        overtimeApproval
+                    }, finalTransaction);
+                }
+            }
+        }
+
         const availabilityFailure = schedulingDecision.valid ? null : schedulingDecision;
         const approvedOvertime = this._buildOvertimeApproval(overtimeApproval);
         if (availabilityFailure) {
@@ -1078,7 +1111,9 @@ class BookingService {
      * Select best available staff for "Any Staff" bookings
      * @private
      */
-    async _selectBestAvailableStaff(tenantId, serviceId, startTime, transaction) {
+    async _selectBestAvailableStaff(tenantId, serviceId, startTime, transaction, options = {}) {
+        const { variantId, duration, excludeStaffIds = [], excludeAppointmentId } = options;
+
         // Get all staff who can perform this service
         const serviceEmployees = await db.ServiceEmployee.findAll({
             where: { serviceId },
@@ -1089,8 +1124,13 @@ class BookingService {
             return null;
         }
 
+        const excludedSet = new Set((excludeStaffIds || []).map(String));
         // Get staff IDs and fetch staff records
-        const staffIds = serviceEmployees.map(se => se.staffId);
+        const staffIds = serviceEmployees.map(se => se.staffId).filter(id => !excludedSet.has(String(id)));
+        if (staffIds.length === 0) {
+            return null;
+        }
+
         const staffMembers = await db.Staff.findAll({
             where: {
                 id: { [Op.in]: staffIds },
@@ -1109,24 +1149,26 @@ class BookingService {
             return null;
         }
 
-        const availabilityService = require('./availabilityService');
-        const date = start.toISOString().split('T')[0];
-        const requestedTimestamp = start.getTime();
+        let resolvedDuration = Number(duration);
+        if (!resolvedDuration || resolvedDuration <= 0) {
+            const service = await db.Service.findByPk(serviceId, { transaction });
+            resolvedDuration = Number(service?.duration || 30);
+        }
 
         const candidateResults = await Promise.all(staffMembers.map(async (staff) => {
             try {
-                const result = await availabilityService.getAvailableSlots(tenantId, {
+                const decision = await this.evaluateSchedulingRequest({
+                    tenantId,
                     serviceId,
+                    variantId,
                     staffId: staff.id,
-                    date
-                });
+                    startTime: start,
+                    duration: resolvedDuration,
+                    excludeAppointmentId,
+                    _skipResourceCheck: true
+                }, transaction);
 
-                const matchingSlot = (result.slots || []).find((slot) => {
-                    const slotStart = new Date(slot.startTime);
-                    return slot.available && !Number.isNaN(slotStart.getTime()) && slotStart.getTime() === requestedTimestamp;
-                });
-
-                if (!matchingSlot) {
+                if (!decision.valid) {
                     return null;
                 }
 
@@ -1335,16 +1377,208 @@ class BookingService {
      * @param {Object} transaction - Database transaction
      * @returns {Promise<boolean>} - true if conflict exists
      */
-    async evaluateSchedulingRequest({ tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId = null }, transaction = null) {
+    async evaluateSchedulingRequest({ tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId = null, _skipResourceCheck = false }, transaction = null) {
         const start = startTime instanceof Date ? startTime : new Date(startTime);
         const durationMinutes = normalizeNumber(duration, 0);
         const end = new Date(start.getTime() + durationMinutes * 60000);
 
-        if (!tenantId || !staffId || !serviceId || Number.isNaN(start.getTime()) || durationMinutes <= 0) {
+        if (!tenantId || !serviceId || Number.isNaN(start.getTime()) || durationMinutes <= 0) {
             return {
                 valid: false,
                 reasonType: 'invalid_request',
-                message: 'A valid staff member, service, start time, and duration are required.'
+                message: 'A valid service, start time, and duration are required.'
+            };
+        }
+
+        const isAutoStaff = !staffId || staffId === 'any' || staffId === 'auto';
+        if (isAutoStaff) {
+            // Check resource requirements first
+            let resourceCheck = null;
+            let resourceConflict = null;
+            if (!_skipResourceCheck && serviceId && serviceId !== 'legacy-validation') {
+                const requirements = await resolveServiceResourceRequirements(serviceId, variantId, tenantId, transaction);
+                if (requirements.length > 0) {
+                    resourceCheck = await checkResourceAvailability(
+                        tenantId,
+                        requirements,
+                        start,
+                        end,
+                        excludeAppointmentId,
+                        transaction
+                    );
+                    if (!resourceCheck.available && resourceCheck.conflictDetails) {
+                        resourceConflict = resourceCheck.conflictDetails;
+                    }
+                }
+            }
+
+            // Find qualified active staff
+            const serviceEmployees = await db.ServiceEmployee.findAll({
+                where: { serviceId },
+                transaction
+            });
+            const qualifiedStaffIds = serviceEmployees.map(se => se.staffId);
+            const staffMembers = qualifiedStaffIds.length > 0 ? await db.Staff.findAll({
+                where: {
+                    id: { [Op.in]: qualifiedStaffIds },
+                    tenantId,
+                    isActive: true
+                },
+                transaction
+            }) : [];
+
+            // Evaluate scheduling feasibility for each candidate staff
+            const staffDecisions = await Promise.all(staffMembers.map(async (member) => {
+                const dec = await this.evaluateSchedulingRequest({
+                    tenantId,
+                    serviceId,
+                    variantId,
+                    staffId: member.id,
+                    startTime: start,
+                    duration: durationMinutes,
+                    overtimeApproval,
+                    excludeAppointmentId,
+                    _skipResourceCheck: true
+                }, transaction);
+                return { member, decision: dec };
+            }));
+
+            const availableStaff = staffDecisions.filter(sd => sd.decision.valid);
+            const hasAvailableStaff = availableStaff.length > 0;
+            const isResourceAvailable = !resourceConflict;
+
+            // CASE 1 & 2: At least one staff available AND resource available -> VALID
+            if (hasAvailableStaff && isResourceAvailable) {
+                let bestStaffId = availableStaff[0].member.id;
+                if (availableStaff.length > 1) {
+                    const dayStart = new Date(start);
+                    dayStart.setHours(0, 0, 0, 0);
+                    const dayEnd = new Date(start);
+                    dayEnd.setHours(23, 59, 59, 999);
+                    const workloads = await Promise.all(availableStaff.map(async (cand) => {
+                        const count = await db.Appointment.count({
+                            where: {
+                                staffId: cand.member.id,
+                                status: { [Op.notIn]: ['cancelled', 'no_show'] },
+                                startTime: { [Op.between]: [dayStart, dayEnd] }
+                            },
+                            transaction
+                        });
+                        return { member: cand.member, count };
+                    }));
+                    workloads.sort((a, b) => a.count - b.count || (b.member.rating || 0) - (a.member.rating || 0));
+                    bestStaffId = workloads[0].member.id;
+                }
+
+                return {
+                    valid: true,
+                    staffId: bestStaffId,
+                    assignmentMode: 'auto_assigned',
+                    conflicts: [],
+                    conflictDetails: null
+                };
+            }
+
+            // CASE 5: Free staff exists, but RESOURCE is occupied -> RESOURCE conflict (never blame employee)
+            if (hasAvailableStaff && !isResourceAvailable) {
+                const conflicts = [resourceConflict];
+                return {
+                    valid: false,
+                    reasonType: resourceConflict.reasonType || 'RESOURCE_OCCUPIED',
+                    conflictType: resourceConflict.type,
+                    message: resourceCheck?.message || `${resourceConflict.entityName} is unavailable at this time.`,
+                    messageAr: resourceCheck?.messageAr || `${resourceConflict.entityNameAr || resourceConflict.entityName} غير متاح في هذا الوقت.`,
+                    actionableGuidance: resourceCheck?.actionableGuidance || 'Please choose a different time.',
+                    actionableGuidanceAr: resourceCheck?.actionableGuidanceAr || 'يرجى اختيار وقت مختلف.',
+                    conflicts,
+                    conflictDetails: {
+                        entityType: 'resource',
+                        entityId: resourceConflict.entityId,
+                        entityName: resourceConflict.entityName,
+                        entityNameAr: resourceConflict.entityNameAr,
+                        message: resourceCheck?.message,
+                        messageAr: resourceCheck?.messageAr,
+                        actionableGuidance: resourceCheck?.actionableGuidance,
+                        actionableGuidanceAr: resourceCheck?.actionableGuidanceAr,
+                        availableAgainAt: resourceConflict.availableAgainAt || null
+                    }
+                };
+            }
+
+            // CASE 6: No staff available, but resource is free -> STAFF conflict
+            if (!hasAvailableStaff && isResourceAvailable) {
+                const staffConflict = {
+                    type: 'STAFF_UNAVAILABLE',
+                    entityType: 'staff',
+                    reasonType: 'no_available_staff',
+                    message: 'No qualified professionals are available at the requested time. Please choose another time.',
+                    messageAr: 'لا يوجد موظفون مؤهلون متاحون في الوقت المطلوب. يرجى اختيار وقت آخر.'
+                };
+                const conflicts = [staffConflict];
+                return {
+                    valid: false,
+                    reasonType: 'no_available_staff',
+                    conflictType: 'STAFF_UNAVAILABLE',
+                    message: 'No qualified professionals are available at the requested time. Please choose another time.',
+                    messageAr: 'لا يوجد موظفون مؤهلون متاحون في الوقت المطلوب. يرجى اختيار وقت آخر.',
+                    actionableGuidance: 'Please choose another time.',
+                    actionableGuidanceAr: 'يرجى اختيار وقت آخر.',
+                    conflicts,
+                    conflictDetails: {
+                        entityType: 'staff',
+                        message: 'No qualified professionals are available at the requested time. Please choose another time.',
+                        messageAr: 'لا يوجد موظفون مؤهلون متاحون في الوقت المطلوب. يرجى اختيار وقت آخر.',
+                        actionableGuidance: 'Please choose another time.',
+                        actionableGuidanceAr: 'يرجى اختيار وقت آخر.'
+                    }
+                };
+            }
+
+            // CASE 7: Both staff and resource constraints block -> MULTIPLE_CONFLICTS
+            const staffConflict = {
+                type: 'STAFF_UNAVAILABLE',
+                entityType: 'staff',
+                reasonType: 'no_available_staff',
+                message: 'No qualified professionals are available at the requested time.',
+                messageAr: 'لا يوجد موظفون مؤهلون متاحون في الوقت المطلوب.'
+            };
+            const conflicts = [staffConflict, resourceConflict];
+            const tenantSettings = await db.TenantSettings.findOne({
+                where: { tenantId },
+                transaction
+            });
+            const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
+            const resNameEn = resourceConflict.entityName || 'Resource';
+            const resNameAr = resourceConflict.entityNameAr || resNameEn;
+            const availAgainEn = resourceConflict.availableAgainAt
+                ? ` The resource will be available again at ${formatClockEn(resourceConflict.availableAgainAt, timezone)}.`
+                : '';
+            const availAgainAr = resourceConflict.availableAgainAt
+                ? ` ستكون الموارد متاحة مرة أخرى في ${formatClockAr(resourceConflict.availableAgainAt, timezone)}.`
+                : '';
+
+            const finalMessageEn = `No qualified professionals are available at the requested time, and ${resNameEn} is also occupied during this time.${availAgainEn} Please choose another time.`;
+            const finalMessageAr = `لا يوجد موظفون مؤهلون متاحون في الوقت المطلوب، و${resNameAr} مشغولة أيضاً خلال هذا الوقت.${availAgainAr} يرجى اختيار وقت مختلف.`;
+            const finalGuidanceEn = 'Please choose another time.';
+            const finalGuidanceAr = 'يرجى اختيار وقت مختلف.';
+
+            return {
+                valid: false,
+                reasonType: 'multiple_conflicts',
+                conflictType: 'MULTIPLE_CONFLICTS',
+                message: finalMessageEn,
+                messageAr: finalMessageAr,
+                actionableGuidance: finalGuidanceEn,
+                actionableGuidanceAr: finalGuidanceAr,
+                conflicts,
+                conflictDetails: {
+                    entityType: 'multiple',
+                    message: finalMessageEn,
+                    messageAr: finalMessageAr,
+                    actionableGuidance: finalGuidanceEn,
+                    actionableGuidanceAr: finalGuidanceAr,
+                    conflicts
+                }
             };
         }
 
@@ -1512,7 +1746,7 @@ class BookingService {
 
         // ========== RESOURCE AVAILABILITY CHECK (Phase 1B) ==========
         let resourceCheck = null;
-        if (serviceId && serviceId !== 'legacy-validation') {
+        if (!_skipResourceCheck && serviceId && serviceId !== 'legacy-validation') {
             const requirements = await resolveServiceResourceRequirements(serviceId, variantId, tenantId, transaction);
             if (requirements.length > 0) {
                 resourceCheck = await checkResourceAvailability(
@@ -1619,6 +1853,7 @@ class BookingService {
             return {
                 valid: false,
                 reasonType: conflicts[0]?.type?.toLowerCase() || 'booking_conflict',
+                conflictType: conflicts[0]?.type || 'BOOKING_CONFLICT',
                 requestedStartTime: start.toISOString(),
                 requestedEndTime: end.toISOString(),
                 tenantDutyStart: tenantDutyStart?.toISOString() || null,

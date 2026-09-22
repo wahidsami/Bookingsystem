@@ -280,29 +280,28 @@ function getDatePartsInTimeZone(date, timeZone = 'Asia/Riyadh') {
     };
 }
 
-async function ensureStaffSlotAvailable({ tenantId, serviceId, staffId, startTime, excludeAppointmentId = null }) {
+async function ensureStaffSlotAvailable({ tenantId, serviceId, variantId = null, duration = null, staffId, startTime, excludeAppointmentId = null }) {
     if (!tenantId || !serviceId || !staffId || !startTime) return false;
     const requestedStart = new Date(startTime);
     if (Number.isNaN(requestedStart.getTime())) return false;
-    const tenantSettings = await db.TenantSettings.findOne({
-        where: { tenantId },
-        attributes: ['timezone']
-    });
-    const timezone = tenantSettings?.timezone || 'Asia/Riyadh';
-    const requestedParts = getDatePartsInTimeZone(requestedStart, timezone);
 
-    const availability = await availabilityService.getAvailableSlots(tenantId, {
+    let resolvedDuration = Number(duration);
+    if (!resolvedDuration || resolvedDuration <= 0) {
+        const service = await db.Service.findByPk(serviceId);
+        resolvedDuration = Number(service?.duration || 30);
+    }
+
+    const evaluation = await bookingService.evaluateSchedulingRequest({
+        tenantId,
         serviceId,
+        variantId,
         staffId,
-        date: requestedParts.dateKey,
-        excludeAppointmentId
+        startTime: requestedStart,
+        duration: resolvedDuration,
+        excludeAppointmentId,
+        _skipResourceCheck: true
     });
-
-    return (availability?.slots || []).some((slot) => {
-        if (slot.available !== true) return false;
-        const slotParts = getDatePartsInTimeZone(new Date(slot.startTime), timezone);
-        return slotParts.dateKey === requestedParts.dateKey && slotParts.timeKey === requestedParts.timeKey;
-    });
+    return Boolean(evaluation && evaluation.valid);
 }
 
 async function inspectStaffSlotAvailability({ tenantId, serviceId, staffId, startTime }) {
@@ -921,8 +920,8 @@ exports.createAppointment = async (req, res) => {
                 return {
                     serviceId: itemServiceId,
                     variantId: item?.variantId || null,
-                    staffId: item?.staffId || null,
-                    requestedStaffId: item?.requestedStaffId || item?.staffId || null,
+                    staffId: (item?.assignmentMode === 'auto_assigned' && !item?.isExplicitStaff) ? null : (item?.staffId || null),
+                    requestedStaffId: (item?.assignmentMode === 'auto_assigned' && !item?.isExplicitStaff) ? null : (item?.requestedStaffId || (item?.isExplicitStaff ? item?.staffId : null)),
                     startTime: parsedStartTime.toISOString(),
                     notes: item?.notes || notes || null,
                     paymentMethod: itemPaymentMethod,
@@ -1112,11 +1111,13 @@ exports.createAppointment = async (req, res) => {
             }
         }
 
-        const explicitStaffId = staffId || requestedStaffId || null;
+        const isExplicitStaff = assignmentMode !== 'auto_assigned' && Boolean(staffId || requestedStaffId);
+        const explicitStaffId = isExplicitStaff ? (staffId || requestedStaffId || null) : null;
         if (explicitStaffId) {
             const slotAvailable = await ensureStaffSlotAvailable({
                 tenantId,
                 serviceId,
+                variantId,
                 staffId: explicitStaffId,
                 startTime
             });
@@ -1178,15 +1179,15 @@ exports.createAppointment = async (req, res) => {
         const appointment = await bookingService.createBooking({
             serviceId,
             variantId: variantId || null,
-            staffId: staffId || null,
-            requestedStaffId: requestedStaffId || null,
+            staffId: isExplicitStaff ? staffId : null,
+            requestedStaffId: isExplicitStaff ? requestedStaffId : null,
             platformUserId: customerUser.id,
             tenantId,
             startTime,
             notes: normalizedNotes,
             paymentMethod: dashboardOverridePaymentMethod,
             paymentAllocations,
-            assignmentMode: assignmentMode || (staffId ? 'tenant_reassigned' : undefined),
+            assignmentMode: assignmentMode || (isExplicitStaff ? 'tenant_reassigned' : 'auto_assigned'),
             skipServicePaymentOptionValidation: true,
             bookingSessionId: existingSession?.id || null,
             bookingReference: resolvedBookingReference || undefined,
