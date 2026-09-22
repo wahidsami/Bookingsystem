@@ -1,6 +1,13 @@
-import React, { useMemo } from 'react';
-import { Search, Package as PackageIcon, Clock, Trash, PlusCircle, Layers } from 'lucide-react';
-import { resolveServiceImageUrl, resolveServiceOrBundleCategory, type ServiceRecord, type ServiceVariantRecord } from '../../lib/serviceContract';
+import React, { useState, useMemo } from 'react';
+import { Search, Package as PackageIcon, Clock, Trash, PlusCircle, Layers, ChevronDown, Check } from 'lucide-react';
+import {
+  resolveServiceImageUrl,
+  resolveServiceOrBundleCategory,
+  isParentServiceBookable,
+  getServiceDisplayName,
+  type ServiceRecord,
+  type ServiceVariantRecord
+} from '../../lib/serviceContract';
 import AppointmentServiceRow from './AppointmentServiceRow';
 
 export interface StagedService {
@@ -88,7 +95,25 @@ export default function AppointmentServicesStep({
   formatMinutesToTime,
 }: AppointmentServicesStepProps) {
 
+  const [expandedVariantServiceIds, setExpandedVariantServiceIds] = useState<Record<string, boolean>>({});
+
+  const isServiceVariantsExpanded = (serviceId: string, hasStagedItem: boolean) => {
+    if (expandedVariantServiceIds[serviceId] !== undefined) {
+      return expandedVariantServiceIds[serviceId];
+    }
+    return hasStagedItem || Boolean(forceExpandAll);
+  };
+
+  const toggleServiceVariantsExpanded = (serviceId: string, hasStagedItem: boolean) => {
+    const current = isServiceVariantsExpanded(serviceId, hasStagedItem);
+    setExpandedVariantServiceIds(prev => ({
+      ...prev,
+      [serviceId]: !current
+    }));
+  };
+
   const effectiveBundles = useMemo(() => {
+
     if (services2Bundles && services2Bundles.length > 0) {
       return services2Bundles;
     }
@@ -601,27 +626,33 @@ export default function AppointmentServicesStep({
 
                         <div className="space-y-3">
                           {section.services.map((service) => {
-                            const variants = Array.isArray(service.variants) && service.variants.length > 0 ? service.variants : [null];
+                            const activeVariants = Array.isArray(service.variants)
+                              ? service.variants.filter((v: any) => v && v.isActive !== false)
+                              : [];
+                            const hasVariants = activeVariants.length > 0;
+                            const isParentBookable = isParentServiceBookable(service);
+                            const stagedChildItems = stagedServices.filter(s => s.serviceId === service.id && s.itemType !== 'package');
+                            const hasStagedItem = stagedChildItems.length > 0;
+                            const isExpanded = isServiceVariantsExpanded(service.id, hasStagedItem);
 
-                            return variants.map((variant) => {
-                              const stagedItem = variant
-                                ? stagedServices.find((s) => s.serviceId === service.id && s.variantId === variant.id && s.itemType !== 'package')
-                                : stagedServices.find((s) => s.serviceId === service.id && !s.variantId && s.itemType !== 'package');
+                            // Case 1: Service without variants -> Render standard single row
+                            if (!hasVariants) {
+                              const stagedItem = stagedServices.find((s) => s.serviceId === service.id && !s.variantId && s.itemType !== 'package') || null;
 
                               return (
                                 <AppointmentServiceRow
                                   tenantId={tenantId}
                                   tenantTimezone={tenantTimezone}
                                   selectedDate={selectedDate}
-                                  key={variant ? `${service.id}-${variant.id}` : service.id}
+                                  key={service.id}
                                   service={service}
-                                  variant={variant}
+                                  variant={null}
                                   isRtl={isRtl}
                                   boardStartHour={boardStartHour}
                                   slotMinutes={slotMinutes}
                                   forceExpanded={forceExpandAll}
                                   availableStylists={availableStylists}
-                                  stagedItem={stagedItem || null}
+                                  stagedItem={stagedItem}
                                   otherStagedServices={stagedServices.filter(s => s.id !== stagedItem?.id)}
                                   onAddService={onAddService}
                                   onUpdateService={onUpdateService}
@@ -631,9 +662,158 @@ export default function AppointmentServicesStep({
                                   }}
                                 />
                               );
-                            });
+                            }
+
+                            // Case 2: Service WITH variants -> Render expandable parent card
+                            const serviceName = getServiceDisplayName(service, isRtl ? 'ar' : 'en');
+                            const serviceDesc = isRtl
+                              ? (service.descriptionAr || service.description_ar || '')
+                              : (service.descriptionEn || service.description_en || '');
+
+                            return (
+                              <div
+                                key={service.id}
+                                data-service-id={service.id}
+                                className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm transition hover:border-primary/30"
+                              >
+                                {/* Parent Service Header: Clearly communicates variant options */}
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => toggleServiceVariantsExpanded(service.id, hasStagedItem)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      toggleServiceVariantsExpanded(service.id, hasStagedItem);
+                                    }
+                                  }}
+                                  className={`flex items-center justify-between gap-3 px-3.5 py-3 sm:px-4 min-h-[72px] cursor-pointer transition select-none ${
+                                    isExpanded ? 'bg-slate-50/80 border-b border-slate-100' : 'hover:bg-slate-50/50'
+                                  }`}
+                                >
+                                  {/* Left: Thumbnail + Service Title + Variant Badge */}
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                                      {service.image ? (
+                                        <img
+                                          src={resolveServiceImageUrl(service.image)}
+                                          alt={serviceName}
+                                          className="h-full w-full object-cover"
+                                          loading="lazy"
+                                        />
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-slate-400">
+                                          <Layers className="h-5 w-5 text-purple-600" />
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0 pr-2">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="font-bold tracking-tight text-slate-900 text-base sm:text-[15px] truncate">
+                                          {serviceName}
+                                        </h4>
+                                        <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold text-purple-700">
+                                          {activeVariants.length} {isRtl ? (activeVariants.length === 1 ? 'خيار متاح' : activeVariants.length === 2 ? 'خياران متاحان' : 'خيارات متاحة') : (activeVariants.length === 1 ? '1 variant' : `${activeVariants.length} variants`)}
+                                        </span>
+                                        {hasStagedItem && (
+                                          <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                            <Check className="h-3 w-3" />
+                                            <span>{stagedChildItems.length} {isRtl ? 'تم اختياره' : 'selected'}</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                                        {serviceDesc || (isRtl ? 'انقر لعرض الخيارات والبدائل المتاحة' : 'Click to expand options & variants')}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Right: Expand/Collapse Button */}
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleServiceVariantsExpanded(service.id, hasStagedItem);
+                                      }}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 transition cursor-pointer shadow-2xs"
+                                      aria-label={isExpanded ? (isRtl ? 'إخفاء الخيارات' : 'Collapse options') : (isRtl ? 'عرض الخيارات' : 'Expand options')}
+                                    >
+                                      <span>{isExpanded ? (isRtl ? 'إخفاء الخيارات' : 'Hide options') : (isRtl ? 'عرض الخيارات' : 'View options')}</span>
+                                      <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Expanded Options List */}
+                                {isExpanded && (
+                                  <div className="bg-slate-50/60 p-3 sm:p-4 space-y-2.5">
+                                    {/* 1. Main Service Option (Rendered only when validly bookable as standalone) */}
+                                    {isParentBookable && (() => {
+                                      const stagedItem = stagedServices.find(s => s.serviceId === service.id && !s.variantId && s.itemType !== 'package') || null;
+                                      return (
+                                        <AppointmentServiceRow
+                                          tenantId={tenantId}
+                                          tenantTimezone={tenantTimezone}
+                                          selectedDate={selectedDate}
+                                          key={`${service.id}-main`}
+                                          service={service}
+                                          variant={null}
+                                          isMainServiceOption={true}
+                                          depth={1}
+                                          isRtl={isRtl}
+                                          boardStartHour={boardStartHour}
+                                          slotMinutes={slotMinutes}
+                                          forceExpanded={forceExpandAll}
+                                          availableStylists={availableStylists}
+                                          stagedItem={stagedItem}
+                                          otherStagedServices={stagedServices.filter(s => s.id !== stagedItem?.id)}
+                                          onAddService={onAddService}
+                                          onUpdateService={onUpdateService}
+                                          onRemoveService={(id) => {
+                                            const idx = stagedServices.findIndex(s => s.id === id);
+                                            if (idx !== -1) onRemoveService(idx);
+                                          }}
+                                        />
+                                      );
+                                    })()}
+
+                                    {/* 2. Independent Variant Options */}
+                                    {activeVariants.map((variant) => {
+                                      const stagedItem = stagedServices.find(s => s.serviceId === service.id && s.variantId === variant.id && s.itemType !== 'package') || null;
+                                      return (
+                                        <AppointmentServiceRow
+                                          tenantId={tenantId}
+                                          tenantTimezone={tenantTimezone}
+                                          selectedDate={selectedDate}
+                                          key={`${service.id}-${variant.id}`}
+                                          service={service}
+                                          variant={variant}
+                                          depth={1}
+                                          isRtl={isRtl}
+                                          boardStartHour={boardStartHour}
+                                          slotMinutes={slotMinutes}
+                                          forceExpanded={forceExpandAll}
+                                          availableStylists={availableStylists}
+                                          stagedItem={stagedItem}
+                                          otherStagedServices={stagedServices.filter(s => s.id !== stagedItem?.id)}
+                                          onAddService={onAddService}
+                                          onUpdateService={onUpdateService}
+                                          onRemoveService={(id) => {
+                                            const idx = stagedServices.findIndex(s => s.id === id);
+                                            if (idx !== -1) onRemoveService(idx);
+                                          }}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
                           })}
                         </div>
+
                       </div>
                     )}
                   </div>

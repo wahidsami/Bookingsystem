@@ -4,6 +4,7 @@ import { to12HourTime, to24HourTime } from '../../lib/employeeHelpers';
 import { useEarlyAvailabilityValidation } from '../../hooks/useEarlyAvailabilityValidation';
 import { useTimeSlotAvailability, type TimeSlotOption } from '../../hooks/useTimeSlotAvailability';
 import { AlertCircle, CheckCircle2, Loader2, ChevronDown, Clock } from 'lucide-react';
+import { getServiceDisplayName } from '../../lib/serviceContract';
 
 interface AppointmentServiceConfigurationProps {
   tenantId: string;
@@ -142,49 +143,61 @@ export default function AppointmentServiceConfiguration({
     }
   }, [isDropdownOpen]);
 
+  const serviceName = service ? getServiceDisplayName(service, isRtl ? 'ar' : 'en') : '';
+  const variantName = activeVariant
+    ? (isRtl
+        ? (activeVariant.name_ar || activeVariant.nameAr || activeVariant.name_en || activeVariant.nameEn)
+        : (activeVariant.name_en || activeVariant.nameEn || activeVariant.name_ar || activeVariant.nameAr))
+    : '';
+
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">
       <div className="space-y-5">
-        {/* Service Variant Selector / Information */}
-        {availableVariants.length > 0 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {isRtl ? 'البديل / الخيار المحدد' : 'Service Variant'}
+        {/* Service & Option Identification Banner */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              {isRtl ? 'الخدمة والخيار المحدد' : 'Selected Service & Option'}
+            </span>
+            {activeVariant ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-[11px] font-bold text-purple-700">
+                <span>{isRtl ? 'بديل' : 'Variant'}</span>
               </span>
-              {activeVariant && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-[11px] font-bold text-purple-700">
-                  <span>{isRtl ? (activeVariant.name_ar || activeVariant.nameAr || activeVariant.name_en || activeVariant.nameEn) : (activeVariant.name_en || activeVariant.nameEn || activeVariant.name_ar || activeVariant.nameAr)}</span>
-                  <span>•</span>
-                  <span>{activeVariant.duration || service?.duration} {isRtl ? 'دقيقة' : 'min'}</span>
-                  <span>•</span>
-                  <span dir="ltr">{Number(activeVariant.finalPrice ?? activeVariant.rawPrice ?? activeVariant.price ?? 0).toFixed(2)} SAR</span>
-                </span>
-              )}
-            </div>
-
-            {availableVariants.length > 1 && (
-              <select
-                value={effectiveVariantId || ''}
-                onChange={(e) => handleVariantChange(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 focus:border-transparent focus:ring-2 focus:ring-primary shadow-sm"
-              >
-                {availableVariants.map((v: any) => {
-                  const vName = isRtl
-                    ? (v.name_ar || v.nameAr || v.name_en || v.nameEn)
-                    : (v.name_en || v.nameEn || v.name_ar || v.nameAr);
-                  const vPrice = Number(v.finalPrice ?? v.rawPrice ?? v.price ?? 0);
-                  const vDuration = Number(v.duration || service?.duration || 0);
-                  return (
-                    <option key={v.id} value={v.id}>
-                      {vName} — {vDuration} {isRtl ? 'دقيقة' : 'min'} ({vPrice.toFixed(2)} SAR)
-                    </option>
-                  );
-                })}
-              </select>
-            )}
+            ) : availableVariants.length > 0 ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                <span>{isRtl ? 'الخدمة الأساسية' : 'Main Service'}</span>
+              </span>
+            ) : null}
           </div>
-        )}
+
+          <div className="flex items-center gap-2 flex-wrap text-sm font-bold text-slate-900">
+            <span>{serviceName}</span>
+            {activeVariant ? (
+              <>
+                <span className="text-slate-400 font-normal">→</span>
+                <span className="text-purple-700">
+                  {variantName}
+                </span>
+              </>
+            ) : availableVariants.length > 0 ? (
+              <>
+                <span className="text-slate-400 font-normal">→</span>
+                <span className="text-slate-700">
+                  {isRtl ? 'الخدمة الأساسية' : 'Main Service'}
+                </span>
+              </>
+            ) : null}
+            <span className="text-slate-300 font-normal">•</span>
+            <span className="text-xs text-slate-600 font-semibold">
+              {Number(draftConfig.duration || activeVariant?.duration || service?.duration || 0)} {isRtl ? 'دقيقة' : 'min'}
+            </span>
+            <span className="text-slate-300 font-normal">•</span>
+            <span dir="ltr" className="text-xs text-slate-600 font-semibold">
+              {Number(draftConfig.finalPrice ?? draftConfig.basePrice ?? activeVariant?.finalPrice ?? service?.finalPrice ?? 0).toFixed(2)} SAR
+            </span>
+          </div>
+        </div>
+
 
         <div className="grid gap-4 md:grid-cols-2">
           {/* Team Member */}

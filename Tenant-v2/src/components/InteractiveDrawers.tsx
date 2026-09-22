@@ -1706,10 +1706,10 @@ export default function InteractiveDrawers({
     const isSelected = isQueuedServiceSelected(service.id, variantOverride?.id);
     if (isSelected) {
       setStagedServices((current) => current.filter((item) => {
-        if (variantOverride) {
+        if (variantOverride?.id) {
           return !(item.serviceId === service.id && item.variantId === variantOverride.id);
         }
-        return item.serviceId !== service.id;
+        return !(item.serviceId === service.id && !item.variantId);
       }));
       setExpandedServiceIds((current) => ({
         ...current,
@@ -1744,7 +1744,7 @@ export default function InteractiveDrawers({
       const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
 
       const newItem: StagedService = {
-        id: `stg-${Date.now()}`,
+        id: `stg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         serviceId: service.id,
         variantId: resolvedVariant?.id || undefined,
         serviceCategory: service.category,
@@ -1762,11 +1762,15 @@ export default function InteractiveDrawers({
       };
 
       setStagedServices(prev => [...prev, newItem]);
+      const optionName = resolvedVariant
+        ? (isRtl ? (resolvedVariant.name_ar || resolvedVariant.nameAr || resolvedVariant.name_en || resolvedVariant.nameEn) : (resolvedVariant.name_en || resolvedVariant.nameEn || resolvedVariant.name_ar || resolvedVariant.nameAr))
+        : (isRtl ? service.nameAr : service.nameEn);
       addLocalToast(
-        `تمت إضافة "${isRtl ? service.nameAr : service.nameEn}" لقائمة الخدمات المطلوبة بنجاح`,
-        `Successfully queued "${isRtl ? service.nameAr : service.nameEn}" into the staging list`,
+        `تمت إضافة "${optionName}" لقائمة الخدمات المطلوبة بنجاح`,
+        `Successfully queued "${optionName}" into the staging list`,
         'success'
       );
+
 
       setExpandedServiceIds((current) => ({
         ...current,

@@ -29,6 +29,7 @@ interface AppointmentServiceRowProps {
   onUpdateService: (id: string, updates: Partial<StagedService>) => void;
   onRemoveService: (id: string) => void;
   children?: React.ReactNode;
+  isMainServiceOption?: boolean;
 }
 
 export default function AppointmentServiceRow({
@@ -48,7 +49,8 @@ export default function AppointmentServiceRow({
   onAddService,
   onUpdateService,
   onRemoveService,
-  children
+  children,
+  isMainServiceOption = false
 }: AppointmentServiceRowProps) {
   const effectiveVariantId = stagedItem?.variantId || variant?.id;
   const activeVariant = variant || (effectiveVariantId ? (service.variants || []).find((v: any) => v.id === effectiveVariantId) : null);
@@ -57,9 +59,14 @@ export default function AppointmentServiceRow({
   const variantName = isRtl
     ? (activeVariant?.name_ar || activeVariant?.nameAr || activeVariant?.name_en || activeVariant?.nameEn || activeVariant?.description || '')
     : (activeVariant?.name_en || activeVariant?.nameEn || activeVariant?.name_ar || activeVariant?.nameAr || activeVariant?.description || '');
-  const title = isVariantRow
-    ? `${serviceName} - ${variantName}`.trim() || serviceName
-    : serviceName;
+
+  const title = isMainServiceOption
+
+    ? (isRtl ? 'الخدمة الأساسية' : 'Main Service')
+    : isVariantRow
+      ? variantName || serviceName
+      : serviceName;
+
   const price = isVariantRow
     ? Number(activeVariant?.finalPrice ?? activeVariant?.rawPrice ?? activeVariant?.price ?? service.finalPrice ?? service.price ?? 0)
     : Number(getServiceDisplayPrice(service) || 0);
@@ -186,22 +193,40 @@ export default function AppointmentServiceRow({
         </div>
 
         <div className="flex-1 min-w-0 pr-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className={`truncate font-semibold tracking-tight text-slate-900 text-base sm:text-[15px]`}>
               {title}
             </p>
-            {isVariantRow && (
-              <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
+            {isVariantRow ? (
+              <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-purple-700">
                 {isRtl ? 'بديل' : 'Variant'}
               </span>
+            ) : isMainServiceOption ? (
+              <span className="shrink-0 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-600">
+                {isRtl ? 'الأساسية' : 'Main'}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mt-0.5">
+            <span>{duration} {isRtl ? 'دقيقة' : 'min'}</span>
+            <span>•</span>
+            <span dir="ltr">{price.toFixed(2)} SAR</span>
+            {isVariantRow && (
+              <>
+                <span>•</span>
+                <span className="text-slate-400 truncate text-[11px]">
+                  {serviceName}
+                </span>
+              </>
             )}
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <div className="whitespace-nowrap text-[13px] sm:text-sm font-semibold text-slate-900" dir="ltr">
+          <div className="hidden sm:block whitespace-nowrap text-[13px] sm:text-sm font-semibold text-slate-900" dir="ltr">
             {price.toFixed(2)} <span className="text-[10px] sm:text-xs text-slate-500 font-medium">SAR</span>
           </div>
+
 
           <div className="flex shrink-0 items-center gap-1.5">
             {isAdded && (

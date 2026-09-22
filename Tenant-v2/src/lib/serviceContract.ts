@@ -532,6 +532,27 @@ export const getServiceCategoryLabel = (service: Partial<ServiceRecord> & Record
     : toStringValue(service?.categoryEn ?? service?.category_label_en ?? key, '').trim() || key;
 };
 
+/**
+ * Determines whether a parent service is independently bookable without selecting a variant.
+ * Validates duration, price, and absence of standalone booking restrictions.
+ */
+export const isParentServiceBookable = (service: Partial<ServiceRecord> & Record<string, any>): boolean => {
+  if (!service) return false;
+  if ((service as any).requiresVariant === true) return false;
+  if ((service as any).isStandaloneBookable === false) return false;
+  if ((service as any).allowStandaloneBooking === false) return false;
+
+  const duration = Number(service.duration || 0);
+  if (!Number.isFinite(duration) || duration <= 0) return false;
+
+  const priceType = service.priceType || 'fixed';
+  if (priceType === 'free') return true;
+
+  const price = Number(service.finalPrice ?? service.price ?? service.rawPrice ?? 0);
+  return Number.isFinite(price) && price >= 0;
+};
+
+
 export const groupServicesByCategory = (services: any[]) => {
   const groups = new Map<string, { key: string; labelAr: string; labelEn: string; services: ServiceRecord[] }>();
 
