@@ -161,3 +161,22 @@ export const buildExtendedHoursBookingDialog = ({
   bodyAr: `سينتهي هذا الحجز بعد ${extensionMinutes} دقيقة من وقت الإغلاق المعتاد. هل تريد تمديد ساعات الخدمة؟`,
   bodyEn: `This booking will end ${extensionMinutes} minutes after the normal closing time. Would you like to extend the service hours?`
 });
+
+export const buildSpecificConflictDialog = (error: unknown): BookingDialogCopy => {
+  const meta = typeof error === 'object' && error !== null && 'payload' in (error as any)
+    ? (error as BookingErrorMeta)
+    : extractBookingErrorMeta(error);
+
+  const payload = meta.payload;
+  const messageEn = payload?.message || meta.message || 'The selected time or resource is unavailable.';
+  const messageAr = payload?.messageAr || payload?.message || meta.message || 'الوقت المحدد أو المورد المطلوب غير متاح.';
+  const guidanceEn = payload?.actionableGuidance ? `\n\n${payload.actionableGuidance}` : '';
+  const guidanceAr = payload?.actionableGuidanceAr ? `\n\n${payload.actionableGuidanceAr}` : '';
+
+  return {
+    titleAr: 'تعارض في الموعد',
+    titleEn: 'Scheduling Conflict',
+    bodyAr: `${messageAr}${guidanceAr}`,
+    bodyEn: `${messageEn}${guidanceEn}`
+  };
+};

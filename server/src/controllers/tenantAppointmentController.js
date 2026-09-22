@@ -1478,7 +1478,25 @@ exports.createAppointment = async (req, res) => {
             errorMessage = error.message;
         }
 
-        const isConflict = /Time slot not available/i.test(errorMessage) || /Time slot is no longer available/i.test(errorMessage);
+        if (error.conflictDetails || error.conflict || error.code === 'BOOKING_CONFLICT' || error.code === 'RESOURCE_OCCUPIED' || error.code === 'RESOURCE_POOL_EXHAUSTED' || error.code === 'RESOURCE_TYPE_UNCONFIGURED' || error.code === 'INSUFFICIENT_TOTAL_CAPACITY') {
+            const details = error.conflictDetails || {
+                success: false,
+                conflict: true,
+                code: error.code || 'BOOKING_CONFLICT',
+                message: errorMessage,
+                messageAr: errorMessage,
+                actionableGuidance: 'Please choose another employee or a different time.',
+                actionableGuidanceAr: 'يرجى اختيار موظف آخر أو وقت مختلف.',
+                conflicts: []
+            };
+            return res.status(409).json({
+                success: false,
+                conflict: true,
+                ...details
+            });
+        }
+
+        const isConflict = /Time slot not available/i.test(errorMessage) || /Time slot is no longer available/i.test(errorMessage) || /already booked/i.test(errorMessage) || /conflict/i.test(errorMessage);
         const isKnownAdvanceBookingValidation = /Booking must be at least \d+ minutes in advance/i.test(errorMessage);
         const statusCode = isConflict ? 409 : (isKnownAdvanceBookingValidation ? 400 : 500);
 
@@ -2886,33 +2904,27 @@ const _reassignAppointmentStaff = async (req, res) => {
             });
         }
 
-        const hasConflict = await bookingService.hasConflict(
-            staffId,
-            new Date(appointment.startTime),
-            new Date(appointment.endTime),
-            appointment.id,
-            transaction
-        );
-
-        if (hasConflict) {
-            await transaction.rollback();
-            return res.status(409).json({
-                success: false,
-                message: 'Selected staff is not available for this time slot'
-            });
-        }
-
-        const slotAvailable = await ensureStaffSlotAvailable({
+        const schedulingDecision = await bookingService.checkSchedulingConflictDetails({
             tenantId,
             serviceId: appointment.serviceId,
+            variantId: appointment.serviceVariantId,
             staffId,
-            startTime: appointment.startTime
-        });
-        if (!slotAvailable) {
+            startTime: new Date(appointment.startTime),
+            endTime: new Date(appointment.endTime),
+            excludeAppointmentId: appointment.id
+        }, transaction);
+
+        if (!schedulingDecision.valid) {
             await transaction.rollback();
-            return res.status(409).json({
+            return res.status(409).json(schedulingDecision.conflictDetails || {
                 success: false,
-                message: 'Selected staff is not available for this time slot'
+                conflict: true,
+                code: 'BOOKING_CONFLICT',
+                message: schedulingDecision.message,
+                messageAr: schedulingDecision.messageAr || schedulingDecision.message,
+                actionableGuidance: schedulingDecision.actionableGuidance || 'Please choose another employee or a different time.',
+                actionableGuidanceAr: schedulingDecision.actionableGuidanceAr || 'يرجى اختيار موظف آخر أو وقت مختلف.',
+                conflicts: schedulingDecision.conflicts || []
             });
         }
 
@@ -3102,35 +3114,69 @@ exports.rescheduleAppointment = async (req, res) => {
             Math.max(15, Math.round((new Date(appointment.endTime).getTime() - new Date(appointment.startTime).getTime()) / 60000));
         const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
 
-        const hasConflict = await bookingService.hasConflict(
-            requestedStaffId,
-            requestedStart,
-            requestedEnd,
-            appointment.id,
-            transaction
-        );
+        const schedulingDecision = await bookingService.checkSchedulingConflictDetails({
+            tenantId,
+            serviceId: appointment.serviceId,
+            variantId: appointment.serviceVariantId,
+            staffId: requestedStaffId,
+            startTime: requestedStart,
+            endTime: requestedEnd,
+            excludeAppointmentId: appointment.id
+        }, transaction);
 
-        if (hasConflict) {
+        if (!schedulingDecision.valid) {
             await transaction.rollback();
-            return res.status(409).json({
+            return res.status(409).json(schedulingDecision.conflictDetails || {
                 success: false,
-                message: 'Selected time slot is no longer available'
+                conflict: true,
+                code: 'BOOKING_CONFLICT',
+                message: schedulingDecision.message,
+                messageAr: schedulingDecision.messageAr || schedulingDecision.message,
+                actionableGuidance: schedulingDecision.actionableGuidance || 'Please choose another employee or a different time.',
+                actionableGuidanceAr: schedulingDecision.actionableGuidanceAr || 'يرجى اختيار موظف آخر أو وقت مختلف.',
+                conflicts: schedulingDecision.conflicts || []
             });
         }
 
-        const slotAvailable = await ensureStaffSlotAvailable({
+        const {
+            resolveServiceResourceRequirements,
+            allocateServiceResources
+        } = require('../utils/resourceRequirementResolver');
+
+        const requirements = await resolveServiceResourceRequirements(
+            appointment.serviceId,
+            appointment.serviceVariantId,
             tenantId,
-            serviceId: appointment.serviceId,
-            staffId: requestedStaffId,
-            startTime: requestedStart,
-            excludeAppointmentId: appointment.id
-        });
-        if (!slotAvailable) {
-            await transaction.rollback();
-            return res.status(409).json({
-                success: false,
-                message: 'Selected time slot is no longer available'
-            });
+            transaction
+        );
+
+        let newAllocations = null;
+        if (requirements.length > 0) {
+            try {
+                const allocationResult = await allocateServiceResources({
+                    tenantId,
+                    serviceId: appointment.serviceId,
+                    variantId: appointment.serviceVariantId,
+                    startTime: requestedStart,
+                    endTime: requestedEnd,
+                    excludeAppointmentId: appointment.id,
+                    transaction,
+                    lockRows: true
+                });
+                newAllocations = allocationResult.allocations;
+            } catch (resourceErr) {
+                await transaction.rollback();
+                return res.status(409).json(resourceErr.conflictDetails || {
+                    success: false,
+                    conflict: true,
+                    code: resourceErr.code || 'BOOKING_CONFLICT',
+                    message: resourceErr.message || 'Required resources are not available at the selected time',
+                    messageAr: resourceErr.message || 'الموارد المطلوبة غير متوفرة في الوقت المحدد',
+                    actionableGuidance: 'Please choose a different time.',
+                    actionableGuidanceAr: 'يرجى اختيار وقت مختلف.',
+                    conflicts: []
+                });
+            }
         }
 
         if (staffId) {
@@ -3155,6 +3201,20 @@ exports.rescheduleAppointment = async (req, res) => {
         appointment.customerReminderSentAt = null;
         appointment.noShowMarkedAt = null;
         await appointment.save({ transaction });
+
+        if (requirements.length > 0 && newAllocations) {
+            await db.AppointmentResource.destroy({
+                where: { appointmentId: appointment.id },
+                transaction
+            });
+            await db.AppointmentResource.bulkCreate(
+                newAllocations.map(alloc => ({
+                    appointmentId: appointment.id,
+                    resourceId: alloc.resourceId
+                })),
+                { transaction }
+            );
+        }
         await createAppointmentEventSafe({
             appointmentId: appointment.id,
             tenantId,
@@ -3382,19 +3442,27 @@ exports.reassignRescheduleAppointment = async (req, res) => {
         const durationMinutes = Math.max(15, Math.round((currentEnd.getTime() - currentStart.getTime()) / 60000));
         const requestedEnd = new Date(requestedStart.getTime() + durationMinutes * 60000);
 
-        const hasConflict = await bookingService.hasConflict(
+        const schedulingDecision = await bookingService.checkSchedulingConflictDetails({
+            tenantId,
+            serviceId: appointment.serviceId,
+            variantId: appointment.serviceVariantId,
             staffId,
-            requestedStart,
-            requestedEnd,
-            appointment.id,
-            transaction
-        );
+            startTime: requestedStart,
+            endTime: requestedEnd,
+            excludeAppointmentId: appointment.id
+        }, transaction);
 
-        if (hasConflict) {
+        if (!schedulingDecision.valid) {
             await transaction.rollback();
-            return res.status(409).json({
+            return res.status(409).json(schedulingDecision.conflictDetails || {
                 success: false,
-                message: 'Selected slot is not available'
+                conflict: true,
+                code: 'BOOKING_CONFLICT',
+                message: schedulingDecision.message,
+                messageAr: schedulingDecision.messageAr || schedulingDecision.message,
+                actionableGuidance: schedulingDecision.actionableGuidance || 'Please choose another employee or a different time.',
+                actionableGuidanceAr: schedulingDecision.actionableGuidanceAr || 'يرجى اختيار موظف آخر أو وقت مختلف.',
+                conflicts: schedulingDecision.conflicts || []
             });
         }
 
@@ -3426,9 +3494,15 @@ exports.reassignRescheduleAppointment = async (req, res) => {
                 newAllocations = allocationResult.allocations;
             } catch (resourceErr) {
                 await transaction.rollback();
-                return res.status(409).json({
+                return res.status(409).json(resourceErr.conflictDetails || {
                     success: false,
-                    message: resourceErr.message || 'Required resources are not available at the selected time'
+                    conflict: true,
+                    code: resourceErr.code || 'BOOKING_CONFLICT',
+                    message: resourceErr.message || 'Required resources are not available at the selected time',
+                    messageAr: resourceErr.message || 'الموارد المطلوبة غير متوفرة في الوقت المحدد',
+                    actionableGuidance: 'Please choose a different time.',
+                    actionableGuidanceAr: 'يرجى اختيار وقت مختلف.',
+                    conflicts: []
                 });
             }
         }

@@ -131,6 +131,19 @@ export default function AppointmentServiceRow({
     }
   };
 
+  const setDraftConfigAndSync = (action: React.SetStateAction<Partial<StagedService>>) => {
+    setDraftConfig((prev) => {
+      const next = typeof action === 'function' ? (action as any)(prev) : action;
+      if (stagedItem) {
+        onUpdateService(stagedItem.id, {
+          ...next,
+          isExplicitStaff: Boolean(next.staffId)
+        });
+      }
+      return next;
+    });
+  };
+
   return (
     <article
       className={`overflow-hidden rounded-[22px] border shadow-sm transition border-slate-200 bg-white hover:border-primary/30 hover:shadow-md`}
@@ -220,7 +233,7 @@ export default function AppointmentServiceRow({
           boardStartHour={boardStartHour}
           slotMinutes={slotMinutes}
           draftConfig={draftConfig}
-          setDraftConfig={setDraftConfig}
+          setDraftConfig={setDraftConfigAndSync}
           validStylists={validStylists}
           otherStagedServices={otherStagedServices}
           onSave={handleSave}

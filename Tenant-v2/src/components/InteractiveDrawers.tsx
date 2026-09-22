@@ -41,6 +41,7 @@ import {
   buildAdvanceBookingDialog,
   buildExtendedHoursBookingDialog,
   buildGenericBookingErrorDialog,
+  buildSpecificConflictDialog,
   extractBookingErrorMeta,
   hasStructuredBookingDiagnostics,
   isBookingConflictError,
@@ -1740,8 +1741,8 @@ export default function InteractiveDrawers({
         serviceId: service.id,
         variantId: resolvedVariant?.id || undefined,
         serviceCategory: service.category,
-        staffId: '', // Default to Any Professional
-        isExplicitStaff: false,
+        staffId: currentStaffId || '',
+        isExplicitStaff: Boolean(currentStaffId),
         startTime: nextStartTime,
         startTimeIso: nextStartTimeIso,
         duration: resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration),
@@ -2351,11 +2352,16 @@ export default function InteractiveDrawers({
               setConflictView(bookingRecoveryMode === 'separate_services' ? 'explanation' : 'time-selection');
             }
           } else {
-            showBookingErrorDialog(buildGenericBookingErrorDialog());
+            showBookingErrorDialog(buildSpecificConflictDialog(meta));
           }
         },
         onError: (err) => {
-          showBookingErrorDialog(buildGenericBookingErrorDialog());
+          const meta = extractBookingErrorMeta(err);
+          if (meta.status === 409 || isBookingConflictError(meta)) {
+            showBookingErrorDialog(buildSpecificConflictDialog(meta));
+          } else {
+            showBookingErrorDialog(buildGenericBookingErrorDialog());
+          }
         }
       });
     } catch (err: any) {

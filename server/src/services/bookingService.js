@@ -21,7 +21,11 @@ const {
 const {
     resolveServiceResourceRequirements,
     checkResourceAvailability,
-    allocateServiceResources
+    allocateServiceResources,
+    formatTimeRangeEn,
+    formatTimeRangeAr,
+    formatClockEn,
+    formatClockAr
 } = require('../utils/resourceRequirementResolver');
 
 const formatNotificationDate = (value) => {
@@ -368,7 +372,11 @@ class BookingService {
         const availabilityFailure = schedulingDecision.valid ? null : schedulingDecision;
         const approvedOvertime = this._buildOvertimeApproval(overtimeApproval);
         if (availabilityFailure) {
-            throw new Error(availabilityFailure.message);
+            const err = new Error(availabilityFailure.message);
+            err.code = 'BOOKING_CONFLICT';
+            err.conflict = true;
+            err.conflictDetails = availabilityFailure.conflictDetails;
+            throw err;
         }
 
         // ========== PRICING CALCULATION ==========
@@ -440,7 +448,11 @@ class BookingService {
             }, finalTransaction);
             const finalConflictCheck = finalSchedulingDecision.valid ? null : finalSchedulingDecision;
             if (finalConflictCheck) {
-                throw new Error(finalConflictCheck.message);
+                const err = new Error(finalConflictCheck.message);
+                err.code = 'BOOKING_CONFLICT';
+                err.conflict = true;
+                err.conflictDetails = finalConflictCheck.conflictDetails;
+                throw err;
             }
 
             // ========== ALLOCATE PHYSICAL RESOURCES (Phase 1B) ==========
@@ -1447,48 +1459,63 @@ class BookingService {
             transaction
         });
 
+        const conflicts = [];
+        const staffNameEn = staff.name || 'This employee';
+        const staffNameAr = staff.name_ar || staffNameEn;
+
         if (completionWindow && (!excludeAppointmentId || String(completionWindow.id) !== String(excludeAppointmentId))) {
-            return {
-                valid: false,
-                reasonType: 'existing_booking',
-                requestedStartTime: start.toISOString(),
-                requestedEndTime: end.toISOString(),
-                message: `${staff.name || 'This employee'} is already booked for that time. Please select a different time or employee.`
-            };
+            const apptStart = new Date(completionWindow.startTime);
+            const apptEnd = new Date(completionWindow.endTime);
+            conflicts.push({
+                type: 'STAFF_UNAVAILABLE',
+                entityType: 'staff',
+                entityId: staffId,
+                entityName: staffNameEn,
+                entityNameAr: staffNameAr,
+                startTime: apptStart.toISOString(),
+                endTime: apptEnd.toISOString(),
+                conflictingAppointmentId: completionWindow.id
+            });
         }
 
         for (const [reasonType, windows] of [['staff_break', availabilityContext.breaks || []], ['time_off', availabilityContext.timeOff || []]]) {
             const blocker = windows.find((window) => requestStart < new Date(window.endTime).getTime() && requestEnd > new Date(window.startTime).getTime());
             if (blocker) {
-                return {
-                    valid: false,
-                    reasonType,
-                    blockingStartTime: new Date(blocker.startTime).toISOString(),
-                    blockingEndTime: new Date(blocker.endTime).toISOString(),
-                    requestedStartTime: start.toISOString(),
-                    requestedEndTime: end.toISOString(),
-                    message: `${staff.name || 'This employee'} has ${reasonType === 'staff_break' ? 'a break' : 'approved time off'} from ${this._formatClockLabel(blocker.startTime, timezone)} to ${this._formatClockLabel(blocker.endTime, timezone)}. Please select a different time or employee.`
-                };
+                const bStart = new Date(blocker.startTime);
+                const bEnd = new Date(blocker.endTime);
+                const isBreak = reasonType === 'staff_break';
+                conflicts.push({
+                    type: isBreak ? 'BREAK_CONFLICT' : 'TIME_OFF_CONFLICT',
+                    entityType: 'staff',
+                    entityId: staffId,
+                    entityName: staffNameEn,
+                    entityNameAr: staffNameAr,
+                    startTime: bStart.toISOString(),
+                    endTime: bEnd.toISOString(),
+                    reasonType
+                });
             }
         }
 
         const approvedOvertime = this._buildOvertimeApproval(overtimeApproval);
         if (hoursFailures.length > 0 && !approvedOvertime) {
-            return {
-                valid: false,
-                ...hoursFailures[0],
-                requestedStartTime: start.toISOString(),
-                requestedEndTime: end.toISOString(),
-                tenantDutyStart: tenantDutyStart?.toISOString() || null,
-                tenantDutyEnd: tenantDutyEnd?.toISOString() || null
-            };
+            conflicts.push({
+                type: 'DUTY_HOURS_CONFLICT',
+                entityType: 'staff',
+                entityId: staffId,
+                entityName: staffNameEn,
+                entityNameAr: staffNameAr,
+                reasonType: hoursFailures[0].reasonType,
+                message: hoursFailures[0].message
+            });
         }
 
         // ========== RESOURCE AVAILABILITY CHECK (Phase 1B) ==========
+        let resourceCheck = null;
         if (serviceId && serviceId !== 'legacy-validation') {
             const requirements = await resolveServiceResourceRequirements(serviceId, variantId, tenantId, transaction);
             if (requirements.length > 0) {
-                const resourceCheck = await checkResourceAvailability(
+                resourceCheck = await checkResourceAvailability(
                     tenantId,
                     requirements,
                     start,
@@ -1496,16 +1523,113 @@ class BookingService {
                     excludeAppointmentId,
                     transaction
                 );
-                if (!resourceCheck.available) {
-                    return {
-                        valid: false,
-                        reasonType: 'resource_unavailable',
-                        requestedStartTime: start.toISOString(),
-                        requestedEndTime: end.toISOString(),
-                        message: resourceCheck.message || 'Required resource is not available at this time.'
-                    };
+                if (!resourceCheck.available && resourceCheck.conflictDetails) {
+                    conflicts.push(resourceCheck.conflictDetails);
                 }
             }
+        }
+
+        if (conflicts.length > 0) {
+            const staffConflict = conflicts.find((c) => c.entityType === 'staff');
+            const resourceConflict = conflicts.find((c) => c.entityType === 'resource');
+
+            let finalMessageEn = '';
+            let finalMessageAr = '';
+            let finalGuidanceEn = '';
+            let finalGuidanceAr = '';
+
+            if (staffConflict && resourceConflict) {
+                // Rule 4: Multiple simultaneous conflicts
+                const sStart = staffConflict.startTime ? new Date(staffConflict.startTime) : start;
+                const sEnd = staffConflict.endTime ? new Date(staffConflict.endTime) : end;
+                const staffTimeRangeEn = formatTimeRangeEn(sStart, sEnd, timezone);
+                const staffTimeRangeAr = formatTimeRangeAr(sStart, sEnd, timezone);
+
+                const resNameEn = resourceConflict.entityName || 'Resource';
+                const resNameAr = resourceConflict.entityNameAr || resNameEn;
+                const availAgainEn = resourceConflict.availableAgainAt
+                    ? ` The resource will be available again at ${formatClockEn(resourceConflict.availableAgainAt, timezone)}.`
+                    : '';
+                const availAgainAr = resourceConflict.availableAgainAt
+                    ? ` ستكون الموارد متاحة مرة أخرى في ${formatClockAr(resourceConflict.availableAgainAt, timezone)}.`
+                    : '';
+
+                finalMessageEn = `${staffNameEn} is booked from ${staffTimeRangeEn}, and ${resNameEn} is also occupied during this time.${availAgainEn} Please choose another employee and/or another time.`;
+                finalMessageAr = `${staffNameAr} محجوز من ${staffTimeRangeAr}، و${resNameAr} مشغولة أيضاً خلال هذا الوقت.${availAgainAr} يرجى اختيار موظف آخر و/أو وقت مختلف.`;
+                finalGuidanceEn = 'Please choose another employee and/or another time.';
+                finalGuidanceAr = 'يرجى اختيار موظف آخر و/أو وقت مختلف.';
+            } else if (staffConflict) {
+                if (staffConflict.type === 'STAFF_UNAVAILABLE') {
+                    // Rule 1: Employee/Staff booked
+                    const sStart = staffConflict.startTime ? new Date(staffConflict.startTime) : start;
+                    const sEnd = staffConflict.endTime ? new Date(staffConflict.endTime) : end;
+                    const staffTimeRangeEn = formatTimeRangeEn(sStart, sEnd, timezone);
+                    const staffTimeRangeAr = formatTimeRangeAr(sStart, sEnd, timezone);
+
+                    finalMessageEn = `${staffNameEn} is already booked from ${staffTimeRangeEn}. Please choose another employee or a different time.`;
+                    finalMessageAr = `${staffNameAr} محجوز بالفعل من ${staffTimeRangeAr}. يرجى اختيار موظف آخر أو وقت مختلف.`;
+                    finalGuidanceEn = 'Please choose another employee or a different time.';
+                    finalGuidanceAr = 'يرجى اختيار موظف آخر أو وقت مختلف.';
+                } else if (staffConflict.type === 'BREAK_CONFLICT') {
+                    const bStart = new Date(staffConflict.startTime);
+                    const bEnd = new Date(staffConflict.endTime);
+                    const breakRangeEn = formatTimeRangeEn(bStart, bEnd, timezone);
+                    const breakRangeAr = formatTimeRangeAr(bStart, bEnd, timezone);
+
+                    finalMessageEn = `${staffNameEn} has a scheduled break from ${breakRangeEn}. Please choose another employee or a different time.`;
+                    finalMessageAr = `${staffNameAr} لديه استراحة مجدولة من ${breakRangeAr}. يرجى اختيار موظف آخر أو وقت مختلف.`;
+                    finalGuidanceEn = 'Please choose another employee or a different time.';
+                    finalGuidanceAr = 'يرجى اختيار موظف آخر أو وقت مختلف.';
+                } else if (staffConflict.type === 'TIME_OFF_CONFLICT') {
+                    const bStart = new Date(staffConflict.startTime);
+                    const bEnd = new Date(staffConflict.endTime);
+                    const rangeEn = formatTimeRangeEn(bStart, bEnd, timezone);
+                    const rangeAr = formatTimeRangeAr(bStart, bEnd, timezone);
+
+                    finalMessageEn = `${staffNameEn} has approved time off from ${rangeEn}. Please choose another employee or a different time.`;
+                    finalMessageAr = `${staffNameAr} لديه إجازة معتمدة من ${rangeAr}. يرجى اختيار موظف آخر أو وقت مختلف.`;
+                    finalGuidanceEn = 'Please choose another employee or a different time.';
+                    finalGuidanceAr = 'يرجى اختيار موظف آخر أو وقت مختلف.';
+                } else {
+                    // DUTY_HOURS_CONFLICT
+                    finalMessageEn = staffConflict.message || `${staffNameEn} is outside duty hours.`;
+                    finalMessageAr = hoursFailures[0]?.message || finalMessageEn;
+                    finalGuidanceEn = 'Please choose another employee or an appropriate time within operating hours.';
+                    finalGuidanceAr = 'يرجى اختيار موظف آخر أو وقت مناسب ضمن ساعات العمل.';
+                }
+            } else if (resourceConflict) {
+                // Rule 3, 5, 6: Resource constraint
+                finalMessageEn = resourceCheck?.message || `${resourceConflict.entityName} is unavailable at this time.`;
+                finalMessageAr = resourceCheck?.messageAr || finalMessageEn;
+                finalGuidanceEn = resourceCheck?.actionableGuidance || 'Please choose a different time.';
+                finalGuidanceAr = resourceCheck?.actionableGuidanceAr || 'يرجى اختيار وقت مختلف.';
+            }
+
+            const conflictDetails = {
+                success: false,
+                conflict: true,
+                code: 'BOOKING_CONFLICT',
+                message: finalMessageEn,
+                messageAr: finalMessageAr,
+                actionableGuidance: finalGuidanceEn,
+                actionableGuidanceAr: finalGuidanceAr,
+                conflicts
+            };
+
+            return {
+                valid: false,
+                reasonType: conflicts[0]?.type?.toLowerCase() || 'booking_conflict',
+                requestedStartTime: start.toISOString(),
+                requestedEndTime: end.toISOString(),
+                tenantDutyStart: tenantDutyStart?.toISOString() || null,
+                tenantDutyEnd: tenantDutyEnd?.toISOString() || null,
+                message: finalMessageEn,
+                messageAr: finalMessageAr,
+                actionableGuidance: finalGuidanceEn,
+                actionableGuidanceAr: finalGuidanceAr,
+                conflicts,
+                conflictDetails
+            };
         }
 
         return {
@@ -1600,6 +1724,22 @@ class BookingService {
 
         const endTimes = context.finalWindows.map((window) => new Date(window.endTime).getTime());
         return new Date(Math.max(...endTimes));
+    }
+
+    async checkSchedulingConflictDetails({ tenantId, serviceId, variantId, staffId, startTime, endTime, excludeAppointmentId = null, overtimeApproval = null }, transaction = null) {
+        const start = startTime instanceof Date ? startTime : new Date(startTime);
+        const end = endTime instanceof Date ? endTime : new Date(endTime);
+        const duration = (end.getTime() - start.getTime()) / 60000;
+        return await this.evaluateSchedulingRequest({
+            tenantId,
+            serviceId: serviceId || 'legacy-validation',
+            variantId: variantId || null,
+            staffId,
+            startTime: start,
+            duration,
+            overtimeApproval,
+            excludeAppointmentId
+        }, transaction);
     }
 
     async hasConflict(staffId, startTime, endTime, excludeAppointmentId = null, transaction = null) {
