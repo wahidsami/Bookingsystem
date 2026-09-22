@@ -3398,7 +3398,40 @@ exports.reassignRescheduleAppointment = async (req, res) => {
             });
         }
 
+        const {
+            resolveServiceResourceRequirements,
+            allocateServiceResources
+        } = require('../utils/resourceRequirementResolver');
 
+        const requirements = await resolveServiceResourceRequirements(
+            appointment.serviceId,
+            appointment.serviceVariantId,
+            tenantId,
+            transaction
+        );
+
+        let newAllocations = null;
+        if (requirements.length > 0) {
+            try {
+                const allocationResult = await allocateServiceResources({
+                    tenantId,
+                    serviceId: appointment.serviceId,
+                    variantId: appointment.serviceVariantId,
+                    startTime: requestedStart,
+                    endTime: requestedEnd,
+                    excludeAppointmentId: appointment.id,
+                    transaction,
+                    lockRows: true
+                });
+                newAllocations = allocationResult.allocations;
+            } catch (resourceErr) {
+                await transaction.rollback();
+                return res.status(409).json({
+                    success: false,
+                    message: resourceErr.message || 'Required resources are not available at the selected time'
+                });
+            }
+        }
 
         const previousStaffId = appointment.staffId;
         const previousStartTime = currentStart;
@@ -3414,6 +3447,21 @@ exports.reassignRescheduleAppointment = async (req, res) => {
         appointment.customerReminderSentAt = null;
         appointment.noShowMarkedAt = null;
         await appointment.save({ transaction });
+
+        if (requirements.length > 0 && newAllocations) {
+            await db.AppointmentResource.destroy({
+                where: { appointmentId: appointment.id },
+                transaction
+            });
+            await db.AppointmentResource.bulkCreate(
+                newAllocations.map(alloc => ({
+                    appointmentId: appointment.id,
+                    resourceId: alloc.resourceId
+                })),
+                { transaction }
+            );
+        }
+
         await createAppointmentEventSafe({
             appointmentId: appointment.id,
             tenantId,

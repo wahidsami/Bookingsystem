@@ -10,6 +10,9 @@ const {
     parseServiceVariants,
     resolveServiceVariant
 } = require('../utils/serviceVariant');
+const {
+    resolveServiceResourceRequirements
+} = require('../utils/resourceRequirementResolver');
 
 class AvailabilityService {
     /**
@@ -25,7 +28,8 @@ class AvailabilityService {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
-            hour12: false
+            hour12: false,
+            hourCycle: 'h23'
         });
 
         const parts = formatter.formatToParts(date);
@@ -35,6 +39,10 @@ class AvailabilityService {
                 map[part.type] = part.value;
             }
         });
+
+        if (map.hour === '24') {
+            map.hour = '00';
+        }
 
         return {
             dateKey: `${map.year}-${map.month}-${map.day}`,
@@ -197,6 +205,36 @@ class AvailabilityService {
         const bufferAfter = service.bufferAfter || tenantSettings.booking?.defaultBufferAfter || 0;
         const totalSlotLength = duration + bufferBefore + bufferAfter; // Total minutes
 
+        const resourceContext = await this._buildResourceAvailabilityContext(
+            tenantId,
+            serviceId,
+            serviceVariant?.id || null,
+            date,
+            timezone,
+            excludeAppointmentId
+        );
+
+        if (resourceContext && resourceContext.hasRequirements && !resourceContext.hasTotalCapacity) {
+            return {
+                slots: [],
+                diagnostics: [{ code: 'INSUFFICIENT_RESOURCE_CAPACITY', message: 'Salon lacks total capacity for required service resources' }],
+                metadata: {
+                    date,
+                    serviceId,
+                    staffId: staffId || null,
+                    serviceDuration: duration,
+                    bufferBefore,
+                    bufferAfter,
+                    totalSlotLength,
+                    stepSize,
+                    timezone,
+                    totalSlots: 0,
+                    availableSlots: 0,
+                    staffCount: staffId ? 1 : 0
+                }
+            };
+        }
+
         // If staffId provided, get slots for that staff
         if (staffId) {
             return await this._getSlotsForStaff(
@@ -211,7 +249,8 @@ class AvailabilityService {
                 stepSize,
                 timezone,
                 serviceVariant?.id || null,
-                excludeAppointmentId
+                excludeAppointmentId,
+                resourceContext
             );
         }
 
@@ -227,7 +266,8 @@ class AvailabilityService {
             stepSize,
             timezone,
             serviceVariant?.id || null,
-            excludeAppointmentId
+            excludeAppointmentId,
+            resourceContext
         );
     }
 
@@ -235,7 +275,18 @@ class AvailabilityService {
      * Get available slots for a specific staff member
      * @private
      */
-    async _getSlotsForStaff(tenantId, serviceId, staffId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null, excludeAppointmentId = null) {
+    async _getSlotsForStaff(tenantId, serviceId, staffId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null, excludeAppointmentId = null, resourceContext = null) {
+        if (!resourceContext) {
+            resourceContext = await this._buildResourceAvailabilityContext(
+                tenantId,
+                serviceId,
+                variantId,
+                date,
+                timezone,
+                excludeAppointmentId
+            );
+        }
+
         // Validate staff exists and can perform service
         const staff = await db.Staff.findByPk(staffId);
         if (!staff) throw new Error('Staff not found');
@@ -355,7 +406,8 @@ class AvailabilityService {
                 bufferAfter,
                 totalSlotLength,
                 stepSize,
-                existingAppointments
+                existingAppointments,
+                resourceContext
             );
             allSlots.push(...slots);
         }
@@ -414,7 +466,18 @@ class AvailabilityService {
      * Get available slots for any eligible staff (for "Any Staff" selection)
      * @private
      */
-    async _getSlotsForAnyStaff(tenantId, serviceId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null, excludeAppointmentId = null) {
+    async _getSlotsForAnyStaff(tenantId, serviceId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null, excludeAppointmentId = null, resourceContext = null) {
+        if (!resourceContext) {
+            resourceContext = await this._buildResourceAvailabilityContext(
+                tenantId,
+                serviceId,
+                variantId,
+                date,
+                timezone,
+                excludeAppointmentId
+            );
+        }
+
         // Get all staff who can perform this service
         const serviceEmployees = await db.ServiceEmployee.findAll({
             where: { serviceId }
@@ -465,15 +528,16 @@ class AvailabilityService {
                     serviceId,
                     staff.id,
                     date,
-                duration,
-                bufferBefore,
-                bufferAfter,
-                totalSlotLength,
-                stepSize,
-                timezone,
-                variantId,
-                excludeAppointmentId
-            );
+                    duration,
+                    bufferBefore,
+                    bufferAfter,
+                    totalSlotLength,
+                    stepSize,
+                    timezone,
+                    variantId,
+                    excludeAppointmentId,
+                    resourceContext
+                );
                 
                 // Add staff info to each slot
                 result.slots.forEach(slot => {
@@ -880,10 +944,121 @@ class AvailabilityService {
     }
 
     /**
+     * Build resource availability context for slot generation.
+     * Pre-fetches active resources and day appointments to perform fast in-memory availability checks per slot.
+     * @private
+     */
+    async _buildResourceAvailabilityContext(tenantId, serviceId, variantId, date, timezone = 'Asia/Riyadh', excludeAppointmentId = null) {
+        const requirements = await resolveServiceResourceRequirements(serviceId, variantId, tenantId);
+        if (!requirements || requirements.length === 0) {
+            return { hasRequirements: false };
+        }
+
+        const activeResourcesByType = new Map();
+        for (const req of requirements) {
+            const activeResources = await db.Resource.findAll({
+                where: {
+                    tenantId,
+                    resourceTypeId: req.resourceTypeId,
+                    is_active: true
+                },
+                order: [['name_en', 'ASC'], ['id', 'ASC']]
+            });
+
+            if (activeResources.length < req.quantity) {
+                return {
+                    hasRequirements: true,
+                    hasTotalCapacity: false,
+                    reason: 'INSUFFICIENT_TOTAL_CAPACITY',
+                    requirements
+                };
+            }
+
+            activeResourcesByType.set(req.resourceTypeId, activeResources);
+        }
+
+        const dayRange = this._getTimeZoneDayRange(date, timezone);
+        const allActiveResourceIds = [];
+        for (const list of activeResourcesByType.values()) {
+            for (const r of list) {
+                allActiveResourceIds.push(r.id);
+            }
+        }
+
+        const appointmentWhere = {
+            status: { [Op.notIn]: ['cancelled', 'no_show'] },
+            startTime: { [Op.lt]: dayRange.endOfDay },
+            endTime: { [Op.gt]: dayRange.startOfDay }
+        };
+        if (excludeAppointmentId) {
+            appointmentWhere.id = { [Op.ne]: excludeAppointmentId };
+        }
+
+        const occupiedAllocations = await db.AppointmentResource.findAll({
+            where: {
+                resourceId: { [Op.in]: allActiveResourceIds }
+            },
+            include: [
+                {
+                    model: db.Appointment,
+                    as: 'appointment',
+                    where: appointmentWhere,
+                    attributes: ['id', 'startTime', 'endTime', 'status'],
+                    required: true
+                }
+            ]
+        });
+
+        const allocationsByResource = new Map();
+        for (const alloc of occupiedAllocations) {
+            if (!alloc.appointment) continue;
+            const rId = String(alloc.resourceId);
+            if (!allocationsByResource.has(rId)) {
+                allocationsByResource.set(rId, []);
+            }
+            allocationsByResource.get(rId).push({
+                appointmentId: alloc.appointment.id,
+                startTime: new Date(alloc.appointment.startTime).getTime(),
+                endTime: new Date(alloc.appointment.endTime).getTime()
+            });
+        }
+
+        return {
+            hasRequirements: true,
+            hasTotalCapacity: true,
+            requirements,
+            activeResourcesByType,
+            isSlotResourceAvailable(slotStart, slotEnd) {
+                const sStart = slotStart instanceof Date ? slotStart.getTime() : new Date(slotStart).getTime();
+                const sEnd = slotEnd instanceof Date ? slotEnd.getTime() : new Date(slotEnd).getTime();
+
+                for (const req of requirements) {
+                    const activeList = activeResourcesByType.get(req.resourceTypeId) || [];
+                    let freeCount = 0;
+
+                    for (const resource of activeList) {
+                        const intervals = allocationsByResource.get(String(resource.id)) || [];
+                        const isOccupied = intervals.some(interval => interval.startTime < sEnd && interval.endTime > sStart);
+                        if (!isOccupied) {
+                            freeCount++;
+                        }
+                    }
+
+                    if (freeCount < req.quantity) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        };
+    }
+
+    /**
      * Generate time slots within a time window
      * @private
      */
-    _generateSlots(windowStart, windowEnd, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, existingAppointments) {
+    _generateSlots(windowStart, windowEnd, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, existingAppointments, resourceContext = null) {
         const slots = [];
         let current = new Date(windowStart);
 
@@ -906,10 +1081,21 @@ class AvailabilityService {
                 existingAppointments
             );
 
+            let available = !hasConflict;
+            let unavailableReason = hasConflict ? 'staff_conflict' : null;
+
+            if (available && resourceContext && resourceContext.hasRequirements) {
+                if (!resourceContext.hasTotalCapacity || !resourceContext.isSlotResourceAvailable(slotStart, slotEnd)) {
+                    available = false;
+                    unavailableReason = 'resource_unavailable';
+                }
+            }
+
             slots.push({
                 startTime: slotStart.toISOString(),
                 endTime: slotEnd.toISOString(),
-                available: !hasConflict,
+                available,
+                unavailableReason,
                 staffId: null, // Will be set by caller if needed
                 staffName: null
             });

@@ -18,6 +18,11 @@ const {
     parseServiceVariants,
     resolveServiceVariant
 } = require('../utils/serviceVariant');
+const {
+    resolveServiceResourceRequirements,
+    checkResourceAvailability,
+    allocateServiceResources
+} = require('../utils/resourceRequirementResolver');
 
 const formatNotificationDate = (value) => {
     const date = new Date(value);
@@ -438,6 +443,18 @@ class BookingService {
                 throw new Error(finalConflictCheck.message);
             }
 
+            // ========== ALLOCATE PHYSICAL RESOURCES (Phase 1B) ==========
+            const resourceAllocationResult = await allocateServiceResources({
+                tenantId,
+                serviceId,
+                variantId,
+                startTime: start,
+                endTime: end,
+                transaction: finalTransaction,
+                lockRows: true,
+                alreadyAllocatedResourceIds: data.preAllocatedResourceIds || []
+            });
+
             // ========== CREATE APPOINTMENT ==========
             const requiresArrivalPayment = ['at-center', 'at_center', 'pay_on_visit', 'cash_on_delivery', 'cash']
                 .includes(`${normalizedPaymentMethod}`.trim().toLowerCase());
@@ -498,6 +515,16 @@ class BookingService {
                         })
                     }, { transaction: createTransaction });
 
+                    if (resourceAllocationResult.allocations && resourceAllocationResult.allocations.length > 0) {
+                        await db.AppointmentResource.bulkCreate(
+                            resourceAllocationResult.allocations.map(alloc => ({
+                                appointmentId: appointment.id,
+                                resourceId: alloc.resourceId
+                            })),
+                            { transaction: createTransaction }
+                        );
+                    }
+
                     if (createTransaction !== finalTransaction) {
                         await createTransaction.commit();
                     }
@@ -515,6 +542,11 @@ class BookingService {
                         throw createError;
                     }
                 }
+            }
+
+            if (resourceAllocationResult.allocations && resourceAllocationResult.allocations.length > 0) {
+                appointment.setDataValue('allocatedResources', resourceAllocationResult.allocations);
+                appointment.allocatedResources = resourceAllocationResult.allocations;
             }
 
             const invoice = await ensureAppointmentInvoice(appointment.id, {
@@ -1151,6 +1183,43 @@ class BookingService {
             }
         }
 
+        // 2b. Validate simultaneous resource capacity for overlapping parallel steps
+        for (let i = 0; i < stepWindows.length; i++) {
+            const wA = stepWindows[i];
+            const reqsA = await resolveServiceResourceRequirements(wA.step.service.id, wA.step.pItem.variantId || null, tenantId, transaction);
+            if (!reqsA || reqsA.length === 0) continue;
+
+            for (const reqA of reqsA) {
+                let simultaneousNeeded = reqA.quantity;
+                for (let j = 0; j < stepWindows.length; j++) {
+                    if (i === j) continue;
+                    const wB = stepWindows[j];
+                    const overlaps = wA.start < wB.end && wA.end > wB.start;
+                    if (overlaps) {
+                        const reqsB = await resolveServiceResourceRequirements(wB.step.service.id, wB.step.pItem.variantId || null, tenantId, transaction);
+                        const matchB = reqsB.find(r => r.resourceTypeId === reqA.resourceTypeId);
+                        if (matchB) {
+                            simultaneousNeeded += matchB.quantity;
+                        }
+                    }
+                }
+
+                const totalActive = await db.Resource.count({
+                    where: {
+                        tenantId,
+                        resourceTypeId: reqA.resourceTypeId,
+                        is_active: true
+                    },
+                    transaction
+                });
+
+                if (totalActive < simultaneousNeeded) {
+                    const typeName = reqA.resourceType?.name_en || reqA.resourceType?.name_ar || 'Resource';
+                    throw new Error(`Cannot book parallel bundle: salon has ${totalActive} active instance(s) of "${typeName}", but ${simultaneousNeeded} are required simultaneously for overlapping services.`);
+                }
+            }
+        }
+
         // 3. For any steps missing staffId, perform coordinated group auto-allocation
         const unassignedSteps = stepWindows.filter(w => !w.staffId);
         if (unassignedSteps.length > 0) {
@@ -1392,6 +1461,30 @@ class BookingService {
                 tenantDutyStart: tenantDutyStart?.toISOString() || null,
                 tenantDutyEnd: tenantDutyEnd?.toISOString() || null
             };
+        }
+
+        // ========== RESOURCE AVAILABILITY CHECK (Phase 1B) ==========
+        if (serviceId && serviceId !== 'legacy-validation') {
+            const requirements = await resolveServiceResourceRequirements(serviceId, variantId, tenantId, transaction);
+            if (requirements.length > 0) {
+                const resourceCheck = await checkResourceAvailability(
+                    tenantId,
+                    requirements,
+                    start,
+                    end,
+                    excludeAppointmentId,
+                    transaction
+                );
+                if (!resourceCheck.available) {
+                    return {
+                        valid: false,
+                        reasonType: 'resource_unavailable',
+                        requestedStartTime: start.toISOString(),
+                        requestedEndTime: end.toISOString(),
+                        message: resourceCheck.message || 'Required resource is not available at this time.'
+                    };
+                }
+            }
         }
 
         return {

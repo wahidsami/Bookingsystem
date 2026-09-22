@@ -84,6 +84,74 @@ class BookingConflictDetector {
     }
 
     /**
+     * Check if one or more physical resource instances conflict with existing active appointments.
+     * Uses appointment overlap semantics: existingStart < newEnd && existingEnd > newStart.
+     * Ignores cancelled and no_show appointments.
+     * 
+     * @param {Array<string>|string} resourceIds - Single resource ID or array of resource IDs
+     * @param {Date|string} startTime - Start of requested interval
+     * @param {Date|string} endTime - End of requested interval
+     * @param {string|null} excludeAppointmentId - Optional appointment ID to exclude
+     * @param {object|null} transaction - Optional Sequelize transaction
+     * @returns {Promise<{ hasConflicts: boolean, conflicts: Array<object>, conflictingResourceIds: Array<string> }>}
+     */
+    async checkResourceConflicts(resourceIds, startTime, endTime, excludeAppointmentId = null, transaction = null) {
+        try {
+            const ids = Array.isArray(resourceIds) ? resourceIds.filter(Boolean) : [resourceIds].filter(Boolean);
+            if (ids.length === 0) {
+                return { hasConflicts: false, conflicts: [], conflictingResourceIds: [] };
+            }
+
+            const start = startTime instanceof Date ? startTime : new Date(startTime);
+            const end = endTime instanceof Date ? endTime : new Date(endTime);
+
+            const appointmentWhere = {
+                status: { [Op.notIn]: ['cancelled', 'no_show'] },
+                startTime: { [Op.lt]: end },
+                endTime: { [Op.gt]: start }
+            };
+
+            if (excludeAppointmentId) {
+                appointmentWhere.id = { [Op.ne]: excludeAppointmentId };
+            }
+
+            const conflicts = await db.AppointmentResource.findAll({
+                where: {
+                    resourceId: { [Op.in]: ids }
+                },
+                include: [
+                    {
+                        model: db.Appointment,
+                        as: 'appointment',
+                        where: appointmentWhere,
+                        attributes: ['id', 'startTime', 'endTime', 'status', 'staffId', 'serviceId'],
+                        required: true
+                    }
+                ],
+                transaction
+            });
+
+            const conflictingResourceIds = Array.from(new Set(conflicts.map(c => c.resourceId)));
+
+            return {
+                hasConflicts: conflicts.length > 0,
+                conflicts: conflicts.map(c => ({
+                    resourceId: c.resourceId,
+                    appointment: c.appointment
+                })),
+                conflictingResourceIds
+            };
+        } catch (error) {
+            logger.error('Error checking resource conflicts', error, {
+                resourceIds,
+                startTime,
+                endTime
+            });
+            throw error;
+        }
+    }
+
+    /**
      * Check for service availability conflicts
      * Accounts for service duration and staff availability
      */
