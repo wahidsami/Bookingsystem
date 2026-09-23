@@ -41,6 +41,7 @@ import {
     PaymentOption,
     BookingConfirmationPass,
 } from '../components/booking';
+import { getCustomerFacingBookingErrorMessage } from '../components/booking/bookingErrorHelper';
 import { addDays, format, startOfToday } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 
@@ -253,6 +254,7 @@ export function BookingJourneyScreen({ route, navigation }: any) {
     // Step 1: Staff Selection Handlers
     const handleModeChange = (mode: StaffSelectionMode) => {
         setStaffMode(mode);
+        setSelectedSlot(null);
         if (mode === 'any') {
             items.forEach((item) => {
                 updateItem(item.id, { staff: null, requestedStaffId: null });
@@ -261,6 +263,7 @@ export function BookingJourneyScreen({ route, navigation }: any) {
     };
 
     const handleSelectStaff = (itemId: string, staff: Staff | null) => {
+        setSelectedSlot(null);
         updateItem(itemId, {
             staff,
             requestedStaffId: staff ? staff.id : null,
@@ -590,68 +593,79 @@ export function BookingJourneyScreen({ route, navigation }: any) {
             let currentStart = new Date(selectedSlot.startTime);
 
             for (const item of items) {
-                const staffId =
-                    item.requestedStaffId ||
-                    item.staff?.id ||
-                    selectedSlot.staffId;
-                const duration = item.service.duration || 30;
+                // If package item, evaluate its child steps with authoritative scheduling
+                if (item.itemType === 'package' && item.packageItems && item.packageItems.length > 0) {
+                    const isParallel = item.scheduleType === 'parallel';
+                    let stepCurrent = currentStart.getTime();
 
-                // Validate interval with authoritative backend evaluation if staffId is specified
-                if (staffId) {
+                    for (const pItem of item.packageItems) {
+                        const stepDuration = pItem.duration || pItem.service?.duration || 30;
+                        const stepStartTime = new Date(isParallel ? currentStart.getTime() : stepCurrent);
+                        const stepStaffId = staffMode === 'any' ? null : (pItem.defaultStaffId || item.requestedStaffId || item.staff?.id || null);
+
+                        try {
+                            const evalRes = await api.post<any>('/bookings/evaluate', {
+                                tenantId,
+                                serviceId: pItem.serviceId,
+                                variantId: pItem.variantId || undefined,
+                                staffId: stepStaffId, // pass null for Any Professional; backend evaluates candidate staff
+                                startTime: stepStartTime.toISOString(),
+                                duration: stepDuration,
+                            });
+
+                            if (evalRes && !evalRes.success) {
+                                const formatted = getCustomerFacingBookingErrorMessage(evalRes, isRTL);
+                                Alert.alert(formatted.title, formatted.message);
+                                return;
+                            }
+                        } catch (evalErr: any) {
+                            const formatted = getCustomerFacingBookingErrorMessage(evalErr, isRTL);
+                            Alert.alert(formatted.title, formatted.message);
+                            return;
+                        }
+
+                        if (!isParallel) {
+                            stepCurrent += stepDuration * 60000;
+                        }
+                    }
+
+                    const bundleDuration = (item.totalDuration || item.service.duration || 60) * 60000;
+                    currentStart = new Date(currentStart.getTime() + (isParallel ? bundleDuration : (stepCurrent - currentStart.getTime())));
+                } else {
+                    // Regular service: evaluate scheduling with authoritative backend
+                    const staffId = staffMode === 'any' ? null : (item.requestedStaffId || item.staff?.id || null);
+                    const duration = item.service.duration || 30;
+
                     try {
-                        const evalRes = await api.post<{
-                            success: boolean;
-                            decision?: {
-                                valid: boolean;
-                                reasonType?: string;
-                                message?: string;
-                            };
-                            message?: string;
-                        }>('/bookings/evaluate', {
+                        const evalRes = await api.post<any>('/bookings/evaluate', {
                             tenantId,
                             serviceId: item.service.id,
                             variantId: item.variant?.id || undefined,
-                            staffId,
+                            staffId: staffId, // pass null for Any Professional; backend evaluates candidate staff
                             startTime: currentStart.toISOString(),
                             duration,
                         });
 
                         if (evalRes && !evalRes.success) {
-                            const reason =
-                                evalRes.decision?.message ||
-                                evalRes.message ||
-                                (isRTL
-                                    ? 'الموعد المحدد غير متاح لدى مقدم الخدمة المختار (تعارض أو وقت راحة)'
-                                    : 'Selected slot is not available for this specialist (conflict or break)');
-                            Alert.alert(
-                                isRTL ? 'تعارض في الموعد' : 'Schedule Conflict',
-                                reason
-                            );
+                            const formatted = getCustomerFacingBookingErrorMessage(evalRes, isRTL);
+                            Alert.alert(formatted.title, formatted.message);
                             return;
                         }
                     } catch (evalErr: any) {
-                        // If 409 conflict was returned, catch and display message
-                        const errMessage =
-                            evalErr?.response?.data?.decision?.message ||
-                            evalErr?.response?.data?.message;
-                        if (errMessage) {
-                            Alert.alert(
-                                isRTL ? 'تعارض في الموعد' : 'Schedule Conflict',
-                                errMessage
-                            );
-                            return;
-                        }
+                        const formatted = getCustomerFacingBookingErrorMessage(evalErr, isRTL);
+                        Alert.alert(formatted.title, formatted.message);
+                        return;
                     }
+
+                    currentStart = new Date(currentStart.getTime() + duration * 60000);
                 }
-                currentStart = new Date(
-                    currentStart.getTime() + duration * 60000
-                );
             }
 
             setStep('review');
         } catch (err) {
-            console.warn('Backend evaluation skipped or encountered warning:', err);
-            setStep('review');
+            console.warn('Backend evaluation encountered error:', err);
+            const formatted = getCustomerFacingBookingErrorMessage(err, isRTL);
+            Alert.alert(formatted.title, formatted.message);
         } finally {
             setEvaluatingSlot(false);
         }
@@ -692,6 +706,41 @@ export function BookingJourneyScreen({ route, navigation }: any) {
             // Compute sequential start and end times for all items
             let currentStart = new Date(selectedSlot.startTime).getTime();
             const bookingItemsPayload = items.map((item) => {
+                if (item.itemType === 'package' && item.packageId) {
+                    const isParallel = item.scheduleType === 'parallel';
+                    let stepCurrent = currentStart;
+                    const packageItems = (item.packageItems || []).map((pItem, idx) => {
+                        const durMs = (pItem.duration || pItem.service?.duration || 30) * 60000;
+                        const pStart = new Date(isParallel ? currentStart : stepCurrent).toISOString();
+                        const pEnd = new Date((isParallel ? currentStart : stepCurrent) + durMs).toISOString();
+                        if (!isParallel) {
+                            stepCurrent += durMs;
+                        }
+                        return {
+                            serviceId: pItem.serviceId,
+                            variantId: pItem.variantId || null,
+                            packageItemId: pItem.packageItemId || undefined,
+                            staffId: staffMode === 'any' ? null : (pItem.defaultStaffId || item.requestedStaffId || item.staff?.id || null),
+                            requestedStaffId: staffMode === 'any' ? null : (pItem.defaultStaffId || item.requestedStaffId || item.staff?.id || null),
+                            startTime: pStart,
+                            endTime: pEnd,
+                            duration: pItem.duration || pItem.service?.duration || 30,
+                            sequenceOrder: pItem.sequenceOrder ?? idx,
+                        };
+                    });
+
+                    const totalBundleMs = (item.totalDuration || item.service.duration || 60) * 60000;
+                    currentStart += isParallel ? totalBundleMs : (stepCurrent - currentStart);
+
+                    return {
+                        itemType: 'package',
+                        packageId: item.packageId,
+                        packageItems,
+                        notes: notes.trim() || undefined,
+                        paymentMethod: selectedPaymentMethod,
+                    };
+                }
+
                 const durationMs = (item.service.duration || 30) * 60000;
                 const itemStartTime = new Date(currentStart).toISOString();
                 const itemEndTime = new Date(
@@ -700,11 +749,11 @@ export function BookingJourneyScreen({ route, navigation }: any) {
                 currentStart += durationMs;
 
                 return {
+                    itemType: 'service',
                     serviceId: item.service.id,
                     variantId: item.variant?.id || null,
-                    staffId: item.requestedStaffId || item.staff?.id || null,
-                    requestedStaffId:
-                        item.requestedStaffId || item.staff?.id || null,
+                    staffId: staffMode === 'any' ? null : (item.requestedStaffId || item.staff?.id || null),
+                    requestedStaffId: staffMode === 'any' ? null : (item.requestedStaffId || item.staff?.id || null),
                     startTime: itemStartTime,
                     endTime: itemEndTime,
                     notes: notes.trim() || undefined,
@@ -805,13 +854,8 @@ export function BookingJourneyScreen({ route, navigation }: any) {
             clearCart();
         } catch (error: any) {
             console.error('Booking checkout error:', error);
-            Alert.alert(
-                isRTL ? 'خطأ في تأكيد الحجز' : 'Booking Error',
-                error?.message ||
-                    (isRTL
-                        ? 'تعذر تأكيد الحجز، يرجى المحاولة مرة أخرى'
-                        : 'Could not complete booking, please try again')
-            );
+            const formatted = getCustomerFacingBookingErrorMessage(error, isRTL);
+            Alert.alert(formatted.title, formatted.message);
         } finally {
             setSubmittingBooking(false);
         }

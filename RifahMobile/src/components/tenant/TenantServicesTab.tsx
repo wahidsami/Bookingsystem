@@ -1,10 +1,26 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { ThemedText as Text } from '../ThemedText';
 import { AppIcon } from '../AppIcon';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Service, ServiceCategoryFull, ServiceBundle, getServicePrice, getImageUrl } from '../../api/client';
 import { formatRiyal } from '../../utils/currency';
+
+export const CATEGORY_TRANSLATIONS: Record<string, { ar: string; en: string }> = {
+    body: { ar: 'العناية بالجسم والمساج', en: 'Body & Massage' },
+    massage: { ar: 'المساج والاسترخاء', en: 'Massage & Relaxation' },
+    nails: { ar: 'العناية بالأظافر', en: 'Nails Care' },
+    hair: { ar: 'العناية بالشعر والتصفيف', en: 'Hair & Styling' },
+    face: { ar: 'العناية بالبشرة والوجه', en: 'Facial & Skincare' },
+    facial: { ar: 'العناية بالبشرة والوجه', en: 'Facial & Skincare' },
+    skincare: { ar: 'العناية بالبشرة', en: 'Skincare' },
+    makeup: { ar: 'المكياج والتجميل', en: 'Makeup & Beauty' },
+    spa: { ar: 'خدمات السبا', en: 'Spa Services' },
+    waxing: { ar: 'إزالة الشعر بالشمع', en: 'Waxing & Depilation' },
+    barber: { ar: 'الحلاقة والعناية الرجالية', en: 'Barber & Grooming' },
+    general: { ar: 'خدمات عامة', en: 'General Services' },
+    other: { ar: 'خدمات أخرى', en: 'Other Services' },
+};
 
 export interface TenantServicesTabProps {
     services: Service[];
@@ -42,15 +58,19 @@ export function TenantServicesTab({
 
     const getCategoryLabel = (cat: ServiceCategoryFull | string): string => {
         if (typeof cat === 'string') {
-            if (cat.toLowerCase() === 'all') return isRTL ? 'الكل' : 'All';
-            return cat;
+            const lower = cat.toLowerCase();
+            if (lower === 'all') return isRTL ? 'الكل' : 'All';
+            if (CATEGORY_TRANSLATIONS[lower]) {
+                return isRTL ? CATEGORY_TRANSLATIONS[lower].ar : CATEGORY_TRANSLATIONS[lower].en;
+            }
+            return cat.charAt(0).toUpperCase() + cat.slice(1);
         }
         return isRTL ? cat.name_ar || cat.name_en || cat.slug : cat.name_en || cat.name_ar || cat.slug;
     };
 
     const isServiceInSelectedCategory = (service: Service): boolean => {
         if (selectedCategory === 'all') return true;
-        if (service.tenantServiceCategoryId && service.tenantServiceCategoryId === selectedCategory) return true;
+        if (service.tenantServiceCategoryId && service.tenantServiceCategoryId.toLowerCase() === selectedCategory.toLowerCase()) return true;
         if ((service.category || '').toLowerCase() === selectedCategory.toLowerCase()) return true;
         return false;
     };
@@ -59,14 +79,14 @@ export function TenantServicesTab({
 
     const isBundleInSelectedCategory = (bundle: ServiceBundle): boolean => {
         if (selectedCategory === 'all') return true;
-        if (bundle.tenantServiceCategoryId && bundle.tenantServiceCategoryId === selectedCategory) return true;
+        if (bundle.tenantServiceCategoryId && bundle.tenantServiceCategoryId.toLowerCase() === selectedCategory.toLowerCase()) return true;
         if ((bundle.tenantCategory?.slug || '').toLowerCase() === selectedCategory.toLowerCase()) return true;
-        if ((bundle.tenantCategory?.id || '') === selectedCategory) return true;
+        if ((bundle.tenantCategory?.id || '').toLowerCase() === selectedCategory.toLowerCase()) return true;
         // Authoritative fallback: bundle matches if any of its child services belongs to selected category
         if (bundle.items?.some((it) => {
             const svc = it.service;
             if (!svc) return false;
-            if (svc.tenantServiceCategoryId && svc.tenantServiceCategoryId === selectedCategory) return true;
+            if (svc.tenantServiceCategoryId && svc.tenantServiceCategoryId.toLowerCase() === selectedCategory.toLowerCase()) return true;
             if ((svc.category || '').toLowerCase() === selectedCategory.toLowerCase()) return true;
             return false;
         })) {
@@ -86,6 +106,66 @@ export function TenantServicesTab({
             onSelectService(service);
         }
     };
+
+    // Category-aware service grouping
+    const groupedServices = useMemo(() => {
+        if (selectedCategory !== 'all') {
+            const currentCatObj = categories.find((c) => getCategoryKey(c).toLowerCase() === selectedCategory.toLowerCase()) || selectedCategory;
+            return [{
+                key: selectedCategory,
+                label: getCategoryLabel(currentCatObj),
+                services: filteredServices,
+            }];
+        }
+
+        // When "all" is selected, group services under their natural categories
+        const groupsMap = new Map<string, { key: string; label: string; services: Service[] }>();
+
+        // Pre-populate defined categories to preserve clean catalog ordering
+        categories.forEach((cat) => {
+            const key = getCategoryKey(cat);
+            if (key.toLowerCase() !== 'all') {
+                groupsMap.set(key.toLowerCase(), {
+                    key,
+                    label: getCategoryLabel(cat),
+                    services: [],
+                });
+            }
+        });
+
+        // Distribute services to groups
+        services.forEach((service) => {
+            let matchedKey = '';
+            if (service.tenantServiceCategoryId) {
+                matchedKey = service.tenantServiceCategoryId.toLowerCase();
+            } else if (service.category) {
+                matchedKey = service.category.trim().toLowerCase();
+            }
+
+            if (matchedKey && groupsMap.has(matchedKey)) {
+                groupsMap.get(matchedKey)!.services.push(service);
+            } else if (matchedKey) {
+                const newGroup = {
+                    key: matchedKey,
+                    label: getCategoryLabel(matchedKey),
+                    services: [service],
+                };
+                groupsMap.set(matchedKey, newGroup);
+            } else {
+                const otherKey = 'other';
+                if (!groupsMap.has(otherKey)) {
+                    groupsMap.set(otherKey, {
+                        key: otherKey,
+                        label: isRTL ? 'خدمات أخرى' : 'Other Services',
+                        services: [],
+                    });
+                }
+                groupsMap.get(otherKey)!.services.push(service);
+            }
+        });
+
+        return Array.from(groupsMap.values()).filter((g) => g.services.length > 0);
+    }, [services, filteredServices, selectedCategory, categories, isRTL]);
 
     return (
         <View style={styles.container}>
@@ -155,7 +235,7 @@ export function TenantServicesTab({
                 </ScrollView>
             )}
 
-            {/* 2. Service Cards List */}
+            {/* 2. Service Groups List */}
             <View style={styles.servicesList}>
                 {filteredServices.length === 0 && filteredBundles.length === 0 ? (
                     <View style={styles.emptyStateContainer}>
@@ -168,74 +248,105 @@ export function TenantServicesTab({
                         </Text>
                     </View>
                 ) : (
-                    filteredServices.map((service) => {
-                        const isSelected = selectedServiceIds.includes(service.id);
-                        const imageUri = getServiceImageUri(service);
-                        const durationMinutes = service.duration || 45;
-                        const rawPrice = getServicePrice(service) || (service.variants && service.variants[0] ? getServicePrice(service, service.variants[0]) : 0);
-                        const price = Number(rawPrice).toFixed(0);
-                        const title = (isRTL ? service.name_ar || service.name_en : service.name_en || service.name_ar) || (isRTL ? 'خدمة' : 'Service');
-
-                        return (
-                            <TouchableOpacity
-                                key={service.id}
-                                style={[styles.serviceCard, isRTL && styles.rowRTL]}
-                                onPress={() => handleServicePress(service)}
-                                activeOpacity={0.85}
-                            >
-                                {/* 80x80 Compact Image Thumbnail */}
-                                {imageUri ? (
-                                    <Image
-                                        source={{ uri: imageUri }}
-                                        style={styles.serviceImage}
-                                        resizeMode="cover"
-                                    />
-                                ) : (
-                                    <View style={styles.serviceImagePlaceholder}>
-                                        <AppIcon name="sparkles" size={28} color="#6537C0" />
-                                    </View>
-                                )}
-
-                                {/* Service Information */}
-                                <View style={[styles.serviceInfo, isRTL && styles.serviceInfoRTL]}>
-                                    <Text
-                                        style={[styles.serviceTitle, isRTL && styles.textRTL]}
-                                        numberOfLines={1}
-                                    >
-                                        {title}
+                    groupedServices.map((group) => (
+                        <View key={group.key} style={styles.categorySection}>
+                            {/* Category Section Header when multiple categories are present */}
+                            {(selectedCategory === 'all' || categories.length > 1) && (
+                                <View style={[styles.categorySectionHeader, isRTL && styles.rowRTL]}>
+                                    <Text style={[styles.categorySectionHeading, isRTL && styles.textRTL]}>
+                                        {group.label}
                                     </Text>
-                                    <Text style={[styles.serviceDuration, isRTL && styles.textRTL]}>
-                                        {durationMinutes} {isRTL ? 'دقيقة' : 'min'}
-                                    </Text>
-                                    <Text style={[styles.servicePrice, isRTL && styles.textRTL]}>
-                                        {formatRiyal(price, isRTL ? 'ar' : 'en')}
+                                    <Text style={[styles.categorySectionCount, isRTL && styles.textRTL]}>
+                                        {group.services.length} {isRTL ? 'خدمات' : 'services'}
                                     </Text>
                                 </View>
+                            )}
 
-                                {/* Action Button */}
-                                <TouchableOpacity
-                                    style={[
-                                        styles.actionButton,
-                                        isSelected && styles.actionButtonSelected,
-                                    ]}
-                                    onPress={() => handleServicePress(service)}
-                                    activeOpacity={0.85}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.actionButtonText,
-                                            isSelected && styles.actionButtonTextSelected,
-                                            isRTL && styles.textRTL,
-                                        ]}
+                            {/* Category Service Cards */}
+                            {group.services.map((service) => {
+                                const isSelected = selectedServiceIds.includes(service.id);
+                                const imageUri = getServiceImageUri(service);
+                                const durationMinutes = service.duration || 45;
+                                const rawPrice = getServicePrice(service) || (service.variants && service.variants[0] ? getServicePrice(service, service.variants[0]) : 0);
+                                const price = Number(rawPrice).toFixed(0);
+                                const title = (isRTL ? service.name_ar || service.name_en : service.name_en || service.name_ar) || (isRTL ? 'خدمة' : 'Service');
+                                const hasVariants = Boolean(service.variants && service.variants.length > 0);
+
+                                return (
+                                    <TouchableOpacity
+                                        key={service.id}
+                                        style={[styles.serviceCard, isRTL && styles.rowRTL]}
+                                        onPress={() => handleServicePress(service)}
+                                        activeOpacity={0.85}
                                     >
-                                        {isSelected
-                                            ? (isRTL ? '✓ تم' : '✓ Added')
-                                            : (isRTL ? '+ إضافة' : '+ Add')}
-                                    </Text>
-                                </TouchableOpacity>
-                            </TouchableOpacity>
-                        );
-                    })
+                                        {/* 80x80 Compact Image Thumbnail */}
+                                        {imageUri ? (
+                                            <Image
+                                                source={{ uri: imageUri }}
+                                                style={styles.serviceImage}
+                                                resizeMode="cover"
+                                            />
+                                        ) : (
+                                            <View style={styles.serviceImagePlaceholder}>
+                                                <AppIcon name="sparkles" size={28} color="#6537C0" />
+                                            </View>
+                                        )}
+
+                                        {/* Service Information */}
+                                        <View style={[styles.serviceInfo, isRTL && styles.serviceInfoRTL]}>
+                                            <Text
+                                                style={[styles.serviceTitle, isRTL && styles.textRTL]}
+                                                numberOfLines={1}
+                                            >
+                                                {title}
+                                            </Text>
+
+                                            {/* Variant Discoverability Badge */}
+                                            {hasVariants && (
+                                                <View style={[styles.variantBadge, isRTL && styles.rowRTL]}>
+                                                    <AppIcon name="sparkles" size={11} color="#6537C0" />
+                                                    <Text style={[styles.variantBadgeText, isRTL && styles.textRTL]}>
+                                                        {service.variants!.length} {isRTL ? 'خيارات متاحة' : 'options available'}
+                                                    </Text>
+                                                </View>
+                                            )}
+
+                                            <Text style={[styles.serviceDuration, isRTL && styles.textRTL]}>
+                                                {durationMinutes} {isRTL ? 'دقيقة' : 'min'}
+                                            </Text>
+                                            <Text style={[styles.servicePrice, isRTL && styles.textRTL]}>
+                                                {formatRiyal(price, isRTL ? 'ar' : 'en')}
+                                            </Text>
+                                        </View>
+
+                                        {/* Action Button */}
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.actionButton,
+                                                isSelected && styles.actionButtonSelected,
+                                            ]}
+                                            onPress={() => handleServicePress(service)}
+                                            activeOpacity={0.85}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.actionButtonText,
+                                                    isSelected && styles.actionButtonTextSelected,
+                                                    isRTL && styles.textRTL,
+                                                ]}
+                                            >
+                                                {isSelected
+                                                    ? (isRTL ? '✓ تم' : '✓ Added')
+                                                    : hasVariants
+                                                        ? (isRTL ? 'خيارات' : 'Options')
+                                                        : (isRTL ? '+ إضافة' : '+ Add')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    ))
                 )}
 
                 {/* 3. Bundles Section */}
@@ -390,7 +501,29 @@ const styles = StyleSheet.create({
     },
     servicesList: {
         paddingHorizontal: 20,
-        gap: 12,
+        gap: 16,
+    },
+    categorySection: {
+        gap: 10,
+    },
+    categorySectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 4,
+        paddingTop: 6,
+        paddingBottom: 2,
+    },
+    categorySectionHeading: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1D035F',
+        letterSpacing: 0.3,
+    },
+    categorySectionCount: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#716B88',
     },
     serviceCard: {
         backgroundColor: '#FFFFFF',
@@ -434,6 +567,23 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#1D035F',
+    },
+    variantBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F3FF',
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 6,
+        gap: 4,
+        alignSelf: 'flex-start',
+        marginTop: 1,
+        marginBottom: 1,
+    },
+    variantBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#6537C0',
     },
     serviceDuration: {
         fontSize: 13,

@@ -4,9 +4,27 @@ import { Service, ServiceVariant, Staff, Tenant } from '../api/client';
 import { GroupGuestPayload } from '../utils/groupGuest';
 
 export type ServiceBookingPaymentMethod = 'at-center' | 'online-full' | 'booking-fee';
+export type ServiceBookingItemType = 'service' | 'package';
+
+export interface PackageItemSelection {
+    serviceId: string;
+    variantId?: string | null;
+    packageItemId?: string | null;
+    sequenceOrder?: number;
+    defaultStaffId?: string | null;
+    service?: Service | null;
+    variant?: ServiceVariant | null;
+    duration?: number;
+}
 
 export interface ServiceBookingCartItem {
     id: string;
+    itemType?: ServiceBookingItemType;
+    packageId?: string | null;
+    bundle?: any;
+    packageItems?: PackageItemSelection[];
+    scheduleType?: 'sequential' | 'parallel';
+    totalDuration?: number;
     tenantId: string;
     tenant?: Pick<Tenant, 'id' | 'name' | 'name_en' | 'name_ar' | 'slug' | 'logo'>;
     service: Service;
@@ -24,6 +42,7 @@ export interface ServiceBookingCartItem {
     totalPrice: number;
     payableNowAmount: number;
 }
+
 
 interface CartAddResult {
     success: boolean;

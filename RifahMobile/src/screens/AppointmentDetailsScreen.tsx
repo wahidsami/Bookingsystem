@@ -248,7 +248,7 @@ export function AppointmentDetailsScreen({ route, navigation }: any) {
 
   const getCenterPhoneNumber = (booking?: Booking | null) => {
     const tenant = booking?.tenant;
-    const candidate = `${tenant?.whatsappNumber || tenant?.mobile || tenant?.phone || ''}`.trim();
+    const candidate = `${tenant?.whatsappNumber || (tenant as any)?.whatsapp || tenant?.mobile || tenant?.phone || ''}`.trim();
     return candidate || '';
   };
 

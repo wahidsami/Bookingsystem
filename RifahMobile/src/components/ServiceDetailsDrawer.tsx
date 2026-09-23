@@ -27,14 +27,27 @@ export function ServiceDetailsDrawer({ visible, onClose, service, variant, tenan
     const [expandedDescription, setExpandedDescription] = useState(false);
     const [selectedVariant, setSelectedVariant] = useState<ServiceVariant | null>(variant || null);
 
+    const isMainBookable = Boolean(
+        service &&
+        (Number(service.duration) > 0 || Number((service as any).rawDuration) > 0) &&
+        getServicePrice(service) !== undefined &&
+        getServicePrice(service) !== null &&
+        !isNaN(Number(getServicePrice(service)))
+    );
+
     React.useEffect(() => {
         if (variant) {
             setSelectedVariant(variant);
+        } else if (isMainBookable) {
+            // Default to Main Service (null variant) when valid and independently bookable
+            setSelectedVariant(null);
+        } else if (service?.variants && service.variants.length > 0) {
+            // Main Service is not independently bookable; default to first variant
+            setSelectedVariant(service.variants[0]);
         } else {
-            // Default to Main Service (null variant), never auto-select first variant
             setSelectedVariant(null);
         }
-    }, [service, variant, visible]);
+    }, [service, variant, visible, isMainBookable]);
 
     if (!service) return null;
 
@@ -153,79 +166,83 @@ export function ServiceDetailsDrawer({ visible, onClose, service, variant, tenan
                         {/* Options Section when service has variants */}
                         {service.variants && service.variants.length > 0 && (
                             <View style={styles.section}>
-                                {/* 1. Main Service Option */}
-                                <View style={[styles.variantsHeaderRow, isRTL ? styles.variantsHeaderRowRtl : null]}>
-                                    <Text style={[styles.sectionTitle, isRTL ? styles.sectionTitleRtl : null]}>
-                                        {isRTL ? 'الخدمة الأساسية' : 'Main Service'}
-                                    </Text>
-                                </View>
+                                {/* 1. Main Service Option (Rendered only when independently bookable) */}
+                                {isMainBookable && (
+                                    <>
+                                        <View style={[styles.variantsHeaderRow, isRTL ? styles.variantsHeaderRowRtl : null]}>
+                                            <Text style={[styles.sectionTitle, isRTL ? styles.sectionTitleRtl : null]}>
+                                                {isRTL ? 'الخدمة الأساسية' : 'Main Service'}
+                                            </Text>
+                                        </View>
 
-                                {(() => {
-                                    const isMainSelected = selectedVariant === null;
-                                    const mainPrice = getServicePrice(service);
-                                    const isMainInCart = isOptionInCart(null);
+                                        {(() => {
+                                            const isMainSelected = selectedVariant === null;
+                                            const mainPrice = getServicePrice(service);
+                                            const isMainInCart = isOptionInCart(null);
 
-                                    return (
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.variantCard,
-                                                isMainSelected && styles.variantCardSelected,
-                                                isRTL && styles.variantCardRtl
-                                            ]}
-                                            onPress={() => setSelectedVariant(null)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <View style={[
-                                                styles.variantRadio,
-                                                isMainSelected && styles.variantRadioSelected,
-                                                isRTL && styles.variantRadioRtl
-                                            ]}>
-                                                {isMainSelected && <View style={styles.variantRadioInner} />}
-                                            </View>
-
-                                            <View style={[styles.variantTextCol, isRTL && styles.variantTextColRtl]}>
-                                                <View style={[styles.variantNameRow, isRTL && styles.variantNameRowRtl]}>
-                                                    <Text style={[styles.variantName, isMainSelected && styles.variantNameSelected, isRTL && styles.textRtl]}>
-                                                        {baseServiceName}
-                                                    </Text>
-                                                    {isMainInCart && (
-                                                        <View style={styles.inCartBadge}>
-                                                            <Text style={styles.inCartBadgeText}>
-                                                                {isRTL ? 'في السلة' : 'In Basket'}
-                                                            </Text>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                                {!!service.duration && (
-                                                    <Text style={[styles.variantDuration, isRTL && styles.textRtl]}>
-                                                        {service.duration} {isRTL ? 'دقيقة' : 'min'}
-                                                    </Text>
-                                                )}
-                                            </View>
-
-                                            <View style={[styles.variantActionCol, isRTL && styles.variantActionColRtl]}>
-                                                <Text style={[styles.variantPrice, isMainSelected && styles.variantPriceSelected]}>
-                                                    {formatRiyal(mainPrice, isRTL ? 'ar' : 'en')}
-                                                </Text>
+                                            return (
                                                 <TouchableOpacity
-                                                    style={[styles.inlineAddBtn, isMainInCart && styles.inlineAddBtnRemove]}
-                                                    onPress={() => {
-                                                        setSelectedVariant(null);
-                                                        handleToggleCartItem(null, false);
-                                                    }}
-                                                    activeOpacity={0.8}
+                                                    style={[
+                                                        styles.variantCard,
+                                                        isMainSelected && styles.variantCardSelected,
+                                                        isRTL && styles.variantCardRtl
+                                                    ]}
+                                                    onPress={() => setSelectedVariant(null)}
+                                                    activeOpacity={0.7}
                                                 >
-                                                    <Text style={[styles.inlineAddBtnText, isMainInCart && styles.inlineAddBtnTextRemove]}>
-                                                        {isMainInCart ? (isRTL ? 'إزالة' : 'Remove') : (isRTL ? 'إضافة' : 'Add')}
-                                                    </Text>
+                                                    <View style={[
+                                                        styles.variantRadio,
+                                                        isMainSelected && styles.variantRadioSelected,
+                                                        isRTL && styles.variantRadioRtl
+                                                    ]}>
+                                                        {isMainSelected && <View style={styles.variantRadioInner} />}
+                                                    </View>
+
+                                                    <View style={[styles.variantTextCol, isRTL && styles.variantTextColRtl]}>
+                                                        <View style={[styles.variantNameRow, isRTL && styles.variantNameRowRtl]}>
+                                                            <Text style={[styles.variantName, isMainSelected && styles.variantNameSelected, isRTL && styles.textRtl]}>
+                                                                {baseServiceName}
+                                                            </Text>
+                                                            {isMainInCart && (
+                                                                <View style={styles.inCartBadge}>
+                                                                    <Text style={styles.inCartBadgeText}>
+                                                                        {isRTL ? 'في السلة' : 'In Basket'}
+                                                                    </Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                        {!!service.duration && (
+                                                            <Text style={[styles.variantDuration, isRTL && styles.textRtl]}>
+                                                                {service.duration} {isRTL ? 'دقيقة' : 'min'}
+                                                            </Text>
+                                                        )}
+                                                    </View>
+
+                                                    <View style={[styles.variantActionCol, isRTL && styles.variantActionColRtl]}>
+                                                        <Text style={[styles.variantPrice, isMainSelected && styles.variantPriceSelected]}>
+                                                            {formatRiyal(mainPrice, isRTL ? 'ar' : 'en')}
+                                                        </Text>
+                                                        <TouchableOpacity
+                                                            style={[styles.inlineAddBtn, isMainInCart && styles.inlineAddBtnRemove]}
+                                                            onPress={() => {
+                                                                setSelectedVariant(null);
+                                                                handleToggleCartItem(null, false);
+                                                            }}
+                                                            activeOpacity={0.8}
+                                                        >
+                                                            <Text style={[styles.inlineAddBtnText, isMainInCart && styles.inlineAddBtnTextRemove]}>
+                                                                {isMainInCart ? (isRTL ? 'إزالة' : 'Remove') : (isRTL ? 'إضافة' : 'Add')}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    </View>
                                                 </TouchableOpacity>
-                                            </View>
-                                        </TouchableOpacity>
-                                    );
-                                })()}
+                                            );
+                                        })()}
+                                    </>
+                                )}
 
                                 {/* 2. Available Variant Options */}
-                                <View style={[styles.variantsHeaderRow, { marginTop: spacing.lg }, isRTL ? styles.variantsHeaderRowRtl : null]}>
+                                <View style={[styles.variantsHeaderRow, isMainBookable && { marginTop: spacing.lg }, isRTL ? styles.variantsHeaderRowRtl : null]}>
                                     <Text style={[styles.sectionTitle, isRTL ? styles.sectionTitleRtl : null]}>
                                         {isRTL ? 'الخيارات المتاحة' : 'Available Options'}
                                     </Text>

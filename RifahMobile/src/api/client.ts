@@ -951,7 +951,7 @@ const normalizeBooking = (appointment: Partial<Booking> | null | undefined): Boo
             logo: toOptionalString(appointment.tenant.logo),
             phone: toOptionalString((appointment.tenant as any).phone),
             mobile: toOptionalString((appointment.tenant as any).mobile),
-            whatsappNumber: toOptionalString((appointment.tenant as any).whatsappNumber),
+            whatsappNumber: toOptionalString((appointment.tenant as any).whatsappNumber) || toOptionalString((appointment.tenant as any).whatsapp),
         } : undefined,
         duration: appointment?.duration !== undefined
             ? toNumber(appointment.duration)

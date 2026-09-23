@@ -136,6 +136,26 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
 
     const pageEnterAnim = useMemo(() => new Animated.Value(0), []);
 
+    // Service categories: Use authoritative tenant categories from backend if available.
+    // Fallback: derive categories from existing service.category when backend category endpoint returns 0 categories or fails.
+    const serviceCategories = useMemo(() => {
+        if (tenantCategories.length > 0) {
+            return tenantCategories;
+        }
+        // Fallback: derive unique categories from service records
+        const uniqueDerived = Array.from(
+            new Set(
+                services
+                    .map((s) => s.category?.trim())
+                    .filter((c): c is string => Boolean(c && c.toLowerCase() !== 'all'))
+            )
+        );
+        if (uniqueDerived.length === 0) {
+            return ['all'];
+        }
+        return ['all', ...uniqueDerived];
+    }, [tenantCategories, services]);
+
     useEffect(() => {
         Animated.timing(pageEnterAnim, {
             toValue: 1,
@@ -453,78 +473,78 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
     };
 
     const isBundleInCart = (bundle: ServiceBundle): boolean => {
-        if (!bundle.items || bundle.items.length === 0) return false;
-        return bundle.items.every((item) =>
-            serviceBookingItems.some(
-                (cartItem) =>
-                    cartItem.service.id === item.serviceId &&
-                    (item.variantId ? cartItem.variant?.id === item.variantId : true)
-            )
+        return serviceBookingItems.some(
+            (item) => item.itemType === 'package' && item.packageId === bundle.id
         );
     };
 
     const handleToggleBundle = (bundle: ServiceBundle) => {
         const inCart = isBundleInCart(bundle);
         if (inCart) {
-            bundle.items.forEach((item) => {
-                const cartItem = serviceBookingItems.find(
-                    (ci) =>
-                        ci.service.id === item.serviceId &&
-                        (item.variantId ? ci.variant?.id === item.variantId : true)
-                );
-                if (cartItem) {
-                    removeServiceBookingItem(cartItem.id);
-                }
-            });
+            const existing = serviceBookingItems.find(
+                (item) => item.itemType === 'package' && item.packageId === bundle.id
+            );
+            if (existing) {
+                removeServiceBookingItem(existing.id);
+            }
         } else {
-            for (const item of bundle.items) {
-                if (!item.service) continue;
-                const matchingVariant = item.variantId
-                    ? item.service.variants?.find((v) => v.id === item.variantId) || null
-                    : null;
+            const result = addServiceBookingItem({
+                id: `pkg-${bundle.id}-${Date.now().toString(36)}`,
+                itemType: 'package',
+                packageId: bundle.id,
+                bundle: bundle,
+                packageItems: (bundle.items || []).map((it, idx) => ({
+                    serviceId: it.serviceId,
+                    variantId: it.variantId || null,
+                    packageItemId: it.id,
+                    sequenceOrder: it.sequenceOrder ?? idx,
+                    defaultStaffId: it.defaultStaffId || null,
+                    service: it.service,
+                    duration: it.service?.duration || 30,
+                })),
+                scheduleType: bundle.scheduleType === 'parallel' ? 'parallel' : 'sequential',
+                totalDuration: bundle.totalDuration || 60,
+                tenantId: tenant?.id || tenantId || '',
+                tenant: tenant
+                    ? {
+                          id: tenant.id,
+                          name: tenant.name,
+                          name_en: tenant.name_en,
+                          name_ar: tenant.name_ar,
+                          slug: tenant.slug,
+                          logo: tenant.logo,
+                      }
+                    : undefined,
+                service: {
+                    id: bundle.id,
+                    tenantId: tenant?.id || tenantId || '',
+                    name_en: bundle.name_en,
+                    name_ar: bundle.name_ar,
+                    description_en: bundle.description_en || '',
+                    description_ar: bundle.description_ar || '',
+                    price: bundle.totalPrice,
+                    rawPrice: bundle.totalPrice,
+                    duration: bundle.totalDuration || 60,
+                    category: bundle.tenantCategory?.name_en || 'Bundle',
+                    isActive: true,
+                    allowOnlineBooking: bundle.allowOnlineBooking ?? true,
+                } as Service,
+                staff: null,
+                requestedStaffId: null,
+                staffId: null,
+                startTime: '',
+                paymentMethod: 'at-center',
+                totalPrice: Number(bundle.totalPrice || 0),
+                payableNowAmount: 0,
+            });
 
-                const alreadyInCart = serviceBookingItems.some(
-                    (cartItem) =>
-                        cartItem.service.id === item.service.id &&
-                        (matchingVariant ? cartItem.variant?.id === matchingVariant.id : !cartItem.variant)
+            if (!result.success && result.reason === 'different_tenant') {
+                Alert.alert(
+                    isRTL ? 'تنبيه' : 'Cannot Add Package',
+                    isRTL
+                        ? 'لا يمكنك إضافة باقات من مراكز مختلفة في نفس الحجز. يرجى إفراغ السلة أولاً.'
+                        : 'You cannot add packages from different centers to the same booking. Please clear your basket first.'
                 );
-
-                if (!alreadyInCart) {
-                    const price = getServicePrice(item.service, matchingVariant);
-                    const result = addServiceBookingItem({
-                        id: Math.random().toString(36).substring(7),
-                        tenantId: tenant?.id || tenantId || '',
-                        tenant: tenant
-                            ? {
-                                  id: tenant.id,
-                                  name: tenant.name,
-                                  name_en: tenant.name_en,
-                                  name_ar: tenant.name_ar,
-                                  slug: tenant.slug,
-                                  logo: tenant.logo,
-                              }
-                            : undefined,
-                        service: item.service,
-                        variant: matchingVariant,
-                        staff: null,
-                        requestedStaffId: item.defaultStaffId || null,
-                        staffId: null,
-                        startTime: '',
-                        paymentMethod: 'at-center',
-                        totalPrice: price,
-                        payableNowAmount: 0,
-                    });
-
-                    if (!result.success && result.reason === 'different_tenant') {
-                        Alert.alert(
-                            isRTL ? 'تنبيه' : 'Cannot Add Service',
-                            isRTL
-                                ? 'لا يمكنك إضافة خدمات من مراكز مختلفة في نفس الحجز. يرجى إفراغ السلة أولاً.'
-                                : 'You cannot add services from different centers to the same booking. Please clear your basket first.'
-                        );
-                        return;
-                    }
-                }
             }
         }
     };
@@ -601,11 +621,6 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
         ? rawBusinessType.replace(/_/g, ' ')
         : (isRTL ? 'صالون وسبا فاخر' : 'Luxury Spa & Beauty Salon');
 
-    // Service categories: Strictly authoritative tenant categories from backend.
-    // If request failed, or tenant has 0 categories, render only 'all' (never derive categories from service.category).
-    const serviceCategories = tenantCategories.length > 0
-        ? tenantCategories
-        : ['all'];
 
     const selectedBundleIds = bundles.filter(isBundleInCart).map((b) => b.id);
 
@@ -766,7 +781,7 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     itemCount={serviceBookingItemCount}
                     totalPrice={serviceBookingTotalPrice}
                     totalDuration={serviceBookingItems.reduce(
-                        (acc, item) => acc + (item.service.duration || 0),
+                        (acc, item) => acc + (item.totalDuration || item.service.duration || 0),
                         0
                     )}
                     onContinue={() =>

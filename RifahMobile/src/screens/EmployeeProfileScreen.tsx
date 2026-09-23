@@ -4,6 +4,9 @@ import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
 import { api, Booking, getImageUrl, Staff } from '../api/client';
 import { colors, fontSize, spacing } from '../theme/colors';
+import { typography } from '../theme';
+import { CustomerSubpageHeader } from '../components/ui/CustomerSubpageHeader';
+import { AppButton } from '../components/ui/AppButton';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useScreenSafeArea } from '../utils/safeArea';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
@@ -119,16 +122,10 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.heroHeader, isRTL && styles.rowRTL, { paddingTop: topInset + 8 }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.glassButton}>
-          <AppIcon name={isRTL ? 'arrow_forward' : 'arrow_back'} size={22} color={colors.text} />
-        </TouchableOpacity>
-        <View style={[styles.heroActions, isRTL && styles.rowRTL]}>
-          <TouchableOpacity style={styles.glassButton}>
-            <AppIcon name="share" size={18} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CustomerSubpageHeader
+        title={isRTL ? 'ملف مقدم الخدمة' : 'Staff Profile'}
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding + 120 }]}>
         <View style={styles.profileHeroCard}>
@@ -190,10 +187,12 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
           <View style={[styles.reviewsHeaderRow, isRTL && styles.rowRTL]}>
             <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{isRTL ? 'تقييمات العملاء' : 'Customer Reviews'}</Text>
             {hasEligibleBookingForReview ? (
-              <TouchableOpacity style={[styles.writeReviewButton, isRTL && styles.rowRTL]} onPress={openProviderReviewPrompt}>
-                <AppIcon name="star" size={14} color="#FFFFFF" />
-                <Text style={styles.writeReviewButtonText}>{isRTL ? 'إضافة تقييم' : 'Write Review'}</Text>
-              </TouchableOpacity>
+              <AppButton
+                variant="compact"
+                label={isRTL ? 'إضافة تقييم' : 'Write Review'}
+                icon="star"
+                onPress={openProviderReviewPrompt}
+              />
             ) : null}
           </View>
           {loading ? (
@@ -234,9 +233,11 @@ export function EmployeeProfileScreen({ route, navigation }: any) {
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(scrollBottomPadding, 14) }]}>
-        <TouchableOpacity style={styles.primaryCta} onPress={() => navigation.goBack()}>
-          <Text style={styles.primaryCtaText}>{isRTL ? 'العودة للخدمات' : 'Back to services'}</Text>
-        </TouchableOpacity>
+        <AppButton
+          variant="primary"
+          label={isRTL ? 'العودة للخدمات' : 'Back to services'}
+          onPress={() => navigation.goBack()}
+        />
       </View>
 
       <ReviewPromptModal
@@ -274,25 +275,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F6FB'
   },
-  heroHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm
-  },
-  heroActions: {
-    flexDirection: 'row',
-    gap: 10
-  },
-  glassButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF'
-  },
   content: {
     padding: spacing.md
   },
@@ -326,15 +308,15 @@ const styles = StyleSheet.create({
     color: colors.primary
   },
   name: {
-    fontSize: 30,
-    fontWeight: '800',
+    ...typography.pageTitle,
+    fontSize: 24,
+    lineHeight: 32,
     color: '#15153E'
   },
   subtitle: {
+    ...typography.cardSubtitle,
     marginTop: 4,
-    fontSize: 16,
-    color: '#646B89',
-    fontWeight: '600'
+    color: '#646B89'
   },
   experiencePill: {
     marginTop: 10,
@@ -347,9 +329,8 @@ const styles = StyleSheet.create({
     gap: 6
   },
   experienceText: {
-    color: '#4D4B73',
-    fontSize: 13,
-    fontWeight: '600'
+    ...typography.captionStrong,
+    color: '#4D4B73'
   },
   statsCard: {
     backgroundColor: '#FFFFFF',
@@ -366,12 +347,13 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   statValue: {
-    fontSize: 30,
-    fontWeight: '800',
+    ...typography.hero,
+    fontSize: 28,
+    lineHeight: 34,
     color: '#221A62'
   },
   statLabel: {
-    fontSize: 12,
+    ...typography.caption,
     color: '#767D9D',
     marginTop: 4
   },
@@ -390,8 +372,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md
   },
   bioText: {
+    ...typography.body,
     marginTop: 4,
-    fontSize: 16,
     color: '#4D5576',
     lineHeight: 24
   },
@@ -401,8 +383,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: '800',
+    ...typography.sectionTitle,
     color: '#171840',
     marginBottom: spacing.sm
   },
@@ -411,20 +392,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.xs
-  },
-  writeReviewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  writeReviewButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700'
   },
   skillChip: {
     borderRadius: 999,
@@ -435,13 +402,12 @@ const styles = StyleSheet.create({
     paddingVertical: 7
   },
   skillChipText: {
-    color: '#4F4672',
-    fontSize: 13,
-    fontWeight: '600'
+    ...typography.buttonCompact,
+    color: '#4F4672'
   },
   emptyText: {
-    color: '#737A9A',
-    fontSize: 14
+    ...typography.secondary,
+    color: '#737A9A'
   },
   reviewCard: {
     backgroundColor: '#FFFFFF',
@@ -463,8 +429,7 @@ const styles = StyleSheet.create({
     marginBottom: 6
   },
   reviewAuthor: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...typography.bodyStrong,
     color: '#1E1E47'
   },
   starsRow: {
@@ -479,7 +444,7 @@ const styles = StyleSheet.create({
     color: colors.warning
   },
   reviewComment: {
-    fontSize: 15,
+    ...typography.body,
     color: '#4F5678',
     lineHeight: 22
   },
@@ -493,13 +458,12 @@ const styles = StyleSheet.create({
     borderRadius: 10
   },
   replyLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
+    ...typography.captionStrong,
     color: colors.primary,
     marginBottom: 4
   },
   replyText: {
-    fontSize: fontSize.sm,
+    ...typography.secondary,
     color: '#3F4567'
   },
   bottomBar: {
@@ -515,18 +479,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 8
-  },
-  primaryCta: {
-    height: 54,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  primaryCtaText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800'
   },
   rowRTL: {
     flexDirection: 'row-reverse',
