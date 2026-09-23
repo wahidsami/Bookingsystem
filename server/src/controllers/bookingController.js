@@ -495,7 +495,7 @@ const getBooking = async (req, res) => {
             include: [
                 { model: db.Service, as: 'service' },
                 { model: db.Staff, as: 'staff' },
-                { model: db.Tenant, as: 'tenant', required: false, attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsappNumber'] },
+                { model: db.Tenant, as: 'tenant', required: false, attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', ['whatsapp', 'whatsappNumber']] },
                 {
                     model: db.PlatformUser,
                     as: 'user',
@@ -664,7 +664,7 @@ const listBookings = async (req, res) => {
                     model: db.Tenant,
                     as: 'tenant',
                     required: false,
-                    attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsappNumber']
+                    attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', ['whatsapp', 'whatsappNumber']]
                 },
                 {
                     model: db.PlatformUser,
@@ -874,13 +874,18 @@ const rescheduleBooking = async (req, res) => {
         await appointment.save({ transaction });
         await transaction.commit();
 
-        const refreshed = await db.Appointment.findByPk(appointment.id, {
-            include: [
-                { model: db.Service, as: 'service' },
-                { model: db.Staff, as: 'staff' },
-                { model: db.Tenant, as: 'tenant', required: false, attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsappNumber'] }
-            ]
-        });
+        let refreshed = null;
+        try {
+            refreshed = await db.Appointment.findByPk(appointment.id, {
+                include: [
+                    { model: db.Service, as: 'service' },
+                    { model: db.Staff, as: 'staff' },
+                    { model: db.Tenant, as: 'tenant', required: false, attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', ['whatsapp', 'whatsappNumber']] }
+                ]
+            });
+        } catch (fetchError) {
+            console.warn('Post-reschedule appointment refresh warning:', fetchError.message);
+        }
 
         return res.json({
             success: true,
@@ -912,7 +917,7 @@ const getInviteDetails = async (req, res) => {
             include: [
                 { model: db.Service, as: 'service', attributes: ['id', 'name_en', 'name_ar', 'duration'] },
                 { model: db.Staff, as: 'staff', attributes: ['id', 'name'] },
-                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', 'whatsappNumber'], required: false },
+                { model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'slug', 'logo', 'phone', 'mobile', ['whatsapp', 'whatsappNumber']], required: false },
                 { model: db.PlatformUser, as: 'user', attributes: ['id', 'email'], required: false }
             ]
         });
