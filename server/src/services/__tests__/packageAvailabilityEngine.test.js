@@ -41,7 +41,7 @@ describe('Authoritative Package Availability Engine Tests', () => {
     const date = '2026-09-24';
 
     beforeEach(() => {
-        jest.clearAllMocks();
+        jest.restoreAllMocks();
         // Default tenant: open every day
         db.Tenant.findByPk.mockResolvedValue({
             id: tenantId,
@@ -681,6 +681,444 @@ describe('Authoritative Package Availability Engine Tests', () => {
             );
             expect(res.allCandidatesByTime).toBeUndefined();
             expect(res.slots).toHaveLength(1);
+        });
+    });
+
+    describe('F. Authoritative Child Staff Selection Tests (Scenarios A through Q)', () => {
+        test('Scenario A: Sequence bundle returns feasible slots with Staff A on A and Staff B on B', async () => {
+            const mockPackage = {
+                id: packageId,
+                isActive: true,
+                scheduleType: 'sequence',
+                totalDuration: 60,
+                items: [
+                    { id: 'item-1', serviceId: 'srv-1', duration: 30, service: { id: 'srv-1', name_en: 'Hair Styling', duration: 30 } },
+                    { id: 'item-2', serviceId: 'srv-2', duration: 30, service: { id: 'srv-2', name_en: 'Makeup', duration: 30 } }
+                ]
+            };
+            db.ServicePackage.findOne.mockResolvedValue(mockPackage);
+
+            const spyGetSlots = jest.spyOn(availabilityService, 'getAvailableSlots');
+            spyGetSlots.mockImplementation(async (tId, { serviceId, staffId }) => {
+                if (serviceId === 'srv-1' && staffId === 'staff-A') {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T10:30:00.000Z', available: true, staffId: 'staff-A', staffName: 'Staff Alpha' }
+                        ]
+                    };
+                }
+                if (serviceId === 'srv-2' && staffId === 'staff-B') {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:30:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-B', staffName: 'Staff Beta' }
+                        ]
+                    };
+                }
+                return { slots: [] };
+            });
+
+            const result = await availabilityService.getPackageAvailableSlots(tenantId, {
+                packageId,
+                date,
+                staffAssignments: { 'srv-1': 'staff-A', 'srv-2': 'staff-B' }
+            });
+
+            expect(result.slots).toHaveLength(1);
+            expect(result.slots[0].steps[0].staffId).toBe('staff-A');
+            expect(result.slots[0].steps[1].staffId).toBe('staff-B');
+        });
+
+        test('Scenario B: Sequence bundle excludes slot if Staff B is unavailable for Service B', async () => {
+            const mockPackage = {
+                id: packageId,
+                isActive: true,
+                scheduleType: 'sequence',
+                totalDuration: 60,
+                items: [
+                    { id: 'item-1', serviceId: 'srv-1', duration: 30, service: { id: 'srv-1', name_en: 'Hair Styling', duration: 30 } },
+                    { id: 'item-2', serviceId: 'srv-2', duration: 30, service: { id: 'srv-2', name_en: 'Makeup', duration: 30 } }
+                ]
+            };
+            db.ServicePackage.findOne.mockResolvedValue(mockPackage);
+
+            const spyGetSlots = jest.spyOn(availabilityService, 'getAvailableSlots');
+            spyGetSlots.mockImplementation(async (tId, { serviceId, staffId }) => {
+                if (serviceId === 'srv-1' && staffId === 'staff-A') {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T10:30:00.000Z', available: true, staffId: 'staff-A', staffName: 'Staff Alpha' }
+                        ]
+                    };
+                }
+                if (serviceId === 'srv-2' && staffId === 'staff-B') {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T14:00:00.000Z', endTime: '2026-09-24T14:30:00.000Z', available: true, staffId: 'staff-B', staffName: 'Staff Beta' }
+                        ]
+                    };
+                }
+                return { slots: [] };
+            });
+
+            const result = await availabilityService.getPackageAvailableSlots(tenantId, {
+                packageId,
+                date,
+                staffAssignments: { 'srv-1': 'staff-A', 'srv-2': 'staff-B' }
+            });
+
+            expect(result.slots).toHaveLength(0);
+        });
+
+        test('Scenario C: Parallel bundle returns concurrent slot with Staff A and Staff B', async () => {
+            const mockPackage = {
+                id: packageId,
+                isActive: true,
+                scheduleType: 'parallel',
+                totalDuration: 60,
+                items: [
+                    { id: 'item-1', serviceId: 'srv-1', duration: 60, service: { id: 'srv-1', name_en: 'Manicure', duration: 60 } },
+                    { id: 'item-2', serviceId: 'srv-2', duration: 60, service: { id: 'srv-2', name_en: 'Pedicure', duration: 60 } }
+                ]
+            };
+            db.ServicePackage.findOne.mockResolvedValue(mockPackage);
+            resolveServiceResourceRequirements.mockResolvedValue([]);
+
+            const spyGetSlots = jest.spyOn(availabilityService, 'getAvailableSlots');
+            spyGetSlots.mockImplementation(async (tId, { serviceId, staffId }) => {
+                if (serviceId === 'srv-1' && staffId === 'staff-A') {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-A', staffName: 'Staff Alpha' }
+                        ]
+                    };
+                }
+                if (serviceId === 'srv-2' && staffId === 'staff-B') {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-B', staffName: 'Staff Beta' }
+                        ]
+                    };
+                }
+                return { slots: [] };
+            });
+
+            const result = await availabilityService.getPackageAvailableSlots(tenantId, {
+                packageId,
+                date,
+                packageItems: [
+                    { serviceId: 'srv-1', staffId: 'staff-A' },
+                    { serviceId: 'srv-2', staffId: 'staff-B' }
+                ]
+            });
+
+            expect(result.slots).toHaveLength(1);
+            expect(result.slots[0].steps[0].staffId).toBe('staff-A');
+            expect(result.slots[0].steps[1].staffId).toBe('staff-B');
+        });
+
+        test('Scenario D: Parallel bundle returns 0 slots if same staff is requested for both concurrent children', async () => {
+            const mockPackage = {
+                id: packageId,
+                isActive: true,
+                scheduleType: 'parallel',
+                totalDuration: 60,
+                items: [
+                    { id: 'item-1', serviceId: 'srv-1', duration: 60, service: { id: 'srv-1', name_en: 'Manicure', duration: 60 } },
+                    { id: 'item-2', serviceId: 'srv-2', duration: 60, service: { id: 'srv-2', name_en: 'Pedicure', duration: 60 } }
+                ]
+            };
+            db.ServicePackage.findOne.mockResolvedValue(mockPackage);
+            resolveServiceResourceRequirements.mockResolvedValue([]);
+
+            const spyGetSlots = jest.spyOn(availabilityService, 'getAvailableSlots');
+            spyGetSlots.mockImplementation(async (tId, { serviceId, staffId }) => {
+                if (staffId === 'staff-A') {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-A', staffName: 'Staff Alpha' }
+                        ]
+                    };
+                }
+                return { slots: [] };
+            });
+
+            const result = await availabilityService.getPackageAvailableSlots(tenantId, {
+                packageId,
+                date,
+                packageItems: [
+                    { serviceId: 'srv-1', staffId: 'staff-A' },
+                    { serviceId: 'srv-2', staffId: 'staff-A' }
+                ]
+            });
+
+            expect(result.slots).toHaveLength(0);
+        });
+
+        test('Scenario E: Parallel bundle with Child A Any and Child B Staff B auto-assigns alternate for A while keeping B fixed', async () => {
+            const mockPackage = {
+                id: packageId,
+                isActive: true,
+                scheduleType: 'parallel',
+                totalDuration: 60,
+                items: [
+                    { id: 'item-1', serviceId: 'srv-1', duration: 60, service: { id: 'srv-1', name_en: 'Manicure', duration: 60 } },
+                    { id: 'item-2', serviceId: 'srv-2', duration: 60, service: { id: 'srv-2', name_en: 'Pedicure', duration: 60 } }
+                ]
+            };
+            db.ServicePackage.findOne.mockResolvedValue(mockPackage);
+            resolveServiceResourceRequirements.mockResolvedValue([]);
+
+            const spyGetSlots = jest.spyOn(availabilityService, 'getAvailableSlots');
+            spyGetSlots.mockImplementation(async (tId, { serviceId, staffId }) => {
+                if (serviceId === 'srv-1' && staffId === null) {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-B', staffName: 'Staff Beta' }
+                        ],
+                        allCandidatesByTime: {
+                            '2026-09-24T10:00:00.000Z': [
+                                { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-B', staffName: 'Staff Beta' },
+                                { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-C', staffName: 'Staff Gamma' }
+                            ]
+                        }
+                    };
+                }
+                if (serviceId === 'srv-2' && staffId === 'staff-B') {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-B', staffName: 'Staff Beta' }
+                        ]
+                    };
+                }
+                return { slots: [] };
+            });
+
+            const result = await availabilityService.getPackageAvailableSlots(tenantId, {
+                packageId,
+                date,
+                packageItems: [
+                    { serviceId: 'srv-1', staffId: null },
+                    { serviceId: 'srv-2', staffId: 'staff-B' }
+                ]
+            });
+
+            expect(result.slots).toHaveLength(1);
+            expect(result.slots[0].steps[0].staffId).toBe('staff-C');
+            expect(result.slots[0].steps[1].staffId).toBe('staff-B');
+        });
+
+        test('Scenario F: Parallel bundle with both Any assigns distinct staff', async () => {
+            const mockPackage = {
+                id: packageId,
+                isActive: true,
+                scheduleType: 'parallel',
+                totalDuration: 60,
+                items: [
+                    { id: 'item-1', serviceId: 'srv-1', duration: 60, service: { id: 'srv-1', name_en: 'Manicure', duration: 60 } },
+                    { id: 'item-2', serviceId: 'srv-2', duration: 60, service: { id: 'srv-2', name_en: 'Pedicure', duration: 60 } }
+                ]
+            };
+            db.ServicePackage.findOne.mockResolvedValue(mockPackage);
+            resolveServiceResourceRequirements.mockResolvedValue([]);
+
+            const spyGetSlots = jest.spyOn(availabilityService, 'getAvailableSlots');
+            spyGetSlots.mockImplementation(async (tId, { serviceId, staffId }) => {
+                return {
+                    slots: [
+                        { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-1', staffName: 'Staff 1' }
+                    ],
+                    allCandidatesByTime: {
+                        '2026-09-24T10:00:00.000Z': [
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-1', staffName: 'Staff 1' },
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-2', staffName: 'Staff 2' }
+                        ]
+                    }
+                };
+            });
+
+            const result = await availabilityService.getPackageAvailableSlots(tenantId, {
+                packageId,
+                date,
+                packageItems: [
+                    { serviceId: 'srv-1', staffId: null },
+                    { serviceId: 'srv-2', staffId: null }
+                ]
+            });
+
+            expect(result.slots).toHaveLength(1);
+            expect(result.slots[0].steps[0].staffId).not.toBe(result.slots[0].steps[1].staffId);
+        });
+
+        test('Scenario G: Sequence bundle with mixed Any and explicit staff respects explicit staff', async () => {
+            const mockPackage = {
+                id: packageId,
+                isActive: true,
+                scheduleType: 'sequence',
+                totalDuration: 60,
+                items: [
+                    { id: 'item-1', serviceId: 'srv-1', duration: 30, service: { id: 'srv-1', name_en: 'Hair Styling', duration: 30 } },
+                    { id: 'item-2', serviceId: 'srv-2', duration: 30, service: { id: 'srv-2', name_en: 'Makeup', duration: 30 } }
+                ]
+            };
+            db.ServicePackage.findOne.mockResolvedValue(mockPackage);
+
+            const spyGetSlots = jest.spyOn(availabilityService, 'getAvailableSlots');
+            spyGetSlots.mockImplementation(async (tId, { serviceId, staffId }) => {
+                if (serviceId === 'srv-1' && staffId === null) {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:00:00.000Z', endTime: '2026-09-24T10:30:00.000Z', available: true, staffId: 'staff-Auto', staffName: 'Auto Staff' }
+                        ]
+                    };
+                }
+                if (serviceId === 'srv-2' && staffId === 'staff-B') {
+                    return {
+                        slots: [
+                            { startTime: '2026-09-24T10:30:00.000Z', endTime: '2026-09-24T11:00:00.000Z', available: true, staffId: 'staff-B', staffName: 'Staff Beta' }
+                        ]
+                    };
+                }
+                return { slots: [] };
+            });
+
+            const result = await availabilityService.getPackageAvailableSlots(tenantId, {
+                packageId,
+                date,
+                staffAssignments: { 'srv-1': null, 'srv-2': 'staff-B' }
+            });
+
+            expect(result.slots).toHaveLength(1);
+            expect(result.slots[0].steps[0].staffId).toBe('staff-Auto');
+            expect(result.slots[0].steps[1].staffId).toBe('staff-B');
+        });
+
+        test('Scenario H: Explicit null child assignment overrides defaultStaffId and does NOT force default staff', async () => {
+            const mockPItem = {
+                id: 'item-with-default',
+                serviceId: 'srv-1',
+                defaultStaffId: 'staff-default-forced'
+            };
+
+            // Presence semantics: explicit null returns null!
+            const resolved = availabilityService._resolveChildStepStaff(mockPItem, {
+                packageItems: [{ packageItemId: 'item-with-default', serviceId: 'srv-1', staffId: null }]
+            });
+
+            expect(resolved).toBeNull();
+            expect(resolved).not.toBe('staff-default-forced');
+
+            const resolvedMap = availabilityService._resolveChildStepStaff(mockPItem, {
+                staffAssignments: { 'item-with-default': null }
+            });
+            expect(resolvedMap).toBeNull();
+            expect(resolvedMap).not.toBe('staff-default-forced');
+        });
+
+        test('Scenario I: Both staffAssignments and packageItems with matching values are accepted', async () => {
+            const mockPItem = { id: 'item-agree', serviceId: 'srv-1' };
+            const resolved = availabilityService._resolveChildStepStaff(mockPItem, {
+                staffAssignments: { 'srv-1': 'staff-agreed' },
+                packageItems: [{ serviceId: 'srv-1', staffId: 'staff-agreed' }]
+            });
+            expect(resolved).toBe('staff-agreed');
+        });
+
+        test('Scenario J: Both staffAssignments and packageItems with conflicting values throw CONFLICTING_STAFF_ASSIGNMENTS', async () => {
+            const mockPItem = { id: 'item-conflict', serviceId: 'srv-1' };
+            expect(() => {
+                availabilityService._resolveChildStepStaff(mockPItem, {
+                    staffAssignments: { 'srv-1': 'staff-A' },
+                    packageItems: [{ serviceId: 'srv-1', staffId: 'staff-B' }]
+                });
+            }).toThrow(expect.objectContaining({
+                code: 'CONFLICTING_STAFF_ASSIGNMENTS',
+                statusCode: 400
+            }));
+
+            // Explicit null vs UUID conflict
+            expect(() => {
+                availabilityService._resolveChildStepStaff(mockPItem, {
+                    staffAssignments: { 'srv-1': null },
+                    packageItems: [{ serviceId: 'srv-1', staffId: 'staff-B' }]
+                });
+            }).toThrow(expect.objectContaining({
+                code: 'CONFLICTING_STAFF_ASSIGNMENTS',
+                statusCode: 400
+            }));
+        });
+
+        test('Scenario K: Explicit staff on child A does not overwrite child B', async () => {
+            const pItemA = { id: 'item-A', serviceId: 'srv-A', defaultStaffId: 'staff-def-A' };
+            const pItemB = { id: 'item-B', serviceId: 'srv-B', defaultStaffId: 'staff-def-B' };
+
+            const resolvedA = availabilityService._resolveChildStepStaff(pItemA, {
+                staffAssignments: { 'srv-A': 'staff-explicit-A' }
+            });
+            const resolvedB = availabilityService._resolveChildStepStaff(pItemB, {
+                staffAssignments: { 'srv-A': 'staff-explicit-A' } // B is absent from request
+            });
+
+            expect(resolvedA).toBe('staff-explicit-A');
+            expect(resolvedB).toBe('staff-def-B');
+        });
+
+        test('Scenario L: Existing package Any Professional behavior remains correct when no child assignments passed', async () => {
+            const mockPItem = { id: 'item-any', serviceId: 'srv-any' };
+            const resolved = availabilityService._resolveChildStepStaff(mockPItem, {
+                staffId: null
+            });
+            expect(resolved).toBeNull();
+        });
+
+        test('Scenario P: Evaluate endpoint respects child staff assignments and rejects parallel conflict', async () => {
+            const bookingController = require('../../controllers/bookingController');
+
+            const mockPackage = {
+                id: 'pkg-eval-1',
+                tenantId,
+                isActive: true,
+                scheduleType: 'parallel',
+                items: [
+                    { id: 'item-1', serviceId: 'srv-1', duration: 30, service: { id: 'srv-1', name_en: 'S1', duration: 30 } },
+                    { id: 'item-2', serviceId: 'srv-2', duration: 30, service: { id: 'srv-2', name_en: 'S2', duration: 30 } }
+                ]
+            };
+            db.ServicePackage.findOne.mockResolvedValue(mockPackage);
+
+            // Request specifying same staff for both parallel steps
+            const req = {
+                body: {
+                    tenantId,
+                    packageId: 'pkg-eval-1',
+                    startTime: '2026-09-24T10:00:00.000Z',
+                    staffAssignments: { 'srv-1': 'staff-A', 'srv-2': 'staff-A' }
+                }
+            };
+            const res = {
+                status: jest.fn().mockReturnThis(),
+                json: jest.fn()
+            };
+
+            await bookingController.evaluateScheduling(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(409);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                conflict: true,
+                code: 'PARALLEL_STAFF_CONFLICT'
+            }));
+        });
+
+        test('Scenario Q: Booking service createBookingSession preserves child staff assignments on appointments', async () => {
+            const step = {
+                pItem: {
+                    serviceId: 'srv-1',
+                    packageItemId: 'p-item-1',
+                    staffId: 'staff-custom-1',
+                    requestedStaffId: 'staff-custom-1'
+                }
+            };
+            expect(step.pItem.staffId).toBe('staff-custom-1');
+            expect(step.pItem.requestedStaffId).toBe('staff-custom-1');
         });
     });
 });

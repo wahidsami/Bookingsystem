@@ -126,7 +126,7 @@ const createAppointmentEventSafe = async ({
  */
 const searchAvailability = async (req, res) => {
     try {
-        const { serviceId, packageId, staffId, date, tenantId, variantId } = req.body;
+        const { serviceId, packageId, staffId, date, tenantId, variantId, staffAssignments, packageItems } = req.body;
 
         const finalTenantId = tenantId || req.tenantId;
         if (!finalTenantId) {
@@ -153,7 +153,9 @@ const searchAvailability = async (req, res) => {
                 packageId,
                 staffId: staffId || null,
                 date,
-                variantId: variantId || null
+                variantId: variantId || null,
+                staffAssignments,
+                packageItems
             });
 
             return res.json({
@@ -187,7 +189,9 @@ const searchAvailability = async (req, res) => {
                     packageId: serviceId,
                     staffId: staffId || null,
                     date,
-                    variantId: variantId || null
+                    variantId: variantId || null,
+                    staffAssignments,
+                    packageItems
                 });
 
                 return res.json({
@@ -233,7 +237,7 @@ const searchAvailability = async (req, res) => {
         let statusCode = 500;
         if (error.code === 'PACKAGE_NOT_FOUND' || error.message.includes('not found')) {
             statusCode = 404;
-        } else if (error.message.includes('required')) {
+        } else if (error.code === 'CONFLICTING_STAFF_ASSIGNMENTS' || error.message.includes('required') || error.message.includes('Conflicting staff assignments')) {
             statusCode = 400;
         }
 
@@ -252,7 +256,7 @@ const searchAvailability = async (req, res) => {
  */
 const searchPackageAvailability = async (req, res) => {
     try {
-        const { packageId, serviceId, staffId, date, tenantId, variantId } = req.body;
+        const { packageId, serviceId, staffId, date, tenantId, variantId, staffAssignments, packageItems } = req.body;
         const finalTenantId = tenantId || req.tenantId;
         const targetPackageId = packageId || serviceId;
 
@@ -276,7 +280,9 @@ const searchPackageAvailability = async (req, res) => {
             packageId: targetPackageId,
             staffId: staffId || null,
             date,
-            variantId: variantId || null
+            variantId: variantId || null,
+            staffAssignments,
+            packageItems
         });
 
         res.json({
@@ -294,7 +300,7 @@ const searchPackageAvailability = async (req, res) => {
         let statusCode = 500;
         if (error.code === 'PACKAGE_NOT_FOUND' || error.message.includes('not found')) {
             statusCode = 404;
-        } else if (error.message.includes('required')) {
+        } else if (error.code === 'CONFLICTING_STAFF_ASSIGNMENTS' || error.message.includes('required') || error.message.includes('Conflicting staff assignments')) {
             statusCode = 400;
         }
         res.status(statusCode).json({
@@ -313,10 +319,10 @@ const evaluateScheduling = async (req, res) => {
         serviceId: req.body?.serviceId,
         variantId: req.body?.variantId,
         requestedStart: req.body?.startTime,
-        tenantTimezone: req.headers['x-tenant-timezone'] || 'UTC'
+        tenantTimezone: req.headers?.['x-tenant-timezone'] || 'UTC'
     });
     try {
-        const { tenantId, serviceId, packageId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId } = req.body || {};
+        const { tenantId, serviceId, packageId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId, staffAssignments, packageItems } = req.body || {};
         const targetId = packageId || serviceId;
         if (!tenantId || !targetId || !startTime) {
             return res.status(400).json({
@@ -361,12 +367,44 @@ const evaluateScheduling = async (req, res) => {
 
                 const isParallel = pkg.scheduleType === 'parallel';
                 let stepStartMs = new Date(startTime).getTime();
-                const normalizedStaffId = (staffId && staffId !== 'any' && staffId !== 'auto') ? staffId : null;
+                const availabilityService = require('../services/availabilityService');
 
-                for (const pItem of activeItems) {
+                // Resolve child staff using presence semantics and validate consistency
+                let resolvedStepStaffList = [];
+                try {
+                    resolvedStepStaffList = activeItems.map(pItem =>
+                        availabilityService._resolveChildStepStaff(pItem, { staffAssignments, packageItems, staffId })
+                    );
+                } catch (confError) {
+                    if (confError.code === 'CONFLICTING_STAFF_ASSIGNMENTS') {
+                        return res.status(400).json({
+                            success: false,
+                            code: confError.code,
+                            message: confError.message,
+                            messageAr: confError.messageAr || 'تعارض في تعيينات الموظفين المحددة للباقة'
+                        });
+                    }
+                    throw confError;
+                }
+
+                if (isParallel) {
+                    const explicitStaff = resolvedStepStaffList.filter(Boolean);
+                    if (new Set(explicitStaff).size !== explicitStaff.length) {
+                        return res.status(409).json({
+                            success: false,
+                            conflict: true,
+                            code: 'PARALLEL_STAFF_CONFLICT',
+                            message: 'A staff member cannot perform multiple overlapping services within a parallel bundle.',
+                            messageAr: 'لا يمكن لنفس الموظف تقديم أكثر من خدمة متزامنة في نفس الوقت'
+                        });
+                    }
+                }
+
+                for (let idx = 0; idx < activeItems.length; idx++) {
+                    const pItem = activeItems[idx];
+                    const stepStaffId = resolvedStepStaffList[idx];
                     const stepDuration = Number(pItem.duration || pItem.service?.duration || 30);
                     const stepStartTime = isParallel ? startTime : new Date(stepStartMs).toISOString();
-                    const stepStaffId = normalizedStaffId || pItem.defaultStaffId || null;
 
                     const stepDecision = await bookingService.evaluateSchedulingRequest({
                         tenantId,

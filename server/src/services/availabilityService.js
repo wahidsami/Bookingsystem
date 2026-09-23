@@ -285,6 +285,88 @@ class AvailabilityService {
     }
 
     /**
+     * Resolves the effective staff ID for a package child item.
+     * Enforces:
+     * 1. Preserves explicit child assignment (including null for Any Professional).
+     * 2. Rejects conflicting inputs between staffAssignments and packageItems with HTTP 400.
+     * 3. Prevents explicit null from falling through to defaultStaffId.
+     * 4. Falls back to package-level staffId if supplied.
+     * 5. Falls back to pItem.defaultStaffId only when no explicit preference was provided.
+     */
+    _resolveChildStepStaff(pItem, { staffAssignments, packageItems, staffId } = {}) {
+        let hasPackageItemPref = false;
+        let packageItemStaff = null;
+
+        if (Array.isArray(packageItems)) {
+            // Prioritize canonical packageItemId / id matching
+            let matched = packageItems.find(it =>
+                (it.packageItemId && (it.packageItemId === pItem.id)) ||
+                (it.id && (it.id === pItem.id))
+            );
+            // Fall back to serviceId only if not matched by item ID
+            if (!matched) {
+                matched = packageItems.find(it => it.serviceId && (it.serviceId === pItem.serviceId));
+            }
+            if (matched) {
+                if (matched.requestedStaffId !== undefined) {
+                    hasPackageItemPref = true;
+                    packageItemStaff = (matched.requestedStaffId === 'any' || matched.requestedStaffId === 'auto' || matched.requestedStaffId === '') ? null : matched.requestedStaffId;
+                } else if (matched.staffId !== undefined) {
+                    hasPackageItemPref = true;
+                    packageItemStaff = (matched.staffId === 'any' || matched.staffId === 'auto' || matched.staffId === '') ? null : matched.staffId;
+                } else if (matched.staff !== undefined) {
+                    hasPackageItemPref = true;
+                    packageItemStaff = matched.staff ? matched.staff.id : null;
+                }
+            }
+        }
+
+        let hasStaffAssignment = false;
+        let staffAssignmentVal = null;
+
+        if (staffAssignments && typeof staffAssignments === 'object') {
+            if (pItem.id && staffAssignments[pItem.id] !== undefined) {
+                hasStaffAssignment = true;
+                const rawVal = staffAssignments[pItem.id];
+                staffAssignmentVal = (rawVal === 'any' || rawVal === 'auto' || rawVal === '') ? null : rawVal;
+            } else if (pItem.serviceId && staffAssignments[pItem.serviceId] !== undefined) {
+                hasStaffAssignment = true;
+                const rawVal = staffAssignments[pItem.serviceId];
+                staffAssignmentVal = (rawVal === 'any' || rawVal === 'auto' || rawVal === '') ? null : rawVal;
+            }
+        }
+
+        // Validate consistency if both specify the same child item
+        if (hasPackageItemPref && hasStaffAssignment) {
+            const pVal = packageItemStaff ? String(packageItemStaff) : null;
+            const aVal = staffAssignmentVal ? String(staffAssignmentVal) : null;
+            if (pVal !== aVal) {
+                const err = new Error(`Conflicting staff assignments for child service: ${pItem.service?.name_en || pItem.serviceId}`);
+                err.code = 'CONFLICTING_STAFF_ASSIGNMENTS';
+                err.statusCode = 400;
+                err.messageAr = 'تعارض في تعيينات الموظفين المحددة للباقة';
+                throw err;
+            }
+        }
+
+        // 1. Explicit child assignment exists: use it exactly (including explicit null for Any Professional)
+        if (hasPackageItemPref) {
+            return packageItemStaff;
+        }
+        if (hasStaffAssignment) {
+            return staffAssignmentVal;
+        }
+
+        // 2. Package-level staffId if supplied (and not empty)
+        if (staffId !== undefined && staffId !== null && staffId !== '') {
+            return (staffId === 'any' || staffId === 'auto') ? null : staffId;
+        }
+
+        // 3. Fallback to defaultStaffId on the package item
+        return pItem.defaultStaffId || null;
+    }
+
+    /**
      * Get available slots for a package (bundle)
      * Backend-authoritative package availability engine for both sequence and parallel bundles
      *
@@ -295,9 +377,11 @@ class AvailabilityService {
      * @param {string} [options.staffId] - Preferred staff ID (optional, null = any staff)
      * @param {string} [options.variantId] - Variant ID (optional)
      * @param {string} [options.excludeAppointmentId] - Appointment to exclude (optional)
+     * @param {Object} [options.staffAssignments] - Map of child itemId or serviceId to staffId | null
+     * @param {Array} [options.packageItems] - Array of child package items with staffId / requestedStaffId
      * @returns {Promise<Object>} Available package slots with metadata
      */
-    async getPackageAvailableSlots(tenantId, { packageId, date, staffId, variantId, excludeAppointmentId }) {
+    async getPackageAvailableSlots(tenantId, { packageId, date, staffId, variantId, excludeAppointmentId, staffAssignments, packageItems }) {
         if (!packageId || !date) {
             throw new Error('packageId and date are required');
         }
@@ -392,16 +476,28 @@ class AvailabilityService {
         // 1. Fetch available slots for each child item using core getAvailableSlots
         const childSlotsResults = await Promise.all(
             activeItems.map(async (pItem) => {
-                const stepStaffId = staffId || pItem.defaultStaffId || null;
+                const stepStaffId = this._resolveChildStepStaff(pItem, { staffAssignments, packageItems, staffId });
                 const stepVariantId = pItem.variantId || variantId || null;
-                return await this.getAvailableSlots(tenantId, {
-                    serviceId: pItem.serviceId,
-                    staffId: stepStaffId,
-                    date,
-                    variantId: stepVariantId,
-                    excludeAppointmentId,
-                    includeAllCandidates: (scheduleType === 'parallel')
-                });
+                try {
+                    return await this.getAvailableSlots(tenantId, {
+                        serviceId: pItem.serviceId,
+                        staffId: stepStaffId,
+                        date,
+                        variantId: stepVariantId,
+                        excludeAppointmentId,
+                        includeAllCandidates: (scheduleType === 'parallel')
+                    });
+                } catch (err) {
+                    if (err.message && (
+                        err.message.includes('cannot perform') ||
+                        err.message.includes('not active') ||
+                        err.message.includes('Staff not found') ||
+                        err.message.includes('does not belong')
+                    )) {
+                        return { slots: [], allCandidatesByTime: {} };
+                    }
+                    throw err;
+                }
             })
         );
 
