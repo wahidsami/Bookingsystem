@@ -132,14 +132,16 @@ const searchAvailability = async (req, res) => {
         if (!finalTenantId) {
             return res.status(400).json({
                 success: false,
-                message: 'tenantId is required'
+                message: 'tenantId is required',
+                messageAr: 'معرف المستأجر مطلوب'
             });
         }
 
         if (!date) {
             return res.status(400).json({
                 success: false,
-                message: 'date is required'
+                message: 'date is required',
+                messageAr: 'التاريخ مطلوب'
             });
         }
 
@@ -169,7 +171,8 @@ const searchAvailability = async (req, res) => {
         if (!serviceId) {
             return res.status(400).json({
                 success: false,
-                message: 'serviceId or packageId is required'
+                message: 'serviceId or packageId is required',
+                messageAr: 'معرف الخدمة أو معرف الباقة مطلوب'
             });
         }
 
@@ -254,10 +257,18 @@ const searchPackageAvailability = async (req, res) => {
         const targetPackageId = packageId || serviceId;
 
         if (!finalTenantId) {
-            return res.status(400).json({ success: false, message: 'tenantId is required' });
+            return res.status(400).json({
+                success: false,
+                message: 'tenantId is required',
+                messageAr: 'معرف المستأجر مطلوب'
+            });
         }
         if (!targetPackageId || !date) {
-            return res.status(400).json({ success: false, message: 'packageId and date are required' });
+            return res.status(400).json({
+                success: false,
+                message: 'packageId and date are required',
+                messageAr: 'معرف الباقة والتاريخ مطلوبان'
+            });
         }
 
         const availabilityService = require('../services/availabilityService');
@@ -310,7 +321,8 @@ const evaluateScheduling = async (req, res) => {
         if (!tenantId || !targetId || !startTime) {
             return res.status(400).json({
                 success: false,
-                message: 'tenantId, serviceId or packageId, and startTime are required'
+                message: 'tenantId, serviceId or packageId, and startTime are required',
+                messageAr: 'معرف المستأجر، ومعرف الخدمة أو الباقة، ووقت البدء مطلوبة'
             });
         }
 

@@ -619,6 +619,27 @@ describe('Authoritative Package Availability Engine Tests', () => {
                 totalSlots: 1
             }));
         });
+
+        test('searchPackageAvailability returns HTTP 400 with bilingual message and messageAr on missing fields', async () => {
+            const req = {
+                body: { tenantId } // missing packageId and date
+            };
+            const res = {
+                json: jest.fn(),
+                status: jest.fn().mockReturnThis()
+            };
+
+            await bookingController.searchPackageAvailability(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                message: expect.stringContaining('required'),
+                messageAr: expect.any(String)
+            }));
+            const payload = res.json.mock.calls[0][0];
+            expect(payload.messageAr.length).toBeGreaterThan(0);
+        });
     });
 
     describe('E. Single-Service & Regression Invariants', () => {
