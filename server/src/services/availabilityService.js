@@ -173,7 +173,7 @@ class AvailabilityService {
      * @param {string} excludeAppointmentId - Appointment ID to exclude from availability calculation
      * @returns {Promise<Object>} Available slots with metadata
      */
-    async getAvailableSlots(tenantId, { serviceId, staffId, date, variantId, excludeAppointmentId }) {
+    async getAvailableSlots(tenantId, { serviceId, staffId, date, variantId, excludeAppointmentId, includeAllCandidates = false }) {
         if (!serviceId || !date) {
             throw new Error('serviceId and date are required');
         }
@@ -237,7 +237,7 @@ class AvailabilityService {
 
         // If staffId provided, get slots for that staff
         if (staffId) {
-            return await this._getSlotsForStaff(
+            const result = await this._getSlotsForStaff(
                 tenantId,
                 serviceId,
                 staffId,
@@ -252,6 +252,18 @@ class AvailabilityService {
                 excludeAppointmentId,
                 resourceContext
             );
+
+            if (includeAllCandidates && !result.allCandidatesByTime) {
+                const allCandidatesByTime = {};
+                (result.slots || []).filter(s => s.available).forEach(s => {
+                    const k = new Date(s.startTime).toISOString();
+                    if (!allCandidatesByTime[k]) allCandidatesByTime[k] = [];
+                    allCandidatesByTime[k].push(s);
+                });
+                result.allCandidatesByTime = allCandidatesByTime;
+            }
+
+            return result;
         }
 
         // If no staffId, get slots for all eligible staff
@@ -267,8 +279,411 @@ class AvailabilityService {
             timezone,
             serviceVariant?.id || null,
             excludeAppointmentId,
-            resourceContext
+            resourceContext,
+            includeAllCandidates
         );
+    }
+
+    /**
+     * Get available slots for a package (bundle)
+     * Backend-authoritative package availability engine for both sequence and parallel bundles
+     *
+     * @param {string} tenantId - Tenant ID
+     * @param {Object} options
+     * @param {string} options.packageId - Package ID (required)
+     * @param {string} options.date - Date in YYYY-MM-DD format
+     * @param {string} [options.staffId] - Preferred staff ID (optional, null = any staff)
+     * @param {string} [options.variantId] - Variant ID (optional)
+     * @param {string} [options.excludeAppointmentId] - Appointment to exclude (optional)
+     * @returns {Promise<Object>} Available package slots with metadata
+     */
+    async getPackageAvailableSlots(tenantId, { packageId, date, staffId, variantId, excludeAppointmentId }) {
+        if (!packageId || !date) {
+            throw new Error('packageId and date are required');
+        }
+
+        const ServicePackage = db.ServicePackage || db.Package;
+        const ServicePackageItem = db.ServicePackageItem || db.PackageItem;
+
+        const servicePackage = await ServicePackage.findOne({
+            where: { id: packageId, tenantId },
+            include: [{
+                model: ServicePackageItem,
+                as: 'items',
+                where: { isActive: true },
+                required: false,
+                include: [{
+                    model: db.Service,
+                    as: 'service'
+                }]
+            }],
+            order: [[{ model: ServicePackageItem, as: 'items' }, 'sequenceOrder', 'ASC']]
+        });
+
+        if (!servicePackage) {
+            const err = new Error('Package not found');
+            err.code = 'PACKAGE_NOT_FOUND';
+            err.messageAr = 'الباقة غير موجودة';
+            throw err;
+        }
+
+        if (!servicePackage.isActive) {
+            return {
+                slots: [],
+                diagnostics: [{ code: 'PACKAGE_INACTIVE', message: 'Package is currently inactive' }],
+                totalSlots: 0,
+                availableSlots: 0,
+                date,
+                package: {
+                    id: servicePackage.id,
+                    name_en: servicePackage.name_en || servicePackage.nameEn,
+                    name_ar: servicePackage.name_ar || servicePackage.nameAr,
+                    scheduleType: servicePackage.scheduleType || 'sequence',
+                    totalDuration: servicePackage.totalDuration || 60
+                }
+            };
+        }
+
+        const activeItems = (servicePackage.items || []).filter(item => Boolean(item.serviceId && item.service));
+        if (activeItems.length === 0) {
+            return {
+                slots: [],
+                diagnostics: [{ code: 'NO_ACTIVE_SERVICES', message: 'Package has no active services' }],
+                totalSlots: 0,
+                availableSlots: 0,
+                date,
+                package: {
+                    id: servicePackage.id,
+                    name_en: servicePackage.name_en || servicePackage.nameEn,
+                    name_ar: servicePackage.name_ar || servicePackage.nameAr,
+                    scheduleType: servicePackage.scheduleType || 'sequence',
+                    totalDuration: servicePackage.totalDuration || 60
+                }
+            };
+        }
+
+        const tenantSettings = await this._getTenantSettings(tenantId);
+        const dayOfWeek = this._getDayOfWeekForDate(date);
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const dayName = dayNames[dayOfWeek];
+
+        // Check if tenant is closed on this weekday
+        const tenant = await db.Tenant.findByPk(tenantId, { attributes: ['id', 'workingHours'] });
+        if (tenant?.workingHours && tenant.workingHours[dayName]?.isOpen === false) {
+            return {
+                slots: [],
+                diagnostics: [{ code: 'TENANT_CLOSED', message: 'Salon is closed on this day' }],
+                totalSlots: 0,
+                availableSlots: 0,
+                date,
+                package: {
+                    id: servicePackage.id,
+                    name_en: servicePackage.name_en || servicePackage.nameEn,
+                    name_ar: servicePackage.name_ar || servicePackage.nameAr,
+                    scheduleType: servicePackage.scheduleType || 'sequence',
+                    totalDuration: servicePackage.totalDuration || 60
+                },
+                metadata: { date, status: 'day-off' }
+            };
+        }
+
+        const scheduleType = servicePackage.scheduleType || 'sequence';
+
+        // 1. Fetch available slots for each child item using core getAvailableSlots
+        const childSlotsResults = await Promise.all(
+            activeItems.map(async (pItem) => {
+                const stepStaffId = staffId || pItem.defaultStaffId || null;
+                const stepVariantId = pItem.variantId || variantId || null;
+                return await this.getAvailableSlots(tenantId, {
+                    serviceId: pItem.serviceId,
+                    staffId: stepStaffId,
+                    date,
+                    variantId: stepVariantId,
+                    excludeAppointmentId,
+                    includeAllCandidates: (scheduleType === 'parallel')
+                });
+            })
+        );
+
+        // Extract available slots per step
+        const childLayers = childSlotsResults.map(res => (res.slots || []).filter(s => s.available));
+
+        // If any step has zero available slots, the complete bundle cannot fit on this day
+        if (childLayers.some(layer => layer.length === 0)) {
+            return {
+                slots: [],
+                diagnostics: [{ code: 'CHILD_STEP_UNAVAILABLE', message: 'One or more bundle services are not available on this date' }],
+                totalSlots: 0,
+                availableSlots: 0,
+                date,
+                package: {
+                    id: servicePackage.id,
+                    name_en: servicePackage.name_en || servicePackage.nameEn,
+                    name_ar: servicePackage.name_ar || servicePackage.nameAr,
+                    scheduleType,
+                    totalDuration: servicePackage.totalDuration || 60
+                }
+            };
+        }
+
+        const packageSlots = [];
+
+        if (scheduleType === 'parallel') {
+            // ==========================================
+            // PARALLEL BUNDLE SCHEDULING
+            // All child services must run concurrently at the same startTime
+            // ==========================================
+            const firstLayer = childLayers[0];
+            const maxDuration = Math.max(...activeItems.map(it => Number(it.duration || it.service?.duration || 30)));
+
+            for (const firstSlot of firstLayer) {
+                const startTimeStr = firstSlot.startTime;
+                const startTimeIso = new Date(startTimeStr).toISOString();
+
+                // 1. Gather qualified available staff candidates for each concurrent child service at this startTime
+                const candidateLists = activeItems.map((_, idx) => {
+                    const res = childSlotsResults[idx];
+                    if (res?.allCandidatesByTime) {
+                        return res.allCandidatesByTime[startTimeIso] || res.allCandidatesByTime[startTimeStr] || [];
+                    }
+                    return (res?.slots || []).filter(
+                        s => s.available && (s.startTime === startTimeStr || new Date(s.startTime).toISOString() === startTimeIso)
+                    );
+                });
+
+                // If any step has 0 available candidates at this startTime, this start time is not feasible
+                if (candidateLists.some(list => list.length === 0)) {
+                    continue;
+                }
+
+                // 2. Coordinated Parallel Staff Distinctness: find valid distinct staff assignment across all steps
+                const assignedSlots = this._findParallelDistinctStaffAssignment(candidateLists);
+                if (!assignedSlots) {
+                    continue;
+                }
+
+                // 3. Coordinated Resource Concurrency: enforce active resource capacity
+                const resourcesAvailable = await this._verifyParallelResourceConcurrency(tenantId, activeItems, startTimeStr, maxDuration, excludeAppointmentId);
+                if (!resourcesAvailable) {
+                    continue;
+                }
+
+                const startMs = new Date(startTimeStr).getTime();
+                const endIso = new Date(startMs + maxDuration * 60000).toISOString();
+
+                packageSlots.push({
+                    startTime: startTimeStr,
+                    endTime: endIso,
+                    available: true,
+                    duration: maxDuration,
+                    scheduleType: 'parallel',
+                    staffId: assignedSlots[0]?.staffId || null,
+                    staffName: assignedSlots[0]?.staffName || null,
+                    steps: activeItems.map((it, idx) => ({
+                        serviceId: it.serviceId,
+                        serviceName: it.service?.name_en || it.service?.name_ar,
+                        startTime: startTimeStr,
+                        endTime: new Date(startMs + Number(it.duration || it.service?.duration || 30) * 60000).toISOString(),
+                        staffId: assignedSlots[idx]?.staffId || null,
+                        staffName: assignedSlots[idx]?.staffName || null
+                    }))
+                });
+            }
+        } else {
+            // ==========================================
+            // SEQUENTIAL BUNDLE SCHEDULING
+            // Child services run sequentially end-to-start (buffer 0 to 5 minutes)
+            // ==========================================
+            let chains = childLayers[0].map(slot => [slot]);
+
+            for (let i = 1; i < childLayers.length; i++) {
+                const nextLayer = childLayers[i];
+                const nextChains = [];
+
+                for (const chain of chains) {
+                    const lastSlot = chain[chain.length - 1];
+                    const lastEndMs = new Date(lastSlot.endTime).getTime();
+
+                    for (const nextSlot of nextLayer) {
+                        const nextStartMs = new Date(nextSlot.startTime).getTime();
+                        const gap = nextStartMs - lastEndMs;
+                        // Strictly contiguous: 0 to 5 minutes buffer
+                        if (gap >= 0 && gap <= 5 * 60000) {
+                            nextChains.push([...chain, nextSlot]);
+                        }
+                    }
+                }
+                chains = nextChains;
+            }
+
+            const totalDuration = activeItems.reduce((acc, it) => acc + Number(it.duration || it.service?.duration || 30), 0);
+
+            for (const chain of chains) {
+                const startIso = chain[0].startTime;
+                const endIso = chain[chain.length - 1].endTime;
+
+                packageSlots.push({
+                    startTime: startIso,
+                    endTime: endIso,
+                    available: true,
+                    duration: totalDuration,
+                    scheduleType: 'sequence',
+                    staffId: chain[0].staffId || null,
+                    staffName: chain[0].staffName || null,
+                    steps: activeItems.map((it, idx) => ({
+                        serviceId: it.serviceId,
+                        serviceName: it.service?.name_en || it.service?.name_ar,
+                        startTime: chain[idx].startTime,
+                        endTime: chain[idx].endTime,
+                        staffId: chain[idx].staffId || null,
+                        staffName: chain[idx].staffName || null
+                    }))
+                });
+            }
+        }
+
+        // Deduplicate slots by startTime and sort chronologically
+        const uniqueSlotsMap = new Map();
+        for (const slot of packageSlots) {
+            if (!uniqueSlotsMap.has(slot.startTime)) {
+                uniqueSlotsMap.set(slot.startTime, slot);
+            }
+        }
+
+        const sortedSlots = Array.from(uniqueSlotsMap.values()).sort(
+            (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        );
+
+        return {
+            slots: sortedSlots,
+            diagnostics: [],
+            totalSlots: sortedSlots.length,
+            availableSlots: sortedSlots.filter(s => s.available).length,
+            date,
+            package: {
+                id: servicePackage.id,
+                name_en: servicePackage.name_en || servicePackage.nameEn,
+                name_ar: servicePackage.name_ar || servicePackage.nameAr,
+                scheduleType,
+                totalDuration: servicePackage.totalDuration || 60
+            }
+        };
+    }
+
+    /**
+     * Check simultaneous resource capacity for parallel bundle steps
+     * @private
+     */
+    async _verifyParallelResourceConcurrency(tenantId, activeItems, startTimeStr, maxDuration, excludeAppointmentId) {
+        try {
+            const typeRequirements = new Map();
+            for (const item of activeItems) {
+                const reqs = await resolveServiceResourceRequirements(item.serviceId, item.variantId || null, tenantId);
+                if (Array.isArray(reqs)) {
+                    for (const req of reqs) {
+                        const existing = typeRequirements.get(req.resourceTypeId) || 0;
+                        typeRequirements.set(req.resourceTypeId, existing + (req.quantity || 1));
+                    }
+                }
+            }
+
+            if (typeRequirements.size === 0) return true;
+
+            for (const [resourceTypeId, neededCount] of typeRequirements.entries()) {
+                const totalActive = await db.Resource.count({
+                    where: {
+                        tenantId,
+                        resourceTypeId,
+                        is_active: true
+                    }
+                });
+
+                if (totalActive < neededCount) {
+                    return false;
+                }
+            }
+
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Find a combination of distinct staff across parallel child steps
+     * @private
+     * @param {Array<Array<Object>>} candidateLists - Array of candidate slot arrays per step
+     * @returns {Array<Object>|null} Array of selected candidate slots per step or null if impossible
+     */
+    _findParallelDistinctStaffAssignment(candidateLists) {
+        if (!candidateLists || candidateLists.length === 0) return null;
+        if (candidateLists.length === 1) {
+            return candidateLists[0].length > 0 ? [candidateLists[0][0]] : null;
+        }
+
+        const assignStep = (stepIdx, usedStaffIds, currentAssignment) => {
+            if (stepIdx === candidateLists.length) {
+                return currentAssignment;
+            }
+
+            const candidates = candidateLists[stepIdx];
+            for (const cand of candidates) {
+                const sId = cand.staffId;
+                if (!sId || !usedStaffIds.has(sId)) {
+                    const nextUsed = new Set(usedStaffIds);
+                    if (sId) nextUsed.add(sId);
+
+                    const match = assignStep(stepIdx + 1, nextUsed, [...currentAssignment, cand]);
+                    if (match) return match;
+                }
+            }
+            return null;
+        };
+
+        return assignStep(0, new Set(), []);
+    }
+
+    /**
+     * Check if distinct staff can be assigned across parallel bundle steps
+     * @private
+     */
+    _verifyParallelStaffDistinctness(matchingSlots, childSlotsResults, activeItems) {
+        if (matchingSlots.length <= 1) return true;
+
+        const staffIds = matchingSlots.map(s => s.staffId).filter(Boolean);
+        const uniqueStaff = new Set(staffIds);
+
+        if (uniqueStaff.size === staffIds.length) {
+            return true;
+        }
+
+        // Check if any duplicate staff can be swapped with another staff candidate available at the same time
+        for (let i = 0; i < matchingSlots.length; i++) {
+            for (let j = i + 1; j < matchingSlots.length; j++) {
+                if (matchingSlots[i].staffId && matchingSlots[i].staffId === matchingSlots[j].staffId) {
+                    const duplicateId = matchingSlots[i].staffId;
+                    const startTimeStr = matchingSlots[i].startTime;
+                    const startTimeIso = new Date(startTimeStr).toISOString();
+
+                    const candidateSource = childSlotsResults[j]?.allCandidatesByTime?.[startTimeIso]
+                        || childSlotsResults[j]?.allCandidatesByTime?.[startTimeStr]
+                        || childSlotsResults[j]?.slots
+                        || [];
+
+                    const alternates = candidateSource.filter(
+                        s => s.available && (s.startTime === startTimeStr || new Date(s.startTime).toISOString() === startTimeIso) && s.staffId && s.staffId !== duplicateId
+                    );
+
+                    if (alternates.length === 0) {
+                        return false;
+                    }
+                    matchingSlots[j] = alternates[0];
+                }
+            }
+        }
+
+        const recheckedStaff = matchingSlots.map(s => s.staffId).filter(Boolean);
+        return new Set(recheckedStaff).size === recheckedStaff.length;
     }
 
     /**
@@ -412,6 +827,11 @@ class AvailabilityService {
             allSlots.push(...slots);
         }
 
+        allSlots.forEach(slot => {
+            slot.staffId = staffId;
+            slot.staffName = staff.name;
+        });
+
         // Sort slots by start time
         allSlots.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 
@@ -466,7 +886,7 @@ class AvailabilityService {
      * Get available slots for any eligible staff (for "Any Staff" selection)
      * @private
      */
-    async _getSlotsForAnyStaff(tenantId, serviceId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null, excludeAppointmentId = null, resourceContext = null) {
+    async _getSlotsForAnyStaff(tenantId, serviceId, date, duration, bufferBefore, bufferAfter, totalSlotLength, stepSize, timezone = 'Asia/Riyadh', variantId = null, excludeAppointmentId = null, resourceContext = null, includeAllCandidates = false) {
         if (!resourceContext) {
             resourceContext = await this._buildResourceAvailabilityContext(
                 tenantId,
@@ -574,6 +994,8 @@ class AvailabilityService {
 
         // Deduplicate and resolve conflicts per time block
         const uniqueSlots = [];
+        const allCandidatesByTime = includeAllCandidates ? {} : undefined;
+
         for (const [timeKey, candidates] of slotsByTime.entries()) {
             const availableCandidates = candidates.filter(c => c.available);
             
@@ -581,6 +1003,16 @@ class AvailabilityService {
                 // Determine winner using isolated scheduling policy
                 const winner = this._applySchedulingPolicy(availableCandidates, staffWorkloads);
                 uniqueSlots.push(winner);
+
+                if (includeAllCandidates) {
+                    // Sort candidates by workload so the optimal candidate is evaluated first
+                    const sortedCandidates = [...availableCandidates].sort((a, b) => {
+                        const wA = staffWorkloads.get(a.staffId) || 0;
+                        const wB = staffWorkloads.get(b.staffId) || 0;
+                        return wA - wB;
+                    });
+                    allCandidatesByTime[timeKey] = sortedCandidates;
+                }
             } else {
                 // If no staff is available, arbitrarily push the first unavailable slot 
                 uniqueSlots.push(candidates[0]);
@@ -592,6 +1024,7 @@ class AvailabilityService {
 
         return {
             slots: uniqueSlots,
+            ...(includeAllCandidates ? { allCandidatesByTime } : {}),
             diagnostics,
             metadata: {
                 date,

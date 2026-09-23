@@ -120,25 +120,15 @@ const createAppointmentEventSafe = async ({
 };
 
 /**
- * Search for available slots
+ * Search for available slots (Service or Package/Bundle)
  * POST /api/v1/bookings/search
  * Public endpoint - tenantId required in request body
  */
 const searchAvailability = async (req, res) => {
     try {
-        const { serviceId, staffId, date, tenantId, variantId } = req.body;
+        const { serviceId, packageId, staffId, date, tenantId, variantId } = req.body;
 
-        if (!serviceId || !date) {
-            return res.status(400).json({
-                success: false,
-                message: 'serviceId and date are required'
-            });
-        }
-
-        // tenantId is optional for now (for backward compatibility)
-        // In production, this should be required or come from context
         const finalTenantId = tenantId || req.tenantId;
-
         if (!finalTenantId) {
             return res.status(400).json({
                 success: false,
@@ -146,8 +136,76 @@ const searchAvailability = async (req, res) => {
             });
         }
 
-        // Use new AvailabilityService
+        if (!date) {
+            return res.status(400).json({
+                success: false,
+                message: 'date is required'
+            });
+        }
+
         const availabilityService = require('../services/availabilityService');
+
+        // 1. Direct package search if packageId is supplied
+        if (packageId) {
+            const result = await availabilityService.getPackageAvailableSlots(finalTenantId, {
+                packageId,
+                staffId: staffId || null,
+                date,
+                variantId: variantId || null
+            });
+
+            return res.json({
+                success: true,
+                slots: result.slots,
+                date,
+                totalSlots: result.totalSlots,
+                availableSlots: result.availableSlots,
+                package: result.package,
+                diagnostics: result.diagnostics || [],
+                metadata: result.metadata || {}
+            });
+        }
+
+        if (!serviceId) {
+            return res.status(400).json({
+                success: false,
+                message: 'serviceId or packageId is required'
+            });
+        }
+
+        // 2. Check if service exists
+        const service = await db.Service.findByPk(serviceId);
+        if (!service) {
+            // Check if serviceId is actually a packageId
+            const ServicePackage = db.ServicePackage || db.Package;
+            const pkg = await ServicePackage.findByPk(serviceId);
+            if (pkg) {
+                const result = await availabilityService.getPackageAvailableSlots(finalTenantId, {
+                    packageId: serviceId,
+                    staffId: staffId || null,
+                    date,
+                    variantId: variantId || null
+                });
+
+                return res.json({
+                    success: true,
+                    slots: result.slots,
+                    date,
+                    totalSlots: result.totalSlots,
+                    availableSlots: result.availableSlots,
+                    package: result.package,
+                    diagnostics: result.diagnostics || [],
+                    metadata: result.metadata || {}
+                });
+            }
+
+            return res.status(404).json({
+                success: false,
+                message: 'Service not found'
+            });
+        }
+
+        // 3. Single service availability search
         const result = await availabilityService.getAvailableSlots(finalTenantId, {
             serviceId,
             staffId: staffId || null, // null = any staff
@@ -170,13 +228,69 @@ const searchAvailability = async (req, res) => {
         console.error('Search availability error:', error);
 
         let statusCode = 500;
-        if (error.message.includes('required') || error.message.includes('not found')) {
+        if (error.code === 'PACKAGE_NOT_FOUND' || error.message.includes('not found')) {
+            statusCode = 404;
+        } else if (error.message.includes('required')) {
             statusCode = 400;
         }
 
         res.status(statusCode).json({
             success: false,
-            message: error.message
+            code: error.code || 'AVAILABILITY_SEARCH_ERROR',
+            message: error.message || 'Failed to search availability',
+            messageAr: error.messageAr || 'تعذر البحث عن الأوقات المتاحة'
+        });
+    }
+};
+
+/**
+ * Search for available slots for a package / bundle
+ * POST /api/v1/bookings/package-search
+ */
+const searchPackageAvailability = async (req, res) => {
+    try {
+        const { packageId, serviceId, staffId, date, tenantId, variantId } = req.body;
+        const finalTenantId = tenantId || req.tenantId;
+        const targetPackageId = packageId || serviceId;
+
+        if (!finalTenantId) {
+            return res.status(400).json({ success: false, message: 'tenantId is required' });
+        }
+        if (!targetPackageId || !date) {
+            return res.status(400).json({ success: false, message: 'packageId and date are required' });
+        }
+
+        const availabilityService = require('../services/availabilityService');
+        const result = await availabilityService.getPackageAvailableSlots(finalTenantId, {
+            packageId: targetPackageId,
+            staffId: staffId || null,
+            date,
+            variantId: variantId || null
+        });
+
+        res.json({
+            success: true,
+            slots: result.slots,
+            date,
+            totalSlots: result.totalSlots,
+            availableSlots: result.availableSlots,
+            package: result.package,
+            diagnostics: result.diagnostics || [],
+            metadata: result.metadata || {}
+        });
+    } catch (error) {
+        console.error('Search package availability error:', error);
+        let statusCode = 500;
+        if (error.code === 'PACKAGE_NOT_FOUND' || error.message.includes('not found')) {
+            statusCode = 404;
+        } else if (error.message.includes('required')) {
+            statusCode = 400;
+        }
+        res.status(statusCode).json({
+            success: false,
+            code: error.code || 'PACKAGE_AVAILABILITY_ERROR',
+            message: error.message || 'Failed to search package availability',
+            messageAr: error.messageAr || 'تعذر البحث عن أوقات الباقة المتاحة'
         });
     }
 };
@@ -191,16 +305,99 @@ const evaluateScheduling = async (req, res) => {
         tenantTimezone: req.headers['x-tenant-timezone'] || 'UTC'
     });
     try {
-        const { tenantId, serviceId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId } = req.body || {};
-        if (!tenantId || !serviceId || !startTime) {
+        const { tenantId, serviceId, packageId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId } = req.body || {};
+        const targetId = packageId || serviceId;
+        if (!tenantId || !targetId || !startTime) {
             return res.status(400).json({
                 success: false,
-                message: 'tenantId, serviceId, and startTime are required'
+                message: 'tenantId, serviceId or packageId, and startTime are required'
             });
         }
 
-        const service = await db.Service.findByPk(serviceId);
+        let service = null;
+        if (serviceId && !packageId) {
+            service = await db.Service.findByPk(serviceId);
+        }
+
         if (!service || service.tenantId !== tenantId) {
+            // Check if targetId is a package
+            const ServicePackage = db.ServicePackage || db.Package;
+            const ServicePackageItem = db.ServicePackageItem || db.PackageItem;
+            const pkg = await ServicePackage.findOne({
+                where: { id: targetId, tenantId },
+                include: [{
+                    model: ServicePackageItem,
+                    as: 'items',
+                    where: { isActive: true },
+                    required: false,
+                    include: [{ model: db.Service, as: 'service' }]
+                }],
+                order: [[{ model: ServicePackageItem, as: 'items' }, 'sequenceOrder', 'ASC']]
+            });
+
+            if (pkg) {
+                const activeItems = (pkg.items || []).filter(it => Boolean(it.serviceId && it.service));
+                if (activeItems.length === 0) {
+                    return res.status(409).json({
+                        success: false,
+                        conflict: true,
+                        code: 'NO_ACTIVE_SERVICES',
+                        message: 'Package has no active services',
+                        messageAr: 'الباقة لا تحتوي على خدمات نشطة'
+                    });
+                }
+
+                const isParallel = pkg.scheduleType === 'parallel';
+                let stepStartMs = new Date(startTime).getTime();
+                const normalizedStaffId = (staffId && staffId !== 'any' && staffId !== 'auto') ? staffId : null;
+
+                for (const pItem of activeItems) {
+                    const stepDuration = Number(pItem.duration || pItem.service?.duration || 30);
+                    const stepStartTime = isParallel ? startTime : new Date(stepStartMs).toISOString();
+                    const stepStaffId = normalizedStaffId || pItem.defaultStaffId || null;
+
+                    const stepDecision = await bookingService.evaluateSchedulingRequest({
+                        tenantId,
+                        serviceId: pItem.serviceId,
+                        variantId: pItem.variantId || variantId || null,
+                        staffId: stepStaffId,
+                        startTime: stepStartTime,
+                        duration: stepDuration,
+                        overtimeApproval,
+                        excludeAppointmentId
+                    });
+
+                    if (!stepDecision.valid) {
+                        return res.status(409).json({
+                            success: false,
+                            conflict: true,
+                            code: stepDecision.code || 'SCHEDULING_CONFLICT',
+                            message: stepDecision.message,
+                            messageAr: stepDecision.messageAr,
+                            actionableGuidance: stepDecision.actionableGuidance,
+                            actionableGuidanceAr: stepDecision.actionableGuidanceAr,
+                            conflicts: stepDecision.conflicts,
+                            conflictDetails: stepDecision.conflictDetails,
+                            decision: stepDecision
+                        });
+                    }
+
+                    if (!isParallel) {
+                        stepStartMs += stepDuration * 60000;
+                    }
+                }
+
+                return res.json({
+                    success: true,
+                    decision: {
+                        valid: true,
+                        code: 'SCHEDULING_VALID',
+                        message: 'Time slot is available for package',
+                        messageAr: 'الوقت متاح للباقة'
+                    }
+                });
+            }
+
             return res.status(404).json({ success: false, message: 'Service not found' });
         }
 
@@ -304,11 +501,17 @@ const createBooking = async (req, res) => {
         let finalTenantId = tenantId || req.tenantId;
 
         if (!finalTenantId) {
-            const firstBookingServiceId = bookingItems[0]?.serviceId || serviceId;
+            const firstItem = bookingItems[0];
+            const firstBookingServiceId = firstItem?.serviceId || (firstItem?.itemType === 'package' && firstItem?.packageItems?.[0]?.serviceId) || serviceId;
             if (firstBookingServiceId) {
                 const service = await db.Service.findByPk(firstBookingServiceId);
                 if (service && service.tenantId) {
                     finalTenantId = service.tenantId;
+                }
+            } else if (firstItem?.itemType === 'package' && firstItem?.packageId) {
+                const pkg = await db.ServicePackage.findByPk(firstItem.packageId);
+                if (pkg && pkg.tenantId) {
+                    finalTenantId = pkg.tenantId;
                 }
             }
         }
@@ -330,6 +533,39 @@ const createBooking = async (req, res) => {
 
         if (bookingItems.length > 0) {
             const normalizedItems = bookingItems.map((item, index) => {
+                const normalizedPaymentMethod = normalizeBookingItemPaymentMethod(item.paymentMethod || paymentMethod);
+                if (!normalizedPaymentMethod) {
+                    throw new Error(`Invalid payment method for booking item ${index + 1}`);
+                }
+
+                if (item.itemType === 'package') {
+                    if (!item.packageId) {
+                        throw new Error(`packageId is required for package booking item ${index + 1}`);
+                    }
+                    if (!Array.isArray(item.packageItems) || item.packageItems.length === 0) {
+                        throw new Error(`packageItems is required for package booking item ${index + 1}`);
+                    }
+
+                    return {
+                        itemType: 'package',
+                        packageId: item.packageId,
+                        packageItems: item.packageItems.map((pItem) => {
+                            const rawStartTime = pItem?.startTime || null;
+                            const parsedStartTime = rawStartTime ? new Date(rawStartTime) : null;
+                            if (!parsedStartTime || Number.isNaN(parsedStartTime.getTime())) {
+                                throw new Error(`Invalid start time for package step in item ${index + 1}`);
+                            }
+                            return {
+                                ...pItem,
+                                startTime: parsedStartTime.toISOString(),
+                                assignmentMode: pItem.assignmentMode || (pItem.staffId ? 'customer_selected' : 'auto_assigned')
+                            };
+                        }),
+                        notes: item?.notes || normalizedNotes || null,
+                        paymentMethod: normalizedPaymentMethod
+                    };
+                }
+
                 const rawStartTime = item.startTime
                     || (item.date && item.time ? new Date(`${item.date}T${item.time}`).toISOString() : null)
                     || null;
@@ -337,11 +573,6 @@ const createBooking = async (req, res) => {
 
                 if (!parsedStartTime || Number.isNaN(parsedStartTime.getTime())) {
                     throw new Error(`Invalid start time for booking item ${index + 1}`);
-                }
-
-                const normalizedPaymentMethod = normalizeBookingItemPaymentMethod(item.paymentMethod || paymentMethod);
-                if (!normalizedPaymentMethod) {
-                    throw new Error(`Invalid payment method for booking item ${index + 1}`);
                 }
 
                 return {
@@ -1318,6 +1549,7 @@ const respondToInviteByToken = async (req, res) => {
 module.exports = {
     evaluateScheduling,
     searchAvailability,
+    searchPackageAvailability,
     getRecommendations,
     createBooking,
     getBooking,
