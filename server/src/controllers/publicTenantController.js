@@ -805,6 +805,10 @@ exports.getPublicServices = async (req, res) => {
             where.category = category;
         }
 
+        if (req.query.tenantServiceCategoryId) {
+            where.tenantServiceCategoryId = req.query.tenantServiceCategoryId;
+        }
+
         if (minPrice || maxPrice) {
             where.finalPrice = {};
             if (minPrice) {
@@ -833,6 +837,7 @@ exports.getPublicServices = async (req, res) => {
                 'description_en',
                 'description_ar',
                 'category',
+                'tenantServiceCategoryId',
                 'finalPrice',
                 'duration',
                 'image',
@@ -885,6 +890,7 @@ exports.getPublicService = async (req, res) => {
                 'description_en',
                 'description_ar',
                 'category',
+                'tenantServiceCategoryId',
                 'finalPrice',
                 'duration',
                 'image',
@@ -937,6 +943,141 @@ exports.getPublicService = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch service',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get public service categories (tenant-owned categories)
+ */
+exports.getPublicServiceCategories = async (req, res) => {
+    try {
+        const { tenantId } = req.params;
+        const tenant = await db.Tenant.findOne({
+            where: {
+                [Op.or]: [{ id: tenantId }, { slug: tenantId }]
+            }
+        });
+        if (!tenant) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tenant not found'
+            });
+        }
+
+        const categories = await db.TenantServiceCategory.findAll({
+            where: {
+                tenantId: tenant.id,
+                isActive: true
+            },
+            order: [
+                ['sortOrder', 'ASC'],
+                ['name_en', 'ASC']
+            ],
+            attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
+        });
+
+        res.json({
+            success: true,
+            categories
+        });
+    } catch (error) {
+        console.error('Get public service categories error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch service categories',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get public service bundles / packages
+ */
+exports.getPublicBundles = async (req, res) => {
+    try {
+        const { tenantId } = req.params;
+        const tenant = await db.Tenant.findOne({
+            where: {
+                [Op.or]: [{ id: tenantId }, { slug: tenantId }]
+            }
+        });
+        if (!tenant) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tenant not found'
+            });
+        }
+
+        const where = {
+            tenantId: tenant.id,
+            isActive: true,
+            allowOnlineBooking: true
+        };
+
+        if (req.query.tenantServiceCategoryId) {
+            where.tenantServiceCategoryId = req.query.tenantServiceCategoryId;
+        }
+
+        const bundles = await db.ServicePackage.findAll({
+            where,
+            include: [
+                {
+                    model: db.ServicePackageItem,
+                    as: 'items',
+                    include: [
+                        {
+                            model: db.Service,
+                            as: 'service',
+                            attributes: [
+                                'id',
+                                'name_en',
+                                'name_ar',
+                                'duration',
+                                'finalPrice',
+                                'rawPrice',
+                                'basePrice',
+                                'image',
+                                'category',
+                                'variants',
+                                'tenantServiceCategoryId'
+                            ]
+                        }
+                    ]
+                },
+                {
+                    model: db.TenantServiceCategory,
+                    as: 'tenantCategory',
+                    attributes: ['id', 'name_en', 'name_ar', 'slug', 'icon', 'sortOrder']
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        const formattedBundles = bundles.map(b => {
+            const plain = b.toJSON();
+            if (plain.items && plain.items.length) {
+                plain.items.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+                plain.items = plain.items.map(item => {
+                    if (item.service) {
+                        item.service.variants = parseServiceVariants(item.service.variants || []);
+                    }
+                    return item;
+                });
+            }
+            return plain;
+        });
+
+        res.json({
+            success: true,
+            bundles: formattedBundles
+        });
+    } catch (error) {
+        console.error('Get public bundles error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch bundles',
             error: error.message
         });
     }

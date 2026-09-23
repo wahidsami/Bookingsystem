@@ -28,6 +28,10 @@ router.get('/tenant/:tenantId/page-data', publicTenantController.getPublicPageDa
 
 // Services
 router.get('/tenant/:tenantId/services', publicTenantController.getPublicServices);
+// Service categories (tenant-owned categories)
+router.get('/tenant/:tenantId/service-categories', publicTenantController.getPublicServiceCategories);
+// Service bundles / packages
+router.get('/tenant/:tenantId/bundles', publicTenantController.getPublicBundles);
 // Staff by service - MUST come before /services/:id to avoid route conflict
 router.get('/tenant/:tenantId/services/:serviceId/staff', publicTenantController.getPublicStaffByService);
 router.get('/tenant/:tenantId/services/:id', publicTenantController.getPublicService);
