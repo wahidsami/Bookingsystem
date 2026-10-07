@@ -1157,7 +1157,7 @@
         "clinic": "Clinic"
       },
       "logo": "Business Logo",
-      "logoHint": "Accepted formats: JPG, PNG, GIF (Max 10MB)",
+      "logoHint": "All file types are currently accepted (Max 10MB)",
       "phone": "Phone Number",
       "mobile": "Mobile Number",
       "email": "Email",
@@ -1188,7 +1188,7 @@
     "step2": {
       "title": "Official Documentation",
       "description": "Upload your business official documents",
-      "fileHint": "Accepted formats: PDF, JPG, PNG (Max 10MB)",
+      "fileHint": "All document formats are currently accepted (Max 10MB)",
       "cr": {
         "title": "Commercial Registration",
         "number": "CR Number",

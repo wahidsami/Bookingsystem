@@ -352,6 +352,10 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
+    if (loading) {
+      return;
+    }
+
     if (!validateStep(currentStep)) {
       return;
     }
@@ -457,8 +461,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
               inputId="logo-upload"
               label={isRtl ? 'رفع شعار المنشأة' : 'Business logo upload'}
               file={files.logo}
-              accept="image/*"
-              hint={isRtl ? 'PNG / JPG / SVG' : 'PNG / JPG / SVG'}
+              hint={isRtl ? 'جميع الصيغ مقبولة (حد أقصى 10 ميجا)' : 'All formats accepted (Max 10MB)'}
               onChange={(file) => handleFileSelected('logo', file)}
             />
           </Field>
@@ -532,7 +535,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             error={errors.crDocument}
             file={files.crDocument}
             onChange={(file) => handleFileSelected('crDocument', file)}
-            hint={isRtl ? 'مستند رسمي مطلوب' : 'Required official file'}
+            hint={isRtl ? 'جميع أنواع الملفات مقبولة (حد أقصى 10 ميجا)' : 'All formats accepted (Max 10MB)'}
           />
           <Field label={isRtl ? 'الرقم الضريبي' : 'Tax number'} required error={errors.taxNumber}>
             <input value={formData.taxNumber} onChange={handleChange} name="taxNumber" className={premiumFieldClass} />
@@ -544,7 +547,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             error={errors.taxDocument}
             file={files.taxDocument}
             onChange={(file) => handleFileSelected('taxDocument', file)}
-            hint={isRtl ? 'PDF أو صورة' : 'PDF or image'}
+            hint={isRtl ? 'جميع أنواع الملفات مقبولة (حد أقصى 10 ميجا)' : 'All formats accepted (Max 10MB)'}
           />
           <PublicFileUploadField
             inputId="na-document-upload"
@@ -553,7 +556,7 @@ export default function PublicRegistrationWizard({ lang, onNavigate }: PublicReg
             error={errors.nationalAddressDocument}
             file={files.nationalAddressDocument}
             onChange={(file) => handleFileSelected('nationalAddressDocument', file)}
-            hint={isRtl ? 'PDF أو صورة' : 'PDF or image'}
+            hint={isRtl ? 'جميع أنواع الملفات مقبولة (حد أقصى 10 ميجا)' : 'All formats accepted (Max 10MB)'}
           />
         </div>
       );

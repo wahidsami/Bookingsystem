@@ -56,6 +56,8 @@ const storage = multer.diskStorage({
             uploadPath = path.join(__dirname, '../../uploads/tenants/documents/cr');
         } else if (file.fieldname === 'taxDocument') {
             uploadPath = path.join(__dirname, '../../uploads/tenants/documents/tax');
+        } else if (file.fieldname === 'licenseDocument') {
+            uploadPath = path.join(__dirname, '../../uploads/tenants/documents/license');
         } else if (file.fieldname === 'nationalAddressDocument') {
             uploadPath = path.join(__dirname, '../../uploads/tenants/documents/national_address');
         } else {
@@ -70,22 +72,18 @@ const storage = multer.diskStorage({
         cb(null, uploadPath);
     },
     filename: function (req, file, cb) {
+        // Safe filename generation: sanitize extension and fieldname to avoid path traversal
+        const rawExt = path.extname(file.originalname || '');
+        const safeExt = rawExt.replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 16);
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        const safeFieldName = String(file.fieldname || 'file').replace(/[^a-zA-Z0-9_-]/g, '');
+        cb(null, `${safeFieldName}-${uniqueSuffix}${safeExt}`);
     }
 });
 
+// For stabilization phase: accept any file type without rejecting on MIME or extension
 const fileFilter = (req, file, cb) => {
-    // Accept images, PDFs, and WEBP
-    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype) || file.mimetype === 'image/webp';
-
-    if (mimetype && extname) {
-        return cb(null, true);
-    } else {
-        cb(new Error('Only images (JPEG, PNG, GIF, WEBP) and PDF files are allowed!'));
-    }
+    cb(null, true);
 };
 
 const upload = multer({
@@ -94,13 +92,38 @@ const upload = multer({
     fileFilter: fileFilter
 });
 
-// Middleware for handling registration file uploads
-exports.uploadMiddleware = upload.fields([
+const uploadFields = upload.fields([
     { name: 'logo', maxCount: 1 },
     { name: 'crDocument', maxCount: 1 },
     { name: 'taxDocument', maxCount: 1 },
+    { name: 'licenseDocument', maxCount: 1 },
     { name: 'nationalAddressDocument', maxCount: 1 }
 ]);
+
+// Middleware for handling registration file uploads with client-friendly 400 error handling
+exports.uploadMiddleware = (req, res, next) => {
+    uploadFields(req, res, (err) => {
+        if (err) {
+            if (err instanceof multer.MulterError) {
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'File size exceeds maximum allowed limit (10MB)'
+                    });
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: `File upload error: ${err.message}`
+                });
+            }
+            return res.status(400).json({
+                success: false,
+                message: err.message || 'File upload failed'
+            });
+        }
+        next();
+    });
+};
 
 /**
  * @route POST /api/v1/auth/tenant/register
@@ -138,6 +161,7 @@ const _register = async (req, res) => {
             // Step 2: Official Documentation
             crNumber,
             taxNumber,
+            licenseNumber,
 
             // Step 3: Contact Person
             contactPersonNameAr,
@@ -294,6 +318,7 @@ const _register = async (req, res) => {
         const logo = req.files?.logo?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
         const crDocument = req.files?.crDocument?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
         const taxDocument = req.files?.taxDocument?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
+        const licenseDocument = req.files?.licenseDocument?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
         const nationalAddressDocument = req.files?.nationalAddressDocument?.[0]?.path?.replace(/\\/g, '/').split('uploads/')[1] || null;
 
         // Generate slug from English name
@@ -353,6 +378,8 @@ const _register = async (req, res) => {
             crDocument,
             taxNumber,
             taxDocument,
+            licenseNumber,
+            licenseDocument,
             nationalAddressDocument,
 
             // Contact Person
@@ -407,7 +434,11 @@ const _register = async (req, res) => {
         });
 
         if (!subscriptionPackage) {
-            throw new Error('Selected subscription package was not found or is inactive');
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Selected subscription package was not found or is inactive'
+            });
         }
 
         // Calculate price based on billing period
@@ -418,17 +449,20 @@ const _register = async (req, res) => {
             priceToPay = subscriptionPackage.sixMonthPrice;
         } else if (selectedBillingPeriod === 'annual') {
             priceToPay = subscriptionPackage.annualPrice;
+        } else {
+            priceToPay = subscriptionPackage.monthlyPrice || 0;
         }
 
-        // Calculate period dates
+        // Calculate period dates with guaranteed valid forward period
         const now = new Date();
         let periodEnd = new Date(now);
-        if (selectedBillingPeriod === 'monthly') {
-            periodEnd.setMonth(periodEnd.getMonth() + 1);
+        if (selectedBillingPeriod === 'annual') {
+            periodEnd.setFullYear(periodEnd.getFullYear() + 1);
         } else if (selectedBillingPeriod === 'sixMonth') {
             periodEnd.setMonth(periodEnd.getMonth() + 6);
-        } else if (selectedBillingPeriod === 'annual') {
-            periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+        } else {
+            // Default: 1 month trial/period
+            periodEnd.setMonth(periodEnd.getMonth() + 1);
         }
 
         // Create subscription draft that will be activated after approval + payment
@@ -496,7 +530,11 @@ const _register = async (req, res) => {
     } catch (error) {
         // Rollback transaction if it exists
         if (transaction && !transaction.finished) {
-            await transaction.rollback();
+            try {
+                await transaction.rollback();
+            } catch (rbErr) {
+                console.error('Transaction rollback error:', rbErr);
+            }
         }
 
         console.error('Registration error:', error);
@@ -504,11 +542,27 @@ const _register = async (req, res) => {
         // Clean up uploaded files if registration fails
         if (req.files) {
             Object.values(req.files).forEach(fileArray => {
-                fileArray.forEach(file => {
-                    if (fs.existsSync(file.path)) {
-                        fs.unlinkSync(file.path);
-                    }
-                });
+                if (Array.isArray(fileArray)) {
+                    fileArray.forEach(file => {
+                        try {
+                            if (file?.path && fs.existsSync(file.path)) {
+                                fs.unlinkSync(file.path);
+                            }
+                        } catch (unlinkErr) {
+                            console.error('Failed to unlink file during registration cleanup:', unlinkErr);
+                        }
+                    });
+                }
+            });
+        }
+
+        // Return 400 for Sequelize validation or unique constraint errors
+        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+            const firstMsg = error.errors?.[0]?.message || error.message;
+            return res.status(400).json({
+                success: false,
+                message: firstMsg || 'Validation error during registration',
+                error: firstMsg
             });
         }
 

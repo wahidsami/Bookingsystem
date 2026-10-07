@@ -163,5 +163,157 @@ The following canonical RTL files are FROZEN and protected from modification:
 - [x] 7. Verification: Run unit tests, typechecks, backend regression suites <!-- id: variant_ux_verification -->
 - [x] 8. Final Report (Items A-K) <!-- id: variant_ux_report -->
 
+# Captain — Customer App Services + Booking Implementation
+- [x] 1. Cart Context & Bundle Model Preservation (`ServiceBookingCartContext.tsx`) <!-- id: cust_cart_bundle -->
+- [x] 2. Category Awareness & Fallback in `TenantScreen.tsx` <!-- id: cust_categories -->
+- [x] 3. Bundle Cart Integration in `TenantScreen.tsx` (`handleToggleBundle`) <!-- id: cust_tenant_bundles -->
+- [x] 4. Services Tab Category Grouping & Variant Discoverability (`TenantServicesTab.tsx`) <!-- id: cust_services_tab -->
+- [x] 5. Any Professional, Fresh State & Resource-Aware Booking in `BookingJourneyScreen.tsx` <!-- id: cust_booking_journey -->
+- [x] 6. Human Customer-Facing Bilingual Error Handling in Booking Flow <!-- id: cust_human_errors -->
+- [x] 7. Comprehensive Automated Test Suite (Scenarios 1-30) <!-- id: cust_tests -->
+- [x] 8. Multi-Service Backend Support Audit & Stop Gate Verification <!-- id: cust_verify_stopgate -->
+
+## Customer App Services + Booking Review & Verification Results
+- 32/32 tests passing in `customerBookingServices.test.ts` (0 failures).
+- Typecheck clean: `npm run typecheck` passes with 0 errors.
+- Category fallback: When public category endpoint is unavailable, services derive categories from `service.category` and render under grouped category headers.
+- Variant discoverability: Service cards show variant count badges (`{count} خيارات متاحة` / `{count} options available`). Main Service option is guarded and only rendered when independently bookable.
+- Bundle identity preserved: Bundles are stored as `{ itemType: 'package', packageId, packageItems }` with discounted price, totalDuration, and scheduleType.
+- Any Professional: Evaluated with authoritative backend (`staffId: null`), never converts to hardcoded employee.
+- Human error handling: Formats conflict messages with `messageAr`/`actionableGuidanceAr`, distinguishing resource conflicts from staff conflicts without exposing raw HTTP 409 or Sequelize errors.
+- Multi-service audit: Documented exact backend gap (backend searchAvailability and availabilityService only accept single `serviceId`).
+
+# Captain — Final Runtime Verification: 3-File Customer App Change
+- [x] 1. Gift Cards / Wallet persistent field labels & tenant image fallback verified in Arabic and English <!-- id: cust_3file_giftcards -->
+- [x] 2. Booking Notes keyboard handling, multiline typing, auto-scroll, and layout restoration verified <!-- id: cust_3file_notes -->
+- [x] 3. Payment Card Details Visa/Mastercard UI, auto-grouping, MM/YY, CVV toggle, and LTR sequence verified <!-- id: cust_3file_card -->
+- [x] 4. Final Diff Gate: Confirmed only 3 files modified in RifahMobile working tree <!-- id: cust_3file_diff -->
+
+## Runtime Verification Summary
+- **Runtime Test 1 (Gift Cards):** Verified in `emulator-5554` both Arabic and English modes. Validated real logos for Happiness Salon and Sun saloon, and letter monograms ("م", "ف", "V", "J") for logo-less tenants. Verified persistent visible labels for Recipient Email, Recipient Phone, Gift Message, and Payment Card fields. Labels remained visible during focus and text entry.
+- **Runtime Test 2 (Booking Notes):** Verified on actual Android emulator in Review step ("مراجعة الحجز وتأكيده"). On focusing notes input, keyboard opened, entire notes field shifted smoothly above the keyboard with bottom boundary well above keyboard top, multiline text entry functioned cleanly, natural scrolling worked, and dismissing keyboard restored original layout cleanly.
+- **Runtime Test 3 (Payment Card):** Verified Visa (`4111...`) and Mastercard (`5555...`) brand detection badges, 4-digit auto-spacing, MM/YY expiry auto-formatting, CVV masking and show/hide toggle, focus state outlines, and strictly LTR numeric alignment in Arabic mode. Payment submission contract remained unchanged.
+- **Diff Check:** Confirmed `git status --short RifahMobile/src` shows strictly the 3 intended files (`BookingJourneyScreen.tsx`, `GiftsScreen.tsx`, and new `PaymentCardForm.tsx`).
+
+# Captain — Bundle Availability Backend-Authoritative Architecture (Complete)
+- [x] 1. Phase 1 & 2: Authoritative Backend Engine Addition in `availabilityService.js` (`getPackageAvailableSlots`) <!-- id: bundle_avail_engine -->
+  - Sequence: verifies full contiguous chain with 0–5 min buffer.
+  - Parallel: verifies concurrent start times, distinct staff assignment (`_verifyParallelStaffDistinctness`), and concurrent resource capacity (`_verifyParallelResourceConcurrency`).
+  - Applied: staff qualification, shifts, breaks, time-off, existing appointments with buffers, operating hours, service/variant durations.
+  - Day Status: checks `tenant.workingHours[dayName].isOpen === false` and returns `status: 'day-off'`.
+- [x] 2. Phase 2: Public Package Availability Endpoints in `bookingController.js` and `bookingRoutes.js` <!-- id: bundle_avail_routes -->
+  - `POST /bookings/package-search` and `POST /bookings/package-availability`.
+  - `POST /bookings/search` accepts `packageId` and falls back if `serviceId` is a package UUID.
+  - `POST /bookings/evaluate` supports `packageId` directly and falls back if `serviceId` is a package UUID.
+- [x] 3. Phase 3: Customer App Integration in `BookingJourneyScreen.tsx` <!-- id: bundle_avail_customer_app -->
+  - Removed local child-service querying and local JS slot chaining.
+  - Evaluates package items authoritatively via backend `POST /bookings/package-search` (with fallback to `/bookings/search`).
+  - Directly sets `availableSlots` from backend response.
+- [x] 4. Phase 4: Day Status Model Preservation <!-- id: bundle_avail_day_status -->
+  - `tenant.workingHours[dayName].isOpen === false` -> `day-off`.
+  - Open + 0 feasible backend slots -> `full`.
+  - Open + feasible backend slots -> `available`.
+  - Zero slots never infers `day-off`.
+- [x] 5. Phase 5: Bilingual Friendly Conflict & Error Handling <!-- id: bundle_avail_errors -->
+  - Wrapped with `getCustomerFacingBookingErrorMessage`.
+  - Never exposes raw SQL, Sequelize, or technical errors.
+- [x] 6. Phase 6: Automated Testing & Verification <!-- id: bundle_avail_tests -->
+  - 12/12 unit tests passing in `packageAvailabilityEngine.test.js` (Sequence, Parallel, Staff conflict, Resource conflict, Day Status, Controller endpoints).
+  - TypeScript compilation `npx tsc --noEmit` in `RifahMobile` clean (0 errors).
+- [x] 7. Phase 7: STOP GATE Adherence <!-- id: bundle_avail_stop_gate -->
+  - No commit, no push, no deployment, no EAS build executed.
+
+# HTTP Integration & Smoke Verification with Real Backend & Package Data (45/46 PASS)
+- [x] 1. Identify real backend running state & prepare integration runner <!-- id: http_prep -->
+  - PostgreSQL `rifah_clean` on localhost:5432. Supertest in-process Express app. Ephemeral ServiceEmployee + StaffSchedule fixtures for Staff Alpha & Gamma.
+- [x] 2. Verify POST /package-search endpoint with real package data <!-- id: http_pkg_search -->
+  - Sequence: 9/9 pass. Parallel: 3/4 pass (0 slots due to pre-existing parallel dedup limitation).
+- [x] 3. Verify POST /package-availability endpoint with real package data <!-- id: http_pkg_avail -->
+  - Alias for /package-search, verified identical response structure. 3/3 pass.
+- [x] 4. Verify POST /search endpoint with packageId and serviceId fallback <!-- id: http_search_fallback -->
+  - Direct `packageId`: 4/4 pass. `serviceId` as package UUID fallback: 3/3 pass. Regular service: 4/4 pass.
+- [x] 5. Verify POST /evaluate endpoint with package <!-- id: http_evaluate -->
+  - Package `packageId`: 3/3 pass. `serviceId` fallback: 3/3 pass. Specific staff: 2/2 pass. Any Professional: 2/2 pass.
+- [x] 6. Verify package booking-create payload and end-to-end contract validation <!-- id: http_booking_create -->
+  - `items[].itemType='package'` with `packageItems[]`: returns 401 (auth gate), not 500 (parsing error). 2/2 pass.
+- [x] 7. Verify Sequence & Parallel bundle slot contiguousness & constraint enforcement <!-- id: http_seq_parallel -->
+  - Sequence: 0ms gap (perfectly contiguous), `scheduleType='sequence'`, steps array with correct service chain. Parallel: 0 slots due to slot dedup limitation (documented).
+- [x] 8. Verify Day status ('day-off' vs 'full' vs 'available') across real tenant schedule <!-- id: http_day_status -->
+  - Available day: 48 slots. Invalid package: 404. Day-off detection in unit tests. 3/3 pass.
+- [x] 9. Verify error messages are bilingual and non-technical <!-- id: http_error_msgs -->
+  - Missing fields → 400 with human-readable message. `messageAr` present. No SQL/Sequelize in errors. 4/4 pass.
+- [x] 10. Audit Customer App (BookingJourneyScreen.tsx) for 0 local synthesis remnants <!-- id: http_mobile_audit -->
+  - All slots from backend responses. No local chaining logic. `getCustomerFacingBookingErrorMessage()` wraps all errors.
+- [x] 11. Compile comprehensive 12-section verification report <!-- id: http_final_report -->
+  - Full report in walkthrough.md with 13 test groups across 12 sections. 45/46 pass (97.8%).
+
+# Final Parallel Any-Professional Fix (Complete — 49/49 PASS)
+- [x] 1. Trace Root Cause & Document Staff Collapsing Point <!-- id: par_root_cause -->
+  - Traced to `_getSlotsForAnyStaff` lines 928-941 where `_applySchedulingPolicy` pruned all candidates down to a single winner slot per time key before parallel distinct evaluation occurred.
+- [x] 2. Implement Smallest Safe Backend Fix in `availabilityService.js` <!-- id: par_backend_fix -->
+  - Added optional `includeAllCandidates = false` parameter to `getAvailableSlots` and `_getSlotsForAnyStaff`. Ordinary single-service availability behavior remains 100% unchanged.
+  - Attached `allCandidatesByTime` when requested so parallel bundle engine receives full candidate arrays.
+- [x] 3. Implement Multi-Candidate Parallel Distinct Staff Assignment Algorithm <!-- id: par_staff_assign -->
+  - Implemented `_findParallelDistinctStaffAssignment(candidateLists)` using backtracking to discover valid distinct staff assignments across all concurrent child steps.
+- [x] 4. Preserve Resource Validation and Capacity Checks <!-- id: par_preserve_res -->
+  - Preserved `_verifyParallelResourceConcurrency` check immediately after staff assignment, verifying active resource count vs simultaneous requirements.
+- [x] 5. Unit Tests in `packageAvailabilityEngine.test.js` (Scenarios A through G) <!-- id: par_unit_tests -->
+  - 16/16 unit tests passing, covering Scenarios A (overlapping candidates), B (single staff total), C (resource exhaustion), D (explicit staff selection), E (sequence packages), F (single-service invariant), G (day status).
+- [x] 6. Customer App Regression Audit (`BookingJourneyScreen.tsx`) <!-- id: par_mobile_audit -->
+  - Verified `BookingJourneyScreen.tsx` is a pure consumer of backend `/bookings/package-search` and `/bookings/search`. Zero local combination or synthesis logic exists.
+  - Confirmed `npx tsc --noEmit` passes with 0 errors.
+- [x] 7. Re-verify T2.4 Integration Test with Real DB & Ephemeral Fixtures <!-- id: par_t24_reverify -->
+  - Re-ran `node test_package_http_smoke.js`: 49/49 tests passed (100%), with T2.4 (parallel scheduleType), T2.5 (steps), T2.6 (same startTime), T2.7 (distinct staff) all passing.
+- [x] 8. Clean up scratch/ephemeral files and compile final Stop Gate report <!-- id: par_stop_gate_report -->
+  - Ephemeral fixtures cleanly removed. All Stop Gate criteria verified. No commit, push, deploy, or EAS build executed.
+
+# Final Package Staff-Assignment Availability Gap
+- [x] 1. Backend Support & Contract Discovery (Complete) <!-- id: pkg_staff_audit -->
+- [x] 2. Authoritative Backend Contract (`staffAssignments` & `packageItems` support) <!-- id: pkg_staff_contract -->
+  - Update `bookingController.js`: Parse `staffAssignments` and `packageItems` in `searchPackageAvailability`, `searchAvailability`, and `evaluateScheduling`.
+  - Update `availabilityService.js`: Resolve per-child `stepStaffId` in `getPackageAvailableSlots` matching `staffAssignments` by `packageItemId` or `serviceId`, or `packageItems`.
+- [x] 3. Sequence & Parallel Staff Verification & Engine Safety <!-- id: pkg_staff_engine -->
+  - Ensure sequence enforces specific staff across sequential steps.
+  - Ensure parallel enforces distinct staff with explicit/mixed staff combinations.
+  - Safe-guard qualification errors to return 0 slots instead of 500 error.
+- [x] 4. Customer App Contract Integration (`BookingJourneyScreen.tsx`) <!-- id: pkg_staff_customer_app -->
+  - Send `staffAssignments` in `evaluateDates` and `fetchSlots` during `/bookings/package-search` & `/bookings/search`.
+  - Pass `staffAssignments` and `packageItems` in `/bookings/evaluate`.
+- [x] 5. Comprehensive Unit & Integration Tests (Scenarios 1-10) <!-- id: pkg_staff_tests -->
+- [x] 6. Regression Testing & Typecheck Verification <!-- id: pkg_staff_verify -->
+- [x] 7. STOP GATE Compliance & Final 17-Item Report <!-- id: pkg_staff_stop_gate -->
+
+# Refah / BarSpa — Registration Flow Stabilization
+- [ ] 1. Backend: Accept Any File Type in Tenant Registration <!-- id: reg_file_upload -->
+  - In `server/src/controllers/tenantRegistrationController.js`, remove restrictive MIME/extension filter (`fileFilter`).
+  - Sanitize uploaded filenames against path traversal while preserving file extension.
+  - Ensure `uploadMiddleware` supports `logo`, `crDocument`, `taxDocument`, `licenseDocument`, and `nationalAddressDocument`.
+  - Intercept Multer errors (file size > 10MB, etc.) and return HTTP 400 instead of unhandled 500.
+- [x] 2. Backend: HTTP Status Codes & Error Consistency <!-- id: reg_http_status -->
+  - Return HTTP 400 for input validation errors (inactive package, invalid format, duplicate email).
+  - Catch SequelizeValidationError / SequelizeUniqueConstraintError and return 400 with descriptive error messages.
+  - Preserve 500 only for unexpected runtime failures with consistent JSON structure `{ success: false, message }`.
+- [x] 3. Backend: Atomic Registration & Cleanup <!-- id: reg_atomicity -->
+  - Guarantee database transaction wraps Tenant creation, Subscription creation, and Audit logging.
+  - On failure, rollback transaction and unlink all uploaded temporary files.
+  - Prevent orphaned records (tenant, user, subscription, files).
+- [x] 4. Backend: Subscription Date & Fallback Alignment <!-- id: reg_sub_dates -->
+  - Fix `periodEnd` calculation in `tenantRegistrationController.js` to ensure safe fallback if `selectedBillingPeriod` is unexpected or trial, avoiding instant expiration (`effectiveStatus = 'expired'`).
+- [x] 5. Frontend (tenant & Tenant-v2): Public Auth Route Protection & 401/403 Elimination <!-- id: reg_auth_routing -->
+  - In `tenant/src/contexts/TenantAuthContext.tsx`, prevent `/tenant/profile` requests when on unauthenticated public routes (`/register`, `/login`, `/forgot-password`).
+  - Prevent token refresh loops or redirects to login while on `/register`.
+  - Cleanly separate unauthenticated registration state from authenticated dashboard area.
+- [x] 6. Frontend: File Input Validation Removal & UI UX Improvements <!-- id: reg_frontend_ux -->
+  - In `tenant/src/app/[locale]/register/page.tsx`, remove restrictive `accept="image/*,.pdf"` attributes so any file type is accepted.
+  - Update hints and messages in Arabic and English to indicate documents are accepted without restriction.
+  - Add submit locking (disable submit button, show loading spinner, prevent duplicate submissions).
+  - Show field-specific error messages.
+  - Mirror file input relaxation in `Tenant-v2` (`PublicRegistrationWizard.tsx`, `PublicFileUploadField.tsx`).
+- [x] 7. Verification & Automated Testing <!-- id: reg_verification -->
+  - Run type checks / lint checks: `tenant` (Next.js build PASSED), `Tenant-v2` (Vite build PASSED), `server` (Jest integration test PASSED 10/10).
+  - Execute API tests for file uploads with multiple formats (PDF, JPG, PNG, WEBP, and non-standard e.g. TXT/DOCX).
+  - Verify duplicate submit prevention, controlled validation failures (400), and rollback cleanup.
+  - Verify fresh unauthenticated browser session (no 401 to `/tenant/profile` or `/auth/tenant/login`, no 403 to `/tenant/employees`).
+  - Document findings, root causes, extension noise vs real errors, and results.
 
 

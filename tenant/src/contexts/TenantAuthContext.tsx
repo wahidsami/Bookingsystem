@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { tenantApi } from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { normalizeDashboardPermissions } from '@/lib/dashboardAccess';
 
 interface TenantUser {
@@ -33,6 +33,18 @@ interface TenantAuthContextType {
 
 const TenantAuthContext = createContext<TenantAuthContextType | undefined>(undefined);
 
+function isPublicAuthRoute(pathname?: string | null): boolean {
+  if (!pathname) return false;
+  const stripped = pathname.replace(/^\/(ar|en)/, '') || '/';
+  return (
+    stripped === '/' ||
+    stripped.startsWith('/login') ||
+    stripped.startsWith('/register') ||
+    stripped.startsWith('/forgot-password') ||
+    stripped.startsWith('/reset-password')
+  );
+}
+
 export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TenantUser | null>(null);
   const [tenant, setTenant] = useState<TenantUser | null>(null);
@@ -41,15 +53,24 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const [sessionType, setSessionType] = useState<'tenant_owner' | 'tenant_account' | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   const isAuthenticated = !!user;
 
-  // Load user on mount
+  // Load user on mount or pathname change (skip on public unauthenticated routes)
   useEffect(() => {
+    if (isPublicAuthRoute(pathname)) {
+      setLoading(false);
+      return;
+    }
     loadUser();
-  }, []);
+  }, [pathname]);
 
   const loadUser = async () => {
+    if (isPublicAuthRoute(pathname)) {
+      setLoading(false);
+      return;
+    }
     try {
       const accessToken = typeof window !== 'undefined'
         ? sessionStorage.getItem('rifah_tenant_access_token')

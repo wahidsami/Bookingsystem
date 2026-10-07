@@ -17,7 +17,7 @@ export default function PublicFileUploadField({
   file,
   required = false,
   error,
-  accept = '.pdf,image/*',
+  accept,
   hint,
   inputId,
   onChange
@@ -58,7 +58,7 @@ export default function PublicFileUploadField({
           <div className="min-w-0">
             <div className="truncate font-semibold text-[#1D035F]">{file ? file.name : 'Drop your file here or browse'}</div>
             <div className="mt-0.5 text-xs text-zinc-500">
-              {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'PNG, JPG, PDF and office files supported'}
+              {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'All document and file formats supported (Max 10MB)'}
             </div>
           </div>
         </div>

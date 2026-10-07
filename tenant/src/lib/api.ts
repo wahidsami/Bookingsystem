@@ -165,16 +165,26 @@ class TenantApiClient {
           headers,
         });
       } else {
-        // Refresh failed, clear tokens and redirect to login
+        // Refresh failed, clear tokens
         this.clearTokens();
-        this.redirectToLogin();
+        if (typeof window !== 'undefined') {
+          const path = window.location.pathname || '';
+          if (!path.includes('/login') && !path.includes('/register') && !path.includes('/forgot-password')) {
+            this.redirectToLogin();
+          }
+        }
         throw new Error('Authentication failed. Please login again.');
       }
     }
 
     if (response.status === 401) {
       this.clearTokens();
-      this.redirectToLogin();
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname || '';
+        if (!path.includes('/login') && !path.includes('/register') && !path.includes('/forgot-password')) {
+          this.redirectToLogin();
+        }
+      }
       throw new Error('Your session expired. Please login again.');
     }
 

@@ -345,6 +345,12 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
     console.error('Unhandled server error:', err);
+    if (err && (err.name === 'MulterError' || err.code === 'LIMIT_FILE_SIZE')) {
+        return res.status(400).json({
+            success: false,
+            message: err.code === 'LIMIT_FILE_SIZE' ? 'File size exceeds maximum allowed limit (10MB)' : (err.message || 'File upload error')
+        });
+    }
     res.status(err.status || 500).json({
         success: false,
         message: err.message || 'Internal server error'
@@ -814,6 +820,21 @@ const ensureTenantSettlementSchema = async () => {
     }
 };
 
+const ensureActivityLogSchema = async () => {
+    try {
+        await db.sequelize.query(`
+            ALTER TABLE public.activity_logs
+                ADD COLUMN IF NOT EXISTS "tenantId" UUID,
+                ADD COLUMN IF NOT EXISTS "requestId" VARCHAR(64),
+                ADD COLUMN IF NOT EXISTS "operationId" VARCHAR(64),
+                ADD COLUMN IF NOT EXISTS "correlationId" VARCHAR(64);
+        `);
+        console.log('Activity log schema verified.');
+    } catch (error) {
+        console.error('Failed to ensure activity log schema:', error);
+    }
+};
+
 // Database Connection and Server Start
 const startServer = async () => {
     try {
@@ -832,6 +853,7 @@ const startServer = async () => {
         await ensurePaymentTransactionSchema();
         await ensureUserAddressSchema();
         await ensureTenantSettlementSchema();
+        await ensureActivityLogSchema();
 
         console.log('✅ Database connectivity verified successfully.');
 
