@@ -13,6 +13,20 @@ const {
  * Handles sending emails using Resend API
  */
 
+const BRAND_IDENTITY = Object.freeze({
+    name: 'BARSPA',
+    nameAr: 'BARSPA',
+    legalName: 'BARSPA Platform',
+    logoFileName: 'barspalogo.png',
+    getLogoUrl: () => {
+        if (process.env.BARSPA_LOGO_URL) return process.env.BARSPA_LOGO_URL;
+        const publicUrl = getServerPublicUrl();
+        return publicUrl ? `${publicUrl}/uploads/assets/barspalogo.png` : 'cid:logo';
+    },
+    supportEmail: process.env.SUPPORT_EMAIL || 'noreply@unifinitylab.com',
+    copyright: '© 2024-2026 BARSPA. All rights reserved.'
+});
+
 let resendClient = null;
 
 const getResendClient = () => {
@@ -45,9 +59,19 @@ const sendEmail = async (options) => {
             throw new Error('Resend not initialized - missing RESEND_API_KEY');
         }
 
-        const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL;
-        if (!fromEmail) {
-            throw new Error('Resend from address not set - set RESEND_FROM_EMAIL or FROM_EMAIL (e.g. Rifah <onboarding@yourdomain.com>)');
+        const rawFromEmail = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL;
+        if (!rawFromEmail) {
+            throw new Error('Resend from address not set - set RESEND_FROM_EMAIL or FROM_EMAIL (e.g. BARSPA <onboarding@yourdomain.com>)');
+        }
+
+        // Always ensure sender display name is BARSPA while preserving configured email domain/address
+        let fromHeader = rawFromEmail.trim();
+        if (fromHeader.includes('<') && fromHeader.includes('>')) {
+            const match = fromHeader.match(/<([^>]+)>/);
+            const address = match ? match[1].trim() : fromHeader;
+            fromHeader = `BARSPA <${address}>`;
+        } else {
+            fromHeader = `BARSPA <${fromHeader}>`;
         }
 
         // Load template
@@ -59,23 +83,37 @@ const sendEmail = async (options) => {
 
         let htmlContent = fs.readFileSync(templatePath, 'utf8');
 
+        const emailData = {
+            supportEmail: process.env.SUPPORT_EMAIL || 'noreply@unifinitylab.com',
+            brandName: 'BARSPA',
+            ...(data || {})
+        };
+
         // Replace placeholders with actual data
-        Object.keys(data).forEach(key => {
+        Object.keys(emailData).forEach(key => {
             const placeholder = new RegExp(`{{${key}}}`, 'g');
-            const value = data[key] === null || data[key] === undefined ? '' : String(data[key]);
+            const value = emailData[key] === null || emailData[key] === undefined ? '' : String(emailData[key]);
             htmlContent = htmlContent.replace(placeholder, value);
         });
 
-        // Resend supports inline images via contentId; keep cid:logo in HTML
-        htmlContent = htmlContent.replace(/src="RifahNewLogoWhite\.png"/g, 'src="cid:logo"');
+        // Resend supports inline images via contentId; map BARSPA logo references to cid:logo
+        htmlContent = htmlContent
+            .replace(/src=["'](?:RifahNewLogoWhite\.png|barspalogo\.png|cid:logo)["']/g, 'src="cid:logo"')
+            .replace(/alt=["'](?:Rifah Platform Logo|Rifah Logo|Rifah|Refah Platform Logo|Refah Logo|Refah)["']/gi, 'alt="BARSPA"');
 
-        const logoPath = path.join(__dirname, '../templates/emails', 'RifahNewLogoWhite.png');
+        const primaryLogoPath = path.join(__dirname, '../templates/emails', 'barspalogo.png');
+        const rootLogoPath = path.join(__dirname, '../../../barspalogo.png');
+        const legacyLogoPath = path.join(__dirname, '../templates/emails', 'RifahNewLogoWhite.png');
+        const logoPath = fs.existsSync(primaryLogoPath)
+            ? primaryLogoPath
+            : (fs.existsSync(rootLogoPath) ? rootLogoPath : legacyLogoPath);
+
         const attachments = [];
 
         if (fs.existsSync(logoPath)) {
             const logoBuffer = fs.readFileSync(logoPath);
             attachments.push({
-                filename: 'logo.png',
+                filename: 'barspalogo.png',
                 content: logoBuffer.toString('base64'),
                 inlineContentId: 'logo'
             });
@@ -86,11 +124,15 @@ const sendEmail = async (options) => {
         }
 
         const payload = {
-            from: fromEmail.includes('<') ? fromEmail : `Rifah Platform <${fromEmail}>`,
+            from: fromHeader,
             to: Array.isArray(to) ? to : [to],
             subject,
             html: htmlContent
         };
+
+        if (options.replyTo || process.env.RESEND_REPLY_TO) {
+            payload.reply_to = options.replyTo || process.env.RESEND_REPLY_TO;
+        }
 
         if (cc) {
             payload.cc = Array.isArray(cc) ? cc : [cc];
@@ -134,8 +176,8 @@ const sendWelcomeEmail = async (tenantData) => {
     return sendEmail({
         to: tenantData.email,
         subject: locale === 'en'
-            ? 'Welcome to Rifah - Registration Received'
-            : 'مرحباً بك في رفاه - تم استلام طلب التسجيل',
+            ? 'Welcome to BARSPA - Registration Received'
+            : 'مرحباً بك في BARSPA - تم استلام طلب التسجيل',
         template: 'welcome',
         data: {
             tenantName: tenantData.name_en || tenantData.name,
@@ -163,8 +205,8 @@ const sendApprovalEmail = async (tenantData, options = {}) => {
         to: tenantData.email,
         cc: options.cc,
         subject: locale === 'en'
-            ? (options.isFree ? 'Rifah account approved' : `Rifah account approved - invoice ${data.invoiceNumber}`)
-            : (options.isFree ? 'تم قبول حساب رفاه' : `تم قبول حساب رفاه - فاتورة ${data.invoiceNumber}`),
+            ? (options.isFree ? 'BARSPA account approved' : `BARSPA account approved - invoice ${data.invoiceNumber}`)
+            : (options.isFree ? 'تم قبول حساب BARSPA' : `تم قبول حساب BARSPA - فاتورة ${data.invoiceNumber}`),
         template: 'approved',
         data
     });
@@ -179,8 +221,8 @@ const sendRejectionEmail = async (tenantData, reason) => {
     return sendEmail({
         to: tenantData.email,
         subject: locale === 'en'
-            ? 'Rifah Account Application Update'
-            : 'تحديث طلب انضمامك إلى رفاه',
+            ? 'BARSPA Account Application Update'
+            : 'تحديث طلب انضمامك إلى BARSPA',
         template: 'rejected',
         data: {
             tenantName: tenantData.name_en || tenantData.name,
@@ -199,8 +241,8 @@ const sendPaymentExpiredEmail = async (tenantData, options = {}) => {
     return sendEmail({
         to: tenantData.email,
         subject: locale === 'en'
-            ? 'Rifah - Payment window expired'
-            : 'رفاه - انتهت مهلة الدفع',
+            ? 'BARSPA - Payment window expired'
+            : 'BARSPA - انتهت مهلة الدفع',
         template: 'payment_expired',
         data: buildBillingEmailData(tenantData, options)
     });
@@ -215,8 +257,8 @@ const sendPaymentReminderEmail = async (tenantData, options = {}) => {
     return sendEmail({
         to: tenantData.email,
         subject: locale === 'en'
-            ? `Rifah - Payment reminder for invoice ${options?.bill?.billNumber || ''}`.trim()
-            : `رفاه - تذكير بسداد الفاتورة ${options?.bill?.billNumber || ''}`.trim(),
+            ? `BARSPA - Payment reminder for invoice ${options?.bill?.billNumber || ''}`.trim()
+            : `BARSPA - تذكير بسداد الفاتورة ${options?.bill?.billNumber || ''}`.trim(),
         template: 'payment_reminder',
         data: buildBillingEmailData(tenantData, options)
     });
@@ -234,11 +276,11 @@ const sendPaymentSuccessEmail = async (tenantData, options = {}) => {
         to: tenantData.email,
         subject: locale === 'en'
             ? (hasInvoiceNumber
-                ? `Rifah - Payment successful for ${data.invoiceNumber}`
-                : 'Rifah - Your account is active')
+                ? `BARSPA - Payment successful for ${data.invoiceNumber}`
+                : 'BARSPA - Your account is active')
             : (hasInvoiceNumber
-                ? `رفاه - تم السداد بنجاح للفاتورة ${data.invoiceNumber}`
-                : 'رفاه - تم تفعيل حسابك بنجاح'),
+                ? `BARSPA - تم السداد بنجاح للفاتورة ${data.invoiceNumber}`
+                : 'BARSPA - تم تفعيل حسابك بنجاح'),
         template: 'payment_success',
         data
     });
@@ -253,8 +295,8 @@ const sendPaymentFailedEmail = async (tenantData) => {
     return sendEmail({
         to: tenantData.email,
         subject: locale === 'en'
-            ? 'Rifah - Payment could not be completed'
-            : 'رفاه - تعذر إتمام الدفع',
+            ? 'BARSPA - Payment could not be completed'
+            : 'BARSPA - تعذر إتمام الدفع',
         template: 'payment_failed',
         data: buildBillingEmailData(tenantData)
     });
@@ -347,7 +389,7 @@ const buildBillingEmailData = (tenantData = {}, options = {}) => {
         paidDateText: formatDateTime(bill?.paidAt || options.paidAt, locale),
         periodStartText: formatDateOnly(options.periodStart || bill?.invoiceIssuedAt, locale),
         periodEndText: formatDateOnly(options.periodEnd || bill?.subscription?.currentPeriodEnd, locale),
-        supportEmail: process.env.SUPPORT_EMAIL || 'support@rifah.sa',
+        supportEmail: process.env.SUPPORT_EMAIL || 'noreply@unifinitylab.com',
         paidOnlyDisplay: options.isFree ? 'none' : 'block',
         freeOnlyDisplay: options.isFree ? 'block' : 'none'
     };
@@ -357,7 +399,7 @@ const sendStaffInviteEmail = async ({ email, staffName, tenantName, temporaryPas
     const loginUrl = getStaffAppLoginUrl();
     return sendEmail({
         to: email,
-        subject: 'Rifah staff app invitation',
+        subject: 'BARSPA staff app invitation',
         template: 'staff_invite',
         data: {
             staffName,
@@ -373,7 +415,7 @@ const sendDashboardAccountInviteEmail = async ({ email, displayName, tenantName,
     const dashboardLoginUrl = loginUrl || getTenantDashboardLoginUrl();
     return sendEmail({
         to: email,
-        subject: 'Rifah dashboard access invitation',
+        subject: 'BARSPA dashboard access invitation',
         template: 'dashboard_invite',
         data: {
             displayName,
@@ -389,7 +431,7 @@ const sendStaffPasswordResetEmail = async ({ email, staffName, tenantName, tempo
     const loginUrl = getStaffAppLoginUrl();
     return sendEmail({
         to: email,
-        subject: 'Rifah staff app password reset',
+        subject: 'BARSPA staff app password reset',
         template: 'staff_password_reset',
         data: {
             staffName,
@@ -405,7 +447,7 @@ const sendCustomerPasswordResetEmail = async ({ email, firstName, resetUrl, expi
     const passwordResetUrl = resetUrl || getCustomerAppResetUrl('');
     return sendEmail({
         to: email,
-        subject: 'Rifah customer app password reset',
+        subject: 'BARSPA customer app password reset',
         template: 'customer_password_reset',
         data: {
             firstName: firstName || 'Customer',
@@ -416,6 +458,7 @@ const sendCustomerPasswordResetEmail = async ({ email, firstName, resetUrl, expi
 };
 
 module.exports = {
+    BRAND_IDENTITY,
     sendEmail,
     sendWelcomeEmail,
     sendApprovalEmail,

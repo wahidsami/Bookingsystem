@@ -118,7 +118,7 @@ const notifyServiceCompleted = async (appointment) => {
     const hasPaymentDue = dueAmount > 0;
     let effectiveServiceName = serviceName;
     let effectiveCustomerName = customerName;
-    let tenantName = 'Refah';
+    let tenantName = 'BARSPA';
     let googleReviewUrl = appointment?.tenant?.googleMapLink || appointment?.tenant?.mapUrl || '';
     let reviewLink = `${(getServerPublicUrl() || 'http://localhost:5000').replace(/\/+$/, '')}/api/v1/bookings/${encodeURIComponent(appointment.id)}/review/open`;
     let userEmail = null;

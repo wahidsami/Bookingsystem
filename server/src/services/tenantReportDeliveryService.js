@@ -93,7 +93,7 @@ async function deliverTenantSavedReport(savedReport, preview, options = {}) {
         if (recipientEmails.length > 0) {
             emailResult = await sendEmail({
                 to: recipientEmails,
-                subject: `Rifah scheduled report: ${savedReport.title}`,
+                subject: `BARSPA scheduled report: ${savedReport.title}`,
                 template: 'admin_report_delivery',
                 data: {
                     reportTitle: savedReport.title,

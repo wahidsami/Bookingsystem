@@ -211,7 +211,7 @@ async function sendScheduledReportEmail(savedReport, preview, recipients, export
 
     const result = await sendEmail({
         to: recipients,
-        subject: `Rifah scheduled report: ${savedReport.title}`,
+        subject: `BARSPA scheduled report: ${savedReport.title}`,
         template: 'admin_report_delivery',
         data: {
             reportTitle: savedReport.title,

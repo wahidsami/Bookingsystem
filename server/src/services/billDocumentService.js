@@ -9,7 +9,8 @@ const { BILL_STATUS } = require('../utils/billStatus');
 const uploadsRoot = path.resolve(__dirname, '../../uploads');
 const billsRoot = path.join(uploadsRoot, 'bills');
 const cairoFontPath = path.resolve(__dirname, '../templates/invoices/fonts/Cairo-Regular.ttf');
-const logoFallbackPath = path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
+const barspaLogoFallback = path.resolve(__dirname, '../templates/emails/barspalogo.png');
+const logoFallbackPath = fs.existsSync(barspaLogoFallback) ? barspaLogoFallback : path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
 
 function ensureDirectory(directoryPath) {
     fs.mkdirSync(directoryPath, { recursive: true });

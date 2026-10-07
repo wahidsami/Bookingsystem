@@ -31,7 +31,8 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const NO_MATCH_UUID = '00000000-0000-0000-0000-000000000000';
 const GIFT_CARD_AUDIT_ENABLED = process.env.GIFT_CARD_AUDIT_LOGS !== '0';
 const cairoFontPath = path.resolve(__dirname, '../templates/invoices/fonts/Cairo-Regular.ttf');
-const logoFallbackPath = path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
+const barspaLogoFallback = path.resolve(__dirname, '../templates/emails/barspalogo.png');
+const logoFallbackPath = fs.existsSync(barspaLogoFallback) ? barspaLogoFallback : path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
 
 const parseDateRange = (startDate, endDate) => {
     const range = {};

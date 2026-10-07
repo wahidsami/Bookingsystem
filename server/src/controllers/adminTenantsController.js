@@ -819,7 +819,7 @@ const requestMoreInfo = async (req, res) => {
         const resubmitUrl = getTenantDashboardBaseUrl();
         sendEmail({
             to: tenant.email,
-            subject: 'Rifah – More information required',
+            subject: 'BARSPA – More information required',
             template: 'more_info_required',
             data: {
                 tenantName: tenant.name_en || tenant.name,

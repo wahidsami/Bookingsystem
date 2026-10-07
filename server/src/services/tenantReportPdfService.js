@@ -4,7 +4,8 @@ const PDFDocument = require('pdfkit');
 const pdfMake = require('pdfmake');
 
 const uploadsRoot = path.resolve(__dirname, '../../uploads');
-const refahLogoFallbackPath = path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
+const barspaLogoFallbackPath = path.resolve(__dirname, '../templates/emails/barspalogo.png');
+const refahLogoFallbackPath = fs.existsSync(barspaLogoFallbackPath) ? barspaLogoFallbackPath : path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
 const pdfMakeRoot = path.dirname(require.resolve('pdfmake/package.json'));
 
 pdfMake.setFonts({

@@ -46,11 +46,11 @@ const generateGiftCode = (prefix = 'TN') => {
 const sendTenantGiftClaimEmail = async ({ to, senderName, totalCredit, code, claimLink }) => {
   return sendEmail({
     to,
-    subject: `${senderName} sent you a Refah gift card`,
+    subject: `${senderName} sent you a BARSPA gift card`,
     template: 'customer_review_invite',
     data: {
       customerName: 'Dear customer',
-      tenantName: 'Refah',
+      tenantName: 'BARSPA',
       serviceName: `Gift card ${Number(totalCredit || 0).toFixed(2)} SAR - Code: ${code || '-'}`,
       appointmentDate: new Date().toLocaleString('en-US'),
       reviewLink: claimLink,

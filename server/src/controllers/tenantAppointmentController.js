@@ -535,11 +535,11 @@ async function sendAppointmentInviteEmail({ to, customerName, tenantName, invite
 
     await sendEmail({
         to,
-        subject: locale === 'ar' ? 'دعوة لتأكيد موعدك في رفاه' : 'Confirm your Refah appointment',
+        subject: locale === 'ar' ? 'دعوة لتأكيد موعدك في BARSPA' : 'Confirm your BARSPA appointment',
         template: 'customer_appointment_invite',
         data: {
             customerName: customerName || (locale === 'ar' ? 'عميلنا العزيز' : 'Dear customer'),
-            tenantName: tenantName || 'Refah',
+            tenantName: tenantName || 'BARSPA',
             serviceName: serviceName || (locale === 'ar' ? 'الخدمة' : 'Service'),
             appointmentDate,
             inviteLink
@@ -587,11 +587,11 @@ async function sendAppointmentRescheduleEmail({
 
     await sendEmail({
         to,
-        subject: locale === 'ar' ? 'تم تحديث موعدك في رفاه' : 'Your Refah appointment has been updated',
+        subject: locale === 'ar' ? 'تم تحديث موعدك في BARSPA' : 'Your BARSPA appointment has been updated',
         template: 'customer_appointment_rescheduled',
         data: {
             customerName: customerName || (locale === 'ar' ? 'عميلنا العزيز' : 'Dear customer'),
-            tenantName: tenantName || 'Refah',
+            tenantName: tenantName || 'BARSPA',
             serviceName: serviceName || (locale === 'ar' ? 'الخدمة' : 'Service'),
             appointmentDate,
             previousAppointmentDate,
@@ -644,12 +644,12 @@ async function sendAppointmentStatusEmail({
     await sendEmail({
         to,
         subject: locale === 'ar'
-            ? 'تم تحديث حالة موعدك في رفاه'
-            : 'Your Refah appointment status has been updated',
+            ? 'تم تحديث حالة موعدك في BARSPA'
+            : 'Your BARSPA appointment status has been updated',
         template: 'customer_appointment_status_updated',
         data: {
             customerName: customerName || (locale === 'ar' ? 'عميلنا العزيز' : 'Dear customer'),
-            tenantName: tenantName || 'Refah',
+            tenantName: tenantName || 'BARSPA',
             serviceName: serviceName || (locale === 'ar' ? 'الخدمة' : 'Service'),
             appointmentDate: appointmentDate || '',
             previousStatus: statusLabels[previousStatus] || previousStatus || '-',
@@ -1431,7 +1431,7 @@ exports.createAppointment = async (req, res) => {
             await sendAppointmentInviteEmail({
                 to: customerUser.email,
                 customerName,
-                tenantName: fullAppointment?.tenant?.name || 'Refah',
+                tenantName: fullAppointment?.tenant?.name || 'BARSPA',
                 inviteLink,
                 startTime: appointment.startTime,
                 serviceName
@@ -2557,7 +2557,7 @@ exports.updateAppointmentStatus = async (req, res) => {
                     await sendAppointmentStatusEmail({
                         to: appointment.user.email,
                         customerName,
-                        tenantName: appointment.tenant?.name || appointment.tenant?.name_en || appointment.tenant?.name_ar || 'Refah',
+                        tenantName: appointment.tenant?.name || appointment.tenant?.name_en || appointment.tenant?.name_ar || 'BARSPA',
                         serviceName,
                         appointmentDate,
                         previousStatus,
@@ -3275,7 +3275,7 @@ exports.rescheduleAppointment = async (req, res) => {
             await sendAppointmentRescheduleEmail({
                 to: appointment.user?.email,
                 customerName,
-                tenantName: 'Refah',
+                tenantName: 'BARSPA',
                 startTime: requestedStart,
                 serviceName,
                 oldStartTime: previousStartTime,
@@ -3593,7 +3593,7 @@ exports.reassignRescheduleAppointment = async (req, res) => {
                     customerName: appointment.user
                         ? `${appointment.user.firstName || ''} ${appointment.user.lastName || ''}`.trim()
                         : 'A customer',
-                    tenantName: 'Refah',
+                    tenantName: 'BARSPA',
                     startTime: requestedStart,
                     serviceName: appointment.service?.name_en || appointment.service?.name_ar || 'service',
                     oldStartTime: previousStartTime,

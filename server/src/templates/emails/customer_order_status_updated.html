@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BARSPA Order Status Update</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f3ff;font-family:Arial,sans-serif;color:#111827;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e9d5ff;">
+          <tr>
+            <td style="background:#7f50d2;color:#ffffff;padding:22px 24px;">
+              <h1 style="margin:0;font-size:20px;line-height:1.3;font-weight:700;">{{title}}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;">
+              <p style="margin:0 0 12px 0;font-size:15px;line-height:1.5;">Hello {{customerName}},</p>
+              <p style="margin:0 0 8px 0;font-size:15px;line-height:1.5;">Your order from <strong>{{tenantName}}</strong> has a new update.</p>
+              <p style="margin:0 0 18px 0;font-size:15px;line-height:1.5;direction:rtl;text-align:right;">مرحباً {{customerName}}، لديك تحديث جديد بخصوص طلبك من <strong>{{tenantName}}</strong>.</p>
+
+              <div style="margin:16px 0 20px 0;padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#faf5ff;">
+                <p style="margin:0 0 10px;font-size:15px;font-weight:700;color:#581c87;">Order Summary | تفاصيل الطلب</p>
+                <p style="margin:0 0 6px 0;font-size:14px;color:#374151;"><strong>Order Reference | رقم الطلب:</strong> {{orderNumber}}</p>
+                <p style="margin:0 0 6px 0;font-size:14px;color:#374151;"><strong>Store | المتجر:</strong> {{tenantName}}</p>
+                <p style="margin:0 0 6px 0;font-size:14px;color:#374151;"><strong>Fulfillment | طريقة الاستلام:</strong> {{deliveryMethodText}}</p>
+                <p style="margin:0 0 6px 0;font-size:14px;color:#374151;"><strong>Current Status | الحالة الحالية:</strong> <span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#ede9fe;color:#6d28d9;font-weight:700;">{{statusTextBilingual}}</span></p>
+                {{trackingSectionHtml}}
+                {{pickupSectionHtml}}
+              </div>
+
+              {{actionHtml}}
+
+              <p style="margin:20px 0 4px 0;color:#6b7280;font-size:13px;line-height:1.6;">
+                You can track your order live anytime in the BARSPA app under "My Purchases".
+              </p>
+              <p style="margin:0 0 0 0;color:#6b7280;font-size:13px;line-height:1.6;direction:rtl;text-align:right;">
+                يمكنك متابعة حالة طلبك مباشرة في أي وقت عبر تطبيق BARSPA من قسم "مشترياتي".
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

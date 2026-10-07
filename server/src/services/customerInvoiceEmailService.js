@@ -262,7 +262,7 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
         const locale = user.preferredLanguage === 'ar' ? 'ar' : 'en';
         const template = options.template || statusToTemplate(invoice.status);
         const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || (locale === 'ar' ? 'عميلنا الكريم' : 'Valued Customer');
-        const tenantName = invoice.tenant?.name_ar || invoice.tenant?.name_en || invoice.tenant?.name || 'Refah';
+        const tenantName = invoice.tenant?.name_ar || invoice.tenant?.name_en || invoice.tenant?.name || 'BARSPA';
         const rankUsUrl = buildMapsUrl(invoice.tenant || {});
         const paymentMethodSnapshot = invoice.paymentMethodSnapshot || {};
         const paymentStatusSnapshot = invoice.paymentStatusSnapshot || {};
@@ -313,8 +313,8 @@ async function sendCustomerInvoiceLifecycleEmail(invoiceId, options = {}) {
             : '';
 
         const subject = locale === 'ar'
-            ? `رفاه - ${invoice.status === 'PAID' ? 'إيصال سداد' : 'فاتورة'} ${invoice.invoiceNumber}`
-            : `Refah - ${invoice.status === 'PAID' ? 'Payment receipt' : 'Invoice'} ${invoice.invoiceNumber}`;
+            ? `BARSPA - ${invoice.status === 'PAID' ? 'إيصال سداد' : 'فاتورة'} ${invoice.invoiceNumber}`
+            : `BARSPA - ${invoice.status === 'PAID' ? 'Payment receipt' : 'Invoice'} ${invoice.invoiceNumber}`;
 
         const portalUrl = getTenantDashboardLoginUrl(locale);
         const generatedInvoicePdf = await ensureCustomerInvoicePdf(invoice);
