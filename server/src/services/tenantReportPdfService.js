@@ -5,7 +5,8 @@ const pdfMake = require('pdfmake');
 
 const uploadsRoot = path.resolve(__dirname, '../../uploads');
 const barspaLogoFallbackPath = path.resolve(__dirname, '../templates/emails/barspalogo.png');
-const refahLogoFallbackPath = fs.existsSync(barspaLogoFallbackPath) ? barspaLogoFallbackPath : path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
+const rootReportLogo = path.resolve(__dirname, '../../../barspalogo.png');
+const refahLogoFallbackPath = fs.existsSync(barspaLogoFallbackPath) ? barspaLogoFallbackPath : (fs.existsSync(rootReportLogo) ? rootReportLogo : null);
 const pdfMakeRoot = path.dirname(require.resolve('pdfmake/package.json'));
 
 pdfMake.setFonts({
@@ -237,7 +238,7 @@ function buildPdfMakeDoc(payload) {
         ? payload.sections.map((section) => normalizePdfText(section)).join(' • ')
         : 'overview';
     const coverBlocks = [
-        { text: 'Refah Reports', style: 'coverBrand' },
+        { text: 'BARSPA Reports', style: 'coverBrand' },
         buildCoverImageStack(payload.tenantLogoPath),
         { text: title, style: 'coverTitle' },
         { text: tenantName, style: 'coverTenant' },
@@ -510,6 +511,11 @@ function buildPdfMakeDoc(payload) {
     const docDefinition = {
         pageSize: 'A4',
         pageMargins: [40, 40, 40, 40],
+        info: {
+            title: `${title} - BARSPA`,
+            author: 'BARSPA',
+            subject: 'BARSPA Tenant Report'
+        },
         defaultStyle: {
             font: 'Roboto',
             fontSize: 10,
@@ -584,7 +590,7 @@ function drawCover(doc, payload) {
         } catch (_) {}
     }
 
-    doc.fillColor('#FFFFFF').fontSize(28).text('Refah Reports', 50, 100, { align: 'left' });
+    doc.fillColor('#FFFFFF').fontSize(28).text('BARSPA Reports', 50, 100, { align: 'left' });
 
     doc.fillColor('#0F172A').fontSize(30).text(reportTitle || 'Business Report', 50, 240);
     doc.moveDown(0.4);
@@ -682,7 +688,7 @@ function generateReportPdfBuffer(payload) {
 
 function generateFallbackReportPdfBuffer(payload) {
     return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Title: 'BARSPA Report', Author: 'BARSPA' } });
         const chunks = [];
         doc.on('data', (chunk) => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -714,7 +720,7 @@ function generateFallbackReportPdfBuffer(payload) {
 
 function generateEmergencyReportPdfBuffer(payload) {
     return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Title: 'BARSPA Report', Author: 'BARSPA' } });
         const chunks = [];
         doc.on('data', (chunk) => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -722,7 +728,7 @@ function generateEmergencyReportPdfBuffer(payload) {
 
         try {
             const safePayload = safePlainClone(payload);
-            doc.fontSize(24).fillColor('#111827').text('Refah Report', 50, 60);
+            doc.fontSize(24).fillColor('#111827').text('BARSPA Report', 50, 60);
             doc.moveDown(0.6);
             doc.fontSize(14).fillColor('#374151').text(safePayload.tenantName || 'Tenant');
             doc.moveDown(0.6);

@@ -23,7 +23,7 @@ function xmlEscape(value) {
 
 function createReportPdfBuffer(report, preview) {
     return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ size: 'A4', margin: 42 });
+        const doc = new PDFDocument({ size: 'A4', margin: 42, info: { Title: report.title || 'BARSPA Report', Author: 'BARSPA' } });
         const chunks = [];
         doc.on('data', (chunk) => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));

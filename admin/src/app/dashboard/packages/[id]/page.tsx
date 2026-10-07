@@ -570,7 +570,7 @@ export default function EditPackagePage() {
                                             onChange={(e) => setFormData({ ...formData, hasNewToRefah: e.target.checked })}
                                             className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
                                         />
-                                        <span className="text-sm font-medium text-white">New to Refah Tag</span>
+                                        <span className="text-sm font-medium text-white">New to BARSPA Tag</span>
                                     </label>
                                     <div className={`transition-opacity ${formData.hasNewToRefah ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
                                         <label className="block text-xs text-dark-400 mb-1">Duration (Days)</label>

@@ -549,7 +549,7 @@ export default function NewPackagePage() {
                                     );
                                 })}
 
-                                {/* New To Refah */}
+                                {/* New To BARSPA */}
                                 <div className="bg-dark-900/50 p-3 rounded-lg border border-dark-600/50">
                                     <label className="flex items-center gap-2 cursor-pointer mb-2">
                                         <input
@@ -558,7 +558,7 @@ export default function NewPackagePage() {
                                             onChange={(e) => setFormData({ ...formData, hasNewToRefah: e.target.checked })}
                                             className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
                                         />
-                                        <span className="text-sm font-medium text-white">New to Refah Tag</span>
+                                        <span className="text-sm font-medium text-white">New to BARSPA Tag</span>
                                     </label>
                                     <div className={`transition-opacity ${formData.hasNewToRefah ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
                                         <label className="block text-xs text-dark-400 mb-1">Duration (Days)</label>

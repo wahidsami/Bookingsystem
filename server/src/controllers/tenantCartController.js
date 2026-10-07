@@ -332,7 +332,7 @@ exports.purchaseGiftCard = async (req, res) => {
         metadata: {
           operatorAccountId: req.tenantAccountId || null,
           staffId: req.staffId || null,
-          senderName: `${req.tenant?.name || req.tenant?.name_en || 'Refah'}`.trim(),
+          senderName: `${req.tenant?.name || req.tenant?.name_en || 'BARSPA'}`.trim(),
           packageTitle
         },
         transaction: tx,
@@ -429,7 +429,7 @@ exports.purchaseGiftCard = async (req, res) => {
       });
     }
 
-    const senderName = req.tenant?.name_ar || req.tenant?.name_en || req.tenant?.name || 'Refah';
+    const senderName = req.tenant?.name_ar || req.tenant?.name_en || req.tenant?.name || 'BARSPA';
     if (recipient?.id && isRefahRecipient) {
       try {
         await notificationOrchestrator.notifyCustomer({

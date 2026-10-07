@@ -210,7 +210,7 @@ class PushNotificationService {
         const messages = tokens.map((to) => ({
             to,
             sound: 'default',
-            title: sanitizeText(payload.title, 'Rifah'),
+            title: sanitizeText(payload.title, 'BARSPA'),
             body: sanitizeText(payload.body, ''),
             data: payload.data || {},
             channelId: 'default'

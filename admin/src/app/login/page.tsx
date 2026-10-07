@@ -51,11 +51,15 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4">
-            <span className="text-3xl font-bold text-white">R</span>
+          <div className="flex justify-center mb-4">
+            <img
+              src="/barspalogo.png"
+              alt="BARSPA"
+              className="h-14 w-auto max-w-[200px] object-contain drop-shadow"
+            />
           </div>
-          <h1 className="text-3xl font-bold text-white">Rifah Admin</h1>
-          <p className="text-dark-400 mt-2">Super Admin Dashboard</p>
+          <h1 className="text-3xl font-bold text-white">BARSPA Admin</h1>
+          <p className="text-dark-400 mt-2">BARSPA Admin Dashboard</p>
         </div>
 
         {/* Login Card */}
@@ -78,7 +82,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input"
-                placeholder="admin@rifah.sa"
+                placeholder="admin@barspa.com"
                 required
                 autoFocus
               />
@@ -119,15 +123,6 @@ export default function LoginPage() {
               Protected area. Authorized personnel only.
             </p>
           </div>
-        </div>
-
-        {/* Dev credentials hint */}
-        <div className="mt-6 p-4 bg-dark-800/50 rounded-lg border border-dark-700">
-          <p className="text-dark-400 text-xs text-center">
-            <span className="text-dark-500">Development:</span>{" "}
-            <code className="text-primary-400">admin@rifah.sa</code> /{" "}
-            <code className="text-primary-400">RifahAdmin@2024</code>
-          </p>
         </div>
       </div>
     </div>

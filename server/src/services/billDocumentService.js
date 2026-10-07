@@ -10,7 +10,8 @@ const uploadsRoot = path.resolve(__dirname, '../../uploads');
 const billsRoot = path.join(uploadsRoot, 'bills');
 const cairoFontPath = path.resolve(__dirname, '../templates/invoices/fonts/Cairo-Regular.ttf');
 const barspaLogoFallback = path.resolve(__dirname, '../templates/emails/barspalogo.png');
-const logoFallbackPath = fs.existsSync(barspaLogoFallback) ? barspaLogoFallback : path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
+const rootLogoFallback = path.resolve(__dirname, '../../../barspalogo.png');
+const logoFallbackPath = fs.existsSync(barspaLogoFallback) ? barspaLogoFallback : (fs.existsSync(rootLogoFallback) ? rootLogoFallback : null);
 
 function ensureDirectory(directoryPath) {
     fs.mkdirSync(directoryPath, { recursive: true });
@@ -132,7 +133,7 @@ function drawPageFrame(doc, bill, isPaidDocument) {
 
     doc.fillColor('#FFFFFF')
         .fontSize(18)
-        .text(bill.invoiceTitle || 'Refah Invoice | فاتورة رفاه', 170, 36, {
+        .text(bill.invoiceTitle || 'BARSPA Invoice | فاتورة بارسبا', 170, 36, {
             width: 350,
             align: 'right'
         });
@@ -161,9 +162,9 @@ function drawPartyCards(doc, bill) {
     doc.roundedRect(36, 144, 250, 132, 16).fill('#FFFFFF').stroke('#E2E8F0');
     doc.roundedRect(310, 144, 250, 132, 16).fill('#FFFFFF').stroke('#E2E8F0');
 
-    doc.fillColor('#7C3AED').fontSize(11).text('من Refah | From Refah', 52, 158, { width: 218, align: 'right' });
+    doc.fillColor('#7C3AED').fontSize(11).text('من BARSPA | From BARSPA', 52, 158, { width: 218, align: 'right' });
     doc.fillColor('#0F172A').fontSize(12).text(
-        seller.sellerNameAr || seller.sellerNameEn || 'رفاه',
+        seller.sellerNameAr || seller.sellerNameEn || 'بارسبا',
         52,
         180,
         { width: 218, align: 'right' }
@@ -221,7 +222,7 @@ function drawLineItems(doc, bill) {
     const description = [
         lineItem.descriptionAr || planSnapshot.packageNameAr,
         lineItem.descriptionEn || planSnapshot.packageName
-    ].filter(Boolean).join(' | ') || 'Refah subscription package | باقة اشتراك رفاه';
+    ].filter(Boolean).join(' | ') || 'BARSPA subscription package | باقة اشتراك بارسبا';
 
     doc.roundedRect(36, 392, 524, 192, 16).fill('#FFFFFF').stroke('#E2E8F0');
 
@@ -358,7 +359,7 @@ function drawFooter(doc, bill) {
     doc.fillColor('#64748B')
         .fontSize(8)
         .text(
-            footerNote || 'شكراً لاختياركم رفاه | Thank you for choosing Refah',
+            footerNote || 'شكراً لاختياركم بارسبا | Thank you for choosing BARSPA',
             36,
             786,
             {
@@ -380,8 +381,8 @@ async function renderBillPdf(billRecord, documentKind = 'invoice') {
             size: 'A4',
             margin: 0,
             info: {
-                Title: bill.invoiceTitle || bill.billNumber || 'Refah Invoice',
-                Author: 'Refah',
+                Title: bill.invoiceTitle || bill.billNumber || 'BARSPA Invoice',
+                Author: 'BARSPA',
                 Subject: `${bill.billNumber || ''} ${bill.type || ''}`.trim()
             }
         });

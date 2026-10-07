@@ -432,8 +432,8 @@ exports.getCustomerAppContent = async (req, res) => {
             })
         ]);
 
-        const tenantNameEn = tenant?.name_en || tenant?.name || 'Refah';
-        const tenantNameAr = tenant?.name_ar || tenant?.name || 'رفاه';
+        const tenantNameEn = tenant?.name_en || tenant?.name || 'BARSPA';
+        const tenantNameAr = tenant?.name_ar || tenant?.name || 'بارسبا';
         const supportPhone = normalizeSocialUrl(tenant?.whatsapp || tenant?.mobile || tenant?.phone);
         const supportEmail = normalizeSocialUrl(tenant?.email);
         const contactData = publicPageData?.contactUs_data || {};

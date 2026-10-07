@@ -32,7 +32,8 @@ const NO_MATCH_UUID = '00000000-0000-0000-0000-000000000000';
 const GIFT_CARD_AUDIT_ENABLED = process.env.GIFT_CARD_AUDIT_LOGS !== '0';
 const cairoFontPath = path.resolve(__dirname, '../templates/invoices/fonts/Cairo-Regular.ttf');
 const barspaLogoFallback = path.resolve(__dirname, '../templates/emails/barspalogo.png');
-const logoFallbackPath = fs.existsSync(barspaLogoFallback) ? barspaLogoFallback : path.resolve(__dirname, '../templates/emails/RifahNewLogoWhite.png');
+const rootPosLogo = path.resolve(__dirname, '../../../barspalogo.png');
+const logoFallbackPath = fs.existsSync(barspaLogoFallback) ? barspaLogoFallback : (fs.existsSync(rootPosLogo) ? rootPosLogo : null);
 
 const parseDateRange = (startDate, endDate) => {
     const range = {};
@@ -1679,7 +1680,7 @@ const renderTransactionReceiptPdf = (res, transaction) => {
 
     doc.fillColor('#FFFFFF')
         .fontSize(20)
-        .text('Refah Payment Receipt | سند قبض رفاه', 160, 42, {
+        .text('BARSPA Payment Receipt | سند قبض بارسبا', 160, 42, {
             width: 360,
             align: 'right'
         });
@@ -1735,10 +1736,10 @@ const renderTransactionReceiptPdf = (res, transaction) => {
     }
 
     const footerText = appointment
-        ? 'تم تحصيل هذه الدفعة لحجز خدمة عبر منصة رفاه | This payment was collected for a service booking via Refah.'
+        ? 'تم تحصيل هذه الدفعة لحجز خدمة عبر منصة بارسبا | This payment was collected for a service booking via BARSPA.'
         : order
-            ? 'تم تحصيل هذه الدفعة لطلب منتجات عبر منصة رفاه | This payment was collected for a product order via Refah.'
-            : 'شكراً لاستخدام رفاه | Thank you for using Refah.';
+            ? 'تم تحصيل هذه الدفعة لطلب منتجات عبر منصة بارسبا | This payment was collected for a product order via BARSPA.'
+            : 'شكراً لاستخدام بارسبا | Thank you for using BARSPA.';
 
     doc.fillColor('#64748B').fontSize(9).text(footerText, 40, 790, {
         width: 515,

@@ -315,5 +315,20 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Verify duplicate submit prevention, controlled validation failures (400), and rollback cleanup.
   - Verify fresh unauthenticated browser session (no 401 to `/tenant/profile` or `/auth/tenant/login`, no 403 to `/tenant/employees`).
   - Document findings, root causes, extension noise vs real errors, and results.
-
-
+# BARSPA — Complete Admin Dashboard & PDF Rebrand
+- [x] 1. Admin Dashboard Rebranding <!-- id: admin_rebrand -->
+  - [x] 1.1 Login Page: Replace "R" box with `barspalogo.png`, change title to "BARSPA Admin", subtitle to "Admin Dashboard", remove hardcoded dev credentials banner, update placeholder. <!-- id: admin_login -->
+  - [x] 1.2 Layout & Navigation: Update AdminLayout header and sidebar to use `barspalogo.png` and "BARSPA Admin". Update app layout metadata. <!-- id: admin_layout -->
+  - [x] 1.3 Internal Pages: Update Settings (seller names, placeholders), Packages UI labels ("New to BARSPA"), and verify other pages. <!-- id: admin_pages -->
+- [x] 2. Backend PDF Documents & Invoices Rebranding <!-- id: pdf_rebrand -->
+  - [x] 2.1 Bill / Subscription Invoice (`billDocumentService.js`): Update titles, headers, footers, and prioritize `barspalogo.png`. <!-- id: pdf_bill -->
+  - [x] 2.2 Invoice Snapshot Builder (`invoiceSnapshotBuilder.js`): Default seller names to BARSPA/بارسبا and default logo to `barspalogo.png`. <!-- id: pdf_snapshot -->
+  - [x] 2.3 Customer Invoice & Report PDFs (`customerInvoiceDocumentService.js`, `tenantReportPdfService.js`, etc.): Audit and rebrand. <!-- id: pdf_reports -->
+- [x] 3. Verification & Testing <!-- id: barspa_verification -->
+  - [x] 3.1 Build Admin (`npm run build` in `admin/`). <!-- id: test_admin_build -->
+  - [x] 3.2 Run Backend PDF tests and smoke test PDF generation with `barspalogo.png`. <!-- id: test_pdf_smoke -->
+  - [x] 3.3 Repository audit for Refah/Rifah/رفاه occurrences. <!-- id: repo_audit -->
+- [ ] 4. Git Commit & Push <!-- id: git_commit_push -->
+  - [ ] 4.1 Commit with message `feat(refah): complete BARSPA admin and PDF rebrand`. <!-- id: git_commit -->
+  - [ ] 4.2 Push to `origin/main`. <!-- id: git_push -->
+  - [ ] 4.3 Output final handoff report matching exact template. <!-- id: final_handoff -->

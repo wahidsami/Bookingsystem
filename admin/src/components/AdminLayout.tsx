@@ -199,10 +199,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </svg>
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">R</span>
-            </div>
-            <span className="font-semibold text-white">Rifah Admin</span>
+            <img src="/barspalogo.png" alt="BARSPA" className="h-7 w-auto object-contain" />
+            <span className="font-semibold text-white">BARSPA Admin</span>
           </div>
           <Link
             href="/dashboard/notifications"
@@ -227,12 +225,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         `}>
           {/* Sidebar Header */}
           <div className="flex items-center gap-3 px-6 py-5 border-b border-dark-700">
-            <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">R</span>
-            </div>
+            <img src="/barspalogo.png" alt="BARSPA" className="h-9 w-auto object-contain" />
             <div>
-              <h2 className="font-bold text-white">Rifah Admin</h2>
-              <p className="text-xs text-dark-400">Super Admin Panel</p>
+              <h2 className="font-bold text-white">BARSPA Admin</h2>
+              <p className="text-xs text-dark-400">Admin Dashboard</p>
             </div>
           </div>
 

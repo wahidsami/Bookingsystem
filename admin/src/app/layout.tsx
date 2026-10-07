@@ -4,8 +4,11 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Rifah Admin - Super Admin Dashboard",
-  description: "Rifah Platform Super Admin Dashboard",
+  title: "BARSPA Admin - Admin Dashboard",
+  description: "BARSPA Platform Admin Dashboard",
+  icons: {
+    icon: "/barspalogo.png",
+  },
 };
 
 export default function RootLayout({

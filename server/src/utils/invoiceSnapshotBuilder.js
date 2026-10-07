@@ -89,16 +89,16 @@ function getTenantLanguage(tenant) {
 function formatInvoiceTitle(type, locale) {
     const titles = {
         initial: {
-            ar: 'فاتورة اشتراك رفاه',
-            en: 'Refah Subscription Invoice'
+            ar: 'فاتورة اشتراك بارسبا',
+            en: 'BARSPA Subscription Invoice'
         },
         renewal: {
-            ar: 'فاتورة تجديد اشتراك رفاه',
-            en: 'Refah Subscription Renewal Invoice'
+            ar: 'فاتورة تجديد اشتراك بارسبا',
+            en: 'BARSPA Subscription Renewal Invoice'
         },
         upgrade: {
-            ar: 'فاتورة ترقية باقة رفاه',
-            en: 'Refah Package Upgrade Invoice'
+            ar: 'فاتورة ترقية باقة بارسبا',
+            en: 'BARSPA Package Upgrade Invoice'
         }
     };
 
@@ -120,8 +120,8 @@ async function getInvoiceSellerSnapshot() {
     }
 
     return {
-        sellerNameAr: settings?.invoiceSellerNameAr || 'رفاه',
-        sellerNameEn: settings?.invoiceSellerNameEn || 'Refah',
+        sellerNameAr: settings?.invoiceSellerNameAr || 'بارسبا',
+        sellerNameEn: settings?.invoiceSellerNameEn || 'BARSPA',
         vatNumber: settings?.invoiceVatNumber || null,
         crNumber: settings?.invoiceCrNumber || null,
         addressAr: settings?.invoiceAddressAr || null,
@@ -130,7 +130,7 @@ async function getInvoiceSellerSnapshot() {
         country: settings?.invoiceCountry || 'Saudi Arabia',
         email: settings?.invoiceEmail || null,
         phone: settings?.invoicePhone || null,
-        logoPath: settings?.invoiceLogoPath || '/uploads/logo-white.png',
+        logoPath: settings?.invoiceLogoPath || '/uploads/assets/barspalogo.png',
         footerNoteAr: settings?.invoiceFooterNoteAr || null,
         footerNoteEn: settings?.invoiceFooterNoteEn || null,
         taxRate: toNumber(settings?.taxRate, 15),
@@ -226,7 +226,7 @@ async function buildSubscriptionInvoiceSnapshot({
     const invoiceUuid = randomUUID();
     const zatcaInvoiceTimestamp = formatSaudiIsoTimestamp(issueDate);
     const zatcaQrPayload = buildZatcaPhase1QrPayload({
-        sellerName: sellerSnapshot.sellerNameAr || sellerSnapshot.sellerNameEn || 'Refah',
+        sellerName: sellerSnapshot.sellerNameAr || sellerSnapshot.sellerNameEn || 'BARSPA',
         vatNumber: sellerSnapshot.vatNumber || '',
         invoiceTimestamp: issueDate,
         totalAmount: finalTotalAmount,
@@ -263,8 +263,8 @@ async function buildSubscriptionInvoiceSnapshot({
         buyerSnapshot,
         lineItemsSnapshot: [{
             code: `SUBSCRIPTION_${(selectedCycle || 'monthly').toUpperCase()}`,
-            descriptionAr: planSnapshot.packageNameAr || planSnapshot.packageName || 'باقة اشتراك رفاه',
-            descriptionEn: planSnapshot.packageName || planSnapshot.packageNameAr || 'Refah subscription package',
+            descriptionAr: planSnapshot.packageNameAr || planSnapshot.packageName || 'باقة اشتراك بارسبا',
+            descriptionEn: planSnapshot.packageName || planSnapshot.packageNameAr || 'BARSPA subscription package',
             billingCycle: selectedCycle,
             billingCycleLabel: planSnapshot.billingCycleLabel,
             quantity: 1,

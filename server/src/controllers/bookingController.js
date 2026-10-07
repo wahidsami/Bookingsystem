@@ -1256,7 +1256,7 @@ const openInvite = async (req, res) => {
 
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Refah Appointment Invite</title>
+<title>BARSPA Appointment Invite</title>
 <style>
 body{font-family:Arial,sans-serif;padding:20px;max-width:560px;margin:0 auto;color:#111;background:#f7f7fb}
 .card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
@@ -1271,13 +1271,13 @@ button,a.button{display:inline-block;padding:10px 14px;border-radius:10px;border
 </style>
 </head><body>
 <div class="card">
-<h2 style="margin:0 0 10px 0;">Refah Appointment Confirmation</h2>
+<h2 style="margin:0 0 10px 0;">BARSPA Appointment Confirmation</h2>
 <p style="margin:0 0 12px 0;">Review and confirm your appointment.</p>
 <div id="details" class="row">Loading appointment details...</div>
 <div class="actions">
   <button class="primary" id="confirmBtn">Confirm Appointment</button>
   <button class="danger" id="declineBtn">Decline Appointment</button>
-  <a class="button ghost" href="${deepLinkPrimary}">Open in Refah App</a>
+  <a class="button ghost" href="${deepLinkPrimary}">Open in BARSPA App</a>
 </div>
 <p class="status" id="status"></p>
 <p class="muted">No app installed? You can confirm directly on this page. Install app: <a href="${androidStore}">Android</a> | <a href="${iosStore}">iOS</a></p>
@@ -1322,7 +1322,7 @@ async function loadInvite() {
     }
     const serviceName = (invite.service && (invite.service.name_en || invite.service.name_ar)) || 'Service';
     const staffName = invite.staff && invite.staff.name ? invite.staff.name : 'Provider';
-    const tenantName = invite.tenant && invite.tenant.name ? invite.tenant.name : 'Refah';
+    const tenantName = invite.tenant && invite.tenant.name ? invite.tenant.name : 'BARSPA';
     detailsEl.innerHTML =
       '<strong>Center:</strong> ' + tenantName + '<br/>' +
       '<strong>Service:</strong> ' + serviceName + '<br/>' +
@@ -1385,12 +1385,12 @@ const openReviewLink = async (req, res) => {
 
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Refah Review</title>
+<title>BARSPA Review</title>
 <style>body{font-family:Arial,sans-serif;padding:24px;max-width:520px;margin:0 auto;color:#111}a.button{display:inline-block;margin-top:8px;padding:10px 14px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px}small{display:block;margin-top:16px;color:#666}</style>
 </head><body>
 <h2>Rate Your Appointment</h2>
-<p>Open Refah app to leave your review.</p>
-<a class="button" href="${deepLinkPrimary}">Open Refah App</a>
+<p>Open BARSPA app to leave your review.</p>
+<a class="button" href="${deepLinkPrimary}">Open BARSPA App</a>
 <p>If you do not have the app yet, install it first:</p>
 <a href="${androidStore}">Android</a> | <a href="${iosStore}">iOS</a>
 <small>If the app did not open automatically, use the button above.</small>

@@ -50,8 +50,8 @@ const DEFAULT_SETTINGS: AdminSettingsState = {
   serviceCommissionRate: 10,
   productCommissionRate: 10,
   taxRate: 15,
-  invoiceSellerNameAr: "رفاه",
-  invoiceSellerNameEn: "Refah",
+  invoiceSellerNameAr: "بارسبا",
+  invoiceSellerNameEn: "BARSPA",
   invoiceVatNumber: "",
   invoiceCrNumber: "",
   invoiceAddressAr: "",
@@ -221,7 +221,7 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="text"
-                  value={settings.invoiceSellerNameEn || "Refah"}
+                  value={settings.invoiceSellerNameEn || "BARSPA"}
                   disabled
                   className="input opacity-60"
                 />
@@ -332,7 +332,7 @@ export default function SettingsPage() {
                 <div className="pt-4 border-t border-dark-700">
                   <p className="text-sm font-semibold text-white">Official Invoice Identity</p>
                   <p className="text-xs text-dark-400 mt-1">
-                    These values are copied into each newly issued Refah VAT invoice snapshot and QR metadata.
+                    These values are copied into each newly issued BARSPA VAT invoice snapshot and QR metadata.
                   </p>
                 </div>
 
@@ -347,7 +347,7 @@ export default function SettingsPage() {
                       value={settings.invoiceSellerNameAr}
                       onChange={handleChange}
                       className="input"
-                      placeholder="رفاه"
+                      placeholder="بارسبا"
                     />
                   </div>
                   <div>
@@ -360,7 +360,7 @@ export default function SettingsPage() {
                       value={settings.invoiceSellerNameEn}
                       onChange={handleChange}
                       className="input"
-                      placeholder="Refah"
+                      placeholder="BARSPA"
                     />
                   </div>
                   <div>
@@ -425,7 +425,7 @@ export default function SettingsPage() {
                       value={settings.invoiceEmail}
                       onChange={handleChange}
                       className="input"
-                      placeholder="billing@refah.sa"
+                      placeholder="billing@barspa.com"
                     />
                   </div>
                   <div>
@@ -478,7 +478,7 @@ export default function SettingsPage() {
                     value={settings.invoiceAddressAr}
                     onChange={handleChange}
                     className="input min-h-[84px]"
-                    placeholder="العنوان الوطني لشركة رفاه"
+                    placeholder="العنوان الوطني لشركة بارسبا"
                   />
                 </div>
 
@@ -491,7 +491,7 @@ export default function SettingsPage() {
                     value={settings.invoiceAddressEn}
                     onChange={handleChange}
                     className="input min-h-[84px]"
-                    placeholder="Refah legal national address"
+                    placeholder="BARSPA legal national address"
                   />
                 </div>
 

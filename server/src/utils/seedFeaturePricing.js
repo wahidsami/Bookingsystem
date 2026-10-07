@@ -18,7 +18,7 @@ const DEFAULT_FEATURES = [
     { featureKey: 'aiContentAssistant', label: 'AI Content Assistant', unitLabel: 'per 1K tokens' },
     { featureKey: 'promotionalEmails', label: 'Promotional Emails', unitLabel: 'per email' },
     { featureKey: 'searchRankingBoost', label: 'Search Ranking Boost', unitLabel: 'per month' },
-    { featureKey: 'newToRefah', label: 'New to Refah Tag', unitLabel: 'per day' }
+    { featureKey: 'newToRefah', label: 'New to BARSPA Tag', unitLabel: 'per day' }
 ];
 
 async function seedFeaturePricing() {

@@ -60,7 +60,7 @@ function getKeyLimitsList(limits: any): { label: string; value: string }[] {
     if (limits.hasProductsAndOrders === true) list.push({ label: 'Products & orders', value: 'Included' });
     if (limits.hasInternalMessaging === true) list.push({ label: 'Internal messaging', value: 'Included' });
     if (limits.hasNewToRefah === true)
-        list.push({ label: 'New to Refah', value: limits.newToRefahDays ? `${limits.newToRefahDays} days` : 'Included' });
+        list.push({ label: 'New to BARSPA', value: limits.newToRefahDays ? `${limits.newToRefahDays} days` : 'Included' });
     if (limits.featuredCarousel === true)
         list.push({ label: 'Featured carousel', value: limits.carouselPriority ? `${limits.carouselPriority}` : 'Included' });
     if (limits.hotDealsAutoApprove === true) list.push({ label: 'Hot deals auto-approve', value: 'Included' });
