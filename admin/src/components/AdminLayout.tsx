@@ -198,9 +198,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <div className="flex items-center gap-2">
-            <img src="/barspalogo.png" alt="BARSPA" className="h-7 w-auto object-contain" />
-            <span className="font-semibold text-white">BARSPA Admin</span>
+          <div className="flex items-center gap-2.5">
+            <div className="bg-white rounded-lg p-1 px-2 shadow-sm border border-purple-100/40 flex items-center justify-center shrink-0">
+              <img src="/barspalogo.png" alt="BARSPA" className="h-6 w-auto object-contain" />
+            </div>
+            <span className="font-bold text-white tracking-tight">BARSPA Admin</span>
           </div>
           <Link
             href="/dashboard/notifications"
@@ -224,11 +226,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
           {/* Sidebar Header */}
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-dark-700">
-            <img src="/barspalogo.png" alt="BARSPA" className="h-9 w-auto object-contain" />
-            <div>
-              <h2 className="font-bold text-white">BARSPA Admin</h2>
-              <p className="text-xs text-dark-400">Admin Dashboard</p>
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-dark-700/80 bg-dark-900/40">
+            <div className="bg-white rounded-xl p-1.5 px-2.5 shadow-md shadow-black/20 border border-purple-100/50 flex items-center justify-center shrink-0">
+              <img src="/barspalogo.png" alt="BARSPA" className="h-7 w-auto object-contain" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-bold text-white text-base leading-tight tracking-tight truncate">BARSPA Admin</h2>
+              <p className="text-[11px] text-primary-300 font-medium tracking-wide">Admin Dashboard</p>
             </div>
           </div>
 

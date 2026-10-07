@@ -41,47 +41,53 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-dark-950 via-[#0e0728] to-dark-950 p-4 relative overflow-hidden">
       {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary-600/15 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-primary-700/15 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-md">
-        {/* Logo */}
+        {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
+          <div className="inline-flex items-center justify-center p-4 px-7 rounded-2xl bg-white shadow-2xl shadow-primary-950/40 border border-purple-100/60 mb-5 ring-1 ring-white/60">
             <img
               src="/barspalogo.png"
               alt="BARSPA"
-              className="h-14 w-auto max-w-[200px] object-contain drop-shadow"
+              className="h-16 sm:h-20 w-auto max-w-[240px] object-contain drop-shadow-sm"
             />
           </div>
-          <h1 className="text-3xl font-bold text-white">BARSPA Admin</h1>
-          <p className="text-dark-400 mt-2">BARSPA Admin Dashboard</p>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">BARSPA Admin</h1>
+          <p className="text-primary-200/80 text-sm mt-1.5 font-medium tracking-wide">
+            BARSPA Admin Dashboard
+          </p>
         </div>
 
         {/* Login Card */}
-        <div className="card p-8">
-          <h2 className="text-xl font-semibold text-white mb-6">Welcome back</h2>
+        <div className="bg-dark-800/95 backdrop-blur-xl border border-dark-700/80 hover:border-primary-500/30 rounded-2xl p-8 shadow-2xl shadow-black/40 transition-all">
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-white tracking-tight">Welcome back</h2>
+            <p className="text-xs text-dark-400 mt-1">Sign in with your administrator credentials</p>
+          </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-danger/10 border border-danger/20 rounded-lg text-danger text-sm">
-              {error}
+            <div className="mb-6 p-4 bg-danger/10 border border-danger/20 rounded-xl text-danger text-sm flex items-start gap-2.5">
+              <span className="text-base shrink-0">⚠️</span>
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-dark-300 mb-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-dark-300 mb-2">
                 Email Address
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input"
+                className="input py-2.5 bg-dark-900/70 border-dark-600/80 text-white placeholder-dark-500 rounded-xl text-sm"
                 placeholder="admin@barspa.com"
                 required
                 autoFocus
@@ -89,14 +95,14 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-dark-300 mb-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-dark-300 mb-2">
                 Password
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input"
+                className="input py-2.5 bg-dark-900/70 border-dark-600/80 text-white placeholder-dark-500 rounded-xl text-sm"
                 placeholder="••••••••"
                 required
               />
@@ -105,7 +111,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn btn-primary w-full py-3"
+              className="btn btn-primary w-full py-3 rounded-xl font-semibold text-sm shadow-lg shadow-primary-600/20 active:scale-[0.99] transition-all"
             >
               {loading ? (
                 <>
@@ -118,10 +124,9 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-dark-700">
-            <p className="text-dark-400 text-sm text-center">
-              Protected area. Authorized personnel only.
-            </p>
+          <div className="mt-6 pt-6 border-t border-dark-700/60 flex items-center justify-center gap-1.5 text-dark-400 text-xs">
+            <span>🔒</span>
+            <span>Protected area. Authorized personnel only.</span>
           </div>
         </div>
       </div>

@@ -10,17 +10,38 @@ const config: Config = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: "#6366F1", // Indigo
-          50: "#EEF2FF",
-          100: "#E0E7FF",
-          200: "#C7D2FE",
-          300: "#A5B4FC",
-          400: "#818CF8",
-          500: "#6366F1",
-          600: "#4F46E5",
-          700: "#4338CA",
-          800: "#3730A3",
-          900: "#312E81",
+          DEFAULT: "#6537C0", // Canonical BARSPA Brand Purple
+          50: "#FAF7FD",
+          100: "#F3EDFC",
+          200: "#E7DDFC",
+          300: "#D0BFF8",
+          400: "#A379E2",
+          500: "#6537C0",
+          600: "#5527B0",
+          700: "#451C90",
+          800: "#1D035F",
+          900: "#12023F",
+          950: "#0A0124",
+        },
+        brand: {
+          50: "#FAF7FD",
+          100: "#F3EDFC",
+          200: "#E7DDFC",
+          300: "#D0BFF8",
+          400: "#A379E2",
+          500: "#6537C0",
+          600: "#5527B0",
+          700: "#451C90",
+          800: "#1D035F",
+          900: "#12023F",
+          950: "#0A0124",
+        },
+        barspa: {
+          primary: "#6537C0",
+          deep: "#1D035F",
+          soft: "#A379E2",
+          light: "#E7DDFC",
+          lavender: "#F3EDFC",
         },
         dark: {
           DEFAULT: "#0F172A", // Slate 900

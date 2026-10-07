@@ -328,7 +328,28 @@ The following canonical RTL files are FROZEN and protected from modification:
   - [x] 3.1 Build Admin (`npm run build` in `admin/`). <!-- id: test_admin_build -->
   - [x] 3.2 Run Backend PDF tests and smoke test PDF generation with `barspalogo.png`. <!-- id: test_pdf_smoke -->
   - [x] 3.3 Repository audit for Refah/Rifah/رفاه occurrences. <!-- id: repo_audit -->
-- [ ] 4. Git Commit & Push <!-- id: git_commit_push -->
-  - [ ] 4.1 Commit with message `feat(refah): complete BARSPA admin and PDF rebrand`. <!-- id: git_commit -->
-  - [ ] 4.2 Push to `origin/main`. <!-- id: git_push -->
-  - [ ] 4.3 Output final handoff report matching exact template. <!-- id: final_handoff -->
+- [x] 4. Git Commit & Push <!-- id: git_commit_push -->
+  - [x] 4.1 Commit with message `feat(refah): complete BARSPA admin and PDF rebrand`. <!-- id: git_commit -->
+  - [x] 4.2 Push to `origin/main`. <!-- id: git_push -->
+  - [x] 4.3 Output final handoff report matching exact template. <!-- id: final_handoff -->
+
+# BARSPA Admin — Final Visual Theme Audit
+- [x] 1. Audit Existing Admin CSS and Brand Identity <!-- id: theme_audit -->
+  - Audit `admin/tailwind.config.ts`, `globals.css`, color palette, brand tokens.
+  - Inspect `barspalogo.png` properties (dimensions, transparency, color scheme).
+  - Search repository for existing BARSPA brand colors (#..., purple, violet, mauve).
+- [x] 2. Logo Contrast & Presentation Fix <!-- id: logo_contrast -->
+  - Option A: Implement premium logo container (soft white/off-white background, elegant radius, subtle shadow, appropriate padding).
+  - Ensure logo rendered dimensions have proper visual presence without distortion or horizontal/vertical stretching.
+  - Apply clean logo presentation to both Login page, Sidebar, and Mobile header.
+- [x] 3. Polish Admin Login Page & Layout Theme <!-- id: login_theme -->
+  - Enhance Login page layout, card elevation, border styling, inputs, and primary button with BARSPA brand palette.
+  - Align typography hierarchy, accessibility contrast, and responsive layout.
+  - Ensure AdminLayout sidebar and shell reflect the coherent BARSPA aesthetic.
+- [x] 4. Verification & Testing <!-- id: theme_verification -->
+  - Run `npm run build` in `admin/` to verify zero TypeScript/ESLint/Next.js build errors.
+  - Review `git status` and `git diff`.
+- [x] 5. Commit and Push <!-- id: theme_commit_push -->
+  - Commit: `feat(admin): polish BARSPA admin theme and logo presentation`.
+  - Push to `origin/main`.
+  - Provide final handoff report.
