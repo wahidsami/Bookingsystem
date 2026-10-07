@@ -44,6 +44,13 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'tenantId',
                 as: 'resources'
             });
+
+            if (models.TenantServiceCategory) {
+                Tenant.hasMany(models.TenantServiceCategory, {
+                    foreignKey: 'tenantId',
+                    as: 'serviceCategories'
+                });
+            }
         }
     }
     Tenant.init({
@@ -509,14 +516,6 @@ module.exports = (sequelize, DataTypes) => {
     Tenant.prototype.comparePassword = async function(candidatePassword) {
         const bcrypt = require('bcrypt');
         return await bcrypt.compare(candidatePassword, this.password);
-    };
-
-    // Associations
-    Tenant.associate = (models) => {
-        Tenant.hasMany(models.TenantServiceCategory, {
-            foreignKey: 'tenantId',
-            as: 'serviceCategories'
-        });
     };
 
     return Tenant;

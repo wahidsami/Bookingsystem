@@ -272,7 +272,11 @@ const getTenantDetails = async (req, res) => {
                 order: [['createdAt', 'DESC']]
             })
         ]);
-        const tenantData = tenant.toJSON();
+        const tenantJson = tenant.toJSON();
+        const tenantData = {
+            ...tenantJson,
+            ...buildTenantPlanSnapshot(tenantJson, subscription)
+        };
         tenantData.stats = {
             ...(tenantData.stats || {}),
             ...bookingStats

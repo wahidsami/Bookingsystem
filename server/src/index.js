@@ -28,11 +28,35 @@ app.set('trust proxy', trustProxyValue);
 // ========================================
 // CORS Configuration - Environment-based
 // ========================================
-const normalizeOrigin = (value) => `${value || ''}`.trim().replace(/\/+$/, '');
+const normalizeOrigin = (value) => `${value || ''}`.trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
+
+const defaultAllowedOrigins = [
+    'https://rifah.sa',
+    'https://www.rifah.sa',
+    'https://admin.rifah.sa',
+    'https://tenant.rifah.sa',
+    'https://public.rifah.sa',
+    'https://radmin.unifinitylab.com',
+    'https://rtenant.unifinitylab.com',
+    'https://rtenantv2.unifinitylab.com',
+    'https://refah.unifinitylab.com',
+    'https://rapi.unifinitylab.com',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:3003',
+    'http://localhost:3004',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:3002',
+    'http://127.0.0.1:3003',
+    'http://127.0.0.1:3004'
+];
 
 const allowedOriginPatterns = [
     /^https:\/\/([a-z0-9-]+\.)?rifah\.sa$/i,
     /^https:\/\/([a-z0-9-]+\.)?unifinitylab\.com$/i,
+    /^https?:\/\/([a-z0-9-]+\.)?sslip\.io$/i,
     /^http:\/\/localhost(:\d+)?$/i,
     /^http:\/\/127\.0\.0\.1(:\d+)?$/i,
 ];
@@ -41,6 +65,10 @@ const isAllowedOrigin = (origin) => {
     const normalizedOrigin = normalizeOrigin(origin);
     if (!normalizedOrigin) {
         return false;
+    }
+
+    if (defaultAllowedOrigins.includes(normalizedOrigin)) {
+        return true;
     }
 
     const envOrigins = (process.env.CORS_ORIGINS || '')
@@ -56,47 +84,42 @@ const isAllowedOrigin = (origin) => {
 };
 
 const getCorsOrigins = () => {
-    const env = process.env.NODE_ENV || 'development';
+    const envOrigins = (process.env.CORS_ORIGINS || '')
+        .split(',')
+        .map(o => normalizeOrigin(o))
+        .filter(Boolean);
 
-    // Parse environment variable if it exists
-    if (process.env.CORS_ORIGINS) {
-        const parsed = process.env.CORS_ORIGINS.split(',').map(o => normalizeOrigin(o)).filter(Boolean);
-        if (parsed.length > 0) return parsed;
-    }
-
-    const defaultProdOrigins = [
-        'https://rifah.sa',
-        'https://www.rifah.sa',
-        'https://admin.rifah.sa',
-        'https://tenant.rifah.sa',
-        'https://public.rifah.sa',
-        'https://radmin.unifinitylab.com',
-        'https://rtenant.unifinitylab.com'
-    ];
-
-    if (env === 'production') {
-        return defaultProdOrigins;
-    }
-
-    // Development fallback (includes prod domains just in case NODE_ENV isn't set right)
-    return [
-        ...defaultProdOrigins,
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:3002',
-        'http://localhost:3003',
-        'http://localhost:3004',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:3002',
-        'http://127.0.0.1:3003',
-        'http://127.0.0.1:3004'
-    ];
+    return Array.from(new Set([...defaultAllowedOrigins, ...envOrigins]));
 };
 
 // Initialize Redis
 redisService.initRedis();
 
 const PORT = process.env.PORT || 5000;
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || isAllowedOrigin(origin)) {
+            return callback(null, true);
+        }
+        return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'X-Forwarded-For',
+        'X-Tenant-Id',
+        'Cache-Control',
+        'Pragma'
+    ],
+    exposedHeaders: ['Content-Disposition', 'Content-Type', 'Content-Length'],
+    optionsSuccessStatus: 204
+};
 
 // Middleware - CORS with environment-based origins
 app.use((req, res, next) => {
@@ -115,28 +138,16 @@ app.use((req, res, next) => {
     }
 
     if (req.method === 'OPTIONS') {
-        return res.sendStatus(204);
+        if (requestOrigin && isAllowedOrigin(requestOrigin)) {
+            return res.sendStatus(204);
+        }
     }
 
     next();
 });
 
-app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin) {
-            return callback(null, true);
-        }
-
-        if (isAllowedOrigin(origin)) {
-            return callback(null, true);
-        }
-
-        return callback(null, false);
-    },
-    credentials: true,
-    exposedHeaders: ['Content-Disposition', 'Content-Type', 'Content-Length'],
-    optionsSuccessStatus: 204
-}));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Serve uploaded files FIRST (before helmet) with proper CORS headers
 app.use('/uploads', (req, res, next) => {
