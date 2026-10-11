@@ -817,6 +817,13 @@ export default function InteractiveDrawers({
     tenantServiceCategoryId: service.tenantServiceCategoryId || (service as any).tenant_service_category_id || null
   })), [services]);
   const serviceCategories = useMemo(() => groupServicesByCategory(canonicalServices), [canonicalServices]);
+  const effectiveBundles = useMemo(() => {
+    if (services2Bundles && services2Bundles.length > 0) {
+      return services2Bundles;
+    }
+    return servicePackages || [];
+  }, [services2Bundles, servicePackages]);
+
   const serviceCategoryTabs = useMemo(() => {
     const tabs = [
       { key: 'all', labelAr: 'الكل', labelEn: 'All' }
@@ -831,7 +838,7 @@ export default function InteractiveDrawers({
     });
 
     const hasUncategorizedServices = canonicalServices.some(s => !resolveServiceOrBundleCategory(s, tenantCategories));
-    const hasUncategorizedBundles = (services2Bundles || []).some(b => !resolveServiceOrBundleCategory(b, tenantCategories));
+    const hasUncategorizedBundles = effectiveBundles.some(b => !resolveServiceOrBundleCategory(b, tenantCategories));
     if (hasUncategorizedServices || hasUncategorizedBundles) {
       tabs.push({
         key: 'uncategorized',
@@ -841,14 +848,7 @@ export default function InteractiveDrawers({
     }
 
     return tabs;
-  }, [tenantCategories, canonicalServices, services2Bundles]);
-
-  const effectiveBundles = useMemo(() => {
-    if (services2Bundles && services2Bundles.length > 0) {
-      return services2Bundles;
-    }
-    return servicePackages || [];
-  }, [services2Bundles, servicePackages]);
+  }, [tenantCategories, canonicalServices, effectiveBundles]);
 
   const categorySections = useMemo(() => {
     const query = serviceSearch.trim().toLowerCase();
@@ -870,14 +870,16 @@ export default function InteractiveDrawers({
       if (currentServiceCategory !== 'all' && currentServiceCategory !== cat.id) return;
 
       const catServices = canonicalServices.filter(s => {
-        const matchCat = resolveServiceOrBundleCategory(s, tenantCategories);
-        if (matchCat !== cat.id) return false;
+        const resolved = resolveServiceOrBundleCategory(s, tenantCategories);
+        const matchesCategory = resolved ? (resolved.id === cat.id || (resolved.slug && resolved.slug === cat.slug)) : false;
+        if (!matchesCategory) return false;
         return matchesQuery(s.nameAr, s.nameEn, s.descriptionAr, s.descriptionEn);
       });
 
       const catBundles = effectiveBundles.filter(b => {
-        const matchCat = resolveServiceOrBundleCategory(b, tenantCategories);
-        if (matchCat !== cat.id) return false;
+        const resolved = resolveServiceOrBundleCategory(b, tenantCategories);
+        const matchesCategory = resolved ? (resolved.id === cat.id || (resolved.slug && resolved.slug === cat.slug)) : false;
+        if (!matchesCategory) return false;
         return matchesQuery(b.name_ar || b.nameAr, b.name_en || b.nameEn, b.description_ar || b.descriptionAr, b.description_en || b.descriptionEn);
       });
 
@@ -894,14 +896,14 @@ export default function InteractiveDrawers({
 
     if (currentServiceCategory === 'all' || currentServiceCategory === 'uncategorized') {
       const uncatServices = canonicalServices.filter(s => {
-        const matchCat = resolveServiceOrBundleCategory(s, tenantCategories);
-        if (matchCat) return false;
+        const resolved = resolveServiceOrBundleCategory(s, tenantCategories);
+        if (resolved) return false;
         return matchesQuery(s.nameAr, s.nameEn, s.descriptionAr, s.descriptionEn);
       });
 
       const uncatBundles = effectiveBundles.filter(b => {
-        const matchCat = resolveServiceOrBundleCategory(b, tenantCategories);
-        if (matchCat) return false;
+        const resolved = resolveServiceOrBundleCategory(b, tenantCategories);
+        if (resolved) return false;
         return matchesQuery(b.name_ar || b.nameAr, b.name_en || b.nameEn, b.description_ar || b.descriptionAr, b.description_en || b.descriptionEn);
       });
 
@@ -920,12 +922,31 @@ export default function InteractiveDrawers({
   }, [canonicalServices, effectiveBundles, tenantCategories, currentServiceCategory, serviceSearch]);
 
   const tabCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: canonicalServices.length + effectiveBundles.length };
+    const counts: Record<string, number> = { all: 0, uncategorized: 0 };
     (tenantCategories || []).forEach(cat => {
-      const sCount = canonicalServices.filter(s => resolveServiceOrBundleCategory(s, tenantCategories) === cat.id).length;
-      const bCount = effectiveBundles.filter(b => resolveServiceOrBundleCategory(b, tenantCategories) === cat.id).length;
-      counts[cat.id] = sCount + bCount;
+      counts[cat.id] = 0;
     });
+
+    canonicalServices.forEach(s => {
+      counts.all = (counts.all || 0) + 1;
+      const cat = resolveServiceOrBundleCategory(s, tenantCategories);
+      if (cat && cat.id && counts[cat.id] !== undefined) {
+        counts[cat.id] = (counts[cat.id] || 0) + 1;
+      } else {
+        counts.uncategorized = (counts.uncategorized || 0) + 1;
+      }
+    });
+
+    effectiveBundles.forEach(b => {
+      counts.all = (counts.all || 0) + 1;
+      const cat = resolveServiceOrBundleCategory(b, tenantCategories);
+      if (cat && cat.id && counts[cat.id] !== undefined) {
+        counts[cat.id] = (counts[cat.id] || 0) + 1;
+      } else {
+        counts.uncategorized = (counts.uncategorized || 0) + 1;
+      }
+    });
+
     return counts;
   }, [canonicalServices, effectiveBundles, tenantCategories]);
 

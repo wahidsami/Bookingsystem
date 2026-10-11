@@ -403,7 +403,13 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Run `npm run build` in `Tenant-v2` (PASSED).
   - Run backend walkin tests in `server/` (PASSED).
   - Verify layout responsiveness, walk-in compatibility, and invoice totals.
-- [ ] 7. Change Control & Handoff <!-- id: p2_handoff -->
-  - Stage and commit ONLY dedicated Phase 2 files.
-  - Push to `origin/main` and provide isolated Coolify deployment instructions.
+
+# BARSPA — Phase 2 Fix: Service Catalogue Category Resolution
+- [x] 1. Root Cause Identification: `resolveServiceOrBundleCategory` returns object, compared with string `cat.id` <!-- id: cat_root_cause -->
+- [x] 2. Apply fix in `InteractiveDrawers.tsx` for `categorySections` and `tabCounts` <!-- id: cat_apply_fix -->
+- [x] 3. Run typecheck, build, and backend test verification <!-- id: cat_verify -->
+- [ ] 4. Commit and push only dedicated fix to `origin/main` <!-- id: cat_commit_push -->
+- [ ] 5. Report root cause, files changed, verification results, commit SHA and handoff <!-- id: cat_report -->
+
+
 
