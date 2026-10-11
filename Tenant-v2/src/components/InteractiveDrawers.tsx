@@ -7,12 +7,16 @@ import { SmartConflictModal } from './appointment/SmartConflictModal';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Calendar, Loader2 as CalendarIcon, User, Users, PlusCircle, Check,
-  Trash, ChevronLeft, Loader2, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search, AlertCircle
+  Trash, ChevronLeft, Loader2, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search, AlertCircle,
+  ChevronDown, Clock, Layers, Package as PackageIcon, Settings2
 } from 'lucide-react';
 import AppointmentServicesStep from './appointment/AppointmentServicesStep';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import {
   getServiceDisplayName,
+  getServiceDisplayPrice,
+  isParentServiceBookable,
+  resolveServiceImageUrl,
   groupServicesByCategory,
   normalizeServiceRecord,
   resolveServiceOrBundleCategory,
@@ -667,6 +671,17 @@ export default function InteractiveDrawers({
   const [currentServiceCategory, setCurrentServiceCategory] = useState<string>('all');
   const [serviceSearch, setServiceSearch] = useState<string>('');
   const [stagedServices, setStagedServices] = useState<StagedService[]>([]);
+  const [mobileDrawerTab, setMobileDrawerTab] = useState<'booking' | 'catalogue'>('catalogue');
+  const [isOptionsExpanded, setIsOptionsExpanded] = useState(false);
+  const [expandedVariantServiceIds, setExpandedVariantServiceIds] = useState<Record<string, boolean>>({});
+  const [configuredServiceId, setConfiguredServiceId] = useState<string | null>(null);
+
+  const toggleVariants = (serviceId: string) => {
+    setExpandedVariantServiceIds(prev => ({
+      ...prev,
+      [serviceId]: !prev[serviceId]
+    }));
+  };
 
   // Canonical Identity Validation and Messages
   const IDENTITY_PREREQUISITE_MESSAGE = useMemo(() => ({
@@ -827,6 +842,174 @@ export default function InteractiveDrawers({
 
     return tabs;
   }, [tenantCategories, canonicalServices, services2Bundles]);
+
+  const effectiveBundles = useMemo(() => {
+    if (services2Bundles && services2Bundles.length > 0) {
+      return services2Bundles;
+    }
+    return servicePackages || [];
+  }, [services2Bundles, servicePackages]);
+
+  const categorySections = useMemo(() => {
+    const query = serviceSearch.trim().toLowerCase();
+
+    const matchesQuery = (nameAr?: string, nameEn?: string, descAr?: string, descEn?: string) => {
+      if (!query) return true;
+      return [nameAr, nameEn, descAr, descEn].some(val => `${val || ''}`.toLowerCase().includes(query));
+    };
+
+    const sections: Array<{
+      id: string;
+      labelAr: string;
+      labelEn: string;
+      services: ServiceRecord[];
+      bundles: any[];
+    }> = [];
+
+    (tenantCategories || []).forEach(cat => {
+      if (currentServiceCategory !== 'all' && currentServiceCategory !== cat.id) return;
+
+      const catServices = canonicalServices.filter(s => {
+        const matchCat = resolveServiceOrBundleCategory(s, tenantCategories);
+        if (matchCat !== cat.id) return false;
+        return matchesQuery(s.nameAr, s.nameEn, s.descriptionAr, s.descriptionEn);
+      });
+
+      const catBundles = effectiveBundles.filter(b => {
+        const matchCat = resolveServiceOrBundleCategory(b, tenantCategories);
+        if (matchCat !== cat.id) return false;
+        return matchesQuery(b.name_ar || b.nameAr, b.name_en || b.nameEn, b.description_ar || b.descriptionAr, b.description_en || b.descriptionEn);
+      });
+
+      if (catServices.length > 0 || catBundles.length > 0) {
+        sections.push({
+          id: cat.id,
+          labelAr: cat.name_ar || cat.nameAr || cat.name_en || 'فئة',
+          labelEn: cat.name_en || cat.nameEn || cat.name_ar || 'Category',
+          services: catServices,
+          bundles: catBundles
+        });
+      }
+    });
+
+    if (currentServiceCategory === 'all' || currentServiceCategory === 'uncategorized') {
+      const uncatServices = canonicalServices.filter(s => {
+        const matchCat = resolveServiceOrBundleCategory(s, tenantCategories);
+        if (matchCat) return false;
+        return matchesQuery(s.nameAr, s.nameEn, s.descriptionAr, s.descriptionEn);
+      });
+
+      const uncatBundles = effectiveBundles.filter(b => {
+        const matchCat = resolveServiceOrBundleCategory(b, tenantCategories);
+        if (matchCat) return false;
+        return matchesQuery(b.name_ar || b.nameAr, b.name_en || b.nameEn, b.description_ar || b.descriptionAr, b.description_en || b.descriptionEn);
+      });
+
+      if (uncatServices.length > 0 || uncatBundles.length > 0) {
+        sections.push({
+          id: 'uncategorized',
+          labelAr: 'غير مصنف',
+          labelEn: 'Uncategorized',
+          services: uncatServices,
+          bundles: uncatBundles
+        });
+      }
+    }
+
+    return sections;
+  }, [canonicalServices, effectiveBundles, tenantCategories, currentServiceCategory, serviceSearch]);
+
+  const tabCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: canonicalServices.length + effectiveBundles.length };
+    (tenantCategories || []).forEach(cat => {
+      const sCount = canonicalServices.filter(s => resolveServiceOrBundleCategory(s, tenantCategories) === cat.id).length;
+      const bCount = effectiveBundles.filter(b => resolveServiceOrBundleCategory(b, tenantCategories) === cat.id).length;
+      counts[cat.id] = sCount + bCount;
+    });
+    return counts;
+  }, [canonicalServices, effectiveBundles, tenantCategories]);
+
+  const appointmentInvoiceSummary = useMemo(() => {
+    const standaloneCartItems = stagedServices.filter(s => s.itemType !== 'package').map((item, index) => {
+      const srv = canonicalServices.find((service) => service.id === item.serviceId);
+      const variant = srv?.variants.find((entry) => entry.id === item.variantId) || srv?.variants[0] || null;
+      const staff = availableStylists.find((stylist) => stylist.id === item.staffId);
+      const basePrice = variant ? toMoney(variant.finalPrice ?? variant.price) : (srv ? toMoney(srv.price) : 0);
+      let finalPrice = basePrice;
+      if (item.discountType === 'flat') {
+        finalPrice = Math.max(0, basePrice - (item.discountValue || 0));
+      } else if (item.discountType === 'percent') {
+        finalPrice = Math.max(0, basePrice - (basePrice * (item.discountValue || 0)) / 100);
+      }
+
+      const resolvedDuration = resolveBookingDuration(item.duration, variant?.duration, srv?.duration);
+
+      return {
+        id: item.id,
+        index,
+        itemType: 'service' as const,
+        serviceId: item.serviceId,
+        variantId: item.variantId,
+        serviceName: srv ? `${isRtl ? srv.nameAr : srv.nameEn}${variant ? ` / ${isRtl ? (variant.name_ar || variant.nameAr || variant.name_en || variant.nameEn) : (variant.name_en || variant.nameEn || variant.name_ar || variant.nameAr)}` : ''}` : item.serviceId,
+        staffId: item.staffId,
+        staffName: isRtl ? staff?.nameAr : staff?.nameEn,
+        duration: resolvedDuration,
+        startTime: item.startTime,
+        price: finalPrice,
+        basePrice,
+        hasDiscount: item.discountType !== 'none' && (item.discountValue || 0) > 0,
+        discountType: item.discountType,
+        discountValue: item.discountValue,
+        notes: item.notes
+      };
+    });
+
+    const pkgCartItems = stagedServices.filter(s => s.itemType === 'package');
+    const pkgGroups = pkgCartItems.reduce((acc, curr) => {
+      const groupKey = curr.packageInstanceId || curr.packageId!;
+      if (!acc[groupKey]) acc[groupKey] = [];
+      acc[groupKey].push(curr);
+      return acc;
+    }, {} as Record<string, typeof stagedServices>);
+
+    const packageCartItems = Object.entries(pkgGroups).map(([instanceId, items]: [string, any[]]) => {
+      const pkgId = items[0].packageId;
+      const pkg = services2Bundles?.find(p => p.id === pkgId) || servicePackages?.find(p => p.id === pkgId);
+      const packagePrice = Number(pkg?.totalPrice ?? 0);
+      const isParallel = pkg?.scheduleType === 'parallel';
+      const duration = isParallel
+        ? Math.max(...items.map(it => Number(it.duration || 0)))
+        : (pkg?.totalDuration || items.reduce((sum, it) => sum + Number(it.duration || 0), 0));
+      return {
+        id: instanceId,
+        itemType: 'package' as const,
+        packageId: pkgId,
+        serviceName: pkg ? (isRtl ? pkg.name_ar || pkg.nameAr : pkg.name_en || pkg.nameEn) : 'Package',
+        staffName: items.length + (isRtl ? (isParallel ? ' خدمات متزامنة' : ' خدمات') : (isParallel ? ' parallel services' : ' services')),
+        duration,
+        startTime: items[0]?.startTime || 0,
+        price: packagePrice,
+        basePrice: packagePrice,
+        hasDiscount: false,
+        isParallel,
+        childItems: items
+      };
+    });
+
+    const queuedLineItems = [...packageCartItems, ...standaloneCartItems];
+    const subtotal = queuedLineItems.reduce((sum, item) => sum + item.price, 0);
+    const vat = subtotal * 0.15;
+    const total = subtotal + vat;
+
+    return {
+      standaloneCartItems,
+      packageCartItems,
+      queuedLineItems,
+      subtotal,
+      vat,
+      total
+    };
+  }, [stagedServices, canonicalServices, availableStylists, isRtl, services2Bundles, servicePackages]);
 
   useEffect(() => {
     if (createStep === 3 && stagedServices.length === 0) {
@@ -1716,17 +1899,6 @@ export default function InteractiveDrawers({
         [service.id]: false
       }));
     } else {
-      // Defense-in-depth: Reject adding service if identity prerequisite is not met
-      if (!hasAppointmentIdentity(custMode, selectedCustId)) {
-        addLocalToast(
-          IDENTITY_PREREQUISITE_MESSAGE.ar,
-          IDENTITY_PREREQUISITE_MESSAGE.en,
-          'warning'
-        );
-        safeSetCreateStep(1);
-        return;
-      }
-
       const resolvedVariant = variantOverride || null;
       let nextStartTime = currentStartTime;
       const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
@@ -1771,7 +1943,6 @@ export default function InteractiveDrawers({
         'success'
       );
 
-
       setExpandedServiceIds((current) => ({
         ...current,
         [service.id]: true
@@ -1780,17 +1951,6 @@ export default function InteractiveDrawers({
   };
 
   const handleAddPackageToStaged = (pkgId: string) => {
-    // Defense-in-depth: Reject adding bundle if identity prerequisite is not met
-    if (!hasAppointmentIdentity(custMode, selectedCustId)) {
-      addLocalToast(
-        IDENTITY_PREREQUISITE_MESSAGE.ar,
-        IDENTITY_PREREQUISITE_MESSAGE.en,
-        'warning'
-      );
-      safeSetCreateStep(1);
-      return;
-    }
-
     const pkg = services2Bundles?.find(p => p.id === pkgId) || servicePackages?.find(p => p.id === pkgId);
     if (!pkg || !pkg.items || pkg.items.length === 0) {
       addLocalToast(
@@ -2753,7 +2913,9 @@ export default function InteractiveDrawers({
               animate={{ x: 0 }}
               exit={{ x: isRtl ? '-100%' : '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 220 }}
-              className={`relative w-full max-w-3xl h-screen bg-slate-50 shadow-2xl flex flex-col z-10 overflow-hidden ${
+              className={`relative w-full ${
+                createMode === 'appointment' ? 'max-w-4xl lg:max-w-6xl xl:max-w-7xl' : 'max-w-3xl'
+              } h-screen bg-slate-50 shadow-2xl flex flex-col z-10 overflow-hidden ${
                 isRtl ? 'border-r border-slate-200' : 'border-l border-slate-200'
               }`}
             >
@@ -2868,69 +3030,57 @@ export default function InteractiveDrawers({
               </div>
 
               {createMode === 'appointment' ? (
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  {/* Read-Only Step Progress Indicator */}
-                  <div
-                    className="px-5 py-2.5 bg-slate-100/90 border-b border-slate-200 flex items-center justify-between text-xs select-none cursor-default"
-                    aria-label={isRtl ? 'مؤشر مراحل الحجز' : 'Appointment booking progress'}
-                  >
-                    <ol className="flex items-center gap-2 sm:gap-4 list-none m-0 p-0">
-                      {[
-                        { step: 1, labelAr: 'بيانات العميل', labelEn: 'Identity' },
-                        { step: 2, labelAr: 'الخدمات والجدولة', labelEn: 'Services' },
-                        { step: 3, labelAr: 'الفاتورة والسداد', labelEn: 'Invoice' }
-                      ].map((item, idx, arr) => {
-                        const isCurrent = createStep === item.step;
-                        const isCompleted = createStep > item.step;
-                        return (
-                          <li
-                            key={item.step}
-                            aria-current={isCurrent ? 'step' : undefined}
-                            className={`flex items-center gap-1.5 transition-colors select-none ${
-                              isCurrent
-                                ? 'text-[#6537C0] font-black'
-                                : isCompleted
-                                  ? 'text-slate-700 font-bold'
-                                  : 'text-slate-400 font-medium'
-                            }`}
-                          >
-                            <span
-                              className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-mono shrink-0 select-none ${
-                                isCurrent
-                                  ? 'bg-[#6537C0] text-white font-black shadow-xs ring-2 ring-[#6537C0]/20'
-                                  : isCompleted
-                                    ? 'bg-[#6537C0]/15 text-[#6537C0] font-black border border-[#6537C0]/30'
-                                    : 'bg-slate-200 text-slate-500 font-medium'
-                              }`}
-                            >
-                              {isCompleted ? '✓' : item.step}
-                            </span>
-                            <span className="truncate">{isRtl ? item.labelAr : item.labelEn}</span>
-                            {idx < arr.length - 1 && (
-                              <span className="text-slate-300 font-normal mx-0.5 sm:mx-1 select-none" aria-hidden="true">
-                                /
-                              </span>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ol>
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                  {/* Mobile Navigation Header: Switcher between Booking/Invoice and Service Catalogue (hidden on desktop) */}
+                  <div className="lg:hidden flex border-b border-slate-200 bg-white select-none shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setMobileDrawerTab('booking')}
+                      className={`flex-1 py-3 px-3 text-xs font-bold flex items-center justify-center gap-2 border-b-2 transition-all cursor-pointer ${
+                        mobileDrawerTab === 'booking'
+                          ? 'border-[#6537C0] text-[#6537C0] bg-purple-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <User className="w-4 h-4" />
+                      <span>{isRtl ? 'تفاصيل الموعد والفاتورة' : 'Booking & Invoice'}</span>
+                      {stagedServices.length > 0 && (
+                        <span className="bg-[#6537C0] text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono">
+                          {stagedServices.length}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobileDrawerTab('catalogue')}
+                      className={`flex-1 py-3 px-3 text-xs font-bold flex items-center justify-center gap-2 border-b-2 transition-all cursor-pointer ${
+                        mobileDrawerTab === 'catalogue'
+                          ? 'border-[#6537C0] text-[#6537C0] bg-purple-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <Search className="w-4 h-4" />
+                      <span>{isRtl ? 'كتالوج الخدمات' : 'Service Catalogue'}</span>
+                    </button>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    {createStep === 1 && (
-                      <div className="space-y-4 animate-fadeIn">
-                        <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                            <div>
-                              <label className="block text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">
-                                {isRtl ? 'تصنيف ملف العميل لحجز الموعد' : 'Booking Guest Category'}
-                              </label>
-                              <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-                                {isRtl ? 'بيانات العميل' : 'Identity'}
-                              </h3>
-                            </div>
-                            <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+                  {/* Two-Column Responsive Workspace: Side-by-side on lg+ screens */}
+                  <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+                    
+                    {/* COLUMN 1: Booking Details, Customer, Queued Services, Progressive Disclosure & Persistent Invoice */}
+                    <div className={`w-full lg:w-[480px] xl:w-[500px] shrink-0 border-e border-slate-200 flex flex-col h-full bg-slate-50 min-h-0 overflow-hidden ${
+                      mobileDrawerTab !== 'booking' ? 'hidden lg:flex' : 'flex'
+                    }`}>
+                      {/* Scrollable upper body */}
+                      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+                        
+                        {/* 1. Customer Identification Card */}
+                        <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                              {isRtl ? 'بيانات العميل' : 'Client Profile'}
+                            </span>
+                            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5">
                               {([
                                 { key: 'existing', icon: User, labelEn: 'Registered', labelAr: 'مسجل' },
                                 { key: 'walkin', icon: Users, labelEn: 'Walk-in', labelAr: 'زائر' }
@@ -2942,13 +3092,13 @@ export default function InteractiveDrawers({
                                     key={mode.key}
                                     type="button"
                                     onClick={() => setCustMode(mode.key)}
-                                    className={`inline-flex items-center gap-2 rounded-[18px] px-4 py-2 text-sm font-semibold transition ${
+                                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
                                       active
-                                        ? 'bg-[#6537C0] text-white shadow-sm'
-                                        : 'text-slate-500 hover:bg-white hover:text-slate-900'
+                                        ? 'bg-[#6537C0] text-white shadow-xs'
+                                        : 'text-slate-500 hover:text-slate-900'
                                     }`}
                                   >
-                                    <Icon className="h-4 w-4" />
+                                    <Icon className="h-3.5 w-3.5" />
                                     <span>{isRtl ? mode.labelAr : mode.labelEn}</span>
                                   </button>
                                 );
@@ -2956,510 +3106,796 @@ export default function InteractiveDrawers({
                             </div>
                           </div>
 
-                          {identityValidationError && !hasAppointmentIdentity(custMode, selectedCustId) && (
-                            <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-950 flex items-center gap-2.5 animate-fadeIn">
-                              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                              <span>{isRtl ? IDENTITY_PREREQUISITE_MESSAGE.ar : IDENTITY_PREREQUISITE_MESSAGE.en}</span>
-                            </div>
-                          )}
-
-                          <div className="mt-6">
-                            {custMode === 'existing' ? (
-                              <div className="space-y-4">
-                                <div>
-                                  <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                    {isRtl ? 'البحث واختيار عميلة مسجلة' : 'Search & Select Customer'}
-                                  </label>
+                          {custMode === 'existing' ? (
+                            <div className="space-y-2.5">
+                              {selectedRegisteredCustomer ? (
+                                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-emerald-200 text-sm font-black text-emerald-700 shadow-2xs">
+                                      {`${selectedRegisteredCustomer.name || 'U'}`.trim().charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-bold text-slate-900">
+                                        {selectedRegisteredCustomer.name}
+                                      </p>
+                                      <p className="truncate text-xs font-mono text-slate-600">
+                                        {selectedRegisteredCustomer.phone || selectedRegisteredCustomer.email || (isRtl ? 'عميل مسجل' : 'Registered customer')}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedCustId('')}
+                                    className="shrink-0 text-xs font-bold text-[#6537C0] hover:underline px-2 py-1 cursor-pointer"
+                                  >
+                                    {isRtl ? 'تغيير' : 'Change'}
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
                                   <div className="relative">
-                                    <Search className={`pointer-events-none absolute top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 ${isRtl ? 'right-4' : 'left-4'}`} />
+                                    <Search className={`pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isRtl ? 'right-3' : 'left-3'}`} />
                                     <input
                                       ref={registeredCustomerSearchRef}
                                       type="text"
                                       value={customerSearch}
                                       onChange={(e) => setCustomerSearch(e.target.value)}
                                       placeholder={isRtl ? 'ابحث باسم العميل أو رقم الجوال...' : 'Search by name or phone...'}
-                                      className={`w-full rounded-2xl border border-slate-200 bg-white py-4 text-base font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-4 focus:ring-[#6537C0]/15 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
+                                      className={`w-full rounded-xl border border-slate-200 bg-white py-2 text-xs font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
                                     />
                                   </div>
-                                </div>
 
-                                <div>
-                                  <p className="mb-2 mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                    {isRtl ? 'قائمة العملاء المسجلين' : 'Registered Customers'}
-                                  </p>
-                                  <div className="rounded-[22px] border border-slate-200 bg-white">
-                                    <div className="max-h-[360px] overflow-y-auto">
-                                      {filteredCustomers.length > 0 ? filteredCustomers.map((customer) => {
-                                        const active = selectedCustId === customer.id;
-                                        return (
-                                          <button
-                                            key={customer.id}
-                                            type="button"
-                                            onClick={() => setSelectedCustId(customer.id)}
-                                            className={`flex w-full items-center gap-4 border-b border-slate-100 px-5 py-4 text-start transition last:border-b-0 ${
-                                              active
-                                                ? 'bg-[#F3EDFC] text-slate-900 ring-1 ring-inset ring-[#6537C0]/30'
-                                                : 'bg-white text-slate-700 hover:bg-slate-50'
-                                            }`}
-                                          >
-                                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-base font-bold ${
-                                              active
-                                                ? 'border-[#A379E2]/40 bg-[#F3EDFC] text-[#6537C0]'
-                                                : 'border-slate-200 bg-slate-50 text-slate-500'
-                                            }`}>
-                                              {`${customer?.name || 'U'}`.trim().charAt(0).toUpperCase()}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                              <p className="truncate text-base font-semibold tracking-tight">{customer?.name || '—'}</p>
-                                              <p className="mt-0.5 truncate text-[12px] text-slate-400">
-                                                {customer?.email || (isRtl ? 'عميل مسجل' : 'Registered customer')}
-                                              </p>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                              <span className="shrink-0 text-sm font-mono text-slate-600">{customer?.phone || ''}</span>
-                                              {active ? <Check className="h-5 w-5 shrink-0 text-[#6537C0]" /> : <div className="h-5 w-5" />}
-                                            </div>
-                                          </button>
-                                        );
-                                      }) : (
-                                        <div className="px-5 py-12 text-center text-sm text-slate-500">
-                                          {customerSearch.trim()
-                                            ? (isRtl ? 'لا توجد نتائج مطابقة.' : 'No matching customers found.')
-                                            : (isRtl ? 'لا يوجد عملاء مسجلون حالياً.' : 'No registered customers available.')}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {selectedRegisteredCustomer ? (
-                                  <div className="mt-4 rounded-[22px] border border-emerald-200 bg-emerald-50/70 p-4">
-                                    <div className="mb-3 flex items-center justify-between gap-3">
-                                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">
-                                        {isRtl ? 'العميل المحدد' : 'Selected Customer'}
+                                  <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+                                    {filteredCustomers.length > 0 ? (
+                                      filteredCustomers.slice(0, 15).map((customer) => (
+                                        <button
+                                          key={customer.id}
+                                          type="button"
+                                          onClick={() => setSelectedCustId(customer.id)}
+                                          className="flex w-full items-center justify-between px-3 py-2 text-start text-xs hover:bg-slate-50 transition cursor-pointer"
+                                        >
+                                          <div className="min-w-0">
+                                            <p className="font-bold text-slate-900 truncate">{customer.name}</p>
+                                            <p className="text-[11px] font-mono text-slate-500 truncate">{customer.phone}</p>
+                                          </div>
+                                          <Check className="h-3.5 w-3.5 text-slate-300" />
+                                        </button>
+                                      ))
+                                    ) : (
+                                      <p className="p-3 text-center text-xs text-slate-400">
+                                        {isRtl ? 'لا توجد نتائج مطابقة.' : 'No matching customers found.'}
                                       </p>
-                                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
-                                        {isRtl ? 'مسجل' : 'Registered'}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-base font-black text-emerald-700 shadow-sm border border-emerald-100">
-                                        <Check className="h-6 w-6" />
-                                      </div>
-                                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-base font-black text-emerald-700 shadow-sm">
-                                        {`${selectedRegisteredCustomer.name || 'U'}`.trim().charAt(0).toUpperCase()}
-                                      </div>
-                                      <div className="min-w-0 flex-1">
-                                        <p className="truncate text-base font-semibold text-slate-900">
-                                          {selectedRegisteredCustomer.name}
-                                        </p>
-                                        <p className="truncate text-sm text-slate-600">
-                                          {selectedRegisteredCustomer.phone}
-                                        </p>
-                                      </div>
-                                    </div>
+                                    )}
                                   </div>
-                                ) : null}
-                              </div>
-                            ) : (
-                              <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm space-y-5">
-                                {/* Fast Walk-In One-Click Action Banner */}
-                                <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                  <div>
-                                    <p className="text-xs font-bold text-violet-900 flex items-center gap-1.5">
-                                      <span>⚡</span>
-                                      <span>{isRtl ? 'تسجيل زائر سريع بدون تفاصيل' : 'Fast Walk-In (No Details Required)'}</span>
+
+                                  {identityValidationError && !selectedCustId && (
+                                    <p className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
+                                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                      <span>{isRtl ? 'يرجى اختيار عميل من القائمة أو التبديل إلى زائر.' : 'Please select a customer or switch to Walk-in.'}</span>
                                     </p>
-                                    <p className="text-[11px] text-violet-700/80 mt-0.5">
-                                      {isRtl
-                                        ? 'المتابعة المباشرة لجدولة الخدمات؛ سيتم إنشاء حساب زائر تلقائي بدون متطلبات إلزامية.'
-                                        : 'Proceed directly to service scheduling; a walk-in record will be generated automatically.'}
-                                    </p>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => safeSetCreateStep(2)}
-                                    className="shrink-0 px-3.5 py-2 rounded-xl bg-[#6537C0] text-white text-xs font-bold hover:bg-[#532ba3] transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                                  >
-                                    <span>{isRtl ? 'متابعة سريعة للخدمات' : 'Quick Continue'}</span>
-                                    <span>{isRtl ? '←' : '→'}</span>
-                                  </button>
+                                  )}
                                 </div>
-
-                                <div className="grid gap-6 sm:grid-cols-2">
-                                  <div>
-                                    <label className="mb-2 block text-xs font-semibold text-slate-600">
-                                      {isRtl ? 'الاسم الكامل (اختياري للزائر السريع)' : 'Full Name (Optional for walk-in)'}
-                                    </label>
-                                    <input
-                                      ref={walkinNameRef}
-                                      type="text"
-                                      value={walkinFullName}
-                                      onChange={(e) => setWalkinFullName(e.target.value)}
-                                      placeholder={isRtl ? 'نورة أحمد (أو اترك فارغاً لزائر سريع)' : 'Noura Ahmad (or leave empty for quick walk-in)'}
-                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="mb-2 block text-xs font-semibold text-slate-600">
-                                      {isRtl ? 'رقم الجوال (اختياري)' : 'Phone (Optional)'}
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={walkinPhone}
-                                      onChange={(e) => setWalkinPhone(e.target.value)}
-                                      placeholder={isRtl ? '+966 50... (اختياري)' : '+966 50... (Optional)'}
-                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="mb-2 block text-xs font-semibold text-slate-600">
-                                      {isRtl ? 'البريد الإلكتروني' : 'Email'}
-                                    </label>
-                                    <input
-                                      type="email"
-                                      value={walkinEmail}
-                                      onChange={(e) => setWalkinEmail(e.target.value)}
-                                      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="mb-2 block text-xs font-semibold text-slate-600">
-                                      {isRtl ? 'تاريخ الميلاد' : 'Date of Birth'}
-                                    </label>
-                                    <div className="relative">
-                                      <input
-                                        type="text"
-                                        value={walkinDob}
-                                        onChange={(e) => setWalkinDob(e.target.value)}
-                                        placeholder="12/05/1998"
-                                        className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
-                                      />
-                                      <CalendarIcon className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isRtl ? 'left-4' : 'right-4'}`} />
-                                    </div>
-                                  </div>
-                                  <div className="sm:col-span-2 mt-2">
-                                    <label className="flex items-center gap-3">
-                                      <input
-                                        type="checkbox"
-                                        checked={walkinIsVip}
-                                        onChange={(e) => setWalkinIsVip(e.target.checked)}
-                                        className="h-5 w-5 rounded border-slate-300 accent-[#6537C0]"
-                                      />
-                                      <span className="text-sm font-bold text-slate-700">
-                                        {isRtl ? 'تصنيف كعميل مميز VIP 👑' : 'Categorize as Premium VIP 👑'}
-                                      </span>
-                                    </label>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Phase 1 Correctness: The defective guest UI in single-client wizard has been decoupled.
-                        Product requirement note: Genuine multi-client group appointments will be implemented
-                        in Phase 2/3 with proper multi-appointment database persistence. */}
-                    {createStep === 2 && (
-                      <AppointmentServicesStep
-                        tenantId={tenantId}
-                        tenantTimezone={resolvedTenantTimezone}
-                        selectedDate={getLocalDateKey(selectedDate)}
-                        isRtl={isRtl}
-                        boardStartHour={boardStartHour}
-                        slotMinutes={slotMinutes}
-                        normalEndHour={normalEndHour}
-                        bookingRecoveryMode={bookingRecoveryMode}
-                        forceExpandAll={bookingRecoveryMode !== 'chain'}
-                        canonicalServices={canonicalServices}
-                        servicePackages={servicePackages}
-                        services2Bundles={services2Bundles}
-                        tenantCategories={tenantCategories}
-                        stagedServices={stagedServices as any[]}
-                        availableStylists={availableStylists}
-                        serviceCategoryTabs={serviceCategoryTabs}
-                        currentServiceCategory={currentServiceCategory}
-                        setCurrentServiceCategory={setCurrentServiceCategory}
-                        serviceSearch={serviceSearch}
-                        setServiceSearch={setServiceSearch}
-                        onAddService={handleToggleServiceSelection}
-                        onAddBundle={handleAddPackageToStaged}
-                        onAddPackage={handleAddPackageToStaged}
-                        onUpdateService={handleUpdateStagedService}
-                        onRemoveService={(index) => setStagedServices(prev => prev.filter((_, i) => i !== index))}
-                        formatMinutesToTime={formatMinutesToTime}
-                        onPrevious={() => safeSetCreateStep(1)}
-                        onNext={() => {
-                          if (stagedServices.length === 0) {
-                            addLocalToast(
-                              isRtl ? 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة' : 'Please add at least one service before opening the invoice step',
-                              isRtl ? 'Please add at least one service before opening the invoice step' : 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
-                              'warning'
-                            );
-                            return;
-                          }
-
-                          // Pre-flight validation: 15-minute advance booking rule
-                          const earliestStartTimestamp = Math.min(...stagedServices.map(item => {
-                            const iso = getSyncedStagedStartIso(item);
-                            return new Date(iso).getTime();
-                          }));
-                          const nowTimestamp = Date.now();
-                          const MINIMUM_ADVANCE_MS = 15 * 60 * 1000;
-                          if (Number.isFinite(earliestStartTimestamp) && (earliestStartTimestamp < nowTimestamp + MINIMUM_ADVANCE_MS)) {
-                            const earliestItem = stagedServices[0];
-                            const slotLabel = formatMinutesToTime(
-                              typeof earliestItem?.startTime === 'number'
-                                ? earliestItem.startTime
-                                : currentStartTime
-                            );
-                            showBookingErrorDialog(buildAdvanceBookingDialog({
-                              isRtl,
-                              currentLabel: getRiyadhCurrentTimeLabel(),
-                              slotLabel
-                            }));
-                            addLocalToast(
-                              'يجب أن يكون وقت الحجز قبل الموعد بـ 15 دقيقة على الأقل.',
-                              'Appointments must be booked at least 15 minutes in advance.',
-                              'warning'
-                            );
-                            return;
-                          }
-
-                          safeSetCreateStep(3);
-                        }}
-                      />
-                    )}
-
-                    {createStep === 3 && (
-                      <div className="space-y-4 animate-fadeIn text-xs">
-                        {bookingRecoveryMode === 'separate_services' && stagedServices.length > 1 && (
-                          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-semibold text-amber-900">
-                            {isRtl
-                              ? `سيتم إنشاء ${stagedServices.length} مواعيد منفصلة عند التأكيد النهائي.`
-                              : `${stagedServices.length} separate appointments will be created when you confirm.`}
-                          </div>
-                        )}
-                        {(() => {
-                          const standaloneCartItems = stagedServices.filter(s => s.itemType !== 'package').map((item, index) => {
-                            const srv = canonicalServices.find((service) => service.id === item.serviceId);
-                            const variant = srv?.variants.find((entry) => entry.id === item.variantId) || srv?.variants[0] || null;
-                            const staff = availableStylists.find((stylist) => stylist.id === item.staffId);
-                            const basePrice = variant ? toMoney(variant.finalPrice ?? variant.price) : (srv ? toMoney(srv.price) : 0);
-                            let finalPrice = basePrice;
-                            if (item.discountType === 'flat') {
-                              finalPrice = Math.max(0, basePrice - item.discountValue);
-                            } else if (item.discountType === 'percent') {
-                              finalPrice = Math.max(0, basePrice - (basePrice * item.discountValue) / 100);
-                            }
-
-                            const resolvedDuration = resolveBookingDuration(item.duration, variant?.duration, srv?.duration);
-
-                            return {
-                              id: item.id,
-                              index,
-                              itemType: 'service',
-                              serviceName: srv ? `${isRtl ? srv.nameAr : srv.nameEn}${variant ? ` / ${isRtl ? variant.nameAr : variant.nameEn}` : ''}` : item.serviceId,
-                              staffName: isRtl ? staff?.nameAr : staff?.nameEn,
-                              duration: resolvedDuration,
-                              startTime: item.startTime,
-                              price: finalPrice,
-                              basePrice,
-                              hasDiscount: item.discountType !== 'none' && item.discountValue > 0
-                            };
-                          });
-
-                          const pkgCartItems = stagedServices.filter(s => s.itemType === 'package');
-                          const pkgGroups = pkgCartItems.reduce((acc, curr) => {
-                             const groupKey = curr.packageInstanceId || curr.packageId!;
-                             if (!acc[groupKey]) acc[groupKey] = [];
-                             acc[groupKey].push(curr);
-                             return acc;
-                          }, {} as Record<string, typeof stagedServices>);
-                          
-                          const packageCartItems = Object.entries(pkgGroups).map(([instanceId, items]: [string, any[]]) => {
-                             const pkgId = items[0].packageId;
-                             const pkg = services2Bundles?.find(p => p.id === pkgId) || servicePackages?.find(p => p.id === pkgId);
-                             const packagePrice = Number(pkg?.totalPrice ?? 0);
-                             const isParallel = pkg?.scheduleType === 'parallel';
-                             const duration = isParallel
-                               ? Math.max(...items.map(it => Number(it.duration || 0)))
-                               : (pkg?.totalDuration || items.reduce((sum, it) => sum + Number(it.duration || 0), 0));
-                             return {
-                               id: instanceId,
-                               itemType: 'package',
-                               serviceName: pkg ? (isRtl ? pkg.name_ar : pkg.name_en) : 'Package',
-                               staffName: items.length + (isRtl ? (isParallel ? ' خدمات متزامنة' : ' خدمات') : (isParallel ? ' parallel services' : ' services')),
-                               duration,
-                               startTime: items[0]?.startTime || 0,
-                               price: packagePrice,
-                               basePrice: packagePrice,
-                               hasDiscount: false
-                             };
-                          });
-
-                          const queuedLineItems = [...packageCartItems, ...standaloneCartItems];
-                          const primarySubtotal = queuedLineItems.reduce((sum, item) => sum + item.price, 0);
-                          const subtotal = primarySubtotal;
-                          const vat = subtotal * 0.15;
-                          const total = subtotal + vat;
-
-                          return (
-                            <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
-                              <h4 className="font-black border-b pb-1.5 flex items-center justify-between text-slate-800">
-                                <span>{isRtl ? 'ملخص الحساب الضريبي للفاتورة' : 'Invoice Statement'}</span>
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded uppercase">ZATCA QR</span>
-                              </h4>
-                              <div className="space-y-2 border-b pb-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-bold text-slate-700">{isRtl ? 'خدمات الجلسة المحجوزة' : 'Queued Service Lines'}</span>
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{queuedLineItems.length}</span>
-                                </div>
-                                {queuedLineItems.length === 0 ? (
-                                  <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50 px-3 py-3 text-[11px] font-semibold text-amber-800">
-                                    {isRtl
-                                      ? 'لا توجد خدمات في قائمة الجلسة بعد. أضف خدمة واحدة على الأقل قبل متابعة الفاتورة.'
-                                      : 'No services have been added to the session queue yet. Add at least one service before continuing.'}
-                                  </div>
-                                ) : (
-                                  queuedLineItems.map((item) => (
-                                    <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                          <p className="font-bold text-slate-800 truncate">{item.serviceName}</p>
-                                          <p className="text-[10px] text-slate-400 truncate">
-                                            {item.staffName || (isRtl ? 'غير محدد' : 'Unassigned')}
-                                            {' · '}
-                                            {formatMinutesToTime(item.startTime)} · {item.duration} {isRtl ? 'دقيقة' : 'min'}
-                                          </p>
-                                        </div>
-                                        <div className="text-right flex flex-col items-end">
-                                          <span className="font-mono font-bold text-slate-700 whitespace-nowrap">
-                                            {item.price.toFixed(2)} ر.س
-                                          </span>
-                                          {item.hasDiscount && (
-                                            <span className="font-mono text-[9px] text-slate-400 line-through">
-                                              {item.basePrice.toFixed(2)} ر.س
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-
-                              </div>
-
-                              <div className="flex justify-between">
-                                <span>{isRtl ? 'مجموع الخدمات' : 'Services Subtotal'}</span>
-                                <span className="font-mono">{toMoney(subtotal).toFixed(2)} ر.س</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>{isRtl ? 'الضريبة المضافة ZATCA (15%)' : 'Tax VAT (15%)'}</span>
-                                <span className="font-mono">{toMoney(vat).toFixed(2)} ر.س</span>
-                              </div>
-                              <div className="flex justify-between font-black text-[#6537C0] text-sm border-t pt-1.5">
-                                <span>{isRtl ? 'المبلغ المستحق النهائي' : 'Grand Total Due'}</span>
-                                <span className="font-mono">{toMoney(total).toFixed(2)} ر.س</span>
-                              </div>
-
-
+                              )}
                             </div>
-                          );
-                        })()}
+                          ) : (
+                            /* Walk-In Mode */
+                            <div className="space-y-2.5">
+                              <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-2.5 flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-violet-900 flex items-center gap-1">
+                                    <span>⚡</span>
+                                    <span>{isRtl ? 'تسجيل زائر سريع' : 'Fast Walk-In Active'}</span>
+                                  </p>
+                                  <p className="text-[11px] text-violet-700/80">
+                                    {isRtl ? 'الاسم والجوال اختياريان؛ سيتم استخدام عميل افتراضي.' : 'Name & phone optional; default profile created.'}
+                                  </p>
+                                </div>
+                              </div>
 
-{/* TEMPORARILY DISABLED (Refah – Remove Payment from Wizard)
-                        <div className="p-4 bg-white border rounded-xl space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold">{isRtl ? 'طريقة الدفع' : 'Payment allocation'}</span>
-                            <button type="button" onClick={() => setCreateSplitActive(!createSplitActive)} className={`px-2 py-0.5 rounded text-[10px] font-bold ${createSplitActive ? 'bg-amber-500 text-zinc-950' : 'bg-slate-100 text-slate-500'}`}>
-                              {createSplitActive ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'تفعيل' : 'Activate')}
-                            </button>
-                          </div>
-                          {createSplitActive && (
-                            <div className="grid grid-cols-3 gap-2 animate-fadeIn">
-                              <div>
-                                <label className="text-[9px] text-zinc-500 block mb-0.5 font-bold">{isRtl ? 'بطاقة' : 'Card'}</label>
-                                <input type="number" placeholder="0" value={createSplitAmounts.card || ''} onChange={(e) => setCreateSplitAmounts(prev => ({ ...prev, card: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold text-xs" />
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                                    {isRtl ? 'الاسم الكامل (اختياري)' : 'Name (Optional)'}
+                                  </label>
+                                  <input
+                                    ref={walkinNameRef}
+                                    type="text"
+                                    value={walkinFullName}
+                                    onChange={(e) => setWalkinFullName(e.target.value)}
+                                    placeholder={isRtl ? 'عميل زائر' : 'Walk-in Customer'}
+                                    className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-[#6537C0] ${isRtl ? 'text-right' : 'text-left'}`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                                    {isRtl ? 'رقم الجوال (اختياري)' : 'Phone (Optional)'}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={walkinPhone}
+                                    onChange={(e) => setWalkinPhone(e.target.value)}
+                                    placeholder={isRtl ? '+966 50...' : '+966 50...'}
+                                    className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-[#6537C0] ${isRtl ? 'text-right' : 'text-left'}`}
+                                  />
+                                </div>
                               </div>
-                              <div>
-                                <label className="text-[9px] text-zinc-500 block mb-0.5 font-bold">{isRtl ? 'نقداً' : 'Cash'}</label>
-                                <input type="number" placeholder="0" value={createSplitAmounts.cash || ''} onChange={(e) => setCreateSplitAmounts(prev => ({ ...prev, cash: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold text-xs" />
-                              </div>
-                              <div>
-                                <label className="text-[9px] text-zinc-500 block mb-0.5 font-bold">{isRtl ? 'أونلاين' : 'Online'}</label>
-                                <input type="number" placeholder="0" value={createSplitAmounts.online || ''} onChange={(e) => setCreateSplitAmounts(prev => ({ ...prev, online: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold text-xs" />
-                              </div>
-                              <div>
-                                <label className="text-[9px] text-zinc-500 block mb-0.5 font-bold">{isRtl ? 'تحويل بنكي' : 'Bank Transfer'}</label>
-                                <input type="number" placeholder="0" value={createSplitAmounts.bank_transfer || ''} onChange={(e) => setCreateSplitAmounts(prev => ({ ...prev, bank_transfer: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold text-xs" />
-                              </div>
-                              <div>
-                                <label className="text-[9px] text-zinc-500 block mb-0.5 font-bold">{isRtl ? 'محفظة' : 'Wallet'}</label>
-                                <input type="number" placeholder="0" value={createSplitAmounts.wallet || ''} onChange={(e) => setCreateSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold text-xs" />
-                              </div>
-                              <div>
-                                <label className="text-[9px] text-zinc-500 block mb-0.5 font-bold">{isRtl ? 'بطاقة هدية' : 'Gift Card'}</label>
-                                <input type="number" placeholder="0" value={createSplitAmounts.gift_card || ''} onChange={(e) => setCreateSplitAmounts(prev => ({ ...prev, gift_card: parseFloat(e.target.value) || 0 }))} className="w-full border p-1 rounded font-mono text-center font-bold text-xs" />
-                              </div>
+
+                              <label className="flex items-center gap-2 pt-0.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={walkinIsVip}
+                                  onChange={(e) => setWalkinIsVip(e.target.checked)}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 accent-[#6537C0]"
+                                />
+                                <span className="text-xs font-bold text-slate-700">
+                                  {isRtl ? 'عميل مميز VIP 👑' : 'VIP Client 👑'}
+                                </span>
+                              </label>
                             </div>
                           )}
                         </div>
-                        */}
 
-                        <div className="p-4 bg-white border rounded-xl space-y-2">
-                          <label className="text-slate-500 block">{isRtl ? 'ملاحظات الجلسة العامة للموظفة' : 'Staff comments'}</label>
-                          <textarea rows={2} value={sessionNotes} onChange={(e) => setSessionNotes(e.target.value)} placeholder={isRtl ? 'ضيافة قهوة عربية' : 'Hospitality request'} className="w-full bg-slate-50 border p-2 rounded-lg text-xs" />
+                        {/* 2. Queued / Staged Services Section */}
+                        <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                                {isRtl ? 'الخدمات المحددة في الجلسة' : 'Queued Services'}
+                              </h4>
+                              <span className="rounded-full bg-[#6537C0]/10 px-2 py-0.5 text-[10px] font-black text-[#6537C0]">
+                                {stagedServices.length}
+                              </span>
+                            </div>
+
+                            {/* Mobile button to open catalogue */}
+                            <button
+                              type="button"
+                              onClick={() => setMobileDrawerTab('catalogue')}
+                              className="lg:hidden text-xs font-bold text-[#6537C0] hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>{isRtl ? '+ إضافة خدمات' : '+ Add Services'}</span>
+                            </button>
+                          </div>
+
+                          {/* Recovery mode indicator if active */}
+                          {bookingRecoveryMode === 'separate_services' && stagedServices.length > 1 && (
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">
+                              {isRtl
+                                ? `سيتم إنشاء ${stagedServices.length} مواعيد منفصلة عند التأكيد النهائي.`
+                                : `${stagedServices.length} separate appointments will be created when confirmed.`}
+                            </div>
+                          )}
+
+                          {stagedServices.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center space-y-2">
+                              <div className="w-10 h-10 rounded-full bg-purple-50 text-[#6537C0] flex items-center justify-center mx-auto">
+                                <Sparkles className="w-5 h-5" />
+                              </div>
+                              <p className="text-xs font-bold text-slate-700">
+                                {isRtl ? 'لم يتم اختيار أي خدمات بعد' : 'No services queued yet'}
+                              </p>
+                              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                                {isRtl
+                                  ? 'اختر الخدمات أو الباقات من الكتالوج لإضافتها إلى جدول الموعد.'
+                                  : 'Select services or bundles from the catalogue on the right to start building the appointment.'}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => setMobileDrawerTab('catalogue')}
+                                className="lg:hidden mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#6537C0] text-white text-xs font-bold cursor-pointer"
+                              >
+                                {isRtl ? 'تصفح الكتالوج' : 'Browse Catalogue'}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {/* Staged Bundles Groups */}
+                              {appointmentInvoiceSummary.packageCartItems.map((pkgItem) => {
+                                const pkg = services2Bundles?.find(p => p.id === pkgItem.packageId) || servicePackages?.find(p => p.id === pkgItem.packageId);
+                                const isParallel = pkg?.scheduleType === 'parallel';
+
+                                return (
+                                  <div key={pkgItem.id} className="rounded-xl border border-purple-200 bg-purple-50/30 p-3 space-y-2.5">
+                                    <div className="flex items-start justify-between gap-2 border-b border-purple-100 pb-2">
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-[9px] font-black bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded uppercase">
+                                            BUNDLE
+                                          </span>
+                                          {isParallel && (
+                                            <span className="text-[9px] font-black bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.2 rounded uppercase">
+                                              PARALLEL
+                                            </span>
+                                          )}
+                                          <h5 className="font-bold text-slate-900 text-xs truncate">{pkgItem.serviceName}</h5>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                                          <span>{pkgItem.price.toFixed(2)} SAR</span>
+                                          {' · '}
+                                          <span>{pkgItem.duration} {isRtl ? 'دقيقة' : 'min'}</span>
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const indicesToRemove = [];
+                                          stagedServices.forEach((s, idx) => {
+                                            if ((s.packageInstanceId || s.packageId) === pkgItem.id) {
+                                              indicesToRemove.push(idx);
+                                            }
+                                          });
+                                          indicesToRemove.reverse().forEach(idx => {
+                                            setStagedServices(prev => prev.filter((_, i) => i !== idx));
+                                          });
+                                        }}
+                                        className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition cursor-pointer"
+                                        title={isRtl ? 'إزالة الباقة' : 'Remove Bundle'}
+                                      >
+                                        <Trash className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+
+                                    {/* Child steps in bundle */}
+                                    <div className="space-y-2 pt-1">
+                                      {pkgItem.childItems.map((cItem) => {
+                                        const cSrv = canonicalServices.find(s => s.id === cItem.serviceId);
+                                        const cStylists = availableStylists.filter(s => {
+                                          const assignments = cSrv?.employeeAssignments || [];
+                                          return assignments.length === 0 || assignments.map(String).includes(String(s.id));
+                                        });
+
+                                        return (
+                                          <div key={cItem.id} className="rounded-lg bg-white border border-purple-100 p-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <div className="min-w-0">
+                                              <p className="font-semibold text-slate-800 text-[11px] truncate">
+                                                {cSrv ? (isRtl ? cSrv.nameAr : cSrv.nameEn) : cItem.serviceId}
+                                              </p>
+                                              <p className="text-[10px] text-slate-400 font-mono">
+                                                {formatMinutesToTime(cItem.startTime)} · {cItem.duration} min
+                                              </p>
+                                            </div>
+                                            <select
+                                              value={cItem.staffId || ''}
+                                              onChange={(e) => {
+                                                const newStaff = e.target.value;
+                                                handleUpdateStagedService(cItem.id, {
+                                                  staffId: newStaff,
+                                                  isExplicitStaff: Boolean(newStaff)
+                                                });
+                                              }}
+                                              className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 outline-none"
+                                            >
+                                              <option value="">{isRtl ? 'أي مختص متاح' : 'Any Stylist'}</option>
+                                              {cStylists.map(st => (
+                                                <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Standalone Staged Services */}
+                              {appointmentInvoiceSummary.standaloneCartItems.map((item) => {
+                                const srv = canonicalServices.find(s => s.id === item.serviceId);
+                                const validStylists = availableStylists.filter(s => {
+                                  const assignments = srv?.employeeAssignments || [];
+                                  return assignments.length === 0 || assignments.map(String).includes(String(s.id));
+                                });
+                                const isConfiguring = configuredServiceId === item.id;
+
+                                return (
+                                  <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs space-y-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="font-bold text-slate-900 text-xs truncate">{item.serviceName}</p>
+                                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 font-semibold">
+                                          <span className="font-mono text-purple-700 bg-purple-100/60 px-1 py-0.2 rounded text-[10px]">
+                                            {formatMinutesToTime(item.startTime)}
+                                          </span>
+                                          <span>·</span>
+                                          <span>{item.duration} {isRtl ? 'دقيقة' : 'min'}</span>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <div className="text-right">
+                                          <span className="font-mono font-bold text-slate-900 text-xs">
+                                            {item.price.toFixed(2)} SAR
+                                          </span>
+                                          {item.hasDiscount && (
+                                            <span className="block font-mono text-[9px] text-slate-400 line-through">
+                                              {item.basePrice.toFixed(2)} SAR
+                                            </span>
+                                          )}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => setConfiguredServiceId(isConfiguring ? null : item.id)}
+                                          className={`p-1.5 rounded-lg transition cursor-pointer ${
+                                            isConfiguring ? 'bg-purple-100 text-[#6537C0]' : 'text-slate-400 hover:bg-slate-200'
+                                          }`}
+                                          title={isRtl ? 'إعدادات الخصم والملاحظات' : 'Configure service'}
+                                        >
+                                          <Settings2 className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setStagedServices(prev => prev.filter((_, i) => i !== item.index))}
+                                          className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition cursor-pointer"
+                                          title={isRtl ? 'إزالة' : 'Remove'}
+                                        >
+                                          <Trash className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Stylist Selector & Time offset */}
+                                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="text-[10px] font-bold text-slate-500 shrink-0">
+                                          {isRtl ? 'المختص:' : 'Stylist:'}
+                                        </span>
+                                        <select
+                                          value={item.staffId || ''}
+                                          onChange={(e) => {
+                                            const newStaff = e.target.value;
+                                            handleUpdateStagedService(item.id, {
+                                              staffId: newStaff,
+                                              isExplicitStaff: Boolean(newStaff)
+                                            });
+                                          }}
+                                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none max-w-[150px] truncate"
+                                        >
+                                          <option value="">{isRtl ? 'أي مختص متاح' : 'Any Stylist'}</option>
+                                          {validStylists.map(st => (
+                                            <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <Clock className="w-3 h-3 text-slate-400" />
+                                        <select
+                                          value={formatBlockStartClockValue(item.startTime)}
+                                          onChange={(e) => {
+                                            const offset = convertBlockClockToOffset(e.target.value);
+                                            handleUpdateStagedService(item.id, { startTime: offset });
+                                          }}
+                                          className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-700 outline-none"
+                                        >
+                                          {blockStartTimeOptions.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    </div>
+
+                                    {/* Inline Service Configuration Drawer (Discount & Notes) */}
+                                    {isConfiguring && (
+                                      <div className="mt-2 pt-2 border-t border-slate-200 space-y-2 bg-white p-2.5 rounded-lg">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-[10px] font-bold text-slate-500">
+                                            {isRtl ? 'نوع الخصم:' : 'Discount:'}
+                                          </span>
+                                          <select
+                                            value={item.discountType || 'none'}
+                                            onChange={(e) => {
+                                              const newType = e.target.value;
+                                              handleUpdateStagedService(item.id, { discountType: newType });
+                                            }}
+                                            className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-700 outline-none"
+                                          >
+                                            <option value="none">{isRtl ? 'بدون خصم' : 'None'}</option>
+                                            <option value="flat">{isRtl ? 'مبلغ ثابت (SAR)' : 'Flat (SAR)'}</option>
+                                            <option value="percent">{isRtl ? 'نسبة مئوية (%)' : 'Percent (%)'}</option>
+                                          </select>
+                                          {item.discountType !== 'none' && (
+                                            <input
+                                              type="number"
+                                              min="0"
+                                              step="5"
+                                              value={item.discountValue || ''}
+                                              onChange={(e) => {
+                                                const val = parseFloat(e.target.value) || 0;
+                                                handleUpdateStagedService(item.id, { discountValue: val });
+                                              }}
+                                              placeholder="0"
+                                              className="w-16 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-700 outline-none"
+                                            />
+                                          )}
+                                        </div>
+
+                                        <div>
+                                          <input
+                                            type="text"
+                                            value={item.notes || ''}
+                                            onChange={(e) => handleUpdateStagedService(item.id, { notes: e.target.value })}
+                                            placeholder={isRtl ? 'ملاحظة خاصة بالخدمة...' : 'Note for this service...'}
+                                            className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-700 outline-none"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 3. Progressive Disclosure Accordion: Additional Options & Notes */}
+                        <div className="rounded-[20px] border border-slate-200 bg-white overflow-hidden shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => setIsOptionsExpanded(!isOptionsExpanded)}
+                            className="w-full flex items-center justify-between p-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <span>📝</span>
+                              <span>{isRtl ? 'ملاحظات وخيارات إضافية' : 'Additional Options & Notes'}</span>
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOptionsExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {isOptionsExpanded && (
+                            <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-3 text-xs animate-fadeIn">
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                                  {isRtl ? 'ملاحظات الجلسة للموظفين' : 'Staff Comments & Requests'}
+                                </label>
+                                <textarea
+                                  rows={2}
+                                  value={sessionNotes}
+                                  onChange={(e) => setSessionNotes(e.target.value)}
+                                  placeholder={isRtl ? 'مثال: طلب ضيافة خاصة، حساسية معينة...' : 'e.g. hospitality request, special preferences...'}
+                                  className="w-full bg-white border border-slate-200 p-2 rounded-xl text-xs outline-none focus:border-[#6537C0]"
+                                />
+                              </div>
+
+                              <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={notifyWhatsApp}
+                                  onChange={(e) => setNotifyWhatsApp(e.target.checked)}
+                                  className="h-4 w-4 rounded border-slate-300 accent-[#6537C0]"
+                                />
+                                <span className="text-xs font-semibold text-slate-700">
+                                  {isRtl ? 'إرسال تأكيد الموعد عبر واتساب 💬' : 'Send WhatsApp appointment reminder 💬'}
+                                </span>
+                              </label>
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+
+                      {/* 4. Persistent Invoice Summary & Schedule Action Bar (Always visible at bottom of Column 1) */}
+                      <div className="p-4 bg-white border-t border-slate-200 shadow-md space-y-3 shrink-0">
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex justify-between text-slate-600">
+                            <span>{isRtl ? 'مجموع الخدمات' : 'Services Subtotal'}</span>
+                            <span className="font-mono font-bold">{appointmentInvoiceSummary.subtotal.toFixed(2)} SAR</span>
+                          </div>
+                          <div className="flex justify-between text-slate-600">
+                            <span className="flex items-center gap-1">
+                              <span>{isRtl ? 'ضريبة القيمة المضافة ZATCA (15%)' : 'VAT Tax (15%)'}</span>
+                              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1 rounded">ZATCA</span>
+                            </span>
+                            <span className="font-mono font-bold">{appointmentInvoiceSummary.vat.toFixed(2)} SAR</span>
+                          </div>
+                          <div className="flex justify-between font-black text-[#6537C0] text-sm border-t border-slate-100 pt-2">
+                            <span>{isRtl ? 'المبلغ المستحق النهائي' : 'Grand Total Due'}</span>
+                            <span className="font-mono text-base">{appointmentInvoiceSummary.total.toFixed(2)} SAR</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={stagedServices.length === 0 || (custMode === 'existing' && !selectedCustId) || isSubmitting}
+                          onClick={() => handleConfirmAppointmentCreation()}
+                          className={`w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-md cursor-pointer ${
+                            stagedServices.length === 0 || (custMode === 'existing' && !selectedCustId) || isSubmitting
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                              : 'bg-[#6537C0] hover:bg-[#532ab0] text-white shadow-purple-500/20'
+                          }`}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>{isRtl ? 'جارٍ الحفظ والجدولة...' : 'Scheduling Booking...'}</span>
+                            </>
+                          ) : stagedServices.length === 0 ? (
+                            <span>{isRtl ? 'أضف خدمات للمتابعة 🗓️' : 'Add services to schedule 🗓️'}</span>
+                          ) : (custMode === 'existing' && !selectedCustId) ? (
+                            <span>{isRtl ? 'اختر عميلاً لتأكيد الحجز 👤' : 'Select a customer to schedule 👤'}</span>
+                          ) : bookingRecoveryMode === 'separate_services' && stagedServices.length > 1 ? (
+                            <span>{isRtl ? `تأكيد ${stagedServices.length} مواعيد منفصلة 🗓️` : `Schedule ${stagedServices.length} separate appointments 🗓️`}</span>
+                          ) : (
+                            <span>{isRtl ? 'تأكيد الحجز والجدولة 🗓️' : 'Schedule Booking 🗓️'}</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* COLUMN 2: Searchable Service Catalogue with Categories */}
+                    <div className={`flex-1 min-w-0 flex flex-col h-full bg-white overflow-hidden ${
+                      mobileDrawerTab !== 'catalogue' ? 'hidden lg:flex' : 'flex'
+                    }`}>
+                      {/* Search Bar & Category Filter Pills */}
+                      <div className="p-4 border-b border-slate-200 bg-white space-y-3 shrink-0">
+                        <div className="relative">
+                          <Search className={`pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ${isRtl ? 'right-3' : 'left-3'}`} />
+                          <input
+                            type="text"
+                            value={serviceSearch}
+                            onChange={(e) => setServiceSearch(e.target.value)}
+                            placeholder={isRtl ? 'ابحث عن خدمة أو باقة...' : 'Search services or bundles...'}
+                            className={`w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:bg-white focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
+                          />
+                        </div>
+
+                        {/* Category Navigation Pills */}
+                        <div className="flex flex-wrap gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                          {serviceCategoryTabs.map((tab) => {
+                            const active = currentServiceCategory === tab.key || (!currentServiceCategory && tab.key === 'all');
+                            const count = tabCounts[tab.key];
+
+                            return (
+                              <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setCurrentServiceCategory(tab.key)}
+                                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition cursor-pointer shrink-0 ${
+                                  active
+                                    ? '!border-[#1D035F] !bg-[#1D035F] !text-white shadow-xs'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                                }`}
+                              >
+                                <span className={active ? '!text-white' : ''}>{isRtl ? tab.labelAr : tab.labelEn}</span>
+                                {count !== undefined && (
+                                  <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono font-bold ${
+                                    active ? '!bg-[#6537C0] !text-white' : 'bg-slate-100 text-slate-600'
+                                  }`}>
+                                    {count}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                    )}
-                  </div>
 
-                  <div className="p-4 bg-white border-t flex justify-between">
-                    {createStep > 1 ? (
-                      <button type="button" onClick={() => safeSetCreateStep(prev => prev - 1)} className="py-2 px-4 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 transition">
-                        {isRtl ? 'السابق' : 'Previous'}
-                      </button>
-                    ) : <div />}
+                      {/* Catalogue Scrollable List */}
+                      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                        {categorySections.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-xs text-slate-500">
+                            {serviceSearch.trim()
+                              ? (isRtl ? 'لا توجد خدمات أو باقات مطابقة للبحث.' : 'No services or bundles match the search.')
+                              : (isRtl ? 'لا توجد خدمات متاحة ضمن هذه الفئة.' : 'No services available in this category.')}
+                          </div>
+                        ) : (
+                          categorySections.map((section) => (
+                            <div key={`cat-sec-${section.id}`} className="space-y-3">
+                              <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-[#6537C0]" />
+                                  <span>{isRtl ? section.labelAr : section.labelEn}</span>
+                                </h4>
+                                <span className="text-[10px] font-bold text-slate-400">
+                                  {section.services.length + section.bundles.length} {isRtl ? 'عنصر' : 'items'}
+                                </span>
+                              </div>
 
-                    {createStep < 3 ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (createStep === 1) {
-                            if (!hasAppointmentIdentity(custMode, selectedCustId)) {
-                              setIdentityValidationError(true);
-                              addLocalToast(
-                                IDENTITY_PREREQUISITE_MESSAGE.ar,
-                                IDENTITY_PREREQUISITE_MESSAGE.en,
-                                'warning'
-                              );
-                              return;
-                            }
-                          }
-                          if (createStep === 2 && stagedServices.length === 0) {
-                            addLocalToast(
-                              isRtl ? 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة' : 'Please add at least one service before opening the invoice step',
-                              isRtl ? 'Please add at least one service before opening the invoice step' : 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',
-                              'warning'
-                            );
-                            return;
-                          }
-                          safeSetCreateStep(prev => prev + 1);
-                        }}
-                        className="py-2 px-5 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-bold transition shadow-sm"
-                      >
-                        {isRtl ? 'التالي' : 'Next Step'}
-                      </button>
-                    ) : (
-                      <button type="button" onClick={handleConfirmAppointmentCreation} className="py-2 px-5 bg-[#6537C0] hover:bg-[#532ab0] text-white font-black rounded-xl text-xs shadow-md transition">
-                        {bookingRecoveryMode === 'separate_services' && stagedServices.length > 1
-                          ? (isRtl ? `تأكيد ${stagedServices.length} مواعيد منفصلة 🗓️` : 'Schedule separate appointments 🗓️')
-                          : (isRtl ? 'تأكيد الحجز والجدولة 🗓️' : 'Schedule Booking 🗓️')}
-                      </button>
-                    )}
+                              {/* Category Bundles */}
+                              {section.bundles.map((bundle) => {
+                                const isParallel = bundle.scheduleType === 'parallel';
+                                const bName = isRtl ? (bundle.name_ar || bundle.nameAr) : (bundle.name_en || bundle.nameEn);
+                                const isStaged = stagedServices.some(s => s.packageId === bundle.id);
+
+                                return (
+                                  <div
+                                    key={`bnd-${bundle.id}`}
+                                    className="rounded-xl border border-purple-200/90 bg-purple-50/20 p-3 hover:border-purple-300 transition-all flex items-center justify-between gap-3"
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+                                        <PackageIcon className="w-5 h-5" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-[8px] font-black bg-purple-100 text-purple-800 px-1 py-0.2 rounded uppercase">
+                                            BUNDLE
+                                          </span>
+                                          {isParallel && (
+                                            <span className="text-[8px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1 py-0.2 rounded uppercase">
+                                              PARALLEL
+                                            </span>
+                                          )}
+                                          <p className="font-bold text-slate-900 text-xs truncate">{bName}</p>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                                          <span className="font-mono text-purple-700 font-bold">{bundle.totalPrice} SAR</span>
+                                          {' · '}
+                                          <span>{bundle.totalDuration || 60} {isRtl ? 'دقيقة' : 'min'}</span>
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddPackageToStaged(bundle.id)}
+                                      className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                                        isStaged
+                                          ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                                          : 'bg-[#6537C0] text-white hover:bg-[#532ab0]'
+                                      }`}
+                                    >
+                                      {isStaged ? <Check className="w-3.5 h-3.5" /> : <PlusCircle className="w-3.5 h-3.5" />}
+                                      <span>{isStaged ? (isRtl ? 'مضاف' : 'Added') : (isRtl ? 'إضافة' : 'Add')}</span>
+                                    </button>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Category Services */}
+                              <div className="grid grid-cols-1 gap-2">
+                                {section.services.map((service) => {
+                                  const sName = getServiceDisplayName(service, isRtl ? 'ar' : 'en');
+                                  const hasVariants = Array.isArray(service.variants) && service.variants.length > 0;
+                                  const isExpanded = Boolean(expandedVariantServiceIds[service.id]);
+                                  const isAdded = isQueuedServiceSelected(service.id, null);
+                                  const parentBookable = isParentServiceBookable(service);
+
+                                  return (
+                                    <div
+                                      key={`srv-${service.id}`}
+                                      className="rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all overflow-hidden"
+                                    >
+                                      <div className="p-3 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 font-bold text-xs">
+                                            {sName.charAt(0).toUpperCase()}
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="font-bold text-slate-900 text-xs truncate">{sName}</p>
+                                            <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                                              <span className="font-mono text-slate-700 font-bold">
+                                                {Number(service.finalPrice ?? service.price ?? 0).toFixed(2)} SAR
+                                              </span>
+                                              {' · '}
+                                              <span>{service.duration || 30} {isRtl ? 'دقيقة' : 'min'}</span>
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          {hasVariants ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleVariants(service.id)}
+                                              className="px-2.5 py-1.5 rounded-lg border border-purple-200 bg-purple-50 text-[#6537C0] text-[11px] font-bold flex items-center gap-1 hover:bg-purple-100 transition cursor-pointer"
+                                            >
+                                              <span>{service.variants.length} {isRtl ? 'خيارات' : 'options'}</span>
+                                              <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleServiceSelection(service, null)}
+                                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                                                isAdded
+                                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                                  : 'bg-[#6537C0] text-white hover:bg-[#532ab0]'
+                                              }`}
+                                            >
+                                              {isAdded ? <Check className="w-3.5 h-3.5" /> : <PlusCircle className="w-3.5 h-3.5" />}
+                                              <span>{isAdded ? (isRtl ? 'مضاف' : 'Added') : (isRtl ? 'إضافة' : 'Add')}</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Variant Expansion Rows */}
+                                      {hasVariants && isExpanded && (
+                                        <div className="bg-slate-50 border-t border-slate-100 p-2.5 space-y-1.5">
+                                          {/* Main standalone service option if independently bookable */}
+                                          {parentBookable && (
+                                            <div className="rounded-lg bg-white border border-slate-200 p-2 flex items-center justify-between text-xs">
+                                              <div>
+                                                <span className="font-bold text-slate-800 text-[11px]">
+                                                  {isRtl ? 'الخدمة الأساسية' : 'Main Service Option'}
+                                                </span>
+                                                <span className="block text-[10px] text-slate-500 font-mono">
+                                                  {Number(service.finalPrice ?? service.price ?? 0).toFixed(2)} SAR · {service.duration} min
+                                                </span>
+                                              </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleToggleServiceSelection(service, null)}
+                                                className={`px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                                                  isAdded
+                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                    : 'bg-[#6537C0] text-white hover:bg-[#532ab0]'
+                                                }`}
+                                              >
+                                                {isAdded ? <Check className="w-3.5 h-3.5" /> : <PlusCircle className="w-3.5 h-3.5" />}
+                                                <span>{isAdded ? (isRtl ? 'مضاف' : 'Added') : (isRtl ? 'إضافة' : 'Add')}</span>
+                                              </button>
+                                            </div>
+                                          )}
+
+                                          {/* Individual Variants */}
+                                          {service.variants.map((variant) => {
+                                            const vName = isRtl
+                                              ? (variant.name_ar || variant.nameAr || variant.name_en || variant.nameEn)
+                                              : (variant.name_en || variant.nameEn || variant.name_ar || variant.nameAr);
+                                            const vPrice = Number(variant.finalPrice ?? variant.rawPrice ?? variant.price ?? 0);
+                                            const vDuration = Number(variant.duration || service.duration || 30);
+                                            const isVarAdded = isQueuedServiceSelected(service.id, variant.id);
+
+                                            return (
+                                              <div key={`var-${variant.id}`} className="rounded-lg bg-white border border-slate-200 p-2 flex items-center justify-between text-xs">
+                                                <div className="min-w-0">
+                                                  <span className="font-bold text-slate-800 text-[11px] truncate block">
+                                                    {vName}
+                                                  </span>
+                                                  <span className="text-[10px] text-slate-500 font-mono">
+                                                    {vPrice.toFixed(2)} SAR · {vDuration} min
+                                                  </span>
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleToggleServiceSelection(service, variant)}
+                                                  className={`px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 shrink-0 cursor-pointer ${
+                                                    isVarAdded
+                                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                      : 'bg-[#6537C0] text-white hover:bg-[#532ab0]'
+                                                  }`}
+                                                >
+                                                  {isVarAdded ? <Check className="w-3.5 h-3.5" /> : <PlusCircle className="w-3.5 h-3.5" />}
+                                                  <span>{isVarAdded ? (isRtl ? 'مضاف' : 'Added') : (isRtl ? 'إضافة' : 'Add')}</span>
+                                                </button>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Mobile Sticky Floating Review Bar at bottom of Catalogue */}
+                      {stagedServices.length > 0 && (
+                        <div className="lg:hidden p-3 bg-white border-t border-slate-200 flex items-center justify-between shadow-lg shrink-0">
+                          <div>
+                            <span className="text-xs font-bold text-slate-700 block">
+                              {stagedServices.length} {isRtl ? 'خدمات محددة' : 'services queued'}
+                            </span>
+                            <span className="text-sm font-mono font-black text-[#6537C0]">
+                              {appointmentInvoiceSummary.total.toFixed(2)} SAR
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setMobileDrawerTab('booking')}
+                            className="px-4 py-2 bg-[#6537C0] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          >
+                            <span>{isRtl ? 'مراجعة الموعد والفاتورة' : 'Review & Schedule'}</span>
+                            <span>{isRtl ? '←' : '→'}</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 </div>
               ) : (

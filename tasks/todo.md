@@ -378,3 +378,32 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Verify zero unrelated working-tree modifications are included in `git status`.
   - Prepare final Phase 1 handoff report.
 
+# BARSPA — Phase 2: Fresha-Inspired Appointment Drawer
+- [x] 1. Pre-edit Audit & Baseline Verification <!-- id: p2_baseline -->
+  - Confirm git branch `main`, commit `83b43a0`, and working-tree status.
+  - Audit all pre-existing modifications to ensure clean isolation.
+  - Write concise implementation plan with UI states, risks, and acceptance criteria.
+- [x] 2. Desktop Two-Column Layout Architecture in InteractiveDrawers.tsx <!-- id: p2_two_column -->
+  - Expand drawer container width on desktop (`max-w-4xl lg:max-w-6xl xl:max-w-7xl`).
+  - Implement two-column split on `lg:` screens:
+    * Left side (in LTR) / Booking side: Customer details, queued services list, scheduling & staff controls, progressive disclosure accordions, persistent invoice footer.
+    * Right side (in LTR) / Catalogue side: Searchable service catalogue, category filter tabs, service cards with duration/price, variant expansion, bundles.
+- [x] 3. Queued Services Management & Progressive Disclosure <!-- id: p2_staged_items -->
+  - Live queued service cards with stylist assignment dropdown, duration, start time, and remove button.
+  - Progressive disclosure for advanced settings: notes, discount (flat/percent), overtime approval.
+  - Fast Walk-in shortcut banner integrated cleanly into Customer card.
+- [x] 4. Persistent Invoice Summary & Action Bar <!-- id: p2_persistent_invoice -->
+  - Always-visible subtotal, 15% VAT, and final grand total in footer.
+  - Obvious primary action: "Schedule Booking 🗓️" (or separate appointments if recovery mode).
+- [x] 5. Mobile Responsive Layout Adaptation <!-- id: p2_mobile_layout -->
+  - Adapt layout on `< lg` screens to a clean tabbed view between Booking Details and Catalogue.
+  - Ensure zero horizontal scrolling or cramped cards on small screens.
+- [x] 6. Local Verification & Build <!-- id: p2_verification -->
+  - Run `npm run lint` (`tsc --noEmit`) in `Tenant-v2` (PASSED).
+  - Run `npm run build` in `Tenant-v2` (PASSED).
+  - Run backend walkin tests in `server/` (PASSED).
+  - Verify layout responsiveness, walk-in compatibility, and invoice totals.
+- [ ] 7. Change Control & Handoff <!-- id: p2_handoff -->
+  - Stage and commit ONLY dedicated Phase 2 files.
+  - Push to `origin/main` and provide isolated Coolify deployment instructions.
+
