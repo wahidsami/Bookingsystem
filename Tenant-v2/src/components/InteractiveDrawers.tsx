@@ -689,7 +689,7 @@ export default function InteractiveDrawers({
 
   // Centralized guard check for advancing workflow steps
   const canAdvanceToStep = (targetStep: number): { allowed: boolean; reason?: { ar: string; en: string } } => {
-    // Advancing beyond Step 1 (to Guests, Services, or Invoice) strictly requires Identity
+    // Advancing beyond Step 1 (to Services or Invoice) strictly requires Identity
     if (targetStep >= 2) {
       if (!hasAppointmentIdentity(custMode, selectedCustId)) {
         return {
@@ -699,8 +699,8 @@ export default function InteractiveDrawers({
       }
     }
 
-    // Advancing to Step 4 (Invoice) strictly requires at least one service
-    if (targetStep >= 4) {
+    // Advancing to Step 3 (Invoice) strictly requires at least one service
+    if (targetStep >= 3) {
       if (stagedServices.length === 0) {
         return {
           allowed: false,
@@ -829,8 +829,8 @@ export default function InteractiveDrawers({
   }, [tenantCategories, canonicalServices, services2Bundles]);
 
   useEffect(() => {
-    if (createStep === 4 && stagedServices.length === 0) {
-      setCreateStep(3);
+    if (createStep === 3 && stagedServices.length === 0) {
+      setCreateStep(2);
     }
   }, [createStep, stagedServices.length]);
 
@@ -1935,17 +1935,10 @@ export default function InteractiveDrawers({
         balance = Number(existing.walletBalance || existing.balance || 0);
       }
     } else {
-      if (!walkinFullName.trim() || !walkinPhone.trim()) {
-        showBookingErrorDialog({
-          titleAr: 'يرجى تعبئة بيانات العميل الزائر',
-          titleEn: 'Missing walk-in details',
-          bodyAr: 'لا يمكن متابعة الحجز بدون اسم العميل الزائر ورقم جواله.',
-          bodyEn: 'The booking cannot continue without the walk-in customer name and mobile number.'
-        });
-        return;
-      }
-      custNameEn = walkinFullName.trim();
-      custNameAr = walkinFullName.trim();
+      const trimmedWalkinName = walkinFullName.trim();
+      const defaultWalkinLabel = isRtl ? 'عميل' : 'Customer';
+      custNameEn = trimmedWalkinName || defaultWalkinLabel;
+      custNameAr = trimmedWalkinName || defaultWalkinLabel;
       custPhone = walkinPhone.trim();
       custEmail = walkinEmail.trim() || '';
       loyalty = walkinIsVip ? 'Premium VIP' : 'Guest Account';
@@ -1955,12 +1948,12 @@ export default function InteractiveDrawers({
     const splitCustomerName = (value: string) => {
       const normalized = `${value || ''}`.trim().replace(/\s+/g, ' ');
       if (!normalized) {
-        return { firstName: 'Customer', lastName: 'Guest' };
+        return { firstName: isRtl ? 'عميل' : 'Customer', lastName: '' };
       }
 
       const parts = normalized.split(' ').filter(Boolean);
       if (parts.length === 1) {
-        return { firstName: parts[0], lastName: 'Guest' };
+        return { firstName: parts[0], lastName: '' };
       }
 
       if (parts.length === 2) {
@@ -2080,22 +2073,9 @@ export default function InteractiveDrawers({
       }
     });
 
-    // Aggregate guest pricing review totals
-    let guestAddonsPrice = 0;
-    if (includeGroupGuests) {
-      guestsList.forEach((g, idx) => {
-        const guestServices = g.services || [];
-        guestServices.forEach((gs) => {
-          if (!g.isFree && !gs.isFree) {
-            guestAddonsPrice += gs.finalPrice;
-          }
-          serviceNamesEn.push(`Guest ${idx + 1} (${g.name}): ${gs.serviceName}`);
-          serviceNamesAr.push(`مرافق ${idx + 1} (${g.name}): ${gs.serviceNameAr || gs.serviceName}`);
-        });
-      });
-    }
-
-    const finalPrice = Math.max(0, totalRawPrice + guestAddonsPrice);
+    // In Phase 1: group guest appointments are decoupled from single-client booking.
+    // Phantom guest pricing is removed so ordinary invoice matches actual staged line items.
+    const finalPrice = Math.max(0, totalRawPrice);
 
     const normalClosingMinutes = Math.max(0, Math.round(Number(normalEndHour ?? (boardStartHour + 8)))) * 60;
 
@@ -2187,7 +2167,7 @@ export default function InteractiveDrawers({
         extensionMinutes,
         onChooseAnotherDay: () => {
           setBookingHoursDecisionDialog(null);
-          setCreateStep(3);
+          setCreateStep(2);
         },
         onExtendHours: () => {
           setBookingHoursDecisionDialog(null);
@@ -2246,10 +2226,7 @@ export default function InteractiveDrawers({
       overtimeApproval: allowExtendedHours || itemsToSubmit.some(i => i.overtimeApproval?.approved) ? { approved: true } : undefined,
       staffId: finalStaged.some(i => i.isExplicitStaff) ? (finalStaged.find(i => i.isExplicitStaff)?.staffId || null) : null,
       startTime: buildIsoFromMinutes(selectedDate, earliestStartTime),
-      notes: sessionNotes || [
-        ...finalStaged.map(s => s.notes),
-        ...(includeGroupGuests ? guestsList.map(g => g.notes ? `${g.name}: ${g.notes}` : '') : [])
-      ].filter(Boolean).join(' | '),
+      notes: sessionNotes || finalStaged.map(s => s.notes).filter(Boolean).join(' | '),
       assignmentMode: finalStaged.some(i => i.isExplicitStaff) ? 'tenant_reassigned' : 'auto_assigned',
       notifyCustomer: notifyWhatsApp,
       paymentMethod: 'at-center',
@@ -2257,9 +2234,9 @@ export default function InteractiveDrawers({
       customer: custMode === 'walkin'
         ? {
             firstName: derivedCustomerNameParts.firstName,
-            lastName: derivedCustomerNameParts.lastName,
-            email: custEmail.trim(),
-            phone: custPhone.trim(),
+            lastName: derivedCustomerNameParts.lastName || undefined,
+            email: custEmail.trim() || undefined,
+            phone: custPhone.trim() || undefined,
             gender: undefined,
             notes: undefined,
             isGuest: !walkinIsVip
@@ -2900,9 +2877,8 @@ export default function InteractiveDrawers({
                     <ol className="flex items-center gap-2 sm:gap-4 list-none m-0 p-0">
                       {[
                         { step: 1, labelAr: 'بيانات العميل', labelEn: 'Identity' },
-                        { step: 2, labelAr: 'المرافقين', labelEn: 'Include Guests' },
-                        { step: 3, labelAr: 'الخدمات والجدولة', labelEn: 'Services' },
-                        { step: 4, labelAr: 'الفاتورة والسداد', labelEn: 'Invoice' }
+                        { step: 2, labelAr: 'الخدمات والجدولة', labelEn: 'Services' },
+                        { step: 3, labelAr: 'الفاتورة والسداد', labelEn: 'Invoice' }
                       ].map((item, idx, arr) => {
                         const isCurrent = createStep === item.step;
                         const isCompleted = createStep > item.step;
@@ -3086,30 +3062,53 @@ export default function InteractiveDrawers({
                                 ) : null}
                               </div>
                             ) : (
-                              <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                              <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm space-y-5">
+                                {/* Fast Walk-In One-Click Action Banner */}
+                                <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                  <div>
+                                    <p className="text-xs font-bold text-violet-900 flex items-center gap-1.5">
+                                      <span>⚡</span>
+                                      <span>{isRtl ? 'تسجيل زائر سريع بدون تفاصيل' : 'Fast Walk-In (No Details Required)'}</span>
+                                    </p>
+                                    <p className="text-[11px] text-violet-700/80 mt-0.5">
+                                      {isRtl
+                                        ? 'المتابعة المباشرة لجدولة الخدمات؛ سيتم إنشاء حساب زائر تلقائي بدون متطلبات إلزامية.'
+                                        : 'Proceed directly to service scheduling; a walk-in record will be generated automatically.'}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => safeSetCreateStep(2)}
+                                    className="shrink-0 px-3.5 py-2 rounded-xl bg-[#6537C0] text-white text-xs font-bold hover:bg-[#532ba3] transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    <span>{isRtl ? 'متابعة سريعة للخدمات' : 'Quick Continue'}</span>
+                                    <span>{isRtl ? '←' : '→'}</span>
+                                  </button>
+                                </div>
+
                                 <div className="grid gap-6 sm:grid-cols-2">
                                   <div>
                                     <label className="mb-2 block text-xs font-semibold text-slate-600">
-                                      {isRtl ? 'الاسم الكامل' : 'Full Name'}
+                                      {isRtl ? 'الاسم الكامل (اختياري للزائر السريع)' : 'Full Name (Optional for walk-in)'}
                                     </label>
                                     <input
                                       ref={walkinNameRef}
                                       type="text"
                                       value={walkinFullName}
                                       onChange={(e) => setWalkinFullName(e.target.value)}
-                                      placeholder={isRtl ? 'نورة أحمد' : 'Noura Ahmad'}
+                                      placeholder={isRtl ? 'نورة أحمد (أو اترك فارغاً لزائر سريع)' : 'Noura Ahmad (or leave empty for quick walk-in)'}
                                       className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
                                     />
                                   </div>
                                   <div>
                                     <label className="mb-2 block text-xs font-semibold text-slate-600">
-                                      {isRtl ? 'رقم الجوال' : 'Phone'}
+                                      {isRtl ? 'رقم الجوال (اختياري)' : 'Phone (Optional)'}
                                     </label>
                                     <input
                                       type="text"
                                       value={walkinPhone}
                                       onChange={(e) => setWalkinPhone(e.target.value)}
-                                      placeholder={isRtl ? '+966 50...' : '+966 50...'}
+                                      placeholder={isRtl ? '+966 50... (اختياري)' : '+966 50... (Optional)'}
                                       className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'text-right' : 'text-left'}`}
                                     />
                                   </div>
@@ -3160,340 +3159,10 @@ export default function InteractiveDrawers({
                       </div>
                     )}
 
+                    {/* Phase 1 Correctness: The defective guest UI in single-client wizard has been decoupled.
+                        Product requirement note: Genuine multi-client group appointments will be implemented
+                        in Phase 2/3 with proper multi-appointment database persistence. */}
                     {createStep === 2 && (
-                      <div className="space-y-4 animate-fadeIn text-xs">
-                        <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-4">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                            <div>
-                              <p className="font-bold text-slate-800 text-sm">{isRtl ? 'إضافة ضيوف مرافقين للحجز' : 'Include Group Guests'}</p>
-                              <p className="text-[10px] text-slate-400">{isRtl ? 'حجز خدمات إضافية لمرافقين في نفس الموعد' : 'Schedule additional treatments for guests in this reservation'}</p>
-                            </div>
-                            <div className="flex items-center gap-1.5 bg-[#F3EDFC] px-3 py-1.5 rounded-full border border-[#A379E2]/30">
-                              <input
-                                type="checkbox"
-                                id="group-check-step2"
-                                checked={includeGroupGuests}
-                                onChange={(e) => setIncludeGroupGuests(e.target.checked)}
-                                className="rounded accent-[#6537C0] cursor-pointer h-4 w-4"
-                              />
-                              <label htmlFor="group-check-step2" className="font-bold text-[#6537C0] text-[11px] cursor-pointer">
-                                {isRtl ? 'تفعيل حجز المرافقين' : 'Enable Guest Bookings'}
-                              </label>
-                            </div>
-                          </div>
-
-                          {includeGroupGuests ? (
-                            <div className="space-y-4">
-                              {/* Guest Ownership Rules Exposing */}
-                              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl space-y-1 text-xs">
-                                <p className="font-bold text-[10px] uppercase tracking-wide flex items-center gap-1">
-                                  <span>ℹ️</span>
-                                  <span>{isRtl ? 'قواعد ملكية حجز المرافقين' : 'GUEST OWNERSHIP & BOOKING RULES'}</span>
-                                </p>
-                                <p className="text-[10px] leading-relaxed">
-                                  {isRtl
-                                    ? 'الضيوف المرافقين تابعين للحساب الرئيسي للعميل. لا يمكن تعديل أو تتبع حالة دفعهم بشكل منفصل؛ يتم إصدار فاتورة موحدة لكافة الخدمات.'
-                                    : 'All guest reservations are owned by the primary customer account. Individual rescheduling is locked; payment and checkout are processed under a unified invoice.'}
-                                </p>
-                              </div>
-
-                              <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                <div>
-                                  <p className="font-bold text-slate-700">{isRtl ? 'عدد الضيوف ومرافقيهم' : 'Group Size (Pax)'}</p>
-                                  <p className="text-[10px] text-slate-400">{isRtl ? 'الحد الأقصى 8 ضيوف في الجلسة' : 'Maximum of 8 guests'}</p>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => setGuestCount(prev => Math.max(1, prev - 1))}
-                                    className="w-7 h-7 bg-white hover:bg-slate-100 border rounded-lg font-bold flex items-center justify-center cursor-pointer text-sm text-slate-700"
-                                  >
-                                    -
-                                  </button>
-                                  <span className="w-8 text-center font-mono font-black text-slate-800 text-sm">{guestCount}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setGuestCount(prev => Math.min(8, prev + 1))}
-                                    className="w-7 h-7 bg-white hover:bg-slate-100 border rounded-lg font-bold flex items-center justify-center cursor-pointer text-sm text-slate-700"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Structured Guest entries with dedicated capture (email/phone) and first-class notes */}
-                              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1 scrollbar-thin">
-                                {guestsList.map((guest, index) => {
-                                  const isNameEmpty = guest.name.trim() === '';
-                                  const isEmailInvalid = guest.email && guest.email.trim() !== '' && !guest.email.includes('@');
-                                  const hasValidationError = isNameEmpty || isEmailInvalid;
-
-                                  // Calculate guest subtotal based on services
-                                  const guestServicesSubtotal = (guest.services || []).reduce((acc, gs) => acc + (guest.isFree || gs.isFree ? 0 : gs.finalPrice), 0);
-
-                                  return (
-                                    <div
-                                      key={guest.id}
-                                      className={`p-4 bg-slate-50/50 rounded-xl border transition-all space-y-4 ${
-                                        hasValidationError
-                                          ? 'border-red-200 bg-red-50/10 focus-within:border-red-400'
-                                          : 'border-slate-200 focus-within:border-[#6537C0]'
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                                          <span className="w-2.5 h-2.5 rounded-full bg-[#6537C0] shadow-sm" />
-                                          {isRtl ? `بيانات المرافق ${index + 1}` : `Guest ${index + 1} Profile`}
-                                        </span>
-                                        {hasValidationError && (
-                                          <span className="text-[9px] font-black text-red-500 uppercase tracking-tight bg-red-100 px-2 py-0.5 rounded animate-pulse">
-                                            {isNameEmpty ? (isRtl ? 'الاسم مطلوب *' : 'Name Required *') : (isRtl ? 'بريد غير صالح' : 'Invalid Email')}
-                                          </span>
-                                        )}
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-2.5">
-                                        <div>
-                                          <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'الاسم بالكامل *' : 'Full Name *'}</label>
-                                          <input
-                                            type="text"
-                                            required
-                                            value={guest.name}
-                                            onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, name: e.target.value } : g))}
-                                            placeholder={isRtl ? `الاسم الأول (مثال: سارة)` : `e.g. Guest ${index + 1}`}
-                                            className={`w-full bg-white border p-2 rounded-lg text-xs font-semibold focus:outline-none ${
-                                              isNameEmpty ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-[#6537C0]'
-                                            }`}
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'رقم الجوال' : 'Phone'}</label>
-                                          <input
-                                            type="text"
-                                            value={guest.phone}
-                                            onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, phone: e.target.value } : g))}
-                                            placeholder="+966 50"
-                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold"
-                                          />
-                                        </div>
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-2.5">
-                                        <div>
-                                          <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'البريد الإلكتروني' : 'Email Address'}</label>
-                                          <input
-                                            type="email"
-                                            value={guest.email || ''}
-                                            onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, email: e.target.value } : g))}
-                                            placeholder="guest@example.com"
-                                            className={`w-full bg-white border p-2 rounded-lg text-xs font-semibold focus:outline-none ${
-                                              isEmailInvalid ? 'border-red-300 focus:ring-1 focus:ring-red-400' : 'border-slate-200 focus:ring-1 focus:ring-[#6537C0]'
-                                            }`}
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'تاريخ الميلاد' : 'Birth Date'}</label>
-                                          <input
-                                            type="date"
-                                            value={guest.birthDate || ''}
-                                            onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, birthDate: e.target.value } : g))}
-                                            className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold"
-                                          />
-                                        </div>
-                                      </div>
-
-                                      {/* Services list for this Guest */}
-                                      <div className="space-y-3 bg-white p-3 rounded-lg border border-slate-100">
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                                          <span className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">{isRtl ? 'خدمات الضيف' : 'Services Selection'}</span>
-                                          <button
-                                            type="button"
-                                            onClick={() => addGuestService(guest.id)}
-                                            className="text-[#6537C0] hover:text-[#532ab0] font-bold text-[10px] flex items-center gap-1 cursor-pointer"
-                                          >
-                                            <PlusCircle className="w-3.5 h-3.5" />
-                                            <span>{isRtl ? 'إضافة خدمة أخرى' : 'Add Service'}</span>
-                                          </button>
-                                        </div>
-
-                                        <div className="space-y-3 divide-y divide-slate-100">
-                                          {(guest.services || []).map((gs, gsIdx) => (
-                                            <div key={gs.id} className={`space-y-2 ${gsIdx > 0 ? 'pt-2.5' : ''}`}>
-                                              <div className="flex items-center justify-between gap-1.5">
-                                                <span className="text-[10px] font-black text-slate-400">#{gsIdx + 1}</span>
-                                                {(guest.services || []).length > 1 && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => removeGuestService(guest.id, gs.id)}
-                                                    className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer"
-                                                  >
-                                                    <Trash className="w-3.5 h-3.5" />
-                                                  </button>
-                                                )}
-                                              </div>
-
-                                              <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                  <label className="text-[9px] text-slate-400 font-semibold block mb-0.5">{isRtl ? 'الخدمة' : 'Service'}</label>
-                                                  <select
-                                                    value={gs.serviceId}
-                                                    onChange={(e) => updateGuestService(guest.id, gs.id, { serviceId: e.target.value })}
-                                                    className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded text-xs font-black text-slate-700"
-                                                  >
-                                                    {services.map(s => (
-                                                      <option key={s.id} value={s.id}>{isRtl ? s.nameAr : s.nameEn} ({s.price} SAR)</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-
-                                                <div>
-                                                  <label className="text-[9px] text-slate-400 font-semibold block mb-0.5">{isRtl ? 'الموظف' : 'Staff/Stylist'}</label>
-                                                  <select
-                                                    value={gs.staffId}
-                                                    onChange={(e) => updateGuestService(guest.id, gs.id, { staffId: e.target.value })}
-                                                    className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded text-xs font-bold text-slate-700"
-                                                  >
-                                                    {availableStylists.map(st => (
-                                                      <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-                                              </div>
-
-                                              <div className="grid grid-cols-3 gap-2">
-                                                <div>
-                                                  <label className="text-[9px] text-slate-400 font-semibold block mb-0.5">{isRtl ? 'نوع الخصم' : 'Discount Type'}</label>
-                                                  <select
-                                                    value={gs.discountType}
-                                                    onChange={(e) => updateGuestService(guest.id, gs.id, { discountType: e.target.value as any, discountValue: 0 })}
-                                                    className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded text-xs font-semibold text-slate-700"
-                                                  >
-                                                    <option value="none">{isRtl ? 'بلا خصم' : 'No Discount'}</option>
-                                                    <option value="flat">{isRtl ? 'مبلغ ثابت' : 'Flat Cash'}</option>
-                                                    <option value="percent">{isRtl ? 'نسبة مئوية' : 'Percentage'}</option>
-                                                  </select>
-                                                </div>
-
-                                                <div>
-                                                  <label className="text-[9px] text-slate-400 font-semibold block mb-0.5">{isRtl ? 'قيمة الخصم' : 'Discount'}</label>
-                                                  <input
-                                                    type="number"
-                                                    disabled={gs.discountType === 'none'}
-                                                    value={gs.discountValue || ''}
-                                                    placeholder="0"
-                                                    onChange={(e) => updateGuestService(guest.id, gs.id, { discountValue: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded text-xs font-mono text-center font-bold"
-                                                  />
-                                                </div>
-
-                                                <div>
-                                                  <label className="text-[9px] text-slate-400 font-semibold block mb-0.5">{isRtl ? 'الصافي' : 'Net price'}</label>
-                                                  <div className="w-full bg-slate-100 p-1.5 rounded text-xs font-mono font-black text-center text-slate-800">
-                                                    {gs.isFree || guest.isFree ? '0 SAR' : `${gs.finalPrice} SAR`}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-
-                                      <div>
-                                        <label className="text-[10px] text-slate-500 font-bold block mb-1">{isRtl ? 'ملاحظات وتفضيلات الضيف (حقل أساسي)' : 'Guest Notes / Requests'}</label>
-                                        <textarea
-                                          rows={1}
-                                          value={guest.notes}
-                                          onChange={(e) => setGuestsList(prev => prev.map(g => g.id === guest.id ? { ...g, notes: e.target.value } : g))}
-                                          placeholder={isRtl ? 'تفضيلات العناية، تفاصيل مخصصة، حساسية للمنتجات...' : 'Allergies, design reference, specific preferences.'}
-                                          className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-semibold"
-                                        />
-                                      </div>
-
-                                      <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/50">
-                                        <span className="text-[10px] font-bold text-slate-500">
-                                          {isRtl ? 'مجموع خدمات الضيف:' : 'Guest Subtotal:'}
-                                          <span className="font-mono font-black text-slate-800 ml-1">
-                                            {guestServicesSubtotal} SAR
-                                          </span>
-                                        </span>
-
-                                        {/* Guest free-service toggle as a clear control */}
-                                        <label className="flex items-center gap-1.5 cursor-pointer">
-                                          <input
-                                            type="checkbox"
-                                            checked={guest.isFree}
-                                            onChange={(e) => {
-                                              const checked = e.target.checked;
-                                              setGuestsList(prev => prev.map(g => {
-                                                if (g.id === guest.id) {
-                                                  const nextServices = (g.services || []).map(s => ({ ...s, isFree: checked, finalPrice: checked ? 0 : s.basePrice }));
-                                                  return { ...g, isFree: checked, services: nextServices };
-                                                }
-                                                return g;
-                                              }));
-                                            }}
-                                            className="rounded text-emerald-500 focus:ring-0 cursor-pointer h-4 w-4"
-                                          />
-                                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg flex items-center gap-0.5">
-                                            <span>🎁</span>
-                                            <span>{isRtl ? 'جلسات مجانية بالكامل' : 'All Free'}</span>
-                                          </span>
-                                        </label>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-
-                              {/* GUEST PRICING REVIEW / SUMMARY */}
-                              <div className="bg-[#F3EDFC]/60 border border-[#A379E2]/30 rounded-xl p-3.5 space-y-2">
-                                <p className="text-[10px] font-black text-[#1D035F] uppercase tracking-wide flex items-center gap-1">
-                                  <span>💳</span>
-                                  <span>{isRtl ? 'مراجعة وتفصيل أسعار خدمات الضيوف:' : 'GROUP SESSION PRICING REVIEW'}</span>
-                                </p>
-                                <div className="divide-y divide-amber-500/10 text-[11px] font-semibold">
-                                  {guestsList.map((g, idx) => {
-                                    const guestSub = (g.services || []).reduce((acc, gs) => acc + (g.isFree || gs.isFree ? 0 : gs.finalPrice), 0);
-                                    return (
-                                      <div key={g.id} className="flex justify-between py-1.5 animate-fadeIn">
-                                        <div className="text-slate-600">
-                                          <p className="font-bold">{g.name || `${isRtl ? 'مرافق' : 'Guest'} ${idx + 1}`}</p>
-                                          <div className="pl-2 border-l border-slate-300 text-[10px] text-slate-400 space-y-0.5">
-                                            {(g.services || []).map((gs, sIdx) => (
-                                              <p key={gs.id}>- {isRtl ? gs.serviceName : gs.serviceName} ({gs.finalPrice} SAR)</p>
-                                            ))}
-                                          </div>
-                                        </div>
-                                        <span className="font-mono font-bold text-slate-800 self-center">
-                                          {g.isFree ? <span className="text-emerald-600 font-extrabold">{isRtl ? 'مجاني 🎁' : 'FREE 🎁'}</span> : `${guestSub} SAR`}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                  <div className="flex justify-between pt-2.5 mt-2 border-t border-[#A379E2]/30 text-xs font-black text-[#1D035F]">
-                                    <span>{isRtl ? 'مجموع خدمات المرافقين:' : 'Total Guest Group Cost:'}</span>
-                                    <span className="font-mono text-sm">
-                                      {guestsList.reduce((acc, g) => acc + (g.isFree ? 0 : (g.services || []).reduce((sum, gs) => sum + (gs.isFree ? 0 : gs.finalPrice), 0)), 0)} SAR
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center space-y-1">
-                              <p className="font-black text-slate-700">{isRtl ? 'حجز عميل فردي' : 'Single Customer Reservation'}</p>
-                              <p className="text-[10px] text-slate-400 max-w-sm mx-auto">
-                                {isRtl
-                                  ? 'لم يتم تفعيل المرافقين لهذا الحجز. سيتم جدولة العميل الرئيسي فقط.'
-                                  : 'No guest profiles included. Proceeding with single customer booking only.'}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {createStep === 3 && (
                       <AppointmentServicesStep
                         tenantId={tenantId}
                         tenantTimezone={resolvedTenantTimezone}
@@ -3521,7 +3190,7 @@ export default function InteractiveDrawers({
                         onUpdateService={handleUpdateStagedService}
                         onRemoveService={(index) => setStagedServices(prev => prev.filter((_, i) => i !== index))}
                         formatMinutesToTime={formatMinutesToTime}
-                        onPrevious={() => safeSetCreateStep(2)}
+                        onPrevious={() => safeSetCreateStep(1)}
                         onNext={() => {
                           if (stagedServices.length === 0) {
                             addLocalToast(
@@ -3559,12 +3228,12 @@ export default function InteractiveDrawers({
                             return;
                           }
 
-                          safeSetCreateStep(4);
+                          safeSetCreateStep(3);
                         }}
                       />
                     )}
 
-                    {createStep === 4 && (
+                    {createStep === 3 && (
                       <div className="space-y-4 animate-fadeIn text-xs">
                         {bookingRecoveryMode === 'separate_services' && stagedServices.length > 1 && (
                           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-semibold text-amber-900">
@@ -3633,10 +3302,7 @@ export default function InteractiveDrawers({
 
                           const queuedLineItems = [...packageCartItems, ...standaloneCartItems];
                           const primarySubtotal = queuedLineItems.reduce((sum, item) => sum + item.price, 0);
-                          const guestsSubtotal = includeGroupGuests
-                            ? guestsList.reduce((acc, g) => acc + (g.isFree ? 0 : (g.services || []).reduce((sum, gs) => sum + (gs.isFree ? 0 : toMoney(gs.finalPrice)), 0)), 0)
-                            : 0;
-                          const subtotal = primarySubtotal + guestsSubtotal;
+                          const subtotal = primarySubtotal;
                           const vat = subtotal * 0.15;
                           const total = subtotal + vat;
 
@@ -3683,30 +3349,7 @@ export default function InteractiveDrawers({
                                     </div>
                                   ))
                                 )}
-                                {includeGroupGuests && (
-                                  <div className="space-y-1 pl-2.5 border-l-2 border-[#A379E2]/30 pr-2.5">
-                                    <p className="text-[10px] font-bold text-[#1D035F] uppercase tracking-wide">{isRtl ? 'تفصيل خدمات الضيوف:' : 'GROUP GUESTS BREAKDOWN'}</p>
-                                    {guestsList.map((g, idx) => {
-                                      const guestSub = (g.services || []).reduce((acc, gs) => acc + (g.isFree || gs.isFree ? 0 : toMoney(gs.finalPrice)), 0);
-                                      return (
-                                        <div key={g.id} className="space-y-0.5 text-[11px] border-b border-dashed border-slate-100 pb-1 mb-1">
-                                          <div className="flex justify-between font-bold">
-                                            <span>{g.name || `${isRtl ? 'مرافق' : 'Guest'} ${idx + 1}`}</span>
-                                            <span className="font-mono">{g.isFree ? '0.00' : toMoney(guestSub).toFixed(2)} ر.س</span>
-                                          </div>
-                                          <div className="pl-2 text-[10px] text-slate-400">
-                                            {(g.services || []).map(gs => (
-                                              <div key={gs.id} className="flex justify-between">
-                                                <span>- {gs.serviceName}</span>
-                                                <span>{toMoney(gs.finalPrice).toFixed(2)} ر.س</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
+
                               </div>
 
                               <div className="flex justify-between">
@@ -3722,41 +3365,7 @@ export default function InteractiveDrawers({
                                 <span className="font-mono">{toMoney(total).toFixed(2)} ر.س</span>
                               </div>
 
-                              {/* Dedicated Guest Group Summary Card in checkout step */}
-                              {includeGroupGuests && (
-                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
-                                  <p className="font-black text-slate-700 flex items-center gap-1">
-                                    <span>👥</span>
-                                    <span>{isRtl ? 'ملخص بطاقات المرافقين للحجز' : 'Group Guests Summary Card'}</span>
-                                  </p>
-                                  <div className="space-y-2">
-                                    {guestsList.map((g, i) => {
-                                      const guestSub = (g.services || []).reduce((acc, gs) => acc + (g.isFree || gs.isFree ? 0 : gs.finalPrice), 0);
-                                      return (
-                                        <div key={g.id} className="bg-white p-2.5 border rounded-lg flex flex-col gap-1.5 text-[11px] leading-relaxed">
-                                          <div className="flex items-start justify-between border-b pb-1 border-slate-100">
-                                            <div>
-                                              <p className="font-bold text-slate-800">#{i + 1}: {g.name}</p>
-                                              {g.phone && <p className="text-slate-500 font-mono text-[9px]">{g.phone}</p>}
-                                              {g.email && <p className="text-slate-500 font-mono text-[9px]">{g.email}</p>}
-                                              {g.birthDate && <p className="text-slate-500 font-mono text-[9px]">🎂 {g.birthDate}</p>}
-                                            </div>
-                                            <span className="font-mono font-black text-slate-700">
-                                              {g.isFree ? (isRtl ? 'مجاني 🎁' : 'Free 🎁') : `${guestSub} SAR`}
-                                            </span>
-                                          </div>
-                                          <div className="space-y-1 pl-1 text-[10px] text-slate-600">
-                                            {(g.services || []).map(gs => (
-                                              <p key={gs.id}>• {gs.serviceName} ({gs.finalPrice} SAR)</p>
-                                            ))}
-                                          </div>
-                                          {g.notes && <p className="text-[#6537C0] italic text-[9px] mt-0.5 bg-[#F3EDFC] px-1 py-0.5 rounded">📝 {g.notes}</p>}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
+
                             </div>
                           );
                         })()}
@@ -3815,7 +3424,7 @@ export default function InteractiveDrawers({
                       </button>
                     ) : <div />}
 
-                    {createStep < 4 ? (
+                    {createStep < 3 ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -3830,18 +3439,7 @@ export default function InteractiveDrawers({
                               return;
                             }
                           }
-                          if (createStep === 2 && includeGroupGuests) {
-                            const emptyGuestName = guestsList.some(g => g.name.trim() === '');
-                            if (emptyGuestName) {
-                              addLocalToast(
-                                isRtl ? 'يرجى تعبئة أسماء المرافقين للمتابعة' : 'Please fill in all guest names to continue',
-                                isRtl ? 'Please fill in all guest names to continue' : 'يرجى تعبئة أسماء المرافقين للمتابعة',
-                                'warning'
-                              );
-                              return;
-                            }
-                          }
-                          if (createStep === 3 && stagedServices.length === 0) {
+                          if (createStep === 2 && stagedServices.length === 0) {
                             addLocalToast(
                               isRtl ? 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة' : 'Please add at least one service before opening the invoice step',
                               isRtl ? 'Please add at least one service before opening the invoice step' : 'يرجى إدراج خدمة واحدة على الأقل للمتابعة إلى الفاتورة',

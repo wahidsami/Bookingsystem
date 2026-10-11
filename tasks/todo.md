@@ -353,3 +353,28 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Commit: `feat(admin): polish BARSPA admin theme and logo presentation`.
   - Push to `origin/main`.
   - Provide final handoff report.
+
+# BARSPA — Phase 1: Group-Booking Correctness & Fast Walk-in Handling
+- [x] 1. Pre-edit Audit & Baseline Verification <!-- id: p1_baseline -->
+  - Reconfirm Git branch, HEAD SHA, working-tree status.
+  - Verify and isolate all pre-existing working-tree changes to ensure zero overlap.
+  - Confirm local test runners and typechecks.
+- [x] 2. Eliminate Deceptive Group Step & Phantom Guest Pricing <!-- id: p1_group_correctness -->
+  - Streamline wizard from 4 steps to 3 active steps in `InteractiveDrawers.tsx`: (1) Identity, (2) Services, (3) Invoice.
+  - Safely disable the unpersisted guest form in single-client booking drawer while preserving type definitions for future multi-client group bookings.
+  - Remove phantom guest pricing calculation (`guestAddonsPrice`) from subtotal, VAT, invoice, and payment allocations.
+  - Ensure `AppointmentServicesStep.tsx` previous navigation cleanly targets Step 1 (Identity).
+- [x] 3. Implement Fast Walk-in Customer Resolution <!-- id: p1_fast_walkin -->
+  - Add explicit Fast Walk-in support in Step 1 (Walk-in mode requires no mandatory phone/name to proceed).
+  - Pre-fill clean localized placeholders (`Customer` / `عميل`) when fields are left blank.
+  - Ensure `payload.customer` maps `{ isGuest: true }` matching backend `resolveAppointmentCustomer` contract.
+  - Preserve tenant configuration enforcement if `requireWalkInPhone === true`.
+- [x] 4. Automated Testing & Verification <!-- id: p1_tests -->
+  - Add focused backend tests in `server/src/controllers/__tests__/tenantAppointmentController.walkin.test.js` verifying fast walk-in without phone/email and price accuracy without phantom guest items.
+  - Run `Tenant-v2` typecheck (`npm run lint` / `tsc --noEmit`).
+  - Run backend Jest suite.
+- [x] 5. Change Control & Clean Staging <!-- id: p1_change_control -->
+  - Stage ONLY Phase 1 modified files (`InteractiveDrawers.tsx`, new walkin test).
+  - Verify zero unrelated working-tree modifications are included in `git status`.
+  - Prepare final Phase 1 handoff report.
+
