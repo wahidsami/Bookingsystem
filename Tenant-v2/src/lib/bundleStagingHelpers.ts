@@ -145,8 +145,10 @@ export interface GroupParticipantInfo {
 export interface GroupParticipantFinancials {
   participantId: string;
   name: string;
+  participantName: string;
   isOrganizer: boolean;
   serviceCount: number;
+  itemsCount: number;
   subtotal: number;
   vat: number;
   total: number;
@@ -154,9 +156,13 @@ export interface GroupParticipantFinancials {
 
 export interface GroupPricingSummary {
   participants: GroupParticipantFinancials[];
+  participantBreakdowns: GroupParticipantFinancials[];
   consolidatedSubtotal: number;
+  subtotal: number;
   consolidatedVat: number;
+  vat: number;
   consolidatedTotal: number;
+  total: number;
 }
 
 /**
@@ -167,15 +173,22 @@ export const calculateGroupStagedPricing = (
   stagedServices: MinimalStagedItem[],
   packages: MinimalPackageItem[]
 ): GroupPricingSummary => {
-  const defaultParticipantId = participants[0]?.id || 'part-1';
-  const participantFinancials: GroupParticipantFinancials[] = participants.map((p, idx) => {
-    const pItems = stagedServices.filter(s => (s.participantId || defaultParticipantId) === p.id);
-    const pricing = calculateStagedPricing(pItems, packages);
+  const safeParticipants = Array.isArray(participants) && participants.length > 0
+    ? participants
+    : [{ id: 'part-1', name: 'Participant 1', isOrganizer: true }];
+
+  const defaultParticipantId = safeParticipants[0]?.id || 'part-1';
+  const participantFinancials: GroupParticipantFinancials[] = safeParticipants.map((p, idx) => {
+    const pItems = (stagedServices || []).filter(s => (s.participantId || defaultParticipantId) === p.id);
+    const pricing = calculateStagedPricing(pItems, packages || []);
+    const participantName = p.name || `Participant ${idx + 1}`;
     return {
       participantId: p.id,
-      name: p.name || `Participant ${idx + 1}`,
+      name: participantName,
+      participantName,
       isOrganizer: idx === 0 || Boolean(p.isOrganizer),
       serviceCount: pItems.length,
+      itemsCount: pItems.length,
       subtotal: pricing.subtotal,
       vat: pricing.vat,
       total: pricing.total
@@ -188,9 +201,13 @@ export const calculateGroupStagedPricing = (
 
   return {
     participants: participantFinancials,
+    participantBreakdowns: participantFinancials,
     consolidatedSubtotal,
+    subtotal: consolidatedSubtotal,
     consolidatedVat,
-    consolidatedTotal
+    vat: consolidatedVat,
+    consolidatedTotal,
+    total: consolidatedTotal
   };
 };
 

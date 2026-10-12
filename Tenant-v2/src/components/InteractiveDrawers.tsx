@@ -3828,8 +3828,9 @@ export default function InteractiveDrawers({
                             type="button"
                             onClick={() => {
                               setBookingScope('group');
-                              if (groupParticipants.length === 1 && !groupParticipants[0].name) {
-                                groupParticipants[0].name = custMode === 'existing' ? (selectedRegisteredCustomer?.name || '') : walkinFullName;
+                              const primaryName = custMode === 'existing' ? (selectedRegisteredCustomer?.name || '') : walkinFullName;
+                              if (primaryName && groupParticipants.length > 0 && !groupParticipants[0].name) {
+                                setGroupParticipants(prev => prev.map((p, idx) => idx === 0 ? { ...p, name: primaryName } : p));
                               }
                             }}
                             className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -4654,16 +4655,16 @@ export default function InteractiveDrawers({
                               </span>
                             </div>
                             <div className="space-y-1 pt-1 border-t border-purple-200/60 max-h-28 overflow-y-auto pr-1">
-                              {groupFinancialSummary.participantBreakdowns.map((p) => (
+                              {(groupFinancialSummary.participantBreakdowns || groupFinancialSummary.participants || []).map((p) => (
                                 <div key={p.participantId} className="flex items-center justify-between text-[11px] text-slate-700">
                                   <div className="flex items-center gap-1.5 truncate">
-                                    <span className="font-semibold truncate">{p.participantName}</span>
+                                    <span className="font-semibold truncate">{p.participantName || p.name}</span>
                                     <span className="text-[10px] text-slate-400 shrink-0">
-                                      ({p.itemsCount} {isRtl ? 'خدمات' : 'items'})
+                                      ({p.itemsCount ?? p.serviceCount ?? 0} {isRtl ? 'خدمات' : 'items'})
                                     </span>
                                   </div>
                                   <span className="font-mono font-bold text-slate-900 shrink-0">
-                                    {p.total.toFixed(2)} SAR
+                                    {(p.total || 0).toFixed(2)} SAR
                                   </span>
                                 </div>
                               ))}
@@ -4675,7 +4676,7 @@ export default function InteractiveDrawers({
                           <div className="flex justify-between text-slate-600">
                             <span>{isRtl ? 'مجموع الخدمات' : 'Services Subtotal'}</span>
                             <span className="font-mono font-bold">
-                              {(bookingScope === 'group' && groupFinancialSummary ? groupFinancialSummary.subtotal : appointmentInvoiceSummary.subtotal).toFixed(2)} SAR
+                              {(bookingScope === 'group' && groupFinancialSummary ? (groupFinancialSummary.subtotal ?? groupFinancialSummary.consolidatedSubtotal ?? 0) : appointmentInvoiceSummary.subtotal).toFixed(2)} SAR
                             </span>
                           </div>
                           <div className="flex justify-between text-slate-600">
@@ -4684,13 +4685,13 @@ export default function InteractiveDrawers({
                               <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1 rounded">ZATCA</span>
                             </span>
                             <span className="font-mono font-bold">
-                              {(bookingScope === 'group' && groupFinancialSummary ? groupFinancialSummary.vat : appointmentInvoiceSummary.vat).toFixed(2)} SAR
+                              {(bookingScope === 'group' && groupFinancialSummary ? (groupFinancialSummary.vat ?? groupFinancialSummary.consolidatedVat ?? 0) : appointmentInvoiceSummary.vat).toFixed(2)} SAR
                             </span>
                           </div>
                           <div className="flex justify-between font-black text-[#6537C0] text-sm border-t border-slate-100 pt-2">
                             <span>{isRtl ? 'المبلغ المستحق النهائي' : 'Grand Total Due'}</span>
                             <span className="font-mono text-base">
-                              {(bookingScope === 'group' && groupFinancialSummary ? groupFinancialSummary.total : appointmentInvoiceSummary.total).toFixed(2)} SAR
+                              {(bookingScope === 'group' && groupFinancialSummary ? (groupFinancialSummary.total ?? groupFinancialSummary.consolidatedTotal ?? 0) : appointmentInvoiceSummary.total).toFixed(2)} SAR
                             </span>
                           </div>
                         </div>

@@ -185,3 +185,102 @@ test('Group Draft Lifecycle: Detects group mode, group name, and multiple partic
   // Multiple participants added
   assert.equal(checkIsAppointmentDraftDirty({ groupParticipantsCount: 3 }), true);
 });
+
+test('Regression (P1 Group Booking Crash): calculateGroupStagedPricing guarantees participantBreakdowns.map executes without throwing', () => {
+  // Test 1: Empty initial state fallback (should safely produce at least 1 default participant breakdown)
+  const emptySummary = calculateGroupStagedPricing([], [], []);
+  assert.ok(Array.isArray(emptySummary.participantBreakdowns), 'participantBreakdowns must be an array');
+  assert.ok(Array.isArray(emptySummary.participants), 'participants must be an array');
+  assert.equal(emptySummary.participantBreakdowns.length, 1);
+  assert.equal(typeof emptySummary.subtotal, 'number');
+  assert.equal(typeof emptySummary.vat, 'number');
+  assert.equal(typeof emptySummary.total, 'number');
+
+  // Exact expression from InteractiveDrawers.tsx line 4658 must execute cleanly:
+  const renderedEmpty = emptySummary.participantBreakdowns.map(p => ({
+    name: p.participantName || p.name,
+    count: p.itemsCount ?? p.serviceCount,
+    total: p.total
+  }));
+  assert.equal(renderedEmpty.length, 1);
+  assert.equal(renderedEmpty[0].count, 0);
+
+  // Test 2: Registered customer as Organizer on initial group mode switch
+  const registeredOrganizer: GroupParticipantInfo = {
+    id: 'cust-101',
+    name: 'Fatima Al-Zahrani',
+    phone: '+966501234567',
+    isOrganizer: true
+  };
+  const regSummary = calculateGroupStagedPricing([registeredOrganizer], [], []);
+  assert.ok(regSummary.participantBreakdowns);
+  assert.equal(regSummary.participantBreakdowns[0].name, 'Fatima Al-Zahrani');
+  assert.equal(regSummary.participantBreakdowns[0].participantName, 'Fatima Al-Zahrani');
+  assert.equal(regSummary.participantBreakdowns[0].isOrganizer, true);
+  assert.equal(regSummary.subtotal, 0);
+  assert.equal(regSummary.vat, 0);
+  assert.equal(regSummary.total, 0);
+
+  // Test 3: Walk-in guest as Organizer on initial group mode switch
+  const walkinOrganizer: GroupParticipantInfo = {
+    id: 'walkin-default',
+    name: 'Walk-in Guest',
+    isOrganizer: true
+  };
+  const walkinSummary = calculateGroupStagedPricing([walkinOrganizer], [], []);
+  assert.ok(walkinSummary.participantBreakdowns);
+  assert.equal(walkinSummary.participantBreakdowns[0].participantName, 'Walk-in Guest');
+});
+
+test('Regression: Group participant transitions maintain valid participantBreakdowns across add, remove, and switch', () => {
+  let participants: GroupParticipantInfo[] = [
+    { id: 'part-1', name: 'Organizer Sara', isOrganizer: true }
+  ];
+
+  // Initial group mode render
+  let summary = calculateGroupStagedPricing(participants, [], []);
+  assert.equal(summary.participantBreakdowns.length, 1);
+  assert.equal(summary.participantBreakdowns[0].participantName, 'Organizer Sara');
+
+  // Add Participant 2 (Walk-in friend)
+  participants = [
+    ...participants,
+    { id: 'part-2', name: 'Guest 2', isOrganizer: false }
+  ];
+  summary = calculateGroupStagedPricing(participants, [], []);
+  assert.equal(summary.participantBreakdowns.length, 2);
+  assert.equal(summary.participantBreakdowns[1].participantName, 'Guest 2');
+  assert.equal(summary.participantBreakdowns[1].isOrganizer, false);
+
+  // Stage a service for Participant 2
+  const stagedServices: MinimalStagedItem[] = [
+    {
+      id: 'stg-p2-1',
+      serviceId: SERVICE_FACIAL,
+      itemType: 'service',
+      duration: 45,
+      basePrice: 150,
+      finalPrice: 150,
+      participantId: 'part-2'
+    }
+  ];
+
+  summary = calculateGroupStagedPricing(participants, stagedServices, []);
+  assert.equal(summary.participantBreakdowns[0].itemsCount, 0);
+  assert.equal(summary.participantBreakdowns[0].total, 0);
+  assert.equal(summary.participantBreakdowns[1].itemsCount, 1);
+  assert.equal(summary.participantBreakdowns[1].subtotal, 150);
+  assert.equal(summary.participantBreakdowns[1].vat, 22.5);
+  assert.equal(summary.participantBreakdowns[1].total, 172.5);
+  assert.equal(summary.subtotal, 150);
+  assert.equal(summary.vat, 22.5);
+  assert.equal(summary.total, 172.5);
+
+  // Participant 1 switching/updating name does not corrupt Participant 2
+  participants = participants.map((p, idx) => idx === 0 ? { ...p, name: 'Sara Al-Otaibi' } : p);
+  summary = calculateGroupStagedPricing(participants, stagedServices, []);
+  assert.equal(summary.participantBreakdowns[0].name, 'Sara Al-Otaibi');
+  assert.equal(summary.participantBreakdowns[1].name, 'Guest 2');
+  assert.equal(summary.total, 172.5);
+});
+
