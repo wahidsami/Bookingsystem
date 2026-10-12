@@ -753,7 +753,7 @@ class BookingService {
     }
 
     async _createBookingSession(data, options = {}) {
-        const { tenantId, platformUserId, items, notes, paymentMethod, paymentAllocations, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation, skipAdvanceValidation, metadata: initialMetadata } = data;
+        const { tenantId, platformUserId, items, notes, paymentMethod, paymentAllocations, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation, skipAdvanceValidation, metadata: initialMetadata, overtimeApproval } = data;
         const transaction = options.transaction;
         const shouldCommit = !transaction;
         const finalTransaction = transaction || await db.sequelize.transaction();
