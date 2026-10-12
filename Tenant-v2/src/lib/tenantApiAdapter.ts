@@ -1459,6 +1459,31 @@ class TenantApiAdapter {
     return this.post('/api/v1/bookings/search', data);
   }
 
+  async searchPackageAvailability(data: {
+    tenantId: string;
+    packageId: string;
+    date: string;
+    staffId?: string;
+    variantId?: string;
+    staffAssignments?: Array<{ packageItemId?: string; serviceId?: string; staffId: string }>;
+    packageItems?: any[];
+  }): Promise<any> {
+    return this.post('/api/v1/bookings/package-search', data);
+  }
+
+  async getNextAvailableSlot(params: {
+    tenantId: string;
+    serviceId?: string;
+    packageId?: string;
+    staffId?: string;
+    startDate?: string;
+    daysToSearch?: number;
+    variantId?: string;
+  }): Promise<any> {
+    const query = this.buildQueryString(params);
+    return this.get(`/api/v1/bookings/next-available${query ? `?${query}` : ''}`);
+  }
+
   async evaluateScheduling(data: Record<string, any>): Promise<any> {
     return this.post('/api/v1/bookings/evaluate', data);
   }

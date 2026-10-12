@@ -985,19 +985,24 @@ const listBookings = async (req, res) => {
  */
 const getNextAvailableSlot = async (req, res) => {
     try {
-        const { tenantId, serviceId, staffId, daysToSearch } = req.query;
+        const { tenantId, serviceId, packageId, staffId, startDate, daysToSearch, variantId } = req.query;
+        const finalTenantId = tenantId || req.tenantId;
 
-        if (!tenantId || !serviceId || !staffId) {
+        if (!finalTenantId || (!serviceId && !packageId)) {
             return res.status(400).json({
                 success: false,
-                message: 'tenantId, serviceId, and staffId are required'
+                message: 'tenantId and either serviceId or packageId are required',
+                messageAr: 'معرف المستأجر وإما معرف الخدمة أو معرف الباقة مطلوبان'
             });
         }
 
         const availabilityService = require('../services/availabilityService');
-        const result = await availabilityService.getNextAvailableSlot(tenantId, {
+        const result = await availabilityService.getNextAvailableSlot(finalTenantId, {
             serviceId,
-            staffId,
+            packageId,
+            staffId: (staffId && staffId !== 'any' && staffId !== 'auto') ? staffId : null,
+            startDate,
+            variantId,
             daysToSearch: daysToSearch ? parseInt(daysToSearch) : 14
         });
 
@@ -1007,7 +1012,8 @@ const getNextAvailableSlot = async (req, res) => {
         console.error('Get next available slot error:', error);
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to find next available slot'
+            message: error.message || 'Failed to find next available slot',
+            messageAr: 'فشل البحث عن الموعد المتاح التالي'
         });
     }
 };

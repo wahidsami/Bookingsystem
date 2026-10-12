@@ -1992,21 +1992,24 @@ class AvailabilityService {
      * @param {number} daysToSearch - Number of days to search ahead (default: 14)
      * @returns {Promise<Object>} Next available slot or null
      */
-    async getNextAvailableSlot(tenantId, { serviceId, staffId, daysToSearch = 14 }) {
-        if (!serviceId || !staffId) {
-            throw new Error('serviceId and staffId are required');
+    async getNextAvailableSlot(tenantId, { serviceId, packageId, staffId, startDate, variantId, daysToSearch = 14, staffAssignments, packageItems }) {
+        if (!serviceId && !packageId) {
+            throw new Error('serviceId or packageId is required');
         }
 
         const tenantSettings = await this._getTenantSettings(tenantId);
         const timezone = tenantSettings.timezone || 'Asia/Riyadh';
         const today = this._getDatePartsInTimeZone(new Date(), timezone).dateKey;
+        const baseDate = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : today;
 
-        // Search each day
+        const effectiveStaffId = (staffId && staffId !== 'any' && staffId !== 'auto') ? staffId : null;
+
+        // Search each day starting from baseDate
         for (let i = 0; i < daysToSearch; i++) {
             const searchDate = new Date(Date.UTC(
-                Number(today.slice(0, 4)),
-                Number(today.slice(5, 7)) - 1,
-                Number(today.slice(8, 10)) + i,
+                Number(baseDate.slice(0, 4)),
+                Number(baseDate.slice(5, 7)) - 1,
+                Number(baseDate.slice(8, 10)) + i,
                 12,
                 0,
                 0
@@ -2014,27 +2017,39 @@ class AvailabilityService {
             const dateString = this._getDatePartsInTimeZone(searchDate, timezone).dateKey; // YYYY-MM-DD
 
             try {
-                // Get available slots for this date
-                const result = await this.getAvailableSlots(tenantId, {
-                    serviceId,
-                    staffId,
-                    date: dateString
-                });
+                let result = null;
+                if (packageId) {
+                    result = await this.getPackageAvailableSlots(tenantId, {
+                        packageId,
+                        date: dateString,
+                        staffId: effectiveStaffId,
+                        variantId,
+                        staffAssignments,
+                        packageItems
+                    });
+                } else {
+                    result = await this.getAvailableSlots(tenantId, {
+                        serviceId,
+                        staffId: effectiveStaffId,
+                        variantId,
+                        date: dateString
+                    });
+                }
 
-                // Find first available slot
-                const availableSlot = result.slots.find(slot => slot.available);
-                
-                if (availableSlot) {
+                const availableSlots = (result?.slots || []).filter(slot => slot.available);
+                if (availableSlots.length > 0) {
                     return {
                         success: true,
-                        slot: availableSlot,
+                        slot: availableSlots[0],
+                        slots: availableSlots,
                         date: dateString,
                         daysAhead: i,
-                        metadata: result.metadata
+                        metadata: result.metadata || null,
+                        package: result.package || null
                     };
                 }
             } catch (error) {
-                console.error(`Error checking date ${dateString}:`, error.message);
+                console.warn(`[getNextAvailableSlot] Day ${dateString} skipped:`, error.message);
                 // Continue to next day
             }
         }
@@ -2043,9 +2058,11 @@ class AvailabilityService {
         return {
             success: false,
             slot: null,
+            slots: [],
             date: null,
             daysAhead: null,
-            message: `No available slots found in the next ${daysToSearch} days`
+            message: `No available slots found in the next ${daysToSearch} days`,
+            messageAr: `لم يتم العثور على أوقات متاحة في غضون ${daysToSearch} يومًا القادمة`
         };
     }
 

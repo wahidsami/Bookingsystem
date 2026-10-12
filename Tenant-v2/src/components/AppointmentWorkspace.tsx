@@ -49,6 +49,7 @@ import {
   type AvailabilityDiagnostic,
   type ConflictCard
 } from '../lib/bookingConflictDiagnostics';
+import { sanitizeAppointmentNotes } from '../lib/appointmentNotes';
 
 const TEMP_HIDE_REASSIGN_UI = true;
 const SHOW_LATE_CANCEL_BUTTON = false;
@@ -2149,12 +2150,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   };
 
   const getSchedulingErrorToast = (err: unknown, fallbackAr: string, fallbackEn: string) => {
-    const raw = `${(err as any)?.message || err || ''}`.toLowerCase();
-    const isConflict = raw.includes('conflict') || raw.includes('overlap') || raw.includes('not available') || raw.includes('unavailable') || raw.includes('outside working hours') || raw.includes('time slot');
-    if (isConflict) {
+    const errData = (err as any)?.response?.data || (err as any)?.data || (err as any);
+    const msgEn = errData?.message || (typeof err === 'string' ? err : (err as any)?.message) || '';
+    const msgAr = errData?.messageAr || msgEn;
+    const guidanceEn = errData?.actionableGuidance ? ` ${errData.actionableGuidance}` : '';
+    const guidanceAr = errData?.actionableGuidanceAr ? ` ${errData.actionableGuidanceAr}` : '';
+
+    if (msgEn && !msgEn.includes('[object Object]')) {
       return {
-        ar: 'تعذر حفظ التغيير بسبب تعارض في الجدول. جرّب وقتاً أو موظفاً آخر.',
-        en: 'Scheduling conflict detected. Try another time or staff member.'
+        ar: `${msgAr}${guidanceAr}`,
+        en: `${msgEn}${guidanceEn}`
       };
     }
     return { ar: fallbackAr, en: fallbackEn };
@@ -6244,7 +6249,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                     <div className="pt-3 border-t border-[#FAF7FD] space-y-2">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'تفضيلات وملاحظات خبيرة التجميل' : 'Stylist Notes'}</span>
                       <div className="bg-[#FAF7FD] border border-[#E7DDFC] p-3 rounded-xl text-xs text-[#1D035F] font-medium leading-relaxed">
-                        {activeAppointment.notes || '—'}
+                        {sanitizeAppointmentNotes(activeAppointment.notes) || '—'}
                       </div>
                       {normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'cancelled' && (
                         <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-800 text-xs mt-2 space-y-1">
@@ -7939,6 +7944,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         initialCreateMode={initialCreateMode}
         initialCartTab={initialCartTab}
         selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
         customers={liveCustomers}
         services={liveServices}
         servicePackages={servicePackages}

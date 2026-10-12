@@ -442,24 +442,42 @@ The following canonical RTL files are FROZEN and protected from modification:
 - [x] 5. Git Stage, Commit & Push dedicated changes to `main` (`353c644eef29108f28e8dee7d11ff07f464af01a`) <!-- id: p2_git_push -->
 - [x] 6. Final verification report and approval gate <!-- id: p2_final_report -->
 
-# BARSPA Phase 2 — Operating-Hours Extension & Booking Failure Fix
+# BARSPA Phase 2 — Operating-Hours Extension & Booking Failure Fix (Complete)
 - [x] 1. Investigation & Root Cause Trace <!-- id: ext_investigation -->
-  - Traced extension UI dialog trigger and parameter flow (`allowExtendedHours = true`).
-  - Identified backend gap: `tenantAppointmentController.js` and `bookingService.js` dropped `overtimeApproval` on package items and steps.
-  - Identified `_selectBestAvailableStaff` failure: rejected staff with `DUTY_HOURS_CONFLICT` because `overtimeApproval` was missing.
-  - Verified atomic transaction rollback: no partial records are persisted.
-  - Identified error status gap: `No available staff...` returned HTTP 500 instead of HTTP 409 conflict.
 - [x] 2. User Gate Approval: Backend runtime changes approved <!-- id: ext_user_gate -->
 - [x] 3. Backend Fix: Propagate and honor `overtimeApproval` in `tenantAppointmentController.js` and `bookingService.js` <!-- id: ext_backend_fix -->
-  - Authorize and attach `overtimeApproval` on package items and package child steps in `tenantAppointmentController.js`.
-  - Pass `overtimeApproval` into `createBooking` calls within `createBookingSession` in `bookingService.js`.
-  - Pass `overtimeApproval` into `_selectBestAvailableStaff` and `evaluateSchedulingRequest`.
-  - Pass `overtimeApproval` into `_coordinateParallelStaffAllocation`.
-  - Map `No available staff...` to HTTP 409 with structured conflict details.
 - [x] 4. Frontend Fix: Correct payload formatting in `InteractiveDrawers.tsx` <!-- id: ext_frontend_fix -->
-  - Eliminate duplicate package grouping in `executeFinalSubmission`.
-  - Ensure `overtimeApproval` is passed on root payload, package items, and child steps.
 - [x] 5. Automated Tests: Unit and integration tests for bundle overtime extension <!-- id: ext_tests -->
 - [x] 6. Typecheck, build, and backend test verification <!-- id: ext_verify -->
-- [/] 7. Git commit and push dedicated changes to `main` <!-- id: ext_commit_push -->
-- [ ] 8. Comprehensive handoff report <!-- id: ext_handoff_report -->
+- [x] 7. Git commit and push dedicated changes to `main` (`8b25c0fee899bd597d0d48f3f65d77ea5c427e93`) <!-- id: ext_commit_push -->
+- [x] 8. Comprehensive handoff report <!-- id: ext_handoff_report -->
+
+# BARSPA Tenant-v2 — Phase 3: Smart Availability & Conflict Recovery
+- [x] 1. Audit Existing Availability & Next-Available Implementation <!-- id: p3_audit -->
+  - Inspected `availabilityService.js`, `bookingService.js`, `bookingController.js`, and `useSmartConflictResolver.ts`.
+  - Identified gaps in `getNextAvailableSlot`: required `staffId`, no `startDate` parameter, no package/bundle or multi-service support.
+- [x] 2. Backend: Extend `getNextAvailableSlot` to Support Bundles, Any-Staff & StartDate <!-- id: p3_backend_avail -->
+  - Enhanced `availabilityService.getNextAvailableSlot` to accept `startDate`, optional `staffId` (Any Staff), `packageId`, and `packageItems`.
+  - Updated `bookingController.getNextAvailableSlot` to relax required `staffId` and pass `startDate`, `packageId`.
+  - Added backend automated tests in `server/src/services/__tests__/nextAvailableSlot.test.js` (3/3 passed).
+- [x] 3. Frontend API Adapter & Availability Layer in `Tenant-v2` <!-- id: p3_api_adapter -->
+  - Added `searchPackageAvailability` and `getNextAvailableSlot` methods to `tenantApiAdapter.ts`.
+  - Created `Tenant-v2/src/services/smartAvailabilityService.ts` for multi-service chains and bundle availability.
+- [x] 4. Frontend: Fresha-Inspired "Find Available Times" Experience in `InteractiveDrawers.tsx` <!-- id: p3_ui_drawer -->
+  - Added "Find Available Times" toggle & dedicated `SmartAvailabilityPicker` component.
+  - Interactive slot chips grouped by period (Morning, Afternoon, Evening) for the selected date.
+  - "Next available date" banner/card offering earliest valid slot when current date has no availability.
+  - "Check all professionals" toggle allowing receptionist to inspect slots across all qualified staff.
+  - Selecting a slot automatically syncs/cascades service start times while strictly preserving all draft data (customer, services, bundles, discounts, notes).
+  - Responsive layout (desktop & mobile tabs) with full Arabic RTL support.
+- [x] 5. Conflict Recovery & Final Preflight Backend Validation <!-- id: p3_conflict_recovery -->
+  - Connected slot selection to smart conflict resolution and preflight check.
+  - Ensured final booking submission re-validates availability and never treats frontend state as authoritative booking license.
+  - Maintained zero duplicate / partial bookings on failure.
+- [x] 6. Verification & Automated Testing <!-- id: p3_verification -->
+  - Ran Tenant-v2 automated tests (`smartAvailabilityService.test.ts`): 3/3 passed.
+  - Ran Tenant-v2 typecheck (`npm run lint` / `tsc --noEmit`): 0 errors.
+  - Ran Tenant-v2 production build (`npm run build`): Vite & esbuild succeeded.
+  - Ran backend Jest tests (`nextAvailableSlot.test.js` & `tenantAppointmentController.overtimeBundle.test.js`): all passed.
+- [x] 7. Git Stage, Commit & Push dedicated changes to `main` <!-- id: p3_git_push -->
+- [x] 8. Final Phase 3 Handoff Report & Stop Gate <!-- id: p3_report -->

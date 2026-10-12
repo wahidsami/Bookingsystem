@@ -1,9 +1,18 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { calculateNearestValidChain, calculateAllValidChains } from '../utils/bookingChains';
 import { isAutoDerivedFromPreviousChain } from '../lib/chainedServiceTiming';
 import { useAppointmentSubmission } from '../hooks/useAppointmentSubmission';
 import { useSmartConflictResolver } from '../hooks/useSmartConflictResolver';
 import { SmartConflictModal } from './appointment/SmartConflictModal';
+import { SmartAvailabilityPicker } from './appointment/SmartAvailabilityPicker';
+import {
+  calculateSmartAvailability,
+  findNextAvailableAlternative,
+  type SmartSlot,
+  type DayAvailabilitySummary,
+  type NextAvailableAlternative,
+  type StagedItemForAvailability
+} from '../services/smartAvailabilityService';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Calendar, Loader2 as CalendarIcon, User, Users, PlusCircle, Check,
@@ -121,6 +130,7 @@ interface InteractiveDrawersProps {
   initialDuration?: number;
   initialCartTab?: 'products' | 'giftcards';
   selectedDate: Date;
+  setSelectedDate?: (date: Date) => void;
   customers: any[];
   services: any[];
   servicePackages?: any[];
@@ -385,6 +395,7 @@ export default function InteractiveDrawers({
   initialDuration,
   initialCartTab,
   selectedDate,
+  setSelectedDate,
   customers,
   services,
   servicePackages = [],
@@ -817,6 +828,19 @@ export default function InteractiveDrawers({
   const START_HOUR = 9;
 
   const [expandedServiceIds, setExpandedServiceIds] = useState<Record<string, boolean>>({});
+
+  // Phase 3: Smart Availability & Conflict Recovery State
+  const [isFindingAvailableTimes, setIsFindingAvailableTimes] = useState(false);
+  const [smartAvailabilityDate, setSmartAvailabilityDate] = useState<Date>(selectedDate);
+  const [isCheckingAllProfessionals, setIsCheckingAllProfessionals] = useState(false);
+  const [smartAvailabilityLoading, setSmartAvailabilityLoading] = useState(false);
+  const [smartAvailabilitySummary, setSmartAvailabilitySummary] = useState<DayAvailabilitySummary | null>(null);
+  const [nextAvailableAlternative, setNextAvailableAlternative] = useState<NextAvailableAlternative | null>(null);
+  const [isSearchingNextDate, setIsSearchingNextDate] = useState(false);
+
+  useEffect(() => {
+    setSmartAvailabilityDate(selectedDate);
+  }, [selectedDate]);
 
   const canonicalServices = useMemo<ServiceRecord[]>(() => services.map((service) => ({
     ...normalizeServiceRecord(service),
@@ -1998,6 +2022,125 @@ export default function InteractiveDrawers({
       return updatedList;
     });
   };
+
+  // Phase 3: Smart Availability Operations
+  const loadSmartAvailability = useCallback(async (
+    targetDate: Date,
+    checkAll: boolean
+  ) => {
+    if (stagedServices.length === 0) {
+      setSmartAvailabilitySummary(null);
+      setNextAvailableAlternative(null);
+      return;
+    }
+
+    setSmartAvailabilityLoading(true);
+    try {
+      const stagedForAvail: StagedItemForAvailability[] = stagedServices.map(item => ({
+        id: item.id,
+        serviceId: item.serviceId,
+        packageId: item.packageId,
+        variantId: item.variantId,
+        duration: item.duration,
+        staffId: item.staffId,
+        isExplicitStaff: item.isExplicitStaff,
+        sequenceOrder: item.sequenceOrder
+      }));
+
+      const dateKey = getLocalDateKey(targetDate);
+      const summary = await calculateSmartAvailability({
+        tenantId,
+        stagedItems: stagedForAvail,
+        dateKey,
+        checkAllProfessionals: checkAll,
+        isRtl,
+        allStylists: availableStylists
+      });
+
+      setSmartAvailabilitySummary(summary);
+
+      // Offer earliest valid date & slots when requested date has no suitable availability
+      if (summary.slots.length === 0) {
+        setIsSearchingNextDate(true);
+        try {
+          const alternative = await findNextAvailableAlternative({
+            tenantId,
+            stagedItems: stagedForAvail,
+            startDate: dateKey,
+            checkAllProfessionals: checkAll,
+            isRtl
+          });
+          setNextAvailableAlternative(alternative);
+        } catch (altErr) {
+          console.error('Failed to find next available date alternative:', altErr);
+          setNextAvailableAlternative(null);
+        } finally {
+          setIsSearchingNextDate(false);
+        }
+      } else {
+        setNextAvailableAlternative(null);
+      }
+    } catch (err) {
+      console.error('Failed to calculate smart availability:', err);
+      setSmartAvailabilitySummary(null);
+    } finally {
+      setSmartAvailabilityLoading(false);
+    }
+  }, [stagedServices, availableStylists, tenantId, isRtl]);
+
+  const handleSelectSmartSlot = (slot: SmartSlot) => {
+    setCurrentStartTime(slot.timeMinutes);
+
+    if (stagedServices.length > 0) {
+      const anchorItem = stagedServices[0];
+      const updates: Partial<StagedService> = {
+        startTime: slot.timeMinutes,
+        ...(slot.staffId ? { staffId: slot.staffId, isExplicitStaff: true } : {})
+      };
+      handleUpdateStagedService(anchorItem.id, updates);
+    }
+
+    if (slot.staffId) {
+      setCurrentStaffId(slot.staffId);
+    }
+
+    addLocalToast(
+      isRtl
+        ? `تم تعيين الوقت: ${slot.clockLabel}`
+        : `Scheduled time set: ${slot.clockLabel}`,
+      'success'
+    );
+  };
+
+  const handleJumpToNextDate = (alt: NextAvailableAlternative) => {
+    if (!alt.dateKey) return;
+    const parts = alt.dateKey.split('-');
+    if (parts.length === 3) {
+      const nextDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      setSmartAvailabilityDate(nextDate);
+      if (setSelectedDate) {
+        setSelectedDate(nextDate);
+      }
+      if (alt.earliestSlot) {
+        handleSelectSmartSlot(alt.earliestSlot);
+      }
+      loadSmartAvailability(nextDate, isCheckingAllProfessionals);
+    }
+  };
+
+  // Auto-refresh smart availability when active and queue or staff changes
+  useEffect(() => {
+    if (isFindingAvailableTimes && stagedServices.length > 0) {
+      loadSmartAvailability(smartAvailabilityDate, isCheckingAllProfessionals);
+    }
+  }, [
+    isFindingAvailableTimes,
+    smartAvailabilityDate,
+    isCheckingAllProfessionals,
+    stagedServices.length,
+    stagedServices.map(s => `${s.id}:${s.serviceId}:${s.staffId}:${s.duration}`).join(','),
+    appointments.length
+  ]);
 
   const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
     const isSelected = isQueuedServiceSelected(service.id, variantOverride?.id);
@@ -3415,6 +3558,69 @@ export default function InteractiveDrawers({
                               {isRtl
                                 ? `سيتم إنشاء ${stagedServices.length} مواعيد منفصلة عند التأكيد النهائي.`
                                 : `${stagedServices.length} separate appointments will be created when confirmed.`}
+                            </div>
+                          )}
+
+                          {/* Phase 3: Smart Availability Section */}
+                          {stagedServices.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsFindingAvailableTimes(prev => !prev);
+                                    if (!isFindingAvailableTimes) {
+                                      loadSmartAvailability(smartAvailabilityDate, isCheckingAllProfessionals);
+                                    }
+                                  }}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs border ${
+                                    isFindingAvailableTimes
+                                      ? 'border-[#6537C0] bg-[#6537C0] text-white'
+                                      : 'border-purple-200 bg-purple-50 hover:bg-purple-100 text-[#6537C0]'
+                                  }`}
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  <span>
+                                    {isFindingAvailableTimes
+                                      ? (isRtl ? 'إخفاء الأوقات المتاحة' : 'Hide Available Times')
+                                      : (isRtl ? 'البحث عن أوقات متاحة' : 'Find Available Times')}
+                                  </span>
+                                </button>
+                                {isFindingAvailableTimes && (
+                                  <span className="text-[11px] text-slate-500 font-medium">
+                                    {isRtl ? 'حساب التوافر الذكي' : 'Availability-led booking'}
+                                  </span>
+                                )}
+                              </div>
+
+                              {isFindingAvailableTimes && (
+                                <SmartAvailabilityPicker
+                                  isRtl={isRtl}
+                                  smartAvailabilityDate={smartAvailabilityDate}
+                                  onDateChange={(newDate) => {
+                                    setSmartAvailabilityDate(newDate);
+                                    if (setSelectedDate) {
+                                      setSelectedDate(newDate);
+                                    }
+                                    loadSmartAvailability(newDate, isCheckingAllProfessionals);
+                                  }}
+                                  currentStartTime={currentStartTime}
+                                  formatMinutesToTime={formatMinutesToTime}
+                                  isCheckingAllProfessionals={isCheckingAllProfessionals}
+                                  onToggleCheckAllProfessionals={() => {
+                                    const nextVal = !isCheckingAllProfessionals;
+                                    setIsCheckingAllProfessionals(nextVal);
+                                    loadSmartAvailability(smartAvailabilityDate, nextVal);
+                                  }}
+                                  loading={smartAvailabilityLoading}
+                                  summary={smartAvailabilitySummary}
+                                  nextAlternative={nextAvailableAlternative}
+                                  isSearchingNextDate={isSearchingNextDate}
+                                  onSelectSlot={handleSelectSmartSlot}
+                                  onJumpToNextDate={handleJumpToNextDate}
+                                  onClose={() => setIsFindingAvailableTimes(false)}
+                                />
+                              )}
                             </div>
                           )}
 
