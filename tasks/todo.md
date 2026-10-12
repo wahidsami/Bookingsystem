@@ -557,3 +557,65 @@ The following canonical RTL files are FROZEN and protected from modification:
 - **Frontend Typecheck & Build:** `npm run lint` (`tsc --noEmit`) clean with 0 errors; `npm run build` successfully bundled Vite client and esbuild server.
 - **Change Control:** Strictly isolated to Phase 5A files. All 13 unrelated tracked files (`RifahMobile/*`, `server/src/controllers/tenantOrderController.js`, etc.) completely untouched.
 
+# Pre-Deployment Regression Review: Multi-Service Chained Availability
+- [x] 1. Trace Multi-Service Availability Flow <!-- id: reg_trace_flow -->
+  - Traced `calculateSmartAvailability` -> `calculateAllValidChains` -> `handleSelectSmartSlot` -> `handleConfirmAppointmentCreation` -> `preflightMultiServiceChain` -> `bookingService._createBookingSession`.
+- [x] 2. Determine Root Cause & Discrepancy Breakdown <!-- id: reg_root_cause -->
+  - Confirmed `c5c2f71` resolved the board-minute vs minute-from-midnight offset bug (which caused false overnight projections to 2:30 AM).
+  - Identified remaining chain-level defect: `handleSelectSmartSlot` only assigned staff to the first staged item (`anchorItem`), leaving subsequent chained services with default/conflicting staff assignments, causing preflight validation to reject with "cannot be booked continuously".
+- [x] 3. Implement Smallest Safe Local Fix <!-- id: reg_local_fix -->
+  - Created `applySmartSlotToStagedServices` in `smartAvailabilityService.ts` to assign chained start times, ISO timestamps, and assigned qualified staff across all staged items.
+  - Updated `handleSelectSmartSlot` in `InteractiveDrawers.tsx` to apply chained slots when present.
+- [x] 4. Add Automated Regression Tests <!-- id: reg_tests -->
+  - Expanded `smartAvailabilityMismatchRegression.test.ts` to 6 tests covering chained staff assignment, conflict-free preflight acceptance, prior defect demonstration, and genuine conflict rejection.
+- [x] 5. Run Verification Gates & Builds <!-- id: reg_verification_gates -->
+  - 36/36 frontend tests pass.
+  - 16/16 backend tests pass (group booking, walk-in, bundle reconciliation, overtime bundle).
+  - `Tenant-v2` `npm run lint` (`tsc --noEmit`): 0 errors.
+  - `Tenant-v2` `npm run build`: Vite & esbuild succeeded.
+- [x] 6. Preserve Working Tree & Prepare Dedicated Commit <!-- id: reg_commit_ready -->
+  - Staged only `InteractiveDrawers.tsx`, `smartAvailabilityService.ts`, and `smartAvailabilityMismatchRegression.test.ts`.
+  - All 13 unrelated tracked files preserved untouched.
+
+# BARSPA Phase 5A — /bookings/search HTTP 400 Investigation & Fix
+- [x] 1. Investigation & Root Cause Trace <!-- id: p5a_search_trace -->
+  - Audited callers of `/api/v1/bookings/search` across Tenant V2 (`smartAvailabilityService.ts`, `availabilityService.ts`, `AppointmentWorkspace.tsx`, `useTimeSlotAvailability.ts`).
+  - Compared constructed parameters against backend validation rules in `bookingController.searchAvailability` and route registration in `bookingRoutes.js`.
+  - Documented root causes for HTTP 400 Bad Request and 3 failed requests pattern.
+- [x] 2. Backend Route & Controller Contract Alignment <!-- id: p5a_search_backend -->
+  - Registered `router.get('/search', bookingController.searchAvailability)` in `server/src/routes/bookingRoutes.js` before `router.get('/:id')`.
+  - Registered `router.get('/package-search', bookingController.searchPackageAvailability)` and `router.get('/package-availability', ...)`.
+  - Updated `bookingController.searchAvailability` and `searchPackageAvailability` to accept parameters from both `req.query` and `req.body` with safe JSON parsing.
+  - Added UUID regex validation guard to `getBooking` to prevent non-UUID inputs (like `/search`) from throwing PostgreSQL syntax crashes.
+- [x] 3. Frontend Caller Correction & Guarding in Tenant V2 <!-- id: p5a_search_frontend -->
+  - In `Tenant-v2/src/lib/tenantApiAdapter.ts`: accept `packageId?: string`, guard against empty `tenantId` / `date` / `serviceId+packageId`.
+  - In `Tenant-v2/src/services/availabilityService.ts`: support `item.packageId` alongside `item.serviceId` in `fetchAvailabilityLayers`.
+  - In `Tenant-v2/src/services/smartAvailabilityService.ts`: forward `item.packageId` in fallback availability loop.
+  - In `Tenant-v2/src/components/InteractiveDrawers.tsx`: bypass single-client sequential chain preflight for group bookings (`bookingScope === 'group'`).
+  - In `Tenant-v2/src/components/AppointmentWorkspace.tsx`: forward `targetPackageId` alongside `targetServiceId`.
+- [x] 4. Automated Regression Tests <!-- id: p5a_search_tests -->
+  - Added backend tests in `server/src/controllers/__tests__/bookingSearchContract.test.js` covering GET/POST query/body parameters, UUID isolation, and package search (8/8 pass).
+  - Added frontend tests in `Tenant-v2/src/services/__tests__/availabilitySearchContract.test.ts` verifying caller parameter serialization, package support, and group preflight bypassing (6/6 pass).
+- [x] 5. Verification & Gates <!-- id: p5a_search_verify -->
+  - Verified frontend test suite (6/6 pass in `availabilitySearchContract.test.ts`, 7/7 pass in `groupBooking.test.ts`, 6/6 pass in `smartAvailabilityMismatchRegression.test.ts`).
+  - Verified backend test suite (8/8 pass in `bookingSearchContract.test.js`, 5/5 pass in `tenantGroupBooking.test.js`).
+  - Passed Tenant-v2 `npm run lint` (`tsc --noEmit`) with 0 errors.
+  - Passed Tenant-v2 `npm run build` (Vite client & esbuild server).
+  - Confirmed all 13 unrelated tracked files remain untouched.
+- [ ] 6. Git Commit & Push Dedicated Fixes to main <!-- id: p5a_search_push -->
+
+## Phase 5A /bookings/search Review & Verification Results
+- **Root Cause 1 (Backend Route Registration & Parameter Ingestion):**
+  Previously, `server/src/routes/bookingRoutes.js` registered only `POST /search`. Any `GET /search` fell through to `router.get('/:id')` where `:id = 'search'`. Furthermore, `bookingController.searchAvailability` only parsed `req.body`, returning HTTP 400 (`tenantId is required`) if sent via GET or without body.
+- **Root Cause 2 (The 3 Failed Requests Loop):**
+  In `InteractiveDrawers.tsx`, when multi-service or 3 group participants were staged, `handleConfirmAppointmentCreation` preflighted all items via `preflightMultiServiceChain` in a sequential loop of 3 requests. For group bookings with packages or missing `serviceId`, or unhydrated `tenantId`, each request sent invalid/empty search parameters, triggering 3 consecutive HTTP 400 responses.
+- **Backend Fix:** Supported dual GET/POST on `/search` and `/package-search` routes, unified `req.query` and `req.body` ingestion, added UUID route guard on `GET /:id`.
+- **Frontend Fix:** Added parameter validation guard in `tenantApiAdapter.searchAvailability`, supported `packageId` in `fetchAvailabilityLayers` and `AppointmentWorkspace`, and bypassed sequential chain preflight for `bookingScope === 'group'`.
+- **Verification Gates:**
+  - Backend tests: 8/8 PASS (`bookingSearchContract.test.js`), 5/5 PASS (`tenantGroupBooking.test.js`).
+  - Frontend tests: 6/6 PASS (`availabilitySearchContract.test.ts`), 7/7 PASS (`groupBooking.test.ts`), 6/6 PASS (`smartAvailabilityMismatchRegression.test.ts`).
+  - Typecheck: `tsc --noEmit` clean with 0 errors.
+  - Production build: Vite client and esbuild server built successfully.
+  - Unrelated files: All 13 protected tracked files strictly preserved.
+
+

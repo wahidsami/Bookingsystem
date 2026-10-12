@@ -3306,14 +3306,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       let anyFailed = false;
       for (let i = 0; i < currentItems.length; i++) {
         const item = currentItems[i];
+        const targetServiceId = item.serviceId;
+        const targetPackageId = item.packageId;
+        if (!targetServiceId && !targetPackageId) {
+          layers.push([]);
+          diagnosticsByLayer.push([]);
+          continue;
+        }
         const searchResp = await tenantApiAdapter.searchAvailability({
           tenantId: tenant?.id || '',
-          serviceId: item.serviceId,
-          staffId: item.requestedStaffId || undefined,
+          serviceId: targetServiceId,
+          packageId: targetPackageId,
+          staffId: item.requestedStaffId || item.staffId || undefined,
           date: dateString
         });
         if (searchResp?.success && searchResp.slots) {
-          layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: item.serviceId })));
+          layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: targetServiceId || targetPackageId })));
           diagnosticsByLayer.push(Array.isArray(searchResp.diagnostics) ? searchResp.diagnostics : []);
         } else {
           layers.push([]);

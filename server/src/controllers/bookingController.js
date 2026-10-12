@@ -126,7 +126,15 @@ const createAppointmentEventSafe = async ({
  */
 const searchAvailability = async (req, res) => {
     try {
-        const { serviceId, packageId, staffId, date, tenantId, variantId, staffAssignments, packageItems } = req.body;
+        const payload = { ...(req.query || {}), ...(req.body || {}) };
+        const { serviceId, packageId, staffId, date, tenantId, variantId } = payload;
+        let { staffAssignments, packageItems } = payload;
+        if (typeof staffAssignments === 'string') {
+            try { staffAssignments = JSON.parse(staffAssignments); } catch {}
+        }
+        if (typeof packageItems === 'string') {
+            try { packageItems = JSON.parse(packageItems); } catch {}
+        }
 
         const finalTenantId = tenantId || req.tenantId;
         if (!finalTenantId) {
@@ -256,7 +264,15 @@ const searchAvailability = async (req, res) => {
  */
 const searchPackageAvailability = async (req, res) => {
     try {
-        const { packageId, serviceId, staffId, date, tenantId, variantId, staffAssignments, packageItems } = req.body;
+        const payload = { ...(req.query || {}), ...(req.body || {}) };
+        const { packageId, serviceId, staffId, date, tenantId, variantId } = payload;
+        let { staffAssignments, packageItems } = payload;
+        if (typeof staffAssignments === 'string') {
+            try { staffAssignments = JSON.parse(staffAssignments); } catch {}
+        }
+        if (typeof packageItems === 'string') {
+            try { packageItems = JSON.parse(packageItems); } catch {}
+        }
         const finalTenantId = tenantId || req.tenantId;
         const targetPackageId = packageId || serviceId;
 
@@ -771,6 +787,13 @@ const getBooking = async (req, res) => {
     try {
         const { id } = req.params;
         const platformUserId = req.userId; // Optional from optionalAuth
+
+        if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
 
         const appointment = await db.Appointment.findByPk(id, {
             include: [

@@ -177,6 +177,7 @@ export async function calculateSmartAvailability({
         const resp = await tenantApiAdapter.searchAvailability({
           tenantId,
           serviceId: item.serviceId,
+          packageId: item.packageId,
           date: dateKey,
           staffId: requestedStaffId,
           variantId: item.variantId
@@ -189,7 +190,7 @@ export async function calculateSmartAvailability({
             available: Boolean(s.available),
             staffId: s.staffId,
             staffName: s.staffName,
-            serviceId: item.serviceId
+            serviceId: item.serviceId || item.packageId || ''
           })));
         } else {
           layers.push([]);

@@ -1455,7 +1455,26 @@ class TenantApiAdapter {
     return this.get(`/tenant/appointments/${id}`);
   }
 
-  async searchAvailability(data: { tenantId: string; serviceId: string; staffId?: string; date: string; variantId?: string }): Promise<any> {
+  async searchAvailability(data: {
+    tenantId: string;
+    serviceId?: string;
+    packageId?: string;
+    staffId?: string;
+    date: string;
+    variantId?: string;
+    staffAssignments?: Array<{ packageItemId?: string; serviceId?: string; staffId: string }>;
+    packageItems?: any[];
+  }): Promise<any> {
+    if (!data?.tenantId || !data?.date || (!data?.serviceId && !data?.packageId)) {
+      return {
+        success: false,
+        slots: [],
+        totalSlots: 0,
+        availableSlots: 0,
+        diagnostics: [],
+        message: 'Incomplete parameters for availability search'
+      };
+    }
     return this.post('/api/v1/bookings/search', data);
   }
 

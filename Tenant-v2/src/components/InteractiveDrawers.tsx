@@ -3202,7 +3202,7 @@ export default function InteractiveDrawers({
 
   void (async () => {
     executeFinalSubmissionRef.current = executeFinalSubmission;
-    if (items.length > 1 && !allowExtendedHours) {
+    if (bookingScope !== 'group' && items.length > 1 && !allowExtendedHours) {
       if (bookingRecoveryMode === 'separate_services') {
         await preflightSeparateServices(items, stagedServices, getLocalDateKey(selectedDate));
       } else {

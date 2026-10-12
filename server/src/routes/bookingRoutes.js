@@ -4,8 +4,11 @@ const bookingController = require('../controllers/bookingController');
 const { authenticateUser, optionalAuth } = require('../middleware/authUser');
 
 // Search for available slots (public - no auth required)
+router.get('/search', bookingController.searchAvailability);
 router.post('/search', bookingController.searchAvailability);
+router.get('/package-search', bookingController.searchPackageAvailability);
 router.post('/package-search', bookingController.searchPackageAvailability);
+router.get('/package-availability', bookingController.searchPackageAvailability);
 router.post('/package-availability', bookingController.searchPackageAvailability);
 router.post('/evaluate', bookingController.evaluateScheduling);
 

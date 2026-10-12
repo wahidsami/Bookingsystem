@@ -4,7 +4,8 @@ import { AvailabilityDiagnostic } from '../lib/bookingConflictDiagnostics';
 export interface AvailabilityLayerConfig {
   tenantId: string;
   items: Array<{
-    serviceId: string;
+    serviceId?: string;
+    packageId?: string;
     duration?: number | string;
     requestedStaffId?: string;
     staffId?: string;
@@ -34,19 +35,33 @@ export const fetchAvailabilityLayers = async ({
   const diagnosticsByLayer: AvailabilityDiagnostic[][] = [];
   let anyFailed = false;
 
+  if (!tenantId || !dateKey || !Array.isArray(items) || items.length === 0) {
+    return { layers: [], diagnosticsByLayer: [], anyFailed: false };
+  }
+
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
+    const targetServiceId = item.serviceId;
+    const targetPackageId = item.packageId;
+
+    if (!targetServiceId && !targetPackageId) {
+      layers.push([]);
+      diagnosticsByLayer.push([]);
+      continue;
+    }
+
     try {
       const searchResp = await tenantApiAdapter.searchAvailability({
         tenantId,
-        serviceId: item.serviceId,
+        serviceId: targetServiceId,
+        packageId: targetPackageId,
         date: dateKey,
-        staffId: item.requestedStaffId || undefined,
+        staffId: item.requestedStaffId || item.staffId || undefined,
         variantId: item.variantId
       });
 
       if (searchResp?.success && searchResp.slots) {
-        layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: item.serviceId })));
+        layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: targetServiceId || targetPackageId })));
         diagnosticsByLayer.push(Array.isArray(searchResp.diagnostics) ? searchResp.diagnostics : []);
       } else {
         layers.push([]);
