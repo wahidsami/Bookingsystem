@@ -23,6 +23,11 @@ import {
   type ServiceRecord,
   type ServiceVariantRecord
 } from '../lib/serviceContract';
+import {
+  isQueuedStandaloneServiceSelected,
+  removeStandaloneQueuedService,
+  removeBundleFromStagedServices
+} from '../lib/bundleStagingHelpers';
 import { to12HourTime, to24HourTime } from '../lib/employeeHelpers';
 import {
   PRODUCT_CATEGORY_OPTIONS,
@@ -1729,31 +1734,11 @@ export default function InteractiveDrawers({
   // Removed obsolete auto-populate duration and warning validation
 
   const removeQueuedService = (serviceId: string, variantId?: string | null) => {
-    setStagedServices((current) => current.filter((item) => {
-      if (item.serviceId !== serviceId) {
-        return true;
-      }
-
-      if (variantId) {
-        return item.variantId !== variantId;
-      }
-
-      return Boolean(item.variantId);
-    }));
+    setStagedServices((current) => removeStandaloneQueuedService(current, serviceId, variantId));
   };
 
   const isQueuedServiceSelected = (serviceId: string, variantId?: string | null) => {
-    return stagedServices.some((item) => {
-      if (item.serviceId !== serviceId) {
-        return false;
-      }
-
-      if (variantId) {
-        return item.variantId === variantId;
-      }
-
-      return !item.variantId;
-    });
+    return isQueuedStandaloneServiceSelected(stagedServices, serviceId, variantId);
   };
 
   // Removed obsolete handleAddStagedService and toggleServiceExpansion since AppointmentServicesStep handles it
@@ -1909,12 +1894,7 @@ export default function InteractiveDrawers({
   const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
     const isSelected = isQueuedServiceSelected(service.id, variantOverride?.id);
     if (isSelected) {
-      setStagedServices((current) => current.filter((item) => {
-        if (variantOverride?.id) {
-          return !(item.serviceId === service.id && item.variantId === variantOverride.id);
-        }
-        return !(item.serviceId === service.id && !item.variantId);
-      }));
+      setStagedServices((current) => removeStandaloneQueuedService(current, service.id, variantOverride?.id));
       setExpandedServiceIds((current) => ({
         ...current,
         [service.id]: false
@@ -1938,6 +1918,7 @@ export default function InteractiveDrawers({
 
       const newItem: StagedService = {
         id: `stg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        itemType: 'service',
         serviceId: service.id,
         variantId: resolvedVariant?.id || undefined,
         serviceCategory: service.category,
@@ -1978,6 +1959,17 @@ export default function InteractiveDrawers({
         `لم يتم العثور على خدمات في الباقة "${isRtl ? pkg?.name_ar : pkg?.name_en}".`,
         `The package "${isRtl ? pkg?.name_ar : pkg?.name_en}" contains no services.`,
         'warning'
+      );
+      return;
+    }
+
+    const isStaged = stagedServices.some(s => s.packageId === pkgId);
+    if (isStaged) {
+      setStagedServices(prev => removeBundleFromStagedServices(prev, pkgId));
+      addLocalToast(
+        `تمت إزالة الباقة بنجاح`,
+        `Successfully removed package`,
+        'info'
       );
       return;
     }
@@ -3339,15 +3331,7 @@ export default function InteractiveDrawers({
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          const indicesToRemove = [];
-                                          stagedServices.forEach((s, idx) => {
-                                            if ((s.packageInstanceId || s.packageId) === pkgItem.id) {
-                                              indicesToRemove.push(idx);
-                                            }
-                                          });
-                                          indicesToRemove.reverse().forEach(idx => {
-                                            setStagedServices(prev => prev.filter((_, i) => i !== idx));
-                                          });
+                                          setStagedServices(prev => removeBundleFromStagedServices(prev, pkgItem.id));
                                         }}
                                         className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition cursor-pointer"
                                         title={isRtl ? 'إزالة الباقة' : 'Remove Bundle'}
@@ -3445,7 +3429,7 @@ export default function InteractiveDrawers({
                                         </button>
                                         <button
                                           type="button"
-                                          onClick={() => setStagedServices(prev => prev.filter((_, i) => i !== item.index))}
+                                          onClick={() => setStagedServices(prev => prev.filter(s => s.id !== item.id))}
                                           className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition cursor-pointer"
                                           title={isRtl ? 'إزالة' : 'Remove'}
                                         >

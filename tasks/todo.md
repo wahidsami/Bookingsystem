@@ -408,8 +408,18 @@ The following canonical RTL files are FROZEN and protected from modification:
 - [x] 1. Root Cause Identification: `resolveServiceOrBundleCategory` returns object, compared with string `cat.id` <!-- id: cat_root_cause -->
 - [x] 2. Apply fix in `InteractiveDrawers.tsx` for `categorySections` and `tabCounts` <!-- id: cat_apply_fix -->
 - [x] 3. Run typecheck, build, and backend test verification <!-- id: cat_verify -->
-- [ ] 4. Commit and push only dedicated fix to `origin/main` <!-- id: cat_commit_push -->
-- [ ] 5. Report root cause, files changed, verification results, commit SHA and handoff <!-- id: cat_report -->
+- [x] 4. Commit and push only dedicated fix to `origin/main` (commit `f7f70ec`) <!-- id: cat_commit_push -->
+- [x] 5. Report root cause, files changed, verification results, commit SHA and handoff <!-- id: cat_report -->
+
+# BARSPA — Phase 2 Fix: Bundle Component vs Standalone Service Staging Isolation
+- [x] 1. Root cause trace: `isQueuedServiceSelected` matched bundle component items, causing standalone cards to display "Added" <!-- id: bundle_root_cause -->
+- [x] 2. Create `bundleStagingHelpers.ts` for strict standalone vs bundle isolation <!-- id: bundle_helpers -->
+- [x] 3. Update `InteractiveDrawers.tsx` to use shared helpers for selection, removal, and toggle <!-- id: bundle_apply_fix -->
+- [x] 4. Add focused automated test suite `InteractiveDrawers.bundleStaging.test.ts` (5/5 tests passing) <!-- id: bundle_tests -->
+- [x] 5. Run TypeScript check, build, and backend tests <!-- id: bundle_verify -->
+- [ ] 6. Commit and push dedicated fix to `main` <!-- id: bundle_commit_push -->
+- [ ] 7. Report findings, test results, and commit SHA <!-- id: bundle_report -->
+
 
 
 
