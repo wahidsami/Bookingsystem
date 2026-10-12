@@ -2054,7 +2054,9 @@ export default function InteractiveDrawers({
         dateKey,
         checkAllProfessionals: checkAll,
         isRtl,
-        allStylists: availableStylists
+        allStylists: availableStylists,
+        tenantTimezone: resolvedTenantTimezone,
+        boardStartHour
       });
 
       setSmartAvailabilitySummary(summary);
@@ -2068,7 +2070,9 @@ export default function InteractiveDrawers({
             stagedItems: stagedForAvail,
             startDate: dateKey,
             checkAllProfessionals: checkAll,
-            isRtl
+            isRtl,
+            tenantTimezone: resolvedTenantTimezone,
+            boardStartHour
           });
           setNextAvailableAlternative(alternative);
         } catch (altErr) {
@@ -2086,15 +2090,17 @@ export default function InteractiveDrawers({
     } finally {
       setSmartAvailabilityLoading(false);
     }
-  }, [stagedServices, availableStylists, tenantId, isRtl]);
+  }, [stagedServices, availableStylists, tenantId, isRtl, resolvedTenantTimezone, boardStartHour]);
 
   const handleSelectSmartSlot = (slot: SmartSlot) => {
-    setCurrentStartTime(slot.timeMinutes);
+    const slotBoardMinutes = slot.boardMinutes ?? slot.timeMinutes;
+    setCurrentStartTime(slotBoardMinutes);
 
     if (stagedServices.length > 0) {
       const anchorItem = stagedServices[0];
       const updates: Partial<StagedService> = {
-        startTime: slot.timeMinutes,
+        startTime: slotBoardMinutes,
+        startTimeIso: slot.startTime,
         ...(slot.staffId ? { staffId: slot.staffId, isExplicitStaff: true } : {})
       };
       handleUpdateStagedService(anchorItem.id, updates);

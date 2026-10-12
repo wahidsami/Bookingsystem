@@ -1,11 +1,13 @@
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { calculateAllValidChains, BookingSlot, ChainResult } from '../utils/bookingChains';
+import { getDatePartsInTimeZone, DEFAULT_TENANT_TIMEZONE } from '../lib/tenantTime';
 
 export interface SmartSlot {
   startTime: string; // ISO
   endTime: string;   // ISO
-  clockLabel: string; // e.g. "10:30 AM" or "10:30 ص"
-  timeMinutes: number; // minutes from midnight
+  clockLabel: string; // e.g. "5:30 PM" or "5:30 م" (in tenant timezone)
+  boardMinutes: number; // Board minutes offset from boardStartHour (e.g. 510 for 5:30 PM with boardStartHour=9)
+  timeMinutes: number; // Board minutes (synced with boardMinutes for scheduler consistency)
   staffId?: string;
   staffName?: string;
   period: 'morning' | 'afternoon' | 'evening';
@@ -47,9 +49,10 @@ export interface StagedItemForAvailability {
   sequenceOrder?: number;
 }
 
-const formatClockLabel = (date: Date, isRtl: boolean): string => {
-  let hours = date.getHours();
-  const minutes = date.getMinutes();
+const formatClockLabel = (date: Date, isRtl: boolean, timeZone = DEFAULT_TENANT_TIMEZONE): string => {
+  const parts = getDatePartsInTimeZone(date, timeZone);
+  let hours = Number(parts.hour || '0');
+  const minutes = Number(parts.minute || '0');
   const isPm = hours >= 12;
   const amPmEn = isPm ? 'PM' : 'AM';
   const amPmAr = isPm ? 'م' : 'ص';
@@ -73,7 +76,9 @@ export async function calculateSmartAvailability({
   dateKey,
   checkAllProfessionals = false,
   isRtl = false,
-  allStylists = []
+  allStylists = [],
+  tenantTimezone = DEFAULT_TENANT_TIMEZONE,
+  boardStartHour = 9
 }: {
   tenantId: string;
   stagedItems: StagedItemForAvailability[];
@@ -81,6 +86,8 @@ export async function calculateSmartAvailability({
   checkAllProfessionals?: boolean;
   isRtl?: boolean;
   allStylists?: Array<{ id: string; nameEn?: string; nameAr?: string }>;
+  tenantTimezone?: string;
+  boardStartHour?: number;
 }): Promise<DayAvailabilitySummary> {
   if (!tenantId || !stagedItems || stagedItems.length === 0 || !dateKey) {
     return {
@@ -128,17 +135,20 @@ export async function calculateSmartAvailability({
           .map((s: any) => {
             const startD = new Date(s.startTime);
             const endD = new Date(s.endTime);
-            const mins = startD.getHours() * 60 + startD.getMinutes();
+            const parts = getDatePartsInTimeZone(startD, tenantTimezone);
+            const startTotalMins = Number(parts.hour || '0') * 60 + Number(parts.minute || '0');
+            const boardMinutes = Math.max(0, startTotalMins - (boardStartHour * 60));
             const stylist = allStylists.find(st => st.id === s.staffId);
             const resolvedStaffName = s.staffName || (stylist ? (isRtl ? (stylist.nameAr || stylist.nameEn) : (stylist.nameEn || stylist.nameAr)) : undefined);
             return {
               startTime: s.startTime,
               endTime: s.endTime,
-              clockLabel: formatClockLabel(startD, isRtl),
-              timeMinutes: mins,
+              clockLabel: formatClockLabel(startD, isRtl, tenantTimezone),
+              boardMinutes,
+              timeMinutes: boardMinutes,
               staffId: s.staffId,
               staffName: resolvedStaffName,
-              period: getPeriod(mins),
+              period: getPeriod(startTotalMins),
               chainSlots: s.steps ? s.steps.map((st: any) => ({
                 startTime: st.startTime,
                 endTime: st.endTime,
@@ -195,7 +205,9 @@ export async function calculateSmartAvailability({
       rawAvailableSlots = chains.map((chain: ChainResult) => {
         const startD = new Date(chain.startTime);
         const endD = new Date(chain.endTime);
-        const mins = startD.getHours() * 60 + startD.getMinutes();
+        const parts = getDatePartsInTimeZone(startD, tenantTimezone);
+        const startTotalMins = Number(parts.hour || '0') * 60 + Number(parts.minute || '0');
+        const boardMinutes = Math.max(0, startTotalMins - (boardStartHour * 60));
         const primaryStaffId = chain.slots[0]?.staffId;
         const primaryStaff = allStylists.find(s => s.id === primaryStaffId);
         const staffName = primaryStaff ? (isRtl ? primaryStaff.nameAr : primaryStaff.nameEn) : chain.slots[0]?.staffName;
@@ -203,11 +215,12 @@ export async function calculateSmartAvailability({
         return {
           startTime: chain.startTime,
           endTime: chain.endTime,
-          clockLabel: formatClockLabel(startD, isRtl),
-          timeMinutes: mins,
+          clockLabel: formatClockLabel(startD, isRtl, tenantTimezone),
+          boardMinutes,
+          timeMinutes: boardMinutes,
           staffId: primaryStaffId,
           staffName,
-          period: getPeriod(mins),
+          period: getPeriod(startTotalMins),
           chainSlots: chain.slots
         };
       });
@@ -264,7 +277,9 @@ export async function findNextAvailableAlternative({
   startDate,
   checkAllProfessionals = false,
   isRtl = false,
-  daysToSearch = 14
+  daysToSearch = 14,
+  tenantTimezone = DEFAULT_TENANT_TIMEZONE,
+  boardStartHour = 9
 }: {
   tenantId: string;
   stagedItems: StagedItemForAvailability[];
@@ -272,6 +287,8 @@ export async function findNextAvailableAlternative({
   checkAllProfessionals?: boolean;
   isRtl?: boolean;
   daysToSearch?: number;
+  tenantTimezone?: string;
+  boardStartHour?: number;
 }): Promise<NextAvailableAlternative> {
   if (!tenantId || !stagedItems || stagedItems.length === 0 || !startDate) {
     return {
@@ -305,15 +322,18 @@ export async function findNextAvailableAlternative({
 
     if (resp?.success && resp.date && resp.slot) {
       const slotD = new Date(resp.slot.startTime);
-      const mins = slotD.getHours() * 60 + slotD.getMinutes();
+      const parts = getDatePartsInTimeZone(slotD, tenantTimezone);
+      const startTotalMins = Number(parts.hour || '0') * 60 + Number(parts.minute || '0');
+      const boardMinutes = Math.max(0, startTotalMins - (boardStartHour * 60));
       const smartSlot: SmartSlot = {
         startTime: resp.slot.startTime,
         endTime: resp.slot.endTime,
-        clockLabel: formatClockLabel(slotD, isRtl),
-        timeMinutes: mins,
+        clockLabel: formatClockLabel(slotD, isRtl, tenantTimezone),
+        boardMinutes,
+        timeMinutes: boardMinutes,
         staffId: resp.slot.staffId,
         staffName: resp.slot.staffName,
-        period: getPeriod(mins)
+        period: getPeriod(startTotalMins)
       };
 
       const dateObj = new Date(resp.date + 'T12:00:00Z');

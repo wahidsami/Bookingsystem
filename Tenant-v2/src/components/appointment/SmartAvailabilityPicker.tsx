@@ -255,7 +255,8 @@ export const SmartAvailabilityPicker: React.FC<SmartAvailabilityPickerProps> = (
         <div className="space-y-2">
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
             {displayedSlots.map((slot) => {
-              const isSelected = slot.timeMinutes === currentStartTime;
+              const slotMins = slot.boardMinutes ?? slot.timeMinutes;
+              const isSelected = slotMins === currentStartTime;
 
               return (
                 <button
