@@ -33,6 +33,7 @@ async function processAppointmentPayment({
     paymentAllocations,
     transactionRef,
     notes,
+    scope,
     forensicTrace,
     transaction
 }) {
@@ -40,6 +41,7 @@ async function processAppointmentPayment({
         appointmentId: appointment?.id,
         amount,
         paymentMethod,
+        scope,
         paymentAllocationsLength: paymentAllocations?.length
     });
 
@@ -48,7 +50,8 @@ async function processAppointmentPayment({
     }
 
     const bookingSession = appointment.bookingSession || null;
-    const sessionAppointments = Array.isArray(bookingSession?.appointments)
+    const isIndividualPayment = scope === 'appointment' || (scope !== 'session' && bookingSession?.metadata?.paymentArrangement === 'individual_pays');
+    const sessionAppointments = (!isIndividualPayment && Array.isArray(bookingSession?.appointments))
         ? bookingSession.appointments
             .filter((sessionAppointment) => sessionAppointment && `${sessionAppointment.status || ''}`.trim().toLowerCase() !== 'cancelled')
             .slice()
@@ -60,7 +63,7 @@ async function processAppointmentPayment({
                 }
                 return new Date(left.startTime).getTime() - new Date(right.startTime).getTime();
             })
-        : [appointment]; // Fallback to just the current appointment if no session loaded
+        : [appointment]; // Fallback to just the current appointment for individual payment or if no session loaded
 
     const payableSessionAppointments = sessionAppointments
         .map((sessionAppointment) => ({

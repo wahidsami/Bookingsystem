@@ -115,7 +115,10 @@ class BookingService {
         }
 
         if (session.platformUserId && platformUserId && session.platformUserId !== platformUserId) {
-            throw new Error('Booking session does not belong to this customer');
+            const isGroup = session.metadata?.sessionType === 'group';
+            if (!isGroup) {
+                throw new Error('Booking session does not belong to this customer');
+            }
         }
 
         if (session.status === 'cancelled') {
@@ -132,12 +135,17 @@ class BookingService {
 
         const appointments = await db.Appointment.findAll({
             where: { bookingSessionId: sessionId },
-            attributes: ['id', 'rawPrice', 'taxAmount', 'platformFee', 'price'],
+            attributes: ['id', 'rawPrice', 'taxAmount', 'platformFee', 'price', 'status', 'paymentMethod'],
             transaction
         });
 
+        const activeAppointments = appointments.filter(
+            (appointment) => `${appointment.status || ''}`.trim().toLowerCase() !== 'cancelled'
+        );
+        const allCancelled = appointments.length > 0 && activeAppointments.length === 0;
+
         const paymentMethods = new Set();
-        const totals = appointments.reduce((acc, appointment) => {
+        const totals = activeAppointments.reduce((acc, appointment) => {
             const method = `${appointment.paymentMethod || ''}`.trim().toLowerCase();
             if (method) {
                 paymentMethods.add(method);
@@ -166,14 +174,19 @@ class BookingService {
             ? 'mixed'
             : (distinctMethods[0] || session.paymentMethod || null);
 
-        await session.update({
+        const updateFields = {
             itemCount: totals.itemCount,
             subtotal: parseFloat(totals.subtotal.toFixed(2)),
             taxAmount: parseFloat(totals.taxAmount.toFixed(2)),
             platformFee: parseFloat(totals.platformFee.toFixed(2)),
             totalAmount: parseFloat(totals.totalAmount.toFixed(2)),
             paymentMethod
-        }, { transaction });
+        };
+        if (allCancelled) {
+            updateFields.status = 'cancelled';
+        }
+
+        await session.update(updateFields, { transaction });
 
         return session;
     }
@@ -740,7 +753,7 @@ class BookingService {
     }
 
     async _createBookingSession(data, options = {}) {
-        const { tenantId, platformUserId, items, notes, paymentMethod, paymentAllocations, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation, skipAdvanceValidation } = data;
+        const { tenantId, platformUserId, items, notes, paymentMethod, paymentAllocations, bookingSessionId, bookingReference, bookingItemIndex, skipServicePaymentOptionValidation, skipAdvanceValidation, metadata: initialMetadata } = data;
         const transaction = options.transaction;
         const shouldCommit = !transaction;
         const finalTransaction = transaction || await db.sequelize.transaction();
@@ -794,7 +807,8 @@ class BookingService {
                             platformFee: 0,
                             totalAmount: 0,
                             paymentMethod: sessionPaymentMethod,
-                            notes: normalizedNotes || null
+                            notes: normalizedNotes || null,
+                            metadata: initialMetadata && typeof initialMetadata === 'object' ? initialMetadata : {}
                         }, { transaction: finalTransaction });
                     } catch (createError) {
                         const isUniqueReferenceConflict = createError?.name === 'SequelizeUniqueConstraintError'
@@ -918,11 +932,12 @@ class BookingService {
                     for (let i = 0; i < packageSteps.length; i++) {
                         const step = packageSteps[i];
                         const stepOvertime = step.pItem?.overtimeApproval || item.overtimeApproval || overtimeApproval || null;
+                        const participantUserId = step.pItem?.platformUserId || item.platformUserId || platformUserId;
                         const appointment = await this.createBooking({
                             serviceId: step.pItem.serviceId,
                             staffId: step.pItem.staffId || null,
                             requestedStaffId: step.pItem.requestedStaffId || step.pItem.staffId || null,
-                            platformUserId,
+                            platformUserId: participantUserId,
                             tenantId,
                             startTime: step.pItem.startTime,
                             notes: item.notes || normalizedNotes || null,
@@ -969,12 +984,13 @@ class BookingService {
                     }
 
                 } else {
+                    const participantUserId = item.platformUserId || platformUserId;
                     const appointment = await this.createBooking({
                         serviceId: item.serviceId,
                         variantId: item.variantId || null,
                         staffId: item.staffId || null,
                         requestedStaffId: item.requestedStaffId || null,
-                        platformUserId,
+                        platformUserId: participantUserId,
                         tenantId,
                         startTime: item.startTime,
                         notes: item.notes || normalizedNotes || null,
@@ -1036,6 +1052,7 @@ class BookingService {
                     : session.paymentMethod || sessionPaymentMethod,
                 metadata: {
                     ...(session.metadata && typeof session.metadata === 'object' ? session.metadata : {}),
+                    ...(initialMetadata && typeof initialMetadata === 'object' ? initialMetadata : {}),
                     bookingPaymentPlan: paymentPlanMetadata
                 }
             }, { transaction: finalTransaction });
@@ -1083,19 +1100,27 @@ class BookingService {
                     for (const appointment of appointments) {
                         const serviceName = appointment?.service?.name_en || appointment?.service?.name_ar || 'service';
                         const appointmentDate = formatNotificationDate(appointment.startTime);
-                        const customerName = `${platformUser.firstName || ''} ${platformUser.lastName || ''}`.trim() || 'A customer';
+                        let apptCustomerName = customerName;
+                        if (appointment.platformUserId && appointment.platformUserId !== platformUserId) {
+                            try {
+                                const participantUser = await db.PlatformUser.findByPk(appointment.platformUserId);
+                                if (participantUser) {
+                                    apptCustomerName = `${participantUser.firstName || ''} ${participantUser.lastName || ''}`.trim() || customerName;
+                                }
+                            } catch (_) {}
+                        }
                         if (appointment.staffId) {
                             await notificationOrchestrator.notifyStaff({
                                 tenantId,
                                 staffId: appointment.staffId,
                                 eventType: 'staff_appointment_assigned',
                                 title: 'New appointment assigned',
-                                body: `${customerName} booked ${serviceName} for ${appointmentDate}.`,
+                                body: `${apptCustomerName} booked ${serviceName} for ${appointmentDate}.`,
                                 data: {
                                     type: 'staff_appointment_assigned',
                                     appointmentId: appointment.id,
                                     tenantId,
-                                    platformUserId
+                                    platformUserId: appointment.platformUserId || platformUserId
                                 }
                             });
                         }

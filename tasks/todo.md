@@ -512,5 +512,48 @@ The following canonical RTL files are FROZEN and protected from modification:
 - [x] 6. Git Stage, Commit & Push Dedicated Phase 4 Changes <!-- id: p4_commit_push -->
   - Stage only Phase 4 files (preserve 13 unrelated tracked files).
   - Push to `origin/main` without automatic deployment.
-- [ ] 7. Final Phase 4 Report & Stop Gate <!-- id: p4_report -->
+- [x] 7. Final Phase 4 Report & Stop Gate <!-- id: p4_report -->
+
+# BARSPA Tenant-v2 — Phase 5A: Genuine Group Appointments
+- [x] 1. Architecture & Persistence Audit and Service Foundation <!-- id: p5a_arch_foundation -->
+  - Extended `bookingService.createBookingSession` to respect `item.platformUserId`, attributing child appointments to genuine participant identities instead of collapsing to organizer.
+  - Stored group coordination context in `BookingSession.metadata` (`sessionType: 'group'`, `groupName`, `paymentArrangement: 'organizer_pays' | 'individual_pays'`, `organizer`, `participants`).
+  - Updated `syncBookingSessionTotals` in `tenantAppointmentController.js` and `bookingService.js` to exclude cancelled appointments from active session totals.
+- [x] 2. Controller Group Booking Support in `tenantAppointmentController.js` <!-- id: p5a_controller -->
+  - Enhanced `createAppointment` to accept group bookings (`sessionType: 'group'`, `groupName`, `paymentArrangement`, `participants`).
+  - Resolved distinct customer identities (`PlatformUser`) for every participant (both registered customers and walk-in guests via `resolveAppointmentCustomer`).
+  - Enforced atomic transaction creation: validates all participants, staff qualifications, and timing before persisting.
+- [x] 3. Dual Payment Arrangements & Financial Integrity <!-- id: p5a_payments -->
+  - Option A (Organizer pays for everyone): Session-level financial summary, consolidated payment processing across session appointments with 15% VAT, and genuine payment transactions.
+  - Option B (Each participant pays individually): Updated `appointmentPaymentService.js` and `updatePaymentStatus` so `individual_pays` or single-appointment scope restricts payment allocations strictly to that participant's appointment.
+  - Maintained session-level reconciliation (total group value, total collected, remaining balance).
+- [x] 4. Participant Cancellation & Lifecycle Management <!-- id: p5a_cancellation -->
+  - Ensured cancelling one participant's appointment preserves sibling participant appointments and updates session totals without cross-cancelling.
+  - Safely transition session status to 'cancelled' only when all session appointments are cancelled.
+- [x] 5. Frontend Group Booking Experience in `Tenant-v2` (`InteractiveDrawers.tsx`) <!-- id: p5a_frontend_ui -->
+  - Added Single Client vs Group Booking selector in creation drawer.
+  - Implemented Organizer selector & Participant Manager (add/remove participants, registered vs walk-in).
+  - Enabled per-participant service staging, variant selection, staff assignment, and start time.
+  - Added Payment Arrangement selector (Organizer Pays All vs Individual Participant Payments).
+  - Rendered live participant breakdown and consolidated group summary (subtotal, 15% VAT, total).
+  - Preserved Arabic RTL, mobile tab responsiveness, dirty draft dismissal confirmation, and conflict recovery.
+- [x] 6. Comprehensive Automated Tests <!-- id: p5a_tests -->
+  - Backend integration test suite in `tenantGroupBooking.test.js`: 5/5 passed covering 3 participants with distinct identities/services/staff, Option A consolidated payment, Option B independent participant payment, atomic rollback, and single participant cancellation.
+  - Frontend test suite in `groupBooking.test.ts`: 5/5 passed covering group staging, participant scoping, pricing calculation with 15% VAT, and dirty draft detection.
+- [x] 7. Typecheck, Build, and Regression Verification <!-- id: p5a_verification -->
+  - Ran Tenant-v2 typecheck (`npm run lint` / `tsc --noEmit`): 0 errors.
+  - Ran Tenant-v2 production build (`npm run build`): Vite & esbuild succeeded.
+  - Ran backend Jest test suites: 100% pass across group booking and walk-in suites.
+  - Verified zero impact on existing single-client bookings, walk-ins, and bundles.
+- [x] 8. Change Control, Commit, Push & Final Report <!-- id: p5a_report -->
+  - Staged only dedicated Phase 5A files, preserving all 13 unrelated tracked files.
+  - Committed and pushed to `main`.
+  - Reported findings, changed files, Coolify services, and stopped for owner review.
+
+## Phase 5A Review & Verification Results
+- **Backend Tests:** 5/5 PASS in `server/src/controllers/__tests__/tenantGroupBooking.test.js` (Distinct customer records, Option A consolidated session payment, Option B isolated appointment payment, atomic validation rollback, and cancellation isolation).
+- **Existing Backend Suite:** 2/2 PASS in `server/src/controllers/__tests__/tenantAppointmentController.walkin.test.js`.
+- **Frontend Unit Tests:** 5/5 PASS in `Tenant-v2/src/components/__tests__/groupBooking.test.ts`.
+- **Frontend Typecheck & Build:** `npm run lint` (`tsc --noEmit`) clean with 0 errors; `npm run build` successfully bundled Vite client and esbuild server.
+- **Change Control:** Strictly isolated to Phase 5A files. All 13 unrelated tracked files (`RifahMobile/*`, `server/src/controllers/tenantOrderController.js`, etc.) completely untouched.
 

@@ -15,6 +15,7 @@ export interface MinimalStagedItem {
   finalPrice?: number;
   duration?: number;
   startTime?: number;
+  participantId?: string | null;
 }
 
 export interface MinimalPackageItem {
@@ -29,13 +30,18 @@ export interface MinimalPackageItem {
  * Checks whether a standalone service (or variant) is currently selected.
  * Strictly ignores bundle component items so that services inside packages
  * do not falsely appear as standalone bookings.
+ * Optionally scopes selection to a specific participant for group appointments.
  */
 export const isQueuedStandaloneServiceSelected = (
   stagedServices: MinimalStagedItem[],
   serviceId: string,
-  variantId?: string | null
+  variantId?: string | null,
+  participantId?: string | null
 ): boolean => {
   return stagedServices.some((item) => {
+    if (participantId && item.participantId && item.participantId !== participantId) {
+      return false;
+    }
     if (item.itemType === 'package' || Boolean(item.packageId)) {
       return false;
     }
@@ -52,13 +58,18 @@ export const isQueuedStandaloneServiceSelected = (
 /**
  * Removes a standalone service from staged services.
  * Preserves all bundle component items intact even if they share the same serviceId.
+ * Optionally scopes removal to a specific participant for group appointments.
  */
 export const removeStandaloneQueuedService = <T extends MinimalStagedItem>(
   stagedServices: T[],
   serviceId: string,
-  variantId?: string | null
+  variantId?: string | null,
+  participantId?: string | null
 ): T[] => {
   return stagedServices.filter((item) => {
+    if (participantId && item.participantId && item.participantId !== participantId) {
+      return true;
+    }
     if (item.itemType === 'package' || Boolean(item.packageId)) {
       return true;
     }
@@ -74,12 +85,17 @@ export const removeStandaloneQueuedService = <T extends MinimalStagedItem>(
 
 /**
  * Removes all child services belonging to a package instance or package ID.
+ * Optionally scopes removal to a specific participant for group appointments.
  */
 export const removeBundleFromStagedServices = <T extends MinimalStagedItem>(
   stagedServices: T[],
-  packageOrInstanceId: string
+  packageOrInstanceId: string,
+  participantId?: string | null
 ): T[] => {
   return stagedServices.filter((item) => {
+    if (participantId && item.participantId && item.participantId !== participantId) {
+      return true;
+    }
     const isTarget = item.packageInstanceId === packageOrInstanceId || item.packageId === packageOrInstanceId;
     return !isTarget;
   });
@@ -118,6 +134,66 @@ export const calculateStagedPricing = (
   return { subtotal, vat, total };
 };
 
+export interface GroupParticipantInfo {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  isOrganizer?: boolean;
+}
+
+export interface GroupParticipantFinancials {
+  participantId: string;
+  name: string;
+  isOrganizer: boolean;
+  serviceCount: number;
+  subtotal: number;
+  vat: number;
+  total: number;
+}
+
+export interface GroupPricingSummary {
+  participants: GroupParticipantFinancials[];
+  consolidatedSubtotal: number;
+  consolidatedVat: number;
+  consolidatedTotal: number;
+}
+
+/**
+ * Calculates per-participant and consolidated financial summaries for group bookings.
+ */
+export const calculateGroupStagedPricing = (
+  participants: GroupParticipantInfo[],
+  stagedServices: MinimalStagedItem[],
+  packages: MinimalPackageItem[]
+): GroupPricingSummary => {
+  const defaultParticipantId = participants[0]?.id || 'part-1';
+  const participantFinancials: GroupParticipantFinancials[] = participants.map((p, idx) => {
+    const pItems = stagedServices.filter(s => (s.participantId || defaultParticipantId) === p.id);
+    const pricing = calculateStagedPricing(pItems, packages);
+    return {
+      participantId: p.id,
+      name: p.name || `Participant ${idx + 1}`,
+      isOrganizer: idx === 0 || Boolean(p.isOrganizer),
+      serviceCount: pItems.length,
+      subtotal: pricing.subtotal,
+      vat: pricing.vat,
+      total: pricing.total
+    };
+  });
+
+  const consolidatedSubtotal = Number(participantFinancials.reduce((sum, p) => sum + p.subtotal, 0).toFixed(2));
+  const consolidatedVat = Number((consolidatedSubtotal * 0.15).toFixed(2));
+  const consolidatedTotal = Number((consolidatedSubtotal + consolidatedVat).toFixed(2));
+
+  return {
+    participants: participantFinancials,
+    consolidatedSubtotal,
+    consolidatedVat,
+    consolidatedTotal
+  };
+};
+
 export interface DraftStateCheckInput {
   createMode?: string;
   selectedCustId?: string;
@@ -145,6 +221,9 @@ export interface DraftStateCheckInput {
   blockStaffId?: string;
   blockIsRecurring?: boolean;
   blockEndDate?: string;
+  bookingScope?: string;
+  groupName?: string;
+  groupParticipantsCount?: number;
 }
 
 /**
@@ -162,6 +241,9 @@ export const checkIsAppointmentDraftDirty = (input: DraftStateCheckInput): boole
     );
   }
 
+  if (input.bookingScope === 'group') return true;
+  if (input.groupName?.trim()) return true;
+  if ((input.groupParticipantsCount ?? 1) > 1) return true;
   if (input.selectedCustId) return true;
   if (input.customerSearch?.trim()) return true;
   if (input.custMode === 'walkin' && (input.walkinFullName?.trim() || input.walkinPhone?.trim() || input.walkinEmail?.trim() || input.walkinDob?.trim() || input.walkinIsVip)) return true;

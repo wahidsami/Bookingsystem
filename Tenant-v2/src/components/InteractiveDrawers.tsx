@@ -37,7 +37,9 @@ import {
   isQueuedStandaloneServiceSelected,
   removeStandaloneQueuedService,
   removeBundleFromStagedServices,
-  checkIsAppointmentDraftDirty
+  checkIsAppointmentDraftDirty,
+  calculateGroupStagedPricing,
+  type GroupPricingSummary
 } from '../lib/bundleStagingHelpers';
 import { to12HourTime, to24HourTime } from '../lib/employeeHelpers';
 import {
@@ -179,6 +181,15 @@ export interface GuestProfile {
   services: GuestService[];
 }
 
+export interface GroupParticipant {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  isGuest?: boolean;
+  customerId?: string;
+}
+
 interface StagedService {
   id: string;
   itemType?: "service" | "package";
@@ -202,6 +213,7 @@ interface StagedService {
   finalPrice?: number;
   timingMode?: 'auto' | 'manual';
   overtimeApproval?: { approved: boolean };
+  participantId?: string;
 }
 
 interface QueuedServiceEditDraft {
@@ -502,6 +514,15 @@ export default function InteractiveDrawers({
   const registeredCustomerSearchRef = useRef<HTMLInputElement>(null);
   const walkinNameRef = useRef<HTMLInputElement>(null);
 
+  // Group Booking State (Phase 5A)
+  const [bookingScope, setBookingScope] = useState<'single' | 'group'>('single');
+  const [groupName, setGroupName] = useState<string>('');
+  const [groupPaymentArrangement, setGroupPaymentArrangement] = useState<'organizer_pays' | 'individual_pays'>('organizer_pays');
+  const [groupParticipants, setGroupParticipants] = useState<GroupParticipant[]>([
+    { id: 'part-1', name: '', phone: '', email: '', isGuest: true }
+  ]);
+  const [activeParticipantId, setActiveParticipantId] = useState<string>('part-1');
+
   // Appointment service staging state
   const [currentServiceId, setCurrentServiceId] = useState('');
   const [currentDuration, setCurrentDuration] = useState<number>(60);
@@ -716,6 +737,35 @@ export default function InteractiveDrawers({
       ...prev,
       [serviceId]: !prev[serviceId]
     }));
+  };
+
+  // Participant management helpers (Phase 5A)
+  const handleAddGroupParticipant = () => {
+    const nextIndex = groupParticipants.length + 1;
+    const newId = `part-${Date.now()}-${nextIndex}`;
+    const newParticipant: GroupParticipant = {
+      id: newId,
+      name: `${isRtl ? 'مشارك' : 'Participant'} ${nextIndex}`,
+      phone: '',
+      email: '',
+      isGuest: true
+    };
+    setGroupParticipants(prev => [...prev, newParticipant]);
+    setActiveParticipantId(newId);
+  };
+
+  const handleRemoveGroupParticipant = (partId: string) => {
+    if (groupParticipants.length <= 1) return;
+    if (partId === groupParticipants[0].id) return;
+    setGroupParticipants(prev => prev.filter(p => p.id !== partId));
+    setStagedServices(prev => prev.filter(s => s.participantId !== partId));
+    if (activeParticipantId === partId) {
+      setActiveParticipantId(groupParticipants[0].id);
+    }
+  };
+
+  const handleUpdateGroupParticipant = (partId: string, fields: Partial<GroupParticipant>) => {
+    setGroupParticipants(prev => prev.map(p => p.id === partId ? { ...p, ...fields } : p));
   };
 
   // Canonical Identity Validation and Messages
@@ -1080,6 +1130,50 @@ export default function InteractiveDrawers({
     };
   }, [stagedServices, canonicalServices, availableStylists, isRtl, services2Bundles, servicePackages]);
 
+  // Group Financial Summary (Phase 5A)
+  const groupFinancialSummary = useMemo(() => {
+    if (bookingScope !== 'group') return null;
+    return calculateGroupStagedPricing(
+      groupParticipants.map((p, idx) => ({
+        id: p.id,
+        name: p.name || (idx === 0 ? (isRtl ? 'المنظم' : 'Organizer') : `${isRtl ? 'مشارك' : 'Participant'} ${idx + 1}`),
+        phone: p.phone,
+        email: p.email,
+        isOrganizer: idx === 0
+      })),
+      stagedServices,
+      services2Bundles || servicePackages || []
+    );
+  }, [bookingScope, groupParticipants, stagedServices, services2Bundles, servicePackages, isRtl]);
+
+  const activeParticipantName = useMemo(() => {
+    const p = groupParticipants.find(part => part.id === activeParticipantId) || groupParticipants[0];
+    const idx = groupParticipants.findIndex(part => part.id === activeParticipantId);
+    return idx === 0
+      ? (p?.name ? `${p.name} (${isRtl ? 'المنظم' : 'Organizer'})` : (isRtl ? 'المنظم' : 'Organizer'))
+      : (p?.name || `${isRtl ? 'مشارك' : 'Participant'} ${idx + 1}`);
+  }, [groupParticipants, activeParticipantId, isRtl]);
+
+  const activeParticipantItemsCount = useMemo(() => {
+    if (bookingScope !== 'group') return stagedServices.length;
+    return stagedServices.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId).length;
+  }, [bookingScope, stagedServices, groupParticipants, activeParticipantId]);
+
+  const displayedPackageCartItems = useMemo(() => {
+    if (bookingScope !== 'group') return appointmentInvoiceSummary.packageCartItems;
+    return appointmentInvoiceSummary.packageCartItems.filter(pkgItem => {
+      return pkgItem.childItems?.some(c => (c.participantId || groupParticipants[0]?.id) === activeParticipantId);
+    });
+  }, [bookingScope, appointmentInvoiceSummary.packageCartItems, groupParticipants, activeParticipantId]);
+
+  const displayedStandaloneCartItems = useMemo(() => {
+    if (bookingScope !== 'group') return appointmentInvoiceSummary.standaloneCartItems;
+    return appointmentInvoiceSummary.standaloneCartItems.filter(item => {
+      const raw = stagedServices.find(s => s.id === item.id);
+      return (raw?.participantId || groupParticipants[0]?.id) === activeParticipantId;
+    });
+  }, [bookingScope, appointmentInvoiceSummary.standaloneCartItems, stagedServices, groupParticipants, activeParticipantId]);
+
   useEffect(() => {
     if (createStep === 3 && stagedServices.length === 0) {
       setCreateStep(2);
@@ -1124,6 +1218,47 @@ export default function InteractiveDrawers({
     () => customers.find((customer) => customer.id === selectedCustId) || null,
     [customers, selectedCustId]
   );
+
+  // Synchronize Organizer (Participant 1) with primary client info
+  useEffect(() => {
+    if (groupParticipants.length === 0) return;
+    const primaryName = custMode === 'existing'
+      ? (selectedRegisteredCustomer?.name || '')
+      : (walkinFullName || '');
+    const primaryPhone = custMode === 'existing'
+      ? (selectedRegisteredCustomer?.phone || '')
+      : (walkinPhone || '');
+    const primaryEmail = custMode === 'existing'
+      ? (selectedRegisteredCustomer?.email || '')
+      : (walkinEmail || '');
+    const primaryCustomerId = custMode === 'existing' ? selectedCustId : undefined;
+    const primaryIsGuest = custMode === 'walkin';
+
+    setGroupParticipants(prev => {
+      if (prev.length === 0) return prev;
+      const first = prev[0];
+      if (
+        first.name === primaryName &&
+        first.phone === primaryPhone &&
+        first.email === primaryEmail &&
+        first.customerId === primaryCustomerId &&
+        first.isGuest === primaryIsGuest
+      ) {
+        return prev;
+      }
+      return [
+        {
+          ...first,
+          name: primaryName || first.name,
+          phone: primaryPhone,
+          email: primaryEmail,
+          customerId: primaryCustomerId,
+          isGuest: primaryIsGuest
+        },
+        ...prev.slice(1)
+      ];
+    });
+  }, [custMode, selectedRegisteredCustomer, selectedCustId, walkinFullName, walkinPhone, walkinEmail]);
 
   // Step 3: Payments notes & custom checkout
   const [sessionNotes, setSessionNotes] = useState('');
@@ -1637,6 +1772,11 @@ export default function InteractiveDrawers({
     setIsOptionsExpanded(false);
     setShowDiscardConfirmDialog(false);
     setIdentityValidationError(false);
+    setBookingScope('single');
+    setGroupName('');
+    setGroupPaymentArrangement('organizer_pays');
+    setGroupParticipants([{ id: 'part-1', name: '', phone: '', email: '', isGuest: true }]);
+    setActiveParticipantId('part-1');
     removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
     setAppointmentDraftPending(false);
     setShowAppointmentDraftPrompt(false);
@@ -1740,6 +1880,9 @@ export default function InteractiveDrawers({
       blockStaffId,
       blockIsRecurring,
       blockEndDate,
+      bookingScope,
+      groupName,
+      groupParticipantsCount: groupParticipants.length
     });
   }, [
     createMode,
@@ -1768,6 +1911,9 @@ export default function InteractiveDrawers({
     blockStaffId,
     blockIsRecurring,
     blockEndDate,
+    bookingScope,
+    groupName,
+    groupParticipants.length
   ]);
 
   const handleRequestDismissCreateDrawer = () => {
@@ -1884,11 +2030,21 @@ export default function InteractiveDrawers({
   // Removed obsolete auto-populate duration and warning validation
 
   const removeQueuedService = (serviceId: string, variantId?: string | null) => {
-    setStagedServices((current) => removeStandaloneQueuedService(current, serviceId, variantId));
+    setStagedServices((current) => removeStandaloneQueuedService(
+      current,
+      serviceId,
+      variantId,
+      bookingScope === 'group' ? activeParticipantId : null
+    ));
   };
 
   const isQueuedServiceSelected = (serviceId: string, variantId?: string | null) => {
-    return isQueuedStandaloneServiceSelected(stagedServices, serviceId, variantId);
+    return isQueuedStandaloneServiceSelected(
+      stagedServices,
+      serviceId,
+      variantId,
+      bookingScope === 'group' ? activeParticipantId : null
+    );
   };
 
   // Removed obsolete handleAddStagedService and toggleServiceExpansion since AppointmentServicesStep handles it
@@ -2169,7 +2325,12 @@ export default function InteractiveDrawers({
   const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
     const isSelected = isQueuedServiceSelected(service.id, variantOverride?.id);
     if (isSelected) {
-      setStagedServices((current) => removeStandaloneQueuedService(current, service.id, variantOverride?.id));
+      setStagedServices((current) => removeStandaloneQueuedService(
+        current,
+        service.id,
+        variantOverride?.id,
+        bookingScope === 'group' ? activeParticipantId : null
+      ));
       setExpandedServiceIds((current) => ({
         ...current,
         [service.id]: false
@@ -2207,7 +2368,8 @@ export default function InteractiveDrawers({
         notes: '',
         basePrice,
         finalPrice: basePrice,
-        timingMode: 'auto'
+        timingMode: 'auto',
+        participantId: bookingScope === 'group' ? activeParticipantId : undefined
       };
 
       setStagedServices(prev => [...prev, newItem]);
@@ -2238,9 +2400,13 @@ export default function InteractiveDrawers({
       return;
     }
 
-    const isStaged = stagedServices.some(s => s.packageId === pkgId);
+    const isStaged = stagedServices.some(s => s.packageId === pkgId && (bookingScope !== 'group' || (s.participantId || groupParticipants[0]?.id) === activeParticipantId));
     if (isStaged) {
-      setStagedServices(prev => removeBundleFromStagedServices(prev, pkgId));
+      setStagedServices(prev => removeBundleFromStagedServices(
+        prev,
+        pkgId,
+        bookingScope === 'group' ? activeParticipantId : null
+      ));
       addLocalToast(
         `تمت إزالة الباقة بنجاح`,
         `Successfully removed package`,
@@ -2306,7 +2472,8 @@ export default function InteractiveDrawers({
           notes: '',
           basePrice,
           finalPrice: basePrice,
-          timingMode: 'auto'
+          timingMode: 'auto',
+          participantId: bookingScope === 'group' ? activeParticipantId : undefined
         });
 
         if (shouldChainServiceTimes && !isParallel) {
@@ -2738,16 +2905,19 @@ export default function InteractiveDrawers({
       const resolvedDuration = resolveBookingDuration(item.duration, variant?.duration, service?.duration);
 
       if (packageId) {
-        if (!groupedPackages.has(packageId)) {
-          groupedPackages.set(packageId, {
+        const packageKey = item.packageInstanceId || `${packageId}_${(item as any).participantId || 'default'}`;
+        if (!groupedPackages.has(packageKey)) {
+          groupedPackages.set(packageKey, {
             itemType: 'package',
             packageId,
+            packageInstanceId: item.packageInstanceId,
+            participantId: (item as any).participantId || undefined,
             packageItems: [],
             notes: [],
             overtimeApproval: allowExtendedHours ? { approved: true } : undefined
           });
         }
-        const pkgGroup = groupedPackages.get(packageId);
+        const pkgGroup = groupedPackages.get(packageKey);
         if (item.notes) pkgGroup.notes.push(item.notes);
 
         const effectiveStaffId = item.isExplicitStaff ? item.staffId : null;
@@ -2760,6 +2930,7 @@ export default function InteractiveDrawers({
           duration: resolvedDuration,
           assignmentMode: item.isExplicitStaff ? 'tenant_reassigned' : 'auto_assigned',
           packageItemId: (item as any).packageItemId || undefined,
+          participantId: (item as any).participantId || undefined,
           overtimeApproval: item.overtimeApproval || (allowExtendedHours
             && (boardStartHour * 60) + item.startTime + Number(resolvedDuration || 0) > normalClosingMinutes
             ? { approved: true }
@@ -2780,6 +2951,7 @@ export default function InteractiveDrawers({
           paymentMethod: 'at-center',
           assignmentMode: item.isExplicitStaff ? 'tenant_reassigned' : 'auto_assigned',
           variantId: variant?.id || undefined,
+          participantId: (item as any).participantId || undefined,
           overtimeApproval: item.overtimeApproval || (allowExtendedHours
             && (boardStartHour * 60) + item.startTime + Number(resolvedDuration || 0) > normalClosingMinutes
             ? { approved: true }
@@ -2826,6 +2998,21 @@ export default function InteractiveDrawers({
       return;
     }
 
+    if (bookingScope === 'group') {
+      const emptyParticipants = groupParticipants.filter(p => {
+        const count = stagedServices.filter(s => (s.participantId || groupParticipants[0].id) === p.id).length;
+        return count === 0;
+      });
+      if (emptyParticipants.length > 0) {
+        addLocalToast(
+          `يرجى إضافة خدمة واحدة على الأقل لكل مشارك (${emptyParticipants.map(p => p.name || 'مشارك').join(', ')})`,
+          `Please add at least one service for each participant (${emptyParticipants.map(p => p.name || 'Participant').join(', ')})`,
+          'warning'
+        );
+        return;
+      }
+    }
+
     const executeFinalSubmission = async (itemsToSubmit: any[]) => {
       const formattedItems = itemsToSubmit.map(i => {
         if (i.itemType === 'package') {
@@ -2867,6 +3054,30 @@ export default function InteractiveDrawers({
           }
         : null
     };
+
+    if (bookingScope === 'group') {
+      const groupParticipantsPayload = groupParticipants.map((p, idx) => {
+        const pItems = formattedItems.filter((i: any) => (i.participantId || groupParticipants[0].id) === p.id);
+        return {
+          participantId: p.id,
+          isOrganizer: idx === 0,
+          platformUserId: p.customerId || undefined,
+          customer: p.customerId ? undefined : {
+            firstName: p.name.trim() || `Participant ${idx + 1}`,
+            lastName: '',
+            phone: p.phone?.trim() || undefined,
+            email: p.email?.trim() || undefined,
+            isGuest: p.isGuest ?? true
+          },
+          items: pItems
+        };
+      });
+
+      payload.sessionType = 'group';
+      payload.groupName = groupName.trim() || (isRtl ? `مجموعة ${groupParticipants[0].name || 'العميل'}` : `${groupParticipants[0].name || 'Client'}'s Group`);
+      payload.paymentArrangement = groupPaymentArrangement;
+      payload.participants = groupParticipantsPayload;
+    }
 
     try {
       const appointmentTotal = Number((items as any[]).reduce((sum, item) => {
@@ -2940,8 +3151,12 @@ export default function InteractiveDrawers({
             await onBoardChanged();
           }
           addLocalToast(
-            `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
-            `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
+            bookingScope === 'group'
+              ? `تم حجز المجموعة "${payload.groupName || 'المجموعة'}" بنجاح وتوزيع المواعيد على المخطط! 👥🗓️`
+              : `تم إدراج الموعد الجديد لـ ${custNameAr} بنجاح على مخطط لوحة التشغيل! 🗓️`,
+            bookingScope === 'group'
+              ? `Successfully scheduled group booking "${payload.groupName || 'Group'}"! 👥🗓️`
+              : `Successfully scheduled new appointment for ${custNameEn}! 🗓️`,
             'success'
           );
         },
@@ -3592,11 +3807,220 @@ export default function InteractiveDrawers({
                       {/* Scrollable upper body */}
                       <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
                         
+                        {/* Phase 5A: Booking Scope Switcher (Single Client vs Group Booking) */}
+                        <div className="flex bg-slate-200/80 p-1 rounded-2xl gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setBookingScope('single')}
+                            className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              bookingScope === 'single'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            <User className="w-3.5 h-3.5" />
+                            <span>{isRtl ? 'حجز فردي' : 'Single Client'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBookingScope('group');
+                              if (groupParticipants.length === 1 && !groupParticipants[0].name) {
+                                groupParticipants[0].name = custMode === 'existing' ? (selectedRegisteredCustomer?.name || '') : walkinFullName;
+                              }
+                            }}
+                            className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              bookingScope === 'group'
+                                ? 'bg-[#6537C0] text-white shadow-sm'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            <Users className="w-3.5 h-3.5" />
+                            <span>{isRtl ? 'حجز جماعي (مجموعة)' : 'Group Booking'}</span>
+                            {bookingScope === 'group' && (
+                              <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono">
+                                {groupParticipants.length}
+                              </span>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Group Booking Configuration & Payment Arrangement */}
+                        {bookingScope === 'group' && (
+                          <div className="rounded-[20px] border border-purple-200 bg-purple-50/40 p-4 shadow-2xs space-y-3">
+                            <div className="flex items-center justify-between border-b border-purple-100 pb-2.5">
+                              <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4 text-[#6537C0]" />
+                                <span className="text-xs font-bold text-slate-900">
+                                  {isRtl ? 'إعدادات الحجز الجماعي' : 'Group Booking Settings'}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full font-mono">
+                                {groupParticipants.length} {isRtl ? 'مشاركين' : 'Participants'}
+                              </span>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                                {isRtl ? 'اسم المجموعة / المناسبة' : 'Group / Occasion Name'}
+                              </label>
+                              <input
+                                type="text"
+                                value={groupName}
+                                onChange={(e) => setGroupName(e.target.value)}
+                                placeholder={isRtl ? 'مثال: حفل زفاف سارة، عائلة الخالد...' : 'e.g. Bridal Party, Family...'}
+                                className="w-full rounded-xl border border-purple-200 bg-white p-2.5 text-xs font-medium text-slate-900 outline-none focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                                {isRtl ? 'ترتيب الدفع المالي' : 'Payment Arrangement'}
+                              </label>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setGroupPaymentArrangement('organizer_pays')}
+                                  className={`p-2.5 rounded-xl border text-start text-xs font-bold transition cursor-pointer ${
+                                    groupPaymentArrangement === 'organizer_pays'
+                                      ? 'border-[#6537C0] bg-white text-[#6537C0] ring-1 ring-[#6537C0]'
+                                      : 'border-slate-200 bg-white/70 text-slate-600 hover:bg-white'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 font-bold">
+                                    <span>👑</span>
+                                    <span>{isRtl ? 'المنظم يدفع عن الجميع' : 'Organizer Pays for All'}</span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                                    {isRtl ? 'فاتورة موحدة وحساب إجمالي واحد' : 'Single consolidated invoice'}
+                                  </p>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setGroupPaymentArrangement('individual_pays')}
+                                  className={`p-2.5 rounded-xl border text-start text-xs font-bold transition cursor-pointer ${
+                                    groupPaymentArrangement === 'individual_pays'
+                                      ? 'border-[#6537C0] bg-white text-[#6537C0] ring-1 ring-[#6537C0]'
+                                      : 'border-slate-200 bg-white/70 text-slate-600 hover:bg-white'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 font-bold">
+                                    <span>👤</span>
+                                    <span>{isRtl ? 'كل مشارك يدفع بشكل مستقل' : 'Each Pays Individually'}</span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                                    {isRtl ? 'حساب ومطالبة دفع منفصلة لكل شخص' : 'Independent payment per client'}
+                                  </p>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Group Participant Management & Tab Switcher */}
+                        {bookingScope === 'group' && (
+                          <div className="rounded-[20px] border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                {isRtl ? 'المشاركون في الحجز' : 'Participants'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={handleAddGroupParticipant}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-[#6537C0] hover:text-[#532ab0] px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 transition cursor-pointer"
+                              >
+                                <PlusCircle className="w-3.5 h-3.5" />
+                                <span>{isRtl ? 'إضافة مشارك' : 'Add Participant'}</span>
+                              </button>
+                            </div>
+
+                            {/* Participant selection tabs */}
+                            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                              {groupParticipants.map((participant, pIdx) => {
+                                const isActive = activeParticipantId === participant.id;
+                                const pServices = stagedServices.filter(s => (s.participantId || groupParticipants[0].id) === participant.id);
+                                const displayName = pIdx === 0
+                                  ? (participant.name || (isRtl ? 'المنظم' : 'Organizer'))
+                                  : (participant.name || `${isRtl ? 'مشارك' : 'Participant'} ${pIdx + 1}`);
+
+                                return (
+                                  <div
+                                    key={participant.id}
+                                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition shrink-0 cursor-pointer ${
+                                      isActive
+                                        ? 'border-[#6537C0] bg-purple-50 text-[#6537C0] shadow-2xs'
+                                        : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                    onClick={() => setActiveParticipantId(participant.id)}
+                                  >
+                                    <span>{pIdx === 0 ? '👑 ' : ''}{displayName}</span>
+                                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                                      isActive ? 'bg-[#6537C0] text-white' : 'bg-slate-200 text-slate-700'
+                                    }`}>
+                                      {pServices.length}
+                                    </span>
+                                    {pIdx > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemoveGroupParticipant(participant.id);
+                                        }}
+                                        className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer ms-1"
+                                        title={isRtl ? 'حذف المشارك' : 'Remove participant'}
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Non-organizer quick profile editor */}
+                            {activeParticipantId !== groupParticipants[0].id && (() => {
+                              const activePart = groupParticipants.find(p => p.id === activeParticipantId);
+                              if (!activePart) return null;
+                              return (
+                                <div className="pt-2 border-t border-slate-100 space-y-2 text-xs">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                                        {isRtl ? 'اسم المشارك' : 'Participant Name'}
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={activePart.name}
+                                        onChange={(e) => handleUpdateGroupParticipant(activePart.id, { name: e.target.value })}
+                                        placeholder={isRtl ? 'اسم الضيف...' : 'Guest Name...'}
+                                        className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 outline-none focus:border-[#6537C0]"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                                        {isRtl ? 'رقم الجوال (اختياري)' : 'Phone (Optional)'}
+                                      </label>
+                                      <input
+                                        type="tel"
+                                        value={activePart.phone || ''}
+                                        onChange={(e) => handleUpdateGroupParticipant(activePart.id, { phone: e.target.value })}
+                                        placeholder="05XXXXXXXX"
+                                        className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs font-mono text-slate-900 outline-none focus:border-[#6537C0]"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+
                         {/* 1. Customer Identification Card */}
                         <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
                           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                              {isRtl ? 'بيانات العميل' : 'Client Profile'}
+                              {isRtl ? (bookingScope === 'group' ? '👑 بيانات منظم الحجز (المشارك 1)' : 'بيانات العميل') : (bookingScope === 'group' ? '👑 Booking Organizer Profile (Participant 1)' : 'Client Profile')}
                             </span>
                             <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5">
                               {([
@@ -3767,10 +4191,12 @@ export default function InteractiveDrawers({
                           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                             <div className="flex items-center gap-2">
                               <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                                {isRtl ? 'الخدمات المحددة في الجلسة' : 'Queued Services'}
+                                {bookingScope === 'group'
+                                  ? (isRtl ? `الخدمات المحددة لـ: ${activeParticipantName}` : `Queued Services: ${activeParticipantName}`)
+                                  : (isRtl ? 'الخدمات المحددة في الجلسة' : 'Queued Services')}
                               </h4>
                               <span className="rounded-full bg-[#6537C0]/10 px-2 py-0.5 text-[10px] font-black text-[#6537C0]">
-                                {stagedServices.length}
+                                {bookingScope === 'group' ? activeParticipantItemsCount : stagedServices.length}
                               </span>
                             </div>
 
@@ -3856,13 +4282,15 @@ export default function InteractiveDrawers({
                             </div>
                           )}
 
-                          {stagedServices.length === 0 ? (
+                          {activeParticipantItemsCount === 0 ? (
                             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center space-y-2">
                               <div className="w-10 h-10 rounded-full bg-purple-50 text-[#6537C0] flex items-center justify-center mx-auto">
                                 <Sparkles className="w-5 h-5" />
                               </div>
                               <p className="text-xs font-bold text-slate-700">
-                                {isRtl ? 'لم يتم اختيار أي خدمات بعد' : 'No services queued yet'}
+                                {bookingScope === 'group'
+                                  ? (isRtl ? `لم يتم اختيار أي خدمات لـ ${activeParticipantName} بعد` : `No services queued for ${activeParticipantName} yet`)
+                                  : (isRtl ? 'لم يتم اختيار أي خدمات بعد' : 'No services queued yet')}
                               </p>
                               <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
                                 {isRtl
@@ -3880,7 +4308,7 @@ export default function InteractiveDrawers({
                           ) : (
                             <div className="space-y-3">
                               {/* Staged Bundles Groups */}
-                              {appointmentInvoiceSummary.packageCartItems.map((pkgItem) => {
+                              {displayedPackageCartItems.map((pkgItem) => {
                                 const pkg = services2Bundles?.find(p => p.id === pkgItem.packageId) || servicePackages?.find(p => p.id === pkgItem.packageId);
                                 const isParallel = pkg?.scheduleType === 'parallel';
 
@@ -3999,7 +4427,7 @@ export default function InteractiveDrawers({
                               })}
 
                               {/* Standalone Staged Services */}
-                              {appointmentInvoiceSummary.standaloneCartItems.map((item) => {
+                              {displayedStandaloneCartItems.map((item) => {
                                 const srv = canonicalServices.find(s => s.id === item.serviceId);
                                 const validStylists = availableStylists.filter(s => {
                                   const assignments = srv?.employeeAssignments || [];
@@ -4205,30 +4633,79 @@ export default function InteractiveDrawers({
 
                       {/* 4. Persistent Invoice Summary & Schedule Action Bar (Always visible at bottom of Column 1) */}
                       <div className="p-4 bg-white border-t border-slate-200 shadow-md space-y-3 shrink-0">
+                        {bookingScope === 'group' && groupFinancialSummary && (
+                          <div className="rounded-xl border border-purple-200 bg-purple-50/60 p-2.5 space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-purple-950 flex items-center gap-1.5 truncate">
+                                <span>👥</span>
+                                <span className="truncate">{groupName || (isRtl ? 'حجز جماعي' : 'Group Booking')}</span>
+                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                                groupPaymentArrangement === 'organizer_pays'
+                                  ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                                  : 'bg-blue-100 text-blue-800 border border-blue-300'
+                              }`}>
+                                {groupPaymentArrangement === 'organizer_pays'
+                                  ? (isRtl ? 'الخيار أ: المنظم يدفع الكل' : 'Option A: Organizer Pays')
+                                  : (isRtl ? 'الخيار ب: دفع فردي مستقل' : 'Option B: Individual Pays')}
+                              </span>
+                            </div>
+                            <div className="space-y-1 pt-1 border-t border-purple-200/60 max-h-28 overflow-y-auto pr-1">
+                              {groupFinancialSummary.participantBreakdowns.map((p) => (
+                                <div key={p.participantId} className="flex items-center justify-between text-[11px] text-slate-700">
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className="font-semibold truncate">{p.participantName}</span>
+                                    <span className="text-[10px] text-slate-400 shrink-0">
+                                      ({p.itemsCount} {isRtl ? 'خدمات' : 'items'})
+                                    </span>
+                                  </div>
+                                  <span className="font-mono font-bold text-slate-900 shrink-0">
+                                    {p.total.toFixed(2)} SAR
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <div className="space-y-1.5 text-xs">
                           <div className="flex justify-between text-slate-600">
                             <span>{isRtl ? 'مجموع الخدمات' : 'Services Subtotal'}</span>
-                            <span className="font-mono font-bold">{appointmentInvoiceSummary.subtotal.toFixed(2)} SAR</span>
+                            <span className="font-mono font-bold">
+                              {(bookingScope === 'group' && groupFinancialSummary ? groupFinancialSummary.subtotal : appointmentInvoiceSummary.subtotal).toFixed(2)} SAR
+                            </span>
                           </div>
                           <div className="flex justify-between text-slate-600">
                             <span className="flex items-center gap-1">
                               <span>{isRtl ? 'ضريبة القيمة المضافة ZATCA (15%)' : 'VAT Tax (15%)'}</span>
                               <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1 rounded">ZATCA</span>
                             </span>
-                            <span className="font-mono font-bold">{appointmentInvoiceSummary.vat.toFixed(2)} SAR</span>
+                            <span className="font-mono font-bold">
+                              {(bookingScope === 'group' && groupFinancialSummary ? groupFinancialSummary.vat : appointmentInvoiceSummary.vat).toFixed(2)} SAR
+                            </span>
                           </div>
                           <div className="flex justify-between font-black text-[#6537C0] text-sm border-t border-slate-100 pt-2">
                             <span>{isRtl ? 'المبلغ المستحق النهائي' : 'Grand Total Due'}</span>
-                            <span className="font-mono text-base">{appointmentInvoiceSummary.total.toFixed(2)} SAR</span>
+                            <span className="font-mono text-base">
+                              {(bookingScope === 'group' && groupFinancialSummary ? groupFinancialSummary.total : appointmentInvoiceSummary.total).toFixed(2)} SAR
+                            </span>
                           </div>
                         </div>
 
                         <button
                           type="button"
-                          disabled={stagedServices.length === 0 || (custMode === 'existing' && !selectedCustId) || isSubmitting}
+                          disabled={
+                            stagedServices.length === 0 ||
+                            (bookingScope === 'single' && custMode === 'existing' && !selectedCustId) ||
+                            (bookingScope === 'group' && !groupParticipants[0]?.name?.trim() && custMode === 'existing' && !selectedCustId) ||
+                            isSubmitting
+                          }
                           onClick={() => handleConfirmAppointmentCreation()}
                           className={`w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-md cursor-pointer ${
-                            stagedServices.length === 0 || (custMode === 'existing' && !selectedCustId) || isSubmitting
+                            stagedServices.length === 0 ||
+                            (bookingScope === 'single' && custMode === 'existing' && !selectedCustId) ||
+                            (bookingScope === 'group' && !groupParticipants[0]?.name?.trim() && custMode === 'existing' && !selectedCustId) ||
+                            isSubmitting
                               ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                               : 'bg-[#6537C0] hover:bg-[#532ab0] text-white shadow-purple-500/20'
                           }`}
@@ -4240,8 +4717,14 @@ export default function InteractiveDrawers({
                             </>
                           ) : stagedServices.length === 0 ? (
                             <span>{isRtl ? 'أضف خدمات للمتابعة 🗓️' : 'Add services to schedule 🗓️'}</span>
-                          ) : (custMode === 'existing' && !selectedCustId) ? (
+                          ) : (bookingScope === 'single' && custMode === 'existing' && !selectedCustId) ? (
                             <span>{isRtl ? 'اختر عميلاً لتأكيد الحجز 👤' : 'Select a customer to schedule 👤'}</span>
+                          ) : bookingScope === 'group' ? (
+                            <span>
+                              {isRtl
+                                ? `تأكيد حجز المجموعة (${groupParticipants.length} عملاء) 👥🗓️`
+                                : `Schedule Group Booking (${groupParticipants.length} clients) 👥🗓️`}
+                            </span>
                           ) : bookingRecoveryMode === 'separate_services' && stagedServices.length > 1 ? (
                             <span>{isRtl ? `تأكيد ${stagedServices.length} مواعيد منفصلة 🗓️` : `Schedule ${stagedServices.length} separate appointments 🗓️`}</span>
                           ) : (

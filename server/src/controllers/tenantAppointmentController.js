@@ -798,23 +798,92 @@ async function syncBookingSessionTotals(sessionId, transaction) {
         transaction
     });
 
-    const subtotal = appointments.reduce((sum, appointment) => sum + Number(appointment.rawPrice ?? 0), 0);
-    const taxAmount = appointments.reduce((sum, appointment) => sum + Number(appointment.taxAmount ?? 0), 0);
-    const platformFee = appointments.reduce((sum, appointment) => sum + Number(appointment.platformFee ?? 0), 0);
-    const totalAmount = appointments.reduce((sum, appointment) => sum + Number(appointment.price ?? 0), 0);
+    const activeAppointments = appointments.filter(
+        (appointment) => `${appointment.status || ''}`.trim().toLowerCase() !== 'cancelled'
+    );
+    const allCancelled = appointments.length > 0 && activeAppointments.length === 0;
 
-    await db.BookingSession.update({
-        itemCount: appointments.length,
+    const subtotal = activeAppointments.reduce((sum, appointment) => sum + Number(appointment.rawPrice ?? 0), 0);
+    const taxAmount = activeAppointments.reduce((sum, appointment) => sum + Number(appointment.taxAmount ?? 0), 0);
+    const platformFee = activeAppointments.reduce((sum, appointment) => sum + Number(appointment.platformFee ?? 0), 0);
+    const totalAmount = activeAppointments.reduce((sum, appointment) => sum + Number(appointment.price ?? 0), 0);
+
+    const updateFields = {
+        itemCount: activeAppointments.length,
         subtotal: parseFloat(subtotal.toFixed(2)),
         taxAmount: parseFloat(taxAmount.toFixed(2)),
         platformFee: parseFloat(platformFee.toFixed(2)),
         totalAmount: parseFloat(totalAmount.toFixed(2))
-    }, {
+    };
+    if (allCancelled) {
+        updateFields.status = 'cancelled';
+    }
+
+    await db.BookingSession.update(updateFields, {
         where: { id: sessionId },
         transaction
     });
 
     return db.BookingSession.findByPk(sessionId, { transaction });
+}
+
+function buildGroupBookingSummary({ session, appointments = [], groupMetadata = {} }) {
+    const arrangement = groupMetadata?.paymentArrangement || session?.metadata?.paymentArrangement || 'organizer_pays';
+    const participants = Array.isArray(groupMetadata?.participants)
+        ? groupMetadata.participants
+        : (Array.isArray(session?.metadata?.participants) ? session.metadata.participants : []);
+
+    const participantBreakdowns = participants.map((p) => {
+        const pAppointments = appointments.filter(
+            (a) => a.platformUserId === p.platformUserId
+        );
+        const subtotal = roundMoney(pAppointments.reduce((sum, a) => sum + Number(a.rawPrice ?? 0), 0));
+        const taxAmount = roundMoney(pAppointments.reduce((sum, a) => sum + Number(a.taxAmount ?? 0), 0));
+        const total = roundMoney(pAppointments.reduce((sum, a) => sum + Number(a.price ?? 0), 0));
+        const totalPaid = roundMoney(pAppointments.reduce((sum, a) => sum + Number(a.totalPaid ?? 0), 0));
+        const remainingBalance = roundMoney(Math.max(0, total - totalPaid));
+        const isPaid = total > 0 && remainingBalance <= 0.009;
+
+        return {
+            participantIndex: p.participantIndex,
+            platformUserId: p.platformUserId,
+            name: p.name,
+            phone: p.phone,
+            email: p.email,
+            isOrganizer: Boolean(p.isOrganizer),
+            appointmentIds: pAppointments.map((a) => a.id),
+            serviceCount: pAppointments.length,
+            subtotal,
+            taxAmount,
+            total,
+            totalPaid,
+            remainingBalance,
+            paymentStatus: isPaid ? 'fully_paid' : (totalPaid > 0 ? 'partially_paid' : 'pending')
+        };
+    });
+
+    const activeAppts = appointments.filter(
+        (a) => `${a.status || ''}`.trim().toLowerCase() !== 'cancelled'
+    );
+    const groupSubtotal = roundMoney(activeAppts.reduce((sum, a) => sum + Number(a.rawPrice ?? 0), 0));
+    const groupTaxAmount = roundMoney(activeAppts.reduce((sum, a) => sum + Number(a.taxAmount ?? 0), 0));
+    const groupTotal = roundMoney(activeAppts.reduce((sum, a) => sum + Number(a.price ?? 0), 0));
+    const groupTotalPaid = roundMoney(activeAppts.reduce((sum, a) => sum + Number(a.totalPaid ?? 0), 0));
+    const groupRemainingBalance = roundMoney(Math.max(0, groupTotal - groupTotalPaid));
+
+    return {
+        sessionType: 'group',
+        groupName: groupMetadata?.groupName || session?.metadata?.groupName || 'Group Booking',
+        paymentArrangement: arrangement,
+        organizer: groupMetadata?.organizer || session?.metadata?.organizer || null,
+        subtotal: groupSubtotal,
+        taxAmount: groupTaxAmount,
+        totalAmount: groupTotal,
+        totalPaid: groupTotalPaid,
+        remainingBalance: groupRemainingBalance,
+        paymentStatus: groupTotal > 0 && groupRemainingBalance <= 0.009 ? 'fully_paid' : (groupTotalPaid > 0 ? 'partially_paid' : 'pending'),
+        participants: participantBreakdowns
+    };
 }
 
 /**
@@ -845,10 +914,35 @@ exports.createAppointment = async (req, res) => {
             overtimeApproval,
             bookingSessionId,
             bookingReference,
-            bookingItemIndex
+            bookingItemIndex,
+            sessionType,
+            groupName,
+            paymentArrangement,
+            participants
         } = req.body || {};
 
-        if ((!serviceId || !startTime) && (!Array.isArray(items) || items.length === 0)) {
+        const isGroupBooking = sessionType === 'group' || (Array.isArray(participants) && participants.length > 0);
+
+        if (isGroupBooking) {
+            if (!Array.isArray(participants) || participants.length === 0) {
+                await transaction.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'At least one participant is required for a group booking'
+                });
+            }
+
+            for (let i = 0; i < participants.length; i++) {
+                const p = participants[i];
+                if (!Array.isArray(p.items) || p.items.length === 0) {
+                    await transaction.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: `Participant "${p.name || p.firstName || (i + 1)}" must have at least one service selected`
+                    });
+                }
+            }
+        } else if ((!serviceId || !startTime) && (!Array.isArray(items) || items.length === 0)) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
@@ -856,14 +950,88 @@ exports.createAppointment = async (req, res) => {
             });
         }
 
-        const customerUser = await resolveAppointmentCustomer({
-            platformUserId,
-            customer,
-            transaction,
-            tenantId
-        });
+        let customerUser = null;
+        let bookingItems = [];
+        let groupMetadata = null;
 
-        const bookingItems = Array.isArray(items) ? items : [];
+        if (isGroupBooking) {
+            const organizerParticipant = participants.find((p) => p.isOrganizer) || participants[0];
+
+            customerUser = await resolveAppointmentCustomer({
+                platformUserId: platformUserId || organizerParticipant.platformUserId,
+                customer: customer || organizerParticipant.customer || {
+                    firstName: organizerParticipant.firstName || organizerParticipant.name || 'Organizer',
+                    lastName: organizerParticipant.lastName || '',
+                    phone: organizerParticipant.phone,
+                    email: organizerParticipant.email,
+                    isGuest: organizerParticipant.isGuest ?? true
+                },
+                transaction,
+                tenantId
+            });
+
+            const participantSummaries = [];
+            for (let pIdx = 0; pIdx < participants.length; pIdx++) {
+                const p = participants[pIdx];
+                const isOrganizer = p === organizerParticipant || Boolean(p.isOrganizer);
+
+                const pUser = (isOrganizer && customerUser)
+                    ? customerUser
+                    : await resolveAppointmentCustomer({
+                        platformUserId: p.platformUserId,
+                        customer: p.customer || {
+                            firstName: p.firstName || p.name || `Participant ${pIdx + 1}`,
+                            lastName: p.lastName || '',
+                            phone: p.phone,
+                            email: p.email,
+                            isGuest: p.isGuest ?? true
+                        },
+                        transaction,
+                        tenantId
+                    });
+
+                participantSummaries.push({
+                    participantIndex: pIdx,
+                    platformUserId: pUser.id,
+                    name: `${pUser.firstName || ''} ${pUser.lastName || ''}`.trim() || `Participant ${pIdx + 1}`,
+                    phone: pUser.phone || null,
+                    email: pUser.email || null,
+                    isOrganizer
+                });
+
+                for (const item of p.items) {
+                    bookingItems.push({
+                        ...item,
+                        platformUserId: pUser.id,
+                        participantIndex: pIdx,
+                        participantName: `${pUser.firstName || ''} ${pUser.lastName || ''}`.trim() || `Participant ${pIdx + 1}`
+                    });
+                }
+            }
+
+            const resolvedArrangement = paymentArrangement === 'individual_pays' ? 'individual_pays' : 'organizer_pays';
+            groupMetadata = {
+                sessionType: 'group',
+                groupName: groupName || `${customerUser.firstName || 'Group'}'s Booking`,
+                paymentArrangement: resolvedArrangement,
+                organizer: {
+                    platformUserId: customerUser.id,
+                    name: `${customerUser.firstName || ''} ${customerUser.lastName || ''}`.trim() || 'Organizer',
+                    phone: customerUser.phone || null,
+                    email: customerUser.email || null
+                },
+                participants: participantSummaries
+            };
+        } else {
+            customerUser = await resolveAppointmentCustomer({
+                platformUserId,
+                customer,
+                transaction,
+                tenantId
+            });
+            bookingItems = Array.isArray(items) ? items : [];
+        }
+
         const dashboardRole = `${req.tenantAccount?.roleKey || 'owner'}`.trim().toLowerCase();
         const canAuthorizeOvertime = !req.tenantAccount || ['owner', 'manager'].includes(dashboardRole);
         if (overtimeApproval?.approved === true && !canAuthorizeOvertime) {
@@ -898,6 +1066,7 @@ exports.createAppointment = async (req, res) => {
                     return {
                         itemType: 'package',
                         packageId: item.packageId,
+                        platformUserId: item?.platformUserId || null,
                         overtimeApproval: authorizedPackageOvertime,
                         packageItems: item.packageItems.map(pItem => {
                             const rawStartTime = pItem?.startTime || null;
@@ -917,6 +1086,7 @@ exports.createAppointment = async (req, res) => {
 
                             return {
                                 ...pItem,
+                                platformUserId: pItem?.platformUserId || item?.platformUserId || null,
                                 startTime: parsedStartTime.toISOString(),
                                 assignmentMode: pItem.assignmentMode || (pItem.staffId ? 'tenant_reassigned' : 'auto_assigned'),
                                 overtimeApproval: authorizedStepOvertime
@@ -954,6 +1124,7 @@ exports.createAppointment = async (req, res) => {
                     variantId: item?.variantId || null,
                     staffId: (item?.assignmentMode === 'auto_assigned' && !item?.isExplicitStaff) ? null : (item?.staffId || null),
                     requestedStaffId: (item?.assignmentMode === 'auto_assigned' && !item?.isExplicitStaff) ? null : (item?.requestedStaffId || (item?.isExplicitStaff ? item?.staffId : null)),
+                    platformUserId: item?.platformUserId || null,
                     startTime: parsedStartTime.toISOString(),
                     notes: item?.notes || notes || null,
                     paymentMethod: itemPaymentMethod,
@@ -975,7 +1146,8 @@ exports.createAppointment = async (req, res) => {
                 skipServicePaymentOptionValidation: true,
                 bookingSessionId,
                 bookingReference,
-                bookingItemIndex
+                bookingItemIndex,
+                metadata: groupMetadata
             }, { transaction });
 
             const fullAppointments = await db.Appointment.findAll({
@@ -1025,6 +1197,7 @@ exports.createAppointment = async (req, res) => {
             if (hasExplicitPayment) {
                 const requestedAmount = (amount !== undefined && amount !== null) ? Number(amount) : session.totalAmount;
                 const { processAppointmentPayment } = require('../services/appointmentPaymentService');
+                const paymentScope = isGroupBooking && paymentArrangement === 'individual_pays' ? 'appointment' : 'session';
                 await processAppointmentPayment({
                     tenantId,
                     appointment: fullAppointments[0], // entry point for session
@@ -1032,6 +1205,7 @@ exports.createAppointment = async (req, res) => {
                     paymentMethod,
                     paymentAllocations,
                     notes: notes || 'Payment collected during booking session',
+                    scope: paymentScope,
                     forensicTrace: null,
                     transaction
                 });
@@ -1076,6 +1250,12 @@ exports.createAppointment = async (req, res) => {
 
             finalAppointments.forEach(attachCanonicalFinancialState);
 
+            const groupSummary = isGroupBooking ? buildGroupBookingSummary({
+                session,
+                appointments: finalAppointments,
+                groupMetadata
+            }) : null;
+
             // Gate B audit temporarily disabled – appointment creation proceeds without audit logging
 
             await transaction.commit();
@@ -1091,10 +1271,12 @@ exports.createAppointment = async (req, res) => {
                     taxAmount: session.taxAmount,
                     platformFee: session.platformFee,
                     totalAmount: session.totalAmount,
+                    metadata: session.metadata,
                     paymentSummary
                 },
                 appointments: finalAppointments,
-                appointment: finalAppointments[0] || null
+                appointment: finalAppointments[0] || null,
+                groupSummary
             });
         }
 
@@ -2241,6 +2423,13 @@ exports.getAppointment = async (req, res) => {
             responseAppointment.bookingSession.appointments = responseAppointment.bookingSession.appointments.map((sessionAppointment) => (
                 attachCanonicalFinancialState(sessionAppointment)
             ));
+            if (responseAppointment.bookingSession.metadata?.sessionType === 'group') {
+                responseAppointment.bookingSession.groupSummary = buildGroupBookingSummary({
+                    session: responseAppointment.bookingSession,
+                    appointments: responseAppointment.bookingSession.appointments,
+                    groupMetadata: responseAppointment.bookingSession.metadata
+                });
+            }
         }
         attachCanonicalFinancialState(responseAppointment);
         responseAppointment.events = Array.isArray(responseAppointment.events)
@@ -2467,6 +2656,10 @@ exports.updateAppointmentStatus = async (req, res) => {
                     : 'tenant_late_cancellation_fee',
                 transaction
             });
+        }
+
+        if (appointment.bookingSessionId) {
+            await syncBookingSessionTotals(appointment.bookingSessionId, transaction);
         }
 
         await transaction.commit();
@@ -2699,7 +2892,7 @@ exports.updatePaymentStatus = async (req, res) => {
     try {
         const tenantId = req.tenantId;
         const { id } = req.params;
-        const { paymentStatus, paymentMethod, amount, paymentAllocations, transactionRef, notes } = req.body;
+        const { paymentStatus, paymentMethod, amount, paymentAllocations, transactionRef, notes, scope } = req.body;
         
         const validPaymentStatuses = [
             APPOINTMENT_PAYMENT_STATUS.PENDING,
@@ -2770,6 +2963,7 @@ exports.updatePaymentStatus = async (req, res) => {
         });
 
         const { processAppointmentPayment } = require('../services/appointmentPaymentService');
+        const paymentScope = scope || (appointment.bookingSession?.metadata?.paymentArrangement === 'individual_pays' ? 'appointment' : undefined);
         const { appointment: updatedAppt } = await processAppointmentPayment({
             tenantId,
             appointment,
@@ -2778,6 +2972,7 @@ exports.updatePaymentStatus = async (req, res) => {
             paymentAllocations,
             transactionRef,
             notes,
+            scope: paymentScope,
             forensicTrace,
             transaction
         });
