@@ -17,9 +17,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Calendar, Loader2 as CalendarIcon, User, Users, PlusCircle, Check,
   Trash, ChevronLeft, Loader2, ChevronRight, Split, ShoppingBag, Receipt, Printer, Sparkles, AlertTriangle, Search, AlertCircle,
-  ChevronDown, Clock, Layers, Package as PackageIcon, Settings2
+  ChevronDown, Clock, Layers, Package as PackageIcon, Settings2, RotateCcw
 } from 'lucide-react';
 import AppointmentServicesStep from './appointment/AppointmentServicesStep';
+import { CustomerBookingHistory, type CustomerHistoricalSession } from './appointment/CustomerBookingHistory';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import {
   getServiceDisplayName,
@@ -507,6 +508,23 @@ export default function InteractiveDrawers({
   const [currentDiscountType, setCurrentDiscountType] = useState<'none' | 'flat' | 'percent'>('none');
   const [currentDiscountValue, setCurrentDiscountValue] = useState<number>(0);
   const [currentServiceNotes, setCurrentServiceNotes] = useState('');
+
+  // Rebooking resolution state
+  const [rebookPrompt, setRebookPrompt] = useState<{
+    isOpen: boolean;
+    session: any;
+    unavailableItems: Array<{ name: string; variantName?: string; reason: string }>;
+    availableItems: Array<{
+      service: ServiceRecord;
+      variant?: ServiceVariantRecord | null;
+      prevStaffId?: string;
+      duration: number;
+      basePrice: number;
+      sequenceOrder?: number;
+    }>;
+    matchedPkgId?: string | null;
+    hasExistingDraftConflict?: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (availableStylists.length > 0 && !availableStylists.some((stylist) => stylist.id === currentStaffId)) {
@@ -2306,6 +2324,205 @@ export default function InteractiveDrawers({
     );
   };
 
+  const executeApplyRebookedDraft = (
+    items: Array<{
+      service: ServiceRecord;
+      variant?: ServiceVariantRecord | null;
+      prevStaffId?: string;
+      duration: number;
+      basePrice: number;
+      sequenceOrder?: number;
+    }>
+  ) => {
+    if (!items || items.length === 0) {
+      addLocalToast(
+        'تعذر إعادة الحجز لعدم توفر أي من الخدمات في القائمة الحالية.',
+        'Cannot rebook: none of the services are currently available.',
+        'warning'
+      );
+      setRebookPrompt(null);
+      return;
+    }
+
+    let runningStartTime = currentStartTime;
+    const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
+
+    const freshStaged: StagedService[] = items.map((it, idx) => {
+      const itemStartTime = runningStartTime;
+      const nextStartTimeIso = buildIsoFromMinutes(selectedDate, itemStartTime);
+      if (shouldChainServiceTimes) {
+        runningStartTime += it.duration;
+      }
+
+      return {
+        id: `stg-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+        itemType: 'service',
+        serviceId: it.service.id,
+        variantId: it.variant?.id || undefined,
+        serviceCategory: it.service.category,
+        staffId: it.prevStaffId || '',
+        isExplicitStaff: Boolean(it.prevStaffId),
+        startTime: itemStartTime,
+        startTimeIso: nextStartTimeIso,
+        duration: it.duration,
+        discountType: 'none',
+        discountValue: 0,
+        notes: '',
+        basePrice: it.basePrice,
+        finalPrice: it.basePrice,
+        timingMode: 'auto'
+      };
+    });
+
+    setStagedServices(freshStaged);
+    setIsFindingAvailableTimes(true);
+    setRebookPrompt(null);
+
+    addLocalToast(
+      `تم إنشاء مسودة جديدة لـ ${freshStaged.length} خدمة وفق الأسعار الحالية. يرجى اختيار الموعد المناسب.`,
+      `Created fresh draft with ${freshStaged.length} service(s) at current pricing. Please select an available time.`,
+      'success'
+    );
+  };
+
+  const handleRebookAppointment = (session: CustomerHistoricalSession) => {
+    if (!session) return;
+
+    // 1. Extract historical raw service items
+    let rawItems: any[] = [];
+    if (Array.isArray(session.serviceLines) && session.serviceLines.length > 0) {
+      rawItems = session.serviceLines;
+    } else if (Array.isArray(session.details?.services) && session.details.services.length > 0) {
+      rawItems = session.details.services;
+    } else if (Array.isArray(session.appointments) && session.appointments.length > 0) {
+      rawItems = session.appointments;
+    } else {
+      rawItems = [session];
+    }
+
+    // 2. Identify if this is reliably a package bundle
+    // Requirement 3: "Preserve historical bundle composition only when it can be identified reliably from the historical data. Do not guess bundle identity from ambiguous service names or approximate composition."
+    const explicitPkgId = (session as any).packageId
+      || session.details?.service?.packageId
+      || (session.details as any)?.packageId
+      || rawItems.find((it: any) => it.packageId)?.packageId;
+
+    const matchedPkg = explicitPkgId
+      ? (services2Bundles?.find(p => p.id === explicitPkgId) || servicePackages?.find(p => p.id === explicitPkgId))
+      : null;
+
+    if (matchedPkg && matchedPkg.items && matchedPkg.items.length > 0) {
+      // Rebook as package
+      if (stagedServices.length > 0) {
+        setRebookPrompt({
+          isOpen: true,
+          session,
+          unavailableItems: [],
+          availableItems: [],
+          matchedPkgId: matchedPkg.id,
+          hasExistingDraftConflict: true
+        });
+        return;
+      }
+      setStagedServices([]);
+      handleAddPackageToStaged(matchedPkg.id);
+      setIsFindingAvailableTimes(true);
+      return;
+    }
+
+    // 3. For individual services, validate against active catalog
+    const unavailableList: Array<{ name: string; variantName?: string; reason: string }> = [];
+    const availableList: Array<{
+      service: ServiceRecord;
+      variant?: ServiceVariantRecord | null;
+      prevStaffId?: string;
+      duration: number;
+      basePrice: number;
+      sequenceOrder?: number;
+    }> = [];
+
+    rawItems.forEach((item: any, idx: number) => {
+      const sId = item.service?.id || item.serviceId || item.id;
+      const sNameEn = item.serviceNameEn || item.service?.name_en || item.name_en || item.title || '';
+      const sNameAr = item.serviceNameAr || item.service?.name_ar || item.name_ar || item.title || '';
+      const displayName = isRtl ? (sNameAr || sNameEn || `خدمة #${idx + 1}`) : (sNameEn || sNameAr || `Service #${idx + 1}`);
+
+      // Match live service
+      const liveService = canonicalServices.find(s => s.id === sId)
+        || canonicalServices.find(s => (s.nameEn && s.nameEn === sNameEn) || (s.nameAr && s.nameAr === sNameAr));
+
+      if (!liveService || liveService.isActive === false || (liveService as any).status === 'inactive') {
+        unavailableList.push({
+          name: displayName,
+          variantName: item.serviceVariantName || item.variantName || undefined,
+          reason: isRtl ? 'الخدمة غير متوفرة أو معطلة في القائمة الحالية' : 'Service is inactive or no longer in catalog'
+        });
+        return;
+      }
+
+      // Check variant if historical item had a variant
+      const histVariantName = item.serviceVariantName || item.variantName || item.details?.serviceVariantName || '';
+      const histVariantId = item.serviceVariantId || item.variantId || item.details?.serviceVariantId || '';
+      let liveVariant: ServiceVariantRecord | null = null;
+
+      if (histVariantId || histVariantName) {
+        liveVariant = (liveService.variants || []).find((v: any) =>
+          (histVariantId && v.id === histVariantId) ||
+          (histVariantName && (
+            (v.name_en && v.name_en.toLowerCase() === histVariantName.toLowerCase()) ||
+            (v.name_ar && v.name_ar === histVariantName) ||
+            (v.nameEn && v.nameEn.toLowerCase() === histVariantName.toLowerCase()) ||
+            (v.nameAr && v.nameAr === histVariantName)
+          ))
+        ) || null;
+
+        if (!liveVariant || liveVariant.isActive === false) {
+          unavailableList.push({
+            name: displayName,
+            variantName: histVariantName,
+            reason: isRtl ? 'الخيار أو الخصلة المحددة لم تعد متاحة' : 'Variant is no longer available'
+          });
+          return;
+        }
+      }
+
+      // Live price and duration
+      const basePrice = toMoney(liveVariant?.finalPrice ?? liveVariant?.price ?? liveService.finalPrice ?? liveService.price ?? 0);
+      const duration = resolveBookingDuration(undefined, liveVariant?.duration, liveService.duration);
+
+      // Previous staff preference (Requirement 2)
+      const prevStaffId = item.staff?.id || item.staffId || session.details?.staff?.id || (session as any).staffId || '';
+      const matchedStylist = availableStylists.find(st => st.id === prevStaffId);
+      const assignments = liveService.employeeAssignments || [];
+      const isQualified = matchedStylist && (assignments.length === 0 || assignments.map(String).includes(String(matchedStylist.id)));
+
+      availableList.push({
+        service: liveService,
+        variant: liveVariant,
+        prevStaffId: isQualified ? matchedStylist.id : '',
+        duration,
+        basePrice,
+        sequenceOrder: idx
+      });
+    });
+
+    // Requirement 1 & Draft conflict check
+    if (unavailableList.length > 0 || (stagedServices.length > 0 && availableList.length > 0)) {
+      setRebookPrompt({
+        isOpen: true,
+        session,
+        unavailableItems: unavailableList,
+        availableItems: availableList,
+        matchedPkgId: null,
+        hasExistingDraftConflict: stagedServices.length > 0
+      });
+      return;
+    }
+
+    // All available and no draft conflict
+    executeApplyRebookedDraft(availableList);
+  };
+
   const showBookingErrorDialog = (dialog: {
     titleAr: string;
     titleEn: string;
@@ -3410,27 +3627,36 @@ export default function InteractiveDrawers({
                           {custMode === 'existing' ? (
                             <div className="space-y-2.5">
                               {selectedRegisteredCustomer ? (
-                                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-emerald-200 text-sm font-black text-emerald-700 shadow-2xs">
-                                      {`${selectedRegisteredCustomer.name || 'U'}`.trim().charAt(0).toUpperCase()}
+                                <div className="space-y-2">
+                                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-emerald-200 text-sm font-black text-emerald-700 shadow-2xs">
+                                        {`${selectedRegisteredCustomer.name || 'U'}`.trim().charAt(0).toUpperCase()}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-bold text-slate-900">
+                                          {selectedRegisteredCustomer.name}
+                                        </p>
+                                        <p className="truncate text-xs font-mono text-slate-600">
+                                          {selectedRegisteredCustomer.phone || selectedRegisteredCustomer.email || (isRtl ? 'عميل مسجل' : 'Registered customer')}
+                                        </p>
+                                      </div>
                                     </div>
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm font-bold text-slate-900">
-                                        {selectedRegisteredCustomer.name}
-                                      </p>
-                                      <p className="truncate text-xs font-mono text-slate-600">
-                                        {selectedRegisteredCustomer.phone || selectedRegisteredCustomer.email || (isRtl ? 'عميل مسجل' : 'Registered customer')}
-                                      </p>
-                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedCustId('')}
+                                      className="shrink-0 text-xs font-bold text-[#6537C0] hover:underline px-2 py-1 cursor-pointer"
+                                    >
+                                      {isRtl ? 'تغيير' : 'Change'}
+                                    </button>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedCustId('')}
-                                    className="shrink-0 text-xs font-bold text-[#6537C0] hover:underline px-2 py-1 cursor-pointer"
-                                  >
-                                    {isRtl ? 'تغيير' : 'Change'}
-                                  </button>
+
+                                  <CustomerBookingHistory
+                                    customerId={selectedRegisteredCustomer.id}
+                                    customerName={selectedRegisteredCustomer.name}
+                                    isRtl={isRtl}
+                                    onRebook={handleRebookAppointment}
+                                  />
                                 </div>
                               ) : (
                                 <div className="space-y-2">
@@ -5277,6 +5503,158 @@ export default function InteractiveDrawers({
                   {isRtl ? 'إلغاء' : 'Cancel'}
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {rebookPrompt?.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setRebookPrompt(null)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200"
+            >
+              {/* Unavailable Items Notice (Requirement 1) */}
+              {rebookPrompt.unavailableItems.length > 0 ? (
+                <>
+                  <div className="flex items-center gap-3 border-b border-amber-100 pb-3 text-amber-800">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                      <AlertTriangle className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {isRtl ? 'خدمات سابقة غير متوفرة في القائمة' : 'Historical Services Unavailable'}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {isRtl
+                          ? 'الخدمات التالية من هذا الحجز لم تعد متوفرة في قائمة الخدمات الحالية:'
+                          : 'The following services from this appointment are no longer available in the catalogue:'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="my-4 max-h-48 overflow-y-auto space-y-2">
+                    {rebookPrompt.unavailableItems.map((item, uIdx) => (
+                      <div
+                        key={uIdx}
+                        className="rounded-xl border border-rose-150 bg-rose-50/60 p-2.5 text-xs text-rose-800 flex items-start justify-between gap-2"
+                      >
+                        <div>
+                          <p className="font-bold text-slate-900">{item.name}</p>
+                          {item.variantName && (
+                            <p className="text-[11px] text-slate-600">
+                              {isRtl ? `الخيار / الخصلة: ${item.variantName}` : `Variant: ${item.variantName}`}
+                            </p>
+                          )}
+                        </div>
+                        <span className="shrink-0 text-[10px] font-semibold text-rose-600 bg-white px-2 py-0.5 rounded border border-rose-200">
+                          {item.reason}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {rebookPrompt.availableItems.length === 0 ? (
+                    <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600 text-center">
+                      <p className="font-semibold text-slate-700">
+                        {isRtl
+                          ? 'لا تتوفر أي خدمة من خدمات هذا الحجز حالياً، تعذر إتمام إعادة الحجز.'
+                          : 'None of the services from this previous appointment are currently available.'}
+                      </p>
+                      <div className="mt-4 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setRebookPrompt(null)}
+                          className="rounded-xl bg-slate-200 hover:bg-slate-300 px-4 py-2 text-xs font-bold text-slate-800 transition cursor-pointer"
+                        >
+                          {isRtl ? 'إغلاق' : 'Close'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {isRtl
+                          ? `يتطلب المتابعة حذف الخدمات غير المتوفرة وإعادة حجز باقي الخدمات المتاحة (${rebookPrompt.availableItems.length} خدمة).`
+                          : `To proceed, remove the unavailable services and rebook the remaining ${rebookPrompt.availableItems.length} available service(s).`}
+                      </p>
+                      <div className="mt-5 flex flex-col sm:flex-row justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRebookPrompt(null)}
+                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                        >
+                          {isRtl ? 'إلغاء إعادة الحجز' : 'Cancel'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => executeApplyRebookedDraft(rebookPrompt.availableItems)}
+                          className="rounded-xl bg-[#6537C0] hover:bg-[#522ba3] px-4 py-2 text-xs font-bold text-white transition shadow-sm cursor-pointer"
+                        >
+                          {isRtl
+                            ? `حذف غير المتاحة ومتابعة الباقي (${rebookPrompt.availableItems.length})`
+                            : `Remove Unavailable & Rebook (${rebookPrompt.availableItems.length})`}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : rebookPrompt.hasExistingDraftConflict ? (
+                <>
+                  <div className="flex items-center gap-3 border-b border-purple-100 pb-3 text-purple-900">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-[#6537C0]">
+                      <RotateCcw className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {isRtl ? 'استبدال المسودة الحالية؟' : 'Replace current draft?'}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {isRtl
+                          ? 'لديك خدمات محددة في المسودة الحالية. هل ترغب في استبدالها بخدمات هذا الحجز السابق؟'
+                          : 'You currently have services staged in your draft. Replace them with this previous appointment?'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-col sm:flex-row justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRebookPrompt(null)}
+                      className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      {isRtl ? 'الاحتفاظ بالمسودة الحالية' : 'Keep current draft'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (rebookPrompt.matchedPkgId) {
+                          setStagedServices([]);
+                          handleAddPackageToStaged(rebookPrompt.matchedPkgId);
+                          setIsFindingAvailableTimes(true);
+                          setRebookPrompt(null);
+                        } else {
+                          executeApplyRebookedDraft(rebookPrompt.availableItems);
+                        }
+                      }}
+                      className="rounded-xl bg-[#6537C0] hover:bg-[#522ba3] px-4 py-2 text-xs font-bold text-white transition shadow-sm cursor-pointer"
+                    >
+                      {isRtl ? 'استبدال المسودة والمتابعة' : 'Replace Draft & Rebook'}
+                    </button>
+                  </div>
+                </>
+              ) : null}
             </motion.div>
           </div>
         )}

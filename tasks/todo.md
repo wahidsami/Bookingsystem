@@ -481,3 +481,36 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Ran backend Jest tests (`nextAvailableSlot.test.js` & `tenantAppointmentController.overtimeBundle.test.js`): all passed.
 - [x] 7. Git Stage, Commit & Push dedicated changes to `main` <!-- id: p3_git_push -->
 - [x] 8. Final Phase 3 Handoff Report & Stop Gate <!-- id: p3_report -->
+
+# BARSPA Tenant-v2 — Phase 4: Customer History & One-Click Rebooking
+- [x] 1. Step 1: Audit Existing Capabilities & Intended Design <!-- id: p4_audit -->
+  - Inspected customer search/selection in `InteractiveDrawers.tsx`, appointment history APIs in `tenantCustomerController.js` and `tenantApiAdapter.ts`.
+  - Validated models (Service, ServiceVariant, ServicePackage, Appointment).
+  - Reported audit findings, reused endpoints, files to change, and backend dependencies. Approved by user.
+- [x] 2. Step 2: Customer Booking History UI Component (`CustomerBookingHistory.tsx`) <!-- id: p4_history_ui -->
+  - Built compact, accessible recent booking history viewer for selected registered customer.
+  - Displays appointment date/time, services & variants booked, staff assignments, status pill, reference price.
+  - Implemented loading, empty ("First-time client"), and error states (non-blocking).
+  - Full Arabic RTL and English localization.
+- [x] 3. Step 3: One-Click Rebooking Handler & Draft Creation in `InteractiveDrawers.tsx` <!-- id: p4_rebook_engine -->
+  - Implemented `handleRebookAppointment` converting historical appointment/session into a fresh draft.
+  - Revalidates customer and service existence against current catalog; clearly flags retired/inactive services.
+  - Recalculates prices and VAT with current catalog rates (`finalPrice ?? price`), never copying old prices.
+  - Evaluates current availability via `SmartAvailabilityPicker` / availability engine; allows date/time and staff adjustment.
+  - Generates fresh unique IDs; does not copy appointment ID, payment state, transactions, or expired discounts.
+  - Preserves sequential/parallel bundle rules and standalone isolation.
+- [x] 4. Step 4: Safeguard Existing Behavior & Invariants <!-- id: p4_safeguards -->
+  - Preserved fast walk-in mode and tenant contact-number policies.
+  - Preserved dirty-draft dismissal protection and reset/discard behavior.
+  - Preserved timezone, board-minute calculation, and overtime authorization rules.
+  - Kept payment processing and checkout untouched.
+- [x] 5. Step 5: Verification & Automated Test Suite <!-- id: p4_verification -->
+  - Wrote focused tests in `customerBookingHistory.test.ts` covering Scenarios 1-10 (10/10 passed).
+  - Ran `Tenant-v2` typecheck (`npm run lint` / `tsc --noEmit` - passed with 0 errors).
+  - Ran `Tenant-v2` production build (`npm run build` - Vite & esbuild succeeded).
+  - Ran all regression suites in Tenant-v2 (28/28 tests passed).
+- [x] 6. Git Stage, Commit & Push Dedicated Phase 4 Changes <!-- id: p4_commit_push -->
+  - Stage only Phase 4 files (preserve 13 unrelated tracked files).
+  - Push to `origin/main` without automatic deployment.
+- [ ] 7. Final Phase 4 Report & Stop Gate <!-- id: p4_report -->
+
