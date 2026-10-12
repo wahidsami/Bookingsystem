@@ -298,10 +298,22 @@ class BookingService {
                 : (serviceVariant?.duration || service.duration || 30);
             finalStaffId = await this._selectBestAvailableStaff(tenantId, serviceId, startTime, finalTransaction, {
                 variantId,
-                duration: candidateDuration
+                duration: candidateDuration,
+                overtimeApproval
             });
             if (!finalStaffId) {
-                throw new Error('No available staff for this service at the selected time');
+                const staffConflictErr = new Error('No available staff for this service at the selected time');
+                staffConflictErr.code = 'BOOKING_CONFLICT';
+                staffConflictErr.conflictDetails = {
+                    type: 'STAFF_UNAVAILABLE',
+                    entityType: 'staff',
+                    reasonType: 'no_available_staff',
+                    message: 'No available staff for this service at the selected time',
+                    messageAr: 'لا يوجد موظفون متاحون لهذه الخدمة في الوقت المحدد',
+                    actionableGuidance: 'Please choose another time or assign an available employee.',
+                    actionableGuidanceAr: 'يرجى اختيار وقت آخر أو تعيين موظف متاح.'
+                };
+                throw staffConflictErr;
             }
         }
 
@@ -384,7 +396,8 @@ class BookingService {
                 const altStaffId = await this._selectBestAvailableStaff(tenantId, serviceId, start, finalTransaction, {
                     variantId,
                     duration: resolvedDuration,
-                    excludeStaffIds: [finalStaffId]
+                    excludeStaffIds: [finalStaffId],
+                    overtimeApproval
                 });
                 if (altStaffId) {
                     finalStaffId = altStaffId;
@@ -904,6 +917,7 @@ class BookingService {
 
                     for (let i = 0; i < packageSteps.length; i++) {
                         const step = packageSteps[i];
+                        const stepOvertime = step.pItem?.overtimeApproval || item.overtimeApproval || overtimeApproval || null;
                         const appointment = await this.createBooking({
                             serviceId: step.pItem.serviceId,
                             staffId: step.pItem.staffId || null,
@@ -935,7 +949,8 @@ class BookingService {
                                 sequenceOrder: step.pItem.sequenceOrder || (i + 1),
                                 allocatedPrice: step.allocatedPrice,
                                 duration: step.pItem.duration || step.service.duration
-                            }
+                            },
+                            overtimeApproval: stepOvertime
                         }, { transaction: finalTransaction });
 
                         appointments.push(appointment);
@@ -1112,7 +1127,7 @@ class BookingService {
      * @private
      */
     async _selectBestAvailableStaff(tenantId, serviceId, startTime, transaction, options = {}) {
-        const { variantId, duration, excludeStaffIds = [], excludeAppointmentId } = options;
+        const { variantId, duration, excludeStaffIds = [], excludeAppointmentId, overtimeApproval } = options;
 
         // Get all staff who can perform this service
         const serviceEmployees = await db.ServiceEmployee.findAll({
@@ -1164,6 +1179,7 @@ class BookingService {
                     staffId: staff.id,
                     startTime: start,
                     duration: resolvedDuration,
+                    overtimeApproval,
                     excludeAppointmentId,
                     _skipResourceCheck: true
                 }, transaction);
@@ -1321,7 +1337,8 @@ class BookingService {
                         serviceId: item.step.service.id,
                         staffId: staff.id,
                         startTime: new Date(item.start),
-                        duration: (item.end - item.start) / 60000
+                        duration: (item.end - item.start) / 60000,
+                        overtimeApproval: item.step?.pItem?.overtimeApproval || item.step?.overtimeApproval || null
                     }, transaction);
 
                     if (check.valid) {

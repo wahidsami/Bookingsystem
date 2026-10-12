@@ -439,5 +439,27 @@ The following canonical RTL files are FROZEN and protected from modification:
   - `npm run lint` (`tsc --noEmit`): 0 errors.
   - `npm run build`: Vite & esbuild succeeded.
   - Server walkin tests: 2/2 passing.
-- [ ] 5. Git Stage, Commit & Push dedicated changes to `main` <!-- id: p2_git_push -->
-- [ ] 6. Final verification report and approval gate <!-- id: p2_final_report -->
+- [x] 5. Git Stage, Commit & Push dedicated changes to `main` (`353c644eef29108f28e8dee7d11ff07f464af01a`) <!-- id: p2_git_push -->
+- [x] 6. Final verification report and approval gate <!-- id: p2_final_report -->
+
+# BARSPA Phase 2 — Operating-Hours Extension & Booking Failure Fix
+- [x] 1. Investigation & Root Cause Trace <!-- id: ext_investigation -->
+  - Traced extension UI dialog trigger and parameter flow (`allowExtendedHours = true`).
+  - Identified backend gap: `tenantAppointmentController.js` and `bookingService.js` dropped `overtimeApproval` on package items and steps.
+  - Identified `_selectBestAvailableStaff` failure: rejected staff with `DUTY_HOURS_CONFLICT` because `overtimeApproval` was missing.
+  - Verified atomic transaction rollback: no partial records are persisted.
+  - Identified error status gap: `No available staff...` returned HTTP 500 instead of HTTP 409 conflict.
+- [x] 2. User Gate Approval: Backend runtime changes approved <!-- id: ext_user_gate -->
+- [x] 3. Backend Fix: Propagate and honor `overtimeApproval` in `tenantAppointmentController.js` and `bookingService.js` <!-- id: ext_backend_fix -->
+  - Authorize and attach `overtimeApproval` on package items and package child steps in `tenantAppointmentController.js`.
+  - Pass `overtimeApproval` into `createBooking` calls within `createBookingSession` in `bookingService.js`.
+  - Pass `overtimeApproval` into `_selectBestAvailableStaff` and `evaluateSchedulingRequest`.
+  - Pass `overtimeApproval` into `_coordinateParallelStaffAllocation`.
+  - Map `No available staff...` to HTTP 409 with structured conflict details.
+- [x] 4. Frontend Fix: Correct payload formatting in `InteractiveDrawers.tsx` <!-- id: ext_frontend_fix -->
+  - Eliminate duplicate package grouping in `executeFinalSubmission`.
+  - Ensure `overtimeApproval` is passed on root payload, package items, and child steps.
+- [x] 5. Automated Tests: Unit and integration tests for bundle overtime extension <!-- id: ext_tests -->
+- [x] 6. Typecheck, build, and backend test verification <!-- id: ext_verify -->
+- [/] 7. Git commit and push dedicated changes to `main` <!-- id: ext_commit_push -->
+- [ ] 8. Comprehensive handoff report <!-- id: ext_handoff_report -->

@@ -2377,7 +2377,8 @@ export default function InteractiveDrawers({
             itemType: 'package',
             packageId,
             packageItems: [],
-            notes: []
+            notes: [],
+            overtimeApproval: allowExtendedHours ? { approved: true } : undefined
           });
         }
         const pkgGroup = groupedPackages.get(packageId);
@@ -2460,46 +2461,22 @@ export default function InteractiveDrawers({
     }
 
     const executeFinalSubmission = async (itemsToSubmit: any[]) => {
-    // Group package items for the backend
-    const standaloneItems = itemsToSubmit.filter(i => i.itemType !== 'package');
-    const pkgItems = itemsToSubmit.filter(i => i.itemType === 'package');
-    const groupedPackages: Record<string, any[]> = {};
-    pkgItems.forEach(i => {
-      const groupKey = i.packageInstanceId || i.packageId;
-      if (!groupedPackages[groupKey]) groupedPackages[groupKey] = [];
-      groupedPackages[groupKey].push(i);
-    });
-
-    const formattedItems = [
-      ...standaloneItems.map(i => {
-        const effectiveStaffId = i.isExplicitStaff ? i.staffId : null;
+      const formattedItems = itemsToSubmit.map(i => {
+        if (i.itemType === 'package') {
+          return {
+            ...i,
+            overtimeApproval: i.overtimeApproval || (allowExtendedHours ? { approved: true } : undefined),
+            packageItems: (i.packageItems || []).map((c: any) => ({
+              ...c,
+              overtimeApproval: c.overtimeApproval || (allowExtendedHours ? { approved: true } : undefined)
+            }))
+          };
+        }
         return {
           ...i,
-          staffId: effectiveStaffId,
-          requestedStaffId: i.isExplicitStaff ? i.staffId : null,
-          assignmentMode: i.isExplicitStaff ? 'tenant_reassigned' : 'auto_assigned',
-          startTime: getSyncedStagedStartIso(i),
-          itemType: 'service'
+          overtimeApproval: i.overtimeApproval || (allowExtendedHours ? { approved: true } : undefined)
         };
-      }),
-      ...Object.entries(groupedPackages).map(([_instanceId, children]) => ({
-        itemType: 'package',
-        packageId: children[0].packageId,
-        packageItems: children.map(c => {
-          const effectiveStaffId = c.isExplicitStaff ? c.staffId : null;
-          return {
-            packageItemId: c.packageItemId,
-            serviceId: c.serviceId,
-            staffId: effectiveStaffId,
-            requestedStaffId: c.isExplicitStaff ? c.staffId : null,
-            assignmentMode: c.isExplicitStaff ? 'tenant_reassigned' : 'auto_assigned',
-            startTime: getSyncedStagedStartIso(c),
-            duration: c.duration,
-            sequenceOrder: c.sequenceOrder || 0
-          };
-        })
-      }))
-    ];
+      });
 
     const payload: any = {
       items: formattedItems,
@@ -2585,7 +2562,7 @@ export default function InteractiveDrawers({
         payload.paymentAllocations = paymentAllocations;
       }
 
-      await sharedExecuteSubmission(itemsToSubmit, payload, {
+      await sharedExecuteSubmission(formattedItems, payload, {
         onSuccess: async () => {
           suppressAppointmentDraftPersistenceRef.current = true;
           resetAppointmentDraft();

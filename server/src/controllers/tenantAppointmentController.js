@@ -877,6 +877,16 @@ exports.createAppointment = async (req, res) => {
             const normalizedItems = bookingItems.map((item, index) => {
                 const itemPaymentMethod = dashboardOverridePaymentMethod;
 
+                const isPackageOvertimeApproved = overtimeApproval?.approved === true || item?.overtimeApproval?.approved === true;
+                const authorizedPackageOvertime = isPackageOvertimeApproved
+                    ? {
+                        approved: true,
+                        authorizedBy: req.tenantAccountId || req.userId || tenantId,
+                        authorizedAt: new Date().toISOString(),
+                        reason: item?.overtimeApproval?.reason || overtimeApproval?.reason || null
+                    }
+                    : null;
+
                 if (item.itemType === 'package') {
                     if (!item.packageId) {
                         throw new Error(`packageId is required for package booking item ${index + 1}`);
@@ -888,16 +898,28 @@ exports.createAppointment = async (req, res) => {
                     return {
                         itemType: 'package',
                         packageId: item.packageId,
+                        overtimeApproval: authorizedPackageOvertime,
                         packageItems: item.packageItems.map(pItem => {
                             const rawStartTime = pItem?.startTime || null;
                             const parsedStartTime = rawStartTime ? new Date(rawStartTime) : null;
                             if (!parsedStartTime || Number.isNaN(parsedStartTime.getTime())) {
                                 throw new Error(`Invalid start time for package step in item ${index + 1}`);
                             }
+                            const isStepOvertimeApproved = isPackageOvertimeApproved || pItem?.overtimeApproval?.approved === true;
+                            const authorizedStepOvertime = isStepOvertimeApproved
+                                ? (authorizedPackageOvertime || {
+                                    approved: true,
+                                    authorizedBy: req.tenantAccountId || req.userId || tenantId,
+                                    authorizedAt: new Date().toISOString(),
+                                    reason: pItem?.overtimeApproval?.reason || item?.overtimeApproval?.reason || overtimeApproval?.reason || null
+                                })
+                                : null;
+
                             return {
                                 ...pItem,
                                 startTime: parsedStartTime.toISOString(),
-                                assignmentMode: pItem.assignmentMode || (pItem.staffId ? 'tenant_reassigned' : 'auto_assigned')
+                                assignmentMode: pItem.assignmentMode || (pItem.staffId ? 'tenant_reassigned' : 'auto_assigned'),
+                                overtimeApproval: authorizedStepOvertime
                             };
                         }),
                         notes: item?.notes || notes || null,
@@ -917,6 +939,16 @@ exports.createAppointment = async (req, res) => {
                     throw new Error(`Invalid start time for booking item ${index + 1}`);
                 }
 
+                const isStandaloneOvertimeApproved = overtimeApproval?.approved === true || item?.overtimeApproval?.approved === true;
+                const authorizedStandaloneOvertime = isStandaloneOvertimeApproved
+                    ? {
+                        approved: true,
+                        authorizedBy: req.tenantAccountId || req.userId || tenantId,
+                        authorizedAt: new Date().toISOString(),
+                        reason: item?.overtimeApproval?.reason || overtimeApproval?.reason || null
+                    }
+                    : null;
+
                 return {
                     serviceId: itemServiceId,
                     variantId: item?.variantId || null,
@@ -929,14 +961,7 @@ exports.createAppointment = async (req, res) => {
                     duration: item?.duration,
                     discountType: item?.discountType,
                     discountValue: item?.discountValue,
-                    overtimeApproval: overtimeApproval?.approved === true && item?.overtimeApproval?.approved === true
-                        ? {
-                            approved: true,
-                            authorizedBy: req.tenantAccountId || req.userId || tenantId,
-                            authorizedAt: new Date().toISOString(),
-                            reason: item?.overtimeApproval?.reason || overtimeApproval?.reason || null
-                        }
-                        : null
+                    overtimeApproval: authorizedStandaloneOvertime
                 };
             });
 
@@ -1493,18 +1518,32 @@ exports.createAppointment = async (req, res) => {
             return res.status(409).json({
                 success: false,
                 conflict: true,
-                ...details
+                ...details,
+                code: details.code || error.code || 'BOOKING_CONFLICT'
             });
         }
 
-        const isConflict = /Time slot not available/i.test(errorMessage) || /Time slot is no longer available/i.test(errorMessage) || /already booked/i.test(errorMessage) || /conflict/i.test(errorMessage);
+        const isConflict = /Time slot not available/i.test(errorMessage) || 
+            /Time slot is no longer available/i.test(errorMessage) || 
+            /already booked/i.test(errorMessage) || 
+            /conflict/i.test(errorMessage) ||
+            /No available staff/i.test(errorMessage) ||
+            /Selected staff cannot perform/i.test(errorMessage);
         const isKnownAdvanceBookingValidation = /Booking must be at least \d+ minutes in advance/i.test(errorMessage);
         const statusCode = isConflict ? 409 : (isKnownAdvanceBookingValidation ? 400 : 500);
 
         res.status(statusCode).json({
             success: false,
             conflict: isConflict || undefined,
+            code: isConflict ? (error.code || 'BOOKING_CONFLICT') : undefined,
             message: errorMessage,
+            messageAr: /No available staff/i.test(errorMessage)
+                ? 'لا يوجد موظفون متاحون لهذه الخدمة في الوقت المحدد'
+                : (/Selected staff cannot perform/i.test(errorMessage)
+                    ? 'الموظف المحدد لا يمكنه تقديم هذه الخدمة'
+                    : undefined),
+            actionableGuidance: isConflict ? 'Please choose another employee, service, or a different time.' : undefined,
+            actionableGuidanceAr: isConflict ? 'يرجى اختيار موظف آخر أو خدمة أخرى أو وقت مختلف.' : undefined,
             error: error.message,
             errorName: error.name,
             errors: validationDetails
