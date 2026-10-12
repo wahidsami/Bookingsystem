@@ -8,6 +8,7 @@ import { SmartAvailabilityPicker } from './appointment/SmartAvailabilityPicker';
 import {
   calculateSmartAvailability,
   findNextAvailableAlternative,
+  applySmartSlotToStagedServices,
   type SmartSlot,
   type DayAvailabilitySummary,
   type NextAvailableAlternative,
@@ -2270,7 +2271,9 @@ export default function InteractiveDrawers({
     const slotBoardMinutes = slot.boardMinutes ?? slot.timeMinutes;
     setCurrentStartTime(slotBoardMinutes);
 
-    if (stagedServices.length > 0) {
+    if (slot.chainSlots && slot.chainSlots.length > 0) {
+      setStagedServices(prev => applySmartSlotToStagedServices(prev, slot, resolvedTenantTimezone, boardStartHour));
+    } else if (stagedServices.length > 0) {
       const anchorItem = stagedServices[0];
       const updates: Partial<StagedService> = {
         startTime: slotBoardMinutes,

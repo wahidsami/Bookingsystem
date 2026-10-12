@@ -333,7 +333,15 @@ export async function findNextAvailableAlternative({
         timeMinutes: boardMinutes,
         staffId: resp.slot.staffId,
         staffName: resp.slot.staffName,
-        period: getPeriod(startTotalMins)
+        period: getPeriod(startTotalMins),
+        chainSlots: resp.slot.steps ? resp.slot.steps.map((st: any) => ({
+          startTime: st.startTime,
+          endTime: st.endTime,
+          available: true,
+          staffId: st.staffId,
+          staffName: st.staffName,
+          serviceId: st.serviceId
+        })) : undefined
       };
 
       const dateObj = new Date(resp.date + 'T12:00:00Z');
@@ -363,4 +371,72 @@ export async function findNextAvailableAlternative({
     daysAhead: null,
     slotsCount: 0
   };
+}
+
+export interface MinimalStagedServiceForSlot {
+  id: string;
+  startTime: number;
+  startTimeIso?: string;
+  staffId?: string;
+  isExplicitStaff?: boolean;
+  resolvedStaffId?: string;
+  [key: string]: any;
+}
+
+/**
+ * Applies a selected SmartSlot to staged services.
+ * When chainSlots exists (multi-service chains or packages), updates each staged service
+ * with its chained start time, ISO timestamp, and assigned qualified staff.
+ */
+export function applySmartSlotToStagedServices<T extends MinimalStagedServiceForSlot>(
+  stagedServices: T[],
+  slot: SmartSlot,
+  tenantTimezone = DEFAULT_TENANT_TIMEZONE,
+  boardStartHour = 9
+): T[] {
+  if (!stagedServices || stagedServices.length === 0) {
+    return [];
+  }
+
+  const slotBoardMinutes = slot.boardMinutes ?? slot.timeMinutes;
+
+  if (slot.chainSlots && slot.chainSlots.length > 0) {
+    return stagedServices.map((item, idx) => {
+      const chainStep = slot.chainSlots?.[idx];
+      if (!chainStep) return item;
+
+      const stepStartD = new Date(chainStep.startTime);
+      const stepParts = getDatePartsInTimeZone(stepStartD, tenantTimezone);
+      const stepTotalMins = Number(stepParts.hour || '0') * 60 + Number(stepParts.minute || '0');
+      const stepBoardMinutes = Math.max(0, stepTotalMins - (boardStartHour * 60));
+
+      return {
+        ...item,
+        startTime: stepBoardMinutes,
+        startTimeIso: chainStep.startTime,
+        ...(chainStep.staffId ? {
+          staffId: chainStep.staffId,
+          isExplicitStaff: true,
+          resolvedStaffId: chainStep.staffId
+        } : {})
+      };
+    });
+  }
+
+  // Fallback for single service or slot without chainSlots: update anchor item
+  return stagedServices.map((item, idx) => {
+    if (idx === 0) {
+      return {
+        ...item,
+        startTime: slotBoardMinutes,
+        startTimeIso: slot.startTime,
+        ...(slot.staffId ? {
+          staffId: slot.staffId,
+          isExplicitStaff: true,
+          resolvedStaffId: slot.staffId
+        } : {})
+      };
+    }
+    return item;
+  });
 }
