@@ -1960,6 +1960,38 @@ class TenantApiAdapter {
   async deleteResource(id: string): Promise<{ success: boolean; message?: string; deactivated?: boolean }> {
     return this.delete(`/tenant/resources/${id}`);
   }
+
+  async batchCheckResourceAvailability(payload: {
+    stagedItems?: Array<{ id: string; serviceId: string; variantId?: string | null; startTime: string | Date; duration: number; endTime?: string | Date }>;
+    catalogueItems?: Array<{ id: string; serviceId: string; variantId?: string | null; startTime: string | Date; duration: number; endTime?: string | Date }>;
+    items?: Array<{ id: string; serviceId: string; variantId?: string | null; startTime: string | Date; duration: number; endTime?: string | Date; isProbe?: boolean }>;
+    excludeAppointmentId?: string | null;
+  }): Promise<{
+    success: boolean;
+    results: Record<string, {
+      id: string;
+      hasRequirements: boolean;
+      isAvailable: boolean;
+      requirements: Array<{
+        resourceTypeId: string;
+        resourceTypeName: string;
+        resourceTypeNameAr: string;
+        quantity: number;
+        available: boolean;
+        totalActive: number;
+        availableQuantity: number;
+        reason?: string;
+        availableAgainAt?: string | null;
+        messageEn?: string;
+        messageAr?: string;
+        actionableGuidanceEn?: string;
+        actionableGuidanceAr?: string;
+      }>;
+      primaryConflict?: any;
+    }>;
+  }> {
+    return this.post('/tenant/resources/batch-check', payload);
+  }
 }
 
 export const tenantApiAdapter = new TenantApiAdapter();

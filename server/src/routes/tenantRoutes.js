@@ -197,6 +197,7 @@ router.get('/resources/:id', tenantResourceController.getResource);
 router.post('/resources', tenantResourceController.createResource);
 router.put('/resources/:id', tenantResourceController.updateResource);
 router.delete('/resources/:id', tenantResourceController.deleteResource);
+router.post('/resources/batch-check', tenantResourceController.batchCheckResourceAvailability);
 
 // Appointment management
 router.get('/appointments', tenantAppointmentController.getAppointments);

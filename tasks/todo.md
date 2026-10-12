@@ -637,8 +637,40 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Run frontend `tsx --test` test suite.
   - Run `npm run lint` (`tsc --noEmit`) and `npm run build` in `Tenant-v2`.
   - Verify that all 13 protected tracked files remain untouched.
-- [ ] 6. Commit & Push Dedicated Fixes <!-- id: p5a_group_push -->
+- [x] 6. Commit & Push Dedicated Fixes <!-- id: p5a_group_push -->
 
-
-
+# Phase 5A Enhancement — Service Resource Badges & Live Availability Indicators
+- [x] 1. Backend: Authoritative Batch Resource Availability Engine <!-- id: p5a_res_backend_engine -->
+  - In `resourceRequirementResolver.js`, extend `checkResourceAvailability` to support `alreadyAllocatedResourceIds`.
+  - Add `batchCheckResourceAvailability` resolving requirements, querying active instances, filtering DB appointments, and simulating intra-batch concurrent allocations.
+  - Implement controller method `tenantResourceController.batchCheckResourceAvailability` and register `POST /api/v1/tenant/resources/batch-check` in `tenantRoutes.js`.
+  - Add backend tests in `server/src/controllers/__tests__/tenantResourceAvailability.test.js` verifying Scenarios 1 to 5, 7, 8, 10.
+- [x] 2. Frontend: Adapter & Resource Availability State Management <!-- id: p5a_res_frontend_adapter -->
+  - Add `batchCheckResourceAvailability` method to `tenantApiAdapter.ts`.
+  - Create `useLiveResourceAvailability` hook or helper with debounced batching, caching, and distinct loading/unknown vs available vs conflict states.
+- [x] 3. Frontend: Resource Badges on Catalogue Cards & Variants <!-- id: p5a_res_catalogue_badges -->
+  - Implement compact resource badges in `InteractiveDrawers.tsx` for service catalogue cards and individual variant rows.
+  - Handle unknown/loading state without prematurely showing green/available (Scenario 9).
+  - Turn badges red on conflict with tooltip/actionable message and available again time.
+- [x] 4. Frontend: Resource Badges on Queued Services & Bundles <!-- id: p5a_res_queued_badges -->
+  - Render resource badges next to standalone queued services and participant-specific items in Group Booking mode.
+  - For bundles: render component-level badges at their respective scheduled intervals and compact aggregate summary.
+  - Refresh live when adding services, changing date, start time, duration, variant, staff, or smart availability slots.
+- [x] 5. Frontend & Backend Automated Tests (10 Scenarios) <!-- id: p5a_res_tests -->
+  - Scenario 1: Correct resource badges for configured services and variants.
+  - Scenario 2: Available resource vs fully occupied resource.
+  - Scenario 3: Multiple compatible resource instances where at least one remains available.
+  - Scenario 4: Resource capacity exhausted by existing appointments.
+  - Scenario 5: Bundle components with different resource requirements and time intervals.
+  - Scenario 6: Resource status refresh after changing selected time.
+  - Scenario 7: Combined resource allocation across multiple group participants.
+  - Scenario 8: A staged participant consuming remaining resource capacity for another participant.
+  - Scenario 9: Unknown/loading availability not displayed as confirmed available.
+  - Scenario 10: Existing backend final validation still rejects genuine conflicts.
+- [x] 6. Verification Gates, Typecheck & Builds <!-- id: p5a_res_verify -->
+  - Run backend Jest test suites (`tenantResourceAvailability.test.js`, `tenantGroupBooking.test.js`, `resourceSchedulingPhase1b.test.js`).
+  - Run frontend test suite (`tsx --test`).
+  - Run `Tenant-v2` `npm run lint` (`tsc --noEmit`) and `npm run build`.
+  - Verify that all 13 protected tracked files remain untouched.
+- [ ] 7. Dedicated Git Commit & Push to main <!-- id: p5a_res_push -->
 

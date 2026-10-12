@@ -22,6 +22,12 @@ import {
 } from 'lucide-react';
 import AppointmentServicesStep from './appointment/AppointmentServicesStep';
 import { CustomerBookingHistory, type CustomerHistoricalSession } from './appointment/CustomerBookingHistory';
+import {
+  ResourceBadge,
+  ResourceBadgeList,
+  resolveEffectiveServiceRequirements,
+  type ItemResourceAvailability
+} from './appointment/ResourceBadge';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import {
   getServiceDisplayName,
@@ -2338,6 +2344,107 @@ export default function InteractiveDrawers({
     appointments.length
   ]);
 
+  // Live Resource Availability Tracker (Phase 5A)
+  const [resourceAvailabilityMap, setResourceAvailabilityMap] = useState<Record<string, ItemResourceAvailability>>({});
+  const [isCheckingResources, setIsCheckingResources] = useState(false);
+
+  useEffect(() => {
+    if (!isCreateDrawerOpen) return;
+
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setIsCheckingResources(true);
+
+        // 1. Build staged items payload
+        const stagedItemsPayload: Array<{
+          id: string;
+          serviceId: string;
+          variantId?: string | null;
+          startTime: string;
+          duration: number;
+        }> = [];
+
+        for (const item of stagedServices) {
+          if (item.serviceId) {
+            const startIso = buildIsoFromMinutes(selectedDate, Number(item.startTime || 0));
+            stagedItemsPayload.push({
+              id: item.id,
+              serviceId: item.serviceId,
+              variantId: item.variantId || null,
+              startTime: startIso,
+              duration: Number(item.duration || 30)
+            });
+          }
+        }
+
+        // 2. Build catalogue probe items payload (evaluated at proposed currentStartTime)
+        const catalogueStartIso = buildIsoFromMinutes(selectedDate, currentStartTime);
+        const catalogueItemsPayload: Array<{
+          id: string;
+          serviceId: string;
+          variantId?: string | null;
+          startTime: string;
+          duration: number;
+        }> = [];
+
+        for (const srv of canonicalServices) {
+          if (srv.id) {
+            catalogueItemsPayload.push({
+              id: `cat-srv-${srv.id}`,
+              serviceId: srv.id,
+              variantId: null,
+              startTime: catalogueStartIso,
+              duration: Number(srv.duration || 30)
+            });
+
+            if (Array.isArray(srv.variants)) {
+              for (const v of srv.variants) {
+                if (v.id) {
+                  catalogueItemsPayload.push({
+                    id: `cat-var-${v.id}`,
+                    serviceId: srv.id,
+                    variantId: v.id,
+                    startTime: catalogueStartIso,
+                    duration: Number(v.duration || srv.duration || 30)
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        const response = await tenantApiAdapter.batchCheckResourceAvailability({
+          stagedItems: stagedItemsPayload,
+          catalogueItems: catalogueItemsPayload
+        });
+
+        if (!isCancelled && response && response.results) {
+          setResourceAvailabilityMap(response.results);
+        }
+      } catch (err) {
+        console.warn('Batch resource availability check failed:', err);
+      } finally {
+        if (!isCancelled) {
+          setIsCheckingResources(false);
+        }
+      }
+    }, 180);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    isCreateDrawerOpen,
+    selectedDate,
+    currentStartTime,
+    boardStartHour,
+    resolvedTenantTimezone,
+    stagedServices.map(s => `${s.id}:${s.serviceId}:${s.variantId}:${s.startTime}:${s.duration}`).join(','),
+    canonicalServices.length
+  ]);
+
   const handleToggleServiceSelection = (service: ServiceRecord, variantOverride?: ServiceVariantRecord | null) => {
     const isSelected = isQueuedServiceSelected(service.id, variantOverride?.id);
     if (isSelected) {
@@ -4426,6 +4533,13 @@ export default function InteractiveDrawers({
                                               <p className="text-[10px] text-slate-400 font-mono">
                                                 {formatMinutesToTime(cItem.startTime)} · {cItem.duration} min
                                               </p>
+                                              <ResourceBadgeList
+                                                requirements={resolveEffectiveServiceRequirements(cSrv, cItem.variantId)}
+                                                availability={resourceAvailabilityMap[cItem.id]}
+                                                isLoading={isCheckingResources}
+                                                isRtl={isRtl}
+                                                compact
+                                              />
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
                                               <div className="flex items-center gap-1">
@@ -4500,6 +4614,13 @@ export default function InteractiveDrawers({
                                           <span>·</span>
                                           <span>{item.duration} {isRtl ? 'دقيقة' : 'min'}</span>
                                         </div>
+                                        <ResourceBadgeList
+                                          requirements={resolveEffectiveServiceRequirements(srv, item.variantId)}
+                                          availability={resourceAvailabilityMap[item.id]}
+                                          isLoading={isCheckingResources}
+                                          isRtl={isRtl}
+                                          compact
+                                        />
                                       </div>
 
                                       <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -4878,6 +4999,19 @@ export default function InteractiveDrawers({
                                           {' · '}
                                           <span>{bundle.totalDuration || 60} {isRtl ? 'دقيقة' : 'min'}</span>
                                         </p>
+                                        {(() => {
+                                          const childResults = bundle.items?.map((it: any) => resourceAvailabilityMap[`cat-srv-${it.serviceId}`]);
+                                          const hasConflict = childResults?.some((cr: any) => cr && cr.hasRequirements && !cr.isAvailable);
+                                          if (hasConflict) {
+                                            return (
+                                              <span className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 text-rose-700 font-bold px-1.5 py-0.2 text-[9px] mt-1 select-none">
+                                                <AlertCircle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                                                <span>{isRtl ? 'تعارض في الموارد' : 'Resource Conflict'}</span>
+                                              </span>
+                                            );
+                                          }
+                                          return null;
+                                        })()}
                                       </div>
                                     </div>
 
@@ -4925,6 +5059,13 @@ export default function InteractiveDrawers({
                                               {' · '}
                                               <span>{service.duration || 30} {isRtl ? 'دقيقة' : 'min'}</span>
                                             </p>
+                                            <ResourceBadgeList
+                                              requirements={resolveEffectiveServiceRequirements(service, null)}
+                                              availability={resourceAvailabilityMap[`cat-srv-${service.id}`]}
+                                              isLoading={isCheckingResources}
+                                              isRtl={isRtl}
+                                              compact
+                                            />
                                           </div>
                                         </div>
 
@@ -4968,6 +5109,13 @@ export default function InteractiveDrawers({
                                                 <span className="block text-[10px] text-slate-500 font-mono">
                                                   {Number(service.finalPrice ?? service.price ?? 0).toFixed(2)} SAR · {service.duration} min
                                                 </span>
+                                                <ResourceBadgeList
+                                                  requirements={resolveEffectiveServiceRequirements(service, null)}
+                                                  availability={resourceAvailabilityMap[`cat-srv-${service.id}`]}
+                                                  isLoading={isCheckingResources}
+                                                  isRtl={isRtl}
+                                                  compact
+                                                />
                                               </div>
                                               <button
                                                 type="button"
@@ -5002,6 +5150,13 @@ export default function InteractiveDrawers({
                                                   <span className="text-[10px] text-slate-500 font-mono">
                                                     {vPrice.toFixed(2)} SAR · {vDuration} min
                                                   </span>
+                                                  <ResourceBadgeList
+                                                    requirements={resolveEffectiveServiceRequirements(service, variant.id)}
+                                                    availability={resourceAvailabilityMap[`cat-var-${variant.id}`]}
+                                                    isLoading={isCheckingResources}
+                                                    isRtl={isRtl}
+                                                    compact
+                                                  />
                                                 </div>
                                                 <button
                                                   type="button"

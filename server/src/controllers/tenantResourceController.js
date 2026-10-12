@@ -2,6 +2,7 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const { batchCheckResourceAvailability } = require('../utils/resourceRequirementResolver');
 
 /**
  * Tenant Resource Controller
@@ -619,6 +620,41 @@ const tenantResourceController = {
             return res.status(500).json({
                 success: false,
                 message: 'Failed to delete resource',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    },
+
+    /**
+     * Batch check authoritative resource availability for staged items and catalogue queries.
+     * POST /api/v1/tenant/resources/batch-check
+     */
+    batchCheckResourceAvailability: async (req, res) => {
+        try {
+            const tenantId = req.tenantId || req.tenant?.id;
+            if (!tenantId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized tenant' });
+            }
+
+            const { stagedItems, catalogueItems, items, excludeAppointmentId } = req.body || {};
+
+            const result = await batchCheckResourceAvailability({
+                tenantId,
+                stagedItems,
+                catalogueItems,
+                items,
+                excludeAppointmentId
+            });
+
+            return res.status(200).json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            console.error('Error in batchCheckResourceAvailability:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to check resource availability',
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }

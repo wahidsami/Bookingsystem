@@ -749,10 +749,332 @@ async function allocateServiceResources({
     };
 }
 
+/**
+ * Authoritatively check resource availability for a batch of items (staged items or catalogue queries).
+ * Simulates concurrent resource assignment across staged items so subsequent items accurately
+ * reflect remaining resource capacity without conflict.
+ *
+ * @param {object} params
+ * @param {string} params.tenantId
+ * @param {Array<object>} [params.stagedItems]
+ * @param {Array<object>} [params.catalogueItems]
+ * @param {Array<object>} [params.items]
+ * @param {string|null} [params.excludeAppointmentId]
+ * @param {object|null} [params.transaction]
+ * @returns {Promise<{ results: Record<string, object> }>} 
+ */
+async function batchCheckResourceAvailability({
+    tenantId,
+    stagedItems = [],
+    catalogueItems = [],
+    items = [],
+    excludeAppointmentId = null,
+    transaction = null
+}) {
+    if (!tenantId) {
+        throw new Error('tenantId is required for batch resource check');
+    }
+
+    const stagedList = [...(stagedItems || [])];
+    const probeList = [...(catalogueItems || [])];
+
+    if (Array.isArray(items) && items.length > 0) {
+        for (const item of items) {
+            if (item.isProbe || item.type === 'catalogue') {
+                probeList.push(item);
+            } else {
+                stagedList.push(item);
+            }
+        }
+    }
+
+    const allActiveResources = await db.Resource.findAll({
+        where: {
+            tenantId,
+            is_active: true
+        },
+        include: [
+            {
+                model: db.ResourceType,
+                as: 'resourceType',
+                attributes: ['id', 'name_en', 'name_ar', 'is_active']
+            }
+        ],
+        order: [['name_en', 'ASC'], ['id', 'ASC']],
+        transaction
+    });
+
+    const resourcesByType = new Map();
+    for (const r of allActiveResources) {
+        const typeId = String(r.resourceTypeId);
+        if (!resourcesByType.has(typeId)) {
+            resourcesByType.set(typeId, []);
+        }
+        resourcesByType.get(typeId).push(r);
+    }
+
+    const simulatedAllocations = [];
+    const results = {};
+
+    async function evaluateItem(item, shouldConsume = false) {
+        const itemId = item.id || `item_${Math.random().toString(36).slice(2, 9)}`;
+        const serviceId = item.serviceId;
+        const variantId = item.variantId || null;
+
+        if (!serviceId) {
+            results[itemId] = {
+                id: itemId,
+                hasRequirements: false,
+                isAvailable: true,
+                requirements: []
+            };
+            return;
+        }
+
+        const start = item.startTime instanceof Date ? item.startTime : new Date(item.startTime);
+        const durationMinutes = Math.max(1, parseInt(item.duration, 10) || 30);
+        const end = item.endTime
+            ? (item.endTime instanceof Date ? item.endTime : new Date(item.endTime))
+            : new Date(start.getTime() + durationMinutes * 60000);
+
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+            results[itemId] = {
+                id: itemId,
+                hasRequirements: false,
+                isAvailable: false,
+                reason: 'INVALID_TIME',
+                requirements: []
+            };
+            return;
+        }
+
+        const startMs = start.getTime();
+        const endMs = end.getTime();
+        const durationMs = endMs - startMs;
+
+        const requirements = await resolveServiceResourceRequirements(serviceId, variantId, tenantId, transaction);
+
+        if (!requirements || requirements.length === 0) {
+            results[itemId] = {
+                id: itemId,
+                hasRequirements: false,
+                isAvailable: true,
+                requirements: []
+            };
+            return;
+        }
+
+        const reqResults = [];
+        let itemIsAvailable = true;
+        let primaryConflict = null;
+        const itemAllocationsToCommit = [];
+
+        for (const req of requirements) {
+            const { resourceTypeId, quantity, resourceType } = req;
+            const typeNameEn = resourceType?.name_en || resourceType?.name || 'Resource';
+            const typeNameAr = resourceType?.name_ar || typeNameEn;
+
+            const activeResources = resourcesByType.get(String(resourceTypeId)) || [];
+            const totalActive = activeResources.length;
+
+            if (totalActive === 0) {
+                itemIsAvailable = false;
+                const reason = 'RESOURCE_TYPE_UNCONFIGURED';
+                const messageEn = `Service requires "${typeNameEn}", but no active instances are configured in the system.`;
+                const messageAr = `الخدمة تتطلب "${typeNameAr}"، ولكن لا توجد موارد نشطة مهيأة في النظام.`;
+                const guidanceEn = 'Please configure resources in settings or choose another service.';
+                const guidanceAr = 'يرجى تهيئة الموارد في الإعدادات أو اختيار خدمة أخرى.';
+
+                const conf = {
+                    resourceTypeId,
+                    resourceTypeName: typeNameEn,
+                    resourceTypeNameAr: typeNameAr,
+                    quantity,
+                    available: false,
+                    reason,
+                    totalActive: 0,
+                    availableQuantity: 0,
+                    availableAgainAt: null,
+                    messageEn,
+                    messageAr,
+                    actionableGuidanceEn: guidanceEn,
+                    actionableGuidanceAr: guidanceAr
+                };
+                reqResults.push(conf);
+                if (!primaryConflict) primaryConflict = conf;
+                continue;
+            }
+
+            if (totalActive < quantity) {
+                itemIsAvailable = false;
+                const reason = 'INSUFFICIENT_TOTAL_CAPACITY';
+                const messageEn = `Salon has ${totalActive} active instance(s) of "${typeNameEn}", but ${quantity} are required.`;
+                const messageAr = `يتوفر في المركز ${totalActive} فقط من "${typeNameAr}"، بينما تتطلب الخدمة ${quantity}.`;
+                const guidanceEn = 'Please adjust the service resource requirement or add more physical resources.';
+                const guidanceAr = 'يرجى تعديل متطلبات الخدمة أو إضافة موارد فعلية إضافية.';
+
+                const conf = {
+                    resourceTypeId,
+                    resourceTypeName: typeNameEn,
+                    resourceTypeNameAr: typeNameAr,
+                    quantity,
+                    available: false,
+                    reason,
+                    totalActive,
+                    availableQuantity: totalActive,
+                    availableAgainAt: null,
+                    messageEn,
+                    messageAr,
+                    actionableGuidanceEn: guidanceEn,
+                    actionableGuidanceAr: guidanceAr
+                };
+                reqResults.push(conf);
+                if (!primaryConflict) primaryConflict = conf;
+                continue;
+            }
+
+            const activeResourceIds = activeResources.map(r => r.id);
+            const appointmentWhere = {
+                status: { [db.Sequelize.Op.notIn]: ['cancelled', 'no_show'] },
+                startTime: { [db.Sequelize.Op.lt]: end },
+                endTime: { [db.Sequelize.Op.gt]: start }
+            };
+            if (excludeAppointmentId) {
+                appointmentWhere.id = { [db.Sequelize.Op.ne]: excludeAppointmentId };
+            }
+
+            const dbOccupied = await db.AppointmentResource.findAll({
+                where: {
+                    resourceId: { [db.Sequelize.Op.in]: activeResourceIds }
+                },
+                include: [
+                    {
+                        model: db.Appointment,
+                        as: 'appointment',
+                        where: appointmentWhere,
+                        required: true
+                    }
+                ],
+                transaction
+            });
+
+            const dbOccupiedSet = new Set(dbOccupied.map(o => String(o.resourceId)));
+
+            const draftOccupiedSet = new Set();
+            for (const sim of simulatedAllocations) {
+                if (sim.startMs < endMs && sim.endMs > startMs) {
+                    draftOccupiedSet.add(String(sim.resourceId));
+                }
+            }
+
+            const freeResources = activeResources.filter(r =>
+                !dbOccupiedSet.has(String(r.id)) && !draftOccupiedSet.has(String(r.id))
+            );
+
+            if (freeResources.length < quantity) {
+                itemIsAvailable = false;
+                const reason = 'RESOURCE_OCCUPIED';
+
+                const availableAgainAt = await calculateEarliestFeasibleResourceTime({
+                    tenantId,
+                    requirements: [req],
+                    requestedStartTime: start,
+                    durationMs,
+                    excludeAppointmentId,
+                    transaction
+                });
+
+                const timeRangeEn = formatTimeRangeEn(start, end);
+                const timeRangeAr = formatTimeRangeAr(start, end);
+                const availableTimeStrEn = availableAgainAt ? formatClockEn(availableAgainAt) : null;
+                const availableTimeStrAr = availableAgainAt ? formatClockAr(availableAgainAt) : null;
+
+                const isPoolExhausted = totalActive > 1 && freeResources.length === 0;
+                let messageEn = '';
+                let messageAr = '';
+
+                if (isPoolExhausted) {
+                    messageEn = `All ${totalActive} ${typeNameEn}s are currently occupied from ${timeRangeEn}.${availableTimeStrEn ? ` A resource will be available again at ${availableTimeStrEn}.` : ''} Please choose another time.`;
+                    messageAr = `جميع ${typeNameAr} (${totalActive}) مشغولة حالياً من ${timeRangeAr}.${availableTimeStrAr ? ` ستكون متاحة مرة أخرى في ${availableTimeStrAr}.` : ''} يرجى اختيار وقت آخر.`;
+                } else {
+                    const occupiedResource = activeResources.find(r => dbOccupiedSet.has(String(r.id)) || draftOccupiedSet.has(String(r.id)));
+                    const resNameEn = occupiedResource?.name_en || typeNameEn;
+                    const resNameAr = occupiedResource?.name_ar || typeNameAr;
+                    messageEn = `${resNameEn} is currently occupied from ${timeRangeEn}.${availableTimeStrEn ? ` The resource will be available again at ${availableTimeStrEn}.` : ''} Please choose another time.`;
+                    messageAr = `${resNameAr} مشغولة حالياً من ${timeRangeAr}.${availableTimeStrAr ? ` ستكون متاحة مرة أخرى في ${availableTimeStrAr}.` : ''} يرجى اختيار وقت آخر.`;
+                }
+
+                const guidanceEn = availableTimeStrEn ? `Please choose a time at or after ${availableTimeStrEn}.` : 'Please choose a different time.';
+                const guidanceAr = availableTimeStrAr ? `يرجى اختيار وقت في أو بعد ${availableTimeStrAr}.` : 'يرجى اختيار وقت مختلف.';
+
+                const conf = {
+                    resourceTypeId,
+                    resourceTypeName: typeNameEn,
+                    resourceTypeNameAr: typeNameAr,
+                    quantity,
+                    available: false,
+                    reason,
+                    totalActive,
+                    availableQuantity: freeResources.length,
+                    availableAgainAt,
+                    messageEn,
+                    messageAr,
+                    actionableGuidanceEn: guidanceEn,
+                    actionableGuidanceAr: guidanceAr
+                };
+                reqResults.push(conf);
+                if (!primaryConflict) primaryConflict = conf;
+            } else {
+                reqResults.push({
+                    resourceTypeId,
+                    resourceTypeName: typeNameEn,
+                    resourceTypeNameAr: typeNameAr,
+                    quantity,
+                    available: true,
+                    totalActive,
+                    availableQuantity: freeResources.length
+                });
+
+                if (shouldConsume) {
+                    for (let q = 0; q < quantity; q++) {
+                        itemAllocationsToCommit.push({
+                            resourceId: String(freeResources[q].id),
+                            startMs,
+                            endMs
+                        });
+                    }
+                }
+            }
+        }
+
+        if (itemIsAvailable && shouldConsume) {
+            simulatedAllocations.push(...itemAllocationsToCommit);
+        }
+
+        results[itemId] = {
+            id: itemId,
+            hasRequirements: true,
+            isAvailable: itemIsAvailable,
+            requirements: reqResults,
+            primaryConflict
+        };
+    }
+
+    for (const stagedItem of stagedList) {
+        await evaluateItem(stagedItem, true);
+    }
+
+    for (const probeItem of probeList) {
+        await evaluateItem(probeItem, false);
+    }
+
+    return { results };
+}
 module.exports = {
     resolveServiceResourceRequirements,
     calculateEarliestFeasibleResourceTime,
     checkResourceAvailability,
+    batchCheckResourceAvailability,
     allocateServiceResources,
     formatTimeRangeEn,
     formatTimeRangeAr,
