@@ -1,6 +1,7 @@
 /**
  * Helpers for managing staged services and bundles in appointment drawers,
- * ensuring strict isolation between standalone service selections and bundle components.
+ * ensuring strict isolation between standalone service selections and bundle components,
+ * safe dismissal evaluation, and cascading time recalculations.
  */
 
 export interface MinimalStagedItem {
@@ -13,6 +14,7 @@ export interface MinimalStagedItem {
   basePrice?: number;
   finalPrice?: number;
   duration?: number;
+  startTime?: number;
 }
 
 export interface MinimalPackageItem {
@@ -114,4 +116,188 @@ export const calculateStagedPricing = (
   const total = Number((subtotal + vat).toFixed(2));
 
   return { subtotal, vat, total };
+};
+
+export interface DraftStateCheckInput {
+  createMode?: string;
+  selectedCustId?: string;
+  customerSearch?: string;
+  custMode?: string;
+  walkinFullName?: string;
+  walkinPhone?: string;
+  walkinEmail?: string;
+  walkinDob?: string;
+  walkinIsVip?: boolean;
+  includeGroupGuests?: boolean;
+  guestCount?: number;
+  guestNames?: string;
+  stagedServicesCount?: number;
+  currentServiceId?: string;
+  currentDiscountType?: string;
+  currentDiscountValue?: number;
+  currentServiceNotes?: string;
+  sessionNotes?: string;
+  createSplitActive?: boolean;
+  createSplitAmounts?: Record<string, number>;
+  giftCardCodeInput?: string;
+  blockTitleAr?: string;
+  blockTitleEn?: string;
+  blockStaffId?: string;
+  blockIsRecurring?: boolean;
+  blockEndDate?: string;
+}
+
+/**
+ * Checks whether an appointment creation draft is dirty (contains unsaved user changes).
+ * Returns false when pristine.
+ */
+export const checkIsAppointmentDraftDirty = (input: DraftStateCheckInput): boolean => {
+  if (input.createMode === 'blocked') {
+    return Boolean(
+      (input.blockTitleAr && input.blockTitleAr !== 'استراحة قهوة الموظفين') ||
+      (input.blockTitleEn && input.blockTitleEn !== 'Staff Espresso Recess') ||
+      input.blockStaffId ||
+      input.blockIsRecurring ||
+      input.blockEndDate?.trim()
+    );
+  }
+
+  if (input.selectedCustId) return true;
+  if (input.customerSearch?.trim()) return true;
+  if (input.custMode === 'walkin' && (input.walkinFullName?.trim() || input.walkinPhone?.trim() || input.walkinEmail?.trim() || input.walkinDob?.trim() || input.walkinIsVip)) return true;
+  if (input.includeGroupGuests || (input.guestCount && input.guestCount > 1) || input.guestNames?.trim()) return true;
+  if ((input.stagedServicesCount ?? 0) > 0) return true;
+  if (input.currentServiceId) return true;
+  if ((input.currentDiscountType && input.currentDiscountType !== 'none') || (input.currentDiscountValue ?? 0) > 0) return true;
+  if (input.currentServiceNotes?.trim()) return true;
+  if (input.sessionNotes?.trim()) return true;
+  if (input.createSplitActive || Object.values(input.createSplitAmounts || {}).some(a => Number(a) > 0)) return true;
+  if (input.giftCardCodeInput?.trim()) return true;
+
+  return false;
+};
+
+export type DismissalIntent = 'dismiss_request' | 'confirm_discard' | 'keep_editing';
+
+export interface DismissalDecision {
+  showConfirmDialog: boolean;
+  shouldCloseDrawer: boolean;
+  shouldResetDraft: boolean;
+  invalidateDraftStorage: boolean;
+  preserveState: boolean;
+}
+
+/**
+ * Pure function determining the correct action for drawer dismissal requests.
+ */
+export const evaluateDismissalAction = (
+  isDirty: boolean,
+  intent: DismissalIntent
+): DismissalDecision => {
+  if (intent === 'confirm_discard') {
+    return {
+      showConfirmDialog: false,
+      shouldCloseDrawer: true,
+      shouldResetDraft: true,
+      invalidateDraftStorage: true,
+      preserveState: false
+    };
+  }
+
+  if (intent === 'keep_editing') {
+    return {
+      showConfirmDialog: false,
+      shouldCloseDrawer: false,
+      shouldResetDraft: false,
+      invalidateDraftStorage: false,
+      preserveState: true
+    };
+  }
+
+  // intent === 'dismiss_request' (from close button, backdrop click, or Escape)
+  if (isDirty) {
+    return {
+      showConfirmDialog: true,
+      shouldCloseDrawer: false,
+      shouldResetDraft: false,
+      invalidateDraftStorage: false,
+      preserveState: true
+    };
+  }
+
+  return {
+    showConfirmDialog: false,
+    shouldCloseDrawer: true,
+    shouldResetDraft: true,
+    invalidateDraftStorage: false,
+    preserveState: false
+  };
+};
+
+/**
+ * Recalculates service times in a chain,
+ * supporting parallel bundle synchronization and sequential cascading.
+ */
+export const cascadeTimingForStagedItems = <T extends MinimalStagedItem>(
+  items: T[],
+  targetItemId: string,
+  newStartTime: number,
+  bundleScheduleTypeLookup?: (packageId: string) => string | undefined
+): T[] => {
+  const targetItem = items.find(i => (i.id || '') === targetItemId);
+  if (!targetItem) return items;
+
+  const targetPkgType = targetItem.packageId && bundleScheduleTypeLookup
+    ? bundleScheduleTypeLookup(targetItem.packageId)
+    : undefined;
+  const isParallelBundle = Boolean(targetItem.packageInstanceId && targetPkgType === 'parallel');
+
+  // Step 1: Update target item (and parallel siblings if in a parallel bundle)
+  const updatedList = items.map(item => {
+    const isTarget = (item.id || '') === targetItemId;
+    const isParallelSibling = isParallelBundle && item.packageInstanceId === targetItem.packageInstanceId;
+
+    if (isTarget || isParallelSibling) {
+      return {
+        ...item,
+        startTime: newStartTime
+      };
+    }
+    return item;
+  });
+
+  // Step 2: Cascade subsequent sequential items
+  for (let i = 1; i < updatedList.length; i++) {
+    const current = updatedList[i];
+    const prev = updatedList[i - 1];
+
+    // Parallel siblings in the same bundle share start time and do not chain sequentially
+    if (
+      current.packageInstanceId &&
+      prev.packageInstanceId &&
+      current.packageInstanceId === prev.packageInstanceId
+    ) {
+      const pkgType = current.packageId && bundleScheduleTypeLookup
+        ? bundleScheduleTypeLookup(current.packageId)
+        : undefined;
+      if (pkgType === 'parallel') {
+        continue;
+      }
+    }
+
+    let expectedStart = Number(prev.startTime || 0) + Number(prev.duration || 0);
+    if (prev.packageInstanceId) {
+      const prevPkgType = prev.packageId && bundleScheduleTypeLookup
+        ? bundleScheduleTypeLookup(prev.packageId)
+        : undefined;
+      if (prevPkgType === 'parallel') {
+        const siblings = updatedList.filter(it => it.packageInstanceId === prev.packageInstanceId);
+        expectedStart = Math.max(...siblings.map(it => Number(it.startTime || 0) + Number(it.duration || 0)));
+      }
+    }
+
+    current.startTime = expectedStart;
+  }
+
+  return updatedList;
 };

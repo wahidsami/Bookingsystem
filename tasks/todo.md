@@ -417,9 +417,27 @@ The following canonical RTL files are FROZEN and protected from modification:
 - [x] 3. Update `InteractiveDrawers.tsx` to use shared helpers for selection, removal, and toggle <!-- id: bundle_apply_fix -->
 - [x] 4. Add focused automated test suite `InteractiveDrawers.bundleStaging.test.ts` (5/5 tests passing) <!-- id: bundle_tests -->
 - [x] 5. Run TypeScript check, build, and backend tests <!-- id: bundle_verify -->
-- [ ] 6. Commit and push dedicated fix to `main` <!-- id: bundle_commit_push -->
-- [ ] 7. Report findings, test results, and commit SHA <!-- id: bundle_report -->
+- [x] 6. Commit and push dedicated fix to `main` (`2a79ad21619505876cdaca64508bdf46bdbc9658`) <!-- id: bundle_commit_push -->
+- [x] 7. Report findings, test results, and commit SHA <!-- id: bundle_report -->
 
-
-
-
+# BARSPA Tenant-v2 — Phase 2 Additional Requirements
+- [x] 1. Requirement A: Guard drawer dismissal & reset discarded drafts <!-- id: p2_dismissal_guard -->
+  - Backdrop, close button (X), and Escape route through unified `handleRequestDismissCreateDrawer`.
+  - Clicking inside drawer does not dismiss (`onClick={(e) => e.stopPropagation()}`).
+  - Pristine drawer closes immediately with zero prompts.
+  - Dirty drawer prompts confirmation dialog with "Keep editing" and "Discard and leave".
+  - Keep editing preserves all entered state.
+  - Discard and leave resets entire form state and permanently invalidates draft storage so reopening shows a fresh form.
+- [x] 2. Requirement B: Functional service-level time editing <!-- id: p2_time_editing -->
+  - Bundle header: start time selector adjusts bundle start time (synchronizing parallel bundles or cascading sequential bundles).
+  - Bundle child steps: per-service start time selector adjusts step time and cascades sequential dependents.
+  - Standalone queued services: clicking card toggles configuration drawer, start time selector adjusts time and cascades dependent services.
+  - Resource checks, staff eligibility, and preflight conflict checks preserved.
+- [x] 3. Comprehensive automated test suite (`InteractiveDrawers.dismissalAndTiming.test.ts`) <!-- id: p2_additional_tests -->
+  - 15/15 tests passing across bundle staging, dismissal evaluation, dirty checking, and time cascading.
+- [x] 4. Typecheck and build verification <!-- id: p2_additional_build -->
+  - `npm run lint` (`tsc --noEmit`): 0 errors.
+  - `npm run build`: Vite & esbuild succeeded.
+  - Server walkin tests: 2/2 passing.
+- [ ] 5. Git Stage, Commit & Push dedicated changes to `main` <!-- id: p2_git_push -->
+- [ ] 6. Final verification report and approval gate <!-- id: p2_final_report -->

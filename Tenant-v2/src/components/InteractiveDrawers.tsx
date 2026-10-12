@@ -26,7 +26,8 @@ import {
 import {
   isQueuedStandaloneServiceSelected,
   removeStandaloneQueuedService,
-  removeBundleFromStagedServices
+  removeBundleFromStagedServices,
+  checkIsAppointmentDraftDirty
 } from '../lib/bundleStagingHelpers';
 import { to12HourTime, to24HourTime } from '../lib/employeeHelpers';
 import {
@@ -1145,6 +1146,7 @@ export default function InteractiveDrawers({
   const [appointmentDraftPending, setAppointmentDraftPending] = useState<boolean>(() => Boolean(readDraftStorage<AppointmentDraftSnapshot>(APPOINTMENT_DRAFT_STORAGE_KEY)));
   const [cartDraftPending, setCartDraftPending] = useState<boolean>(() => Boolean(readDraftStorage<CartDraftSnapshot>(CART_DRAFT_STORAGE_KEY)));
   const [showAppointmentDraftPrompt, setShowAppointmentDraftPrompt] = useState(false);
+  const [showDiscardConfirmDialog, setShowDiscardConfirmDialog] = useState(false);
   const [showCartDraftPrompt, setShowCartDraftPrompt] = useState(false);
   const suppressAppointmentDraftPersistenceRef = useRef(false);
   const previousCreateDrawerOpenRef = useRef(isCreateDrawerOpen);
@@ -1586,6 +1588,13 @@ export default function InteractiveDrawers({
     setExpandedServiceIds({});
     setConflictDialog(null);
     setBookingRecoveryMode('chain');
+    setCurrentServiceCategory('all');
+    setServiceSearch('');
+    setConfiguredServiceId(null);
+    setExpandedVariantServiceIds({});
+    setIsOptionsExpanded(false);
+    setShowDiscardConfirmDialog(false);
+    setIdentityValidationError(false);
     removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
     setAppointmentDraftPending(false);
     setShowAppointmentDraftPrompt(false);
@@ -1604,7 +1613,7 @@ export default function InteractiveDrawers({
     setGcSender(snapshot.gcSender);
     setGcRecipient(snapshot.gcRecipient);
     setGcValue(snapshot.gcValue);
-    setGeneratedGcCode(snapshot.generatedGcCode);
+    setGeneratedGcCode(`REF-GFT-2026-${Math.floor(1000 + Math.random() * 9000)}`);
     setPosCustMode(snapshot.posCustMode);
     setPosSelectedCustId(snapshot.posSelectedCustId);
     setPosCustomerSearch(snapshot.posCustomerSearch);
@@ -1660,6 +1669,105 @@ export default function InteractiveDrawers({
     setAppointmentDraftPending(false);
     setShowAppointmentDraftPrompt(false);
   };
+
+  const isAppointmentFormDirty = useMemo(() => {
+    return checkIsAppointmentDraftDirty({
+      createMode,
+      selectedCustId,
+      customerSearch,
+      custMode,
+      walkinFullName,
+      walkinPhone,
+      walkinEmail,
+      walkinDob,
+      walkinIsVip,
+      includeGroupGuests,
+      guestCount,
+      guestNames,
+      stagedServicesCount: stagedServices.length,
+      currentServiceId,
+      currentDiscountType,
+      currentDiscountValue,
+      currentServiceNotes,
+      sessionNotes,
+      createSplitActive,
+      createSplitAmounts,
+      giftCardCodeInput,
+      blockTitleAr,
+      blockTitleEn,
+      blockStaffId,
+      blockIsRecurring,
+      blockEndDate,
+    });
+  }, [
+    createMode,
+    selectedCustId,
+    customerSearch,
+    custMode,
+    walkinFullName,
+    walkinPhone,
+    walkinEmail,
+    walkinDob,
+    walkinIsVip,
+    includeGroupGuests,
+    guestCount,
+    guestNames,
+    stagedServices.length,
+    currentServiceId,
+    currentDiscountType,
+    currentDiscountValue,
+    currentServiceNotes,
+    sessionNotes,
+    createSplitActive,
+    createSplitAmounts,
+    giftCardCodeInput,
+    blockTitleAr,
+    blockTitleEn,
+    blockStaffId,
+    blockIsRecurring,
+    blockEndDate,
+  ]);
+
+  const handleRequestDismissCreateDrawer = () => {
+    if (showDiscardConfirmDialog) {
+      setShowDiscardConfirmDialog(false);
+      return;
+    }
+    if (isAppointmentFormDirty) {
+      setShowDiscardConfirmDialog(true);
+    } else {
+      resetAppointmentDraft();
+      setIsCreateDrawerOpen(false);
+    }
+  };
+
+  const handleConfirmDiscardAndLeave = () => {
+    setShowDiscardConfirmDialog(false);
+    suppressAppointmentDraftPersistenceRef.current = true;
+    resetAppointmentDraft();
+    removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
+    setAppointmentDraftPending(false);
+    setIsCreateDrawerOpen(false);
+  };
+
+  const handleCancelDiscard = () => {
+    setShowDiscardConfirmDialog(false);
+  };
+
+  useEffect(() => {
+    if (!isCreateDrawerOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleRequestDismissCreateDrawer();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCreateDrawerOpen, isAppointmentFormDirty, showDiscardConfirmDialog]);
 
   const handleContinueCartDraft = () => {
     const snapshot = readDraftStorage<CartDraftSnapshot>(CART_DRAFT_STORAGE_KEY);
@@ -2918,7 +3026,7 @@ export default function InteractiveDrawers({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs transition-opacity"
-              onClick={() => setIsCreateDrawerOpen(false)}
+              onClick={handleRequestDismissCreateDrawer}
             />
 
             <motion.div
@@ -2926,12 +3034,66 @@ export default function InteractiveDrawers({
               animate={{ x: 0 }}
               exit={{ x: isRtl ? '-100%' : '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 220 }}
+              onClick={(e) => e.stopPropagation()}
               className={`relative w-full ${
                 createMode === 'appointment' ? 'max-w-4xl lg:max-w-6xl xl:max-w-7xl' : 'max-w-3xl'
               } h-screen bg-slate-50 shadow-2xl flex flex-col z-10 overflow-hidden ${
                 isRtl ? 'border-r border-slate-200' : 'border-l border-slate-200'
               }`}
             >
+              <AnimatePresence>
+                {showDiscardConfirmDialog && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-[95] flex items-center justify-center bg-zinc-950/65 px-4 backdrop-blur-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCancelDiscard();
+                    }}
+                  >
+                    <div
+                      className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-2xl bg-rose-500/10 p-2.5 text-rose-600">
+                          <AlertTriangle size={22} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-base font-black text-slate-900">
+                            {isRtl ? 'تجاهل التغييرات غير المحفوظة؟' : 'Discard unsaved changes?'}
+                          </h4>
+                          <p className="mt-2 text-xs leading-5 text-slate-600">
+                            {isRtl
+                              ? 'لديك تغييرات غير محفوظة في هذا الحجز. إذا غادرت الآن، فسيتم إلغاء جميع التعديلات والبيانات المدخلة بشكل نهائي.'
+                              : 'You have unsaved changes in this draft. Leaving now will discard all entered details and reset the appointment form.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={handleCancelDiscard}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          {isRtl ? 'متابعة التعديل' : 'Keep editing'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleConfirmDiscardAndLeave}
+                          className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2.5 text-xs font-bold text-white transition shadow-sm"
+                        >
+                          {isRtl ? 'تجاهل ومغادرة' : 'Discard and leave'}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <AnimatePresence>
                 {showAppointmentDraftPrompt && (
                   <motion.div
@@ -3007,7 +3169,7 @@ export default function InteractiveDrawers({
                   </p>
                 </div>
                 <button
-                  onClick={() => setIsCreateDrawerOpen(false)}
+                  onClick={handleRequestDismissCreateDrawer}
                   className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all cursor-pointer"
                 >
                   <X size={16} />
@@ -3322,11 +3484,31 @@ export default function InteractiveDrawers({
                                           )}
                                           <h5 className="font-bold text-slate-900 text-xs truncate">{pkgItem.serviceName}</h5>
                                         </div>
-                                        <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                                          <span>{pkgItem.price.toFixed(2)} SAR</span>
-                                          {' · '}
-                                          <span>{pkgItem.duration} {isRtl ? 'دقيقة' : 'min'}</span>
-                                        </p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <div className="flex items-center gap-1">
+                                            <Clock className="w-3 h-3 text-purple-600" />
+                                            <select
+                                              value={formatBlockStartClockValue(pkgItem.startTime)}
+                                              onChange={(e) => {
+                                                const offset = convertBlockClockToOffset(e.target.value);
+                                                if (pkgItem.childItems && pkgItem.childItems.length > 0) {
+                                                  handleUpdateStagedService(pkgItem.childItems[0].id, { startTime: offset });
+                                                }
+                                              }}
+                                              className="rounded border border-purple-200 bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-purple-900 outline-none"
+                                              title={isRtl ? 'تعديل وقت بدء الباقة' : 'Edit bundle start time'}
+                                            >
+                                              {blockStartTimeOptions.map(opt => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <p className="text-[11px] text-slate-500 font-semibold">
+                                            <span>{pkgItem.price.toFixed(2)} SAR</span>
+                                            {' · '}
+                                            <span>{pkgItem.duration} {isRtl ? 'دقيقة' : 'min'}</span>
+                                          </p>
+                                        </div>
                                       </div>
                                       <button
                                         type="button"
@@ -3359,22 +3541,40 @@ export default function InteractiveDrawers({
                                                 {formatMinutesToTime(cItem.startTime)} · {cItem.duration} min
                                               </p>
                                             </div>
-                                            <select
-                                              value={cItem.staffId || ''}
-                                              onChange={(e) => {
-                                                const newStaff = e.target.value;
-                                                handleUpdateStagedService(cItem.id, {
-                                                  staffId: newStaff,
-                                                  isExplicitStaff: Boolean(newStaff)
-                                                });
-                                              }}
-                                              className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 outline-none"
-                                            >
-                                              <option value="">{isRtl ? 'أي مختص متاح' : 'Any Stylist'}</option>
-                                              {cStylists.map(st => (
-                                                <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
-                                              ))}
-                                            </select>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                              <div className="flex items-center gap-1">
+                                                <Clock className="w-3 h-3 text-purple-500" />
+                                                <select
+                                                  value={formatBlockStartClockValue(cItem.startTime)}
+                                                  onChange={(e) => {
+                                                    const offset = convertBlockClockToOffset(e.target.value);
+                                                    handleUpdateStagedService(cItem.id, { startTime: offset });
+                                                  }}
+                                                  className="rounded border border-purple-200 bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-purple-900 outline-none"
+                                                  title={isRtl ? 'تعديل وقت بدء الخدمة' : 'Edit service start time'}
+                                                >
+                                                  {blockStartTimeOptions.map(opt => (
+                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                              <select
+                                                value={cItem.staffId || ''}
+                                                onChange={(e) => {
+                                                  const newStaff = e.target.value;
+                                                  handleUpdateStagedService(cItem.id, {
+                                                    staffId: newStaff,
+                                                    isExplicitStaff: Boolean(newStaff)
+                                                  });
+                                                }}
+                                                className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 outline-none"
+                                              >
+                                                <option value="">{isRtl ? 'أي مختص متاح' : 'Any Stylist'}</option>
+                                                {cStylists.map(st => (
+                                                  <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
+                                                ))}
+                                              </select>
+                                            </div>
                                           </div>
                                         );
                                       })}
@@ -3394,9 +3594,19 @@ export default function InteractiveDrawers({
 
                                 return (
                                   <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs space-y-2">
-                                    <div className="flex items-start justify-between gap-2">
+                                    <div
+                                      className="flex items-start justify-between gap-2 cursor-pointer select-none"
+                                      onClick={() => setConfiguredServiceId(isConfiguring ? null : item.id)}
+                                    >
                                       <div className="min-w-0">
-                                        <p className="font-bold text-slate-900 text-xs truncate">{item.serviceName}</p>
+                                        <div className="flex items-center gap-1.5">
+                                          <p className="font-bold text-slate-900 text-xs truncate">{item.serviceName}</p>
+                                          {isConfiguring && (
+                                            <span className="text-[9px] font-black bg-purple-100 text-purple-700 px-1 py-0.2 rounded">
+                                              {isRtl ? 'قيد التعديل' : 'Configuring'}
+                                            </span>
+                                          )}
+                                        </div>
                                         <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 font-semibold">
                                           <span className="font-mono text-purple-700 bg-purple-100/60 px-1 py-0.2 rounded text-[10px]">
                                             {formatMinutesToTime(item.startTime)}
@@ -3406,7 +3616,7 @@ export default function InteractiveDrawers({
                                         </div>
                                       </div>
 
-                                      <div className="flex items-center gap-1.5 shrink-0">
+                                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                                         <div className="text-right">
                                           <span className="font-mono font-bold text-slate-900 text-xs">
                                             {item.price.toFixed(2)} SAR
@@ -3439,7 +3649,7 @@ export default function InteractiveDrawers({
                                     </div>
 
                                     {/* Stylist Selector & Time offset */}
-                                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
+                                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60" onClick={(e) => e.stopPropagation()}>
                                       <div className="flex items-center gap-1.5 min-w-0">
                                         <span className="text-[10px] font-bold text-slate-500 shrink-0">
                                           {isRtl ? 'المختص:' : 'Stylist:'}
@@ -3978,7 +4188,7 @@ export default function InteractiveDrawers({
                   </div>
 
                   <div className="pt-2 flex justify-end gap-2">
-                    <button onClick={() => setIsCreateDrawerOpen(false)} className="py-2 px-4 bg-slate-100 rounded-lg text-slate-600 font-bold">
+                    <button onClick={handleRequestDismissCreateDrawer} className="py-2 px-4 bg-slate-100 rounded-lg text-slate-600 font-bold">
                       {isRtl ? 'إلغاء' : 'Cancel'}
                     </button>
                     {isEditingBreak && (
