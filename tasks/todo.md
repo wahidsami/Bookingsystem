@@ -618,4 +618,27 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Production build: Vite client and esbuild server built successfully.
   - Unrelated files: All 13 protected tracked files strictly preserved.
 
+# Phase 5A — Group Scheduling, Resource Allocation & Guest Identity Remediation
+- [x] 1. Issue A — Independent Participant Scheduling & Overlapping Start Times <!-- id: p5a_issue_a -->
+  - Fix `Tenant-v2/src/components/InteractiveDrawers.tsx` service addition (`handleAddStagedService` and `handleAddPackageToStaged`) to base initial start time on the active participant's items, allowing distinct participants to start concurrently at `currentStartTime`.
+  - Fix cascading loop in `handleUpdateStagedService` so sequential start time cascading applies strictly within the same participant's items rather than across participants.
+- [x] 2. Issue B — Group Combined Resource Availability & Capacity Checks <!-- id: p5a_issue_b -->
+  - Verify and reinforce concurrent resource capacity checks across all participants in `bookingService._createBookingSession` and `tenantAppointmentController.js`.
+  - Ensure resource exhaustion throws actionable 409 conflict errors with `availableAgainAt` and rolls back transactions atomically.
+- [x] 3. Issue C — PlatformUser Null Violations & Guest Identity Resolution <!-- id: p5a_issue_c -->
+  - Align `server/src/models/PlatformUser.js` with DB migration `20260812094645` by setting `phone` and `lastName` to `allowNull: true` with conditional E.164 phone validation.
+  - Fix name normalization in `tenantAppointmentController.js:resolveAppointmentCustomer` and `InteractiveDrawers.tsx` to cleanly split full names into `firstName` and `lastName`.
+  - Enforce tenant policy `requireWalkInPhone` consistently across registered and walk-in participants without inventing fake data or throwing unhandled 500s.
+- [x] 4. Automated Regression Tests <!-- id: p5a_group_tests -->
+  - Add backend tests in `tenantGroupBooking.test.js` covering concurrent participant scheduling, resource exhaustion, walk-in vs registered identity, and individual payment.
+  - Add frontend tests in `groupBooking.test.ts` covering overlapping participant times and intra-participant sequential cascading.
+- [x] 5. Verification Gates & Build <!-- id: p5a_group_verify -->
+  - Run backend Jest test suite.
+  - Run frontend `tsx --test` test suite.
+  - Run `npm run lint` (`tsc --noEmit`) and `npm run build` in `Tenant-v2`.
+  - Verify that all 13 protected tracked files remain untouched.
+- [ ] 6. Commit & Push Dedicated Fixes <!-- id: p5a_group_push -->
+
+
+
 

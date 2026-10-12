@@ -2132,7 +2132,20 @@ export default function InteractiveDrawers({
 
       for (let i = 1; i < updatedList.length; i++) {
         const currentItem = updatedList[i];
-        const prevItem = updatedList[i - 1];
+        const defaultPartId = groupParticipants[0]?.id;
+        const currentPartId = currentItem.participantId || defaultPartId;
+
+        // In group bookings, only chain sequentially against preceding services of the SAME participant
+        const precedingSameParticipantItems = updatedList
+          .slice(0, i)
+          .filter(it => (bookingScope !== 'group') || ((it.participantId || defaultPartId) === currentPartId));
+
+        if (precedingSameParticipantItems.length === 0) {
+          // This is the participant's first service; its start time is independent
+          continue;
+        }
+
+        const prevItem = precedingSameParticipantItems[precedingSameParticipantItems.length - 1];
 
         // Sibling services in the same parallel bundle share the same start time and do not chain sequentially
         if (
@@ -2342,10 +2355,14 @@ export default function InteractiveDrawers({
       const resolvedVariant = variantOverride || null;
       let nextStartTime = currentStartTime;
       const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
-      if (shouldChainServiceTimes && stagedServices.length > 0) {
-        const lastItem = stagedServices[stagedServices.length - 1];
+      const participantStaged = bookingScope === 'group'
+        ? stagedServices.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId)
+        : stagedServices;
+
+      if (shouldChainServiceTimes && participantStaged.length > 0) {
+        const lastItem = participantStaged[participantStaged.length - 1];
         if (lastItem.packageInstanceId) {
-          const siblingItems = stagedServices.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
+          const siblingItems = participantStaged.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
           nextStartTime = Math.max(...siblingItems.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
         } else {
           nextStartTime = lastItem.startTime + lastItem.duration;
@@ -2423,10 +2440,14 @@ export default function InteractiveDrawers({
     setStagedServices(prev => {
       let nextStartTime = currentStartTime;
       const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
-      if (shouldChainServiceTimes && prev.length > 0) {
-        const lastItem = prev[prev.length - 1];
+      const participantStaged = bookingScope === 'group'
+        ? prev.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId)
+        : prev;
+
+      if (shouldChainServiceTimes && participantStaged.length > 0) {
+        const lastItem = participantStaged[participantStaged.length - 1];
         if (lastItem.packageInstanceId) {
-          const siblingItems = prev.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
+          const siblingItems = participantStaged.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
           nextStartTime = Math.max(...siblingItems.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
         } else {
           nextStartTime = lastItem.startTime + lastItem.duration;
@@ -3014,6 +3035,16 @@ export default function InteractiveDrawers({
         );
         return;
       }
+
+      const missingNameParticipant = groupParticipants.find(p => !p.customerId && !p.name?.trim());
+      if (missingNameParticipant) {
+        addLocalToast(
+          'يرجى إدخال اسم لكل مشارك في المجموعة',
+          'Please enter a name for each participant in the group',
+          'warning'
+        );
+        return;
+      }
     }
 
     const executeFinalSubmission = async (itemsToSubmit: any[]) => {
@@ -3061,13 +3092,21 @@ export default function InteractiveDrawers({
     if (bookingScope === 'group') {
       const groupParticipantsPayload = groupParticipants.map((p, idx) => {
         const pItems = formattedItems.filter((i: any) => (i.participantId || groupParticipants[0].id) === p.id);
+        const trimmedName = (p.name || '').trim();
+        let firstName = trimmedName || `Participant ${idx + 1}`;
+        let lastName = '';
+        if (trimmedName.includes(' ')) {
+          const parts = trimmedName.split(/\s+/);
+          firstName = parts[0];
+          lastName = parts.slice(1).join(' ');
+        }
         return {
           participantId: p.id,
           isOrganizer: idx === 0,
           platformUserId: p.customerId || undefined,
           customer: p.customerId ? undefined : {
-            firstName: p.name.trim() || `Participant ${idx + 1}`,
-            lastName: '',
+            firstName,
+            lastName: lastName || undefined,
             phone: p.phone?.trim() || undefined,
             email: p.email?.trim() || undefined,
             isGuest: p.isGuest ?? true

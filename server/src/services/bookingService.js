@@ -822,6 +822,7 @@ class BookingService {
             }
 
             const appointments = [];
+            const sessionAllocatedResourceIds = [];
             let subtotal = 0;
             let taxAmount = 0;
             let platformFee = 0;
@@ -965,10 +966,14 @@ class BookingService {
                                 allocatedPrice: step.allocatedPrice,
                                 duration: step.pItem.duration || step.service.duration
                             },
+                            preAllocatedResourceIds: sessionAllocatedResourceIds,
                             overtimeApproval: stepOvertime
                         }, { transaction: finalTransaction });
 
                         appointments.push(appointment);
+                        if (appointment.allocatedResources && Array.isArray(appointment.allocatedResources)) {
+                            sessionAllocatedResourceIds.push(...appointment.allocatedResources.map(a => a.resourceId));
+                        }
                         subtotal += parseFloat(appointment.rawPrice ?? 0);
                         taxAmount += parseFloat(appointment.taxAmount ?? 0);
                         platformFee += parseFloat(appointment.platformFee ?? 0);
@@ -1004,11 +1009,15 @@ class BookingService {
                         skipServicePaymentOptionValidation: Boolean(skipServicePaymentOptionValidation),
                         bookingSessionId: session.id,
                         bookingReference: session.bookingReference,
+                        preAllocatedResourceIds: sessionAllocatedResourceIds,
                         bookingItemIndex: currentItemIndex,
                         skipBookingSessionSync: true
                     }, { transaction: finalTransaction });
 
                     appointments.push(appointment);
+                    if (appointment.allocatedResources && Array.isArray(appointment.allocatedResources)) {
+                        sessionAllocatedResourceIds.push(...appointment.allocatedResources.map(a => a.resourceId));
+                    }
                     subtotal += parseFloat(appointment.rawPrice ?? 0);
                     taxAmount += parseFloat(appointment.taxAmount ?? 0);
                     platformFee += parseFloat(appointment.platformFee ?? 0);

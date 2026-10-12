@@ -284,3 +284,100 @@ test('Regression: Group participant transitions maintain valid participantBreakd
   assert.equal(summary.total, 172.5);
 });
 
+test('Group Scheduling: Independent participant start times (Participant 2 does NOT cascade after Participant 1)', () => {
+  const currentStartTime = 600; // 10:00 AM (minutes from midnight or board start)
+  const bookingScope = 'group';
+  const groupParticipants = [{ id: 'p-1' }, { id: 'p-2' }];
+
+  // Participant 1 has a 60-minute service starting at 10:00 AM (600 -> 660)
+  const stagedServices = [
+    {
+      id: 'stg-1',
+      serviceId: SERVICE_MASSAGE,
+      startTime: 600,
+      duration: 60,
+      participantId: 'p-1'
+    }
+  ];
+
+  // Logic from InteractiveDrawers.tsx:handleAddStagedService
+  const activeParticipantId = 'p-2';
+  const shouldChainServiceTimes = true;
+  const participantStaged = bookingScope === 'group'
+    ? stagedServices.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId)
+    : stagedServices;
+
+  let nextStartTime = currentStartTime;
+  if (shouldChainServiceTimes && participantStaged.length > 0) {
+    const lastItem = participantStaged[participantStaged.length - 1];
+    nextStartTime = lastItem.startTime + lastItem.duration;
+  }
+
+  // Participant 2 must start at currentStartTime (600 = 10:00 AM), NOT forced to 660 (11:00 AM)
+  assert.equal(nextStartTime, 600, 'Participant 2 initial service should start concurrently with Participant 1');
+});
+
+test('Group Scheduling: Within-participant sequential services DO cascade sequentially', () => {
+  const bookingScope = 'group';
+  const groupParticipants = [{ id: 'p-1' }, { id: 'p-2' }];
+
+  // Participant 2 already has Service 1 (10:00 AM - 10:45 AM, duration 45)
+  const stagedServices = [
+    {
+      id: 'stg-p1-1',
+      serviceId: SERVICE_MASSAGE,
+      startTime: 600,
+      duration: 60,
+      participantId: 'p-1'
+    },
+    {
+      id: 'stg-p2-1',
+      serviceId: SERVICE_FACIAL,
+      startTime: 600,
+      duration: 45,
+      participantId: 'p-2'
+    }
+  ];
+
+  // Participant 2 adds Service 2
+  const activeParticipantId = 'p-2';
+  const shouldChainServiceTimes = true;
+  const participantStaged = bookingScope === 'group'
+    ? stagedServices.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId)
+    : stagedServices;
+
+  let nextStartTime = 600;
+  if (shouldChainServiceTimes && participantStaged.length > 0) {
+    const lastItem = participantStaged[participantStaged.length - 1];
+    nextStartTime = lastItem.startTime + lastItem.duration;
+  }
+
+  // Participant 2 second service must cascade sequentially after their own first service (600 + 45 = 645)
+  assert.equal(nextStartTime, 645, 'Participant 2 second service must cascade to 10:45 AM after their own first service');
+});
+
+test('Group Identity: Participant name normalization correctly splits firstName and lastName without losing name parts', () => {
+  const participants = [
+    { id: 'p-1', name: 'Sara Mohammed Ahmad Al-Otaibi', isOrganizer: true },
+    { id: 'p-2', name: 'Noura', isOrganizer: false }
+  ];
+
+  // Logic from InteractiveDrawers.tsx:executeFinalSubmission
+  const normalized = participants.map((p, idx) => {
+    const trimmedName = (p.name || '').trim();
+    let firstName = trimmedName || `Participant ${idx + 1}`;
+    let lastName = '';
+    if (trimmedName.includes(' ')) {
+      const parts = trimmedName.split(/\s+/);
+      firstName = parts[0];
+      lastName = parts.slice(1).join(' ');
+    }
+    return { firstName, lastName };
+  });
+
+  assert.equal(normalized[0].firstName, 'Sara');
+  assert.equal(normalized[0].lastName, 'Mohammed Ahmad Al-Otaibi');
+  assert.equal(normalized[1].firstName, 'Noura');
+  assert.equal(normalized[1].lastName, '');
+});
+

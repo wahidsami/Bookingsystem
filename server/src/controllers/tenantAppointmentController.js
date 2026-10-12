@@ -375,8 +375,13 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
 
     const normalizedCustomer = customer || {};
     const isGuest = normalizedCustomer.isGuest === true;
-    const rawFirstName = `${normalizedCustomer.firstName || ''}`.trim();
-    const rawLastName = `${normalizedCustomer.lastName || ''}`.trim();
+    let rawFirstName = `${normalizedCustomer.firstName || ''}`.trim();
+    let rawLastName = `${normalizedCustomer.lastName || ''}`.trim();
+    if (rawFirstName && !rawLastName && rawFirstName.includes(' ')) {
+        const nameParts = rawFirstName.split(/\s+/);
+        rawFirstName = nameParts[0];
+        rawLastName = nameParts.slice(1).join(' ');
+    }
     const firstName = rawFirstName || (isGuest ? 'Customer' : '');
     const lastName = rawLastName || null;
     let email = `${normalizedCustomer.email || ''}`.trim().toLowerCase();
@@ -401,7 +406,9 @@ async function resolveAppointmentCustomer({ platformUserId, customer, transactio
         if (tenantId) {
             const tenantSettings = await db.TenantSettings.findOne({ where: { tenantId }, transaction });
             if (tenantSettings?.bookingSettings?.requireWalkInPhone === true) {
-                throw new Error('Customer phone number is required by tenant configuration');
+                const err = new Error('Customer phone number is required by tenant configuration');
+                err.statusCode = 400;
+                throw err;
             }
         }
         phone = null;
@@ -1712,7 +1719,13 @@ exports.createAppointment = async (req, res) => {
             /No available staff/i.test(errorMessage) ||
             /Selected staff cannot perform/i.test(errorMessage);
         const isKnownAdvanceBookingValidation = /Booking must be at least \d+ minutes in advance/i.test(errorMessage);
-        const statusCode = isConflict ? 409 : (isKnownAdvanceBookingValidation ? 400 : 500);
+        const isClientValidationError = error.statusCode === 400 || error.status === 400 ||
+            /required/i.test(errorMessage) ||
+            /not found/i.test(errorMessage) ||
+            /invalid/i.test(errorMessage) ||
+            isKnownAdvanceBookingValidation ||
+            error.name === 'SequelizeValidationError';
+        const statusCode = isConflict ? 409 : (isClientValidationError ? 400 : 500);
 
         res.status(statusCode).json({
             success: false,

@@ -101,10 +101,16 @@ module.exports = (sequelize, DataTypes) => {
         },
         phone: {
             type: DataTypes.STRING,
-            allowNull: false,
+            allowNull: true,
             unique: true,
             validate: {
-                is: /^\+?[1-9]\d{1,14}$/ // E.164 format
+                isValidPhone(value) {
+                    if (value !== null && value !== undefined && String(value).trim() !== '') {
+                        if (!/^\+?[1-9]\d{1,14}$/.test(String(value).trim())) {
+                            throw new Error('Phone number must be in E.164 format');
+                        }
+                    }
+                }
             }
         },
         password: {
@@ -137,7 +143,7 @@ module.exports = (sequelize, DataTypes) => {
         },
         lastName: {
             type: DataTypes.STRING,
-            allowNull: false
+            allowNull: true
         },
         dateOfBirth: {
             type: DataTypes.DATEONLY,
