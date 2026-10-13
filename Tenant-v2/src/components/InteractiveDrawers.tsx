@@ -4045,47 +4045,21 @@ export default function InteractiveDrawers({
                               />
                             </div>
 
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-600 mb-1">
-                                {isRtl ? 'ترتيب الدفع المالي' : 'Payment Arrangement'}
-                              </label>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setGroupPaymentArrangement('organizer_pays')}
-                                  className={`p-2.5 rounded-xl border text-start text-xs font-bold transition cursor-pointer ${
-                                    groupPaymentArrangement === 'organizer_pays'
-                                      ? 'border-[#6537C0] bg-white text-[#6537C0] ring-1 ring-[#6537C0]'
-                                      : 'border-slate-200 bg-white/70 text-slate-600 hover:bg-white'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1.5 font-bold">
-                                    <span>👑</span>
-                                    <span>{isRtl ? 'المنظم يدفع عن الجميع' : 'Organizer Pays for All'}</span>
-                                  </div>
-                                  <p className="text-[10px] text-slate-500 font-normal mt-0.5">
-                                    {isRtl ? 'فاتورة موحدة وحساب إجمالي واحد' : 'Single consolidated invoice'}
+                            <div className="bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2.5 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">👥</span>
+                                <div>
+                                  <span className="block text-xs font-bold text-[#1D035F]">
+                                    {isRtl ? 'نظام الحساب الجماعي الموحد' : 'Unified Group Payment Workflow'}
+                                  </span>
+                                  <p className="text-[10px] text-slate-500 font-normal">
+                                    {isRtl ? 'فاتورة موحدة وتحصيل دفع شامل لكافة المشاركين' : 'Single consolidated invoice & checkout for all participants'}
                                   </p>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => setGroupPaymentArrangement('individual_pays')}
-                                  className={`p-2.5 rounded-xl border text-start text-xs font-bold transition cursor-pointer ${
-                                    groupPaymentArrangement === 'individual_pays'
-                                      ? 'border-[#6537C0] bg-white text-[#6537C0] ring-1 ring-[#6537C0]'
-                                      : 'border-slate-200 bg-white/70 text-slate-600 hover:bg-white'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1.5 font-bold">
-                                    <span>👤</span>
-                                    <span>{isRtl ? 'كل مشارك يدفع بشكل مستقل' : 'Each Pays Individually'}</span>
-                                  </div>
-                                  <p className="text-[10px] text-slate-500 font-normal mt-0.5">
-                                    {isRtl ? 'حساب ومطالبة دفع منفصلة لكل شخص' : 'Independent payment per client'}
-                                  </p>
-                                </button>
+                                </div>
                               </div>
+                              <span className="text-[10px] font-bold text-[#6537C0] bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200 shrink-0">
+                                {isRtl ? 'حساب موحد' : 'Unified'}
+                              </span>
                             </div>
                           </div>
                         )}
@@ -4828,14 +4802,8 @@ export default function InteractiveDrawers({
                                 <span>👥</span>
                                 <span className="truncate">{groupName || (isRtl ? 'حجز جماعي' : 'Group Booking')}</span>
                               </span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
-                                groupPaymentArrangement === 'organizer_pays'
-                                  ? 'bg-purple-100 text-purple-800 border border-purple-300'
-                                  : 'bg-blue-100 text-blue-800 border border-blue-300'
-                              }`}>
-                                {groupPaymentArrangement === 'organizer_pays'
-                                  ? (isRtl ? 'الخيار أ: المنظم يدفع الكل' : 'Option A: Organizer Pays')
-                                  : (isRtl ? 'الخيار ب: دفع فردي مستقل' : 'Option B: Individual Pays')}
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold shrink-0 bg-purple-100 text-purple-800 border border-purple-300">
+                                {isRtl ? 'فاتورة جماعية موحدة' : 'Unified Group Billing'}
                               </span>
                             </div>
                             <div className="space-y-1 pt-1 border-t border-purple-200/60 max-h-28 overflow-y-auto pr-1">

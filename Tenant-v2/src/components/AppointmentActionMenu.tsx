@@ -65,7 +65,8 @@ export const AppointmentActionMenu: React.FC<AppointmentActionMenuProps> = ({
         >
           {/* Section 1: Scheduling & Operational Actions */}
           <div className="py-1">
-            {!isCancelled && !readOnly && onReschedule && (
+            {/* Reschedule applies ONLY to active/upcoming visits (strictly forbidden on completed) */}
+            {!isCancelled && !isCompleted && !readOnly && onReschedule && (
               <button
                 type="button"
                 onClick={() => {
@@ -79,7 +80,8 @@ export const AppointmentActionMenu: React.FC<AppointmentActionMenuProps> = ({
               </button>
             )}
 
-            {onRebook && (
+            {/* Rebook creates a fresh draft for completed or previous visits */}
+            {onRebook && (isCompleted || isCancelled) && (
               <button
                 type="button"
                 onClick={() => {

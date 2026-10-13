@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  X, CheckCircle2, Clock, Calendar as CalendarIcon, User, 
+  X, CheckCircle2, Clock, Calendar as CalendarIcon, User, Users,
   CreditCard, Sparkles, AlertTriangle, ArrowRight, Share2, 
   Printer, Split, FileText, ChevronRight, ChevronLeft, ChevronDown, Receipt
 } from 'lucide-react';
@@ -104,6 +104,10 @@ export interface AppointmentDetailsDrawerProps {
     isSplit: boolean;
     splitAllocations: SplitAllocations;
     giftCardCode?: string;
+    totalDue?: number;
+    scope?: string;
+    bookingSessionId?: string;
+    isGroupSession?: boolean;
   }) => Promise<void>;
 }
 
@@ -136,10 +140,20 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
     return null;
   }
 
-  // Determine individual services list
-  const sessionAppointments = Array.isArray(appointment.bookingSession?.appointments)
+  // Determine if appointment is part of a group booking session
+  const isGroupSession = Boolean(
+    appointment.isGroupBooking ||
+    (Array.isArray(appointment.bookingSession?.appointments) && appointment.bookingSession.appointments.length > 1) ||
+    appointment.bookingSessionId
+  );
+
+  const sessionAppointments: any[] = Array.isArray(appointment.bookingSession?.appointments) && appointment.bookingSession.appointments.length > 0
     ? appointment.bookingSession.appointments
-    : [];
+    : [appointment];
+
+  const eligibleAppointments = sessionAppointments.filter(
+    (a: any) => `${a.status || ''}`.toLowerCase() !== 'cancelled'
+  );
 
   const rawServices = sessionAppointments.length > 0
     ? sessionAppointments
@@ -159,6 +173,7 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
     const sPrice = Number(svc.price ?? svc.service?.price ?? (idx === 0 ? appointment.price : 0));
     const sStaffId = svc.staffId || svc.employeeId || appointment.staffId || '';
     const assignedStylist = stylists.find(st => st.id === sStaffId);
+    const svcStatus = svc.status || appointment.status || 'confirmed';
 
     return {
       id: sId,
@@ -176,26 +191,40 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
       staffNameAr: assignedStylist?.nameAr || svc.staffNameAr || svc.staffName || '',
       staffAvatar: assignedStylist?.avatar || svc.staffAvatar || appointment.staffAvatar,
       price: sPrice,
-      participantName: svc.participantName || (appointment.isGroupBooking ? svc.customerNameEn || svc.customerNameAr : undefined),
+      participantName: svc.participantName || (isGroupSession ? (svc.customerNameEn || svc.customerNameAr || `Guest ${idx + 1}`) : undefined),
+      status: svcStatus,
+      appointmentId: svc.appointmentId || svc.id || appointment.id,
       overtimeApproved: Boolean(svc.overtimeApproval?.approved || appointment.overtimeApproval?.approved),
     };
   });
 
-  // Calculate totals and ZATCA VAT
+  // Calculate authoritative session totals and ZATCA VAT
   const totalServicePrice = serviceItems.reduce((sum, item) => sum + item.price, 0);
   const productsTotal = Array.isArray(appointment.products)
     ? appointment.products.reduce((sum: number, p: any) => sum + (Number(p.price || 0) * Number(p.quantity || 1)), 0)
     : 0;
   const originalSubtotal = totalServicePrice + productsTotal;
-  const appointmentDiscount = Number(appointment.discountAmount || 0);
+  const appointmentDiscount = isGroupSession
+    ? eligibleAppointments.reduce((sum: number, a: any) => sum + Number(a.discountAmount || 0), 0)
+    : Number(appointment.discountAmount || 0);
   const totalAmountDue = Math.max(0, originalSubtotal - appointmentDiscount);
   const taxableSubtotal = totalAmountDue / 1.15;
   const vat15 = totalAmountDue - taxableSubtotal;
-  const totalPaid = Number(appointment.totalPaid ?? 0);
+
+  // Authoritative total paid across eligible session appointments
+  const totalPaid = isGroupSession
+    ? eligibleAppointments.reduce((sum: number, a: any) => sum + Number(a.totalPaid ?? 0), 0)
+    : Number(appointment.totalPaid ?? 0);
   const remainingDue = Math.max(0, totalAmountDue - totalPaid);
 
-  const isPaid = appointment.paymentStatus === 'paid' || appointment.paymentStatus === 'fully_paid' || (totalAmountDue > 0 && remainingDue <= 0.01);
   const normalizedStatus = normalizeDrawerStatus(appointment.status);
+  const isAppointmentCompleted = normalizedStatus === 'completed';
+  const isPaid = (totalAmountDue > 0 && remainingDue <= 0.01) || (
+    isGroupSession
+      ? eligibleAppointments.every((a: any) => a.paymentStatus === 'paid' || a.paymentStatus === 'fully_paid')
+      : (appointment.paymentStatus === 'paid' || appointment.paymentStatus === 'fully_paid')
+  );
+
   const statusMeta = STATUS_META[normalizedStatus] || {
     labelEn: normalizedStatus,
     labelAr: normalizedStatus,
@@ -218,8 +247,8 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
   const checkoutLineItems: CheckoutLineItem[] = [
     ...serviceItems.map(item => ({
       id: item.id,
-      nameEn: item.serviceNameEn + (item.serviceVariantName ? ` / ${item.serviceVariantName}` : ''),
-      nameAr: item.serviceNameAr + (item.serviceVariantDescription ? ` / ${item.serviceVariantDescription}` : ''),
+      nameEn: (isGroupSession && item.participantName ? `[${item.participantName}] ` : '') + item.serviceNameEn + (item.serviceVariantName ? ` / ${item.serviceVariantName}` : ''),
+      nameAr: (isGroupSession && item.participantName ? `[${item.participantName}] ` : '') + item.serviceNameAr + (item.serviceVariantDescription ? ` / ${item.serviceVariantDescription}` : ''),
       unitPrice: item.price,
       subtotal: item.price,
       type: 'Service',
@@ -397,50 +426,79 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
               )}
             </div>
 
+            {/* Unified Group Session Context Banner */}
+            {isGroupSession && (
+              <div className="bg-[#F8F5FE] border border-[#D5C2F8] rounded-2xl p-3.5 space-y-2 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users size={15} className="text-[#6537C0]" />
+                    <span className="text-xs font-black text-[#1D035F]">
+                      {isRtl ? 'جلسة حجز جماعي موحدة' : 'Unified Group Session'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-[#6537C0] bg-white px-2 py-0.5 rounded-full border border-[#D5C2F8]">
+                    {isRtl ? `${eligibleAppointments.length} مشاركين` : `${eligibleAppointments.length} Guests`}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  {isRtl
+                    ? 'نظام السداد الجماعي الموحد: يتم تحصيل جميع خدمات الجلسة معاً تحت فاتورة موحدة.'
+                    : 'Unified group billing: All eligible services across this session are settled together under one group invoice.'}
+                </p>
+              </div>
+            )}
+
             {/* Stacked Individual Service Cards */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between px-1">
                 <span className="text-[10px] font-black uppercase text-[#6537C0] tracking-wider block font-sans">
                   {isRtl ? `الخدمات المحجوزة (${serviceItems.length})` : `BOOKED SERVICES (${serviceItems.length})`}
                 </span>
-                {appointment.isGroupBooking && (
+                {isGroupSession && (
                   <span className="text-[10px] font-bold text-[#6537C0] bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
                     {isRtl ? 'حجز جماعي' : 'Group Session'}
                   </span>
                 )}
               </div>
 
-              {serviceItems.map((item) => (
-                <div key={item.id} className="space-y-2">
-                  <AppointmentServiceCard
-                    isRtl={isRtl}
-                    item={item}
-                    canEdit={!readOnly && status !== 'completed' && status !== 'cancelled'}
-                    canRemove={false}
-                    formatMinutesToTime={formatMinutesToTime}
-                    onEdit={(svc) => {
-                      setEditingServiceId(editingServiceId === svc.id ? null : svc.id);
-                    }}
-                  />
+              {serviceItems.map((item) => {
+                const isItemCompleted = item.status === 'completed' || (item.appointmentId === appointment.id && isAppointmentCompleted);
+                const isItemCancelled = item.status === 'cancelled' || (item.appointmentId === appointment.id && isCancelled);
+                const canEditItem = !readOnly && !isItemCompleted && !isItemCancelled;
 
-                  {/* Option A In-Place Service Editor */}
-                  {editingServiceId === item.id && (
-                    <AppointmentServiceEditor
+                return (
+                  <div key={item.id} className="space-y-2">
+                    <AppointmentServiceCard
                       isRtl={isRtl}
                       item={item}
-                      dateKey={appointment.date || ''}
-                      stylists={stylists}
-                      slotMinutes={slotMinutes}
+                      canEdit={canEditItem}
+                      canRemove={false}
                       formatMinutesToTime={formatMinutesToTime}
-                      onSave={async (updated) => {
-                        await onSaveServiceEdit(updated);
-                        setEditingServiceId(null);
+                      onEdit={(svc) => {
+                        if (!canEditItem) return;
+                        setEditingServiceId(editingServiceId === svc.id ? null : svc.id);
                       }}
-                      onCancel={() => setEditingServiceId(null)}
                     />
-                  )}
-                </div>
-              ))}
+
+                    {/* Option A In-Place Service Editor */}
+                    {editingServiceId === item.id && canEditItem && (
+                      <AppointmentServiceEditor
+                        isRtl={isRtl}
+                        item={item}
+                        dateKey={appointment.date || ''}
+                        stylists={stylists}
+                        slotMinutes={slotMinutes}
+                        formatMinutesToTime={formatMinutesToTime}
+                        onSave={async (updated) => {
+                          await onSaveServiceEdit(updated);
+                          setEditingServiceId(null);
+                        }}
+                        onCancel={() => setEditingServiceId(null)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Appointment Notes (if any) */}
@@ -545,7 +603,11 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
                 className="flex-1 py-3 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <CreditCard size={15} className="text-[#E7DDFC]" />
-                <span>{isRtl ? `تحصيل المتبقي (${remainingDue.toFixed(2)} ر.س)` : `Collect Remaining Due (${remainingDue.toFixed(2)} SAR)`}</span>
+                <span>
+                  {isGroupSession
+                    ? (isRtl ? `تحصيل المتبقي للجلسة الجماعية (${remainingDue.toFixed(2)} ر.س)` : `Collect Remaining Group Due (${remainingDue.toFixed(2)} SAR)`)
+                    : (isRtl ? `تحصيل المتبقي (${remainingDue.toFixed(2)} ر.س)` : `Collect Remaining Due (${remainingDue.toFixed(2)} SAR)`)}
+                </span>
               </button>
             ) : (
               <button
@@ -554,7 +616,11 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
                 className="flex-1 py-3 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <CreditCard size={15} className="text-[#E7DDFC]" />
-                <span>{isRtl ? 'إتمام الدفع والتحصيل (Checkout)' : 'Proceed to Checkout'}</span>
+                <span>
+                  {isGroupSession
+                    ? (isRtl ? `سداد الجلسة الجماعية بالكامل (${remainingDue.toFixed(2)} ر.س)` : `Unified Group Checkout (${remainingDue.toFixed(2)} SAR)`)
+                    : (isRtl ? 'إتمام الدفع والتحصيل (Checkout)' : 'Proceed to Checkout')}
+                </span>
               </button>
             )}
 
@@ -562,9 +628,18 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
             <AppointmentActionMenu
               isRtl={isRtl}
               appointmentStatus={normalizedStatus}
-              isGroupBooking={Boolean(appointment.isGroupBooking)}
+              isGroupBooking={Boolean(isGroupSession || appointment.isGroupBooking)}
               readOnly={readOnly}
-              onReschedule={() => onReschedule(appointment)}
+              onReschedule={() => {
+                if (isAppointmentCompleted || isCancelled) return;
+                const firstEditable = serviceItems.find(s => s.status !== 'completed' && s.status !== 'cancelled');
+                if (firstEditable) {
+                  setEditingServiceId(firstEditable.id);
+                }
+                if (onReschedule) {
+                  onReschedule(appointment);
+                }
+              }}
               onRebook={() => onRebook(appointment)}
               onLateCancel={onLateCancel ? () => onLateCancel(appointment) : undefined}
               onNoShow={onNoShow ? () => onNoShow(appointment) : undefined}
@@ -592,6 +667,11 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
             onConfirmPayment={async (payload) => {
               await onConfirmCheckout({
                 appointmentId: appointment.id,
+                totalDue: totalAmountDue,
+                remainingDue,
+                scope: isGroupSession ? 'session' : 'appointment',
+                bookingSessionId: appointment.bookingSessionId || appointment.bookingSession?.id,
+                isGroupSession,
                 ...payload,
               });
               setIsCheckoutOpen(false);

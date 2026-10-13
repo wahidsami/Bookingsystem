@@ -21,6 +21,8 @@ export interface AppointmentServiceItem {
   isComplimentary?: boolean;
   participantName?: string; // for group bookings
   participantId?: string;
+  status?: string;
+  appointmentId?: string;
   resourceWarning?: string | null;
   overtimeApproved?: boolean;
 }
@@ -172,33 +174,44 @@ export const AppointmentServiceCard: React.FC<AppointmentServiceCardProps> = ({
         </div>
       )}
 
-      {/* Actions (Edit / Remove) */}
-      {(canEdit || canRemove) && (
-        <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#FAF7FD]">
-          {canEdit && onEdit && (
-            <button
-              type="button"
-              onClick={() => onEdit(item)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-600 hover:text-[#6537C0] hover:bg-[#F3EDFC] text-[11px] font-bold transition-all cursor-pointer"
-              title={isRtl ? 'تعديل الخدمة والخبيرة والوقت' : 'Edit service, staff, or timing'}
-            >
-              <Edit3 size={12} />
-              <span>{isRtl ? 'تعديل' : 'Edit'}</span>
-            </button>
-          )}
-          {canRemove && onRemove && (
-            <button
-              type="button"
-              onClick={() => onRemove(item)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-[11px] font-bold transition-all cursor-pointer"
-              title={isRtl ? 'حذف هذه الخدمة' : 'Remove service'}
-            >
-              <Trash2 size={12} />
-              <span>{isRtl ? 'حذف' : 'Remove'}</span>
-            </button>
+      {/* Actions (Edit / Remove / Completed Status) */}
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#FAF7FD]">
+        <div>
+          {item.status === 'completed' && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+              <Check size={11} className="text-slate-500" />
+              <span>{isRtl ? 'الخدمة مكتملة' : 'Completed'}</span>
+            </span>
           )}
         </div>
-      )}
+
+        {(canEdit && item.status !== 'completed' || canRemove) && (
+          <div className="flex items-center gap-2">
+            {canEdit && item.status !== 'completed' && onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(item)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-600 hover:text-[#6537C0] hover:bg-[#F3EDFC] text-[11px] font-bold transition-all cursor-pointer"
+                title={isRtl ? 'تعديل الخدمة والخبيرة والوقت' : 'Edit service, staff, or timing'}
+              >
+                <Edit3 size={12} />
+                <span>{isRtl ? 'تعديل' : 'Edit'}</span>
+              </button>
+            )}
+            {canRemove && onRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove(item)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-[11px] font-bold transition-all cursor-pointer"
+                title={isRtl ? 'حذف هذه الخدمة' : 'Remove service'}
+              >
+                <Trash2 size={12} />
+                <span>{isRtl ? 'حذف' : 'Remove'}</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

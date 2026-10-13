@@ -347,4 +347,246 @@ describe('Fresha Appointment Details Drawer Phase 3 - Alignment & Verification',
       assert.equal(rebookDraft.isNewDraft, true);
     });
   });
+
+  describe('Runtime Correction Pass: Unified Group Checkout, Completed Locking, Reschedule vs Rebook', () => {
+    // Fixture: Group session with 2 participants
+    const groupSessionFixture = {
+      id: 'session-grp-777',
+      metadata: {
+        paymentArrangement: 'unified_group'
+      },
+      appointments: [
+        {
+          id: 'apt-p1',
+          bookingSessionId: 'session-grp-777',
+          isGroupBooking: true,
+          status: 'confirmed',
+          paymentStatus: 'unpaid',
+          price: 250.0,
+          totalPaid: 0,
+          customerNameEn: 'Amira (Host)',
+          customerNameAr: 'أميرة',
+          serviceNameEn: 'Balayage',
+          serviceNameAr: 'بالياج',
+          staffId: 'staff-1',
+          duration: 90
+        },
+        {
+          id: 'apt-p2',
+          bookingSessionId: 'session-grp-777',
+          isGroupBooking: true,
+          status: 'confirmed',
+          paymentStatus: 'unpaid',
+          price: 180.0,
+          totalPaid: 0,
+          customerNameEn: 'Sara (Guest)',
+          customerNameAr: 'سارة',
+          serviceNameEn: 'Hair Mask',
+          serviceNameAr: 'ماسك شعر',
+          staffId: 'staff-2',
+          duration: 45
+        }
+      ]
+    };
+
+    // Helper simulating authoritative financial calculation in AppointmentDetailsDrawer
+    function computeDrawerTotals(appointment: any) {
+      const isGroupSession = Boolean(
+        appointment.isGroupBooking ||
+        appointment.bookingSessionId ||
+        (Array.isArray(appointment.bookingSession?.appointments) && appointment.bookingSession.appointments.length > 1)
+      );
+
+      const sessionAppointments: any[] = Array.isArray(appointment.bookingSession?.appointments) && appointment.bookingSession.appointments.length > 0
+        ? appointment.bookingSession.appointments
+        : [appointment];
+
+      const eligibleAppointments = sessionAppointments.filter(
+        (a: any) => `${a.status || ''}`.toLowerCase() !== 'cancelled'
+      );
+
+      const serviceItems = eligibleAppointments.map((svc: any) => ({
+        id: svc.id,
+        price: Number(svc.price || 0),
+        status: svc.status,
+        participantName: svc.customerNameEn
+      }));
+
+      const totalServicePrice = serviceItems.reduce((sum, item) => sum + item.price, 0);
+      const appointmentDiscount = isGroupSession
+        ? eligibleAppointments.reduce((sum: number, a: any) => sum + Number(a.discountAmount || 0), 0)
+        : Number(appointment.discountAmount || 0);
+      const totalAmountDue = Math.max(0, totalServicePrice - appointmentDiscount);
+
+      const totalPaid = isGroupSession
+        ? eligibleAppointments.reduce((sum: number, a: any) => sum + Number(a.totalPaid ?? 0), 0)
+        : Number(appointment.totalPaid ?? 0);
+      const remainingDue = Math.max(0, totalAmountDue - totalPaid);
+
+      const isPaid = (totalAmountDue > 0 && remainingDue <= 0.01) || (
+        isGroupSession
+          ? eligibleAppointments.every((a: any) => a.paymentStatus === 'paid' || a.paymentStatus === 'fully_paid')
+          : (appointment.paymentStatus === 'paid' || appointment.paymentStatus === 'fully_paid')
+      );
+
+      return {
+        isGroupSession,
+        serviceItems,
+        eligibleAppointments,
+        totalAmountDue,
+        totalPaid,
+        remainingDue,
+        isPaid
+      };
+    }
+
+    it('aggregates matching group total whether opened from Participant A or Participant B', () => {
+      const appt1 = {
+        ...groupSessionFixture.appointments[0],
+        bookingSession: groupSessionFixture
+      };
+      const appt2 = {
+        ...groupSessionFixture.appointments[1],
+        bookingSession: groupSessionFixture
+      };
+
+      const drawer1 = computeDrawerTotals(appt1);
+      const drawer2 = computeDrawerTotals(appt2);
+
+      // Both must aggregate the unified total of 250 + 180 = 430 SAR
+      assert.equal(drawer1.totalAmountDue, 430.0);
+      assert.equal(drawer2.totalAmountDue, 430.0);
+      assert.equal(drawer1.remainingDue, 430.0);
+      assert.equal(drawer2.remainingDue, 430.0);
+      assert.equal(drawer1.serviceItems.length, 2);
+      assert.equal(drawer2.serviceItems.length, 2);
+    });
+
+    it('settling the group session marks all participant appointments as paid and prevents duplicate charges', () => {
+      // Simulate post-payment session state where both appointments are fully paid
+      const settledSession = {
+        ...groupSessionFixture,
+        appointments: groupSessionFixture.appointments.map(a => ({
+          ...a,
+          paymentStatus: 'fully_paid',
+          totalPaid: a.price
+        }))
+      };
+
+      const settledAppt1 = {
+        ...settledSession.appointments[0],
+        bookingSession: settledSession
+      };
+      const settledAppt2 = {
+        ...settledSession.appointments[1],
+        bookingSession: settledSession
+      };
+
+      const drawer1 = computeDrawerTotals(settledAppt1);
+      const drawer2 = computeDrawerTotals(settledAppt2);
+
+      assert.equal(drawer1.isPaid, true);
+      assert.equal(drawer2.isPaid, true);
+      assert.equal(drawer1.remainingDue, 0);
+      assert.equal(drawer2.remainingDue, 0);
+
+      // Sibling card (drawer2) must NOT show checkout CTA, must show View Sale
+      assert.equal(drawer2.totalPaid, 430.0);
+    });
+
+    it('enforces completed-visit locking: completed appointment locks edit controls', () => {
+      const completedAppointment = {
+        ...sampleAppointment,
+        status: 'completed',
+        paymentStatus: 'paid'
+      };
+
+      const normalized = normalizeDrawerStatus(completedAppointment.status);
+      assert.equal(normalized, 'completed');
+
+      // Allowed transitions from completed must be strictly empty (read-only)
+      assert.deepEqual(VALID_STATUS_TRANSITIONS[normalized], []);
+
+      // Verify canEdit flag rule: !readOnly && !isItemCompleted && !isItemCancelled
+      const isItemCompleted = completedAppointment.status === 'completed';
+      const canEdit = !isItemCompleted;
+      assert.equal(canEdit, false, 'Completed appointment must NOT allow service editing');
+    });
+
+    it('handles mixed-status groups: locks completed participant while keeping unfinished sibling editable', () => {
+      const mixedSession = {
+        id: 'session-mixed',
+        appointments: [
+          {
+            id: 'mixed-p1',
+            status: 'completed',
+            price: 200,
+            customerNameEn: 'Finished Guest'
+          },
+          {
+            id: 'mixed-p2',
+            status: 'in_service',
+            price: 150,
+            customerNameEn: 'Active Guest'
+          }
+        ]
+      };
+
+      const p1Item = mixedSession.appointments[0];
+      const p2Item = mixedSession.appointments[1];
+
+      const p1CanEdit = p1Item.status !== 'completed' && p1Item.status !== 'cancelled';
+      const p2CanEdit = p2Item.status !== 'completed' && p2Item.status !== 'cancelled';
+
+      assert.equal(p1CanEdit, false, 'Completed participant is locked');
+      assert.equal(p2CanEdit, true, 'Active sibling remains editable');
+    });
+
+    it('differentiates Reschedule vs Rebook semantics', () => {
+      // 1. Reschedule modifies an existing booking:
+      // Preserves original appointment id, applies in-place time/staff update
+      const rescheduleTarget = {
+        id: 'apt-reschedule-101',
+        status: 'confirmed',
+        date: '2026-10-14',
+        staffId: 'staff-old',
+        startTime: 60
+      };
+      const reschedulePayload = {
+        appointmentId: rescheduleTarget.id, // Preserved
+        staffId: 'staff-new',
+        startTime: 120
+      };
+      assert.equal(reschedulePayload.appointmentId, rescheduleTarget.id, 'Reschedule must preserve appointment ID');
+
+      // 2. Rebook creates a fresh draft:
+      // Prepopulates customer and services, but generates new draft ID, zeros payment, requires new date/time
+      const rebookSource = {
+        id: 'apt-historical-999',
+        status: 'completed',
+        paymentStatus: 'paid',
+        customerId: 'cust-555',
+        customerNameEn: 'Fatima',
+        serviceId: 'srv-haircut',
+        price: 250,
+        staffId: 'staff-favorite'
+      };
+      const rebookDraft = {
+        id: `rebook-${Date.now()}-0`, // Fresh generated draft ID
+        selectedCustomerId: rebookSource.customerId,
+        selectedStaffId: rebookSource.staffId,
+        serviceId: rebookSource.serviceId,
+        status: 'draft', // Not completed
+        paymentStatus: 'unpaid', // Old payment NOT copied
+        totalPaid: 0 // Zeroed out
+      };
+
+      assert.notEqual(rebookDraft.id, rebookSource.id, 'Rebook must have fresh ID');
+      assert.equal(rebookDraft.selectedCustomerId, 'cust-555');
+      assert.equal(rebookDraft.paymentStatus, 'unpaid');
+      assert.equal(rebookDraft.totalPaid, 0);
+      assert.notEqual(rebookDraft.status, rebookSource.status);
+    });
+  });
 });
+

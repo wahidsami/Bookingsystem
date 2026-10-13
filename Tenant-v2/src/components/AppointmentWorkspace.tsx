@@ -3200,11 +3200,62 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const handleRebookAppointment = (appt: any) => {
     if (!appt) return;
     setDrawerOpen(false);
+
+    // Prepopulate customer details
+    if (appt.customerId || appt.platformUserId) {
+      setCustMode('existing');
+      setSelectedCustId(appt.customerId || appt.platformUserId);
+    } else {
+      setCustMode('new');
+      setSelectedCustId('');
+      setNewCustName(appt.customerNameEn || appt.customerNameAr || '');
+      setNewCustPhone(appt.customerPhone || '');
+      setNewCustEmail(appt.customerEmail || '');
+    }
+
+    // Set staff preference if available
     if (appt.staffId) {
       setCurrentStaffId(appt.staffId);
     }
+
+    // Set primary service if available
+    if (appt.serviceId) {
+      setCurrentServiceId(appt.serviceId);
+      setCurrentDuration(Number(appt.duration || 60));
+    }
+
+    // Map source services into a fresh stagedServices draft
+    const rawServices = Array.isArray(appt.bookingSession?.appointments) && appt.bookingSession.appointments.length > 0
+      ? appt.bookingSession.appointments
+      : Array.isArray(appt.services) && appt.services.length > 0
+        ? appt.services
+        : [appt];
+
+    const draftItems: StagedService[] = [];
+    rawServices.forEach((svc: any, idx: number) => {
+      const svcId = svc.serviceId || svc.service?.id || appt.serviceId;
+      if (svcId) {
+        draftItems.push({
+          id: `rebook-${Date.now()}-${idx}`,
+          serviceId: svcId,
+          staffId: svc.staffId || svc.employeeId || appt.staffId || '',
+          startTime: 120 + idx * 30, // Fresh placeholder start time
+          duration: Number(svc.duration || svc.service?.duration || 30),
+          discountType: 'none',
+          discountValue: 0,
+          notes: ''
+        });
+      }
+    });
+
+    if (draftItems.length > 1) {
+      setStagedServices(draftItems);
+    } else {
+      setStagedServices([]);
+    }
+
     setInitialCreateMode('appointment');
-    setCreateStep(1);
+    setCreateStep(2);
     resetCreateDrawerStartTimes();
     setIsCreateDrawerOpen(true);
     addLocalToast(
@@ -3286,10 +3337,19 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     isSplit: boolean;
     splitAllocations: any;
     giftCardCode?: string;
+    totalDue?: number;
+    remainingDue?: number;
+    scope?: string;
+    bookingSessionId?: string;
+    isGroupSession?: boolean;
   }) => {
     if (!activeAppointment) return;
 
-    const total = paymentDueAmount > 0 ? paymentDueAmount : (activeAppointment.price || 0);
+    const isGroupSession = Boolean(payload.isGroupSession || activeAppointment.isGroupBooking || activeAppointment.bookingSessionId);
+    const scope = payload.scope || (isGroupSession ? 'session' : 'appointment');
+    const total = Number(
+      payload.totalDue ?? (paymentDueAmount > 0 ? paymentDueAmount : (activeAppointment.price || 0))
+    );
     const paymentMethodApi = payload.paymentMethod || 'card_pos';
 
     const paymentAllocationsPayload = payload.isSplit
@@ -3310,7 +3370,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     let paymentMethodSummary = payload.isSplit ? 'Split Payment' : payload.paymentMethod;
 
     try {
-      const paymentResponse = paymentCollectionMode === 'remainder' || hasTrueRemainderBalance
+      const paymentResponse = (!isGroupSession && (paymentCollectionMode === 'remainder' || hasTrueRemainderBalance))
         ? await tenantApiAdapter.recordRemainderPayment(activeAppointment.id, {
             amount: total,
             paymentMethod: paymentMethodApi,
@@ -3320,8 +3380,11 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         : await tenantApiAdapter.updateAppointmentPaymentStatus(activeAppointment.id, {
             paymentStatus: 'fully_paid',
             paymentMethod: paymentMethodApi,
+            amount: total,
+            totalPaid: total,
+            scope,
             paymentAllocations: paymentAllocationsPayload,
-            totalPaid: total
+            notes: isGroupSession ? 'Unified group session payment' : undefined
           });
 
       await loadBoardData();
@@ -3341,18 +3404,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       }
 
       const receipt = {
-        orderId: `REF-APT-${activeAppointment.id.substring(0, 8).toUpperCase()}`,
+        orderId: isGroupSession && activeAppointment.bookingSessionId
+          ? `REF-GRP-${(activeAppointment.bookingSessionId || activeAppointment.id).substring(0, 8).toUpperCase()}`
+          : `REF-APT-${activeAppointment.id.substring(0, 8).toUpperCase()}`,
         date: (() => {
           const tzParts = getDatePartsInTimeZone(new Date(), tenantTimezone);
           return `${tzParts.year}-${tzParts.month}-${tzParts.day} ${tzParts.hour}:${tzParts.minute}`;
         })(),
         customerName: isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn,
-        serviceName: isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn,
-        servicePrice: Number(activeAppointment.price || 0),
+        serviceName: isGroupSession
+          ? (isRtl ? 'سداد جماعي موحد للجلسة' : 'Unified Group Session Checkout')
+          : (isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn),
+        servicePrice: total,
         products: [],
-        subtotal: Number(activeAppointment.price || 0),
+        subtotal: total,
         discount: 0,
-        vat: Number(activeAppointment.price || 0) - (Number(activeAppointment.price || 0) / 1.15),
+        vat: total - (total / 1.15),
         total,
         paymentSummary: paymentMethodSummary
       };
@@ -3361,8 +3428,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       setShowReceiptModal(true);
 
       addLocalToast(
-        'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',
-        'Session invoice settled and customer checked out successfully! 🧾',
+        isGroupSession
+          ? (isRtl ? 'تم سداد الجلسة الجماعية بالكامل لجميع المشاركين بنجاح! 🧾' : 'Group session settled for all participants successfully! 🧾')
+          : (isRtl ? 'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾' : 'Session invoice settled and customer checked out successfully! 🧾'),
+        isGroupSession
+          ? (isRtl ? 'Group session settled for all participants successfully! 🧾' : 'تم سداد الجلسة الجماعية بالكامل لجميع المشاركين بنجاح! 🧾')
+          : (isRtl ? 'Session invoice settled and customer checked out successfully! 🧾' : 'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾'),
         'success'
       );
     } catch (err) {

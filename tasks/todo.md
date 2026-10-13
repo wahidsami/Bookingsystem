@@ -1,31 +1,41 @@
-# BARSPA — Fresha Appointment Details Drawer Phase 3: Runtime Correction Pass (Complete)
-- [x] 1. Restore the Correct Primary Payment Action <!-- id: runtime_fix_payment_action -->
-  - Identified root cause: `AppointmentDetailsDrawer.tsx` strictly checked `status === 'confirmed'`, `checked_in`, `in_service` and defaulted unpaid active appointments (`booked`, `pending`, uppercase) to "Rebook Appointment".
-  - Re-anchored primary footer CTA directly to payment and appointment lifecycle: unpaid/partially paid active appointments ALWAYS expose "Proceed to Checkout" or "Collect Remaining Due"; paid appointments expose "View Sale & Receipt"; rebook is strictly limited to cancelled/no-show appointments or secondary action.
-- [x] 2. Restore Header Appointment Status Dropdown <!-- id: runtime_fix_status_dropdown -->
-  - Replaced static badge with compact interactive `<select>` status control in the drawer header.
-  - Normalized statuses (`normalizeDrawerStatus`) and enforced valid backend lifecycle transitions (`VALID_STATUS_TRANSITIONS`).
-  - Preserved completion payment gate (`paymentStatus !== 'paid'` triggers warning dialog) and cancellation reason dialog.
-- [x] 3. Correct Service Editor Date & Time Initialization <!-- id: runtime_fix_time_init -->
-  - Identified root cause: `startTime` evaluated as 0 when passed as ISO string or non-number, and non-grid minutes (such as 10:05 AM = 65 board minutes) were omitted from `<select>` options, causing browser to reset to 9:00 AM (0 min).
-  - Implemented `parseAppointmentStartMinutes` handling ISO strings, time strings (`"10:05"`), board minutes, and minutes from midnight.
-  - Dynamically injected current saved non-grid times into `<select>` options labeled as `(Current Saved)`.
-  - Added projected service interval preview box (`${startTime} – ${endTime}`).
-- [x] 4. Make Visit History Meaningful <!-- id: runtime_fix_visit_history -->
-  - Connected "Visit History" in client header ellipsis menu directly to `setCustomerDrawerTab('appointments')`, showing authentic past appointments and visits in `CustomerBookingHistory`.
-  - Left "Client Profile" on `setCustomerDrawerTab('overview')`.
-- [x] 5. Improve Compactness & Fresha Alignment <!-- id: runtime_fix_compactness -->
-  - Tightened drawer width (`sm:w-[460px] xl:w-[500px]`), padding (`p-3.5 space-y-3`), and service card margins/padding (`p-3 rounded-xl space-y-2`).
-  - Retained BARSPA's purple-and-white identity and bidirectional RTL layout.
-- [x] 6. Investigate Genuine Discount Workflow <!-- id: runtime_fix_discount_audit -->
-  - Audited backend financial engine: discounts are strictly promotional/campaign based originating at booking creation or on invoices (`discountAmount`). No arbitrary frontend price overrides exist or are permitted.
-- [x] 7. Automated Testing & Verification <!-- id: runtime_fix_tests -->
-  - Updated `AppointmentDetailsDrawer.phase3.test.ts` (all 26/26 tests pass).
-  - Verified TypeScript type check (`tsc --noEmit`): 0 errors.
-  - Verified Vite production build (`npm run build`): success.
-- [x] 8. Git Change Control & Push <!-- id: runtime_fix_git -->
-  - Staging strictly Tenant-v2 drawer components and test file; protecting all other repositories.
-  - Commit and push to `origin/main`. Stopped for manual deployment.
+# BARSPA — Appointment Drawer Correction: Unified Group Checkout, Completed-Visit Locking, Reschedule vs Rebook
+- [x] 1. Session & Payment Audit & Data Model Discovery <!-- id: audit_group_session -->
+  - [x] Trace calendar cards, appointment IDs, and `BookingSession` links.
+  - [x] Trace group participant appointments, service items, and drawer hydration.
+  - [x] Trace `handleDrawerCheckout` and identify point where single appointment vs session was scoped.
+  - [x] Verified backend `processAppointmentPayment` in `appointmentPaymentService.js`: already supports atomic session settlement with `scope: 'session'` and `syncBookingSessionTotals`.
+  - [x] Identified and audited group payment arrangement UI in `InteractiveDrawers.tsx`.
+- [x] 2. Unified Group Checkout & Settlement <!-- id: impl_group_checkout -->
+  - [x] Aggregate authoritative amounts across all eligible appointments in the session in `AppointmentDetailsDrawer.tsx`.
+  - [x] Show group session context, participant names, and individual service items.
+  - [x] Update `AppointmentCheckoutOverlay` line items to include all eligible group participants.
+  - [x] Send `scope: 'session'`, group amount, and allocations in `handleDrawerCheckout` to `updateAppointmentPaymentStatus`.
+  - [x] After payment, all included appointments reflect settled group payment; clicking any sibling card opens the shared sale/receipt without re-charging.
+- [x] 3. Completed Appointments Are Read-Only <!-- id: impl_completed_lock -->
+  - [x] In `AppointmentServiceCard.tsx`: Hide edit buttons when appointment or item status is `completed`.
+  - [x] In `AppointmentDetailsDrawer.tsx`: Enforce `canEdit = false` on completed service items.
+  - [x] In mixed groups, lock only completed appointments/services; preserve editing on uncompleted siblings.
+  - [x] Lock header status `<select>` dropdown against invalid reverse transitions once completed.
+- [x] 4. Reschedule vs Rebook Differentiation <!-- id: impl_reschedule_rebook -->
+  - [x] Reschedule: Modify existing booking; open in-place editor for active/upcoming appointments with saved date, time, stylist, duration; validate via `evaluateScheduling`; keep appointment ID intact.
+  - [x] Rebook: Fresh booking draft; prepopulate customer and services into create drawer; require new future date/time; run availability checks; zero out old payment/appointment IDs.
+  - [x] UI Distinction: Show Reschedule on upcoming visits; show Rebook on completed/cancelled visits; never use Rebook as primary action for confirmed/unpaid visits.
+- [x] 5. Hide/Remove Confusing Payment Choice UI <!-- id: impl_hide_payment_choice -->
+  - [x] In `InteractiveDrawers.tsx`: Hide the `organizer_pays` vs `individual_pays` toggle; lock default to unified group payment.
+  - [x] Display unified group billing badge without confusing choice radio buttons.
+- [x] 6. Comprehensive Regression Tests & Verification <!-- id: test_verification -->
+  - [x] Add regression tests in `AppointmentDetailsDrawer.phase3.test.ts` covering:
+    - Group checkout from participant A and B produces matching total and includes all eligible appointments.
+    - Unified checkout settles all linked appointments.
+    - Paid group card links to shared receipt; prevents duplicate charges.
+    - Completed appointments lock editing; mixed groups lock only completed services.
+    - Reschedule preserves appointment identity; Rebook creates fresh draft with new IDs.
+  - [x] Run tests with `npx tsx --test` (31/31 passed).
+  - [x] Run `npx tsc --noEmit` (clean, 0 errors) and `npm run build` (builds successfully).
+- [/] 7. Change Control, Diff Inspection, Commit & Push <!-- id: commit_push -->
+  - [x] Stage strictly affected Tenant-v2 components, test file, and todo.md.
+  - [ ] Commit and push to `origin/main`.
+  - [ ] STOP for user manual deployment.
 
 # Todo: Captain — Customer App Full Arabic RTL Reconstruction (Sprint 0 & 1 Complete)
 
