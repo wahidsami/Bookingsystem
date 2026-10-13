@@ -15,10 +15,10 @@
 - [x] 4. Verification & Testing <!-- id: resched_verify -->
   - [x] Run backend tests (9/9 evaluate tests passed, 46/46 suite total passed).
   - [x] Run frontend tests and type checks (`npx tsx --test`, `npx tsc --noEmit` 0 errors, and `npm run build` in Tenant-v2).
-- [ ] 5. Git Delivery <!-- id: resched_delivery -->
-  - [ ] Inspect diff to ensure only intended files are staged.
-  - [ ] Commit and push to `origin/main`.
-  - [ ] STOP for manual user deployment.
+- [x] 5. Git Delivery <!-- id: resched_delivery -->
+  - [x] Inspect diff to ensure only intended files are staged.
+  - [x] Commit and push to `origin/main`.
+  - [x] STOP for manual user deployment.
 
 # BARSPA — Resource Reservations Must Be Recorded and Counted Reliably
 - [x] 1. Full Resource Lifecycle Audit <!-- id: res_lifecycle_audit -->
