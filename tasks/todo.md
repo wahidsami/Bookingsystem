@@ -1,3 +1,23 @@
+# BARSPA — Fresha Appointment Details Drawer Phase 3: Implementation & Verification (Complete)
+- [x] 1. Preflight audit & working tree confirmation <!-- id: phase3_preflight -->
+- [x] 2. Extract Zone A: `AppointmentClientHeader.tsx` <!-- id: phase3_zone_a -->
+- [x] 3. Extract Zone B: `AppointmentServiceCard.tsx` <!-- id: phase3_zone_b -->
+- [x] 4. Extract Zone B Option A Service Editor: `AppointmentServiceEditor.tsx` <!-- id: phase3_service_editor -->
+- [x] 5. Extract Zone C Overflow Menu: `AppointmentActionMenu.tsx` <!-- id: phase3_action_menu -->
+- [x] 6. Extract Zone C Option A Checkout Overlay: `AppointmentCheckoutOverlay.tsx` <!-- id: phase3_checkout_overlay -->
+- [x] 7. Build Modular Drawer Shell: `AppointmentDetailsDrawer.tsx` <!-- id: phase3_drawer_shell -->
+- [x] 8. Integrate into `AppointmentWorkspace.tsx` <!-- id: phase3_integration -->
+  - Replaced legacy 1,163-line 88vw inline layout with compact modular drawer.
+  - Eliminated mock `GFT` 200 SAR voucher discount.
+  - Preserved root-level Customer Profile modal and `TransactionDetailsDrawer`.
+- [x] 9. Automated Testing & Verification <!-- id: phase3_tests -->
+  - Created `AppointmentDetailsDrawer.phase3.test.ts` (16/16 tests pass).
+  - Verified regression test suites (22/22 tests pass; total 38/38 tests pass).
+  - TypeScript type check (`tsc --noEmit`): 0 errors.
+  - Production bundle build (`npm run build`): 100% success.
+- [x] 10. Change Control & Verification <!-- id: phase3_verification -->
+  - Ready for commit and push to `origin/main`.
+
 # Todo: Captain — Customer App Full Arabic RTL Reconstruction (Sprint 0 & 1 Complete)
 
 - [x] 1. Core Contract & Shared Helpers <!-- id: 1 -->
@@ -763,8 +783,32 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Run all backend and frontend tests.
   - Run `Tenant-v2` `npm run lint` (`tsc --noEmit`) and `npm run build`.
   - Verify 13 protected tracked files remain untouched.
-  - Commit and push to `main` without automatic deployment.
+  - Commit and push to `main` without automatic deployment.# BARSPA — Fresha Appointment Details Drawer: Phase 1 Read-Only Audit (Completed)
+- [x] 1. Locate entry point and component hierarchy in Tenant-v2 (`AppointmentWorkspace.tsx`) <!-- id: fdr_p1_entry -->
+- [x] 2. Inventory visible & functional drawer elements (Customer, Services, Finances, Notes, Actions) <!-- id: fdr_p1_inventory -->
+- [x] 3. Trace action behavior and backend API mappings (Status, Payments, Refunds, Reschedule, Cancellation) <!-- id: fdr_p1_actions -->
+- [x] 4. Identify BARSPA business rules to preserve (ZATCA VAT 15%, Split Payments, Overtime, Tenant isolation) <!-- id: fdr_p1_bizrules -->
+- [x] 5. Document UX gaps, mock implementations, and hidden features <!-- id: fdr_p1_gaps -->
+- [x] 6. Formulate Phase 2 comparison checklist and technical deliverable report <!-- id: fdr_p1_deliverable -->
 
+# BARSPA — Fresha Appointment Drawer: Phase 2 Gap Analysis & Alignment Specification (Completed)
+- [x] 1. Workstream A: Define target compact two-zone appointment details drawer (480px-540px) <!-- id: fdr_p2_ws_a -->
+- [x] 2. Workstream B: Define 3 decoupled experiences (Appointment Details, Sale Details, Client Profile) <!-- id: fdr_p2_ws_b -->
+- [x] 3. Workstream C: Section-by-section audit matrix with 4-tier evidence classifications <!-- id: fdr_p2_ws_c -->
+- [x] 4. Workstream D: Functional gaps disposition & action matrix (vouchers, reschedule, rebook, print/share) <!-- id: fdr_p2_ws_d -->
+- [x] 5. Workstream E: Preserve BARSPA business invariants (ZATCA 15% VAT, split payment, cancellation scope) <!-- id: fdr_p2_ws_e -->
+- [x] 6. Deliverable: Author comprehensive `fresha_drawer_phase2_gap_analysis.md` report <!-- id: fdr_p2_deliverable -->
 
-
-
+# BARSPA — Fresha Appointment Drawer: Phase 3 Implementation & Verification
+- [ ] 1. Preflight & Component Design Architecture <!-- id: fdr_p3_preflight -->
+- [ ] 2. Create `AppointmentClientHeader.tsx` (Zone A: Customer Identity, Contact shortcuts, Allergy alert, View Profile) <!-- id: fdr_p3_zone_a -->
+- [ ] 3. Create `AppointmentServiceCard.tsx` (Zone B: Stacked service cards, staff pill, timestamps, price, warnings) <!-- id: fdr_p3_service_card -->
+- [ ] 4. Create `AppointmentServiceEditor.tsx` (Option A in-place service editing with authoritative availability & conflict checks) <!-- id: fdr_p3_service_editor -->
+- [ ] 5. Create `AppointmentActionMenu.tsx` (Contextual transitions, Reschedule, Rebook, Cancel with scope dialog) <!-- id: fdr_p3_action_menu -->
+- [ ] 6. Create `AppointmentCheckoutOverlay.tsx` (Option A focused checkout, split payments, ZATCA 15% VAT, remove GFT mock) <!-- id: fdr_p3_checkout_overlay -->
+- [ ] 7. Assemble modular `AppointmentDetailsDrawer.tsx` (480px-540px, scrollable body, sticky footer, RTL/LTR) <!-- id: fdr_p3_drawer_assembly -->
+- [ ] 8. Integrate into `AppointmentWorkspace.tsx` and wire View Sale, View Profile, Rebook, Reschedule & Checkout <!-- id: fdr_p3_workspace_integration -->
+- [ ] 9. Automated Test Suite (Presentation, Actions, Checkout, Service Editing, RTL) <!-- id: fdr_p3_test_suite -->
+- [ ] 10. Regression Testing, Typecheck & Production Build (`Tenant-v2`) <!-- id: fdr_p3_verification -->
+- [ ] 11. Git Stage, Commit & Push to `main` <!-- id: fdr_p3_commit_push -->
+- [ ] 12. Final Completion Report & Manual Deployment Stop Gate <!-- id: fdr_p3_final_report -->

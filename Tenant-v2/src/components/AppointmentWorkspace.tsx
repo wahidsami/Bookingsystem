@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Language, Product, QuickLaunchRequest } from '../types';
 import InteractiveDrawers from './InteractiveDrawers';
+import { AppointmentDetailsDrawer } from './AppointmentDetailsDrawer';
 import TeamMemberProfileDrawer from './employee-profile/TeamMemberProfileDrawer';
 import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
@@ -3172,6 +3173,205 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     }
   };
 
+  const handleViewSale = (appt: any) => {
+    if (!appt) return;
+    void openCustomerTransactionRecord({
+      appointment: appt,
+      appointmentId: appt.id,
+      appointmentIdLinked: appt.id,
+      amount: Number(appt.totalPaid || appt.price || 0),
+      paymentMethod: appt.paymentMethod || 'card_pos',
+      paymentMethodLabel: appt.paymentMethod || 'Card',
+      reference: appt.invoiceNumber || appt.bookingReference || appt.id,
+      status: appt.paymentStatus || 'paid',
+      normalizedPaymentStatus: appt.paymentStatus || 'paid',
+      date: appt.date || appt.startTime || '',
+      customerId: appt.customerId,
+      customerNameEn: appt.customerNameEn,
+      customerNameAr: appt.customerNameAr,
+      serviceLabel: isRtl ? (appt.serviceNameAr || appt.serviceNameEn) : (appt.serviceNameEn || appt.serviceNameAr),
+      employeeLabel: isRtl ? (appt.staffNameAr || appt.staffName) : (appt.staffNameEn || appt.staffName),
+      invoiceNumber: appt.invoiceNumber || appt.bookingReference || appt.id,
+      typeLabel: isRtl ? 'فاتورة خدمة' : 'Service Sale',
+      detailPath: `/dashboard/appointments/${appt.id}`
+    });
+  };
+
+  const handleRebookAppointment = (appt: any) => {
+    if (!appt) return;
+    setDrawerOpen(false);
+    if (appt.staffId) {
+      setCurrentStaffId(appt.staffId);
+    }
+    setInitialCreateMode('appointment');
+    setCreateStep(1);
+    resetCreateDrawerStartTimes();
+    setIsCreateDrawerOpen(true);
+    addLocalToast(
+      isRtl ? `بدء حجز جديد للعميل ${appt.customerNameAr || appt.customerNameEn || ''}` : `Started fresh rebooking draft for ${appt.customerNameEn || appt.customerNameAr || 'customer'}`,
+      isRtl ? `Started fresh rebooking draft for ${appt.customerNameEn || appt.customerNameAr || 'customer'}` : `بدء حجز جديد للعميل ${appt.customerNameAr || appt.customerNameEn || ''}`,
+      'info'
+    );
+  };
+
+  const handleSaveServiceEdit = async (updatedItem: {
+    id: string;
+    staffId: string;
+    startTime: number;
+    duration: number;
+    date: string;
+  }) => {
+    if (!activeAppointment) return;
+    const targetDate = updatedItem.date || activeAppointment.date || getSelectedDateKey();
+    const startTimeIso = buildIsoFromMinutes(targetDate, updatedItem.startTime);
+
+    try {
+      const evalResponse = await tenantApiAdapter.evaluateScheduling({
+        tenantId: activeAppointment.tenantId || activeAppointment.tenant_id,
+        serviceId: activeAppointment.serviceId,
+        staffId: updatedItem.staffId,
+        startTime: startTimeIso,
+        duration: updatedItem.duration,
+        variantId: activeAppointment.variantId,
+        excludeAppointmentId: activeAppointment.id
+      });
+
+      if (!evalResponse?.success || !evalResponse?.decision?.valid) {
+        const errObj = { response: { data: { decision: evalResponse?.decision } } };
+        const toast = getSchedulingErrorToast(
+          errObj,
+          isRtl ? 'تعذر حفظ التعديل بسبب تعارض في المواعيد أو ساعات العمل.' : 'Cannot save due to a scheduling or duty hours conflict.',
+          isRtl ? 'Cannot save due to a scheduling or duty hours conflict.' : 'تعذر حفظ التعديل بسبب تعارض في المواعيد أو ساعات العمل.'
+        );
+        addLocalToast(toast.ar, toast.en, 'warning');
+        throw new Error(isRtl ? toast.ar : toast.en);
+      }
+
+      await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
+        staffId: updatedItem.staffId,
+        startTime: startTimeIso,
+        notifyCustomer: true
+      });
+
+      await loadBoardData();
+      const refreshed = await tenantApiAdapter.getAppointment(activeAppointment.id);
+      const apptData = refreshed?.appointment || refreshed?.data?.appointment || refreshed?.data || refreshed;
+      if (apptData) {
+        setActiveAppointment(mapBoardAppointment(apptData, getSelectedDateKey()));
+      } else {
+        setActiveAppointment(prev => prev ? {
+          ...prev,
+          staffId: updatedItem.staffId,
+          startTime: startTimeIso,
+          startMinutes: updatedItem.startTime,
+          duration: updatedItem.duration,
+          date: targetDate
+        } : null);
+      }
+      setCustomerProfileRefreshToken(t => t + 1);
+      addLocalToast(
+        isRtl ? 'تم تحديث الموعد والموظف بنجاح! 🌸' : 'Service details updated successfully! 🌸',
+        isRtl ? 'Service details updated successfully! 🌸' : 'تم تحديث الموعد والموظف بنجاح! 🌸',
+        'success'
+      );
+    } catch (err: any) {
+      console.error('Failed to save service edit', err);
+      throw err;
+    }
+  };
+
+  const handleDrawerCheckout = async (payload: {
+    appointmentId: string;
+    paymentMethod: string;
+    isSplit: boolean;
+    splitAllocations: any;
+    giftCardCode?: string;
+  }) => {
+    if (!activeAppointment) return;
+
+    const total = paymentDueAmount > 0 ? paymentDueAmount : (activeAppointment.price || 0);
+    const paymentMethodApi = payload.paymentMethod || 'card_pos';
+
+    const paymentAllocationsPayload = payload.isSplit
+      ? Object.entries(payload.splitAllocations)
+          .filter(([, amount]) => Number(amount) > 0)
+          .map(([pm, amount]) => ({
+            paymentMethod:
+              pm === 'card' ? 'card_pos' :
+              pm === 'bank' ? 'bank_transfer' :
+              pm === 'gift' ? 'gift_card_code' : pm,
+            amount: Number(amount),
+            ...(pm === 'gift' && payload.giftCardCode ? { giftCardCode: payload.giftCardCode } : {})
+          }))
+      : payload.paymentMethod === 'gift_card_code'
+        ? [{ paymentMethod: 'gift_card_code', amount: total, giftCardCode: payload.giftCardCode }]
+        : undefined;
+
+    let paymentMethodSummary = payload.isSplit ? 'Split Payment' : payload.paymentMethod;
+
+    try {
+      const paymentResponse = paymentCollectionMode === 'remainder' || hasTrueRemainderBalance
+        ? await tenantApiAdapter.recordRemainderPayment(activeAppointment.id, {
+            amount: total,
+            paymentMethod: paymentMethodApi,
+            notes: isRtl ? 'تحصيل المتبقي من داخل لوحة الموعد' : 'Collected remainder from appointment drawer',
+            paymentAllocations: paymentAllocationsPayload
+          })
+        : await tenantApiAdapter.updateAppointmentPaymentStatus(activeAppointment.id, {
+            paymentStatus: 'fully_paid',
+            paymentMethod: paymentMethodApi,
+            paymentAllocations: paymentAllocationsPayload,
+            totalPaid: total
+          });
+
+      await loadBoardData();
+      setCustomerProfileRefreshToken(token => token + 1);
+      emitBIReportRefresh({
+        source: 'payment',
+        appointmentId: activeAppointment.id
+      });
+
+      const confirmedAppointmentId = paymentResponse?.appointment?.id || paymentResponse?.data?.appointment?.id || activeAppointment.id;
+      if (confirmedAppointmentId) {
+        const refreshedAppointment = await tenantApiAdapter.getAppointment(confirmedAppointmentId);
+        const confirmedData = refreshedAppointment?.appointment || refreshedAppointment?.data?.appointment || refreshedAppointment?.data || refreshedAppointment;
+        if (confirmedData) {
+          setActiveAppointment(mapBoardAppointment(confirmedData, getSelectedDateKey()));
+        }
+      }
+
+      const receipt = {
+        orderId: `REF-APT-${activeAppointment.id.substring(0, 8).toUpperCase()}`,
+        date: (() => {
+          const tzParts = getDatePartsInTimeZone(new Date(), tenantTimezone);
+          return `${tzParts.year}-${tzParts.month}-${tzParts.day} ${tzParts.hour}:${tzParts.minute}`;
+        })(),
+        customerName: isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn,
+        serviceName: isRtl ? activeAppointment.serviceNameAr : activeAppointment.serviceNameEn,
+        servicePrice: Number(activeAppointment.price || 0),
+        products: [],
+        subtotal: Number(activeAppointment.price || 0),
+        discount: 0,
+        vat: Number(activeAppointment.price || 0) - (Number(activeAppointment.price || 0) / 1.15),
+        total,
+        paymentSummary: paymentMethodSummary
+      };
+
+      setCheckoutReceiptData(receipt);
+      setShowReceiptModal(true);
+
+      addLocalToast(
+        'تم إتمام سداد فاتورة الجلسة وخروج العميل بنجاح! 🧾',
+        'Session invoice settled and customer checked out successfully! 🧾',
+        'success'
+      );
+    } catch (err) {
+      console.error('Drawer checkout failed', err);
+      addLocalToast('فشل إتمام الدفع', 'Checkout failed. Try again.', 'warning');
+      throw err;
+    }
+  };
+
   const getAppointmentStatusOptions = (currentStatus: Appointment['status']) => {
     const options: Array<{ value: Appointment['status']; label: string }> = [];
     const push = (value: Appointment['status'], label: string) => {
@@ -6146,1172 +6346,71 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         )}
       </AnimatePresence>
 
-      {/* 4. PREMIUM APPOINTMENT DETAILS DRAWER (88vw operations workspace) */}
+      {/* 4. MODULAR FRESHA-STYLE APPOINTMENT DETAILS DRAWER */}
+      <AppointmentDetailsDrawer
+        isOpen={drawerOpen && Boolean(activeAppointment)}
+        isRtl={isRtl}
+        appointment={activeAppointment}
+        stylists={liveStylists}
+        readOnly={appointmentDetailsReadOnly}
+        slotMinutes={SLOT_MINUTES}
+        formatMinutesToTime={formatMinutesToTime}
+        onClose={() => setDrawerOpen(false)}
+        onStatusChange={async (newStatus) => {
+          if (newStatus === 'completed' && activeAppointment?.paymentStatus !== 'paid') {
+            setShowPaymentRequiredDialog(true);
+            return;
+          }
+          if (newStatus === 'cancelled') {
+            setShowCancelReasonDialog(true);
+            return;
+          }
+          await handleAppointmentStatusUpdate(newStatus as any);
+        }}
+        onViewProfile={(customerId) => {
+          setIsCustomerProfileOpen(true);
+          setCustomerDrawerTab('overview');
+        }}
+        onViewSale={(appt) => {
+          handleViewSale(appt);
+        }}
+        onRebook={(appt) => {
+          handleRebookAppointment(appt);
+        }}
+        onReschedule={(appt) => {
+          // In-place service editing handles timing & stylist adjustments
+        }}
+        onCancel={(appt) => {
+          if (appt?.bookingSessionId) {
+            setShowCancelScopeModal({ id: appt.id, notes: appt.notes, isLateCancel: false });
+          } else {
+            setShowCancelReasonDialog(true);
+          }
+        }}
+        onLateCancel={(appt) => {
+          if (appt?.bookingSessionId) {
+            setShowCancelScopeModal({ id: appt.id, notes: appt.notes, isLateCancel: true });
+          } else {
+            setShowCancelReasonDialog(true);
+          }
+        }}
+        onNoShow={async (appt) => {
+          await handleAppointmentStatusUpdate('no_show');
+        }}
+        onSaveServiceEdit={handleSaveServiceEdit}
+        onConfirmCheckout={handleDrawerCheckout}
+      />
+
       <AnimatePresence>
-        {drawerOpen && activeAppointment && (
-          <div className="fixed inset-0 z-50 flex overflow-hidden">
-
-            {/* Backdrop slide dim background */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setDrawerOpen(false)}
-              className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs"
-            />
-
-            {/* Slide drawer container spanning 88vw */}
-            <motion.div
-              initial={{ x: isRtl ? '-100%' : '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: isRtl ? '-100%' : '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-[88vw] max-w-[1400px] bg-[#FAF7FD] border-${isRtl ? 'r' : 'l'} border-[#E7DDFC] shadow-2xl flex flex-col`}
-            >
-
-              {/* STICKY COMMAND HEADER */}
-              <header className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-[#E7DDFC] px-6 py-4 flex items-center justify-between z-10 shrink-0 shadow-xs h-16">
-                <div className="flex items-center gap-3">
-                  <span className="p-2 bg-[#1D035F] rounded-xl text-[#E7DDFC] shadow-xs">
-                    <CheckCircle2 size={18} />
-                  </span>
-                <div>
-                  <h2 className="text-base font-bold text-[#1D035F] flex items-center gap-2 leading-none font-sans">
-                    {isRtl ? 'تفاصيل الحجز وإدارة العميل' : 'APPOINTMENT OPERATIONS CONTROL'}
-                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase ${getSemanticStatusBadgeClass(activeAppointment.status)}`}>
-                        {displayAppointmentStatus(activeAppointment.status) === 'confirmed' ? t.confirmed :
-                         displayAppointmentStatus(activeAppointment.status) === 'checked_in' ? t.arrived :
-                         displayAppointmentStatus(activeAppointment.status) === 'in_service' ? (isRtl ? 'بدأت الجلسة' : 'In Service') :
-                         displayAppointmentStatus(activeAppointment.status) === 'cancelled' ? (isRtl ? 'ملغي' : 'Cancelled') :
-                         displayAppointmentStatus(activeAppointment.status) === 'no_show' ? (isRtl ? 'عدم حضور' : 'No-show') : t.completed}
-                      </span>
-                      {appointmentDetailsReadOnly && (
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase bg-slate-100 text-slate-700 border border-slate-300">
-                          {isRtl ? 'وضع قراءة' : 'Read only'}
-                        </span>
-                      )}
-                    </h2>
-                    <p className="text-[10px] text-[#A379E2] font-semibold mt-1">
-                      {isRtl ? 'رقم الموعد: ' + activeAppointment.id : 'ID: ' + activeAppointment.id}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        {isRtl ? 'حالة الموعد' : 'Status'}
-                      </label>
-                      <select
-                        value={normalizeWorkspaceAppointmentStatus(activeAppointment.status) || ''}
-                        disabled={statusUpdating || appointmentDetailsReadOnly || normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'completed'}
-                        onChange={(event) => {
-                          const nextStatus = event.target.value as Appointment['status'];
-                          if (nextStatus === normalizeWorkspaceAppointmentStatus(activeAppointment.status)) return;
-
-                          if (nextStatus === 'completed') {
-                            if (activeAppointment.paymentStatus !== 'paid') {
-                              setShowPaymentRequiredDialog(true);
-                              return;
-                            }
-                          }
-
-                          if (nextStatus === 'cancelled') {
-                            setShowCancelReasonDialog(true);
-                            return;
-                          }
-
-                          void handleAppointmentStatusUpdate(nextStatus);
-                        }}
-                        className={`min-w-[170px] rounded-xl border border-[#E7DDFC] bg-white px-3 py-1.5 text-xs font-bold text-[#1D035F] outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 disabled:cursor-not-allowed disabled:opacity-60 ${isRtl ? 'text-right' : 'text-left'}`}
-                      >
-                        {getAppointmentStatusOptions(normalizeWorkspaceAppointmentStatus(activeAppointment.status)).map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Operations tools */}
-                <div className="flex items-center gap-2">
-                  <button className="p-2 text-slate-500 hover:text-[#1D035F] hover:bg-[#F3EDFC] rounded-xl transition-all cursor-pointer" title="Print Invoice">
-                    <Printer size={15} />
-                  </button>
-                  <button className="p-2 text-slate-500 hover:text-[#1D035F] hover:bg-[#F3EDFC] rounded-xl transition-all cursor-pointer" title="Share Touchpoint">
-                    <Share2 size={15} />
-                  </button>
-                  <button
-                    onClick={() => setIsCustomerProfileOpen(true)}
-                    className="px-3 py-2 text-xs font-bold text-[#1D035F] bg-[#F3EDFC] hover:bg-[#E7DDFC] rounded-xl transition-all cursor-pointer border border-[#E7DDFC]"
-                    title={isRtl ? 'فتح ملف العميل' : 'Open customer profile'}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <User size={14} className="text-[#6537C0]" />
-                      <span>{isRtl ? 'ملف العميل' : 'Customer Profile'}</span>
-                    </div>
-                  </button>
-                  <div className="h-5 w-px bg-[#E7DDFC] mx-1" />
-                  <button
-                    onClick={() => setDrawerOpen(false)}
-                    className="p-1.5 bg-[#F3EDFC] text-[#1D035F] hover:bg-[#E7DDFC] rounded-xl transition-all cursor-pointer"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              </header>
-
-              {/* OPERATIONS THREE-COLUMN WORKSPACE BODY */}
-              <div className="flex-1 overflow-y-auto p-6 md:p-8 grid grid-cols-1 xl:grid-cols-12 gap-6">
-
-                {/* COLUMN 1: STICKY CUSTOMER PROFILE & OPERATIONS SUMMARY (col-span-3) */}
-                <div className="xl:col-span-3">
-                  <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4 sticky top-4">
-
-                    {/* Customer Info Card Header */}
-                    <div className="text-center pb-4 border-b border-[#FAF7FD]">
-                      <div className="w-16 h-16 bg-[#F3EDFC] border border-[#A379E2]/30 rounded-full flex items-center justify-center font-bold text-[#6537C0] text-xl mx-auto mb-2 select-none shadow-xs">
-                        {String(activeAppointment.customerNameEn || activeAppointment.customerNameAr || activeAppointment.id || '').trim().slice(0, 2).toUpperCase()}
-                      </div>
-                      <h3 className="font-bold text-[#1D035F] text-sm leading-tight font-sans">
-                        {isRtl ? activeAppointment.customerNameAr : activeAppointment.customerNameEn}
-                      </h3>
-                      <span className="text-[10px] font-bold text-[#1D035F] bg-[#F3EDFC] border border-[#A379E2]/40 px-2.5 py-0.5 rounded-full mt-1.5 inline-block">
-                        {activeCustomerTier || '—'}
-                      </span>
-                    </div>
-
-                    {/* Quick Profile fields */}
-                    <div className="space-y-3.5 text-xs text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <Phone size={13} className="text-[#A379E2]" />
-                        <span className="font-mono">{activeCustomerPhone || '—'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Mail size={13} className="text-[#A379E2]" />
-                        <span className="truncate">{activeCustomerEmail || '—'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin size={13} className="text-[#A379E2]" />
-                        <span>{activeCustomerBranch || '—'}</span>
-                      </div>
-                    </div>
-
-                    {/* Tag chips with manual add option */}
-                    <div className="pt-3 border-t border-[#FAF7FD] space-y-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'الوسوم المميزة' : 'Customer Tags'}</span>
-                      <div className="flex flex-wrap gap-1">
-                        {activeAppointment.tags.map((tag, idx) => (
-                          <span key={idx} className="bg-[#FAF7FD] text-[#1D035F] border border-[#E7DDFC] px-2 py-0.5 rounded-md text-[10px] font-bold">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Sticky notes editor box */}
-                    <div className="pt-3 border-t border-[#FAF7FD] space-y-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{isRtl ? 'تفضيلات وملاحظات خبيرة التجميل' : 'Stylist Notes'}</span>
-                      <div className="bg-[#FAF7FD] border border-[#E7DDFC] p-3 rounded-xl text-xs text-[#1D035F] font-medium leading-relaxed">
-                        {sanitizeAppointmentNotes(activeAppointment.notes) || '—'}
-                      </div>
-                      {normalizeWorkspaceAppointmentStatus(activeAppointment.status) === 'cancelled' && (
-                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-800 text-xs mt-2 space-y-1">
-                          <p className="font-black flex items-center gap-1.5">
-                            <span>⚠️</span>
-                            <span>{isRtl ? 'سبب إلغاء الحجز:' : 'Cancellation Reason:'}</span>
-                          </p>
-                          <p className="font-semibold whitespace-pre-wrap pl-5">
-                            {(() => {
-                              const notes = activeAppointment.notes || '';
-                              const match = notes.match(/\[Cancellation Reason\]:\s*(.*)/s);
-                              return match ? match[1].trim() : (isRtl ? 'غير محدد' : 'Not specified');
-                            })()}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Wallet Quick Balance card */}
-                    <div className="pt-3 border-t border-[#FAF7FD]">
-                      <div className="bg-[#FAF7FD] p-3 rounded-xl border border-[#E7DDFC] flex items-center justify-between text-xs">
-                        <span className="text-slate-600 font-semibold">{isRtl ? 'رصيد المحفظة النشط:' : 'Active Wallet:'}</span>
-                        <span className="font-mono font-black text-[#1D035F]">{activeCustomerWallet} {t.riyal}</span>
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
-
-                {/* COLUMN 2: TABS & ACTION MODULES (col-span-5) */}
-                <div className="xl:col-span-5 space-y-5">
-
-                  {/* Sliding Tabs selector header */}
-                  <div className="bg-white p-1 rounded-2xl border border-[#E7DDFC] flex gap-1 shadow-2xs">
-                    {[
-                      { id: 'overview', label: isRtl ? 'الملخص والتحكم' : 'Interactive Hub' },
-                      { id: 'timeline', label: isRtl ? 'الخط الزمني' : 'Timeline History' },
-                      { id: 'reviews', label: isRtl ? 'التقييمات والآراء' : 'Reviews Log' }
-                    ].map(tab => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setDrawerTab(tab.id as any)}
-                        className={`flex-1 py-2 px-1 rounded-xl text-xs font-bold transition-all text-center cursor-pointer ${
-                          drawerTab === tab.id
-                            ? 'bg-[#6537C0] text-white shadow-xs'
-                            : 'text-slate-600 hover:text-[#1D035F] hover:bg-[#FAF7FD]'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* TAB 1: CORE OPERATIONS & WALLET INTERFACE */}
-                  {drawerTab === 'overview' && (
-                    <div className="space-y-5">
-
-                      {/* Active service item banner */}
-                      <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-[10px] font-bold text-[#6537C0] bg-[#F3EDFC] border border-[#A379E2]/30 px-2.5 py-0.5 rounded-full uppercase">
-                              {isRtl ? 'الخدمة الرئيسية النشطة' : 'ACTIVE SERVICE LINE'}
-                            </span>
-                            <h4 className="font-bold text-[#1D035F] text-base mt-2.5 flex items-center gap-1.5 font-sans">
-                              {(activeAppointment?.packageId || activeAppointment?.packageSnapshot) && (
-                                <Package size={16} className="text-[#6537C0] shrink-0" />
-                              )}
-                              <span>{isRtl ? activeServiceSummary.nameAr : activeServiceSummary.nameEn}</span>
-                            </h4>
-                            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                              <Clock size={12} className="text-[#A379E2]" />
-                              <span>{activeServiceSummary.duration} {t.durationMin} • {isRtl ? 'مع خبيرة التجميل' : 'assigned to'} {isRtl ? liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameAr : liveStylists.find(s=>s.id === activeAppointment.staffId)?.nameEn}</span>
-                            </p>
-                          </div>
-                          <span className="text-base font-black text-[#1D035F] font-mono">
-                            {activeServiceSummary.price} {t.riyal}
-                          </span>
-                        </div>
-
-                        {/* Interactive Rebook / Reschedule tool buttons */}
-                        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#FAF7FD]">
-                          <button
-                            onClick={async () => {
-                              if (!appointmentDetailsReadOnly) return;
-                              setAppointmentDetailsReadOnly(false);
-                              addLocalToast(
-                                isRtl ? 'الآن يمكنك إعادة جدولة هذا الموعد.' : 'You can now reschedule this appointment.',
-                                isRtl ? 'You can now reschedule this appointment.' : 'الآن يمكنك إعادة جدولة هذا الموعد.',
-                                'info'
-                              );
-                            }}
-                            className="py-2 border border-[#E7DDFC] hover:border-[#6537C0] hover:bg-[#F3EDFC] hover:text-[#1D035F] bg-white rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <Undo2 size={13} className="text-[#6537C0]" />
-                            <span>{t.rebook}</span>
-                          </button>
-
-                          <button
-                            onClick={async () => {
-                              if (appointmentDetailsReadOnly) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-                              if (activeAppointment.bookingSessionId) {
-                                setShowCancelScopeModal({ id: activeAppointment.id, notes: activeAppointment.notes, isLateCancel: false });
-                              } else {
-                                try {
-                                  const response = await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, 'cancelled', activeAppointment.notes, 'single');
-                                  if (response?.success) {
-                                    await loadBoardData();
-                                    setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
-                                    setCustomerProfileRefreshToken(token => token + 1);
-                                    addLocalToast(
-                                      isRtl ? 'تم إلغاء الموعد وحفظ الحالة على الخادم.' : 'Appointment cancelled and synced to the server.',
-                                      isRtl ? 'Appointment cancelled and synced to the server.' : 'تم إلغاء الموعد وحفظ الحالة على الخادم.',
-                                      'success'
-                                    );
-                                  } else {
-                                    throw new Error(response?.message || 'Failed to cancel appointment');
-                                  }
-                                } catch (err) {
-                                  console.error('Failed to cancel appointment', err);
-                                  addLocalToast(
-                                    isRtl ? 'تعذر إلغاء الموعد.' : 'Unable to cancel appointment.',
-                                    isRtl ? 'Unable to cancel appointment.' : 'تعذر إلغاء الموعد.',
-                                    'warning'
-                                  );
-                                }
-                              }
-                            }}
-                            className="py-2 border border-rose-200 hover:border-rose-400 hover:bg-rose-50 bg-white rounded-xl text-xs font-bold text-rose-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                            >
-                            <Trash size={13} />
-                            <span>{isRtl ? 'إلغاء الموعد' : 'Cancel Booking'}</span>
-                          </button>
-
-                          {SHOW_LATE_CANCEL_BUTTON && (
-                            <button
-                              onClick={async () => {
-                                if (appointmentDetailsReadOnly) {
-                                  addLocalToast(
-                                    isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                    isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                    'info'
-                                  );
-                                  return;
-                                }
-                                const lateCancelNotes = `${activeAppointment.notes || ''}${activeAppointment.notes ? ' | ' : ''}${isRtl ? 'إلغاء متأخر' : 'Late cancel'}`;
-                                if (activeAppointment.bookingSessionId) {
-                                  setShowCancelScopeModal({ id: activeAppointment.id, notes: lateCancelNotes, isLateCancel: true });
-                                } else {
-                                  try {
-                                    const response = await tenantApiAdapter.updateAppointmentStatus(
-                                      activeAppointment.id,
-                                      'cancelled',
-                                      lateCancelNotes,
-                                      'single'
-                                    );
-                                    if (response?.success) {
-                                      await loadBoardData();
-                                      setActiveAppointment(prev => prev ? { ...prev, status: 'cancelled' } : null);
-                                      setCustomerProfileRefreshToken(token => token + 1);
-                                      addLocalToast(
-                                        isRtl ? 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.' : 'Late cancel recorded and synced to the server.',
-                                        isRtl ? 'Late cancel recorded and synced to the server.' : 'تم تسجيل الإلغاء المتأخر وحفظه على الخادم.',
-                                        'success'
-                                      );
-                                    } else {
-                                      throw new Error(response?.message || 'Failed to mark late cancel');
-                                    }
-                                  } catch (err) {
-                                    console.error('Failed to mark late cancel', err);
-                                    addLocalToast(
-                                      isRtl ? 'تعذر تسجيل الإلغاء المتأخر.' : 'Unable to mark late cancel.',
-                                      isRtl ? 'Unable to mark late cancel.' : 'تعذر تسجيل الإلغاء المتأخر.',
-                                      'warning'
-                                    );
-                                  }
-                                }
-                              }}
-                              className="py-2 border border-amber-300 hover:border-amber-400 hover:bg-amber-50 bg-white rounded-xl text-xs font-bold text-amber-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                            >
-                              <AlertTriangle size={13} />
-                              <span>{isRtl ? 'إلغاء متأخر' : 'Late Cancel'}</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* GROUP GUESTS SESSION SUMMARY */}
-                      {activeAppointment.isGroupBooking && activeAppointment.guestsDetails && (
-                        <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4 animate-fadeIn">
-                          <div className="flex items-center gap-2 pb-2 border-b border-[#FAF7FD]">
-                            <span className="p-1.5 bg-[#F3EDFC] text-[#6537C0] rounded-xl">
-                              <Users size={14} />
-                            </span>
-                            <span className="text-xs font-black text-[#1D035F]">
-                              {isRtl ? `قائمة مرافقي الجلسة الجماعية (${activeAppointment.guestCount || activeAppointment.guestsDetails.length} أشخاص)` : `GROUP GUEST DETAILS (${activeAppointment.guestCount || activeAppointment.guestsDetails.length} Pax)`}
-                            </span>
-                          </div>
-
-                          <div className="space-y-3">
-                            {activeAppointment.guestsDetails.map((guest: any, idx: number) => {
-                              const srv = liveServices.find(s => s.id === guest.serviceId);
-                              return (
-                                <div key={guest.id || idx} className="p-3 bg-[#FAF7FD] rounded-xl border border-[#E7DDFC] space-y-2 text-xs">
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-bold text-[#1D035F] flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-[#6537C0]" />
-                                      {guest.name}
-                                    </span>
-                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase ${
-                                      guest.isFree ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-[#F3EDFC] text-[#1D035F] border border-[#A379E2]/30'
-                                    }`}>
-                                      {guest.isFree ? (isRtl ? 'خدمة مجانية 🎁' : 'Complimentary 🎁') : `${srv?.price || 0} SAR`}
-                                    </span>
-                                  </div>
-
-                                  <div className="text-slate-600 text-[11px] space-y-1">
-                                    <p className="font-medium">
-                                      <span className="text-slate-400">{isRtl ? 'الخدمة المطلوبة: ' : 'Treatment: '}</span>
-                                      {isRtl ? srv?.nameAr : srv?.nameEn}
-                                    </p>
-                                    {guest.phone && (
-                                      <p className="font-mono">
-                                        <span className="text-slate-400">{isRtl ? 'الجوال: ' : 'Phone: '}</span>
-                                        {guest.phone}
-                                      </p>
-                                    )}
-                                    {guest.notes && (
-                                      <div className="bg-amber-50/50 p-2 rounded-lg border border-amber-200 text-[10px] text-amber-900 leading-normal">
-                                        <span className="font-bold">{isRtl ? 'ملاحظة الضيف: ' : 'Guest Note: '}</span>
-                                        {guest.notes}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-{!TEMP_HIDE_REASSIGN_UI && (
-                        <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4">
-                          <div className="flex items-center gap-2 pb-2 border-b border-[#FAF7FD]">
-                            <span className="p-1.5 bg-[#F3EDFC] text-[#6537C0] rounded-xl">
-                              <CalendarIcon size={14} />
-                            </span>
-                            <span className="text-xs font-black text-[#1D035F]">{isRtl ? 'إعادة التعيين والجدولة الفورية' : 'REASSIGN & RESCHEDULE WORKSPACE'}</span>
-                          </div>
-
-                          {/* Status Dropdown */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'حالة الموعد' : 'Appointment Status'}</label>
-                            <select
-                              value={rescheduleForm?.status || ''}
-                              disabled={appointmentDetailsReadOnly}
-                              onChange={(e) => {
-                                if (appointmentDetailsReadOnly) return;
-                                setRescheduleForm(prev => prev ? { ...prev, status: e.target.value } : null);
-                              }}
-                              className={`w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                            >
-                              <option value="pending">{isRtl ? 'قيد الانتظار' : 'Pending'}</option>
-                              <option value="confirmed">{isRtl ? 'مؤكد' : 'Confirmed'}</option>
-                              <option value="checked_in">{isRtl ? 'وصلت الزبونة' : 'Arrived / Checked In'}</option>
-                              <option value="in_service">{isRtl ? 'بدأت الجلسة' : 'In Service'}</option>
-                              <option value="completed">{isRtl ? 'مكتمل' : 'Completed'}</option>
-                              <option value="no_show">{isRtl ? 'عدم حضور' : 'No Show'}</option>
-                              <option value="cancelled">{isRtl ? 'ملغى' : 'Cancelled'}</option>
-                            </select>
-                          </div>
-
-                          {/* Dropdown for Reassignment */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'إعادة تعيين خبيرة التجميل' : 'Reassign Stylist'}</label>
-                            <select
-                              value={rescheduleForm?.staffId || ''}
-                              disabled={appointmentDetailsReadOnly}
-                              onChange={(e) => {
-                                if (appointmentDetailsReadOnly) return;
-                                setRescheduleForm(prev => prev ? { ...prev, staffId: e.target.value } : null);
-                              }}
-                              className={`w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                            >
-                              {liveStylists.map(s => (
-                                <option key={s.id} value={s.id}>✨ {isRtl ? s.nameAr : s.nameEn}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          {/* Reschedule Time Selection */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تعديل التوقيت' : 'Reschedule Time'}</label>
-                              <select
-                                value={rescheduleForm?.startTime ?? ''}
-                                disabled={appointmentDetailsReadOnly}
-                                onChange={(e) => {
-                                  if (appointmentDetailsReadOnly) return;
-                                  setRescheduleForm(prev => prev ? { ...prev, startTime: parseInt(e.target.value) } : null);
-                                }}
-                                className={`w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-mono font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                              >
-                                {Array.from({ length: TOTAL_HOURS * (60 / SLOT_MINUTES) }).map((_, idx) => {
-                                  const totalMins = idx * SLOT_MINUTES;
-                                  return (
-                                    <option key={idx} value={totalMins}>
-                                      {formatMinutesToTime(totalMins)}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] text-slate-400 font-bold block uppercase">{isRtl ? 'تاريخ الجلسة' : 'Booking Date'}</label>
-                              <input
-                                type="date"
-                                value={rescheduleForm?.date || ''}
-                                disabled={appointmentDetailsReadOnly}
-                                onChange={(e) => {
-                                  if (appointmentDetailsReadOnly) return;
-                                  setRescheduleForm(prev => prev ? { ...prev, date: e.target.value } : null);
-                                }}
-                                className={`w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none ${appointmentDetailsReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Combined Action Reassign + Reschedule */}
-                          <button
-                            onClick={async () => {
-                              if (appointmentDetailsReadOnly || !rescheduleForm || !activeAppointment) {
-                                addLocalToast(
-                                  isRtl ? 'الوضع الحالي للموعد للعرض فقط.' : 'This appointment is currently read-only.',
-                                  isRtl ? 'This appointment is currently read-only.' : 'الوضع الحالي للموعد للعرض فقط.',
-                                  'info'
-                                );
-                                return;
-                              }
-
-                              let statusChanged = false;
-                              let staffChanged = false;
-                              let timeChanged = false;
-                              let hasError = false;
-
-                              const originalStartTime = activeAppointment.startMinutes ?? activeAppointment.startTime ?? 0;
-                              const originalDate = activeAppointment.date || getSelectedDateKey() || '';
-                              const isTimeChanged = rescheduleForm.startTime !== originalStartTime || rescheduleForm.date !== originalDate;
-                              const isStaffChanged = rescheduleForm.staffId !== activeAppointment.staffId;
-
-                              if (isTimeChanged || isStaffChanged) {
-                                try {
-                                  const evalResponse = await tenantApiAdapter.evaluateScheduling({
-                                    tenantId: activeAppointment.tenantId || activeAppointment.tenant_id,
-                                    serviceId: activeAppointment.serviceId,
-                                    staffId: rescheduleForm.staffId,
-                                    startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
-                                    duration: activeAppointment.duration || 60,
-                                    variantId: activeAppointment.variantId,
-                                    excludeAppointmentId: activeAppointment.id
-                                  });
-
-                                  if (!evalResponse?.success || !evalResponse?.decision?.valid) {
-                                    const errObj = { response: { data: { decision: evalResponse?.decision } } };
-                                    const toast = getSchedulingErrorToast(errObj, isRtl ? 'تعذر الحفظ بسبب تعارض في المواعيد.' : 'Cannot save due to a scheduling conflict.', isRtl ? 'Cannot save due to a scheduling conflict.' : 'تعذر الحفظ بسبب تعارض في المواعيد.');
-                                    addLocalToast(toast.ar, toast.en, 'warning');
-                                    return;
-                                  }
-                                } catch (err) {
-                                  console.error('Failed to pre-validate reschedule', err);
-                                  const toast = getSchedulingErrorToast(err, isRtl ? 'فشل التحقق من الموعد.' : 'Failed to validate appointment.', isRtl ? 'Failed to validate appointment.' : 'فشل التحقق من الموعد.');
-                                  addLocalToast(toast.ar, toast.en, 'warning');
-                                  return;
-                                }
-                              }
-
-                              try {
-                                if (rescheduleForm.status !== (activeAppointment.status || 'booked')) {
-                                  await tenantApiAdapter.updateAppointmentStatus(activeAppointment.id, rescheduleForm.status);
-                                  statusChanged = true;
-                                }
-
-                                if (isStaffChanged) {
-                                  await tenantApiAdapter.reassignAppointmentStaff(activeAppointment.id, rescheduleForm.staffId);
-                                  staffChanged = true;
-                                }
-
-                                if (isTimeChanged) {
-                                  await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
-                                    staffId: rescheduleForm.staffId,
-                                    startTime: buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime),
-                                    notifyCustomer: true
-                                  });
-                                  timeChanged = true;
-                                }
-                              } catch (err) {
-                                console.error('Failed to commit workspace changes', err);
-                                hasError = true;
-                                const toast = getSchedulingErrorToast(err, isRtl ? 'تعذر إكمال التعديلات.' : 'Unable to complete changes.', isRtl ? 'Unable to complete changes.' : 'تعذر إكمال التعديلات.');
-                                addLocalToast(toast.ar, toast.en, 'warning');
-                              } finally {
-                                if (statusChanged || staffChanged || timeChanged) {
-                                  await loadBoardData();
-                                  setActiveAppointment(prev => prev ? {
-                                    ...prev,
-                                    status: statusChanged ? rescheduleForm.status : prev.status,
-                                    staffId: (staffChanged || timeChanged) ? rescheduleForm.staffId : prev.staffId,
-                                    startTime: timeChanged ? buildIsoFromMinutes(rescheduleForm.date, rescheduleForm.startTime) : prev.startTime,
-                                    startMinutes: timeChanged ? rescheduleForm.startTime : (prev.startMinutes ?? prev.startTime ?? 0),
-                                    date: timeChanged ? rescheduleForm.date : (prev.date || getSelectedDateKey() || '')
-                                  } : null);
-                                  setCustomerProfileRefreshToken(token => token + 1);
-
-                                  if (!hasError) {
-                                    addLocalToast(
-                                      'تم حفظ التعديلات وإرسال الإشعار للعميلة بنجاح! 💬',
-                                      'Workspace changes committed and notification sent successfully! 💬',
-                                      'success'
-                                    );
-                                  }
-                                } else if (!hasError) {
-                                  addLocalToast(
-                                    'لم يتم إجراء أي تعديلات للحفظ.',
-                                    'No changes to commit.',
-                                    'info'
-                                  );
-                                }
-                              }
-                            }}
-                            className="w-full py-2.5 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                          >
-                            <Sparkles size={13} className="text-[#E7DDFC]" />
-                            <span>{isRtl ? 'حفظ وإرسال إشعار فوري 💬' : 'Commit Roster & Send Notification 💬'}</span>
-                          </button>
-                        </div>
-                      )}
-
-
-                    </div>
-                  )}
-
-                  {/* TAB 2: CLIENT TOUCHPOINT LOG */}
-                  {drawerTab === 'timeline' && (
-                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{t.timelineText}</h4>
-                      {customerProfileLoading ? (
-                        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
-                          {isRtl ? 'جاري تحميل الخط الزمني من بيانات العميل الفعلية...' : 'Loading live timeline from customer data...'}
-                        </div>
-                      ) : customerTimelineEntries.length === 0 ? (
-                        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
-                          {isRtl ? 'لا توجد أحداث زمنية متاحة لهذا العميل حالياً.' : 'No live timeline events are available for this customer yet.'}
-                        </div>
-                      ) : (
-                        <div className="relative border-l border-slate-200 pl-4 space-y-5 py-2 text-xs">
-                          {customerTimelineEntries.map((entry: any) => (
-                            <div key={entry.id} className="relative">
-                              <span className={`absolute -left-6 top-1.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
-                                entry.kind === 'appointment' ? 'bg-blue-400' :
-                                entry.kind === 'order' ? 'bg-emerald-400' :
-                                entry.kind === 'wallet' ? 'bg-amber-400' :
-                                entry.kind === 'gift' ? 'bg-pink-400' :
-                                'bg-slate-300'
-                              }`} />
-                              <div>
-                                <p className="font-bold text-slate-800">{isRtl ? entry.titleAr : entry.titleEn}</p>
-                                <p className="text-slate-500 text-[10px] mt-0.5">{isRtl ? entry.subtitleAr : entry.subtitleEn}</p>
-                                {entry.date && (
-                                  <p className="text-slate-400 mt-1 leading-relaxed text-[10px]">
-                                    {new Date(entry.date).toLocaleString(isRtl ? 'ar-SA' : 'en-US', {
-                                      dateStyle: 'medium',
-                                      timeStyle: 'short'
-                                    })}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* TAB 3: REVIEWS LOG */}
-                      {drawerTab === 'reviews' && (
-                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{t.reviewsText}</h4>
-
-                      <div className="space-y-3.5">
-                        {(() => {
-                          const reviews = customerLiveReviews;
-
-                          if (customerProfileLoading) {
-                            return (
-                              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
-                                {isRtl ? 'جاري تحميل التقييمات من ملف العميل...' : 'Loading customer reviews from the live profile...'}
-                              </div>
-                            );
-                          }
-
-                          if (reviews.length === 0) {
-                            return (
-                              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs">
-                                {isRtl ? 'لا توجد تقييمات مسجلة لهذا العميل حالياً.' : 'No customer reviews are linked to this appointment yet.'}
-                              </div>
-                            );
-                          }
-
-                          return reviews.map((review: any, idx: number) => (
-                            <div key={review.id || idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2 text-xs">
-                              <div className="flex justify-between items-center">
-                                <span className="font-bold text-slate-800">{review.serviceName || review.title || review.service?.name_en || (isRtl ? 'خدمة مرتبطة' : 'Linked Service')}</span>
-                                <div className="flex text-amber-500 gap-0.5">
-                                  {Array.from({ length: Math.max(1, Math.min(5, review.rating || 0)) }).map((_, starIdx) => (
-                                    <Star key={starIdx} size={11} fill="currentColor" />
-                                  ))}
-                                </div>
-                              </div>
-                              <p className="text-slate-600 leading-relaxed italic">
-                                {review.comment || review.text || (isRtl ? 'لا يوجد تعليق مسجل.' : 'No comment recorded.')}
-                              </p>
-                              <p className="text-[10px] text-slate-400">
-                                {review.createdAt || review.reviewedAt || ''}
-                              </p>
-                            </div>
-                          ));
-                        })()}
-
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
-                {/* COLUMN 3: FINANCIALS & PAYMENT WORKSPACE (col-span-4) */}
-                <div className="xl:col-span-4 space-y-5">
-                  <div className="bg-white p-5 rounded-2xl border border-[#E7DDFC] shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-[#1D035F] uppercase tracking-wider pb-2 border-b border-[#FAF7FD] flex items-center gap-1.5 font-sans">
-                      <CreditCard size={14} className="text-[#6537C0]" />
-                      {t.financeSummary}
-                    </h3>
-
-                    <div className="space-y-2 border-b border-[#FAF7FD] pb-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                          {isRtl ? 'بنود الفاتورة المباشرة' : 'LIVE INVOICE LINE ITEMS'}
-                        </span>
-                        <span className="text-[10px] font-bold text-[#6537C0]">
-                          {isRtl ? 'خدمة + منتجات' : 'Service + Products'}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        {activeInvoiceLineItems.length > 0 && (() => {
-                          const showQty = activeInvoiceLineItems.some(i => i.type !== 'service');
-                          return activeInvoiceLineItems.map((item) => (
-                            <div key={item.id} className="bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2.5 text-[10px] space-y-1">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="font-bold text-[#1D035F] truncate font-sans">
-                                    {isRtl ? item.nameAr : item.nameEn}
-                                  </p>
-                                  <p className="text-slate-400">
-                                    {isRtl ? 'الموظفة:' : 'Stylist:'} {isRtl ? item.stylistAr || '—' : item.stylistEn || '—'}
-                                  </p>
-                                </div>
-                                <span className="font-black text-[#1D035F] font-mono">
-                                  {item.subtotal.toFixed(2)} {t.riyal}
-                                </span>
-                              </div>
-                              <div className={`grid gap-2 text-slate-500 ${showQty ? 'grid-cols-4' : 'grid-cols-3'}`}>
-                                {showQty && (
-                                  <div>
-                                    <p className="uppercase text-[9px] font-bold text-[#A379E2]">{isRtl ? 'الكمية' : 'Qty'}</p>
-                                    <p className="font-mono font-bold text-slate-700">{item.quantity}</p>
-                                  </div>
-                                )}
-                                <div>
-                                  <p className="uppercase text-[9px] font-bold text-[#A379E2]">{isRtl ? 'سعر الوحدة' : 'Unit'}</p>
-                                  <p className="font-mono font-bold text-slate-700">{item.unitPrice.toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="uppercase text-[9px] font-bold text-[#A379E2]">{isRtl ? 'الإجمالي' : 'Subtotal'}</p>
-                                  <p className="font-mono font-bold text-slate-700">{item.subtotal.toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="uppercase text-[9px] font-bold text-[#A379E2]">{isRtl ? 'نوع' : 'Type'}</p>
-                                  <p className="font-mono font-bold text-slate-700">{item.type}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ));
-                        })()}
-
-                        {activeInvoiceLineItems.length === 0 && (
-                          <div className="p-3 rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] text-slate-500 text-[10px]">
-                            {isRtl ? 'لم يتم تحميل بنود الفاتورة بعد.' : 'Invoice line items are not loaded yet.'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-
-
-                    {/* Apply Gift Card Section */}
-                    {activeAppointment.paymentStatus !== 'paid' && (
-                      <div className="border-b border-[#FAF7FD] pb-3 space-y-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                          {isRtl ? 'تطبيق كوبون / بطاقة هدايا 🎁' : 'APPLY VOUCHER / GIFT CARD 🎁'}
-                        </span>
-
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            value={appliedGiftCardCode}
-                            onChange={(e) => setAppliedGiftCardCode(e.target.value)}
-                            placeholder={isRtl ? 'مثال: BAR-GFT-9844' : 'e.g. BAR-GFT-9844'}
-                            className="flex-1 bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2 text-xs font-semibold outline-none uppercase focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!appliedGiftCardCode.trim()) {
-                                addLocalToast('يرجى إدخال رمز بطاقة الهدايا أولاً', 'Please enter a gift card code first', 'warning');
-                                return;
-                              }
-                              const cleanedCode = appliedGiftCardCode.trim().toUpperCase();
-                              if (cleanedCode.includes('GFT') || cleanedCode.length >= 6) {
-                                setAppliedGiftCardAmount(200); // 200 SAR discount
-                                addLocalToast(
-                                  `تم تطبيق بطاقة الهدايا بنجاح! الرصيد المتاح: ٢٠٠ ر.س.`,
-                                  `Gift card applied successfully! Available balance: 200 SAR.`,
-                                  'success'
-                                );
-                              } else {
-                                addLocalToast(
-                                  `الرمز غير مطابق أو منتهي الصلاحية!`,
-                                  `Invalid or expired gift card voucher!`,
-                                  'warning'
-                                );
-                              }
-                            }}
-                            className="px-3.5 py-1.5 bg-[#1D035F] hover:bg-[#2e098a] text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs"
-                          >
-                            {isRtl ? 'تطبيق' : 'Apply'}
-                          </button>
-                        </div>
-
-                        {appliedGiftCardAmount > 0 && (
-                          <div className="p-2 bg-emerald-500/10 border border-emerald-500 rounded-xl flex justify-between items-center text-[10px] text-emerald-800">
-                            <span className="font-bold">{isRtl ? 'خصم بطاقة الهدايا نشط ✓' : 'Gift card discount active ✓'}</span>
-                            <span className="font-mono font-black">-{appliedGiftCardAmount} {t.riyal}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Pricing breakdown */}
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between text-slate-500">
-                        <span>{isRtl ? 'الإجمالي الأساسي' : 'Original Subtotal'}</span>
-                        <span className="font-mono font-bold">{(activeInvoiceSubtotal + appointmentServiceDiscount).toFixed(2)} {t.riyal}</span>
-                      </div>
-
-                      {appointmentServiceDiscount > 0 && (
-                        <div className="flex justify-between text-emerald-600 font-semibold">
-                          <span>{isRtl ? 'خصم الخدمة/الموعد' : 'Appointment Discount'}</span>
-                          <span className="font-mono font-black">-{appointmentServiceDiscount.toFixed(2)} {t.riyal}</span>
-                        </div>
-                      )}
-
-
-
-                      {appliedGiftCardAmount > 0 && (
-                        <div className="flex justify-between text-emerald-600 font-semibold">
-                          <span>{isRtl ? 'خصم بطاقة الهدايا' : 'Gift Card Discount'}</span>
-                          <span className="font-mono font-black">-{appliedGiftCardAmount.toFixed(2)} {t.riyal}</span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between text-slate-500 border-t pt-1.5 border-dashed border-[#E7DDFC]">
-                        <span>{isRtl ? 'الوعاء الخاضع للضريبة' : 'Taxable Subtotal'}</span>
-                        <span className="font-mono font-bold">{activeInvoiceTaxable.toFixed(2)} {t.riyal}</span>
-                      </div>
-
-                      <div className="flex justify-between text-slate-500">
-                        <span>{isRtl ? 'ضريبة القيمة المضافة ١٥٪' : 'ZATCA VAT (15%)'}</span>
-                        <span className="font-mono font-bold">{activeInvoiceVat.toFixed(2)} {t.riyal}</span>
-                      </div>
-
-                      <div className="h-px bg-[#FAF7FD] border-dashed border-b border-[#E7DDFC] pt-1" />
-
-                      <div className="flex justify-between text-sm font-black text-[#1D035F] pt-1 font-sans">
-                        <span>{isRtl ? 'المبلغ الكلي المستحق' : 'Total Amount Due'}</span>
-                        <span className="font-mono text-[#6537C0] font-black">{activeInvoiceTotal.toFixed(2)} {t.riyal}</span>
-                      </div>
-
-                      <div className="flex justify-between text-slate-500">
-                        <span>{isRtl ? 'الرصيد المتبقي' : 'Remaining Balance'}</span>
-                        <span className="font-mono font-bold">{activeInvoiceRemaining.toFixed(2)} {t.riyal}</span>
-                      </div>
-
-                      {splitAmounts.wallet > 0 && (
-                        <div className="flex justify-between text-[#6537C0] font-semibold">
-                          <span>{isRtl ? 'خصم/سداد المحفظة' : 'Wallet Deduction'}</span>
-                          <span className="font-mono font-black">-{Number(splitAmounts.wallet).toFixed(2)} {t.riyal}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* SPLIT PAYMENTS COMPONENT CONTAINER */}
-                    {(() => {
-                      const isAlreadyFullyPaid =
-                        activeAppointment.paymentStatus === 'paid' ||
-                        activeAppointment.paymentStatus === 'fully_paid' ||
-                        (activeInvoiceTotal > 0 && Math.max(0, activeInvoiceTotal - Number(activeAppointment.totalPaid ?? 0)) <= 0);
-
-                      if (isAlreadyFullyPaid) {
-                        return (
-                          <div className="pt-3 border-t border-[#FAF7FD] mt-2">
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-emerald-800 text-center shadow-sm">
-                              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-1">
-                                <CheckCircle2 size={26} className="text-emerald-600" />
-                              </div>
-                              <h4 className="font-black text-sm">{isRtl ? 'تم السداد بالكامل' : 'Payment Completed'}</h4>
-                              <p className="text-xs font-bold opacity-90">
-                                {isRtl ? 'المبلغ المسدد:' : 'Amount Paid:'} <span className="font-mono">{Number(activeAppointment.totalPaid ?? 0).toFixed(2)} {t.riyal}</span>
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return (
-                        <>
-                          <div className="pt-3 border-t border-[#FAF7FD] space-y-3">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                          {isRtl ? 'طريقة الدفع' : 'Payment method'}
-                        </label>
-                        <select
-                          value={selectedPaymentMethod || ''}
-                          onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                          className="w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl px-3 py-2 text-xs font-bold text-[#1D035F] focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none"
-                        >
-                          <option value="">{isRtl ? 'اختر طريقة الدفع' : 'Choose payment method'}</option>
-                          {paymentMethodOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {isRtl ? option.labelAr : option.labelEn}
-                            </option>
-                          ))}
-                        </select>
-                        {selectedPaymentMethod === 'gift_card_code' && !isSplitActive && (
-                          <div className="pt-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                              {isRtl ? 'رمز بطاقة الهدية' : 'Gift Card Code'}
-                            </label>
-                            <input
-                              type="text"
-                              value={giftCardCodeInput}
-                              onChange={(e) => setGiftCardCodeInput(e.target.value)}
-                              placeholder="XXXX-XXXX-XXXX"
-                              className="w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl px-3 py-2 text-xs font-bold text-[#1D035F] uppercase focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none"
-                            />
-                          </div>
-                        )}
-                        <p className="text-[10px] text-slate-400 leading-relaxed">
-                          {isRtl
-                            ? 'اختر طريقة الدفع قبل المتابعة.'
-                            : 'Choose a payment method before continuing.'}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{t.splitPayments}</span>
-                        <button
-                          onClick={() => setIsSplitActive(!isSplitActive)}
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
-                            isSplitActive ? 'bg-[#6537C0] text-white shadow-xs' : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          <Split size={10} />
-                          <span>{isSplitActive ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'تفعيل' : 'Activate')}</span>
-                        </button>
-                      </div>
-
-                      {isSplitActive ? (
-                        <div className="space-y-3 animate-fadeIn mt-2">
-                          {(() => {
-                            const totalDue = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
-                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0);
-                            const remaining = Math.max(0, totalDue - splitSum);
-                            const isSplitValid = totalDue > 0 && Math.abs(splitSum - totalDue) < 0.01;
-                            const isSplitComplete = totalDue > 0 && remaining === 0 && isSplitValid;
-                            const hasOverpayment = splitSum > totalDue + 0.01;
-
-                            return (
-                              <>
-                                <div className={`p-2 rounded-xl border ${isSplitComplete ? 'bg-emerald-50 border-emerald-200' : (hasOverpayment ? 'bg-rose-50 border-rose-200' : 'bg-[#FAF7FD] border-[#E7DDFC]')}`}>
-                                  <div className="flex justify-between text-[10px] mb-1">
-                                    <span className="text-slate-500">{isRtl ? 'المطلوب:' : 'Invoice Total:'}</span>
-                                    <span className="font-bold font-mono">{totalDue.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-[10px] mb-1">
-                                    <span className="text-slate-500">{isRtl ? 'المدفوع:' : 'Allocated Amount:'}</span>
-                                    <span className={`font-bold font-mono ${hasOverpayment ? 'text-rose-600' : 'text-emerald-600'}`}>{splitSum.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-[11px] font-black pt-1 border-t border-slate-200 border-dashed">
-                                    <span className={hasOverpayment ? 'text-rose-600' : 'text-slate-700'}>{isRtl ? 'المتبقي:' : 'Remaining Balance:'}</span>
-                                    <span className={`font-mono ${isSplitComplete ? 'text-emerald-600' : (hasOverpayment ? 'text-rose-600' : 'text-[#6537C0]')}`}>
-                                      {isSplitComplete ? (isRtl ? 'اكتمل التخصيص' : 'Allocation Complete') : `${remaining.toFixed(2)}`}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-4 gap-2 text-[10px]">
-                                  <div>
-                                    <label className="text-slate-400 block text-center mb-1">Mada</label>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (!splitAmounts.card && remaining > 0) {
-                                          setSplitAmounts(prev => ({ ...prev, card: parseFloat((remaining + (prev.card || 0)).toFixed(2)) }));
-                                        }
-                                      }}
-                                      className="w-full mb-1 py-1 bg-[#F3EDFC] hover:bg-[#E7DDFC] text-[#6537C0] rounded-lg text-[9px] font-bold transition-colors cursor-pointer"
-                                    >
-                                      {isRtl ? '+ إضافة' : '+ Add'}
-                                    </button>
-                                    <input type="number" placeholder="0" value={splitAmounts.card || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, card: parseFloat(e.target.value) || 0 }))} className="w-full border border-[#E7DDFC] p-1 rounded-lg font-mono text-center font-bold focus:border-[#6537C0] outline-none" />
-                                  </div>
-                                  <div>
-                                    <label className="text-slate-400 block text-center mb-1">Cash</label>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (!splitAmounts.cash && remaining > 0) {
-                                          setSplitAmounts(prev => ({ ...prev, cash: parseFloat((remaining + (prev.cash || 0)).toFixed(2)) }));
-                                        }
-                                      }}
-                                      className="w-full mb-1 py-1 bg-[#F3EDFC] hover:bg-[#E7DDFC] text-[#6537C0] rounded-lg text-[9px] font-bold transition-colors cursor-pointer"
-                                    >
-                                      {isRtl ? '+ إضافة' : '+ Add'}
-                                    </button>
-                                    <input type="number" placeholder="0" value={splitAmounts.cash || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, cash: parseFloat(e.target.value) || 0 }))} className="w-full border border-[#E7DDFC] p-1 rounded-lg font-mono text-center font-bold focus:border-[#6537C0] outline-none" />
-                                  </div>
-                                  <div>
-                                    <label className="text-slate-400 block text-center mb-1">Wallet</label>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (!splitAmounts.wallet && remaining > 0) {
-                                          setSplitAmounts(prev => ({ ...prev, wallet: parseFloat((remaining + (prev.wallet || 0)).toFixed(2)) }));
-                                        }
-                                      }}
-                                      className="w-full mb-1 py-1 bg-[#F3EDFC] hover:bg-[#E7DDFC] text-[#6537C0] rounded-lg text-[9px] font-bold transition-colors cursor-pointer"
-                                    >
-                                      {isRtl ? '+ إضافة' : '+ Add'}
-                                    </button>
-                                    <input type="number" placeholder="0" value={splitAmounts.wallet || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, wallet: parseFloat(e.target.value) || 0 }))} className="w-full border border-[#E7DDFC] p-1 rounded-lg font-mono text-center font-bold focus:border-[#6537C0] outline-none" />
-                                  </div>
-                                  <div>
-                                    <label className="text-slate-400 block text-center mb-1">Gift</label>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (!splitAmounts.gift && remaining > 0) {
-                                          setSplitAmounts(prev => ({ ...prev, gift: parseFloat((remaining + (prev.gift || 0)).toFixed(2)) }));
-                                        }
-                                      }}
-                                      className="w-full mb-1 py-1 bg-[#F3EDFC] hover:bg-[#E7DDFC] text-[#6537C0] rounded-lg text-[9px] font-bold transition-colors cursor-pointer"
-                                    >
-                                      {isRtl ? '+ إضافة' : '+ Add'}
-                                    </button>
-                                    <input type="number" placeholder="0" value={splitAmounts.gift || ''} onChange={(e) => setSplitAmounts(prev => ({ ...prev, gift: parseFloat(e.target.value) || 0 }))} className="w-full border border-[#E7DDFC] p-1 rounded-lg font-mono text-center font-bold focus:border-[#6537C0] outline-none" />
-                                  </div>
-                                </div>
-                                {splitAmounts.gift > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-[#FAF7FD]">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                                      {isRtl ? 'رمز بطاقة الهدية' : 'Gift Card Code'}
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={giftCardCodeInput}
-                                      onChange={(e) => setGiftCardCodeInput(e.target.value)}
-                                      placeholder="XXXX-XXXX-XXXX"
-                                      className="w-full bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl px-3 py-2 text-xs font-bold text-[#1D035F] uppercase focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 outline-none"
-                                    />
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      ) : (
-                        <p className="text-[10px] text-slate-400 leading-relaxed mt-2">
-                          {isRtl ? 'تسمح هذه الأداة بتقسيم الفاتورة الكلية على أكثر من طريقة دفع (مثل البطاقة + كاش).' : 'Allows split distribution among multiple payment methods (Card, Cash, Wallet, Bank transfer).'}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Checkout and Complete operation */}
-                    <div className="pt-3">
-                        <button
-                          disabled={
-                            isSplitActive
-                              ? !(Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) > 0 && Math.max(0, Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) - ((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0))) === 0 && Math.abs(((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0)) - Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0))) < 0.01)
-                              : !selectedPaymentMethod.trim()
-                          }
-                          onClick={() => {
-                            const totalDue = Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0));
-                            const splitSum = (splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0) + (splitAmounts.gift || 0);
-                            const remaining = Math.max(0, totalDue - splitSum);
-                            const isSplitValid = totalDue > 0 && Math.abs(splitSum - totalDue) < 0.01;
-                            const isSplitComplete = totalDue > 0 && remaining === 0 && isSplitValid;
-
-                            if (isSplitActive) {
-                              if (!isSplitComplete) {
-                                addLocalToast(
-                                  'الرجاء إكمال تخصيص تقسيم المدفوعات.',
-                                  'Please complete the split payment allocation.',
-                                  'warning'
-                                );
-                                return;
-                              }
-                            } else if (!selectedPaymentMethod.trim()) {
-                              addLocalToast(
-                                'الرجاء اختيار طريقة الدفع أولاً.',
-                                'Please choose a payment method first.',
-                                'warning'
-                              );
-                              return;
-                            }
-                            setShowPaymentConfirmModal(true);
-                          }}
-                          className={`w-full py-3 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-bold tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
-                            (isSplitActive
-                              ? (Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) > 0 && Math.max(0, Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0)) - ((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0))) === 0 && Math.abs(((splitAmounts.card || 0) + (splitAmounts.cash || 0) + (splitAmounts.wallet || 0)) - Math.max(0, activeInvoiceTotal - Number(activeAppointment?.totalPaid ?? 0))) < 0.01)
-                              : selectedPaymentMethod.trim()) ? '' : 'cursor-not-allowed opacity-60'
-                          }`}
-                        >
-                          <CheckCircle2 size={15} className="text-[#E7DDFC]" />
-                          <span>{t.checkout}</span>
-                        </button>
-                    </div>
-                        </>
-                      );
-                    })()}
-
-                    <div className="pt-3">
-                      {refundableAmount > 0.009 && (
-                        <div className="mt-3 space-y-2">
-                          <div className="grid grid-cols-2 gap-2 text-[10px]">
-                            <div className="rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3 py-2">
-                              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{isRtl ? 'المبلغ الأصلي' : 'Original Payment'}</p>
-                              <p className="mt-1 font-mono font-black text-[#1D035F]">{originalPaymentAmount.toFixed(2)} {t.riyal}</p>
-                            </div>
-                            <div className="rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3 py-2">
-                              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{isRtl ? 'الاسترداد السابق' : 'Already Refunded'}</p>
-                              <p className="mt-1 font-mono font-black text-[#1D035F]">{alreadyRefundedAmount.toFixed(2)} {t.riyal}</p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={openRefundDialog}
-                            disabled={appointmentDetailsReadOnly || refundableAmount <= 0.009}
-                            className={`w-full py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all shadow-sm flex items-center justify-center gap-2 border ${
-                              appointmentDetailsReadOnly || refundableAmount <= 0.009
-                                ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
-                                : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 cursor-pointer'
-                            }`}
-                          >
-                            <RefreshCw size={14} />
-                            <span>{isRtl ? 'استرداد' : 'Refund'}</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                </div>
-
-              </div>
-
-              <AnimatePresence>
                 {isCustomerProfileOpen && activeAppointment && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 z-20"
+                    className="fixed inset-0 z-50 overflow-hidden"
                   >
                     <div
-                      className="absolute inset-0 bg-zinc-950/10"
+                      className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs"
                       onClick={() => {
                         setIsCustomerProfileOpen(false);
                         setCustomerTransactionDetail(null);
@@ -7972,11 +7071,6 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   />
                 )}
               </AnimatePresence>
-
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Render modular advanced interactive creation & POS checkout drawers */}
       <InteractiveDrawers
