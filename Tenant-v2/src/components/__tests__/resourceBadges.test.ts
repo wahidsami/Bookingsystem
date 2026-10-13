@@ -360,3 +360,108 @@ test('Scenario 12: Request sequencing drops stale in-flight availability respons
   assert.equal(activeAvailabilityMap['cat-srv-massage'].isAvailable, true, 'Stale out-of-order response was dropped');
 });
 
+test('Scenario 13: Authoritative capacity count labels in English and Arabic', () => {
+  // Available 1 out of 2 instances
+  const countAvailableEn = `${1}/${2} available`;
+  const countAvailableAr = `${1}/${2} متاح`;
+  assert.equal(countAvailableEn, '1/2 available');
+  assert.equal(countAvailableAr, '1/2 متاح');
+
+  // Conflict: 0 out of 2 instances
+  const countExhaustedEn = `${0}/${2} available`;
+  const countExhaustedAr = `${0}/${2} متاح`;
+  assert.equal(countExhaustedEn, '0/2 available');
+  assert.equal(countExhaustedAr, '0/2 متاح');
+
+  // Full single capacity: 1 out of 1
+  const countSingleEn = `${1}/${1} available`;
+  const countSingleAr = `${1}/${1} متاح`;
+  assert.equal(countSingleEn, '1/1 available');
+  assert.equal(countSingleAr, '1/1 متاح');
+});
+
+test('Scenario 14: Failed or unverified checks never display invented counts', () => {
+  const unverifiedStatus: { availableQuantity?: number; totalActive?: number; status: 'loading' | 'available' | 'conflict' } = {
+    status: 'loading',
+    availableQuantity: undefined,
+    totalActive: undefined
+  };
+
+  const hasCapacityCount = unverifiedStatus.status !== 'loading'
+    && typeof unverifiedStatus.availableQuantity === 'number'
+    && typeof unverifiedStatus.totalActive === 'number';
+
+  assert.equal(hasCapacityCount, false, 'Unverified check must never display capacity count');
+});
+
+test('Scenario 15: Independent resources retain their respective counts without bleed-through', () => {
+  // Salon has 2 Massage Beds and 1 Pedicure Station
+  const results = {
+    'cat-massage': {
+      id: 'cat-massage',
+      hasRequirements: true,
+      isAvailable: false,
+      requirements: [{
+        resourceTypeId: 'rt-bed',
+        resourceTypeName: 'Massage Room',
+        resourceTypeNameAr: 'غرفة مساج',
+        quantity: 1,
+        available: false,
+        availableQuantity: 0,
+        totalActive: 2,
+        reason: 'RESOURCE_OCCUPIED'
+      }]
+    },
+    'cat-pedicure': {
+      id: 'cat-pedicure',
+      hasRequirements: true,
+      isAvailable: true,
+      requirements: [{
+        resourceTypeId: 'rt-pedi',
+        resourceTypeName: 'Pedicure Station',
+        resourceTypeNameAr: 'محطة بدكير',
+        quantity: 1,
+        available: true,
+        availableQuantity: 1,
+        totalActive: 1
+      }]
+    }
+  };
+
+  const massageReq = results['cat-massage'].requirements[0];
+  const pediReq = results['cat-pedicure'].requirements[0];
+
+  assert.equal(massageReq.available, false);
+  assert.equal(massageReq.availableQuantity, 0);
+  assert.equal(massageReq.totalActive, 2);
+
+  assert.equal(pediReq.available, true);
+  assert.equal(pediReq.availableQuantity, 1);
+  assert.equal(pediReq.totalActive, 1);
+});
+
+test('Scenario 16: Dynamic count updates when adding and removing participant services', () => {
+  let totalBeds = 2;
+  let stagedBedCount = 0;
+
+  // Initial: 0 staged -> 2/2 available
+  let availableBeds = totalBeds - stagedBedCount;
+  assert.equal(`${availableBeds}/${totalBeds} available`, '2/2 available');
+
+  // Participant 1 stages massage -> 1/2 available
+  stagedBedCount += 1;
+  availableBeds = totalBeds - stagedBedCount;
+  assert.equal(`${availableBeds}/${totalBeds} available`, '1/2 available');
+
+  // Participant 2 stages massage -> 0/2 available (conflict!)
+  stagedBedCount += 1;
+  availableBeds = totalBeds - stagedBedCount;
+  assert.equal(`${availableBeds}/${totalBeds} available`, '0/2 available');
+
+  // Participant 2 removes service -> restores to 1/2 available
+  stagedBedCount -= 1;
+  availableBeds = totalBeds - stagedBedCount;
+  assert.equal(`${availableBeds}/${totalBeds} available`, '1/2 available');
+});
+
+

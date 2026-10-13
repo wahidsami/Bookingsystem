@@ -76,6 +76,8 @@ interface ResourceBadgeProps {
   nameEn: string;
   nameAr: string;
   quantity?: number;
+  availableQuantity?: number | null;
+  totalActive?: number | null;
   status: 'loading' | 'available' | 'conflict';
   isRtl: boolean;
   conflictDetails?: {
@@ -93,6 +95,8 @@ export function ResourceBadge({
   nameEn,
   nameAr,
   quantity = 1,
+  availableQuantity = null,
+  totalActive = null,
   status,
   isRtl,
   conflictDetails,
@@ -100,6 +104,15 @@ export function ResourceBadge({
 }: ResourceBadgeProps) {
   const displayName = isRtl ? (nameAr || nameEn) : (nameEn || nameAr);
   const qtyLabel = quantity > 1 ? ` x${quantity}` : '';
+
+  // Authoritative capacity count label (e.g. "1/2 available" / "1/2 متاح")
+  const hasCapacityCount = status !== 'loading'
+    && typeof availableQuantity === 'number'
+    && typeof totalActive === 'number';
+
+  const capacityLabel = hasCapacityCount
+    ? (isRtl ? `${availableQuantity}/${totalActive} متاح` : `${availableQuantity}/${totalActive} available`)
+    : '';
 
   // Format availableAgainAt for conflict tooltip/badge
   let availAgainLabel = '';
@@ -118,9 +131,13 @@ export function ResourceBadge({
   }
 
   const tooltip = status === 'conflict'
-    ? (isRtl ? (conflictDetails?.messageAr || 'المورد مشغول حالياً') : (conflictDetails?.messageEn || 'Resource currently occupied'))
+    ? (isRtl
+        ? (conflictDetails?.messageAr || `${displayName}: غير متاح حالياً (${capacityLabel})`)
+        : (conflictDetails?.messageEn || `${displayName}: currently unavailable (${capacityLabel})`))
     : status === 'available'
-    ? (isRtl ? 'المورد متاح في هذا الوقت' : 'Resource available for this time')
+    ? (isRtl
+        ? `${displayName}: متاح في هذا الوقت (${capacityLabel})`
+        : `${displayName}: available for this time (${capacityLabel})`)
     : (isRtl ? 'جاري التحقق من الموارد...' : 'Verifying resource availability...');
 
   if (status === 'loading') {
@@ -128,11 +145,11 @@ export function ResourceBadge({
       <span
         title={tooltip}
         className={`inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100/80 text-slate-500 font-medium select-none ${
-          compact ? 'px-1.5 py-0.2 text-[9px]' : 'px-2 py-0.5 text-[10px]'
+          compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]'
         }`}
       >
         <Loader2 className="w-2.5 h-2.5 animate-spin text-slate-400" />
-        <span className="truncate max-w-[120px]">{displayName}{qtyLabel}</span>
+        <span className="truncate max-w-[100px] sm:max-w-[130px]">{displayName}{qtyLabel}</span>
       </span>
     );
   }
@@ -142,11 +159,16 @@ export function ResourceBadge({
       <span
         title={tooltip}
         className={`inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 text-rose-700 font-bold select-none ${
-          compact ? 'px-1.5 py-0.2 text-[9px]' : 'px-2 py-0.5 text-[10px]'
+          compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]'
         }`}
       >
         <AlertCircle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
-        <span className="truncate max-w-[120px]">{displayName}{qtyLabel}</span>
+        <span className="truncate max-w-[90px] sm:max-w-[130px]">{displayName}{qtyLabel}</span>
+        {capacityLabel && (
+          <span className="shrink-0 font-medium text-[8.5px] sm:text-[9.5px] opacity-90">
+            · {capacityLabel}
+          </span>
+        )}
         {availAgainLabel && (
           <span className="font-mono text-[8px] bg-rose-200/60 text-rose-800 px-1 rounded flex items-center gap-0.5 shrink-0">
             <Clock className="w-2 h-2" />
@@ -162,11 +184,16 @@ export function ResourceBadge({
     <span
       title={tooltip}
       className={`inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50/80 text-emerald-700 font-medium select-none ${
-        compact ? 'px-1.5 py-0.2 text-[9px]' : 'px-2 py-0.5 text-[10px]'
+        compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]'
       }`}
     >
       <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
-      <span className="truncate max-w-[120px]">{displayName}{qtyLabel}</span>
+      <span className="truncate max-w-[90px] sm:max-w-[130px]">{displayName}{qtyLabel}</span>
+      {capacityLabel && (
+        <span className="shrink-0 font-semibold text-[8.5px] sm:text-[9.5px] opacity-90">
+          · {capacityLabel}
+        </span>
+      )}
     </span>
   );
 }
@@ -214,6 +241,8 @@ export function ResourceBadgeList({
         const nameEn = liveStatus?.resourceTypeName || req.resourceType?.name_en || 'Resource';
         const nameAr = liveStatus?.resourceTypeNameAr || req.resourceType?.name_ar || nameEn;
         const qty = liveStatus?.quantity || req.quantity || 1;
+        const availableQty = typeof liveStatus?.availableQuantity === 'number' ? liveStatus.availableQuantity : null;
+        const totalCapacity = typeof liveStatus?.totalActive === 'number' ? liveStatus.totalActive : null;
 
         return (
           <ResourceBadge
@@ -221,6 +250,8 @@ export function ResourceBadgeList({
             nameEn={nameEn}
             nameAr={nameAr}
             quantity={qty}
+            availableQuantity={availableQty}
+            totalActive={totalCapacity}
             status={status}
             isRtl={isRtl}
             conflictDetails={liveStatus?.available === false ? {

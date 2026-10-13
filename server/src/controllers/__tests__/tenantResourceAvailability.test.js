@@ -434,4 +434,108 @@ describe('Authoritative Batch Resource Availability & Badges (Phase 5A)', () => 
             });
         });
     });
+
+    describe('8. Authoritative Capacity Counts & Independent Resources (Phase 5A Badge Counts)', () => {
+        const SERVICE_PEDICURE = 'srv-pedicure-3333';
+        const TYPE_PEDI = 'type-pedicure-station';
+
+        test('Returns exact availableQuantity and totalActive for one occupied room, both occupied rooms, and independent stations', async () => {
+            // Setup: 2 Massage Beds, 1 Pedicure Station
+            jest.spyOn(db.Resource, 'findAll').mockResolvedValue([
+                { id: 'res-bed-1', resourceTypeId: TYPE_BED, name_en: 'Bed 1', name_ar: 'سرير 1', is_active: true },
+                { id: 'res-bed-2', resourceTypeId: TYPE_BED, name_en: 'Bed 2', name_ar: 'سرير 2', is_active: true },
+                { id: 'res-pedi-1', resourceTypeId: TYPE_PEDI, name_en: 'Pedi Station 1', name_ar: 'محطة بدكير 1', is_active: true }
+            ]);
+
+            jest.spyOn(db.ServiceResourceRequirement, 'findAll').mockImplementation(async ({ where }) => {
+                if (where.serviceId === SERVICE_MASSAGE) {
+                    return [{
+                        resourceTypeId: TYPE_BED,
+                        quantity: 1,
+                        variantId: null,
+                        resourceType: { id: TYPE_BED, name_en: 'Massage Bed', name_ar: 'سرير مساج', is_active: true }
+                    }];
+                }
+                if (where.serviceId === SERVICE_PEDICURE) {
+                    return [{
+                        resourceTypeId: TYPE_PEDI,
+                        quantity: 1,
+                        variantId: null,
+                        resourceType: { id: TYPE_PEDI, name_en: 'Pedicure Station', name_ar: 'محطة بدكير', is_active: true }
+                    }];
+                }
+                return [];
+            });
+
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            // State 1: Participant 1 stages Massage at 10:00.
+            // When probing at 10:00:
+            // Massage Bed should have 1 available out of 2 total (1/2 available)
+            // Pedicure Station should have 1 available out of 1 total (1/1 available)
+            const state1 = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'p1-massage', serviceId: SERVICE_MASSAGE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'cat-massage', serviceId: SERVICE_MASSAGE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 },
+                    { id: 'cat-pedicure', serviceId: SERVICE_PEDICURE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 }
+                ]
+            });
+
+            const catMassage1 = state1.results['cat-massage'];
+            expect(catMassage1.isAvailable).toBe(true);
+            expect(catMassage1.requirements[0].availableQuantity).toBe(1);
+            expect(catMassage1.requirements[0].totalActive).toBe(2);
+
+            const catPedicure1 = state1.results['cat-pedicure'];
+            expect(catPedicure1.isAvailable).toBe(true);
+            expect(catPedicure1.requirements[0].availableQuantity).toBe(1);
+            expect(catPedicure1.requirements[0].totalActive).toBe(1);
+
+            // State 2: Participant 2 ALSO stages Massage at 10:00 (both massage rooms now occupied).
+            // When probing at 10:00:
+            // Massage Bed capacity is exhausted: 0 available out of 2 total (0/2 available) -> CONFLICT (red)
+            // Pedicure Station remains independent and available: 1/1 available -> AVAILABLE (green)
+            const state2 = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'p1-massage', serviceId: SERVICE_MASSAGE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 },
+                    { id: 'p2-massage', serviceId: SERVICE_MASSAGE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'cat-massage', serviceId: SERVICE_MASSAGE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 },
+                    { id: 'cat-pedicure', serviceId: SERVICE_PEDICURE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 }
+                ]
+            });
+
+            const catMassage2 = state2.results['cat-massage'];
+            expect(catMassage2.isAvailable).toBe(false);
+            expect(catMassage2.requirements[0].availableQuantity).toBe(0);
+            expect(catMassage2.requirements[0].totalActive).toBe(2);
+            expect(catMassage2.requirements[0].reason).toBe('RESOURCE_OCCUPIED');
+
+            const catPedicure2 = state2.results['cat-pedicure'];
+            expect(catPedicure2.isAvailable).toBe(true);
+            expect(catPedicure2.requirements[0].availableQuantity).toBe(1);
+            expect(catPedicure2.requirements[0].totalActive).toBe(1);
+
+            // State 3: Removing Participant 2's massage restores Bed availability back to 1/2 available immediately
+            const state3 = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'p1-massage', serviceId: SERVICE_MASSAGE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'cat-massage', serviceId: SERVICE_MASSAGE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 }
+                ]
+            });
+
+            const catMassage3 = state3.results['cat-massage'];
+            expect(catMassage3.isAvailable).toBe(true);
+            expect(catMassage3.requirements[0].availableQuantity).toBe(1);
+            expect(catMassage3.requirements[0].totalActive).toBe(2);
+        });
+    });
 });
