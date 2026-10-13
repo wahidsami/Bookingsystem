@@ -168,36 +168,6 @@ export const AppointmentClientHeader: React.FC<AppointmentClientHeaderProps> = (
               <div
                 className={`absolute top-full mt-1.5 ${isRtl ? 'left-0' : 'right-0'} w-44 bg-white rounded-xl shadow-xl border border-[#E7DDFC] py-1.5 z-30 animate-fadeIn`}
               >
-                {cleanPhone && (
-                  <>
-                    <a
-                      href={`tel:${cleanPhone}`}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#F3EDFC] hover:text-[#1D035F] transition-colors"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      <Phone size={13} className="text-emerald-600" />
-                      <span>{isRtl ? 'اتصال هاتفي' : 'Call client'}</span>
-                    </a>
-                    <a
-                      href={`https://wa.me/${waPhone}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#F3EDFC] hover:text-[#1D035F] transition-colors"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      <MessageCircle size={13} className="text-emerald-600" />
-                      <span>{isRtl ? 'محادثة واتساب' : 'WhatsApp'}</span>
-                    </a>
-                    <a
-                      href={`sms:${cleanPhone}`}
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#F3EDFC] hover:text-[#1D035F] transition-colors"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      <MessageSquare size={13} className="text-blue-600" />
-                      <span>{isRtl ? 'رسالة نصية SMS' : 'Send SMS'}</span>
-                    </a>
-                  </>
-                )}
                 <button
                   type="button"
                   onClick={() => {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Clock, User, Calendar, AlertCircle, Check, X, Loader2 } from 'lucide-react';
 import { AppointmentServiceItem } from './AppointmentServiceCard';
+import { DEFAULT_TENANT_TIMEZONE, getBoardMinutesFromTimestamp } from '../lib/tenantTime';
 
 export interface StylistOption {
   id: string;
@@ -11,7 +12,8 @@ export interface StylistOption {
 
 export function parseAppointmentStartMinutes(
   rawStartTime: string | number | undefined,
-  startHour: number = 9
+  startHour: number = 9,
+  timeZone: string = DEFAULT_TENANT_TIMEZONE
 ): number {
   if (typeof rawStartTime === 'number') {
     if (rawStartTime >= 0 && rawStartTime < 720) {
@@ -26,12 +28,9 @@ export function parseAppointmentStartMinutes(
   if (typeof rawStartTime === 'string') {
     const trimmed = rawStartTime.trim();
     if (trimmed.includes('T')) {
-      const d = new Date(trimmed);
-      if (!isNaN(d.getTime())) {
-        const hours = d.getHours();
-        const mins = d.getMinutes();
-        const minsFromMidnight = hours * 60 + mins;
-        return Math.max(0, minsFromMidnight - (startHour * 60));
+      const parsedMinutes = getBoardMinutesFromTimestamp(trimmed, timeZone, startHour);
+      if (parsedMinutes !== null && !isNaN(parsedMinutes)) {
+        return parsedMinutes;
       }
     }
     if (trimmed.includes(':')) {
@@ -45,7 +44,7 @@ export function parseAppointmentStartMinutes(
     }
     const parsedNum = parseFloat(trimmed);
     if (!isNaN(parsedNum)) {
-      return parseAppointmentStartMinutes(parsedNum, startHour);
+      return parseAppointmentStartMinutes(parsedNum, startHour, timeZone);
     }
   }
 
@@ -60,6 +59,7 @@ export interface AppointmentServiceEditorProps {
   slotMinutes?: number;
   startHour?: number;
   totalHours?: number;
+  tenantTimezone?: string;
   formatMinutesToTime: (mins: number) => string;
   onSave: (updatedItem: {
     id: string;
@@ -79,11 +79,12 @@ export const AppointmentServiceEditor: React.FC<AppointmentServiceEditorProps> =
   slotMinutes = 15,
   startHour = 9,
   totalHours = 12,
+  tenantTimezone = DEFAULT_TENANT_TIMEZONE,
   formatMinutesToTime,
   onSave,
   onCancel,
 }) => {
-  const initialMinutes = parseAppointmentStartMinutes(item.startTime, startHour);
+  const initialMinutes = parseAppointmentStartMinutes(item.startTime, startHour, tenantTimezone);
   const [selectedStaffId, setSelectedStaffId] = useState(item.staffId || (stylists[0]?.id ?? ''));
   const [selectedStartTime, setSelectedStartTime] = useState<number>(initialMinutes);
   const [selectedDuration, setSelectedDuration] = useState<number>(item.duration || 30);

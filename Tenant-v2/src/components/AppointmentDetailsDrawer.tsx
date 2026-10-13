@@ -91,6 +91,7 @@ export interface AppointmentDetailsDrawerProps {
   onCancel: (appointment: any) => void;
   onLateCancel?: (appointment: any) => void;
   onNoShow?: (appointment: any) => void;
+  tenantTimezone?: string;
   onSaveServiceEdit: (updatedItem: {
     id: string;
     staffId: string;
@@ -118,6 +119,7 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
   stylists,
   readOnly = false,
   slotMinutes = 15,
+  tenantTimezone,
   formatMinutesToTime,
   onClose,
   onStatusChange,
@@ -155,32 +157,139 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
     (a: any) => `${a.status || ''}`.toLowerCase() !== 'cancelled'
   );
 
-  const rawServices = sessionAppointments.length > 0
-    ? sessionAppointments
-    : Array.isArray(appointment.services) && appointment.services.length > 0
+  // Extract independent bookable service items, preserving genuine packages as single units
+  const rawServices: any[] = (() => {
+    // Case 1: Session contains multiple appointments (e.g. group booking or multi-appointment session)
+    if (Array.isArray(appointment.bookingSession?.appointments) && appointment.bookingSession.appointments.length > 1) {
+      const apts = appointment.bookingSession.appointments;
+      const grouped: any[] = [];
+      const packageMap = new Map<string, any[]>();
+
+      for (const item of apts) {
+        const pkgKey = item.packageInstanceId || item.packageId;
+        const isPkg = Boolean(pkgKey || item.packageSnapshot || item.isPackage);
+        if (isPkg && pkgKey) {
+          if (!packageMap.has(pkgKey)) {
+            const groupList: any[] = [];
+            packageMap.set(pkgKey, groupList);
+            grouped.push({ __isPackageGroup: true, pkgKey, items: groupList });
+          }
+          packageMap.get(pkgKey)!.push(item);
+        } else {
+          grouped.push(item);
+        }
+      }
+
+      return grouped.map(entry => {
+        if (entry.__isPackageGroup) {
+          const items = entry.items;
+          const first = items[0];
+          const totalDuration = items.reduce((sum: number, it: any) => sum + Number(it.duration || it.service?.duration || 0), 0);
+          const totalPrice = items.reduce((sum: number, it: any) => sum + Number(it.price ?? it.service?.price ?? 0), 0);
+          return {
+            ...first,
+            duration: totalDuration,
+            price: totalPrice,
+            serviceNameEn: first.packageSnapshot?.packageNameEn || first.packageNameEn || first.serviceNameEn || first.service?.name_en || 'Package',
+            serviceNameAr: first.packageSnapshot?.packageNameAr || first.packageNameAr || first.serviceNameAr || first.service?.name_ar || 'باقة',
+            isPackage: true
+          };
+        }
+        return entry;
+      });
+    }
+
+    // Case 2: Multi-service items on a single appointment
+    const multi = Array.isArray(appointment.services) && appointment.services.length > 0
       ? appointment.services
       : Array.isArray(appointment.serviceItems) && appointment.serviceItems.length > 0
         ? appointment.serviceItems
-        : [appointment];
+        : null;
+
+    if (multi && multi.length > 0) {
+      const grouped: any[] = [];
+      const packageMap = new Map<string, any[]>();
+
+      for (const item of multi) {
+        const pkgKey = item.packageInstanceId || item.packageId;
+        const isPkg = Boolean(pkgKey || item.packageSnapshot || item.isPackage);
+        if (isPkg && pkgKey) {
+          if (!packageMap.has(pkgKey)) {
+            const groupList: any[] = [];
+            packageMap.set(pkgKey, groupList);
+            grouped.push({ __isPackageGroup: true, pkgKey, items: groupList });
+          }
+          packageMap.get(pkgKey)!.push(item);
+        } else {
+          grouped.push(item);
+        }
+      }
+
+      return grouped.map(entry => {
+        if (entry.__isPackageGroup) {
+          const items = entry.items;
+          const first = items[0];
+          const totalDuration = items.reduce((sum: number, it: any) => sum + Number(it.duration || it.service?.duration || 0), 0);
+          const totalPrice = items.reduce((sum: number, it: any) => sum + Number(it.price ?? it.service?.price ?? 0), 0);
+          return {
+            ...first,
+            duration: totalDuration,
+            price: totalPrice,
+            serviceNameEn: first.packageSnapshot?.packageNameEn || first.packageNameEn || first.serviceNameEn || first.service?.name_en || 'Package',
+            serviceNameAr: first.packageSnapshot?.packageNameAr || first.packageNameAr || first.serviceNameAr || first.service?.name_ar || 'باقة',
+            isPackage: true
+          };
+        }
+        return entry;
+      });
+    }
+
+    // Case 3: Single appointment from bookingSession
+    if (Array.isArray(appointment.bookingSession?.appointments) && appointment.bookingSession.appointments.length === 1) {
+      return [appointment.bookingSession.appointments[0]];
+    }
+
+    // Default: Single appointment record
+    return [appointment];
+  })();
 
   const serviceItems: AppointmentServiceItem[] = rawServices.map((svc: any, idx: number) => {
     const sId = svc.id || `${appointment.id}-svc-${idx}`;
-    const sNameEn = svc.serviceNameEn || svc.service?.name_en || svc.service?.nameEn || svc.service?.name || svc.nameEn || svc.name || appointment.serviceNameEn || 'Service';
-    const sNameAr = svc.serviceNameAr || svc.service?.name_ar || svc.service?.nameAr || svc.service?.name || svc.nameAr || svc.name || appointment.serviceNameAr || 'الخدمة';
-    const variantName = svc.serviceVariantName || svc.serviceVariant?.name_en || svc.serviceVariant?.nameEn || appointment.serviceVariantName || '';
-    const variantDesc = svc.serviceVariantDescription || svc.serviceVariant?.name_ar || svc.serviceVariant?.nameAr || appointment.serviceVariantDescription || '';
+    const sNameEn = svc.service?.name_en
+      || svc.service?.nameEn
+      || svc.service?.name
+      || svc.primaryServiceNameEn
+      || svc.serviceNameEn
+      || svc.nameEn
+      || svc.name
+      || (rawServices.length === 1 ? appointment.primaryServiceNameEn || appointment.serviceNameEn : 'Service')
+      || 'Service';
+    const sNameAr = svc.service?.name_ar
+      || svc.service?.nameAr
+      || svc.service?.name
+      || svc.primaryServiceNameAr
+      || svc.serviceNameAr
+      || svc.nameAr
+      || svc.name
+      || (rawServices.length === 1 ? appointment.primaryServiceNameAr || appointment.serviceNameAr : 'الخدمة')
+      || 'الخدمة';
+    const variantName = svc.serviceVariantName || svc.serviceVariant?.name_en || svc.serviceVariant?.nameEn || (rawServices.length === 1 ? appointment.serviceVariantName : '') || '';
+    const variantDesc = svc.serviceVariantDescription || svc.serviceVariant?.name_ar || svc.serviceVariant?.nameAr || (rawServices.length === 1 ? appointment.serviceVariantDescription : '') || '';
     const sDuration = Number(svc.duration || svc.service?.duration || appointment.duration || 30);
-    const sPrice = Number(svc.price ?? svc.service?.price ?? (idx === 0 ? appointment.price : 0));
+    const sPrice = Number(svc.price ?? svc.service?.price ?? (rawServices.length === 1 ? appointment.price : 0));
     const sStaffId = svc.staffId || svc.employeeId || appointment.staffId || '';
     const assignedStylist = stylists.find(st => st.id === sStaffId);
     const svcStatus = svc.status || appointment.status || 'confirmed';
+    const resolvedParticipantName = svc.participantName
+      || (svc.user?.firstName ? `${svc.user.firstName} ${svc.user.lastName || ''}`.trim() : null)
+      || (isGroupSession ? (svc.customerNameEn || svc.customerNameAr || `Guest ${idx + 1}`) : undefined);
 
     return {
       id: sId,
       serviceId: svc.serviceId || svc.service?.id || appointment.serviceId,
       serviceNameEn: sNameEn,
       serviceNameAr: sNameAr,
-      serviceVariantId: svc.serviceVariantId || appointment.serviceVariantId,
+      serviceVariantId: svc.serviceVariantId || (rawServices.length === 1 ? appointment.serviceVariantId : undefined),
       serviceVariantName: variantName,
       serviceVariantDescription: variantDesc,
       duration: sDuration,
@@ -191,7 +300,7 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
       staffNameAr: assignedStylist?.nameAr || svc.staffNameAr || svc.staffName || '',
       staffAvatar: assignedStylist?.avatar || svc.staffAvatar || appointment.staffAvatar,
       price: sPrice,
-      participantName: svc.participantName || (isGroupSession ? (svc.customerNameEn || svc.customerNameAr || `Guest ${idx + 1}`) : undefined),
+      participantName: resolvedParticipantName,
       status: svcStatus,
       appointmentId: svc.appointmentId || svc.id || appointment.id,
       overtimeApproved: Boolean(svc.overtimeApproval?.approved || appointment.overtimeApproval?.approved),
@@ -489,6 +598,7 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
                         dateKey={appointment.date || ''}
                         stylists={stylists}
                         slotMinutes={slotMinutes}
+                        tenantTimezone={tenantTimezone}
                         formatMinutesToTime={formatMinutesToTime}
                         onSave={async (updated) => {
                           await onSaveServiceEdit(updated);

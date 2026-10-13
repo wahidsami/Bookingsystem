@@ -1,3 +1,35 @@
+# BARSPA — Appointment Drawer Regression Correction Pass
+- [x] 1. Audit & Root Cause Analysis <!-- id: reg_audit -->
+  - [x] Workstream A: Audit why group services are combined into one card in `AppointmentDetailsDrawer.tsx`.
+  - [x] Workstream B: Audit false staff-duty warning when editing service time (e.g. 3:35 PM to 4:00 PM) in `AppointmentServiceEditor.tsx` & `tenantApiAdapter.evaluateScheduling`.
+  - [x] Workstream C: Audit why Rebook loses staged services when transitioning into `InteractiveDrawers.tsx`.
+  - [x] Workstream D: Audit duplicate contact actions in `AppointmentClientHeader.tsx`.
+- [x] 2. Workstream A — Restore Independent Service Cards <!-- id: reg_workstream_a -->
+  - [x] Ensure every independently booked service item has its own `AppointmentServiceCard`.
+  - [x] Retain service name/variant, participant association, staff, actual start/end time, duration, price, edit action.
+  - [x] Preserve genuine bundle/package identity without splitting.
+  - [x] Preserve unified group payment calculation and settlement across session.
+- [x] 3. Workstream B — Correct Service Editing & Scheduling Validation <!-- id: reg_workstream_b -->
+  - [x] Initialize editor with exact persisted date, time, duration, staff, service.
+  - [x] Fix timezone handling between ISO string, board-minutes, and local clock.
+  - [x] Prevent false duty-hour conflicts when staff is actually on-duty; block only genuine conflicts.
+  - [x] Ensure downstream adjustments apply only to sequential dependencies, not independent group members.
+- [x] 4. Workstream C — Repair Rebook & Preserve Reschedule <!-- id: reg_workstream_c -->
+  - [x] Trace `handleRebookAppointment` → `stagedServices` → `InteractiveDrawers.tsx` state handoff.
+  - [x] Ensure create drawer initializes with the prepopulated services, customer, and staff preferences as fresh draft.
+  - [x] Preserve Reschedule in-place editing behavior on active appointments.
+- [x] 5. Workstream D — Remove Duplicate Client Contact Actions <!-- id: reg_workstream_d -->
+  - [x] Remove Call, WhatsApp, and SMS from the three-dot overflow menu in `AppointmentClientHeader.tsx`.
+  - [x] Retain Client Profile and Visit History in the menu.
+- [x] 6. Tests, Verification & Local Build <!-- id: reg_verification -->
+  - [x] Add unit and regression tests in `AppointmentDetailsDrawer.phase3.test.ts`.
+  - [x] Run `npx tsx --test`, `npx tsc --noEmit`, and `npm run build`.
+- [x] 7. Git Delivery <!-- id: reg_git -->
+  - [x] Stage only explicitly modified `Tenant-v2` files and `tasks/todo.md`.
+  - [x] Commit and push to `origin/main`.
+  - [x] STOP for user manual deployment.
+
+
 # BARSPA — Appointment Drawer Correction: Unified Group Checkout, Completed-Visit Locking, Reschedule vs Rebook
 - [x] 1. Session & Payment Audit & Data Model Discovery <!-- id: audit_group_session -->
   - [x] Trace calendar cards, appointment IDs, and `BookingSession` links.

@@ -84,6 +84,7 @@ interface Appointment {
   customerId?: string;
   serviceId?: string;
   service?: any;
+  bookingSession?: any;
   bookingSessionId?: string;
   bookingReference?: string;
   bookingItemIndex?: number;
@@ -91,6 +92,12 @@ interface Appointment {
   customerNameAr: string;
   serviceNameEn: string;
   serviceNameAr: string;
+  primaryServiceNameEn?: string;
+  primaryServiceNameAr?: string;
+  packageId?: string;
+  packageSnapshot?: any;
+  isPackage?: boolean;
+  variantId?: string;
   staffId: string;
   appointmentId?: string;
   avatar?: string;
@@ -973,6 +980,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       id: a.id,
       customerId: a.user?.id || a.customerId,
       serviceId: a.service?.id || a.serviceId,
+      bookingSession: a.bookingSession || undefined,
       bookingSessionId: a.bookingSession?.id || a.bookingSessionId || undefined,
       bookingReference: a.bookingSession?.bookingReference || a.bookingReference || undefined,
       bookingItemIndex: Number.isFinite(Number(a.bookingItemIndex)) ? Number(a.bookingItemIndex) : undefined,
@@ -980,6 +988,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       customerNameAr: a.user?.firstName ? `${a.user.firstName} ${a.user.lastName}` : a.customerNameAr || 'زائرة',
       serviceNameEn,
       serviceNameAr,
+      primaryServiceNameEn,
+      primaryServiceNameAr,
+      packageId: a.packageId || a.service?.packageId || undefined,
+      packageSnapshot: a.packageSnapshot || undefined,
+      isPackage: Boolean(a.packageId || a.packageSnapshot || a.isPackage),
+      variantId: a.serviceVariantId || a.serviceVariant?.id || a.variantId || undefined,
       staffId: a.staffId,
       appointmentId: a.id,
       avatar: a.user?.photo || a.user?.profileImage || null,
@@ -2210,6 +2224,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   interface StagedService {
     id: string;
     serviceId: string;
+    variantId?: string | null;
+    itemType?: 'service' | 'package';
+    packageId?: string | null;
+    packageInstanceId?: string | null;
     staffId: string;
     startTime: number;
     startTimeIso?: string;
@@ -3238,8 +3256,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         draftItems.push({
           id: `rebook-${Date.now()}-${idx}`,
           serviceId: svcId,
+          variantId: svc.serviceVariantId || svc.variantId || appt.serviceVariantId || appt.variantId || null,
           staffId: svc.staffId || svc.employeeId || appt.staffId || '',
-          startTime: 120 + idx * 30, // Fresh placeholder start time
+          itemType: svc.itemType || (svc.packageId || svc.packageSnapshot ? 'package' : 'service'),
+          packageId: svc.packageId || appt.packageId || null,
+          packageInstanceId: svc.packageInstanceId || null,
+          startTime: (appt.startTime || 0) + idx * 30, // Fresh placeholder start time
           duration: Number(svc.duration || svc.service?.duration || 30),
           discountType: 'none',
           discountValue: 0,
@@ -3248,12 +3270,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       }
     });
 
-    if (draftItems.length > 1) {
-      setStagedServices(draftItems);
-    } else {
-      setStagedServices([]);
-    }
-
+    setStagedServices(draftItems);
     setInitialCreateMode('appointment');
     setCreateStep(2);
     resetCreateDrawerStartTimes();
@@ -3276,15 +3293,29 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     const targetDate = updatedItem.date || activeAppointment.date || getSelectedDateKey();
     const startTimeIso = buildIsoFromMinutes(targetDate, updatedItem.startTime);
 
+    // Identify the specific service / appointment item being edited
+    const sessionItems = Array.isArray(activeAppointment.bookingSession?.appointments)
+      ? activeAppointment.bookingSession.appointments
+      : Array.isArray(activeAppointment.services)
+        ? activeAppointment.services
+        : Array.isArray(activeAppointment.serviceItems)
+          ? activeAppointment.serviceItems
+          : [activeAppointment];
+
+    const currentServiceItem = sessionItems.find((s: any) => s.id === updatedItem.id) || activeAppointment;
+    const targetServiceId = currentServiceItem.serviceId || currentServiceItem.service?.id || activeAppointment.serviceId;
+    const targetVariantId = currentServiceItem.serviceVariantId || currentServiceItem.variantId || activeAppointment.serviceVariantId || activeAppointment.variantId;
+    const targetAppointmentId = currentServiceItem.appointmentId || currentServiceItem.id || activeAppointment.id;
+
     try {
       const evalResponse = await tenantApiAdapter.evaluateScheduling({
         tenantId: activeAppointment.tenantId || activeAppointment.tenant_id,
-        serviceId: activeAppointment.serviceId,
+        serviceId: targetServiceId,
         staffId: updatedItem.staffId,
         startTime: startTimeIso,
         duration: updatedItem.duration,
-        variantId: activeAppointment.variantId,
-        excludeAppointmentId: activeAppointment.id
+        variantId: targetVariantId,
+        excludeAppointmentId: targetAppointmentId
       });
 
       if (!evalResponse?.success || !evalResponse?.decision?.valid) {
@@ -3298,7 +3329,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         throw new Error(isRtl ? toast.ar : toast.en);
       }
 
-      await tenantApiAdapter.reassignRescheduleAppointment(activeAppointment.id, {
+      await tenantApiAdapter.reassignRescheduleAppointment(targetAppointmentId, {
         staffId: updatedItem.staffId,
         startTime: startTimeIso,
         notifyCustomer: true
@@ -6421,6 +6452,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       <AppointmentDetailsDrawer
         isOpen={drawerOpen && Boolean(activeAppointment)}
         isRtl={isRtl}
+        tenantTimezone={tenantTimezone}
         appointment={activeAppointment}
         stylists={liveStylists}
         readOnly={appointmentDetailsReadOnly}
@@ -7183,6 +7215,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         giftCardPackages={giftCardPackages}
         onBoardChanged={loadBoardData}
         existingBreak={activeBlockedTime}
+        initialSelectedCustId={selectedCustId}
+        initialCustMode={custMode === 'new' ? 'walkin' : 'existing'}
+        initialWalkinName={newCustName}
+        initialWalkinPhone={newCustPhone}
+        initialWalkinEmail={newCustEmail}
+        initialStagedServices={stagedServices}
+        initialCreateStep={createStep}
       />
 
       {/* Multi-Service Chained Booking Confirmation Modal */}

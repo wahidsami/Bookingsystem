@@ -365,10 +365,26 @@ export const cascadeTimingForStagedItems = <T extends MinimalStagedItem>(
     return item;
   });
 
-  // Step 2: Cascade subsequent sequential items
-  for (let i = 1; i < updatedList.length; i++) {
+  // Step 2: Cascade subsequent sequential items for the same participant / sequence
+  const targetIndex = updatedList.findIndex(i => (i.id || '') === targetItemId);
+  if (targetIndex < 0) return updatedList;
+
+  const targetPartId = targetItem.participantId;
+
+  for (let i = targetIndex + 1; i < updatedList.length; i++) {
     const current = updatedList[i];
-    const prev = updatedList[i - 1];
+
+    // In group bookings, do not cascade across independent participants
+    if (targetPartId && current.participantId && current.participantId !== targetPartId) {
+      continue;
+    }
+
+    const precedingSameParticipantItems = updatedList
+      .slice(0, i)
+      .filter(it => !targetPartId || !it.participantId || it.participantId === targetPartId);
+
+    if (precedingSameParticipantItems.length === 0) continue;
+    const prev = precedingSameParticipantItems[precedingSameParticipantItems.length - 1];
 
     // Parallel siblings in the same bundle share start time and do not chain sequentially
     if (

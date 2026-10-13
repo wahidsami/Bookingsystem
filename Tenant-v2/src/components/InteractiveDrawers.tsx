@@ -159,6 +159,13 @@ interface InteractiveDrawersProps {
     type?: string;
     label?: string;
   } | null;
+  initialSelectedCustId?: string;
+  initialCustMode?: 'existing' | 'walkin';
+  initialWalkinName?: string;
+  initialWalkinPhone?: string;
+  initialWalkinEmail?: string;
+  initialStagedServices?: StagedService[];
+  initialCreateStep?: number;
 }
 
 export interface GuestService {
@@ -426,7 +433,14 @@ export default function InteractiveDrawers({
   stylists,
   onBoardChanged,
   existingBreak,
-  tenantTimezone
+  tenantTimezone,
+  initialSelectedCustId,
+  initialCustMode,
+  initialWalkinName,
+  initialWalkinPhone,
+  initialWalkinEmail,
+  initialStagedServices,
+  initialCreateStep
 }: InteractiveDrawersProps) {
   const resolvedTenantTimezone = useMemo(() => resolveTenantTimezone(tenantTimezone), [tenantTimezone]);
 
@@ -437,10 +451,39 @@ export default function InteractiveDrawers({
 
   // Sync initial parameters when drawer opens
   useEffect(() => {
-    if (isCreateDrawerOpen && initialCreateMode) {
-      setCreateMode(initialCreateMode);
+    if (isCreateDrawerOpen) {
+      if (initialCreateMode) {
+        setCreateMode(initialCreateMode);
+      }
+      if (initialSelectedCustId) {
+        setSelectedCustId(initialSelectedCustId);
+      }
+      if (initialCustMode) {
+        setCustMode(initialCustMode);
+      }
+      if (initialWalkinName) {
+        setWalkinFullName(initialWalkinName);
+        if (initialWalkinPhone) setWalkinPhone(initialWalkinPhone);
+        if (initialWalkinEmail) setWalkinEmail(initialWalkinEmail);
+      }
+      if (Array.isArray(initialStagedServices) && initialStagedServices.length > 0) {
+        setStagedServices(initialStagedServices);
+      }
+      if (typeof initialCreateStep === 'number' && initialCreateStep >= 1) {
+        setCreateStep(initialCreateStep);
+      }
     }
-  }, [isCreateDrawerOpen, initialCreateMode]);
+  }, [
+    isCreateDrawerOpen,
+    initialCreateMode,
+    initialSelectedCustId,
+    initialCustMode,
+    initialWalkinName,
+    initialWalkinPhone,
+    initialWalkinEmail,
+    initialStagedServices,
+    initialCreateStep
+  ]);
 
   // setCurrentDuration is obsolete as duration is now handled directly by the service configuration component
 
