@@ -539,7 +539,23 @@ async function allocateServiceResources({
     const end = endTime instanceof Date ? endTime : new Date(endTime);
     const durationMs = end.getTime() - start.getTime();
     const allocated = [];
-    const reservedResourceIds = new Set((alreadyAllocatedResourceIds || []).map(String));
+    const reservedResourceIds = new Set();
+    for (const item of (alreadyAllocatedResourceIds || [])) {
+        if (typeof item === 'object' && item !== null) {
+            const allocStartMs = item.startMs ?? (item.startTime ? new Date(item.startTime).getTime() : null);
+            const allocEndMs = item.endMs ?? (item.endTime ? new Date(item.endTime).getTime() : null);
+            if (allocStartMs !== null && allocEndMs !== null) {
+                // Strict interval overlap: allocStart < end && allocEnd > start
+                if (allocStartMs < end.getTime() && allocEndMs > start.getTime()) {
+                    reservedResourceIds.add(String(item.resourceId));
+                }
+            } else if (item.resourceId) {
+                reservedResourceIds.add(String(item.resourceId));
+            }
+        } else if (item) {
+            reservedResourceIds.add(String(item));
+        }
+    }
 
     for (const req of requirements) {
         const { resourceTypeId, quantity, resourceType } = req;
@@ -738,7 +754,9 @@ async function allocateServiceResources({
             allocated.push({
                 resourceId: res.id,
                 resourceTypeId: res.resourceTypeId,
-                resource: res
+                resource: res,
+                startMs: start.getTime(),
+                endMs: end.getTime()
             });
         }
     }

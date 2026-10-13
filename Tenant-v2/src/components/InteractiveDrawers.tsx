@@ -2347,16 +2347,19 @@ export default function InteractiveDrawers({
   // Live Resource Availability Tracker (Phase 5A)
   const [resourceAvailabilityMap, setResourceAvailabilityMap] = useState<Record<string, ItemResourceAvailability>>({});
   const [isCheckingResources, setIsCheckingResources] = useState(false);
+  const latestResourceRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isCreateDrawerOpen) return;
 
     let isCancelled = false;
+    const currentRequestId = ++latestResourceRequestIdRef.current;
+
     const timer = setTimeout(async () => {
       try {
         setIsCheckingResources(true);
 
-        // 1. Build staged items payload
+        // 1. Build staged items payload (only items with valid serviceId consume resources)
         const stagedItemsPayload: Array<{
           id: string;
           serviceId: string;
@@ -2378,8 +2381,25 @@ export default function InteractiveDrawers({
           }
         }
 
-        // 2. Build catalogue probe items payload (evaluated at proposed currentStartTime)
-        const catalogueStartIso = buildIsoFromMinutes(selectedDate, currentStartTime);
+        // 2. Build catalogue probe items payload
+        // Evaluate at the active participant's next scheduled/chained start time
+        let activeParticipantNextStartTime = currentStartTime;
+        const participantStaged = bookingScope === 'group'
+          ? stagedServices.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId)
+          : stagedServices;
+
+        const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
+        if (shouldChainServiceTimes && participantStaged.length > 0) {
+          const lastItem = participantStaged[participantStaged.length - 1];
+          if (lastItem.packageInstanceId) {
+            const siblingItems = participantStaged.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
+            activeParticipantNextStartTime = Math.max(...siblingItems.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
+          } else {
+            activeParticipantNextStartTime = lastItem.startTime + lastItem.duration;
+          }
+        }
+
+        const catalogueStartIso = buildIsoFromMinutes(selectedDate, activeParticipantNextStartTime);
         const catalogueItemsPayload: Array<{
           id: string;
           serviceId: string;
@@ -2419,13 +2439,13 @@ export default function InteractiveDrawers({
           catalogueItems: catalogueItemsPayload
         });
 
-        if (!isCancelled && response && response.results) {
+        if (!isCancelled && currentRequestId === latestResourceRequestIdRef.current && response && response.results) {
           setResourceAvailabilityMap(response.results);
         }
       } catch (err) {
         console.warn('Batch resource availability check failed:', err);
       } finally {
-        if (!isCancelled) {
+        if (!isCancelled && currentRequestId === latestResourceRequestIdRef.current) {
           setIsCheckingResources(false);
         }
       }
@@ -2439,9 +2459,13 @@ export default function InteractiveDrawers({
     isCreateDrawerOpen,
     selectedDate,
     currentStartTime,
+    activeParticipantId,
+    groupParticipants.length,
+    bookingScope,
+    bookingRecoveryMode,
     boardStartHour,
     resolvedTenantTimezone,
-    stagedServices.map(s => `${s.id}:${s.serviceId}:${s.variantId}:${s.startTime}:${s.duration}`).join(','),
+    stagedServices.map(s => `${s.id}:${s.serviceId}:${s.variantId}:${s.startTime}:${s.duration}:${s.participantId}`).join(','),
     canonicalServices.length
   ]);
 

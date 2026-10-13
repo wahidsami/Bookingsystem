@@ -972,7 +972,11 @@ class BookingService {
 
                         appointments.push(appointment);
                         if (appointment.allocatedResources && Array.isArray(appointment.allocatedResources)) {
-                            sessionAllocatedResourceIds.push(...appointment.allocatedResources.map(a => a.resourceId));
+                            sessionAllocatedResourceIds.push(...appointment.allocatedResources.map(a => ({
+                                resourceId: a.resourceId,
+                                startMs: new Date(appointment.startTime).getTime(),
+                                endMs: new Date(appointment.endTime).getTime()
+                            })));
                         }
                         subtotal += parseFloat(appointment.rawPrice ?? 0);
                         taxAmount += parseFloat(appointment.taxAmount ?? 0);
@@ -1016,7 +1020,11 @@ class BookingService {
 
                     appointments.push(appointment);
                     if (appointment.allocatedResources && Array.isArray(appointment.allocatedResources)) {
-                        sessionAllocatedResourceIds.push(...appointment.allocatedResources.map(a => a.resourceId));
+                        sessionAllocatedResourceIds.push(...appointment.allocatedResources.map(a => ({
+                            resourceId: a.resourceId,
+                            startMs: new Date(appointment.startTime).getTime(),
+                            endMs: new Date(appointment.endTime).getTime()
+                        })));
                     }
                     subtotal += parseFloat(appointment.rawPrice ?? 0);
                     taxAmount += parseFloat(appointment.taxAmount ?? 0);

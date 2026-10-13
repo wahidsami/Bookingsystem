@@ -3,7 +3,7 @@
 const express = require('express');
 const request = require('supertest');
 const db = require('../../models');
-const { batchCheckResourceAvailability } = require('../../utils/resourceRequirementResolver');
+const { batchCheckResourceAvailability, allocateServiceResources } = require('../../utils/resourceRequirementResolver');
 const tenantResourceController = require('../tenantResourceController');
 
 describe('Authoritative Batch Resource Availability & Badges (Phase 5A)', () => {
@@ -298,6 +298,140 @@ describe('Authoritative Batch Resource Availability & Badges (Phase 5A)', () => 
             // Both can successfully use Bed 1 because their time intervals do not overlap!
             expect(res.results['part-1-10am'].isAvailable).toBe(true);
             expect(res.results['part-2-11am'].isAvailable).toBe(true);
+        });
+
+        test('Empty participant drafts consume zero capacity and do not invalidate existing draft availability', async () => {
+            // Salon has 1 Bed
+            jest.spyOn(db.Resource, 'findAll').mockResolvedValue([
+                { id: 'res-bed-1', resourceTypeId: TYPE_BED, name_en: 'Bed 1', name_ar: 'سرير 1', is_active: true }
+            ]);
+            jest.spyOn(db.ServiceResourceRequirement, 'findAll').mockResolvedValue([
+                {
+                    resourceTypeId: TYPE_BED,
+                    quantity: 1,
+                    variantId: null,
+                    resourceType: { id: TYPE_BED, name_en: 'Massage Bed', name_ar: 'سرير مساج', is_active: true }
+                }
+            ]);
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            // Baseline check with only Participant 1
+            const baseline = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'part-1-item', serviceId: SERVICE_MASSAGE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'cat-facial', serviceId: SERVICE_FACIAL, startTime: '2026-10-15T10:00:00.000Z', duration: 30 }
+                ]
+            });
+            expect(baseline.results['part-1-item'].isAvailable).toBe(true);
+
+            // Adding an empty participant (item with empty/null serviceId, or no staged item at all)
+            const withEmptyParticipant = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'part-1-item', serviceId: SERVICE_MASSAGE, startTime: '2026-10-15T10:00:00.000Z', duration: 60 },
+                    { id: 'part-2-empty', serviceId: null, startTime: '2026-10-15T10:00:00.000Z', duration: 0 }
+                ],
+                catalogueItems: [
+                    { id: 'cat-facial', serviceId: SERVICE_FACIAL, startTime: '2026-10-15T10:00:00.000Z', duration: 30 }
+                ]
+            });
+
+            // Participant 1's availability is unchanged
+            expect(withEmptyParticipant.results['part-1-item'].isAvailable).toBe(true);
+            // Empty participant reports no requirements and doesn't crash or claim resources
+            expect(withEmptyParticipant.results['part-2-empty'].hasRequirements).toBe(false);
+            expect(withEmptyParticipant.results['part-2-empty'].isAvailable).toBe(true);
+            // Catalogue item availability is identical to baseline
+            expect(withEmptyParticipant.results['cat-facial'].isAvailable).toBe(baseline.results['cat-facial'].isAvailable);
+        });
+    });
+
+    describe('7. allocateServiceResources interval-aware pre-allocations (Phase 5A Regression)', () => {
+        test('Non-overlapping intervals: sequential session items reuse physical resources without 409 conflict', async () => {
+            jest.spyOn(db.Resource, 'findAll').mockResolvedValue([
+                { id: 'res-bed-1', resourceTypeId: TYPE_BED, name_en: 'Bed 1', name_ar: 'سرير 1', is_active: true }
+            ]);
+            jest.spyOn(db.ServiceResourceRequirement, 'findAll').mockResolvedValue([
+                {
+                    resourceTypeId: TYPE_BED,
+                    quantity: 1,
+                    variantId: null,
+                    resourceType: { id: TYPE_BED, name_en: 'Massage Bed', name_ar: 'سرير مساج', is_active: true }
+                }
+            ]);
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            // Step 1: Allocates Bed 1 for 10:00 - 11:00
+            const step1Result = await allocateServiceResources({
+                tenantId: TENANT_ID,
+                serviceId: SERVICE_MASSAGE,
+                startTime: new Date('2026-10-15T10:00:00.000Z'),
+                endTime: new Date('2026-10-15T11:00:00.000Z'),
+                alreadyAllocatedResourceIds: []
+            });
+            expect(step1Result.required).toBe(true);
+            expect(step1Result.allocations).toHaveLength(1);
+            expect(step1Result.allocations[0].resourceId).toBe('res-bed-1');
+
+            // Step 2: Next participant or sequential service at 11:00 - 12:00 passing step 1 allocation
+            const step2Result = await allocateServiceResources({
+                tenantId: TENANT_ID,
+                serviceId: SERVICE_MASSAGE,
+                startTime: new Date('2026-10-15T11:00:00.000Z'),
+                endTime: new Date('2026-10-15T12:00:00.000Z'),
+                alreadyAllocatedResourceIds: [
+                    {
+                        resourceId: 'res-bed-1',
+                        startMs: new Date('2026-10-15T10:00:00.000Z').getTime(),
+                        endMs: new Date('2026-10-15T11:00:00.000Z').getTime()
+                    }
+                ]
+            });
+            // Reuses Bed 1 without throwing 409 conflict!
+            expect(step2Result.required).toBe(true);
+            expect(step2Result.allocations).toHaveLength(1);
+            expect(step2Result.allocations[0].resourceId).toBe('res-bed-1');
+        });
+
+        test('Overlapping intervals: concurrent allocation throws 409 conflict when physical capacity is exhausted', async () => {
+            jest.spyOn(db.Resource, 'findAll').mockResolvedValue([
+                { id: 'res-bed-1', resourceTypeId: TYPE_BED, name_en: 'Bed 1', name_ar: 'سرير 1', is_active: true }
+            ]);
+            jest.spyOn(db.ServiceResourceRequirement, 'findAll').mockResolvedValue([
+                {
+                    resourceTypeId: TYPE_BED,
+                    quantity: 1,
+                    variantId: null,
+                    resourceType: { id: TYPE_BED, name_en: 'Massage Bed', name_ar: 'سرير مساج', is_active: true }
+                }
+            ]);
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            // Bed 1 already taken at 10:00 - 11:00
+            const preAllocations = [
+                {
+                    resourceId: 'res-bed-1',
+                    startMs: new Date('2026-10-15T10:00:00.000Z').getTime(),
+                    endMs: new Date('2026-10-15T11:00:00.000Z').getTime()
+                }
+            ];
+
+            // Concurrent request at 10:30 - 11:30 must be rejected
+            await expect(allocateServiceResources({
+                tenantId: TENANT_ID,
+                serviceId: SERVICE_MASSAGE,
+                startTime: new Date('2026-10-15T10:30:00.000Z'),
+                endTime: new Date('2026-10-15T11:30:00.000Z'),
+                alreadyAllocatedResourceIds: preAllocations
+            })).rejects.toMatchObject({
+                conflict: true,
+                conflictDetails: expect.objectContaining({
+                    code: 'BOOKING_CONFLICT'
+                })
+            });
         });
     });
 });

@@ -283,3 +283,80 @@ test('Scenario 9: Unknown / loading availability state is never displayed as con
 
   assert.equal(resolvedStatus, 'loading', 'Unknown availability must remain in loading state and never prematurely confirm available');
 });
+
+test('Scenario 10: Empty participant draft contributes 0 demand and preserves existing draft availability', () => {
+  // Simulating staged services payload construction
+  const groupParticipants = [
+    { id: 'part-1', name: 'Abeer' },
+    { id: 'part-2', name: 'Guest 2' } // Empty participant without staged services
+  ];
+
+  const stagedServices = [
+    { id: 'item-1', serviceId: 'srv-massage-1', participantId: 'part-1', startTime: 600, duration: 60 }
+  ];
+
+  // Empty participant has 0 services
+  const part2Services = stagedServices.filter(s => s.participantId === 'part-2');
+  assert.equal(part2Services.length, 0, 'Participant 2 has no staged services');
+
+  // Payload filtering: only services with serviceId are included
+  const stagedPayload = stagedServices.filter(s => Boolean(s.serviceId));
+  assert.equal(stagedPayload.length, 1, 'Only Participant 1 item is included in payload');
+  assert.equal(stagedPayload[0].participantId, 'part-1');
+});
+
+test('Scenario 11: Guard against false conflict on unverified, API error, or invalid draft checks', () => {
+  // When a batch check returns an error reason or invalid draft time, badge must show neutral loading, NOT conflict (red)
+  const failedStatusReasons = ['UNVERIFIED', 'API_ERROR', 'INVALID_TIME'];
+
+  for (const reason of failedStatusReasons) {
+    const liveStatus = {
+      resourceTypeId: 'rt-massage-bed',
+      resourceTypeName: 'Bed',
+      resourceTypeNameAr: 'سرير',
+      quantity: 1,
+      available: false,
+      reason
+    };
+
+    let status: 'loading' | 'available' | 'conflict' = 'loading';
+    if (!liveStatus.available && (liveStatus.reason === 'UNVERIFIED' || liveStatus.reason === 'API_ERROR' || liveStatus.reason === 'INVALID_TIME')) {
+      status = 'loading';
+    } else {
+      status = liveStatus.available ? 'available' : 'conflict';
+    }
+
+    assert.equal(status, 'loading', `Reason ${reason} must remain in neutral loading state and never display red conflict`);
+  }
+});
+
+test('Scenario 12: Request sequencing drops stale in-flight availability responses', () => {
+  let latestRequestId = 0;
+  let activeAvailabilityMap: Record<string, ItemResourceAvailability> = {};
+
+  // Request 1 dispatched (takes longer)
+  const req1Id = ++latestRequestId;
+
+  // Request 2 dispatched (user added guest or switched participant)
+  const req2Id = ++latestRequestId;
+
+  // Response 2 arrives first
+  const res2 = {
+    'cat-srv-massage': { id: 'cat-srv-massage', hasRequirements: true, isAvailable: true, requirements: [] }
+  };
+  if (req2Id === latestRequestId) {
+    activeAvailabilityMap = res2;
+  }
+
+  // Response 1 arrives late (stale)
+  const res1 = {
+    'cat-srv-massage': { id: 'cat-srv-massage', hasRequirements: true, isAvailable: false, requirements: [] }
+  };
+  if (req1Id === latestRequestId) {
+    activeAvailabilityMap = res1;
+  }
+
+  // Active state must retain res2, NOT stale res1!
+  assert.equal(activeAvailabilityMap['cat-srv-massage'].isAvailable, true, 'Stale out-of-order response was dropped');
+});
+

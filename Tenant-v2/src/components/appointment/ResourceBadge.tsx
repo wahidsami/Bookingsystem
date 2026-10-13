@@ -200,7 +200,12 @@ export function ResourceBadgeList({
         if (isLoading || !availability) {
           status = 'loading';
         } else if (liveStatus) {
-          status = liveStatus.available ? 'available' : 'conflict';
+          // Guard: unverified drafts, network failures, or invalid draft inputs must never present as false conflicts
+          if (!liveStatus.available && (liveStatus.reason === 'UNVERIFIED' || liveStatus.reason === 'API_ERROR' || liveStatus.reason === 'INVALID_TIME')) {
+            status = 'loading';
+          } else {
+            status = liveStatus.available ? 'available' : 'conflict';
+          }
         } else {
           // If availability check completed but this requirement wasn't evaluated, keep neutral/loading
           status = 'loading';
