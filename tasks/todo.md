@@ -1,3 +1,29 @@
+# BARSPA — Critical Resource Availability Isolation Audit & Fix
+- [x] 1. Audit & Root Cause Analysis <!-- id: res_audit -->
+  - [x] Trace `InteractiveDrawers.tsx` candidate-time, duration, and staged services payload construction.
+  - [x] Trace `ResourceBadge` rendering, candidate time string, and what the secondary time (e.g. 7:15 PM) represents.
+  - [x] Trace `POST /api/v1/tenant/resources/batch-check` and `batchCheckResourceAvailability` in `tenantResourceController.js` & `resourceRequirementResolver.js`.
+  - [x] Inspect database schema/models and actual seed/fixtures for resource requirements on Moroccan massage, Thai therapy, and Classic manicure.
+  - [x] Investigate why massage-room services show 0/2 available around 6:45 PM while manicure shows 1/1 available despite Abeer's 7:00 PM manicure appointment.
+  - [x] Identify exact failure class (e.g., resource type cross-contamination, requirement mismatch, query interval, timezone shift, or staged draft bleed).
+- [x] 2. Controlled Reproductions & Scenarios A-D <!-- id: res_repro -->
+  - [x] Scenario A: Nail-resource overlap (6:45-7:15 PM candidate manicure vs 7:00-7:30 PM existing manicure -> 0/1; 7:30-8:00 PM -> 1/1).
+  - [x] Scenario B: Massage-resource independence (6:45-7:45 PM candidate massage with no massage bookings -> 2/2 available; nail appointment must not consume massage rooms).
+  - [x] Scenario C: True partial capacity (Room A free at 6:45, Room B free at 7:15 -> 6:45-7:45 candidate -> 1/2 available).
+  - [x] Scenario D: Later candidate (7:15-8:15 candidate when both rooms free -> 2/2 available).
+- [x] 3. Implementation of Proven Fix <!-- id: res_fix -->
+  - [x] Correct backend and/or frontend availability calculation or data mapping per proven root cause.
+  - [x] Ensure strict resource type isolation (nail vs massage vs stations).
+  - [x] Ensure accurate candidate time derivation, badge rendering, and "available again at" calculation.
+  - [x] Ensure alignment between catalogue badges and authoritative final booking preflight.
+- [x] 4. Verification & Testing <!-- id: res_verification -->
+  - [x] Run backend Jest tests (`tenantResourceAvailability.test.js` 28/28 passed).
+  - [x] Run frontend component tests (`resourceBadges.test.ts` 25/25, `appointmentDraftIsolation.test.ts` 3/3, 73/73 suite total passed).
+  - [x] Run `npx tsc --noEmit` (0 errors) and `npm run build` (built in 6.92s) in `Tenant-v2`.
+- [x] 5. Git Delivery <!-- id: res_delivery -->
+  - [x] Review diff, stage only intended files, commit, and push to `origin/main`.
+  - [x] STOP for manual user deployment.
+
 # BARSPA — Critical Fixes: Stale Customer in New Booking & Resource Availability
 - [x] 1. Audit & Root Cause Analysis <!-- id: crit_audit -->
   - [x] Workstream A: Trace `InteractiveDrawers.tsx` & `AppointmentWorkspace.tsx` to identify why a fresh appointment inherits "Participant 2" / guest email and survives close/cancel.

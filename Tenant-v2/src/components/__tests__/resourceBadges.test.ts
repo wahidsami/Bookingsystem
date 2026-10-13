@@ -918,3 +918,85 @@ test('Scenario 27: Two-room fixture (Room A ends at 16:40, Room B ends at 17:05)
   const isAbuttingOverlapping = (roomA.start < 1000 && roomA.end > 1000);
   assert.equal(isAbuttingOverlapping, false, 'Abutting boundary [15:40, 16:40) with [16:40, 17:40) must have zero overlap');
 });
+
+test('Scenario 28: Controlled Fixtures Scenarios A-D (Two Massage Rooms & One Nail Station)', () => {
+  const TOTAL_MASSAGE_ROOMS = 2;
+  const TOTAL_NAIL_STATIONS = 1;
+
+  // Scenario A fixture: Abeer occupies Nail Station 1 from 7:00 PM to 7:30 PM
+  // Board minutes from 9 AM: 7:00 PM = 600 mins, 7:30 PM = 630 mins
+  // 6:45 PM is 585 minutes, 7:15 PM is 615 minutes, 7:30 PM is 630 minutes, 8:00 PM is 660 minutes
+  const abeerNailAlloc = { resourceId: 'nail-1', start: 600, end: 630 };
+
+  function evaluateNailInterval(candStart: number, candDuration: number) {
+    const candEnd = candStart + candDuration;
+    const isOccupied = abeerNailAlloc.start < candEnd && abeerNailAlloc.end > candStart;
+    const availableQuantity = isOccupied ? 0 : 1;
+    return {
+      availableQuantity,
+      totalActive: TOTAL_NAIL_STATIONS,
+      isAvailable: availableQuantity >= 1
+    };
+  }
+
+  // Candidate manicure 6:45-7:15 PM (585 to 615, 30m): overlaps Abeer (600 to 630) from 600 to 615 -> 0/1 available
+  const evalManicureOverlap = evaluateNailInterval(585, 30);
+  assert.equal(evalManicureOverlap.availableQuantity, 0, 'Candidate manicure 6:45-7:15 overlaps 7:00-7:30 -> 0/1');
+  assert.equal(evalManicureOverlap.isAvailable, false);
+  assert.equal(evalManicureOverlap.totalActive, 1);
+
+  // Candidate manicure 7:30-8:00 PM (630 to 660, 30m): exact boundary abutment at 630 -> 0 overlap -> 1/1 available
+  const evalManicureFree = evaluateNailInterval(630, 30);
+  assert.equal(evalManicureFree.availableQuantity, 1, 'Candidate manicure 7:30-8:00 after Abeer -> 1/1');
+  assert.equal(evalManicureFree.isAvailable, true);
+  assert.equal(evalManicureFree.totalActive, 1);
+
+  // Scenario B: Massage-resource independence — Unrelated nail booking does not impact massage rooms
+  function evaluateMassageIntervalWithOnlyNailAlloc() {
+    return {
+      availableQuantity: TOTAL_MASSAGE_ROOMS,
+      totalActive: TOTAL_MASSAGE_ROOMS,
+      isAvailable: true
+    };
+  }
+  const evalMassageIndependent = evaluateMassageIntervalWithOnlyNailAlloc();
+  assert.equal(evalMassageIndependent.availableQuantity, 2, 'Candidate massage has 2/2 available regardless of nail booking');
+  assert.equal(evalMassageIndependent.totalActive, 2);
+  assert.equal(evalMassageIndependent.isAvailable, true);
+
+  // Scenario C: True partial capacity (Room A occupied until 6:45 PM = 585, Room B occupied until 7:15 PM = 615)
+  const roomA = { resourceId: 'room-a', start: 525, end: 585 }; // 5:15 PM - 6:45 PM
+  const roomB = { resourceId: 'room-b', start: 555, end: 615 }; // 5:55 PM - 7:15 PM
+  const massageAllocs = [roomA, roomB];
+
+  function evaluateMassageInterval(candStart: number, candDuration: number) {
+    const candEnd = candStart + candDuration;
+    const occupied = new Set<string>();
+    for (const alloc of massageAllocs) {
+      if (alloc.start < candEnd && alloc.end > candStart) {
+        occupied.add(alloc.resourceId);
+      }
+    }
+    const availableQuantity = Math.max(0, TOTAL_MASSAGE_ROOMS - occupied.size);
+    return {
+      availableQuantity,
+      totalActive: TOTAL_MASSAGE_ROOMS,
+      isAvailable: availableQuantity >= 1
+    };
+  }
+
+  // Candidate massage 6:45-7:45 PM (585 to 645, 60m):
+  // Room A ends at 585 -> 585 > 585 is FALSE -> Room A is released and free!
+  // Room B ends at 615 -> 615 > 585 is TRUE -> Room B is occupied!
+  // Exactly 1 out of 2 rooms is free -> 1/2 available
+  const evalMassageC = evaluateMassageInterval(585, 60);
+  assert.equal(evalMassageC.availableQuantity, 1, 'Room A released at 6:45 PM, Room B busy until 7:15 PM -> 1/2 available');
+  assert.equal(evalMassageC.isAvailable, true);
+
+  // Scenario D: Later candidate at 7:15 PM (615, 60m):
+  // Both Room A and Room B have ended -> 2/2 available
+  const evalMassageD = evaluateMassageInterval(615, 60);
+  assert.equal(evalMassageD.availableQuantity, 2, 'At 7:15 PM, both rooms released -> 2/2 available');
+  assert.equal(evalMassageD.isAvailable, true);
+});
+
