@@ -38,19 +38,25 @@ type CanonicalCustomerHistory = Record<string, any>;
 type CanonicalCustomerTransaction = Record<string, any>;
 
 function toAbsoluteUrl(input: RequestInfo | URL): URL {
+  const origin = typeof window !== 'undefined' && window?.location?.origin ? window.location.origin : 'http://localhost';
   if (input instanceof URL) {
-    return new URL(input.toString(), window.location.origin);
+    return new URL(input.toString(), origin);
   }
 
   if (typeof input === 'string') {
-    return new URL(input, window.location.origin);
+    return new URL(input, origin);
   }
 
-  return new URL(input.url, window.location.origin);
+  return new URL(input.url, origin);
 }
 
 function isTenantApiPath(pathname: string): boolean {
-  return pathname.startsWith('/api/v1/') || pathname.startsWith('/auth/tenant/');
+  return (
+    pathname.startsWith('/api/v1/') ||
+    pathname.startsWith('/auth/tenant/') ||
+    pathname.startsWith('/tenant/') ||
+    pathname.startsWith('/public/bills/')
+  );
 }
 
 function shouldRetryUnauthorizedRequest(pathname: string): boolean {
@@ -655,9 +661,20 @@ function normalizeResponseForPath(pathname: string, method: string, payload: any
 class TenantApiAdapter {
   private fetchImpl: FetchLike;
   private refreshPromise: Promise<boolean> | null = null;
+  private authFailureHandler: (() => void) | null = null;
 
   constructor(fetchImpl?: FetchLike) {
     this.fetchImpl = fetchImpl || (typeof window !== 'undefined' ? window.fetch.bind(window) : () => Promise.resolve(new Response()));
+  }
+
+  setAuthFailureHandler(handler: (() => void) | null): void {
+    this.authFailureHandler = handler;
+  }
+
+  notifyAuthFailure(): void {
+    if (this.authFailureHandler) {
+      this.authFailureHandler();
+    }
   }
 
   private get baseUrl(): string {
@@ -940,6 +957,10 @@ class TenantApiAdapter {
             : JSON.stringify(translatedBody)
         });
       }
+    }
+
+    if (response.status === 401 && isTenantApiPath(url.pathname) && !url.pathname.startsWith('/auth/tenant/')) {
+      this.notifyAuthFailure();
     }
 
     return response;
@@ -2005,6 +2026,10 @@ export function installTenantApiFetchBridge(onAuthFailure?: () => void): () => v
     return () => undefined;
   }
 
+  if (onAuthFailure) {
+    tenantApiAdapter.setAuthFailureHandler(onAuthFailure);
+  }
+
   if ((window as any)[FETCH_BRIDGE_FLAG]) {
     return () => undefined;
   }
@@ -2039,5 +2064,6 @@ export function installTenantApiFetchBridge(onAuthFailure?: () => void): () => v
   return () => {
     window.fetch = originalFetch;
     (window as any)[FETCH_BRIDGE_FLAG] = false;
+    tenantApiAdapter.setAuthFailureHandler(null);
   };
 }

@@ -338,8 +338,35 @@ const evaluateScheduling = async (req, res) => {
         tenantTimezone: req.headers?.['x-tenant-timezone'] || 'UTC'
     });
     try {
-        const { tenantId, serviceId, packageId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId, staffAssignments, packageItems } = req.body || {};
+        const bodyTenantId = req.body?.tenantId;
+        let tenantId = req.tenantId || req.tenant?.id || bodyTenantId;
+        const { serviceId, packageId, variantId, staffId, startTime, duration, overtimeApproval, excludeAppointmentId, staffAssignments, packageItems } = req.body || {};
         const targetId = packageId || serviceId;
+
+        if (req.tenantId && bodyTenantId && req.tenantId !== bodyTenantId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized tenant access',
+                messageAr: 'غير مصرح بالوصول إلى هذا المستأجر'
+            });
+        }
+
+        if (!tenantId && targetId) {
+            if (serviceId) {
+                const s = await db.Service.findByPk(serviceId);
+                if (s?.tenantId) {
+                    tenantId = s.tenantId;
+                }
+            }
+            if (!tenantId && packageId) {
+                const ServicePackage = db.ServicePackage || db.Package;
+                const p = await ServicePackage.findByPk(packageId);
+                if (p?.tenantId) {
+                    tenantId = p.tenantId;
+                }
+            }
+        }
+
         if (!tenantId || !targetId || !startTime) {
             return res.status(400).json({
                 success: false,

@@ -81,6 +81,8 @@ interface Stylist {
 
 interface Appointment {
   id: string;
+  tenantId?: string;
+  tenant_id?: string;
   customerId?: string;
   serviceId?: string;
   service?: any;
@@ -978,6 +980,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         : (a.service?.duration || a.duration || 60));
     return {
       id: a.id,
+      tenantId: a.tenantId || a.tenant_id || a.branch?.tenantId || undefined,
       customerId: a.user?.id || a.customerId,
       serviceId: a.service?.id || a.serviceId,
       bookingSession: a.bookingSession || undefined,
@@ -3308,13 +3311,16 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     const currentServiceItem = sessionItems.find((s: any) => s.id === updatedItem.id) || activeAppointment;
     const targetServiceId = currentServiceItem.serviceId || currentServiceItem.service?.id || activeAppointment.serviceId;
+    const targetPackageId = currentServiceItem.packageId || currentServiceItem.service?.packageId || activeAppointment.packageId;
     const targetVariantId = currentServiceItem.serviceVariantId || currentServiceItem.variantId || activeAppointment.serviceVariantId || activeAppointment.variantId;
     const targetAppointmentId = currentServiceItem.appointmentId || currentServiceItem.id || activeAppointment.id;
+    const effectiveTenantId = activeAppointment.tenantId || activeAppointment.tenant_id || tenant?.id || user?.tenantId;
 
     try {
       const evalResponse = await tenantApiAdapter.evaluateScheduling({
-        tenantId: activeAppointment.tenantId || activeAppointment.tenant_id,
+        tenantId: effectiveTenantId,
         serviceId: targetServiceId,
+        packageId: (!targetServiceId && targetPackageId) ? targetPackageId : (targetPackageId || undefined),
         staffId: updatedItem.staffId,
         startTime: startTimeIso,
         duration: updatedItem.duration,
@@ -3343,7 +3349,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       const refreshed = await tenantApiAdapter.getAppointment(activeAppointment.id);
       const apptData = refreshed?.appointment || refreshed?.data?.appointment || refreshed?.data || refreshed;
       if (apptData) {
-        setActiveAppointment(mapBoardAppointment(apptData, getSelectedDateKey()));
+        setActiveAppointment(mapBoardAppointment(apptData, targetDate));
       } else {
         setActiveAppointment(prev => prev ? {
           ...prev,
@@ -3362,6 +3368,21 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       );
     } catch (err: any) {
       console.error('Failed to save service edit', err);
+      const isAuthError = err?.status === 401 || err?.response?.status === 401;
+      const isValidationError = err?.status === 400 || err?.response?.status === 400;
+      if (isAuthError) {
+        addLocalToast(
+          isRtl ? 'انتهت صلاحية جلسة العمل. يرجى تسجيل الدخول مجدداً.' : 'Session expired. Please sign in again.',
+          isRtl ? 'Session expired. Please sign in again.' : 'انتهت صلاحية جلسة العمل. يرجى تسجيل الدخول مجدداً.',
+          'warning'
+        );
+      } else if (isValidationError) {
+        addLocalToast(
+          err?.message || (isRtl ? 'بيانات التعديل غير مكتملة أو غير صالحة.' : 'Invalid edit parameters.'),
+          err?.message || (isRtl ? 'بيانات التعديل غير مكتملة أو غير صالحة.' : 'Invalid edit parameters.'),
+          'warning'
+        );
+      }
       throw err;
     }
   };

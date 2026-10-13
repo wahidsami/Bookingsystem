@@ -129,7 +129,22 @@ export const AppointmentServiceEditor: React.FC<AppointmentServiceEditorProps> =
       });
     } catch (err: any) {
       console.error('Failed to save service edits', err);
-      setValidationError(err?.message || (isRtl ? 'تعذر حفظ التعديلات بسبب تعارض' : 'Unable to save due to conflict'));
+      const isAuthError = err?.status === 401 || err?.response?.status === 401;
+      const isValidationError = err?.status === 400 || err?.response?.status === 400;
+      if (isAuthError) {
+        setValidationError(
+          isRtl
+            ? 'انتهت صلاحية جلسة العمل. يرجى إعادة تسجيل الدخول.'
+            : 'Session expired or unauthorized. Please sign in again.'
+        );
+      } else if (isValidationError) {
+        setValidationError(
+          err?.message ||
+          (isRtl ? 'بيانات التعديل غير مكتملة أو غير صالحة.' : 'Invalid or incomplete edit details.')
+        );
+      } else {
+        setValidationError(err?.message || (isRtl ? 'تعذر حفظ التعديلات بسبب تعارض' : 'Unable to save due to conflict'));
+      }
     } finally {
       setIsSubmitting(false);
     }

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bookingController = require('../controllers/bookingController');
 const { authenticateUser, optionalAuth } = require('../middleware/authUser');
+const { optionalTenantAuth } = require('../middleware/authTenant');
 
 // Search for available slots (public - no auth required)
 router.get('/search', bookingController.searchAvailability);
@@ -10,7 +11,7 @@ router.get('/package-search', bookingController.searchPackageAvailability);
 router.post('/package-search', bookingController.searchPackageAvailability);
 router.get('/package-availability', bookingController.searchPackageAvailability);
 router.post('/package-availability', bookingController.searchPackageAvailability);
-router.post('/evaluate', bookingController.evaluateScheduling);
+router.post('/evaluate', optionalTenantAuth, bookingController.evaluateScheduling);
 
 // Get AI-powered staff recommendations (optional auth - better recommendations if logged in)
 router.get('/recommendations', optionalAuth, bookingController.getRecommendations);

@@ -1,3 +1,25 @@
+# BARSPA — Critical Fix: Rescheduling a Confirmed, Paid Appointment Fails Validation
+- [x] 1. Diagnosis & Root Cause Audit <!-- id: resched_audit -->
+  - [x] Trace `POST /api/v1/bookings/evaluate` HTTP 400 error: `tenantId` omitted by `AppointmentWorkspace.tsx` and unhandled in `server/src/controllers/bookingController.js` and `server/src/routes/bookingRoutes.js`.
+  - [x] Trace HTTP 401 errors: `tenantApiAdapter.ts` `isTenantApiPath` missing `/tenant/` relative prefix match, and token-expired handling misclassified as scheduling conflict in `AppointmentServiceEditor.tsx`.
+  - [x] Trace rescheduling contract for confirmed, fully paid appointments: verify `reassignRescheduleAppointment` preserves appointment ID, payment records, linked sales/invoices, and paid state without spawning new appointments.
+- [x] 2. Backend Fixes <!-- id: resched_backend -->
+  - [x] Update `server/src/routes/bookingRoutes.js`: mount `optionalTenantAuth` middleware on `POST /evaluate`.
+  - [x] Update `server/src/controllers/bookingController.js`: resolve `tenantId` from `req.tenantId || req.tenant?.id || req.body?.tenantId`, fallback to `service.tenantId`, and enforce tenant isolation if token authenticated.
+  - [x] Add backend unit tests in `bookingControllerEvaluate.test.js`.
+- [x] 3. Frontend Fixes <!-- id: resched_frontend -->
+  - [x] Update `Tenant-v2/src/components/AppointmentWorkspace.tsx`: add `tenantId` to `Appointment` interface, map `tenantId` in `mapBoardAppointment`, pass `tenantId` and `packageId` (if package) in `handleSaveServiceEdit`.
+  - [x] Update `Tenant-v2/src/lib/tenantApiAdapter.ts`: include `/tenant/` in `isTenantApiPath`, guard `window` in `toAbsoluteUrl`, and notify auth failure handler on 401.
+  - [x] Update `Tenant-v2/src/components/AppointmentServiceEditor.tsx`: differentiate HTTP 401 (auth/session error) and HTTP 400 (validation error) from scheduling conflicts.
+  - [x] Add frontend unit tests in `AppointmentRescheduleValidation.test.ts`.
+- [x] 4. Verification & Testing <!-- id: resched_verify -->
+  - [x] Run backend tests (9/9 evaluate tests passed, 46/46 suite total passed).
+  - [x] Run frontend tests and type checks (`npx tsx --test`, `npx tsc --noEmit` 0 errors, and `npm run build` in Tenant-v2).
+- [ ] 5. Git Delivery <!-- id: resched_delivery -->
+  - [ ] Inspect diff to ensure only intended files are staged.
+  - [ ] Commit and push to `origin/main`.
+  - [ ] STOP for manual user deployment.
+
 # BARSPA — Resource Reservations Must Be Recorded and Counted Reliably
 - [x] 1. Full Resource Lifecycle Audit <!-- id: res_lifecycle_audit -->
   - [x] Trace service & variant resource requirement definitions (`ServiceResourceRequirement`, `variantId`).

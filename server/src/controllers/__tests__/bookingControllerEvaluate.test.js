@@ -210,4 +210,150 @@ describe('POST /api/v1/bookings/evaluate — 409 Standardization', () => {
         expect(payload.conflicts).toHaveLength(2);
         expect(payload.message).toContain('Multiple conflicts');
     });
+
+    describe('Tenant Identity & Authentication Context Contract', () => {
+        test('5. Valid evaluation succeeds when tenantId is provided via authenticated req.tenantId (omitted from body)', async () => {
+            db.Service.findByPk.mockResolvedValue({
+                id: 'svc-facial',
+                tenantId: 'tenant-auth-123',
+                duration: 45
+            });
+
+            bookingService.evaluateSchedulingRequest.mockResolvedValue({
+                valid: true,
+                code: 'SCHEDULING_VALID',
+                message: 'Available'
+            });
+
+            const req = {
+                tenantId: 'tenant-auth-123',
+                body: {
+                    // tenantId omitted from body
+                    serviceId: 'svc-facial',
+                    staffId: 'staff-1',
+                    startTime: '2026-12-16T10:00:00.000Z',
+                    duration: 45
+                },
+                headers: {}
+            };
+            const res = mockResponse();
+
+            await evaluateScheduling(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(bookingService.evaluateSchedulingRequest).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    tenantId: 'tenant-auth-123',
+                    serviceId: 'svc-facial',
+                    startTime: '2026-12-16T10:00:00.000Z'
+                })
+            );
+        });
+
+        test('6. Rejects with 403 if req.tenantId does not match body tenantId (cross-tenant spoofing prevention)', async () => {
+            const req = {
+                tenantId: 'tenant-real',
+                body: {
+                    tenantId: 'tenant-attacker',
+                    serviceId: 'svc-facial',
+                    startTime: '2026-12-16T10:00:00.000Z'
+                },
+                headers: {}
+            };
+            const res = mockResponse();
+
+            await evaluateScheduling(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(403);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    success: false,
+                    message: 'Unauthorized tenant access'
+                })
+            );
+        });
+
+        test('7. Fallback resolves tenantId from service if omitted from both token and body', async () => {
+            db.Service.findByPk.mockResolvedValue({
+                id: 'svc-fallback',
+                tenantId: 'tenant-from-service',
+                duration: 30
+            });
+
+            bookingService.evaluateSchedulingRequest.mockResolvedValue({
+                valid: true,
+                code: 'SCHEDULING_VALID',
+                message: 'Available'
+            });
+
+            const req = {
+                body: {
+                    serviceId: 'svc-fallback',
+                    startTime: '2026-12-16T14:00:00.000Z'
+                },
+                headers: {}
+            };
+            const res = mockResponse();
+
+            await evaluateScheduling(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(bookingService.evaluateSchedulingRequest).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    tenantId: 'tenant-from-service',
+                    serviceId: 'svc-fallback'
+                })
+            );
+        });
+
+        test('8. Rejects with 400 if service/package or startTime is missing', async () => {
+            const reqMissingTime = {
+                tenantId: 'tenant-1',
+                body: {
+                    serviceId: 'svc-1'
+                    // startTime missing
+                },
+                headers: {}
+            };
+            const res1 = mockResponse();
+            await evaluateScheduling(reqMissingTime, res1);
+            expect(res1.status).toHaveBeenCalledWith(400);
+
+            const reqMissingService = {
+                tenantId: 'tenant-1',
+                body: {
+                    startTime: '2026-12-16T10:00:00.000Z'
+                    // serviceId and packageId missing
+                },
+                headers: {}
+            };
+            const res2 = mockResponse();
+            await evaluateScheduling(reqMissingService, res2);
+            expect(res2.status).toHaveBeenCalledWith(400);
+        });
+
+        test('9. Rejects with 400 if tenantId cannot be determined (unauthenticated and service not found)', async () => {
+            db.Service.findByPk.mockResolvedValue(null);
+
+            const req = {
+                body: {
+                    serviceId: 'svc-nonexistent',
+                    startTime: '2026-12-16T10:00:00.000Z'
+                },
+                headers: {}
+            };
+            const res = mockResponse();
+
+            await evaluateScheduling(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    success: false,
+                    message: 'tenantId, serviceId or packageId, and startTime are required'
+                })
+            );
+        });
+    });
 });
+
