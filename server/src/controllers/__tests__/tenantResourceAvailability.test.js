@@ -1220,5 +1220,153 @@ describe('Authoritative Batch Resource Availability & Badges (Phase 5A)', () => 
             expect(moroccan.requirements[0].availableQuantity).toBe(2);
         });
     });
+
+    describe('12. Legacy Unallocated Appointments: resolveOccupiedResources Fallback', () => {
+        const ROOM_A = 'room-a-legacy-fixture';
+        const ROOM_B = 'room-b-legacy-fixture';
+        const TYPE_MASSAGE = 'type-massage-room-legacy';
+        const SRV_MOROCCAN_MASSAGE = 'srv-moroccan-legacy';
+        const SRV_MASSAGE_60 = 'srv-massage-60-legacy';
+
+        beforeEach(() => {
+            jest.spyOn(db.Resource, 'findAll').mockResolvedValue([
+                { id: ROOM_A, tenantId: TENANT_ID, resourceTypeId: TYPE_MASSAGE, name_en: 'Massage Room A', name_ar: 'غرفة مساج أ', is_active: true },
+                { id: ROOM_B, tenantId: TENANT_ID, resourceTypeId: TYPE_MASSAGE, name_en: 'Massage Room B', name_ar: 'غرفة مساج ب', is_active: true }
+            ]);
+
+            jest.spyOn(db.ServiceResourceRequirement, 'findAll').mockImplementation(async ({ where }) => {
+                if (where.serviceId === SRV_MOROCCAN_MASSAGE || where.serviceId === SRV_MASSAGE_60) {
+                    return [{
+                        resourceTypeId: TYPE_MASSAGE,
+                        quantity: 1,
+                        variantId: null,
+                        resourceType: { id: TYPE_MASSAGE, name_en: 'Massage rooms', name_ar: 'غرف مساج', is_active: true }
+                    }];
+                }
+                return [];
+            });
+        });
+
+        it('Scenario 1: Appointment without AppointmentResource row consumes physical capacity', async () => {
+            // DB has 0 AppointmentResource rows
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            // DB has 1 legacy appointment for Moroccan massage (requires 1 Massage Room)
+            // Interval: 16:00 to 17:00
+            jest.spyOn(db.Appointment, 'findAll').mockImplementation(async ({ where }) => {
+                const ltEnd = where?.startTime?.[db.Sequelize.Op?.lt];
+                const gtStart = where?.endTime?.[db.Sequelize.Op?.gt];
+                const legacyAppt = {
+                    id: 'legacy-appt-1',
+                    tenantId: TENANT_ID,
+                    serviceId: SRV_MOROCCAN_MASSAGE,
+                    serviceVariantId: null,
+                    startTime: new Date('2026-10-13T16:00:00.000Z'),
+                    endTime: new Date('2026-10-13T17:00:00.000Z'),
+                    status: 'confirmed'
+                };
+                const aStart = legacyAppt.startTime;
+                const aEnd = legacyAppt.endTime;
+                if ((!ltEnd || aStart < ltEnd) && (!gtStart || aEnd > gtStart)) {
+                    return [legacyAppt];
+                }
+                return [];
+            });
+
+            // Probe at 16:30 for 60m: overlaps the legacy appointment
+            // Total rooms = 2. 1 room should be consumed -> 1/2 available.
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                catalogueItems: [
+                    { id: 'cat-probe-1', serviceId: SRV_MOROCCAN_MASSAGE, startTime: '2026-10-13T16:30:00.000Z', duration: 60 }
+                ]
+            });
+
+            const probe = res.results['cat-probe-1'];
+            expect(probe.isAvailable).toBe(true);
+            expect(probe.requirements[0].totalActive).toBe(2);
+            expect(probe.requirements[0].availableQuantity).toBe(1);
+        });
+
+        it('Scenario 2: Both rooms occupied by legacy appointments reports 0/2 conflict', async () => {
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            jest.spyOn(db.Appointment, 'findAll').mockImplementation(async ({ where }) => {
+                const ltEnd = where?.startTime?.[db.Sequelize.Op?.lt];
+                const gtStart = where?.endTime?.[db.Sequelize.Op?.gt];
+                const appts = [
+                    {
+                        id: 'legacy-1',
+                        tenantId: TENANT_ID,
+                        serviceId: SRV_MOROCCAN_MASSAGE,
+                        startTime: new Date('2026-10-13T16:00:00.000Z'),
+                        endTime: new Date('2026-10-13T17:00:00.000Z'),
+                        status: 'confirmed'
+                    },
+                    {
+                        id: 'legacy-2',
+                        tenantId: TENANT_ID,
+                        serviceId: SRV_MASSAGE_60,
+                        startTime: new Date('2026-10-13T16:15:00.000Z'),
+                        endTime: new Date('2026-10-13T17:15:00.000Z'),
+                        status: 'confirmed'
+                    }
+                ];
+                return appts.filter(a => (!ltEnd || a.startTime < ltEnd) && (!gtStart || a.endTime > gtStart));
+            });
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                catalogueItems: [
+                    { id: 'cat-probe-2', serviceId: SRV_MOROCCAN_MASSAGE, startTime: '2026-10-13T16:30:00.000Z', duration: 60 }
+                ]
+            });
+
+            const probe = res.results['cat-probe-2'];
+            expect(probe.isAvailable).toBe(false);
+            expect(probe.requirements[0].totalActive).toBe(2);
+            expect(probe.requirements[0].availableQuantity).toBe(0);
+        });
+
+        it('Scenario 3: Legacy appointment ending at 16:40 does not block probe starting at 16:40', async () => {
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            jest.spyOn(db.Appointment, 'findAll').mockImplementation(async ({ where }) => {
+                const ltEnd = where?.startTime?.[db.Sequelize.Op?.lt];
+                const gtStart = where?.endTime?.[db.Sequelize.Op?.gt];
+                const appts = [
+                    {
+                        id: 'legacy-room-a',
+                        tenantId: TENANT_ID,
+                        serviceId: SRV_MOROCCAN_MASSAGE,
+                        startTime: new Date('2026-10-13T15:40:00.000Z'),
+                        endTime: new Date('2026-10-13T16:40:00.000Z'),
+                        status: 'confirmed'
+                    },
+                    {
+                        id: 'legacy-room-b',
+                        tenantId: TENANT_ID,
+                        serviceId: SRV_MOROCCAN_MASSAGE,
+                        startTime: new Date('2026-10-13T16:05:00.000Z'),
+                        endTime: new Date('2026-10-13T17:05:00.000Z'),
+                        status: 'confirmed'
+                    }
+                ];
+                return appts.filter(a => (!ltEnd || a.startTime < ltEnd) && (!gtStart || a.endTime > gtStart));
+            });
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                catalogueItems: [
+                    { id: 'cat-probe-3', serviceId: SRV_MOROCCAN_MASSAGE, startTime: '2026-10-13T16:40:00.000Z', duration: 60 }
+                ]
+            });
+
+            const probe = res.results['cat-probe-3'];
+            expect(probe.isAvailable).toBe(true);
+            expect(probe.requirements[0].totalActive).toBe(2);
+            expect(probe.requirements[0].availableQuantity).toBe(1);
+        });
+    });
 });
 

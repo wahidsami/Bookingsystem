@@ -1133,6 +1133,7 @@ const rescheduleBooking = async (req, res) => {
         const schedulingDecision = await bookingService.evaluateSchedulingRequest({
             tenantId: appointment.tenantId,
             serviceId: appointment.serviceId,
+            variantId: appointment.serviceVariantId || null,
             staffId: requestedStaffId,
             startTime: requestedStart,
             duration: durationMinutes,
@@ -1146,6 +1147,38 @@ const rescheduleBooking = async (req, res) => {
                 code: schedulingDecision.reasonType || 'CONFLICT',
                 message: schedulingDecision.message || 'Selected time slot is no longer available'
             });
+        }
+
+        const { resolveServiceResourceRequirements, allocateServiceResources } = require('../utils/resourceRequirementResolver');
+        const requirements = await resolveServiceResourceRequirements(
+            appointment.serviceId,
+            appointment.serviceVariantId || null,
+            appointment.tenantId,
+            transaction
+        );
+
+        let newAllocations = null;
+        if (requirements && requirements.length > 0) {
+            try {
+                const allocationResult = await allocateServiceResources({
+                    tenantId: appointment.tenantId,
+                    serviceId: appointment.serviceId,
+                    variantId: appointment.serviceVariantId || null,
+                    startTime: requestedStart,
+                    endTime: requestedEnd,
+                    excludeAppointmentId: appointment.id,
+                    transaction,
+                    lockRows: true
+                });
+                newAllocations = allocationResult.allocations;
+            } catch (resourceErr) {
+                await transaction.rollback();
+                return res.status(409).json({
+                    success: false,
+                    code: resourceErr.code || 'RESOURCE_OCCUPIED',
+                    message: resourceErr.message || 'Required physical resources are not available for this time'
+                });
+            }
         }
 
         appointment.staffId = requestedStaffId;
@@ -1182,6 +1215,21 @@ const rescheduleBooking = async (req, res) => {
             transaction
         });
         await appointment.save({ transaction });
+
+        if (requirements && requirements.length > 0 && newAllocations) {
+            await db.AppointmentResource.destroy({
+                where: { appointmentId: appointment.id },
+                transaction
+            });
+            await db.AppointmentResource.bulkCreate(
+                newAllocations.map(alloc => ({
+                    appointmentId: appointment.id,
+                    resourceId: alloc.resourceId
+                })),
+                { transaction }
+            );
+        }
+
         await transaction.commit();
 
         let refreshed = null;

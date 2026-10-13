@@ -323,8 +323,41 @@ class BookingConflictDetector {
                 };
             }
 
+            // Allocate required physical resources if configured
+            const { resolveServiceResourceRequirements, allocateServiceResources } = require('../utils/resourceRequirementResolver');
+            const requirements = await resolveServiceResourceRequirements(
+                appointmentData.serviceId,
+                appointmentData.serviceVariantId || null,
+                appointmentData.tenantId,
+                transaction
+            );
+
+            let allocations = [];
+            if (requirements && requirements.length > 0) {
+                const allocResult = await allocateServiceResources({
+                    tenantId: appointmentData.tenantId,
+                    serviceId: appointmentData.serviceId,
+                    variantId: appointmentData.serviceVariantId || null,
+                    startTime: new Date(appointmentData.startTime),
+                    endTime: new Date(appointmentData.endTime),
+                    transaction,
+                    lockRows: true
+                });
+                allocations = allocResult.allocations;
+            }
+
             // Create appointment within transaction
             const appointment = await db.Appointment.create(appointmentData, { transaction });
+
+            if (allocations && allocations.length > 0) {
+                await db.AppointmentResource.bulkCreate(
+                    allocations.map(alloc => ({
+                        appointmentId: appointment.id,
+                        resourceId: alloc.resourceId
+                    })),
+                    { transaction }
+                );
+            }
 
             await transaction.commit();
 

@@ -1,4 +1,38 @@
-# BARSPA — Critical Resource Availability Isolation Audit & Fix
+# BARSPA — Resource Reservations Must Be Recorded and Counted Reliably
+- [x] 1. Full Resource Lifecycle Audit <!-- id: res_lifecycle_audit -->
+  - [x] Trace service & variant resource requirement definitions (`ServiceResourceRequirement`, `variantId`).
+  - [x] Trace active physical resources and types (`Resource`, `ResourceType`).
+  - [x] Trace pre-creation appointment validation (`evaluateSchedulingRequest`).
+  - [x] Trace successful booking creation and physical resource allocation recording (`bookingService.createBookingSession`, `createBooking`, `allocateServiceResources`).
+  - [x] Trace `AppointmentResource` records creation and association with appointments and time intervals.
+  - [x] Trace multi-service and group booking session resource allocation.
+  - [x] Trace resource handling during editing, rescheduling, duration changes, cancellation, status changes (`rescheduleAppointment`, `reassignRescheduleAppointment`, status transitions).
+  - [x] Trace `POST /api/v1/tenant/resources/batch-check` availability derivation against `AppointmentResource` and existing appointments.
+  - [x] Investigate why existing booked appointments (e.g., Abeer's manicure or massage appointments) are missing `AppointmentResource` records or not counted in availability checks.
+  - [x] Prove root cause with concrete code and DB query evidence: availability engines exclusively queried `AppointmentResource`, making legacy / pre-feature / unallocated appointments completely invisible.
+- [x] 2. Missing Allocations & Legacy Compatibility Strategy <!-- id: res_compat_strategy -->
+  - [x] Determine whether active appointments requiring resources lack `AppointmentResource` rows (confirmed: pre-Sept 22 appointments, appointments created before requirements added to service, seed data).
+  - [x] Design non-destructive derived/fallback reconciliation in availability check so active appointments with requirements are not invisible.
+  - [x] Prevent double-counting when both explicit `AppointmentResource` and derived reservations exist.
+  - [x] Ensure non-overlapping reuse of physical instances is preserved via half-open interval checks.
+- [x] 3. Implementation of Proven Fix & Concurrency Controls <!-- id: res_impl -->
+  - [x] Fix booking creation / editing / rescheduling to guarantee atomic `AppointmentResource` persistence.
+  - [x] Update availability resolver (`batchCheckResourceAvailability` / `resourceRequirementResolver.js`) to handle existing appointments with missing allocations safely.
+  - [x] Prevent concurrent over-allocation at authoritative booking preflight / execution.
+- [x] 4. Verification & Regression Tests <!-- id: res_verify -->
+  - [x] Test Scenario A: Two massage rooms (1/2 with 1 booked, 2/2 after, 0/2 with 2 booked).
+  - [x] Test Scenario B: One nail station (0/1 during overlap, 1/1 after).
+  - [x] Test Scenario C: Resource isolation (nail does not block massage).
+  - [x] Test Scenario D: Lifecycle (create, reload, edit, reschedule, cancel, group, missing allocation reconciliation).
+  - [x] Test concurrent conflict prevention.
+  - [x] Run backend Jest tests and frontend component tests.
+  - [x] Run `npx tsc --noEmit` and `npm run build` in `Tenant-v2`.
+- [x] 5. Git Delivery <!-- id: res_delivery -->
+  - [x] Stage only explicitly intended files.
+  - [x] Commit and push to `origin/main`.
+  - [x] STOP for manual user deployment.
+
+# BARSPA — Critical Resource Availability Isolation Audit & Fix (Previous Pass)
 - [x] 1. Audit & Root Cause Analysis <!-- id: res_audit -->
   - [x] Trace `InteractiveDrawers.tsx` candidate-time, duration, and staged services payload construction.
   - [x] Trace `ResourceBadge` rendering, candidate time string, and what the secondary time (e.g. 7:15 PM) represents.

@@ -293,16 +293,17 @@ describe('Reschedule Booking & Tenant Contact Resolution', () => {
 
     test('5. getBooking query uses ["whatsapp", "whatsappNumber"] attribute mapping', async () => {
         let queriedInclude = null;
+        const validUuid = '11111111-1111-4111-8111-111111111111';
         db.Appointment.findByPk = jest.fn().mockImplementation((id, options) => {
             queriedInclude = options.include;
             return Promise.resolve({
-                id: 'apt-001',
+                id: validUuid,
                 tenant: { id: 'tenant-456', whatsappNumber: '+966500000000' }
             });
         });
 
         const req = {
-            params: { id: 'apt-001' },
+            params: { id: validUuid },
             userId: 'user-001'
         };
         const res = {
