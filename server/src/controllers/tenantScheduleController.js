@@ -49,6 +49,52 @@ function normalizeRecurringFlag(value, fallback = true) {
 }
 
 /**
+ * Get all active shifts for all employees of a tenant
+ * GET /api/v1/tenant/shifts
+ */
+exports.getAllShifts = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+
+        if (!db.StaffShift) {
+            console.error('StaffShift model not found in db object');
+            return res.status(500).json({
+                success: false,
+                message: 'StaffShift model not available',
+                error: 'Database model not loaded'
+            });
+        }
+
+        const shifts = await db.StaffShift.findAll({
+            where: { isActive: true },
+            include: [{
+                model: db.Staff,
+                as: 'staff',
+                where: { tenantId },
+                attributes: ['id', 'name', 'isActive']
+            }],
+            order: [
+                ['isRecurring', 'DESC'],
+                ['dayOfWeek', 'ASC'],
+                ['startTime', 'ASC']
+            ]
+        });
+
+        res.json({
+            success: true,
+            shifts
+        });
+    } catch (error) {
+        console.error('Get all shifts error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch shifts',
+            error: error.message
+        });
+    }
+};
+
+/**
  * Get all shifts for an employee
  * GET /api/v1/tenant/employees/:id/shifts
  */

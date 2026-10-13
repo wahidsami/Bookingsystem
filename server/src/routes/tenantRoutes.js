@@ -348,6 +348,7 @@ router.put('/public-page/hero-slider', checkTenantFeature('publicPageCustomizati
 
 // Schedule Management (Phase 3)
 // Shifts
+router.get('/shifts', tenantScheduleController.getAllShifts);
 router.get('/employees/:id/shifts', tenantScheduleController.getShifts);
 router.post('/employees/:id/shifts', tenantScheduleController.createShift);
 router.put('/employees/:id/shifts/:shiftId', tenantScheduleController.updateShift);

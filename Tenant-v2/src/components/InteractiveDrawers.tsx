@@ -2349,6 +2349,31 @@ export default function InteractiveDrawers({
   const [isCheckingResources, setIsCheckingResources] = useState(false);
   const latestResourceRequestIdRef = useRef<number>(0);
 
+  // Compute active participant's candidate start time for new additions and catalogue probes.
+  // Single-client: chains from end of previous service if shouldChainServiceTimes.
+  // Group booking: each participant has an independent timeline. A new participant with no
+  // services starts at their explicit participant startTime or group currentStartTime, NEVER the organizer's chain end.
+  const activeParticipantNextStartTime = useMemo(() => {
+    const activePart = bookingScope === 'group'
+      ? groupParticipants.find(p => p.id === activeParticipantId) || groupParticipants[0]
+      : null;
+    let nextTime = (bookingScope === 'group' && typeof activePart?.startTime === 'number')
+      ? activePart.startTime
+      : currentStartTime;
+    const participantStaged = bookingScope === 'group'
+      ? stagedServices.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId)
+      : stagedServices;
+
+    const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
+    if (shouldChainServiceTimes && participantStaged.length > 0) {
+      const latestEndTime = Math.max(...participantStaged.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
+      if (Number.isFinite(latestEndTime) && latestEndTime > 0) {
+        nextTime = latestEndTime;
+      }
+    }
+    return nextTime;
+  }, [bookingScope, groupParticipants, activeParticipantId, currentStartTime, stagedServices, bookingRecoveryMode]);
+
   useEffect(() => {
     if (!isCreateDrawerOpen) return;
 
@@ -2382,20 +2407,7 @@ export default function InteractiveDrawers({
         }
 
         // 2. Build catalogue probe items payload
-        // Evaluate at the active participant's next scheduled/chained start time
-        let activeParticipantNextStartTime = currentStartTime;
-        const participantStaged = bookingScope === 'group'
-          ? stagedServices.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId)
-          : stagedServices;
-
-        const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
-        if (shouldChainServiceTimes && participantStaged.length > 0) {
-          const latestEndTime = Math.max(...participantStaged.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
-          if (Number.isFinite(latestEndTime) && latestEndTime > 0) {
-            activeParticipantNextStartTime = latestEndTime;
-          }
-        }
-
+        // Evaluate at the active participant's candidate start time
         const catalogueStartIso = buildIsoFromMinutes(selectedDate, activeParticipantNextStartTime);
         const catalogueItemsPayload: Array<{
           id: string;
@@ -2481,18 +2493,7 @@ export default function InteractiveDrawers({
       }));
     } else {
       const resolvedVariant = variantOverride || null;
-      let nextStartTime = currentStartTime;
-      const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
-      const participantStaged = bookingScope === 'group'
-        ? stagedServices.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId)
-        : stagedServices;
-
-      if (shouldChainServiceTimes && participantStaged.length > 0) {
-        const latestEndTime = Math.max(...participantStaged.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
-        if (Number.isFinite(latestEndTime) && latestEndTime > 0) {
-          nextStartTime = latestEndTime;
-        }
-      }
+      const nextStartTime = activeParticipantNextStartTime;
       const nextStartTimeIso = buildIsoFromMinutes(selectedDate, nextStartTime);
 
       const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
@@ -2561,9 +2562,15 @@ export default function InteractiveDrawers({
     }
 
     const isParallel = pkg.scheduleType === 'parallel';
+    const activePart = bookingScope === 'group'
+      ? groupParticipants.find(p => p.id === activeParticipantId) || groupParticipants[0]
+      : null;
+    const initialStartTime = (bookingScope === 'group' && typeof activePart?.startTime === 'number')
+      ? activePart.startTime
+      : currentStartTime;
 
     setStagedServices(prev => {
-      let nextStartTime = currentStartTime;
+      let nextStartTime = initialStartTime;
       const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
       const participantStaged = bookingScope === 'group'
         ? prev.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId)
@@ -4553,6 +4560,7 @@ export default function InteractiveDrawers({
                                                 availability={resourceAvailabilityMap[cItem.id]}
                                                 isLoading={isCheckingResources}
                                                 isRtl={isRtl}
+                                                evaluatedTime={formatMinutesToTime(cItem.startTime)}
                                                 compact
                                               />
                                             </div>
@@ -4634,6 +4642,7 @@ export default function InteractiveDrawers({
                                           availability={resourceAvailabilityMap[item.id]}
                                           isLoading={isCheckingResources}
                                           isRtl={isRtl}
+                                          evaluatedTime={formatMinutesToTime(item.startTime)}
                                           compact
                                         />
                                       </div>
@@ -5079,6 +5088,7 @@ export default function InteractiveDrawers({
                                               availability={resourceAvailabilityMap[`cat-srv-${service.id}`]}
                                               isLoading={isCheckingResources}
                                               isRtl={isRtl}
+                                              evaluatedTime={formatMinutesToTime(activeParticipantNextStartTime)}
                                               compact
                                             />
                                           </div>
@@ -5129,6 +5139,7 @@ export default function InteractiveDrawers({
                                                   availability={resourceAvailabilityMap[`cat-srv-${service.id}`]}
                                                   isLoading={isCheckingResources}
                                                   isRtl={isRtl}
+                                                  evaluatedTime={formatMinutesToTime(activeParticipantNextStartTime)}
                                                   compact
                                                 />
                                               </div>
@@ -5170,6 +5181,7 @@ export default function InteractiveDrawers({
                                                     availability={resourceAvailabilityMap[`cat-var-${variant.id}`]}
                                                     isLoading={isCheckingResources}
                                                     isRtl={isRtl}
+                                                    evaluatedTime={formatMinutesToTime(activeParticipantNextStartTime)}
                                                     compact
                                                   />
                                                 </div>

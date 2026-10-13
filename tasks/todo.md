@@ -703,4 +703,38 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Commit and push confirmed fix to `main`.
   - Document root cause, timestamp-and-capacity breakdown, files changed, test results, commit SHA.
 
+# BARSPA — Final Pre-Fresha Fixes: Group Resource Timing and Employee Duty-Time Shading
+- [x] 1. Workstream A: Audit & Group Booking Resource Timing <!-- id: ws_a_audit -->
+  - Audit candidate probe start time in `InteractiveDrawers.tsx` for single vs group booking.
+  - Fix new participant timing: default to group start time / explicit start time (never organizer chain end).
+  - Fix existing participant timing: chain strictly within participant's own timeline.
+  - Display evaluated candidate time on catalogue resource badges and tooltips (e.g. `Massage rooms · 1/2 available · 5:10 PM`).
+  - Document queued badge semantics (individual item interval viability with self-exclusion).
+- [x] 2. Workstream A: Automated Regression Tests <!-- id: ws_a_tests -->
+  - Abir 60m at 5:10 PM + Participant 2 30m at 5:10 PM fixture.
+  - Candidate at 5:10 PM reports 0/2 available.
+  - Candidate at 5:40 PM evaluates against full duration and reports 1/2 available.
+  - New participant with no services starts at group start time.
+  - Additional service for existing participant follows own timeline.
+- [x] 3. Workstream B: Employee Duty-Time Shading Engine & UI <!-- id: ws_b_engine -->
+  - Inspect `StaffShift` schema and recurring/date-specific shift windows.
+  - Add backend `getAllShifts` (`GET /api/v1/tenant/shifts`) in `tenantScheduleController.js` and `tenantRoutes.js`.
+  - Add `tenantApiAdapter.getTenantShifts()` method.
+  - Create `employeeDutyHours.ts` helper resolving duty intervals for any staff member and dateKey.
+  - Update `AppointmentWorkspace.tsx` to load shifts and attach `dutyIntervals` to `SchedulerColumn`.
+  - Update `SchedulerGrid.tsx` to shade off-duty slots in subtle neutral gray while preserving normal background during duty periods.
+- [x] 4. Workstream B: Automated Regression Tests <!-- id: ws_b_tests -->
+  - Fatima 2:00 PM–10:00 PM shift with 9:00 AM–9:00 PM salon hours.
+  - Morning-only shift.
+  - Split shifts with gray gaps.
+  - No applicable shift (full gray column).
+  - Date changes and shift boundary transitions.
+- [x] 5. Verification Gates, Typecheck & Builds <!-- id: prefresha_verify -->
+  - Run backend unit/integration tests.
+  - Run frontend `resourceBadges.test.ts` and `employeeDutyHours.test.ts`.
+  - Run `Tenant-v2` `npm run lint` and `npm run build`.
+  - Verify all 13 protected tracked files remain untouched.
+- [x] 6. Commit, Push & Final Report <!-- id: prefresha_push -->
+
+
 

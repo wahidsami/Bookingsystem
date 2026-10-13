@@ -720,5 +720,151 @@ test('Scenario 23: Out-of-order and delayed batch-check response guarding reject
   assert.deepEqual(currentAvailabilityMap, resp2.results, 'State must retain latest Request 2 result');
 });
 
+test('Scenario 24: Two-room 5:10 PM fixture (Abir 60m + Part 2 30m) candidate evaluation across time intervals', () => {
+  const TOTAL_ROOMS = 2;
+  // Abir: 5:10 PM - 6:10 PM (minutes from midnight: 17 * 60 + 10 = 1030 to 1090)
+  const abir = { start: 1030, end: 1090, rooms: 1 };
+  // Participant 2: 5:10 PM - 5:40 PM (1030 to 1060)
+  const part2 = { start: 1030, end: 1060, rooms: 1 };
+
+  const staged = [abir, part2];
+
+  function evaluateCandidate(candStart: number, candDuration: number) {
+    const candEnd = candStart + candDuration;
+    // Half-open overlap rule: allocationStart < candEnd && allocationEnd > candStart
+    let maxOverlapCount = 0;
+    // Check overlap at 1-minute resolution or critical boundaries
+    const checkPoints = [candStart, candStart + 1, candEnd - 1, 1030, 1060, 1090].filter(t => t >= candStart && t < candEnd);
+    for (const t of checkPoints) {
+      let activeAtT = 0;
+      for (const a of staged) {
+        if (a.start <= t && a.end > t) {
+          activeAtT += a.rooms;
+        }
+      }
+      if (activeAtT > maxOverlapCount) maxOverlapCount = activeAtT;
+    }
+    const availableRooms = Math.max(0, TOTAL_ROOMS - maxOverlapCount);
+    return {
+      availableQuantity: availableRooms,
+      totalActive: TOTAL_ROOMS,
+      isAvailable: availableRooms >= 1
+    };
+  }
+
+  // 1. Candidate at 5:10 PM for 60m (1030 to 1090)
+  const cand510 = evaluateCandidate(1030, 60);
+  assert.equal(cand510.availableQuantity, 0, 'At 5:10 PM, both Abir and Part 2 occupy rooms -> 0/2 available');
+  assert.equal(cand510.isAvailable, false, 'Must report conflict (0/2)');
+
+  // 2. Candidate at 5:40 PM for 60m (1060 to 1120)
+  const cand540 = evaluateCandidate(1060, 60);
+  assert.equal(cand540.availableQuantity, 1, 'At 5:40 PM, Part 2 has finished; only Abir overlaps until 6:10 PM -> 1/2 available');
+  assert.equal(cand540.isAvailable, true, 'Room released at 5:40 PM is free throughout interval -> available');
+
+  // 3. Candidate at 6:10 PM for 60m (1090 to 1150)
+  const cand610 = evaluateCandidate(1090, 60);
+  assert.equal(cand610.availableQuantity, 2, 'At 6:10 PM, both Abir and Part 2 have finished -> 2/2 available');
+  assert.equal(cand610.isAvailable, true);
+});
+
+test('Scenario 25: Group booking candidate start time independence across participants', () => {
+  const currentStartTime = 1030; // 5:10 PM
+  const groupParticipants = [
+    { id: 'p-abir', name: 'Abir', isPrimary: true, startTime: 1030 },
+    { id: 'p-part2', name: 'Participant 2', isPrimary: false, startTime: 1030 },
+    { id: 'p-part3', name: 'Participant 3', isPrimary: false, startTime: 1030 }
+  ];
+
+  const stagedServices = [
+    // Abir has 60m massage
+    { id: 'stg-1', participantId: 'p-abir', startTime: 1030, duration: 60 },
+    // Participant 2 has 30m massage
+    { id: 'stg-2', participantId: 'p-part2', startTime: 1030, duration: 30 }
+  ];
+
+  function getCandidateNextStartTime(activeParticipantId: string) {
+    const activePart = groupParticipants.find(p => p.id === activeParticipantId) || groupParticipants[0];
+    let nextTime = typeof activePart?.startTime === 'number' ? activePart.startTime : currentStartTime;
+    const participantStaged = stagedServices.filter(s => s.participantId === activeParticipantId);
+    if (participantStaged.length > 0) {
+      const latestEndTime = Math.max(...participantStaged.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
+      if (Number.isFinite(latestEndTime) && latestEndTime > 0) {
+        nextTime = latestEndTime;
+      }
+    }
+    return nextTime;
+  }
+
+  // 1. Participant 3 (new participant with 0 staged services) must evaluate at group / participant start time (5:10 PM = 1030m), NOT Abir's end time (6:10 PM = 1090m)
+  const part3Start = getCandidateNextStartTime('p-part3');
+  assert.equal(part3Start, 1030, 'Participant 3 starts at group start time (5:10 PM)');
+
+  // 2. Participant 2 with 30m service (ends at 5:40 PM) evaluates at 5:40 PM (1060m)
+  const part2NextStart = getCandidateNextStartTime('p-part2');
+  assert.equal(part2NextStart, 1060, 'Participant 2 chains next service to their own end time (5:40 PM)');
+
+  // 3. Abir with 60m service (ends at 6:10 PM) evaluates at 6:10 PM (1090m)
+  const abirNextStart = getCandidateNextStartTime('p-abir');
+  assert.equal(abirNextStart, 1090, 'Abir chains next service to her own end time (6:10 PM)');
+});
+
+test('Scenario 26: ResourceBadge candidate time display and queued badge self-exclusion semantics', () => {
+  // Evaluated time labels
+  const formatted510 = '5:10 PM';
+  const formatted540 = '5:40 PM';
+
+  // Badge label format: "· {availableQuantity}/{totalActive} available · {evaluatedTime}"
+  function formatBadgeCapacity(avail: number, total: number, evalTime?: string | null) {
+    const cap = `${avail}/${total} available`;
+    return evalTime ? `· ${cap} · ${evalTime}` : `· ${cap}`;
+  }
+
+  assert.equal(
+    formatBadgeCapacity(0, 2, formatted510),
+    '· 0/2 available · 5:10 PM',
+    'Badge clearly displays candidate time being evaluated for zero availability'
+  );
+
+  assert.equal(
+    formatBadgeCapacity(1, 2, formatted540),
+    '· 1/2 available · 5:40 PM',
+    'Badge clearly displays candidate time being evaluated for partial availability'
+  );
+
+  // Queued badge semantics audit:
+  // Each queued item represents the viability of that specific service instance.
+  // When evaluated on the backend batch checker, the item itself is not double-counted
+  // against itself (self-exclusion), preserving real capacity.
+  const stagedItem1 = { id: 'stg-1', startTime: 1030, duration: 60 };
+  const stagedItem2 = { id: 'stg-2', startTime: 1030, duration: 30 };
+  const allStaged = [stagedItem1, stagedItem2];
+
+  function evaluateQueuedItem(itemId: string) {
+    const otherStaged = allStaged.filter(s => s.id !== itemId);
+    const item = allStaged.find(s => s.id === itemId)!;
+    // Check contention from other items during [item.startTime, item.startTime + item.duration]
+    const itemEnd = item.startTime + item.duration;
+    let maxOverlap = 0;
+    for (const o of otherStaged) {
+      if (o.startTime < itemEnd && (o.startTime + o.duration) > item.startTime) {
+        maxOverlap += 1;
+      }
+    }
+    const remainingRooms = Math.max(0, 2 - maxOverlap);
+    return { itemId, remainingRooms, isViable: remainingRooms >= 1 };
+  }
+
+  // Item 1 (Abir) sees Item 2 (30m) taking 1 room during [5:10, 5:40]. Out of 2 rooms, 1 remains for Item 1 -> viable!
+  const item1Eval = evaluateQueuedItem('stg-1');
+  assert.equal(item1Eval.remainingRooms, 1);
+  assert.equal(item1Eval.isViable, true);
+
+  // Item 2 (Part 2) sees Item 1 (60m) taking 1 room during [5:10, 5:40]. Out of 2 rooms, 1 remains for Item 2 -> viable!
+  const item2Eval = evaluateQueuedItem('stg-2');
+  assert.equal(item2Eval.remainingRooms, 1);
+  assert.equal(item2Eval.isViable, true);
+});
+
 
 

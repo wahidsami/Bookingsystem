@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Users, ChevronDown, Link2, Package, Zap } from 'lucide-react';
 import { getSchedulerEventBoxMetrics } from './schedulerGeometry';
+import { isSlotOnDuty, type DutyInterval } from '../lib/employeeDutyHours';
 
 
 export type SchedulerViewMode = 'day' | 'week' | 'agenda' | 'team-day' | 'team-week' | 'employee-day' | 'employee-week';
@@ -21,6 +22,11 @@ export interface SchedulerColumn {
    * Staff availability visual state
    */
   availability?: 'available' | 'break' | 'unavailable';
+  /**
+   * Authoritative staff duty intervals for the column's date (minutes from midnight).
+   * Time outside these duty intervals is shaded neutral gray.
+   */
+  dutyIntervals?: DutyInterval[] | null;
 }
 
 export interface SchedulerEvent {
@@ -525,7 +531,7 @@ export default function SchedulerGrid({
   const slotCellClassName = (isHourBoundary: boolean, isActiveHover: boolean) => [
     'relative outline-none transition-colors border-r last:border-r-0',
     isHourBoundary ? 'border-b border-slate-200' : 'border-b border-slate-100/80',
-    isActiveHover ? 'bg-amber-500/10' : 'bg-white hover:bg-slate-50/80',
+    isActiveHover ? 'bg-amber-500/10' : 'hover:bg-slate-50/80',
     isEditable ? 'cursor-pointer' : 'cursor-default',
   ].join(' ');
 
@@ -888,7 +894,12 @@ export default function SchedulerGrid({
                 const slot = resolveSlot(column, columnIndex, row.slotIndex);
                 const isHovered = hoveredSlot?.columnId === slot.columnId && hoveredSlot.slotIndex === slot.slotIndex;
                 const isSelected = isSlotInsideSelection(slot);
-                const laneShade = isExtendedHourRow
+                const slotMinuteOfDay = (startHour * 60) + row.startMinutes;
+                const slotEndMinuteOfDay = slotMinuteOfDay + slotMinutes;
+                const isOnDuty = isSlotOnDuty(slotMinuteOfDay, slotEndMinuteOfDay, column.dutyIntervals);
+                const laneShade = !isOnDuty
+                  ? 'bg-slate-100/80 text-slate-400'
+                  : isExtendedHourRow
                   ? (columnIndex % 2 === 0 ? 'bg-slate-100/80' : 'bg-slate-50/80')
                   : (columnIndex % 2 === 0 ? 'bg-slate-50/70' : 'bg-white');
                 return (

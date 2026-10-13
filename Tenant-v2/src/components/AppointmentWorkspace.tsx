@@ -18,6 +18,7 @@ import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
 import SchedulerGrid, { SchedulerColumn, SchedulerEvent, SchedulerSlot } from './SchedulerGrid';
+import { resolveEmployeeDutyIntervals, type StaffShiftRecord } from '../lib/employeeDutyHours';
 import { resolveEmployeeImageUrl } from '../lib/employeeImage';
 import { resolveProductImageUrl } from '../lib/productContract';
 import { getServiceCategoryKey, getServiceCategoryLabel, normalizeServiceRecord } from '../lib/serviceContract';
@@ -562,6 +563,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   const [stylistStatuses, setStylistStatuses] = useState<Record<string, 'active' | 'break' | 'off' | 'busy' | 'time_off'>>({});
+  const [tenantShifts, setTenantShifts] = useState<StaffShiftRecord[]>([]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedStylistFilter, setSelectedStylistFilter] = useState<string>('all');
@@ -784,14 +786,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
-        const [empRes, srvRes, custRes, prodRes, pkgRes, bundlesRes, categoriesRes] = await Promise.all([
+        const [empRes, srvRes, custRes, prodRes, pkgRes, bundlesRes, categoriesRes, shiftsRes] = await Promise.all([
           tenantApiAdapter.getEmployees(),
           tenantApiAdapter.getServices(),
           tenantApiAdapter.getCustomers({ limit: 1000 }),
           tenantApiAdapter.getProducts(),
           tenantApiAdapter.getPackages(),
           tenantApiAdapter.getServices2Bundles().catch(() => tenantApiAdapter.getPackages()),
-          tenantApiAdapter.getTenantServiceCategories()
+          tenantApiAdapter.getTenantServiceCategories(),
+          tenantApiAdapter.getTenantShifts().catch(() => ({ shifts: [] }))
         ]);
 
         const employees = (empRes?.employees || []).filter((emp: any) => `${emp?.status || ''}`.toLowerCase() !== 'off' && emp?.isActive !== false);
@@ -806,6 +809,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           status: emp.status || (emp.isActive === false ? 'off' : 'active'),
           schedule: Array.isArray(emp.schedule) ? emp.schedule : [],
         })));
+
+        setTenantShifts(Array.isArray(shiftsRes?.shifts) ? shiftsRes.shifts : []);
 
         const services = srvRes?.services || [];
         setLiveServices(services.map((s: any) => ({
@@ -1085,7 +1090,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           setAppointments(mappedApts.sort((left, right) => left.startTime - right.startTime));
         }
       } else {
-        const res = await tenantApiAdapter.getAppointmentsBoard(dateStr, params);
+        const [res, shiftsRes] = await Promise.all([
+          tenantApiAdapter.getAppointmentsBoard(dateStr, params),
+          tenantApiAdapter.getTenantShifts().catch(() => ({ shifts: [] }))
+        ]);
+        if (shiftsRes && Array.isArray(shiftsRes.shifts)) {
+          setTenantShifts(shiftsRes.shifts);
+        }
         if (res && res.success) {
           const mappedApts: Appointment[] = (res.appointments || []).map((a: any) => mapBoardAppointment(a, dateStr));
           const mappedBreaks: Appointment[] = (res.breaks || []).map((b: any) => mapBoardBreak(b));
@@ -4318,6 +4329,13 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               }
             }
 
+            const dutyIntervals = resolveEmployeeDutyIntervals({
+              staffId: stylist.id,
+              dateKey: selectedDateKey,
+              shifts: tenantShifts,
+              fallbackSchedule: stylist.schedule
+            });
+
             return {
               id: getSchedulerColumnId(viewMode, stylist.id),
               kind: 'employee',
@@ -4329,6 +4347,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               statusTone: 'neutral',
               isToday: false,
               availability,
+              dutyIntervals,
             };
           })
       : getDaysOfActiveWeek(selectedDate).map((dayStr) => {
@@ -4336,6 +4355,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           const dayName = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
           const dateLabel = dateValue.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' });
           const isTodayDate = getLocalDateKey(new Date()) === dayStr;
+          const dutyIntervals = focusedEmployeeId
+            ? resolveEmployeeDutyIntervals({
+                staffId: focusedEmployeeId,
+                dateKey: dayStr,
+                shifts: tenantShifts,
+                fallbackSchedule: liveStylists.find(s => s.id === focusedEmployeeId)?.schedule
+              })
+            : undefined;
           return {
             id: getSchedulerColumnId(viewMode, dayStr),
             kind: 'day',
@@ -4346,9 +4373,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
             statusTone: isTodayDate ? 'today' : 'neutral',
             dateKey: dayStr,
             isToday: isTodayDate,
+            dutyIntervals,
           };
         });
-  }, [viewMode, liveStylists, focusedEmployeeId, visibleEmployeeIds, isRtl, stylistStatuses, selectedDate]);
+  }, [viewMode, liveStylists, focusedEmployeeId, visibleEmployeeIds, isRtl, stylistStatuses, selectedDate, selectedDateKey, tenantShifts]);
 
   const schedulerEvents: SchedulerEvent[] = useMemo(() => {
     return schedulerAppointments.map((apt) => {

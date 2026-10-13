@@ -1539,6 +1539,10 @@ class TenantApiAdapter {
     });
   }
 
+  async getTenantShifts(): Promise<any> {
+    return this.get('/tenant/shifts');
+  }
+
   async getEmployeeShifts(employeeId: string): Promise<any> {
     return this.get(`/tenant/employees/${employeeId}/shifts`);
   }

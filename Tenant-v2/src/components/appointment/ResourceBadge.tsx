@@ -89,6 +89,7 @@ interface ResourceBadgeProps {
     actionableGuidanceAr?: string;
   };
   compact?: boolean;
+  evaluatedTime?: string | null;
 }
 
 export function ResourceBadge({
@@ -100,7 +101,8 @@ export function ResourceBadge({
   status,
   isRtl,
   conflictDetails,
-  compact = false
+  compact = false,
+  evaluatedTime = null
 }: ResourceBadgeProps) {
   const displayName = isRtl ? (nameAr || nameEn) : (nameEn || nameAr);
   const qtyLabel = quantity > 1 ? ` x${quantity}` : '';
@@ -113,6 +115,8 @@ export function ResourceBadge({
   const capacityLabel = hasCapacityCount
     ? (isRtl ? `${availableQuantity}/${totalActive} متاح` : `${availableQuantity}/${totalActive} available`)
     : '';
+
+  const evaluatedTimeLabel = evaluatedTime ? ` · ${evaluatedTime}` : '';
 
   // Format availableAgainAt for conflict tooltip/badge
   let availAgainLabel = '';
@@ -132,12 +136,12 @@ export function ResourceBadge({
 
   const tooltip = status === 'conflict'
     ? (isRtl
-        ? (conflictDetails?.messageAr || `${displayName}: غير متاح حالياً (${capacityLabel})`)
-        : (conflictDetails?.messageEn || `${displayName}: currently unavailable (${capacityLabel})`))
+        ? (conflictDetails?.messageAr || `${displayName}: غير متاح ${evaluatedTime ? `في ${evaluatedTime}` : 'حالياً'} (${capacityLabel})`)
+        : (conflictDetails?.messageEn || `${displayName}: currently unavailable ${evaluatedTime ? `at ${evaluatedTime}` : ''} (${capacityLabel})`))
     : status === 'available'
     ? (isRtl
-        ? `${displayName}: متاح في هذا الوقت (${capacityLabel})`
-        : `${displayName}: available for this time (${capacityLabel})`)
+        ? `${displayName}: متاح ${evaluatedTime ? `في ${evaluatedTime}` : 'في هذا الوقت'} (${capacityLabel})`
+        : `${displayName}: available ${evaluatedTime ? `at ${evaluatedTime}` : 'for this time'} (${capacityLabel})`)
     : (isRtl ? 'جاري التحقق من الموارد...' : 'Verifying resource availability...');
 
   if (status === 'loading') {
@@ -166,7 +170,7 @@ export function ResourceBadge({
         <span className="truncate max-w-[90px] sm:max-w-[130px]">{displayName}{qtyLabel}</span>
         {capacityLabel && (
           <span className="shrink-0 font-medium text-[8.5px] sm:text-[9.5px] opacity-90">
-            · {capacityLabel}
+            · {capacityLabel}{evaluatedTimeLabel}
           </span>
         )}
         {availAgainLabel && (
@@ -191,7 +195,7 @@ export function ResourceBadge({
       <span className="truncate max-w-[90px] sm:max-w-[130px]">{displayName}{qtyLabel}</span>
       {capacityLabel && (
         <span className="shrink-0 font-semibold text-[8.5px] sm:text-[9.5px] opacity-90">
-          · {capacityLabel}
+          · {capacityLabel}{evaluatedTimeLabel}
         </span>
       )}
     </span>
@@ -204,6 +208,7 @@ interface ResourceBadgeListProps {
   isLoading?: boolean;
   isRtl: boolean;
   compact?: boolean;
+  evaluatedTime?: string | null;
 }
 
 export function ResourceBadgeList({
@@ -211,7 +216,8 @@ export function ResourceBadgeList({
   availability,
   isLoading = false,
   isRtl,
-  compact = false
+  compact = false,
+  evaluatedTime = null
 }: ResourceBadgeListProps) {
   if (!requirements || requirements.length === 0) {
     return null;
@@ -263,6 +269,7 @@ export function ResourceBadgeList({
               actionableGuidanceAr: liveStatus.actionableGuidanceAr
             } : undefined}
             compact={compact}
+            evaluatedTime={evaluatedTime}
           />
         );
       })}
