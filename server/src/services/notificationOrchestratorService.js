@@ -2,7 +2,7 @@
 
 const db = require('../models');
 const pushNotificationService = require('./pushNotificationService');
-const { sendCustomerNotificationEmail } = require('./customerNotificationEmailService');
+const { sendCustomerNotificationEmail, sendCustomerOrderStatusEmail } = require('./customerNotificationEmailService');
 
 const toSafeText = (value, fallback = '') => {
     const candidate = `${value || ''}`.trim();
@@ -175,15 +175,39 @@ const notifyCustomer = async ({
 
     try {
         if (customer?.email && !`${customer.email}`.toLowerCase().endsWith('@guest.refah.local')) {
-            emailResult = await sendCustomerNotificationEmail({
-                tenant: tenant || {},
-                customer,
-                title: effectiveTitle,
-                body: effectiveBody,
-                actionUrl: data.actionUrl || data.linkUrl || data.url || '',
-                actionText: data.actionText || '',
-                locale: customer?.preferredLanguage === 'ar' ? 'ar' : 'en'
-            });
+            if (effectiveEventType === 'order_status_updated' && (data.orderId || data.order)) {
+                const order = data.order || (data.orderId ? await db.Order.findByPk(data.orderId) : null);
+                if (order) {
+                    emailResult = await sendCustomerOrderStatusEmail({
+                        tenant: tenant || {},
+                        customer,
+                        order,
+                        status: data.status || order.status,
+                        trackingNumber: data.trackingNumber || order.trackingNumber,
+                        estimatedDeliveryDate: data.estimatedDeliveryDate || order.estimatedDeliveryDate
+                    });
+                } else {
+                    emailResult = await sendCustomerNotificationEmail({
+                        tenant: tenant || {},
+                        customer,
+                        title: effectiveTitle,
+                        body: effectiveBody,
+                        actionUrl: data.actionUrl || data.linkUrl || data.url || '',
+                        actionText: data.actionText || '',
+                        locale: customer?.preferredLanguage === 'ar' ? 'ar' : 'en'
+                    });
+                }
+            } else {
+                emailResult = await sendCustomerNotificationEmail({
+                    tenant: tenant || {},
+                    customer,
+                    title: effectiveTitle,
+                    body: effectiveBody,
+                    actionUrl: data.actionUrl || data.linkUrl || data.url || '',
+                    actionText: data.actionText || '',
+                    locale: customer?.preferredLanguage === 'ar' ? 'ar' : 'en'
+                });
+            }
         } else {
             emailResult = { success: false, skipped: true, reason: 'customer_email_missing' };
         }

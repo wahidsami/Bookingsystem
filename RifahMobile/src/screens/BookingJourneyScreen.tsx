@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     View,
     StyleSheet,
@@ -8,6 +8,9 @@ import {
     Alert,
     BackHandler,
     TextInput,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
 import { AppIcon } from '../components/AppIcon';
@@ -103,6 +106,28 @@ export function BookingJourneyScreen({ route, navigation }: any) {
     const [walletBalance, setWalletBalance] = useState<number>(0);
     const [notes, setNotes] = useState<string>('');
     const [submittingBooking, setSubmittingBooking] = useState(false);
+    const scrollViewRef = useRef<ScrollView>(null);
+    const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
+
+    // Track active keyboard height for notes field visibility
+    useEffect(() => {
+        const showSub = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            (e) => {
+                setKeyboardHeight(e.endCoordinates.height);
+            }
+        );
+        const hideSub = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => {
+                setKeyboardHeight(0);
+            }
+        );
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
 
     // Fetch customer wallet balance for this tenant
     useEffect(() => {
@@ -179,6 +204,19 @@ export function BookingJourneyScreen({ route, navigation }: any) {
         const fetchTenant = async () => {
             try {
                 setLoadingTenant(true);
+                const knownSlug = route.params?.slug || firstItem.tenant?.slug;
+                if (knownSlug) {
+                    try {
+                        const slugRes = await api.get<{ success: boolean; data: any }>(
+                            `/public/tenant/${knownSlug}`
+                        );
+                        if (active && slugRes.success && slugRes.data) {
+                            setTenant(slugRes.data);
+                            return;
+                        }
+                    } catch {}
+                }
+
                 const tenantsRes = await api.get<{
                     success: boolean;
                     tenants: Tenant[];
@@ -187,7 +225,18 @@ export function BookingJourneyScreen({ route, navigation }: any) {
                     (t: any) => t.id === tenantId
                 );
                 if (active && matched) {
-                    setTenant(matched);
+                    let fullTenant = matched;
+                    if (matched.slug) {
+                        try {
+                            const slugRes = await api.get<{ success: boolean; data: any }>(
+                                `/public/tenant/${matched.slug}`
+                            );
+                            if (slugRes.success && slugRes.data) {
+                                fullTenant = { ...matched, ...slugRes.data };
+                            }
+                        } catch {}
+                    }
+                    setTenant(fullTenant);
                 }
             } catch (err) {
                 console.warn('Failed to load tenant details in booking:', err);
@@ -196,7 +245,7 @@ export function BookingJourneyScreen({ route, navigation }: any) {
             }
         };
 
-        if (!tenant) {
+        if (!tenant || !tenant.workingHours) {
             fetchTenant();
         } else {
             setLoadingTenant(false);
@@ -207,7 +256,50 @@ export function BookingJourneyScreen({ route, navigation }: any) {
         };
     }, [tenantId]);
 
-    // Fetch Eligible Staff for each service in cart
+    // Helper to get child packageItems and staffAssignments for authoritative backend search/evaluate
+    const getPackageChildAssignments = useCallback((item: ServiceBookingCartItem) => {
+        const childItems =
+            item.packageItems && item.packageItems.length > 0
+                ? item.packageItems
+                : item.bundle?.items || [];
+
+        const staffAssignments: Record<string, string | null> = {};
+        const packageItems = childItems.map((c: any) => {
+            const childStaffId =
+                staffMode === 'any'
+                    ? null
+                    : (c.requestedStaffId !== undefined
+                        ? c.requestedStaffId
+                        : (c.staff !== undefined
+                            ? (c.staff ? c.staff.id : null)
+                            : (c.defaultStaffId || null)));
+
+            const itemId = c.packageItemId || c.id || undefined;
+            if (itemId) staffAssignments[itemId] = childStaffId;
+            if (c.serviceId) staffAssignments[c.serviceId] = childStaffId;
+
+            return {
+                packageItemId: itemId,
+                serviceId: c.serviceId,
+                staffId: childStaffId,
+                requestedStaffId: childStaffId,
+            };
+        });
+
+        // Top-level staffId: if all child items share the exact same explicit staff member, we can also pass it
+        const nonNullStaff = packageItems.map((p: any) => p.staffId).filter(Boolean);
+        const uniformStaffId =
+            staffMode !== 'any' &&
+            nonNullStaff.length === packageItems.length &&
+            packageItems.length > 0 &&
+            packageItems.every((p: any) => p.staffId === packageItems[0].staffId)
+                ? packageItems[0].staffId
+                : undefined;
+
+        return { packageItems, staffAssignments, uniformStaffId };
+    }, [staffMode]);
+
+    // Fetch Eligible Staff for each service/bundle in cart
     useEffect(() => {
         if (!tenantId || items.length === 0) return;
 
@@ -219,16 +311,52 @@ export function BookingJourneyScreen({ route, navigation }: any) {
 
                 const promises = items.map(async (item) => {
                     try {
-                        const res = await api.get<{
-                            success: boolean;
-                            staff: Staff[];
-                        }>(
-                            `/public/tenant/${tenantId}/services/${item.service.id}/staff`
-                        );
-                        if (res.success && Array.isArray(res.staff)) {
-                            map[item.service.id] = res.staff.map(normalizeStaff);
+                        const isPackage =
+                            item.itemType === 'package' ||
+                            Boolean(item.packageId) ||
+                            Boolean(item.bundle);
+
+                        if (isPackage) {
+                            // Package / Bundle cart item: NEVER call /services/${bundle.id}/staff!
+                            // Query eligible staff PER child service ID. No cross-service intersection!
+                            const childItems =
+                                item.packageItems && item.packageItems.length > 0
+                                    ? item.packageItems
+                                    : item.bundle?.items || [];
+
+                            await Promise.all(
+                                childItems
+                                    .filter((ci: any) => ci.serviceId)
+                                    .map(async (ci: any) => {
+                                        try {
+                                            const res = await api.get<{
+                                                success: boolean;
+                                                staff: Staff[];
+                                            }>(
+                                                `/public/tenant/${tenantId}/services/${ci.serviceId}/staff`
+                                            );
+                                            map[ci.serviceId] =
+                                                res.success && Array.isArray(res.staff)
+                                                    ? res.staff.map(normalizeStaff)
+                                                    : [];
+                                        } catch {
+                                            map[ci.serviceId] = [];
+                                        }
+                                    })
+                            );
                         } else {
-                            map[item.service.id] = [];
+                            // Regular single service
+                            const res = await api.get<{
+                                success: boolean;
+                                staff: Staff[];
+                            }>(
+                                `/public/tenant/${tenantId}/services/${item.service.id}/staff`
+                            );
+                            if (res.success && Array.isArray(res.staff)) {
+                                map[item.service.id] = res.staff.map(normalizeStaff);
+                            } else {
+                                map[item.service.id] = [];
+                            }
                         }
                     } catch {
                         map[item.service.id] = [];
@@ -257,23 +385,62 @@ export function BookingJourneyScreen({ route, navigation }: any) {
         setSelectedSlot(null);
         if (mode === 'any') {
             items.forEach((item) => {
-                updateItem(item.id, { staff: null, requestedStaffId: null });
+                const updatedPackageItems = item.packageItems?.map((pItem) => ({
+                    ...pItem,
+                    staff: null,
+                    requestedStaffId: null,
+                }));
+                updateItem(item.id, {
+                    staff: null,
+                    requestedStaffId: null,
+                    ...(updatedPackageItems ? { packageItems: updatedPackageItems } : {}),
+                });
             });
         }
     };
 
-    const handleSelectStaff = (itemId: string, staff: Staff | null) => {
+    const handleSelectStaff = (itemId: string, staff: Staff | null, childServiceId?: string) => {
         setSelectedSlot(null);
-        updateItem(itemId, {
-            staff,
-            requestedStaffId: staff ? staff.id : null,
-        });
+        if (childServiceId) {
+            const item = items.find((i) => i.id === itemId);
+            if (item && item.packageItems) {
+                const updatedPackageItems = item.packageItems.map((pItem) => {
+                    if (pItem.serviceId === childServiceId) {
+                        return {
+                            ...pItem,
+                            staff,
+                            requestedStaffId: staff ? staff.id : null,
+                        };
+                    }
+                    return pItem;
+                });
+                updateItem(itemId, {
+                    packageItems: updatedPackageItems,
+                });
+            }
+        } else {
+            updateItem(itemId, {
+                staff,
+                requestedStaffId: staff ? staff.id : null,
+            });
+        }
     };
 
     const canProceedFromStaff = useMemo(() => {
         if (staffMode === 'any') return true;
-        // In choose mode, every service must have a chosen specialist
-        return items.every((item) => item.staff !== null);
+        // In choose mode:
+        // Single service: must have a chosen specialist (item.staff !== null)
+        // Package: child items can have chosen staff or "Any Professional" (per-child choice permitted)
+        return items.every((item) => {
+            const isPackage =
+                item.itemType === 'package' ||
+                Boolean(item.packageId) ||
+                Boolean(item.bundle);
+            if (isPackage && item.packageItems && item.packageItems.length > 0) {
+                return true;
+            }
+            return item.staff !== null;
+        });
     }, [staffMode, items]);
 
     // Step 2: Authoritative Date Availability Evaluation
@@ -293,52 +460,123 @@ export function BookingJourneyScreen({ route, navigation }: any) {
                     days.map(async (day) => {
                         const dateKey = toDateKey(day);
                         try {
-                            // Query backend /bookings/search for all services on this date
+                            // 1. Check if tenant is configured as closed on this weekday
+                            const weekdayKeys = [
+                                'sunday',
+                                'monday',
+                                'tuesday',
+                                'wednesday',
+                                'thursday',
+                                'friday',
+                                'saturday',
+                            ] as const;
+                            const dayOfWeek = weekdayKeys[day.getDay()];
+                            const isConfiguredClosed =
+                                tenant?.workingHours &&
+                                tenant.workingHours[dayOfWeek]?.isOpen === false;
+
+                            if (isConfiguredClosed) {
+                                return {
+                                    key: dateKey,
+                                    date: day,
+                                    available: false,
+                                    slotCount: 0,
+                                    status: 'day-off',
+                                };
+                            }
+
+                            // 2. Query backend for each cart item authoritatively
+                            // For package items: backend package-search / search with packageId
+                            // For service items: backend search with serviceId
                             const searchResponses = await Promise.all(
-                                items.map((item) =>
-                                    api.post<{
-                                        success: boolean;
-                                        slots?: SlotItem[];
-                                    }>('/bookings/search', {
-                                        tenantId,
-                                        serviceId: item.service.id,
-                                        date: dateKey,
-                                        staffId:
-                                            item.requestedStaffId ||
-                                            item.staff?.id ||
-                                            undefined,
-                                        variantId:
-                                            item.variant?.id || undefined,
-                                    })
-                                )
+                                items.map(async (item) => {
+                                    const isPackage =
+                                        item.itemType === 'package' ||
+                                        Boolean(item.packageId) ||
+                                        Boolean(item.bundle);
+
+                                    if (isPackage) {
+                                        const pkgId =
+                                            item.packageId ||
+                                            item.bundle?.id ||
+                                            item.service.id;
+                                        const { packageItems: childPayloadItems, staffAssignments, uniformStaffId } = getPackageChildAssignments(item);
+                                        const chosenStaffId = uniformStaffId || undefined;
+
+                                        try {
+                                            return await api.post<{
+                                                success: boolean;
+                                                slots?: SlotItem[];
+                                            }>('/bookings/package-search', {
+                                                tenantId,
+                                                packageId: pkgId,
+                                                date: dateKey,
+                                                staffId: chosenStaffId,
+                                                variantId: item.variant?.id || undefined,
+                                                staffAssignments,
+                                                packageItems: childPayloadItems,
+                                            });
+                                        } catch {
+                                            return await api.post<{
+                                                success: boolean;
+                                                slots?: SlotItem[];
+                                            }>('/bookings/search', {
+                                                tenantId,
+                                                packageId: pkgId,
+                                                date: dateKey,
+                                                staffId: chosenStaffId,
+                                                variantId: item.variant?.id || undefined,
+                                                staffAssignments,
+                                                packageItems: childPayloadItems,
+                                            });
+                                        }
+                                    } else {
+                                        const chosenStaffId = staffMode === 'any' ? undefined : (item.requestedStaffId || item.staff?.id || undefined);
+                                        return await api.post<{
+                                            success: boolean;
+                                            slots?: SlotItem[];
+                                        }>('/bookings/search', {
+                                            tenantId,
+                                            serviceId: item.service.id,
+                                            date: dateKey,
+                                            staffId: chosenStaffId,
+                                            variantId: item.variant?.id || undefined,
+                                        });
+                                    }
+                                })
                             );
 
                             const nowTime = new Date().getTime();
+                            const isToday = isSameDay(day, today);
                             const hasValidSlots = searchResponses.every(
                                 (res) => {
-                                    if (!res.success || !res.slots) return false;
+                                    if (!res.success || !Array.isArray(res.slots)) return false;
                                     return res.slots.some((s) => {
                                         if (!s.available) return false;
-                                        const slotStart = new Date(
-                                            s.startTime
-                                        ).getTime();
-                                        if (isSameDay(day, today)) {
-                                            return slotStart > nowTime;
+                                        if (isToday) {
+                                            return new Date(s.startTime).getTime() > nowTime;
                                         }
                                         return true;
                                     });
                                 }
                             );
 
-                            const totalCount = (
+                            const firstAvailableCount = (
                                 searchResponses[0]?.slots || []
-                            ).filter((s) => s.available).length;
+                            ).filter((s) => {
+                                if (!s.available) return false;
+                                if (isToday) {
+                                    return new Date(s.startTime).getTime() > nowTime;
+                                }
+                                return true;
+                            }).length;
 
                             return {
                                 key: dateKey,
                                 date: day,
                                 available: hasValidSlots,
-                                slotCount: totalCount,
+                                slotCount: hasValidSlots ? firstAvailableCount : 0,
+                                status: hasValidSlots ? 'available' : 'full',
                             };
                         } catch {
                             return {
@@ -346,6 +584,7 @@ export function BookingJourneyScreen({ route, navigation }: any) {
                                 date: day,
                                 available: false,
                                 slotCount: 0,
+                                status: 'full',
                             };
                         }
                     })
@@ -377,7 +616,7 @@ export function BookingJourneyScreen({ route, navigation }: any) {
         return () => {
             active = false;
         };
-    }, [tenantId, staffMode, items]);
+    }, [tenantId, staffMode, items, tenant?.workingHours]);
 
     // Step 2: Fetch Authoritative Slots for Selected Date
     useEffect(() => {
@@ -389,119 +628,93 @@ export function BookingJourneyScreen({ route, navigation }: any) {
                 setLoadingSlots(true);
                 setSelectedSlot(null);
                 const dateKey = toDateKey(selectedDate);
+                const nowTime = new Date().getTime();
+                const isToday = isSameDay(selectedDate, startOfToday());
 
-                if (items.length === 1) {
-                    // Single service: authoritative slots from backend
-                    const item = items[0];
-                    const res = await api.post<{
-                        success: boolean;
-                        slots?: SlotItem[];
-                    }>('/bookings/search', {
-                        tenantId,
-                        serviceId: item.service.id,
-                        date: dateKey,
-                        staffId:
-                            item.requestedStaffId ||
-                            item.staff?.id ||
-                            undefined,
-                        variantId: item.variant?.id || undefined,
-                    });
+                // Fetch authoritative backend availability for each cart item
+                const responses = await Promise.all(
+                    items.map(async (item) => {
+                        const isPackage =
+                            item.itemType === 'package' ||
+                            Boolean(item.packageId) ||
+                            Boolean(item.bundle);
 
-                    if (active && res.success && Array.isArray(res.slots)) {
-                        const nowTime = new Date().getTime();
-                        const isToday = isSameDay(selectedDate, startOfToday());
-                        const validSlots = res.slots.filter((s) => {
-                            if (!s.available) return false;
-                            if (isToday) {
-                                return (
-                                    new Date(s.startTime).getTime() > nowTime
-                                );
-                            }
-                            return true;
-                        });
-                        setAvailableSlots(validSlots);
-                    }
-                } else {
-                    // Multi-service: Fetch slots for all services and compute exact contiguous chain (gap === 0)
-                    // Eliminating the flawed 45-minute slack!
-                    const responses = await Promise.all(
-                        items.map((item) =>
-                            api.post<{
-                                success: boolean;
-                                slots?: SlotItem[];
-                            }>('/bookings/search', {
-                                tenantId,
-                                serviceId: item.service.id,
-                                date: dateKey,
-                                staffId:
-                                    item.requestedStaffId ||
-                                    item.staff?.id ||
-                                    undefined,
-                                variantId: item.variant?.id || undefined,
-                            })
-                        )
+                                    if (isPackage) {
+                                        const pkgId =
+                                            item.packageId ||
+                                            item.bundle?.id ||
+                                            item.service.id;
+                                        const { packageItems: childPayloadItems, staffAssignments, uniformStaffId } = getPackageChildAssignments(item);
+                                        const chosenStaffId = uniformStaffId || undefined;
+
+                                        try {
+                                            return await api.post<{
+                                                success: boolean;
+                                                slots?: SlotItem[];
+                                            }>('/bookings/package-search', {
+                                                tenantId,
+                                                packageId: pkgId,
+                                                date: dateKey,
+                                                staffId: chosenStaffId,
+                                                variantId: item.variant?.id || undefined,
+                                                staffAssignments,
+                                                packageItems: childPayloadItems,
+                                            });
+                                        } catch {
+                                            return await api.post<{
+                                                success: boolean;
+                                                slots?: SlotItem[];
+                                            }>('/bookings/search', {
+                                                tenantId,
+                                                packageId: pkgId,
+                                                date: dateKey,
+                                                staffId: chosenStaffId,
+                                                variantId: item.variant?.id || undefined,
+                                                staffAssignments,
+                                                packageItems: childPayloadItems,
+                                            });
+                                        }
+                                    } else {
+                                        const chosenStaffId = staffMode === 'any' ? undefined : (item.requestedStaffId || item.staff?.id || undefined);
+                                        return await api.post<{
+                                            success: boolean;
+                                            slots?: SlotItem[];
+                                        }>('/bookings/search', {
+                                            tenantId,
+                                            serviceId: item.service.id,
+                                            date: dateKey,
+                                            staffId: chosenStaffId,
+                                            variantId: item.variant?.id || undefined,
+                                        });
+                                    }
+                    })
+                );
+
+                if (!active) return;
+
+                // Slots are backend-authoritative: assign directly from backend response
+                const primaryRes = responses[0];
+                if (primaryRes && primaryRes.success && Array.isArray(primaryRes.slots)) {
+                    // If multiple items in cart, ensure every item has feasible backend availability on this date
+                    const allItemsHaveSlots = responses.every(
+                        (res) => res.success && Array.isArray(res.slots) && res.slots.some((s) => s.available)
                     );
 
-                    const nowTime = new Date().getTime();
-                    const isToday = isSameDay(selectedDate, startOfToday());
-
-                    const validLayers = responses.map((res) =>
-                        (res.slots || []).filter((s) => {
-                            if (!s.available) return false;
-                            if (isToday) {
-                                return (
-                                    new Date(s.startTime).getTime() > nowTime
-                                );
-                            }
-                            return true;
-                        })
-                    );
-
-                    if (validLayers.some((layer) => layer.length === 0)) {
-                        if (active) setAvailableSlots([]);
+                    if (!allItemsHaveSlots) {
+                        setAvailableSlots([]);
                         return;
                     }
 
-                    // Build contiguous chains with EXACT end-to-start timing (0 to 5 min buffer, strictly NO 45-minute gap)
-                    let chains = validLayers[0].map((slot) => [slot]);
-                    for (let i = 1; i < items.length; i++) {
-                        const nextLayer = validLayers[i];
-                        const nextChains = [];
-                        for (const chain of chains) {
-                            const lastSlot = chain[chain.length - 1];
-                            const lastSlotEnd = new Date(
-                                lastSlot.endTime
-                            ).getTime();
-                            for (const nextSlot of nextLayer) {
-                                const nextSlotStart = new Date(
-                                    nextSlot.startTime
-                                ).getTime();
-                                const gap = nextSlotStart - lastSlotEnd;
-                                // Strictly contiguous: 0 to 5 minutes buffer
-                                if (gap >= 0 && gap <= 5 * 60000) {
-                                    nextChains.push([...chain, nextSlot]);
-                                }
-                            }
+                    const validSlots = primaryRes.slots.filter((s) => {
+                        if (!s.available) return false;
+                        if (isToday) {
+                            return new Date(s.startTime).getTime() > nowTime;
                         }
-                        chains = nextChains;
-                    }
-
-                    // Map primary slot to the chain start and chain end
-                    const compositeSlots: SlotItem[] = chains.map((chain) => {
-                        const start = chain[0].startTime;
-                        const end = chain[chain.length - 1].endTime;
-                        return {
-                            startTime: start,
-                            endTime: end,
-                            available: true,
-                            staffId: chain[0].staffId,
-                            staffName: chain[0].staffName,
-                        };
+                        return true;
                     });
-
-                    if (active) {
-                        setAvailableSlots(compositeSlots);
-                    }
+                    setAvailableSlots(validSlots);
+                } else {
+                    setAvailableSlots([]);
                 }
             } catch (err) {
                 console.error('Error loading authoritative slots:', err);
@@ -593,44 +806,40 @@ export function BookingJourneyScreen({ route, navigation }: any) {
             let currentStart = new Date(selectedSlot.startTime);
 
             for (const item of items) {
-                // If package item, evaluate its child steps with authoritative scheduling
-                if (item.itemType === 'package' && item.packageItems && item.packageItems.length > 0) {
-                    const isParallel = item.scheduleType === 'parallel';
-                    let stepCurrent = currentStart.getTime();
+                const isPackage =
+                    item.itemType === 'package' ||
+                    Boolean(item.packageId) ||
+                    Boolean(item.bundle);
 
-                    for (const pItem of item.packageItems) {
-                        const stepDuration = pItem.duration || pItem.service?.duration || 30;
-                        const stepStartTime = new Date(isParallel ? currentStart.getTime() : stepCurrent);
-                        const stepStaffId = staffMode === 'any' ? null : (pItem.defaultStaffId || item.requestedStaffId || item.staff?.id || null);
+                if (isPackage) {
+                    const pkgId = item.packageId || item.bundle?.id || item.service.id;
+                    const { packageItems: childPayloadItems, staffAssignments, uniformStaffId } = getPackageChildAssignments(item);
+                    const duration = item.totalDuration || item.service?.duration || 60;
 
-                        try {
-                            const evalRes = await api.post<any>('/bookings/evaluate', {
-                                tenantId,
-                                serviceId: pItem.serviceId,
-                                variantId: pItem.variantId || undefined,
-                                staffId: stepStaffId, // pass null for Any Professional; backend evaluates candidate staff
-                                startTime: stepStartTime.toISOString(),
-                                duration: stepDuration,
-                            });
+                    try {
+                        const evalRes = await api.post<any>('/bookings/evaluate', {
+                            tenantId,
+                            packageId: pkgId,
+                            staffId: uniformStaffId || null,
+                            startTime: currentStart.toISOString(),
+                            duration,
+                            packageItems: childPayloadItems,
+                            staffAssignments,
+                        });
 
-                            if (evalRes && !evalRes.success) {
-                                const formatted = getCustomerFacingBookingErrorMessage(evalRes, isRTL);
-                                Alert.alert(formatted.title, formatted.message);
-                                return;
-                            }
-                        } catch (evalErr: any) {
-                            const formatted = getCustomerFacingBookingErrorMessage(evalErr, isRTL);
+                        if (evalRes && !evalRes.success) {
+                            const formatted = getCustomerFacingBookingErrorMessage(evalRes, isRTL);
                             Alert.alert(formatted.title, formatted.message);
                             return;
                         }
-
-                        if (!isParallel) {
-                            stepCurrent += stepDuration * 60000;
-                        }
+                    } catch (evalErr: any) {
+                        const formatted = getCustomerFacingBookingErrorMessage(evalErr, isRTL);
+                        Alert.alert(formatted.title, formatted.message);
+                        return;
                     }
 
-                    const bundleDuration = (item.totalDuration || item.service.duration || 60) * 60000;
-                    currentStart = new Date(currentStart.getTime() + (isParallel ? bundleDuration : (stepCurrent - currentStart.getTime())));
+                    const bundleDurationMs = duration * 60000;
+                    currentStart = new Date(currentStart.getTime() + bundleDurationMs);
                 } else {
                     // Regular service: evaluate scheduling with authoritative backend
                     const staffId = staffMode === 'any' ? null : (item.requestedStaffId || item.staff?.id || null);
@@ -706,22 +915,42 @@ export function BookingJourneyScreen({ route, navigation }: any) {
             // Compute sequential start and end times for all items
             let currentStart = new Date(selectedSlot.startTime).getTime();
             const bookingItemsPayload = items.map((item) => {
-                if (item.itemType === 'package' && item.packageId) {
+                const isPackage =
+                    item.itemType === 'package' ||
+                    Boolean(item.packageId) ||
+                    Boolean(item.bundle);
+
+                const childItems =
+                    item.packageItems && item.packageItems.length > 0
+                        ? item.packageItems
+                        : item.bundle?.items || [];
+
+                const pkgId = item.packageId || item.bundle?.id;
+
+                if (isPackage && pkgId) {
                     const isParallel = item.scheduleType === 'parallel';
                     let stepCurrent = currentStart;
-                    const packageItems = (item.packageItems || []).map((pItem, idx) => {
+                    const packageItems = childItems.map((pItem: any, idx: number) => {
                         const durMs = (pItem.duration || pItem.service?.duration || 30) * 60000;
                         const pStart = new Date(isParallel ? currentStart : stepCurrent).toISOString();
                         const pEnd = new Date((isParallel ? currentStart : stepCurrent) + durMs).toISOString();
                         if (!isParallel) {
                             stepCurrent += durMs;
                         }
+                        const childStaffId =
+                            staffMode === 'any'
+                                ? null
+                                : (pItem.requestedStaffId !== undefined
+                                    ? pItem.requestedStaffId
+                                    : (pItem.staff !== undefined
+                                        ? (pItem.staff ? pItem.staff.id : null)
+                                        : (pItem.defaultStaffId || null)));
                         return {
                             serviceId: pItem.serviceId,
                             variantId: pItem.variantId || null,
                             packageItemId: pItem.packageItemId || undefined,
-                            staffId: staffMode === 'any' ? null : (pItem.defaultStaffId || item.requestedStaffId || item.staff?.id || null),
-                            requestedStaffId: staffMode === 'any' ? null : (pItem.defaultStaffId || item.requestedStaffId || item.staff?.id || null),
+                            staffId: childStaffId,
+                            requestedStaffId: childStaffId,
                             startTime: pStart,
                             endTime: pEnd,
                             duration: pItem.duration || pItem.service?.duration || 30,
@@ -734,7 +963,7 @@ export function BookingJourneyScreen({ route, navigation }: any) {
 
                     return {
                         itemType: 'package',
-                        packageId: item.packageId,
+                        packageId: pkgId,
                         packageItems,
                         notes: notes.trim() || undefined,
                         paymentMethod: selectedPaymentMethod,
@@ -949,14 +1178,24 @@ export function BookingJourneyScreen({ route, navigation }: any) {
                     <ActivityIndicator size="large" color="#6537C0" />
                 </View>
             ) : (
-                <ScrollView
-                    style={styles.scrollBody}
-                    contentContainerStyle={[
-                        styles.scrollContent,
-                        { paddingBottom: scrollBottomPadding + 90 },
-                    ]}
-                    showsVerticalScrollIndicator={false}
+                <KeyboardAvoidingView
+                    style={{ flex: 1 }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 >
+                    <ScrollView
+                        ref={scrollViewRef}
+                        style={styles.scrollBody}
+                        contentContainerStyle={[
+                            styles.scrollContent,
+                            {
+                                paddingBottom: keyboardHeight > 0
+                                    ? keyboardHeight + 80
+                                    : scrollBottomPadding + 90,
+                            },
+                        ]}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                    >
                     {/* Booking Context Pill Card */}
                     <BookingContextCard
                         salonName={salonName}
@@ -1149,6 +1388,11 @@ export function BookingJourneyScreen({ route, navigation }: any) {
                                     ]}
                                     value={notes}
                                     onChangeText={setNotes}
+                                    onFocus={() => {
+                                        setTimeout(() => {
+                                            scrollViewRef.current?.scrollToEnd({ animated: true });
+                                        }, 150);
+                                    }}
                                     placeholder={
                                         isRTL
                                             ? 'اكتبي أي ملاحظات أو تفضيلات خاصة...'
@@ -1162,7 +1406,8 @@ export function BookingJourneyScreen({ route, navigation }: any) {
                         </>
                     )}
                 </ScrollView>
-            )}
+            </KeyboardAvoidingView>
+        )}
 
             {/* Sticky Bottom Action Bar */}
             <View

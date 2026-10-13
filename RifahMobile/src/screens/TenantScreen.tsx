@@ -501,6 +501,8 @@ export function TenantScreen({ route, navigation }: TenantDetailsProps) {
                     defaultStaffId: it.defaultStaffId || null,
                     service: it.service,
                     duration: it.service?.duration || 30,
+                    staff: null,
+                    requestedStaffId: null,
                 })),
                 scheduleType: bundle.scheduleType === 'parallel' ? 'parallel' : 'sequential',
                 totalDuration: bundle.totalDuration || 60,

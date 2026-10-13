@@ -252,25 +252,11 @@ exports.updateOrderStatus = async (req, res) => {
             });
         }
 
-        // Update order status
-        const updateData = { status };
-        
-        // Add tracking info if provided
-        if (trackingNumber) {
-            updateData.trackingNumber = trackingNumber;
-        }
-        
-        if (estimatedDeliveryDate) {
-            updateData.estimatedDeliveryDate = new Date(estimatedDeliveryDate);
-        }
-
-        // Use orderService for status update logic
-        const updatedOrder = await orderService.updateOrderStatus(id, status);
-
-        // Update tracking fields if provided
-        if (trackingNumber || estimatedDeliveryDate) {
-            await updatedOrder.update(updateData);
-        }
+        // Use orderService for status update and notification logic
+        await orderService.updateOrderStatus(id, status, {
+            trackingNumber: trackingNumber ? trackingNumber.trim() : undefined,
+            estimatedDeliveryDate: estimatedDeliveryDate || undefined
+        });
 
         // Reload order with associations
         const fullOrder = await db.Order.findByPk(id, {

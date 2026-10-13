@@ -4,7 +4,9 @@ import {
     Alert,
     Image,
     ImageBackground,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -14,7 +16,7 @@ import {
     View,
 } from 'react-native';
 import { ThemedText as Text } from '../components/ThemedText';
-import { api } from '../api/client';
+import { api, getImageUrl } from '../api/client';
 import { AppIcon } from '../components/AppIcon';
 import { colors, spacing } from '../theme/colors';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -24,6 +26,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { CustomerSubpageHeader } from '../components/ui/CustomerSubpageHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TenantWalletRechargeModal } from '../components/TenantWalletRechargeModal';
+import { PaymentCardForm } from '../components/PaymentCardForm';
 
 const HERO_IMAGE = require('../../assets/wallethero.jpg');
 
@@ -100,8 +103,10 @@ export function GiftsScreen({ navigation, route }: any) {
         name_en?: string;
         name_ar?: string;
         logo?: string;
+        coverImage?: string;
         address?: string;
     }>>([]);
+    const [failedTenantLogos, setFailedTenantLogos] = useState<Record<string, boolean>>({});
 
     // Tabs: 'balances' (أرصدة الصالونات) or 'gifts' (بطاقات الهدايا)
     const [activeTab, setActiveTab] = useState<'balances' | 'gifts'>('balances');
@@ -690,15 +695,26 @@ export function GiftsScreen({ navigation, route }: any) {
                                         return (
                                             <View key={item.tenantId} style={styles.salonBalanceCard}>
                                                 <View style={[styles.salonCardTopRow, isRTL && styles.rowRTL]}>
-                                                    {item.tenantLogo ? (
-                                                        <Image source={{ uri: item.tenantLogo }} style={styles.salonCardLogo} resizeMode="cover" />
-                                                    ) : (
-                                                        <View style={styles.salonCardLogoFallback}>
-                                                            <Text style={styles.salonCardLogoText}>
-                                                                {localizedName.charAt(0).toUpperCase()}
-                                                            </Text>
-                                                        </View>
-                                                    )}
+                                                    {(() => {
+                                                        const balanceLogoUri = getImageUrl(item.tenantLogo);
+                                                        if (balanceLogoUri && !failedTenantLogos[item.tenantId]) {
+                                                            return (
+                                                                <Image
+                                                                    source={{ uri: balanceLogoUri }}
+                                                                    style={styles.salonCardLogo}
+                                                                    resizeMode="cover"
+                                                                    onError={() => setFailedTenantLogos(prev => ({ ...prev, [item.tenantId]: true }))}
+                                                                />
+                                                            );
+                                                        }
+                                                        return (
+                                                            <View style={styles.salonCardLogoFallback}>
+                                                                <Text style={styles.salonCardLogoText}>
+                                                                    {localizedName.charAt(0).toUpperCase()}
+                                                                </Text>
+                                                            </View>
+                                                        );
+                                                    })()}
 
                                                     <View style={[styles.salonCardMetaCol, isRTL && styles.alignRTL]}>
                                                         <Text style={[styles.salonCardName, isRTL && styles.textRTL]} numberOfLines={1}>
@@ -868,15 +884,26 @@ export function GiftsScreen({ navigation, route }: any) {
                                                     onPress={() => handleSelectTenant(t)}
                                                     activeOpacity={0.85}
                                                 >
-                                                    {t.logo ? (
-                                                        <Image source={{ uri: t.logo }} style={styles.salonSelectorLogo} resizeMode="cover" />
-                                                    ) : (
-                                                        <View style={styles.salonSelectorLogoFallback}>
-                                                            <Text style={styles.salonSelectorLogoText}>
-                                                                {name.charAt(0).toUpperCase()}
-                                                            </Text>
-                                                        </View>
-                                                    )}
+                                                    {(() => {
+                                                        const logoUri = getImageUrl(t.logo || (t as any).coverImage);
+                                                        if (logoUri && !failedTenantLogos[t.id]) {
+                                                            return (
+                                                                <Image
+                                                                    source={{ uri: logoUri }}
+                                                                    style={styles.salonSelectorLogo}
+                                                                    resizeMode="cover"
+                                                                    onError={() => setFailedTenantLogos(prev => ({ ...prev, [t.id]: true }))}
+                                                                />
+                                                            );
+                                                        }
+                                                        return (
+                                                            <View style={styles.salonSelectorLogoFallback}>
+                                                                <Text style={styles.salonSelectorLogoText}>
+                                                                    {name.charAt(0).toUpperCase()}
+                                                                </Text>
+                                                            </View>
+                                                        );
+                                                    })()}
                                                     <Text
                                                         style={[styles.salonSelectorName, isSelected && styles.salonSelectorNameActive]}
                                                         numberOfLines={1}
@@ -911,6 +938,10 @@ export function GiftsScreen({ navigation, route }: any) {
                                             ? (pkg.title_ar || pkg.title || pkg.title_en)
                                             : (pkg.title_en || pkg.title || pkg.title_ar);
                                         const totalCredit = Number(pkg.walletCreditAmount || 0) + Number(pkg.bonusAmount || 0);
+                                        const selectedTenant = availableTenants.find((t) => t.id === (selectedTenantId || pkg.tenantId));
+                                        const pkgHeroUri = getImageUrl((pkg as any).imageUrl || (pkg as any).thumbnailUrl) ||
+                                            (selectedTenant?.coverImage ? getImageUrl(selectedTenant.coverImage) : null) ||
+                                            (selectedTenant?.logo ? getImageUrl(selectedTenant.logo) : null);
                                         return (
                                             <TouchableOpacity
                                                 key={pkg.id}
@@ -923,7 +954,11 @@ export function GiftsScreen({ navigation, route }: any) {
                                                 }}
                                                 activeOpacity={0.9}
                                             >
-                                                <ImageBackground source={HERO_IMAGE} style={styles.giftPkgHero} imageStyle={{ borderRadius: 14 }}>
+                                                <ImageBackground
+                                                    source={pkgHeroUri ? { uri: pkgHeroUri } : HERO_IMAGE}
+                                                    style={styles.giftPkgHero}
+                                                    imageStyle={{ borderRadius: 14 }}
+                                                >
                                                     <View style={styles.pricePill}>
                                                         <Text style={styles.pricePillText}>{sar(Number(pkg.priceAmount))}</Text>
                                                     </View>
@@ -1147,129 +1182,138 @@ export function GiftsScreen({ navigation, route }: any) {
                         idempotencyKeyRef.current = null;
                     }}
                 >
-                    <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-                        <Text style={styles.modalTitle}>
-                            {language === 'ar' ? 'شراء أو إهداء بطاقة صالون' : 'Purchase or Send Gift Card'}
-                        </Text>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        style={{ width: '100%' }}
+                    >
+                        <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+                            <Text style={styles.modalTitle}>
+                                {language === 'ar' ? 'شراء أو إهداء بطاقة صالون' : 'Purchase or Send Gift Card'}
+                            </Text>
 
-                        {/* Mode Selector (Self vs Send) */}
-                        <View style={[styles.modeSelectorRow, isRTL && styles.rowRTL]}>
-                            <TouchableOpacity
-                                style={[styles.modeBtn, mode === 'self' && styles.modeBtnActive]}
-                                onPress={() => setMode('self')}
-                            >
-                                <Text style={[styles.modeBtnText, mode === 'self' && styles.modeBtnTextActive]}>
-                                    {language === 'ar' ? 'شحن رصيدي' : 'Recharge Myself'}
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.modeBtn, mode === 'send' && styles.modeBtnActive]}
-                                onPress={() => setMode('send')}
-                            >
-                                <Text style={[styles.modeBtnText, mode === 'send' && styles.modeBtnTextActive]}>
-                                    {language === 'ar' ? 'إهداء لشخص آخر' : 'Send as a Gift'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView style={{ maxHeight: 350 }} showsVerticalScrollIndicator={false}>
-                            {mode === 'send' && (
-                                <View style={{ gap: 10, marginBottom: 12 }}>
-                                    <TextInput
-                                        style={[styles.modalInput, isRTL && styles.rtlTextInput]}
-                                        value={recipientEmail}
-                                        onChangeText={setRecipientEmail}
-                                        placeholder={language === 'ar' ? 'البريد الإلكتروني للمستلم' : 'Recipient Email'}
-                                        keyboardType="email-address"
-                                        autoCapitalize="none"
-                                    />
-                                    <TextInput
-                                        style={[styles.modalInput, isRTL && styles.rtlTextInput]}
-                                        value={recipientPhone}
-                                        onChangeText={setRecipientPhone}
-                                        placeholder={language === 'ar' ? 'رقم جوال المستلم' : 'Recipient Phone'}
-                                        keyboardType="phone-pad"
-                                    />
-                                    <TextInput
-                                        style={[styles.modalInput, isRTL && styles.rtlTextInput]}
-                                        value={giftMessage}
-                                        onChangeText={setGiftMessage}
-                                        placeholder={language === 'ar' ? 'رسالة إهداء (اختياري)' : 'Gift Message (Optional)'}
-                                    />
-                                    <TouchableOpacity
-                                        style={styles.verifyRecipientBtn}
-                                        onPress={checkRecipient}
-                                        disabled={checkingRecipient}
-                                    >
-                                        <Text style={styles.verifyRecipientBtnText}>
-                                            {checkingRecipient
-                                                ? (language === 'ar' ? 'جاري التحقق...' : 'Checking...')
-                                                : (language === 'ar' ? 'التحقق من حساب المستلم' : 'Verify Recipient Account')}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
-
-                            {/* Card Details */}
-                            <View style={{ gap: 10 }}>
-                                <Text style={styles.inputGroupLabel}>
-                                    {language === 'ar' ? 'بيانات البطاقة البنكية' : 'Payment Card Details'}
-                                </Text>
-                                <TextInput
-                                    style={[styles.modalInput, isRTL && styles.rtlTextInput]}
-                                    value={cardholderName}
-                                    onChangeText={setCardholderName}
-                                    placeholder={language === 'ar' ? 'اسم حامل البطاقة' : 'Cardholder Name'}
-                                />
-                                <TextInput
-                                    style={[styles.modalInput, isRTL && styles.rtlTextInput]}
-                                    value={cardNumber}
-                                    onChangeText={setCardNumber}
-                                    placeholder="4000 0000 0000 0000"
-                                    keyboardType="numeric"
-                                />
-                                <View style={{ flexDirection: 'row', gap: 10 }}>
-                                    <TextInput
-                                        style={[styles.modalInput, { flex: 1 }, isRTL && styles.rtlTextInput]}
-                                        value={expiryDate}
-                                        onChangeText={setExpiryDate}
-                                        placeholder="MM/YY"
-                                    />
-                                    <TextInput
-                                        style={[styles.modalInput, { flex: 1 }, isRTL && styles.rtlTextInput]}
-                                        value={cvv}
-                                        onChangeText={setCvv}
-                                        placeholder="CVV"
-                                        keyboardType="numeric"
-                                        maxLength={4}
-                                    />
-                                </View>
+                            {/* Mode Selector (Self vs Send) */}
+                            <View style={[styles.modeSelectorRow, isRTL && styles.rowRTL]}>
+                                <TouchableOpacity
+                                    style={[styles.modeBtn, mode === 'self' && styles.modeBtnActive]}
+                                    onPress={() => setMode('self')}
+                                >
+                                    <Text style={[styles.modeBtnText, mode === 'self' && styles.modeBtnTextActive]}>
+                                        {language === 'ar' ? 'شحن رصيدي' : 'Recharge Myself'}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.modeBtn, mode === 'send' && styles.modeBtnActive]}
+                                    onPress={() => setMode('send')}
+                                >
+                                    <Text style={[styles.modeBtnText, mode === 'send' && styles.modeBtnTextActive]}>
+                                        {language === 'ar' ? 'إهداء لشخص آخر' : 'Send as Gift Card'}
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
-                        </ScrollView>
 
-                        <View style={styles.modalActionRow}>
-                            <TouchableOpacity
-                                style={styles.modalCancelBtn}
-                                onPress={() => {
-                                    setSelectedPackage(null);
-                                    idempotencyKeyRef.current = null;
-                                }}
-                            >
-                                <Text style={styles.modalCancelBtnText}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.modalConfirmBtn}
-                                onPress={mode === 'self' ? handleSelfPurchase : handleSendGift}
-                                disabled={saving}
-                            >
-                                <Text style={styles.modalConfirmBtnText}>
-                                    {saving
-                                        ? (language === 'ar' ? 'جاري التنفيذ...' : 'Processing...')
-                                        : (language === 'ar' ? 'تأكيد الدفع' : 'Confirm Payment')}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Pressable>
+                            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                                {mode === 'send' && (
+                                    <View style={{ gap: 12, marginBottom: 14 }}>
+                                        <View style={styles.modalFieldGroup}>
+                                            <Text style={[styles.modalFieldLabel, isRTL && styles.textRTL]}>
+                                                {language === 'ar' ? 'البريد الإلكتروني للمستلم' : 'Recipient Email'}
+                                            </Text>
+                                            <TextInput
+                                                style={[styles.modalInput, isRTL && styles.rtlTextInput]}
+                                                value={recipientEmail}
+                                                onChangeText={setRecipientEmail}
+                                                placeholder="example@domain.com"
+                                                placeholderTextColor="#A19BB3"
+                                                keyboardType="email-address"
+                                                autoCapitalize="none"
+                                            />
+                                        </View>
+
+                                        <View style={styles.modalFieldGroup}>
+                                            <Text style={[styles.modalFieldLabel, isRTL && styles.textRTL]}>
+                                                {language === 'ar' ? 'رقم جوال المستلم' : 'Recipient Phone'}
+                                            </Text>
+                                            <TextInput
+                                                style={[styles.modalInput, styles.numericInput]}
+                                                value={recipientPhone}
+                                                onChangeText={setRecipientPhone}
+                                                placeholder="05XXXXXXXX"
+                                                placeholderTextColor="#A19BB3"
+                                                keyboardType="phone-pad"
+                                            />
+                                        </View>
+
+                                        <View style={styles.modalFieldGroup}>
+                                            <Text style={[styles.modalFieldLabel, isRTL && styles.textRTL]}>
+                                                {language === 'ar' ? 'رسالة إهداء (اختياري)' : 'Gift Message (Optional)'}
+                                            </Text>
+                                            <TextInput
+                                                style={[styles.modalInput, isRTL && styles.rtlTextInput]}
+                                                value={giftMessage}
+                                                onChangeText={setGiftMessage}
+                                                placeholder={language === 'ar' ? 'اكتب رسالة للمستلم...' : 'Write a personal note...'}
+                                                placeholderTextColor="#A19BB3"
+                                            />
+                                        </View>
+
+                                        <TouchableOpacity
+                                            style={styles.verifyRecipientBtn}
+                                            onPress={checkRecipient}
+                                            disabled={checkingRecipient}
+                                        >
+                                            <Text style={styles.verifyRecipientBtnText}>
+                                                {checkingRecipient
+                                                    ? (language === 'ar' ? 'جاري التحقق...' : 'Checking...')
+                                                    : (language === 'ar' ? 'التحقق من حساب المستلم' : 'Verify Recipient Account')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
+                                {/* Enhanced Payment Card Details with Persistent Labels */}
+                                <View style={{ marginTop: 2 }}>
+                                    <Text style={[styles.inputGroupLabel, isRTL && styles.textRTL]}>
+                                        {language === 'ar' ? 'بيانات البطاقة البنكية' : 'Payment Card Details'}
+                                    </Text>
+                                    <PaymentCardForm
+                                        cardholderName={cardholderName}
+                                        onCardholderNameChange={setCardholderName}
+                                        cardNumber={cardNumber}
+                                        onCardNumberChange={setCardNumber}
+                                        expiryDate={expiryDate}
+                                        onExpiryDateChange={setExpiryDate}
+                                        cvv={cvv}
+                                        onCvvChange={setCvv}
+                                        disabled={saving}
+                                        showPreviewCard={false}
+                                    />
+                                </View>
+                            </ScrollView>
+
+                            <View style={styles.modalActionRow}>
+                                <TouchableOpacity
+                                    style={styles.modalCancelBtn}
+                                    onPress={() => {
+                                        setSelectedPackage(null);
+                                        idempotencyKeyRef.current = null;
+                                    }}
+                                >
+                                    <Text style={styles.modalCancelBtnText}>{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.modalConfirmBtn}
+                                    onPress={mode === 'self' ? handleSelfPurchase : handleSendGift}
+                                    disabled={saving}
+                                >
+                                    <Text style={styles.modalConfirmBtnText}>
+                                        {saving
+                                            ? (language === 'ar' ? 'جاري التنفيذ...' : 'Processing...')
+                                            : (language === 'ar' ? 'تأكيد الدفع' : 'Confirm Payment')}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </Pressable>
+                    </KeyboardAvoidingView>
                 </Pressable>
             </Modal>
 
@@ -1843,12 +1887,27 @@ const styles = StyleSheet.create({
         color: '#1D035F',
         fontFamily: 'Cairo-Regular',
     },
+    modalFieldGroup: {
+        marginBottom: 4,
+    },
+    modalFieldLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#281C4E',
+        marginBottom: 6,
+        fontFamily: 'Cairo-Bold',
+    },
+    numericInput: {
+        textAlign: 'left',
+        writingDirection: 'ltr',
+    },
     inputGroupLabel: {
         fontSize: 12,
         fontWeight: '700',
         color: '#1D035F',
         fontFamily: 'Cairo-Bold',
-        marginTop: 4,
+        marginTop: 6,
+        marginBottom: 6,
     },
     verifyRecipientBtn: {
         backgroundColor: '#EDE7FB',

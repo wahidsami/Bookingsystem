@@ -23,7 +23,7 @@ exports.getWalletSummary = async (req, res) => {
         const [tenantRows, globalGiftRows] = await Promise.all([
             db.TenantWalletBalance.findAll({
                 where: { platformUserId },
-                include: [{ model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'name_en', 'name_ar'], required: false }],
+                include: [{ model: db.Tenant, as: 'tenant', attributes: ['id', 'name', 'name_en', 'name_ar', 'logo', 'address', 'city'], required: false }],
                 order: [['updatedAt', 'DESC']]
             }),
             db.GiftCardTransaction.findAll({
@@ -51,7 +51,12 @@ exports.getWalletSummary = async (req, res) => {
             .map((row) => ({
                 sourceType: GIFT_SOURCES.TENANT_GIFT,
                 tenantId: row.tenantId,
-                tenantName: row.tenant?.name || row.tenant?.name_en || row.tenant?.name_ar || null,
+                tenantName: row.tenant?.name_ar || row.tenant?.name || row.tenant?.name_en || null,
+                tenantNameEn: row.tenant?.name_en || row.tenant?.name || null,
+                tenantNameAr: row.tenant?.name_ar || null,
+                tenantLogo: row.tenant?.logo || null,
+                tenantAddress: row.tenant?.address || null,
+                tenantCity: row.tenant?.city || null,
                 balance: toNumber(row.balance, 0),
                 currency: row.currency || 'SAR',
                 updatedAt: row.updatedAt

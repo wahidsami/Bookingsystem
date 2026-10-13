@@ -188,11 +188,100 @@ export function BookingSummaryCard({
 
                 <View style={styles.servicesList}>
                     {items.map((item, index) => {
+                        const isPackage =
+                            item.itemType === 'package' ||
+                            Boolean(item.packageId) ||
+                            Boolean(item.bundle);
+
+                        const childItems =
+                            item.packageItems && item.packageItems.length > 0
+                                ? item.packageItems
+                                : item.bundle?.items || [];
+
                         const serviceName = isRTL
                             ? item.service.name_ar || item.service.name_en
                             : item.service.name_en || item.service.name_ar;
                         const duration = item.service.duration || 30;
                         const price = getServicePrice(item.service, item.variant);
+
+                        if (isPackage && childItems.length > 0) {
+                            return (
+                                <View
+                                    key={`${item.id}-${index}`}
+                                    style={styles.packageSummaryGroup}
+                                >
+                                    <View style={[styles.serviceRow, isRTL && styles.rowRTL]}>
+                                        <View style={[styles.serviceRowLeft, isRTL ? styles.serviceRowLeftRTL : styles.serviceRowLeftLTR]}>
+                                            <View style={[styles.bundleSummaryTitleRow, isRTL && styles.rowRTL]}>
+                                                <Text style={[styles.serviceItemTitle, isRTL && { textAlign: 'right' }]}>
+                                                    {serviceName}
+                                                </Text>
+                                                <View style={styles.bundleSmallBadge}>
+                                                    <Text style={styles.bundleSmallBadgeText}>
+                                                        {item.scheduleType === 'parallel'
+                                                            ? (isRTL ? 'متزامن' : 'Parallel')
+                                                            : (isRTL ? 'متسلسل' : 'Sequential')}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <View style={[styles.serviceMetaRow, isRTL && styles.rowRTL]}>
+                                                <View style={[styles.metaItem, isRTL && styles.rowRTL]}>
+                                                    <AppIcon
+                                                        name="clock"
+                                                        size={12}
+                                                        color="#716B88"
+                                                    />
+                                                    <Text style={styles.metaText}>
+                                                        {duration}{' '}
+                                                        {isRTL ? 'دقيقة' : 'min'}
+                                                    </Text>
+                                                </View>
+                                                <Text style={styles.bullet}>•</Text>
+                                                <Text style={styles.metaText}>
+                                                    {childItems.length} {isRTL ? 'خدمات' : 'services'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <Text style={styles.servicePrice}>
+                                            {formatRiyal(price, language)}
+                                        </Text>
+                                    </View>
+
+                                    {/* Child services staff breakdown */}
+                                    <View style={styles.packageChildSummaryList}>
+                                        {childItems.map((child: any, cIdx: number) => {
+                                            const childName = isRTL
+                                                ? child.service?.name_ar || child.service?.name_en || child.serviceId
+                                                : child.service?.name_en || child.service?.name_ar || child.serviceId;
+                                            const childStaff = child.staff;
+                                            const childStaffName = childStaff
+                                                ? (isRTL
+                                                    ? childStaff.name_ar || childStaff.name_en || childStaff.name
+                                                    : childStaff.name_en || childStaff.name_ar || childStaff.name)
+                                                : (isRTL ? 'أي مقدم خدمة' : 'Any professional');
+
+                                            return (
+                                                <View
+                                                    key={`${child.serviceId}-${cIdx}`}
+                                                    style={[styles.childSummaryRow, isRTL && styles.rowRTL]}
+                                                >
+                                                    <Text style={[styles.childSummaryName, isRTL && { textAlign: 'right' }]} numberOfLines={1}>
+                                                        {childName}
+                                                    </Text>
+                                                    <View style={[styles.childStaffBadge, isRTL && styles.rowRTL]}>
+                                                        <AppIcon name="user" size={11} color="#6537C0" />
+                                                        <Text style={styles.childStaffBadgeText} numberOfLines={1}>
+                                                            {childStaffName}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+                            );
+                        }
+
                         const staff = item.staff;
                         const staffName = staff
                             ? isRTL
@@ -500,5 +589,66 @@ const styles = StyleSheet.create({
     salonDetailsRTL: {
         marginRight: 12,
         alignItems: 'flex-end',
+    },
+    packageSummaryGroup: {
+        marginBottom: 12,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#FAF9FC',
+    },
+    bundleSummaryTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+    },
+    bundleSmallBadge: {
+        backgroundColor: '#E7DDFC',
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 6,
+    },
+    bundleSmallBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#6537C0',
+    },
+    packageChildSummaryList: {
+        backgroundColor: '#FAF9FC',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginTop: 8,
+        gap: 4,
+    },
+    childSummaryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 3,
+    },
+    childSummaryName: {
+        fontSize: 12,
+        color: '#1D035F',
+        fontWeight: '600',
+        flex: 1,
+        marginRight: 6,
+    },
+    childStaffBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        gap: 4,
+        maxWidth: '45%',
+    },
+    childStaffBadgeText: {
+        fontSize: 11,
+        color: '#6537C0',
+        fontWeight: '600',
     },
 });

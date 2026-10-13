@@ -12,18 +12,29 @@ function initRedis() {
     try {
         const redis = require('redis');
         const client = redis.createClient({
-            url: process.env.REDIS_URL || 'redis://localhost:6379'
+            url: process.env.REDIS_URL || 'redis://localhost:6379',
+            socket: {
+                reconnectStrategy: (retries) => {
+                    if (retries > 1) {
+                        return new Error('Redis connection failed');
+                    }
+                    return 500;
+                },
+                connectTimeout: 1000
+            }
         });
 
         client.on('error', (err) => {
-            console.error('Redis Client Error:', err);
+            if (process.env.NODE_ENV !== 'test') {
+                console.warn('Redis Client Warning:', err.message);
+            }
         });
 
         client.on('connect', () => {
             console.log('✅ Redis connected');
         });
 
-        client.connect().catch(console.error);
+        client.connect().catch(() => {});
         redisClient = client;
         return client;
     } catch (error) {
@@ -67,8 +78,8 @@ async function closeRedis() {
  */
 async function acquireLock(key, ttl = 300) {
     const client = getRedisClient();
-    if (!client) {
-        // If Redis not available, skip locking (not ideal but allows system to work)
+    if (!client || !client.isOpen) {
+        // If Redis not available or offline, skip locking (fail open)
         return true;
     }
 
@@ -82,7 +93,6 @@ async function acquireLock(key, ttl = 300) {
         return false;
     } catch (error) {
         console.error('Redis lock error:', error);
-        // On error, allow operation (fail open)
         return true;
     }
 }
@@ -93,7 +103,7 @@ async function acquireLock(key, ttl = 300) {
  */
 async function releaseLock(key) {
     const client = getRedisClient();
-    if (!client) return;
+    if (!client || !client.isOpen) return;
 
     try {
         const lockKey = `lock:${key}`;
@@ -110,7 +120,7 @@ async function releaseLock(key) {
  */
 async function isLocked(key) {
     const client = getRedisClient();
-    if (!client) return false;
+    if (!client || !client.isOpen) return false;
 
     try {
         const lockKey = `lock:${key}`;

@@ -32,10 +32,10 @@
     - Reschedule preserves appointment identity; Rebook creates fresh draft with new IDs.
   - [x] Run tests with `npx tsx --test` (31/31 passed).
   - [x] Run `npx tsc --noEmit` (clean, 0 errors) and `npm run build` (builds successfully).
-- [/] 7. Change Control, Diff Inspection, Commit & Push <!-- id: commit_push -->
+- [x] 7. Change Control, Diff Inspection, Commit & Push <!-- id: commit_push -->
   - [x] Stage strictly affected Tenant-v2 components, test file, and todo.md.
-  - [ ] Commit and push to `origin/main`.
-  - [ ] STOP for user manual deployment.
+  - [x] Commit and push to `origin/main` (`200d87a`).
+  - [x] STOP for user manual deployment.
 
 # Todo: Captain — Customer App Full Arabic RTL Reconstruction (Sprint 0 & 1 Complete)
 

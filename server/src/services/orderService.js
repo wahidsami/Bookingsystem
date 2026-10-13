@@ -575,7 +575,16 @@ class OrderService {
             throw new Error('Order not found');
         }
 
+        const previousStatus = order.status;
         const updateData = { status };
+
+        // Support tracking number and estimated delivery date in options
+        if (options.trackingNumber !== undefined) {
+            updateData.trackingNumber = options.trackingNumber || null;
+        }
+        if (options.estimatedDeliveryDate !== undefined) {
+            updateData.estimatedDeliveryDate = options.estimatedDeliveryDate ? new Date(options.estimatedDeliveryDate) : null;
+        }
 
         // Set deliveredAt when status changes to delivered
         if (status === 'delivered') {
@@ -597,21 +606,58 @@ class OrderService {
 
         await order.update(updateData, options);
 
-        try {
-            await notificationOrchestrator.notifyCustomer({
-                tenantId: order.tenantId,
-                platformUserId: order.platformUserId,
-                eventType: 'order_status_updated',
-                title: 'Order status updated',
-                body: `Order ${order.orderNumber} is now ${status.replace(/_/g, ' ')}.`,
-                data: {
-                    type: 'order_status_updated',
-                    orderId: order.id,
-                    status
-                }
-            });
-        } catch (notificationError) {
-            console.warn('Order status notification warning:', notificationError.message);
+        // Prevent duplicate emails/notifications when the same status is submitted repeatedly
+        if (previousStatus !== status) {
+            try {
+                const isPickup = order.deliveryType === 'pickup';
+                const statusLabels = {
+                    delivery: {
+                        pending: { ar: 'تم استلام الطلب', en: 'Order Received' },
+                        confirmed: { ar: 'تم تأكيد طلبك', en: 'Your Order is Confirmed' },
+                        processing: { ar: 'جاري تجهيز طلبك', en: 'Preparing Your Order' },
+                        shipped: { ar: 'طلبك في الطريق', en: 'Your Order is on the Way' },
+                        delivered: { ar: 'تم توصيل طلبك', en: 'Your Order Has Been Delivered' },
+                        completed: { ar: 'اكتمل طلبك', en: 'Your Order is Completed' },
+                        cancelled: { ar: 'تم إلغاء الطلب', en: 'Order Cancelled' },
+                        refunded: { ar: 'تم استرداد الطلب', en: 'Order Refunded' }
+                    },
+                    pickup: {
+                        pending: { ar: 'تم استلام الطلب', en: 'Order Received' },
+                        confirmed: { ar: 'تم تأكيد طلبك', en: 'Your Order is Confirmed' },
+                        processing: { ar: 'جاري تجهيز طلبك', en: 'Preparing Your Order' },
+                        ready_for_pickup: { ar: 'طلبك جاهز للاستلام', en: 'Your Order is Ready for Pickup' },
+                        completed: { ar: 'تم استلام طلبك', en: 'Your Order Has Been Picked Up' },
+                        cancelled: { ar: 'تم إلغاء الطلب', en: 'Order Cancelled' },
+                        refunded: { ar: 'تم استرداد الطلب', en: 'Order Refunded' }
+                    }
+                };
+
+                const flow = isPickup ? statusLabels.pickup : statusLabels.delivery;
+                const label = flow[status] || { ar: status, en: status };
+                const notifTitle = `${label.ar} | ${label.en}`;
+                const notifBody = `Order #${order.orderNumber}: ${label.en} / طلب رقم #${order.orderNumber}: ${label.ar}`;
+
+                await notificationOrchestrator.notifyCustomer({
+                    tenantId: order.tenantId,
+                    platformUserId: order.platformUserId,
+                    eventType: 'order_status_updated',
+                    title: notifTitle,
+                    body: notifBody,
+                    data: {
+                        type: 'order_status_updated',
+                        orderId: order.id,
+                        orderNumber: order.orderNumber,
+                        status,
+                        previousStatus,
+                        deliveryType: order.deliveryType,
+                        trackingNumber: order.trackingNumber,
+                        estimatedDeliveryDate: order.estimatedDeliveryDate,
+                        order
+                    }
+                });
+            } catch (notificationError) {
+                console.warn('Order status notification warning:', notificationError.message);
+            }
         }
 
         return order;

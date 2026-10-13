@@ -15,6 +15,8 @@ export interface PackageItemSelection {
     service?: Service | null;
     variant?: ServiceVariant | null;
     duration?: number;
+    staff?: Staff | null;
+    requestedStaffId?: string | null;
 }
 
 export interface ServiceBookingCartItem {

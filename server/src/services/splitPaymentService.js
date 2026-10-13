@@ -858,10 +858,12 @@ const refundPayment = async (appointmentId, refundData) => {
             }, { transaction });
 
             if (resolvedPaymentMethod === 'wallet') {
-                await walletService.creditWallet({
+                const tenantWalletService = require('./tenantWalletService');
+                await tenantWalletService.creditTenantWallet({
                     platformUserId: targetAppointment.platformUserId,
+                    tenantId: targetAppointment.tenantId,
                     amount: targetRefund,
-                    type: 'refund_credit',
+                    type: 'tenant_gift_refund_credit',
                     referenceType: 'appointment',
                     referenceId: targetAppointment.id,
                     metadata: {
@@ -975,10 +977,12 @@ const collectAppointmentStatusCharge = async ({
         const tenantRevenue = roundMoney(numericAmount - platformFee);
 
         if (resolvedPaymentMethod === 'wallet') {
-            await walletService.debitWallet({
+            const tenantWalletService = require('./tenantWalletService');
+            await tenantWalletService.debitTenantWallet({
                 platformUserId: appointment.platformUserId,
+                tenantId: appointment.tenantId,
                 amount: numericAmount,
-                type: 'service_payment_debit',
+                type: 'tenant_gift_redeem_debit',
                 referenceType: 'appointment',
                 referenceId: appointment.id,
                 metadata: {

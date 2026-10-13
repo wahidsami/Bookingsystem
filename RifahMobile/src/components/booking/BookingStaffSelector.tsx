@@ -18,7 +18,7 @@ export interface BookingStaffSelectorProps {
     selectedMode: 'any' | 'choose';
     onModeChange: (mode: 'any' | 'choose') => void;
     eligibleStaffMap: Record<string, Staff[]>;
-    onSelectStaff: (itemId: string, staff: Staff | null) => void;
+    onSelectStaff: (itemId: string, staff: Staff | null, childServiceId?: string) => void;
     loadingStaff?: boolean;
 }
 
@@ -31,12 +31,17 @@ export function BookingStaffSelector({
     loadingStaff = false,
 }: BookingStaffSelectorProps) {
     const { isRTL, language } = useLanguage();
-    const [expandedItemId, setExpandedItemId] = useState<string | null>(
-        items[0]?.id || null
-    );
+    const [expandedKey, setExpandedKey] = useState<string | null>(() => {
+        const first = items[0];
+        if (!first) return null;
+        if (first.itemType === 'package' && first.packageItems && first.packageItems.length > 0) {
+            return `${first.id}_${first.packageItems[0].serviceId}`;
+        }
+        return first.id;
+    });
 
-    const toggleAccordion = (itemId: string) => {
-        setExpandedItemId((prev) => (prev === itemId ? null : itemId));
+    const toggleAccordion = (key: string) => {
+        setExpandedKey((prev) => (prev === key ? null : key));
     };
 
     const renderStaffAvatar = (staff: Staff, size: number = 44) => {
@@ -182,265 +187,490 @@ export function BookingStaffSelector({
             </View>
 
             {/* Per-Service Specialist List (when Choose Mode is Active) */}
-            {selectedMode === 'choose' && (
-                <View style={styles.servicesSection}>
-                    <View style={[styles.sectionHeaderRow, isRTL && styles.rowRTL]}>
-                        <Text style={styles.sectionHeading}>
-                            {isRTL
-                                ? 'تحديد المختص لكل خدمة'
-                                : 'Select for each service'}
-                        </Text>
-                        <Text style={styles.sectionReadyCount}>
-                            {items.filter((i) => i.staff !== null).length} /{' '}
-                            {items.length} {isRTL ? 'جاهز' : 'ready'}
-                        </Text>
-                    </View>
+            {selectedMode === 'choose' && (() => {
+                const totalSlots = items.reduce((acc, it) => {
+                    if (it.itemType === 'package' && it.packageItems && it.packageItems.length > 0) {
+                        return acc + it.packageItems.length;
+                    }
+                    return acc + 1;
+                }, 0);
 
-                    {items.map((item, idx) => {
-                        const serviceName = isRTL
-                            ? item.service.name_ar || item.service.name_en
-                            : item.service.name_en || item.service.name_ar;
-                        const duration = item.service.duration || 30;
-                        const price = getServicePrice(item.service, item.variant);
-                        const isExpanded = expandedItemId === item.id;
-                        const eligibleStaff =
-                            eligibleStaffMap[item.service.id] || [];
-                        const assignedStaff = item.staff;
-
+                const assignedCount = items.reduce((acc, it) => {
+                    if (it.itemType === 'package' && it.packageItems && it.packageItems.length > 0) {
                         return (
-                            <View key={item.id} style={styles.serviceCard}>
-                                {/* Service Accordion Header */}
-                                <TouchableOpacity
-                                    style={[styles.serviceHeader, isRTL && styles.rowRTL]}
-                                    onPress={() => toggleAccordion(item.id)}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={[styles.serviceHeaderLeft, isRTL && styles.alignEnd]}>
-                                        <Text style={[styles.serviceIndexTag, isRTL && { textAlign: 'right' }]}>
-                                            {isRTL
-                                                ? `الخدمة ${idx + 1}`
-                                                : `Service ${idx + 1}`}
-                                        </Text>
-                                        <Text
-                                            style={[styles.serviceTitle, isRTL && { textAlign: 'right' }]}
-                                            numberOfLines={1}
-                                        >
-                                            {serviceName}
-                                        </Text>
-                                        <Text style={[styles.serviceMeta, isRTL && { textAlign: 'right' }]}>
-                                            {duration}{' '}
-                                            {isRTL ? 'دقيقة' : 'min'} •{' '}
-                                            {formatRiyal(price, language)}
-                                        </Text>
-                                    </View>
+                            acc +
+                            it.packageItems.filter(
+                                (p) => p.staff !== null && p.staff !== undefined
+                            ).length
+                        );
+                    }
+                    return acc + (it.staff !== null && it.staff !== undefined ? 1 : 0);
+                }, 0);
 
-                                    <View style={[styles.serviceHeaderRight, isRTL && styles.rowRTL]}>
-                                        <View style={styles.serviceIconPill}>
-                                            <AppIcon
-                                                name="sparkles"
-                                                size={18}
-                                                color="#6537C0"
-                                            />
-                                        </View>
-                                        <AppIcon
-                                            name={
-                                                isExpanded
-                                                    ? 'chevron_left'
-                                                    : 'chevron_right'
-                                            }
-                                            size={20}
-                                            color="#716B88"
-                                        />
-                                    </View>
-                                </TouchableOpacity>
+                return (
+                    <View style={styles.servicesSection}>
+                        <View style={[styles.sectionHeaderRow, isRTL && styles.rowRTL]}>
+                            <Text style={styles.sectionHeading}>
+                                {isRTL
+                                    ? 'تحديد المختص لكل خدمة'
+                                    : 'Select for each service'}
+                            </Text>
+                            <Text style={styles.sectionReadyCount}>
+                                {assignedCount} / {totalSlots} {isRTL ? 'جاهز' : 'ready'}
+                            </Text>
+                        </View>
 
-                                {/* Assigned Specialist Notice */}
-                                <View style={[styles.assignedNotice, isRTL && styles.rowRTL]}>
-                                    <AppIcon
-                                        name="verified_user"
-                                        size={16}
-                                        color="#6537C0"
-                                    />
-                                    <Text
-                                        style={[
-                                            styles.assignedNoticeText,
-                                            {
-                                                textAlign: isRTL ? 'right' : 'left',
-                                                writingDirection: isRTL ? 'rtl' : 'ltr',
-                                            },
-                                        ]}
-                                        numberOfLines={1}
-                                    >
-                                        {isRTL
-                                            ? 'المختص المحدد: '
-                                            : 'Assigned: '}
-                                        <Text style={styles.assignedName}>
-                                            {assignedStaff
-                                                ? isRTL
-                                                    ? assignedStaff.name_ar ||
-                                                      assignedStaff.name_en ||
-                                                      assignedStaff.name
-                                                    : assignedStaff.name_en ||
-                                                      assignedStaff.name_ar ||
-                                                      assignedStaff.name
-                                                : isRTL
-                                                ? 'لم يتم الاختيار بعد'
-                                                : 'Not selected yet'}
-                                        </Text>
-                                    </Text>
-                                </View>
+                        {items.map((item, idx) => {
+                            const isPackage =
+                                item.itemType === 'package' ||
+                                Boolean(item.packageId) ||
+                                Boolean(item.bundle);
 
-                                {/* Expanded Specialist Options */}
-                                {isExpanded && (
-                                    <View style={styles.specialistsList}>
-                                        {loadingStaff ? (
-                                            <View style={styles.loadingBox}>
-                                                <ActivityIndicator
-                                                    size="small"
-                                                    color="#6537C0"
-                                                />
+                            const childItems =
+                                item.packageItems && item.packageItems.length > 0
+                                    ? item.packageItems
+                                    : item.bundle?.items || [];
+
+                            if (isPackage && childItems.length > 0) {
+                                const bundleName = isRTL
+                                    ? item.service.name_ar || item.service.name_en
+                                    : item.service.name_en || item.service.name_ar;
+
+                                return (
+                                    <View key={item.id} style={styles.bundleContainer}>
+                                        {/* Bundle Header */}
+                                        <View style={[styles.bundleHeader, isRTL && styles.rowRTL]}>
+                                            <View style={styles.bundleIconCircle}>
+                                                <AppIcon name="sparkles" size={18} color="#6537C0" />
                                             </View>
-                                        ) : eligibleStaff.length === 0 ? (
-                                            <Text style={styles.emptyStaffText}>
-                                                {isRTL
-                                                    ? 'لا يوجد مختصون متاحون لهذه الخدمة'
-                                                    : 'No specialists available for this service'}
-                                            </Text>
-                                        ) : (
-                                            eligibleStaff.map((staff) => {
-                                                const isSelected =
-                                                    assignedStaff?.id ===
-                                                    staff.id;
-                                                const staffName = isRTL
-                                                    ? staff.name_ar ||
-                                                      staff.name_en ||
-                                                      staff.name
-                                                    : staff.name_en ||
-                                                      staff.name_ar ||
-                                                      staff.name;
-                                                const title =
-                                                    staff.specialty ||
-                                                    staff.role ||
-                                                    (isRTL
-                                                        ? 'أخصائية'
-                                                        : 'Specialist');
+                                            <View style={[styles.bundleHeaderTextGroup, isRTL && styles.alignEnd]}>
+                                                <View style={[styles.bundleTitleRow, isRTL && styles.rowRTL]}>
+                                                    <Text style={[styles.bundleTitle, isRTL && { textAlign: 'right' }]}>
+                                                        {bundleName}
+                                                    </Text>
+                                                    <View style={styles.bundleBadge}>
+                                                        <Text style={styles.bundleBadgeText}>
+                                                            {item.scheduleType === 'parallel'
+                                                                ? (isRTL ? 'متزامن' : 'Parallel')
+                                                                : (isRTL ? 'متسلسل' : 'Sequential')}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={[styles.bundleSubtitle, isRTL && { textAlign: 'right' }]}>
+                                                    {isRTL
+                                                        ? 'حددي مقدم الخدمة المفضل لكل خدمة في الباقة'
+                                                        : 'Select a preferred specialist for each service in the bundle'}
+                                                </Text>
+                                            </View>
+                                        </View>
 
-                                                return (
+                                        {/* Child Services Cards */}
+                                        {childItems.map((pItem: any, childIdx: number) => {
+                                            const childServiceId = pItem.serviceId;
+                                            const childKey = `${item.id}_${childServiceId}`;
+                                            const isExpanded = expandedKey === childKey;
+                                            const childName = isRTL
+                                                ? pItem.service?.name_ar || pItem.service?.name_en || childServiceId
+                                                : pItem.service?.name_en || pItem.service?.name_ar || childServiceId;
+                                            const duration = pItem.duration || pItem.service?.duration || 30;
+                                            const eligibleStaff = eligibleStaffMap[childServiceId] || [];
+                                            const assignedStaff = pItem.staff || null;
+
+                                            return (
+                                                <View key={childKey} style={styles.childCard}>
+                                                    {/* Child Accordion Header */}
                                                     <TouchableOpacity
-                                                        key={staff.id}
-                                                        style={[
-                                                            styles.specialistRow,
-                                                            isRTL && styles.rowRTL,
-                                                            isSelected &&
-                                                                styles.specialistRowSelected,
-                                                        ]}
-                                                        onPress={() =>
-                                                            onSelectStaff(
-                                                                item.id,
-                                                                staff
-                                                            )
-                                                        }
+                                                        style={[styles.serviceHeader, isRTL && styles.rowRTL]}
+                                                        onPress={() => toggleAccordion(childKey)}
                                                         activeOpacity={0.7}
                                                     >
-                                                        <View
-                                                            style={
-                                                                styles.avatarContainer
-                                                            }
-                                                        >
-                                                            {renderStaffAvatar(
-                                                                staff,
-                                                                44
-                                                            )}
-                                                            {isSelected && (
-                                                                <View
-                                                                    style={
-                                                                        styles.checkBadge
-                                                                    }
-                                                                >
-                                                                    <AppIcon
-                                                                        name="check"
-                                                                        size={10}
-                                                                        color="#FFFFFF"
-                                                                    />
-                                                                </View>
-                                                            )}
+                                                        <View style={[styles.serviceHeaderLeft, isRTL && styles.alignEnd]}>
+                                                            <Text style={[styles.serviceIndexTag, isRTL && { textAlign: 'right' }]}>
+                                                                {isRTL
+                                                                    ? `الخدمة ${childIdx + 1} من ${childItems.length}`
+                                                                    : `Service ${childIdx + 1} of ${childItems.length}`}
+                                                            </Text>
+                                                            <Text
+                                                                style={[styles.serviceTitle, isRTL && { textAlign: 'right' }]}
+                                                                numberOfLines={1}
+                                                            >
+                                                                {childName}
+                                                            </Text>
+                                                            <Text style={[styles.serviceMeta, isRTL && { textAlign: 'right' }]}>
+                                                                {duration} {isRTL ? 'دقيقة' : 'min'}
+                                                            </Text>
                                                         </View>
 
-                                                        <View
+                                                        <View style={[styles.serviceHeaderRight, isRTL && styles.rowRTL]}>
+                                                            <View style={styles.serviceIconPill}>
+                                                                <AppIcon
+                                                                    name="user"
+                                                                    size={16}
+                                                                    color="#6537C0"
+                                                                />
+                                                            </View>
+                                                            <AppIcon
+                                                                name={
+                                                                    isExpanded
+                                                                        ? 'chevron_left'
+                                                                        : 'chevron_right'
+                                                                }
+                                                                size={20}
+                                                                color="#716B88"
+                                                            />
+                                                        </View>
+                                                    </TouchableOpacity>
+
+                                                    {/* Assigned Specialist Notice */}
+                                                    <View style={[styles.assignedNotice, isRTL && styles.rowRTL]}>
+                                                        <AppIcon
+                                                            name="verified_user"
+                                                            size={16}
+                                                            color="#6537C0"
+                                                        />
+                                                        <Text
                                                             style={[
-                                                                styles.staffInfo,
+                                                                styles.assignedNoticeText,
                                                                 {
-                                                                    marginStart: 12,
-                                                                    marginEnd: 4,
+                                                                    textAlign: isRTL ? 'right' : 'left',
+                                                                    writingDirection: isRTL ? 'rtl' : 'ltr',
                                                                 },
                                                             ]}
+                                                            numberOfLines={1}
                                                         >
+                                                            {isRTL ? 'المختص المحدد: ' : 'Assigned: '}
+                                                            <Text style={styles.assignedName}>
+                                                                {assignedStaff
+                                                                    ? (isRTL
+                                                                        ? assignedStaff.name_ar || assignedStaff.name_en || assignedStaff.name
+                                                                        : assignedStaff.name_en || assignedStaff.name_ar || assignedStaff.name)
+                                                                    : (isRTL ? 'أي مقدم خدمة (تعيين تلقائي)' : 'Any professional (auto-assigned)')}
+                                                            </Text>
+                                                        </Text>
+                                                    </View>
+
+                                                    {/* Expanded Specialist Options */}
+                                                    {isExpanded && (
+                                                        <View style={styles.specialistsList}>
+                                                            {/* Option 1: Any Professional Row */}
+                                                            <TouchableOpacity
+                                                                style={[
+                                                                    styles.specialistRow,
+                                                                    isRTL && styles.rowRTL,
+                                                                    !assignedStaff && styles.specialistRowSelected,
+                                                                ]}
+                                                                onPress={() => onSelectStaff(item.id, null, childServiceId)}
+                                                                activeOpacity={0.7}
+                                                            >
+                                                                <View style={styles.avatarPlaceholder}>
+                                                                    <AppIcon name="sparkles" size={20} color="#6537C0" />
+                                                                </View>
+                                                                <View
+                                                                    style={[
+                                                                        styles.staffInfo,
+                                                                        { marginStart: 12, marginEnd: 4 },
+                                                                    ]}
+                                                                >
+                                                                    <Text
+                                                                        style={[
+                                                                            styles.staffName,
+                                                                            {
+                                                                                textAlign: isRTL ? 'right' : 'left',
+                                                                                writingDirection: isRTL ? 'rtl' : 'ltr',
+                                                                            },
+                                                                        ]}
+                                                                    >
+                                                                        {isRTL ? 'أي مقدم خدمة' : 'Any professional'}
+                                                                    </Text>
+                                                                    <Text
+                                                                        style={[
+                                                                            styles.staffTitle,
+                                                                            {
+                                                                                textAlign: isRTL ? 'right' : 'left',
+                                                                                writingDirection: isRTL ? 'rtl' : 'ltr',
+                                                                            },
+                                                                        ]}
+                                                                    >
+                                                                        {isRTL
+                                                                            ? 'تعيين تلقائي للمختص المتاح'
+                                                                            : 'Assign available specialist automatically'}
+                                                                    </Text>
+                                                                </View>
+                                                                {!assignedStaff && (
+                                                                    <View style={styles.checkBadgeStatic}>
+                                                                        <AppIcon name="check" size={12} color="#FFFFFF" />
+                                                                    </View>
+                                                                )}
+                                                            </TouchableOpacity>
+
+                                                            {/* Option 2..N: Qualified Staff for Child Service */}
+                                                            {loadingStaff ? (
+                                                                <View style={styles.loadingBox}>
+                                                                    <ActivityIndicator size="small" color="#6537C0" />
+                                                                </View>
+                                                            ) : eligibleStaff.length === 0 ? (
+                                                                <Text style={styles.emptyStaffText}>
+                                                                    {isRTL
+                                                                        ? 'لا يوجد مختصون متاحون لهذه الخدمة'
+                                                                        : 'No specialists available for this service'}
+                                                                </Text>
+                                                            ) : (
+                                                                eligibleStaff.map((staff) => {
+                                                                    const isSelected = assignedStaff?.id === staff.id;
+                                                                    const staffName = isRTL
+                                                                        ? staff.name_ar || staff.name_en || staff.name
+                                                                        : staff.name_en || staff.name_ar || staff.name;
+                                                                    const title =
+                                                                        staff.specialty ||
+                                                                        staff.role ||
+                                                                        (isRTL ? 'أخصائية' : 'Specialist');
+
+                                                                    return (
+                                                                        <TouchableOpacity
+                                                                            key={staff.id}
+                                                                            style={[
+                                                                                styles.specialistRow,
+                                                                                isRTL && styles.rowRTL,
+                                                                                isSelected && styles.specialistRowSelected,
+                                                                            ]}
+                                                                            onPress={() => onSelectStaff(item.id, staff, childServiceId)}
+                                                                            activeOpacity={0.7}
+                                                                        >
+                                                                            <View style={styles.avatarContainer}>
+                                                                                {renderStaffAvatar(staff, 44)}
+                                                                                {isSelected && (
+                                                                                    <View style={styles.checkBadge}>
+                                                                                        <AppIcon name="check" size={10} color="#FFFFFF" />
+                                                                                    </View>
+                                                                                )}
+                                                                            </View>
+
+                                                                            <View
+                                                                                style={[
+                                                                                    styles.staffInfo,
+                                                                                    { marginStart: 12, marginEnd: 4 },
+                                                                                ]}
+                                                                            >
+                                                                                <View
+                                                                                    style={[
+                                                                                        styles.nameRow,
+                                                                                        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                                                                                    ]}
+                                                                                >
+                                                                                    <Text
+                                                                                        style={[
+                                                                                            styles.staffName,
+                                                                                            {
+                                                                                                textAlign: isRTL ? 'right' : 'left',
+                                                                                                writingDirection: isRTL ? 'rtl' : 'ltr',
+                                                                                            },
+                                                                                        ]}
+                                                                                        numberOfLines={1}
+                                                                                    >
+                                                                                        {staffName}
+                                                                                    </Text>
+                                                                                    <View style={styles.ratingPill}>
+                                                                                        <AppIcon name="star" size={12} color="#F59E0B" />
+                                                                                        <Text style={styles.ratingText}>
+                                                                                            {staff.rating || '5.0'}
+                                                                                        </Text>
+                                                                                    </View>
+                                                                                </View>
+                                                                                <Text
+                                                                                    style={[
+                                                                                        styles.staffTitle,
+                                                                                        {
+                                                                                            textAlign: isRTL ? 'right' : 'left',
+                                                                                            writingDirection: isRTL ? 'rtl' : 'ltr',
+                                                                                        },
+                                                                                    ]}
+                                                                                    numberOfLines={1}
+                                                                                >
+                                                                                    {title}
+                                                                                </Text>
+                                                                            </View>
+                                                                        </TouchableOpacity>
+                                                                    );
+                                                                })
+                                                            )}
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                );
+                            }
+
+                            // Regular Single Service
+                            const serviceName = isRTL
+                                ? item.service.name_ar || item.service.name_en
+                                : item.service.name_en || item.service.name_ar;
+                            const duration = item.service.duration || 30;
+                            const price = getServicePrice(item.service, item.variant);
+                            const isExpanded = expandedKey === item.id;
+                            const eligibleStaff = eligibleStaffMap[item.service.id] || [];
+                            const assignedStaff = item.staff;
+
+                            return (
+                                <View key={item.id} style={styles.serviceCard}>
+                                    {/* Service Accordion Header */}
+                                    <TouchableOpacity
+                                        style={[styles.serviceHeader, isRTL && styles.rowRTL]}
+                                        onPress={() => toggleAccordion(item.id)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={[styles.serviceHeaderLeft, isRTL && styles.alignEnd]}>
+                                            <Text style={[styles.serviceIndexTag, isRTL && { textAlign: 'right' }]}>
+                                                {isRTL ? `الخدمة ${idx + 1}` : `Service ${idx + 1}`}
+                                            </Text>
+                                            <Text
+                                                style={[styles.serviceTitle, isRTL && { textAlign: 'right' }]}
+                                                numberOfLines={1}
+                                            >
+                                                {serviceName}
+                                            </Text>
+                                            <Text style={[styles.serviceMeta, isRTL && { textAlign: 'right' }]}>
+                                                {duration} {isRTL ? 'دقيقة' : 'min'} • {formatRiyal(price, language)}
+                                            </Text>
+                                        </View>
+
+                                        <View style={[styles.serviceHeaderRight, isRTL && styles.rowRTL]}>
+                                            <View style={styles.serviceIconPill}>
+                                                <AppIcon name="sparkles" size={18} color="#6537C0" />
+                                            </View>
+                                            <AppIcon
+                                                name={isExpanded ? 'chevron_left' : 'chevron_right'}
+                                                size={20}
+                                                color="#716B88"
+                                            />
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    {/* Assigned Specialist Notice */}
+                                    <View style={[styles.assignedNotice, isRTL && styles.rowRTL]}>
+                                        <AppIcon name="verified_user" size={16} color="#6537C0" />
+                                        <Text
+                                            style={[
+                                                styles.assignedNoticeText,
+                                                {
+                                                    textAlign: isRTL ? 'right' : 'left',
+                                                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                                                },
+                                            ]}
+                                            numberOfLines={1}
+                                        >
+                                            {isRTL ? 'المختص المحدد: ' : 'Assigned: '}
+                                            <Text style={styles.assignedName}>
+                                                {assignedStaff
+                                                    ? (isRTL
+                                                        ? assignedStaff.name_ar || assignedStaff.name_en || assignedStaff.name
+                                                        : assignedStaff.name_en || assignedStaff.name_ar || assignedStaff.name)
+                                                    : (isRTL ? 'لم يتم الاختيار بعد' : 'Not selected yet')}
+                                            </Text>
+                                        </Text>
+                                    </View>
+
+                                    {/* Expanded Specialist Options */}
+                                    {isExpanded && (
+                                        <View style={styles.specialistsList}>
+                                            {loadingStaff ? (
+                                                <View style={styles.loadingBox}>
+                                                    <ActivityIndicator size="small" color="#6537C0" />
+                                                </View>
+                                            ) : eligibleStaff.length === 0 ? (
+                                                <Text style={styles.emptyStaffText}>
+                                                    {isRTL
+                                                        ? 'لا يوجد مختصون متاحون لهذه الخدمة'
+                                                        : 'No specialists available for this service'}
+                                                </Text>
+                                            ) : (
+                                                eligibleStaff.map((staff) => {
+                                                    const isSelected = assignedStaff?.id === staff.id;
+                                                    const staffName = isRTL
+                                                        ? staff.name_ar || staff.name_en || staff.name
+                                                        : staff.name_en || staff.name_ar || staff.name;
+                                                    const title =
+                                                        staff.specialty ||
+                                                        staff.role ||
+                                                        (isRTL ? 'أخصائية' : 'Specialist');
+
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={staff.id}
+                                                            style={[
+                                                                styles.specialistRow,
+                                                                isRTL && styles.rowRTL,
+                                                                isSelected && styles.specialistRowSelected,
+                                                            ]}
+                                                            onPress={() => onSelectStaff(item.id, staff)}
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            <View style={styles.avatarContainer}>
+                                                                {renderStaffAvatar(staff, 44)}
+                                                                {isSelected && (
+                                                                    <View style={styles.checkBadge}>
+                                                                        <AppIcon name="check" size={10} color="#FFFFFF" />
+                                                                    </View>
+                                                                )}
+                                                            </View>
+
                                                             <View
                                                                 style={[
-                                                                    styles.nameRow,
-                                                                    {
-                                                                        flexDirection: isRTL ? 'row-reverse' : 'row',
-                                                                    },
+                                                                    styles.staffInfo,
+                                                                    { marginStart: 12, marginEnd: 4 },
                                                                 ]}
                                                             >
+                                                                <View
+                                                                    style={[
+                                                                        styles.nameRow,
+                                                                        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                                                                    ]}
+                                                                >
+                                                                    <Text
+                                                                        style={[
+                                                                            styles.staffName,
+                                                                            {
+                                                                                textAlign: isRTL ? 'right' : 'left',
+                                                                                writingDirection: isRTL ? 'rtl' : 'ltr',
+                                                                            },
+                                                                        ]}
+                                                                        numberOfLines={1}
+                                                                    >
+                                                                        {staffName}
+                                                                    </Text>
+                                                                    <View style={styles.ratingPill}>
+                                                                        <AppIcon name="star" size={12} color="#F59E0B" />
+                                                                        <Text style={styles.ratingText}>
+                                                                            {staff.rating || '5.0'}
+                                                                        </Text>
+                                                                    </View>
+                                                                </View>
                                                                 <Text
                                                                     style={[
-                                                                        styles.staffName,
+                                                                        styles.staffTitle,
                                                                         {
                                                                             textAlign: isRTL ? 'right' : 'left',
                                                                             writingDirection: isRTL ? 'rtl' : 'ltr',
                                                                         },
                                                                     ]}
-                                                                    numberOfLines={
-                                                                        1
-                                                                    }
+                                                                    numberOfLines={1}
                                                                 >
-                                                                    {staffName}
+                                                                    {title}
                                                                 </Text>
-                                                                <View
-                                                                    style={
-                                                                        styles.ratingPill
-                                                                    }
-                                                                >
-                                                                    <AppIcon
-                                                                        name="star"
-                                                                        size={12}
-                                                                        color="#F59E0B"
-                                                                    />
-                                                                    <Text
-                                                                        style={
-                                                                            styles.ratingText
-                                                                        }
-                                                                    >
-                                                                        {staff.rating ||
-                                                                            '5.0'}
-                                                                    </Text>
-                                                                </View>
                                                             </View>
-                                                            <Text
-                                                                style={[
-                                                                    styles.staffTitle,
-                                                                    {
-                                                                        textAlign: isRTL ? 'right' : 'left',
-                                                                        writingDirection: isRTL ? 'rtl' : 'ltr',
-                                                                    },
-                                                                ]}
-                                                                numberOfLines={1}
-                                                            >
-                                                                {title}
-                                                            </Text>
-                                                        </View>
-                                                    </TouchableOpacity>
-                                                );
-                                            })
-                                        )}
-                                    </View>
-                                )}
-                            </View>
-                        );
-                    })}
-                </View>
-            )}
+                                                        </TouchableOpacity>
+                                                    );
+                                                })
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
+                            );
+                        })}
+                    </View>
+                );
+            })()}
         </View>
     );
 }
@@ -719,5 +949,75 @@ const styles = StyleSheet.create({
     },
     alignEnd: {
         alignItems: 'flex-end',
+    },
+    bundleContainer: {
+        backgroundColor: '#FAF9FC',
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        padding: 12,
+        marginBottom: 16,
+    },
+    bundleHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        gap: 10,
+    },
+    bundleIconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#E7DDFC',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    bundleHeaderTextGroup: {
+        flex: 1,
+    },
+    bundleTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    bundleTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1D035F',
+        fontFamily: 'Cairo-Bold',
+        flex: 1,
+    },
+    bundleBadge: {
+        backgroundColor: '#E7DDFC',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+    },
+    bundleBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#6537C0',
+    },
+    bundleSubtitle: {
+        fontSize: 12,
+        color: '#716B88',
+        marginTop: 2,
+    },
+    childCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        padding: 12,
+        marginBottom: 10,
+    },
+    checkBadgeStatic: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: '#6537C0',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

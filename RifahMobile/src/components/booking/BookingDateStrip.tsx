@@ -12,11 +12,14 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 
+export type DateStatus = 'available' | 'full' | 'day-off';
+
 export interface DateItem {
     key: string;
     date: Date;
     available: boolean;
     slotCount: number;
+    status?: DateStatus;
 }
 
 export interface BookingDateStripProps {
@@ -73,7 +76,9 @@ export function BookingDateStrip({
                         const isSelected = isSameDay(item.date, selectedDate);
                         const dayName = format(item.date, 'EEE', { locale });
                         const dayNumber = format(item.date, 'd');
-                        const isAvailable = item.available;
+                        const status: DateStatus =
+                            item.status || (item.available ? 'available' : 'full');
+                        const isAvailable = status === 'available';
 
                         return (
                             <TouchableOpacity
@@ -119,6 +124,10 @@ export function BookingDateStrip({
                                                 : styles.dotAvailable,
                                         ]}
                                     />
+                                ) : status === 'day-off' ? (
+                                    <Text style={styles.dayOffTag}>
+                                        {isRTL ? 'يوم إجازة' : 'Day Off'}
+                                    </Text>
                                 ) : (
                                     <Text style={styles.fullTag}>
                                         {isRTL ? 'ممتلئ' : 'Full'}
@@ -242,6 +251,12 @@ const styles = StyleSheet.create({
         fontSize: 9,
         fontWeight: '700',
         color: '#DC2626',
+        marginTop: 3,
+    },
+    dayOffTag: {
+        fontSize: 8.5,
+        fontWeight: '700',
+        color: '#716B88',
         marginTop: 3,
     },
     loadingContainer: {
