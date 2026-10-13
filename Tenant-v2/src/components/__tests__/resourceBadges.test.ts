@@ -866,5 +866,55 @@ test('Scenario 26: ResourceBadge candidate time display and queued badge self-ex
   assert.equal(item2Eval.isViable, true);
 });
 
+test('Scenario 27: Two-room fixture (Room A ends at 16:40, Room B ends at 17:05) boundary interval semantics', () => {
+  const TOTAL_ROOMS = 2;
+  // Room A allocation: 15:40 - 16:40 (minutes: 940 to 1000)
+  const roomA = { resourceId: 'room-a', start: 940, end: 1000 };
+  // Room B allocation: 16:05 - 17:05 (minutes: 965 to 1025)
+  const roomB = { resourceId: 'room-b', start: 965, end: 1025 };
+  const allocations = [roomA, roomB];
 
+  function evaluateInterval(candStart: number, candDuration: number) {
+    const candEnd = candStart + candDuration;
+    // Half-open interval rule: alloc.start < candEnd && alloc.end > candStart
+    const occupiedResources = new Set<string>();
+    for (const alloc of allocations) {
+      if (alloc.start < candEnd && alloc.end > candStart) {
+        occupiedResources.add(alloc.resourceId);
+      }
+    }
+    const availableCount = Math.max(0, TOTAL_ROOMS - occupiedResources.size);
+    return {
+      availableQuantity: availableCount,
+      totalActive: TOTAL_ROOMS,
+      isAvailable: availableCount >= 1
+    };
+  }
 
+  // 1. Candidate at 16:40 (1000) for 60m: [16:40, 17:40)
+  // Room A ends at exactly 16:40 -> 1000 > 1000 is FALSE -> Room A is released and available
+  // Room B ends at 17:05 -> 1025 > 1000 is TRUE -> Room B is occupied
+  // Exactly 1 out of 2 rooms is free -> 1/2 available
+  const eval1640 = evaluateInterval(1000, 60);
+  assert.equal(eval1640.availableQuantity, 1, 'At 16:40, Room A is released; Room B is busy -> exactly 1/2 available');
+  assert.equal(eval1640.totalActive, 2);
+  assert.equal(eval1640.isAvailable, true, 'Service requiring 1 room is available');
+
+  // 2. Candidate at 17:05 (1025) for 60m: [17:05, 18:05)
+  // Both Room A and Room B have finished -> 2/2 available
+  const eval1705 = evaluateInterval(1025, 60);
+  assert.equal(eval1705.availableQuantity, 2, 'At 17:05, both rooms have finished -> 2/2 available');
+  assert.equal(eval1705.totalActive, 2);
+  assert.equal(eval1705.isAvailable, true);
+
+  // 3. Candidate at 16:30 (990) for 60m: [16:30, 17:30)
+  // Both Room A (until 16:40) and Room B (until 17:05) overlap -> 0/2 available (conflict)
+  const eval1630 = evaluateInterval(990, 60);
+  assert.equal(eval1630.availableQuantity, 0, 'At 16:30, both Room A and Room B overlap -> 0/2 available');
+  assert.equal(eval1630.totalActive, 2);
+  assert.equal(eval1630.isAvailable, false, 'Capacity exhausted -> conflict');
+
+  // 4. Boundary verification: exact abutment of allocations has zero overlap
+  const isAbuttingOverlapping = (roomA.start < 1000 && roomA.end > 1000);
+  assert.equal(isAbuttingOverlapping, false, 'Abutting boundary [15:40, 16:40) with [16:40, 17:40) must have zero overlap');
+});

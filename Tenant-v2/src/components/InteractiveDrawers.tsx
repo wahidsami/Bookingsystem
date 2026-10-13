@@ -166,6 +166,7 @@ interface InteractiveDrawersProps {
   initialWalkinEmail?: string;
   initialStagedServices?: StagedService[];
   initialCreateStep?: number;
+  onResetCustomerState?: () => void;
 }
 
 export interface GuestService {
@@ -440,7 +441,8 @@ export default function InteractiveDrawers({
   initialWalkinPhone,
   initialWalkinEmail,
   initialStagedServices,
-  initialCreateStep
+  initialCreateStep,
+  onResetCustomerState
 }: InteractiveDrawersProps) {
   const resolvedTenantTimezone = useMemo(() => resolveTenantTimezone(tenantTimezone), [tenantTimezone]);
 
@@ -455,22 +457,33 @@ export default function InteractiveDrawers({
       if (initialCreateMode) {
         setCreateMode(initialCreateMode);
       }
-      if (initialSelectedCustId) {
-        setSelectedCustId(initialSelectedCustId);
-      }
-      if (initialCustMode) {
-        setCustMode(initialCustMode);
-      }
-      if (initialWalkinName) {
-        setWalkinFullName(initialWalkinName);
-        if (initialWalkinPhone) setWalkinPhone(initialWalkinPhone);
-        if (initialWalkinEmail) setWalkinEmail(initialWalkinEmail);
-      }
-      if (Array.isArray(initialStagedServices) && initialStagedServices.length > 0) {
+      setSelectedCustId(initialSelectedCustId || '');
+      setCustMode(initialCustMode || 'existing');
+      setWalkinFullName(initialWalkinName || '');
+      setWalkinPhone(initialWalkinPhone || '');
+      setWalkinEmail(initialWalkinEmail || '');
+      if (Array.isArray(initialStagedServices)) {
         setStagedServices(initialStagedServices);
+      } else {
+        setStagedServices([]);
       }
       if (typeof initialCreateStep === 'number' && initialCreateStep >= 1) {
         setCreateStep(initialCreateStep);
+      } else {
+        setCreateStep(1);
+      }
+
+      // If this is a fresh draft (not an explicit rebook or prepopulated draft):
+      const hasPrepopulatedIdentity = Boolean(
+        initialSelectedCustId ||
+        initialWalkinName ||
+        (Array.isArray(initialStagedServices) && initialStagedServices.length > 0)
+      );
+      if (!hasPrepopulatedIdentity) {
+        setBookingScope('single');
+        setGroupName('');
+        setGroupParticipants([{ id: 'part-1', name: '', phone: '', email: '', isGuest: true }]);
+        setActiveParticipantId('part-1');
       }
     }
   }, [
@@ -1831,6 +1844,7 @@ export default function InteractiveDrawers({
     setAppointmentDraftPending(false);
     setShowAppointmentDraftPrompt(false);
     suppressAppointmentDraftPersistenceRef.current = true;
+    onResetCustomerState?.();
   };
 
   const restoreCartDraft = (snapshot: CartDraftSnapshot | null) => {
@@ -1975,6 +1989,7 @@ export default function InteractiveDrawers({
       setShowDiscardConfirmDialog(true);
     } else {
       resetAppointmentDraft();
+      onResetCustomerState?.();
       setIsCreateDrawerOpen(false);
     }
   };
@@ -1985,6 +2000,7 @@ export default function InteractiveDrawers({
     resetAppointmentDraft();
     removeDraftStorage(APPOINTMENT_DRAFT_STORAGE_KEY);
     setAppointmentDraftPending(false);
+    onResetCustomerState?.();
     setIsCreateDrawerOpen(false);
   };
 
@@ -2438,7 +2454,7 @@ export default function InteractiveDrawers({
 
         for (const item of stagedServices) {
           if (item.serviceId) {
-            const startIso = buildIsoFromMinutes(selectedDate, Number(item.startTime || 0));
+            const startIso = getSyncedStagedStartIso(item);
             stagedItemsPayload.push({
               id: item.id,
               serviceId: item.serviceId,

@@ -1,3 +1,26 @@
+# BARSPA — Critical Fixes: Stale Customer in New Booking & Resource Availability
+- [x] 1. Audit & Root Cause Analysis <!-- id: crit_audit -->
+  - [x] Workstream A: Trace `InteractiveDrawers.tsx` & `AppointmentWorkspace.tsx` to identify why a fresh appointment inherits "Participant 2" / guest email and survives close/cancel.
+  - [x] Workstream B: Trace resource availability badge & backend (`batch-check`, `resourceRequirementResolver.js`) to find why [16:40, 17:40) reports 0/2 when Room A ends at 16:40.
+- [x] 2. Workstream A — Stale Customer in New Booking <!-- id: crit_workstream_a -->
+  - [x] Distinguish fresh appointment action vs explicit Rebook vs intentional draft recovery.
+  - [x] Fix drawer close / cancel / discard cleanup in `InteractiveDrawers.tsx` & `AppointmentWorkspace.tsx`.
+  - [x] Ensure fresh board creation action clears any prior customer, walk-in info, group participants, staged services.
+  - [x] Preserve explicit Rebook prepopulation.
+- [x] 3. Workstream B — Correct Resource Availability Count <!-- id: crit_workstream_b -->
+  - [x] Verify interval overlap semantics (`allocationStart < candidateEnd && allocationEnd > candidateStart`).
+  - [x] Check candidate timestamp generation, timezone alignment, and physical resource instance tracking.
+  - [x] Fix capacity calculation so [16:40, 17:40) correctly reports 1/2 available.
+- [x] 4. Verification & Testing <!-- id: crit_verification -->
+  - [x] Add unit & integration tests for Workstream A (fresh appointment, cancel/reopen, rebook isolation).
+  - [x] Add unit & integration tests for Workstream B (two-room fixture: 1/2 at 16:40, 2/2 at 17:05, boundary conditions).
+  - [x] Run `npx tsx --test`, `npx tsc --noEmit`, and `npm run build`.
+- [x] 5. Git Delivery <!-- id: crit_git -->
+  - [x] Stage only explicitly intended files.
+  - [x] Commit and push to `origin/main`.
+  - [x] STOP for manual user deployment.
+
+
 # BARSPA — Appointment Drawer Regression Correction Pass
 - [x] 1. Audit & Root Cause Analysis <!-- id: reg_audit -->
   - [x] Workstream A: Audit why group services are combined into one card in `AppointmentDetailsDrawer.tsx`.

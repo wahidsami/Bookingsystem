@@ -785,5 +785,223 @@ describe('Authoritative Batch Resource Availability & Badges (Phase 5A)', () => 
             }));
         });
     });
+
+    describe('10. Workstream B — Two-Room Fixture (Room A ends at 16:40, Room B ends at 17:05) & Boundary Semantics', () => {
+        const ROOM_A = 'room-a-1111';
+        const ROOM_B = 'room-b-2222';
+        const TYPE_MASSAGE_ROOM = 'type-massage-room';
+        const SRV_MASSAGE = 'srv-massage-60';
+
+        beforeEach(() => {
+            jest.spyOn(db.Resource, 'findAll').mockResolvedValue([
+                { id: ROOM_A, resourceTypeId: TYPE_MASSAGE_ROOM, name_en: 'Massage Room A', name_ar: 'غرفة مساج أ', is_active: true },
+                { id: ROOM_B, resourceTypeId: TYPE_MASSAGE_ROOM, name_en: 'Massage Room B', name_ar: 'غرفة مساج ب', is_active: true }
+            ]);
+
+            jest.spyOn(db.ServiceResourceRequirement, 'findAll').mockResolvedValue([
+                {
+                    resourceTypeId: TYPE_MASSAGE_ROOM,
+                    quantity: 1,
+                    variantId: null,
+                    resourceType: { id: TYPE_MASSAGE_ROOM, name_en: 'Massage rooms', name_ar: 'غرف مساج', is_active: true }
+                }
+            ]);
+        });
+
+        test('Case 1: Candidate at 16:40 for 60m [16:40, 17:40) correctly reports 1/2 available when Room A ends at 16:40 and Room B ends at 17:05', async () => {
+            const roomAAppt = {
+                resourceId: ROOM_A,
+                appointment: {
+                    id: 'appt-a',
+                    startTime: new Date('2026-10-15T15:40:00.000Z'),
+                    endTime: new Date('2026-10-15T16:40:00.000Z'),
+                    status: 'confirmed'
+                }
+            };
+            const roomBAppt = {
+                resourceId: ROOM_B,
+                appointment: {
+                    id: 'appt-b',
+                    startTime: new Date('2026-10-15T16:05:00.000Z'),
+                    endTime: new Date('2026-10-15T17:05:00.000Z'),
+                    status: 'confirmed'
+                }
+            };
+
+            const dbAppts = [roomAAppt, roomBAppt];
+
+            jest.spyOn(db.AppointmentResource, 'findAll').mockImplementation(async ({ where, include }) => {
+                const apptWhere = include?.[0]?.where || {};
+                const ltEnd = apptWhere.startTime?.[db.Sequelize.Op?.lt];
+                const gtStart = apptWhere.endTime?.[db.Sequelize.Op?.gt];
+
+                return dbAppts.filter(ea => {
+                    const rIds = where?.resourceId?.[db.Sequelize.Op?.in] || [];
+                    if (!rIds.includes(ea.resourceId)) return false;
+
+                    const aStart = ea.appointment.startTime;
+                    const aEnd = ea.appointment.endTime;
+
+                    return (!ltEnd || aStart < ltEnd) && (!gtStart || aEnd > gtStart);
+                });
+            });
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                catalogueItems: [
+                    { id: 'cat-1640', serviceId: SRV_MASSAGE, startTime: '2026-10-15T16:40:00.000Z', duration: 60 }
+                ]
+            });
+
+            const result1640 = res.results['cat-1640'];
+            expect(result1640).toBeDefined();
+            expect(result1640.isAvailable).toBe(true);
+            expect(result1640.requirements[0].totalActive).toBe(2);
+            expect(result1640.requirements[0].availableQuantity).toBe(1);
+            expect(result1640.requirements[0].available).toBe(true);
+        });
+
+        test('Case 2: Candidate at 17:05 for 60m [17:05, 18:05) correctly reports 2/2 available when both rooms are free', async () => {
+            const roomAAppt = {
+                resourceId: ROOM_A,
+                appointment: {
+                    id: 'appt-a',
+                    startTime: new Date('2026-10-15T15:40:00.000Z'),
+                    endTime: new Date('2026-10-15T16:40:00.000Z'),
+                    status: 'confirmed'
+                }
+            };
+            const roomBAppt = {
+                resourceId: ROOM_B,
+                appointment: {
+                    id: 'appt-b',
+                    startTime: new Date('2026-10-15T16:05:00.000Z'),
+                    endTime: new Date('2026-10-15T17:05:00.000Z'),
+                    status: 'confirmed'
+                }
+            };
+
+            const dbAppts = [roomAAppt, roomBAppt];
+
+            jest.spyOn(db.AppointmentResource, 'findAll').mockImplementation(async ({ where, include }) => {
+                const apptWhere = include?.[0]?.where || {};
+                const ltEnd = apptWhere.startTime?.[db.Sequelize.Op?.lt];
+                const gtStart = apptWhere.endTime?.[db.Sequelize.Op?.gt];
+
+                return dbAppts.filter(ea => {
+                    const rIds = where?.resourceId?.[db.Sequelize.Op?.in] || [];
+                    if (!rIds.includes(ea.resourceId)) return false;
+
+                    const aStart = ea.appointment.startTime;
+                    const aEnd = ea.appointment.endTime;
+
+                    return (!ltEnd || aStart < ltEnd) && (!gtStart || aEnd > gtStart);
+                });
+            });
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                catalogueItems: [
+                    { id: 'cat-1705', serviceId: SRV_MASSAGE, startTime: '2026-10-15T17:05:00.000Z', duration: 60 }
+                ]
+            });
+
+            const result1705 = res.results['cat-1705'];
+            expect(result1705.isAvailable).toBe(true);
+            expect(result1705.requirements[0].totalActive).toBe(2);
+            expect(result1705.requirements[0].availableQuantity).toBe(2);
+            expect(result1705.requirements[0].available).toBe(true);
+        });
+
+        test('Case 3: Staged item ending at 16:40 + candidate probe at 16:40 correctly reports 1/2 available (Room B occupied in DB)', async () => {
+            const roomBAppt = {
+                resourceId: ROOM_B,
+                appointment: {
+                    id: 'appt-b',
+                    startTime: new Date('2026-10-15T16:05:00.000Z'),
+                    endTime: new Date('2026-10-15T17:05:00.000Z'),
+                    status: 'confirmed'
+                }
+            };
+
+            jest.spyOn(db.AppointmentResource, 'findAll').mockImplementation(async ({ where, include }) => {
+                const apptWhere = include?.[0]?.where || {};
+                const ltEnd = apptWhere.startTime?.[db.Sequelize.Op?.lt];
+                const gtStart = apptWhere.endTime?.[db.Sequelize.Op?.gt];
+
+                const aStart = roomBAppt.appointment.startTime;
+                const aEnd = roomBAppt.appointment.endTime;
+
+                const overlaps = (!ltEnd || aStart < ltEnd) && (!gtStart || aEnd > gtStart);
+                return overlaps ? [roomBAppt] : [];
+            });
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'stg-1', serviceId: SRV_MASSAGE, startTime: '2026-10-15T15:40:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'cat-1640', serviceId: SRV_MASSAGE, startTime: '2026-10-15T16:40:00.000Z', duration: 60 }
+                ]
+            });
+
+            expect(res.results['stg-1'].requirements[0].availableQuantity).toBe(1);
+            expect(res.results['cat-1640'].requirements[0].availableQuantity).toBe(1);
+            expect(res.results['cat-1640'].isAvailable).toBe(true);
+        });
+
+        test('Case 4: Candidate at 16:30 for 60m [16:30, 17:30) overlaps both Room A and Room B -> reports 0/2 available (conflict)', async () => {
+            const roomAAppt = {
+                resourceId: ROOM_A,
+                appointment: {
+                    id: 'appt-a',
+                    startTime: new Date('2026-10-15T15:40:00.000Z'),
+                    endTime: new Date('2026-10-15T16:40:00.000Z'),
+                    status: 'confirmed'
+                }
+            };
+            const roomBAppt = {
+                resourceId: ROOM_B,
+                appointment: {
+                    id: 'appt-b',
+                    startTime: new Date('2026-10-15T16:05:00.000Z'),
+                    endTime: new Date('2026-10-15T17:05:00.000Z'),
+                    status: 'confirmed'
+                }
+            };
+
+            const dbAppts = [roomAAppt, roomBAppt];
+
+            jest.spyOn(db.AppointmentResource, 'findAll').mockImplementation(async ({ where, include }) => {
+                const apptWhere = include?.[0]?.where || {};
+                const ltEnd = apptWhere.startTime?.[db.Sequelize.Op?.lt];
+                const gtStart = apptWhere.endTime?.[db.Sequelize.Op?.gt];
+
+                return dbAppts.filter(ea => {
+                    const rIds = where?.resourceId?.[db.Sequelize.Op?.in] || [];
+                    if (!rIds.includes(ea.resourceId)) return false;
+
+                    const aStart = ea.appointment.startTime;
+                    const aEnd = ea.appointment.endTime;
+
+                    return (!ltEnd || aStart < ltEnd) && (!gtStart || aEnd > gtStart);
+                });
+            });
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                catalogueItems: [
+                    { id: 'cat-1630', serviceId: SRV_MASSAGE, startTime: '2026-10-15T16:30:00.000Z', duration: 60 }
+                ]
+            });
+
+            const result1630 = res.results['cat-1630'];
+            expect(result1630.isAvailable).toBe(false);
+            expect(result1630.requirements[0].totalActive).toBe(2);
+            expect(result1630.requirements[0].availableQuantity).toBe(0);
+            expect(result1630.requirements[0].reason).toBe('RESOURCE_OCCUPIED');
+        });
+    });
 });
 

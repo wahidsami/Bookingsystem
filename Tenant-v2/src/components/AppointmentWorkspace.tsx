@@ -1210,14 +1210,14 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     if (dateKey !== selectedDateKey) {
       setSelectedDate(parseLocalDateKey(dateKey));
     }
+    resetParentCustomerState();
     setCurrentStaffId(staffId);
     seedCreateDrawerFromBoardSlot(timeInMinutes);
     if (typeof durationMinutes === 'number' && Number.isFinite(durationMinutes) && durationMinutes > 0) {
       setCurrentDuration(durationMinutes);
     }
     setCreateMode('appointment');
-    setCreateStep(1);
-    setStagedServices([]);
+    setInitialCreateMode('appointment');
     setIsCreateDrawerOpen(true);
     return true;
   };
@@ -2210,6 +2210,22 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const [guestCount, setGuestCount] = useState<number>(1);
   const [guestNames, setGuestNames] = useState('');
 
+  function resetParentCustomerState() {
+    setCustMode('existing');
+    setSelectedCustId('');
+    setNewCustName('');
+    setNewCustPhone('');
+    setNewCustEmail('');
+    setNewCustDob('1998-05-12');
+    setNewCustGender('F');
+    setNewCustIsVip(false);
+    setIncludeGroupGuests(false);
+    setGuestCount(1);
+    setGuestNames('');
+    setStagedServices([]);
+    setCreateStep(1);
+  }
+
   // Step 2: Service Configuration & Queue
   const [currentServiceId, setCurrentServiceId] = useState<string>('');
   const [currentStaffId, setCurrentStaffId] = useState<string>('');
@@ -2298,21 +2314,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
+    resetParentCustomerState();
     setInitialCreateMode('appointment');
     resetCreateDrawerStartTimes();
-    setCreateStep(1);
-    setCustMode('existing');
-    setSelectedCustId('');
-    setNewCustName('');
-    setNewCustPhone('');
-    setNewCustEmail('');
-    setNewCustDob('1998-05-12');
-    setNewCustGender('F');
-    setNewCustIsVip(false);
-    setIncludeGroupGuests(false);
-    setGuestCount(1);
-    setGuestNames('');
-    setStagedServices([]);
     setIsCreateDrawerOpen(true);
   }, [quickLaunchRequest]);
 
@@ -2688,10 +2692,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       } else {
         resetCreateDrawerStartTimes();
       }
+      resetParentCustomerState();
       setActiveBlockedTime(null);
       setInitialCreateMode('appointment');
-      setCreateStep(1);
-      setStagedServices([]);
       setIsCreateDrawerOpen(true);
     } else if (actionType === 'block') {
       setActiveBlockedTime(null);
@@ -2707,6 +2710,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       } else {
         resetCreateDrawerStartTimes();
       }
+      resetParentCustomerState();
       setInitialCreateMode('blocked');
       setIsCreateDrawerOpen(true);
     } else if (actionType === 'giftcards') {
@@ -5013,12 +5017,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
     const dateValue = parseLocalDateKey(range.startSlot.dateKey);
     setSelectedDate(dateValue);
+    resetParentCustomerState();
     setCurrentStaffId(targetStaffId);
     seedCreateDrawerFromBoardSlot(range.startSlot.startMinutes);
     setCurrentDuration(range.durationMinutes);
     setCreateMode('appointment');
-    setCreateStep(1);
-    setStagedServices([]);
+    setInitialCreateMode('appointment');
     setIsCreateDrawerOpen(true);
   };
 
@@ -5106,6 +5110,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       icon: Plus,
       category: 'appointments',
       onClick: (staffId) => {
+        resetParentCustomerState();
         setCurrentStaffId(staffId);
         resetCreateDrawerStartTimes();
         setInitialCreateMode('appointment');
@@ -5120,6 +5125,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       icon: Clock,
       category: 'availability',
       onClick: (staffId) => {
+        resetParentCustomerState();
         setCurrentStaffId(staffId);
         resetCreateDrawerStartTimes();
         setInitialCreateMode('blocked');
@@ -5135,6 +5141,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       icon: Coffee,
       category: 'availability',
       onClick: (staffId) => {
+        resetParentCustomerState();
         setCurrentStaffId(staffId);
         resetCreateDrawerStartTimes();
         setInitialCreateMode('blocked');
@@ -5150,6 +5157,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       icon: Ban,
       category: 'availability',
       onClick: (staffId) => {
+        resetParentCustomerState();
         setCurrentStaffId(staffId);
         resetCreateDrawerStartTimes();
         setInitialCreateMode('blocked');
@@ -7222,6 +7230,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         initialWalkinEmail={newCustEmail}
         initialStagedServices={stagedServices}
         initialCreateStep={createStep}
+        onResetCustomerState={resetParentCustomerState}
       />
 
       {/* Multi-Service Chained Booking Confirmation Modal */}
