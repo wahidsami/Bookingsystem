@@ -9,6 +9,49 @@ export interface StylistOption {
   avatar?: string;
 }
 
+export function parseAppointmentStartMinutes(
+  rawStartTime: string | number | undefined,
+  startHour: number = 9
+): number {
+  if (typeof rawStartTime === 'number') {
+    if (rawStartTime >= 0 && rawStartTime < 720) {
+      return rawStartTime;
+    }
+    if (rawStartTime >= startHour * 60) {
+      return rawStartTime - (startHour * 60);
+    }
+    return Math.max(0, rawStartTime);
+  }
+
+  if (typeof rawStartTime === 'string') {
+    const trimmed = rawStartTime.trim();
+    if (trimmed.includes('T')) {
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) {
+        const hours = d.getHours();
+        const mins = d.getMinutes();
+        const minsFromMidnight = hours * 60 + mins;
+        return Math.max(0, minsFromMidnight - (startHour * 60));
+      }
+    }
+    if (trimmed.includes(':')) {
+      const parts = trimmed.split(':');
+      const hours = parseInt(parts[0], 10);
+      const mins = parseInt(parts[1], 10);
+      if (!isNaN(hours) && !isNaN(mins)) {
+        const minsFromMidnight = hours * 60 + mins;
+        return Math.max(0, minsFromMidnight - (startHour * 60));
+      }
+    }
+    const parsedNum = parseFloat(trimmed);
+    if (!isNaN(parsedNum)) {
+      return parseAppointmentStartMinutes(parsedNum, startHour);
+    }
+  }
+
+  return 0;
+}
+
 export interface AppointmentServiceEditorProps {
   isRtl: boolean;
   item: AppointmentServiceItem;
@@ -40,7 +83,7 @@ export const AppointmentServiceEditor: React.FC<AppointmentServiceEditorProps> =
   onSave,
   onCancel,
 }) => {
-  const initialMinutes = typeof item.startTime === 'number' ? item.startTime : 0;
+  const initialMinutes = parseAppointmentStartMinutes(item.startTime, startHour);
   const [selectedStaffId, setSelectedStaffId] = useState(item.staffId || (stylists[0]?.id ?? ''));
   const [selectedStartTime, setSelectedStartTime] = useState<number>(initialMinutes);
   const [selectedDuration, setSelectedDuration] = useState<number>(item.duration || 30);
@@ -49,6 +92,21 @@ export const AppointmentServiceEditor: React.FC<AppointmentServiceEditorProps> =
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const durationOptions = [15, 30, 45, 60, 75, 90, 105, 120, 150, 180];
+
+  // Build time slot options, ensuring non-grid-aligned times like 10:05 AM (65 min) are preserved as selectable options
+  const allTimeOptions = React.useMemo(() => {
+    const baseSlots = Array.from(
+      { length: Math.ceil((totalHours * 60) / slotMinutes) },
+      (_, idx) => idx * slotMinutes
+    );
+    if (!baseSlots.includes(initialMinutes) && initialMinutes >= 0) {
+      baseSlots.push(initialMinutes);
+    }
+    if (!baseSlots.includes(selectedStartTime) && selectedStartTime >= 0) {
+      baseSlots.push(selectedStartTime);
+    }
+    return baseSlots.sort((a, b) => a - b);
+  }, [totalHours, slotMinutes, initialMinutes, selectedStartTime]);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,11 +212,13 @@ export const AppointmentServiceEditor: React.FC<AppointmentServiceEditorProps> =
               onChange={(e) => setSelectedStartTime(parseInt(e.target.value, 10))}
               className="w-full bg-white border border-[#E7DDFC] rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-[#1D035F] outline-none focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]/20 cursor-pointer"
             >
-              {Array.from({ length: totalHours * (60 / slotMinutes) }).map((_, idx) => {
-                const totalMins = idx * slotMinutes;
+              {allTimeOptions.map((totalMins) => {
+                const isExactCurrent = totalMins === initialMinutes;
+                const isOffGrid = totalMins % slotMinutes !== 0;
                 return (
-                  <option key={idx} value={totalMins}>
+                  <option key={totalMins} value={totalMins}>
                     {formatMinutesToTime(totalMins)}
+                    {isExactCurrent && isOffGrid ? ` (${isRtl ? 'الوقت المحفوظ' : 'Current Saved'})` : ''}
                   </option>
                 );
               })}
@@ -183,6 +243,26 @@ export const AppointmentServiceEditor: React.FC<AppointmentServiceEditorProps> =
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Projected Service Interval Window */}
+        <div className="bg-white p-2.5 rounded-xl border border-[#E7DDFC] text-xs">
+          <div className="flex justify-between items-center text-slate-500 text-[11px]">
+            <span className="font-medium">{isRtl ? 'الفترة الزمنية المتوقعة للخدمة' : 'Projected Service Window'}</span>
+            <span className="font-mono font-black text-[#6537C0]">
+              {formatMinutesToTime(selectedStartTime)} – {formatMinutesToTime(selectedStartTime + selectedDuration)}
+            </span>
+          </div>
+          {(selectedStartTime !== initialMinutes || selectedDuration !== item.duration) && (
+            <p className="text-[10px] text-amber-700 mt-1.5 flex items-center gap-1 leading-snug">
+              <AlertCircle size={11} className="shrink-0 text-amber-600" />
+              <span>
+                {isRtl
+                  ? 'سيتم التحقق من عدم تعارض المواعيد وساعات عمل الموظفة والخدمات اللاحقة عند الحفظ.'
+                  : 'Time adjustment will be validated against staff duty hours and subsequent services upon save.'}
+              </span>
+            </p>
+          )}
         </div>
 
         {/* Date Selection */}

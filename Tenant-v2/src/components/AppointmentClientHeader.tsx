@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Phone, MessageCircle, MessageSquare, User, MoreVertical, AlertTriangle, Wallet, Sparkles, ExternalLink } from 'lucide-react';
+import { Phone, MessageCircle, MessageSquare, User, MoreVertical, AlertTriangle, Wallet, Sparkles, ExternalLink, Clock } from 'lucide-react';
 
 export interface AppointmentClientHeaderProps {
   isRtl: boolean;
@@ -15,6 +15,7 @@ export interface AppointmentClientHeaderProps {
   stylistNotes?: string | string[];
   isWalkIn?: boolean;
   onViewProfile: () => void;
+  onViewHistory?: () => void;
 }
 
 export const AppointmentClientHeader: React.FC<AppointmentClientHeaderProps> = ({
@@ -31,6 +32,7 @@ export const AppointmentClientHeader: React.FC<AppointmentClientHeaderProps> = (
   stylistNotes,
   isWalkIn = false,
   onViewProfile,
+  onViewHistory,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -205,7 +207,22 @@ export const AppointmentClientHeader: React.FC<AppointmentClientHeaderProps> = (
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#F3EDFC] hover:text-[#1D035F] transition-colors text-left"
                 >
                   <User size={13} className="text-[#6537C0]" />
-                  <span>{isRtl ? 'فتح سجل الزيارات' : 'Visit History'}</span>
+                  <span>{isRtl ? 'الملف التعريفي للعميل' : 'Client Profile'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    if (onViewHistory) {
+                      onViewHistory();
+                    } else {
+                      onViewProfile();
+                    }
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[#F3EDFC] hover:text-[#1D035F] transition-colors text-left"
+                >
+                  <Clock size={13} className="text-[#6537C0]" />
+                  <span>{isRtl ? 'سجل المواعيد والزيارات' : 'Visit History'}</span>
                 </button>
               </div>
             )}

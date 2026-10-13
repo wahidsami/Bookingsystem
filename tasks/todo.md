@@ -1,22 +1,31 @@
-# BARSPA — Fresha Appointment Details Drawer Phase 3: Implementation & Verification (Complete)
-- [x] 1. Preflight audit & working tree confirmation <!-- id: phase3_preflight -->
-- [x] 2. Extract Zone A: `AppointmentClientHeader.tsx` <!-- id: phase3_zone_a -->
-- [x] 3. Extract Zone B: `AppointmentServiceCard.tsx` <!-- id: phase3_zone_b -->
-- [x] 4. Extract Zone B Option A Service Editor: `AppointmentServiceEditor.tsx` <!-- id: phase3_service_editor -->
-- [x] 5. Extract Zone C Overflow Menu: `AppointmentActionMenu.tsx` <!-- id: phase3_action_menu -->
-- [x] 6. Extract Zone C Option A Checkout Overlay: `AppointmentCheckoutOverlay.tsx` <!-- id: phase3_checkout_overlay -->
-- [x] 7. Build Modular Drawer Shell: `AppointmentDetailsDrawer.tsx` <!-- id: phase3_drawer_shell -->
-- [x] 8. Integrate into `AppointmentWorkspace.tsx` <!-- id: phase3_integration -->
-  - Replaced legacy 1,163-line 88vw inline layout with compact modular drawer.
-  - Eliminated mock `GFT` 200 SAR voucher discount.
-  - Preserved root-level Customer Profile modal and `TransactionDetailsDrawer`.
-- [x] 9. Automated Testing & Verification <!-- id: phase3_tests -->
-  - Created `AppointmentDetailsDrawer.phase3.test.ts` (16/16 tests pass).
-  - Verified regression test suites (22/22 tests pass; total 38/38 tests pass).
-  - TypeScript type check (`tsc --noEmit`): 0 errors.
-  - Production bundle build (`npm run build`): 100% success.
-- [x] 10. Change Control & Verification <!-- id: phase3_verification -->
-  - Ready for commit and push to `origin/main`.
+# BARSPA — Fresha Appointment Details Drawer Phase 3: Runtime Correction Pass (Complete)
+- [x] 1. Restore the Correct Primary Payment Action <!-- id: runtime_fix_payment_action -->
+  - Identified root cause: `AppointmentDetailsDrawer.tsx` strictly checked `status === 'confirmed'`, `checked_in`, `in_service` and defaulted unpaid active appointments (`booked`, `pending`, uppercase) to "Rebook Appointment".
+  - Re-anchored primary footer CTA directly to payment and appointment lifecycle: unpaid/partially paid active appointments ALWAYS expose "Proceed to Checkout" or "Collect Remaining Due"; paid appointments expose "View Sale & Receipt"; rebook is strictly limited to cancelled/no-show appointments or secondary action.
+- [x] 2. Restore Header Appointment Status Dropdown <!-- id: runtime_fix_status_dropdown -->
+  - Replaced static badge with compact interactive `<select>` status control in the drawer header.
+  - Normalized statuses (`normalizeDrawerStatus`) and enforced valid backend lifecycle transitions (`VALID_STATUS_TRANSITIONS`).
+  - Preserved completion payment gate (`paymentStatus !== 'paid'` triggers warning dialog) and cancellation reason dialog.
+- [x] 3. Correct Service Editor Date & Time Initialization <!-- id: runtime_fix_time_init -->
+  - Identified root cause: `startTime` evaluated as 0 when passed as ISO string or non-number, and non-grid minutes (such as 10:05 AM = 65 board minutes) were omitted from `<select>` options, causing browser to reset to 9:00 AM (0 min).
+  - Implemented `parseAppointmentStartMinutes` handling ISO strings, time strings (`"10:05"`), board minutes, and minutes from midnight.
+  - Dynamically injected current saved non-grid times into `<select>` options labeled as `(Current Saved)`.
+  - Added projected service interval preview box (`${startTime} – ${endTime}`).
+- [x] 4. Make Visit History Meaningful <!-- id: runtime_fix_visit_history -->
+  - Connected "Visit History" in client header ellipsis menu directly to `setCustomerDrawerTab('appointments')`, showing authentic past appointments and visits in `CustomerBookingHistory`.
+  - Left "Client Profile" on `setCustomerDrawerTab('overview')`.
+- [x] 5. Improve Compactness & Fresha Alignment <!-- id: runtime_fix_compactness -->
+  - Tightened drawer width (`sm:w-[460px] xl:w-[500px]`), padding (`p-3.5 space-y-3`), and service card margins/padding (`p-3 rounded-xl space-y-2`).
+  - Retained BARSPA's purple-and-white identity and bidirectional RTL layout.
+- [x] 6. Investigate Genuine Discount Workflow <!-- id: runtime_fix_discount_audit -->
+  - Audited backend financial engine: discounts are strictly promotional/campaign based originating at booking creation or on invoices (`discountAmount`). No arbitrary frontend price overrides exist or are permitted.
+- [x] 7. Automated Testing & Verification <!-- id: runtime_fix_tests -->
+  - Updated `AppointmentDetailsDrawer.phase3.test.ts` (all 26/26 tests pass).
+  - Verified TypeScript type check (`tsc --noEmit`): 0 errors.
+  - Verified Vite production build (`npm run build`): success.
+- [x] 8. Git Change Control & Push <!-- id: runtime_fix_git -->
+  - Staging strictly Tenant-v2 drawer components and test file; protecting all other repositories.
+  - Commit and push to `origin/main`. Stopped for manual deployment.
 
 # Todo: Captain — Customer App Full Arabic RTL Reconstruction (Sprint 0 & 1 Complete)
 

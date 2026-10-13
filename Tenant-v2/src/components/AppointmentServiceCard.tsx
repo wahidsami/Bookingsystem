@@ -79,10 +79,10 @@ export const AppointmentServiceCard: React.FC<AppointmentServiceCardProps> = ({
   };
 
   return (
-    <div className="group relative bg-white hover:bg-[#FAF7FD] rounded-2xl border border-[#E7DDFC] hover:border-[#6537C0]/40 p-4 transition-all shadow-2xs space-y-3">
+    <div className="group relative bg-white hover:bg-[#FAF7FD] rounded-xl border border-[#E7DDFC] hover:border-[#6537C0]/40 p-3 transition-all shadow-2xs space-y-2">
       {/* Participant Badge (Group Bookings) */}
       {item.participantName && (
-        <div className="flex items-center justify-between pb-2 border-b border-[#FAF7FD]">
+        <div className="flex items-center justify-between pb-1.5 border-b border-[#FAF7FD]">
           <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-[#F3EDFC] text-[#6537C0] border border-[#E7DDFC]">
             <User size={10} />
             <span>{item.participantName}</span>

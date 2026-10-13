@@ -3,13 +3,75 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, CheckCircle2, Clock, Calendar as CalendarIcon, User, 
   CreditCard, Sparkles, AlertTriangle, ArrowRight, Share2, 
-  Printer, Split, FileText, ChevronRight, ChevronLeft, Receipt
+  Printer, Split, FileText, ChevronRight, ChevronLeft, ChevronDown, Receipt
 } from 'lucide-react';
 import { AppointmentClientHeader } from './AppointmentClientHeader';
 import { AppointmentServiceCard, AppointmentServiceItem } from './AppointmentServiceCard';
 import { AppointmentServiceEditor, StylistOption } from './AppointmentServiceEditor';
 import { AppointmentActionMenu } from './AppointmentActionMenu';
 import { AppointmentCheckoutOverlay, CheckoutLineItem, SplitAllocations } from './AppointmentCheckoutOverlay';
+
+export const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending: ['confirmed', 'checked_in', 'in_service', 'completed', 'cancelled', 'no_show'],
+  confirmed: ['checked_in', 'in_service', 'completed', 'cancelled', 'no_show'],
+  booked: ['checked_in', 'in_service', 'completed', 'cancelled', 'no_show'],
+  checked_in: ['confirmed', 'in_service', 'completed', 'cancelled', 'no_show'],
+  in_service: ['confirmed', 'checked_in', 'completed', 'cancelled', 'no_show'],
+  completed: [],
+  cancelled: ['confirmed', 'checked_in'],
+  no_show: ['confirmed'],
+};
+
+export const normalizeDrawerStatus = (rawStatus: any): string => {
+  const raw = `${rawStatus || ''}`.toLowerCase().trim();
+  if (raw === 'arrived') return 'checked_in';
+  if (raw === 'started') return 'in_service';
+  if (raw === 'canceled' || raw === 'late_cancelled') return 'cancelled';
+  if (raw === 'noshow' || raw === 'no-show') return 'no_show';
+  if (raw === 'booked') return 'confirmed';
+  if (['pending', 'confirmed', 'checked_in', 'in_service', 'completed', 'cancelled', 'no_show'].includes(raw)) {
+    return raw;
+  }
+  return 'confirmed';
+};
+
+export const STATUS_META: Record<string, { labelEn: string; labelAr: string; cls: string }> = {
+  confirmed: {
+    labelEn: 'Confirmed',
+    labelAr: 'مؤكد',
+    cls: 'bg-[#F3EDFC] text-[#6537C0] border-[#E7DDFC]',
+  },
+  pending: {
+    labelEn: 'Pending',
+    labelAr: 'قيد الانتظار',
+    cls: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  checked_in: {
+    labelEn: 'Arrived',
+    labelAr: 'وصلت المركز',
+    cls: 'bg-teal-50 text-teal-700 border-teal-200',
+  },
+  in_service: {
+    labelEn: 'In Service',
+    labelAr: 'بدأت الجلسة',
+    cls: 'bg-blue-50 text-blue-700 border-blue-200',
+  },
+  completed: {
+    labelEn: 'Completed',
+    labelAr: 'اكتملت الخدمة',
+    cls: 'bg-slate-100 text-slate-700 border-slate-300',
+  },
+  cancelled: {
+    labelEn: 'Cancelled',
+    labelAr: 'ملغي',
+    cls: 'bg-rose-50 text-rose-700 border-rose-200',
+  },
+  no_show: {
+    labelEn: 'No-Show',
+    labelAr: 'عدم حضور',
+    cls: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+};
 
 export interface AppointmentDetailsDrawerProps {
   isOpen: boolean;
@@ -22,6 +84,7 @@ export interface AppointmentDetailsDrawerProps {
   onClose: () => void;
   onStatusChange: (newStatus: string) => Promise<void>;
   onViewProfile: (customerId: string) => void;
+  onViewHistory?: (customerId: string) => void;
   onViewSale: (appointment: any) => void;
   onRebook: (appointment: any) => void;
   onReschedule: (appointment: any) => void;
@@ -55,6 +118,7 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
   onClose,
   onStatusChange,
   onViewProfile,
+  onViewHistory,
   onViewSale,
   onRebook,
   onReschedule,
@@ -131,55 +195,14 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
   const remainingDue = Math.max(0, totalAmountDue - totalPaid);
 
   const isPaid = appointment.paymentStatus === 'paid' || appointment.paymentStatus === 'fully_paid' || (totalAmountDue > 0 && remainingDue <= 0.01);
-  const status = appointment.status || 'confirmed';
-
-  // Status Badge Class
-  const getStatusBadge = (st: string) => {
-    switch (st) {
-      case 'confirmed':
-      case 'booked':
-      case 'pending':
-        return {
-          label: isRtl ? 'مؤكد' : 'Confirmed',
-          cls: 'bg-[#F3EDFC] text-[#6537C0] border-[#E7DDFC]',
-        };
-      case 'checked_in':
-      case 'arrived':
-        return {
-          label: isRtl ? 'وصلت المركز' : 'Arrived',
-          cls: 'bg-teal-50 text-teal-700 border-teal-200',
-        };
-      case 'in_service':
-      case 'started':
-        return {
-          label: isRtl ? 'بدأت الجلسة' : 'In Service',
-          cls: 'bg-blue-50 text-blue-700 border-blue-200',
-        };
-      case 'completed':
-        return {
-          label: isRtl ? 'اكتملت الخدمة' : 'Completed',
-          cls: 'bg-slate-100 text-slate-700 border-slate-300',
-        };
-      case 'cancelled':
-      case 'late_cancelled':
-        return {
-          label: isRtl ? 'ملغي' : 'Cancelled',
-          cls: 'bg-rose-50 text-rose-700 border-rose-200',
-        };
-      case 'no_show':
-        return {
-          label: isRtl ? 'عدم حضور' : 'No-Show',
-          cls: 'bg-amber-50 text-amber-700 border-amber-200',
-        };
-      default:
-        return {
-          label: st,
-          cls: 'bg-slate-100 text-slate-700 border-slate-200',
-        };
-    }
+  const normalizedStatus = normalizeDrawerStatus(appointment.status);
+  const statusMeta = STATUS_META[normalizedStatus] || {
+    labelEn: normalizedStatus,
+    labelAr: normalizedStatus,
+    cls: 'bg-slate-100 text-slate-700 border-slate-200',
   };
-
-  const statusBadge = getStatusBadge(status);
+  const isPartiallyPaid = !isPaid && totalPaid > 0 && remainingDue > 0.01;
+  const isCancelled = normalizedStatus === 'cancelled' || normalizedStatus === 'no_show';
 
   // Status transitions
   const handleTransitionStatus = async (nextStatus: string) => {
@@ -225,13 +248,13 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
         className="absolute inset-0 bg-zinc-950/30 backdrop-blur-xs transition-opacity"
       />
 
-      {/* Slide-over Drawer Sheet (480px Desktop, 540px XL, Full-Width Mobile) */}
+      {/* Slide-over Drawer Sheet (460px Desktop, 500px XL, Full-Width Mobile) */}
       <motion.div
         initial={{ x: isRtl ? '-100%' : '100%' }}
         animate={{ x: 0 }}
         exit={{ x: isRtl ? '-100%' : '100%' }}
         transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-        className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-full sm:w-[480px] xl:w-[540px] max-w-full bg-[#FAF7FD] border-${isRtl ? 'r' : 'l'} border-[#E7DDFC] shadow-2xl flex flex-col z-10`}
+        className={`absolute top-0 bottom-0 ${isRtl ? 'left-0' : 'right-0'} w-full sm:w-[460px] xl:w-[500px] max-w-full bg-[#FAF7FD] border-${isRtl ? 'r' : 'l'} border-[#E7DDFC] shadow-2xl flex flex-col z-10`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* STICKY TOP APP BAR */}
@@ -245,9 +268,37 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
                 <span className="text-xs font-black text-[#1D035F] tracking-wide font-sans">
                   {isRtl ? 'تفاصيل الموعد' : 'APPOINTMENT DETAILS'}
                 </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusBadge.cls}`}>
-                  {statusBadge.label}
-                </span>
+
+                {/* Compact Interactive Header Status Control */}
+                <div className="relative inline-flex items-center">
+                  <select
+                    value={normalizedStatus}
+                    disabled={readOnly || isStatusTransitioning || normalizedStatus === 'completed'}
+                    onChange={async (e) => {
+                      const next = e.target.value;
+                      if (next !== normalizedStatus) {
+                        await handleTransitionStatus(next);
+                      }
+                    }}
+                    aria-label={isRtl ? 'حالة الموعد' : 'Appointment Status'}
+                    className={`appearance-none text-[10px] font-bold py-0.5 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#6537C0] transition-all ${isRtl ? 'ps-2 pe-5' : 'ps-2 pe-5'} ${statusMeta.cls} ${isStatusTransitioning ? 'opacity-60 cursor-wait' : ''}`}
+                  >
+                    <option value={normalizedStatus} className="bg-white text-slate-800 font-medium">
+                      {isRtl ? statusMeta.labelAr : statusMeta.labelEn}
+                    </option>
+                    {(VALID_STATUS_TRANSITIONS[normalizedStatus] || [])
+                      .filter((targetStatus) => targetStatus !== normalizedStatus)
+                      .map((targetStatus) => {
+                        const targetMeta = STATUS_META[targetStatus] || { labelEn: targetStatus, labelAr: targetStatus };
+                        return (
+                          <option key={targetStatus} value={targetStatus} className="bg-white text-slate-800 font-medium">
+                            {isRtl ? targetMeta.labelAr : targetMeta.labelEn}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  <ChevronDown size={11} className={`absolute ${isRtl ? 'left-1.5' : 'right-1.5'} pointer-events-none opacity-60`} />
+                </div>
               </div>
               <p className="text-[10px] text-[#A379E2] font-semibold mt-0.5 truncate font-mono">
                 {isRtl ? `مرجع: ${appointment.id.slice(0, 8).toUpperCase()}` : `REF: ${appointment.id.slice(0, 8).toUpperCase()}`}
@@ -268,7 +319,7 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
         </header>
 
         {/* SCROLLABLE MAIN CONTENT BODY */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
           {/* ZONE A: Client Context Card */}
           <AppointmentClientHeader
             isRtl={isRtl}
@@ -286,6 +337,15 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
             onViewProfile={() => {
               if (appointment.customerId) {
                 onViewProfile(appointment.customerId);
+              }
+            }}
+            onViewHistory={() => {
+              if (appointment.customerId) {
+                if (onViewHistory) {
+                  onViewHistory(appointment.customerId);
+                } else {
+                  onViewProfile(appointment.customerId);
+                }
               }
             }}
           />
@@ -469,45 +529,7 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
                 <Receipt size={15} className="text-[#E7DDFC]" />
                 <span>{isRtl ? 'عرض تفاصيل الفاتورة (View Sale)' : 'View Sale & Receipt'}</span>
               </button>
-            ) : status === 'in_service' || status === 'checked_in' ? (
-              <button
-                type="button"
-                onClick={() => setIsCheckoutOpen(true)}
-                className="flex-1 py-3 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <CheckCircle2 size={15} className="text-[#E7DDFC]" />
-                <span>{isRtl ? 'إتمام الدفع والتحصيل (Checkout)' : 'Proceed to Checkout'}</span>
-              </button>
-            ) : status === 'confirmed' ? (
-              <>
-                <button
-                  type="button"
-                  disabled={isStatusTransitioning}
-                  onClick={() => handleTransitionStatus('checked_in')}
-                  className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <CheckCircle2 size={15} />
-                  <span>{isRtl ? 'تسجيل وصول الزبونة' : 'Mark Arrived'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsCheckoutOpen(true)}
-                  className="px-3.5 py-3 bg-[#F3EDFC] hover:bg-[#E7DDFC] text-[#6537C0] rounded-xl text-xs font-bold border border-[#E7DDFC] transition-all cursor-pointer"
-                  title={isRtl ? 'الدفع المسبق' : 'Pre-pay Checkout'}
-                >
-                  <CreditCard size={15} />
-                </button>
-              </>
-            ) : status === 'completed' && !isPaid ? (
-              <button
-                type="button"
-                onClick={() => setIsCheckoutOpen(true)}
-                className="flex-1 py-3 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <CreditCard size={15} className="text-[#E7DDFC]" />
-                <span>{isRtl ? 'تحصيل المبلغ المتبقي' : 'Collect Remaining Due'}</span>
-              </button>
-            ) : (
+            ) : isCancelled ? (
               <button
                 type="button"
                 onClick={() => onRebook(appointment)}
@@ -516,12 +538,30 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
                 <Sparkles size={15} className="text-[#E7DDFC]" />
                 <span>{isRtl ? 'إعادة حجز الموعد' : 'Rebook Appointment'}</span>
               </button>
+            ) : isPartiallyPaid ? (
+              <button
+                type="button"
+                onClick={() => setIsCheckoutOpen(true)}
+                className="flex-1 py-3 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <CreditCard size={15} className="text-[#E7DDFC]" />
+                <span>{isRtl ? `تحصيل المتبقي (${remainingDue.toFixed(2)} ر.س)` : `Collect Remaining Due (${remainingDue.toFixed(2)} SAR)`}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsCheckoutOpen(true)}
+                className="flex-1 py-3 bg-[#6537C0] hover:bg-[#532ab0] text-white rounded-xl text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <CreditCard size={15} className="text-[#E7DDFC]" />
+                <span>{isRtl ? 'إتمام الدفع والتحصيل (Checkout)' : 'Proceed to Checkout'}</span>
+              </button>
             )}
 
             {/* Secondary Actions Overflow Menu */}
             <AppointmentActionMenu
               isRtl={isRtl}
-              appointmentStatus={status}
+              appointmentStatus={normalizedStatus}
               isGroupBooking={Boolean(appointment.isGroupBooking)}
               readOnly={readOnly}
               onReschedule={() => onReschedule(appointment)}

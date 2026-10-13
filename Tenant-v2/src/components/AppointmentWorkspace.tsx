@@ -6371,6 +6371,10 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
           setIsCustomerProfileOpen(true);
           setCustomerDrawerTab('overview');
         }}
+        onViewHistory={(customerId) => {
+          setIsCustomerProfileOpen(true);
+          setCustomerDrawerTab('appointments');
+        }}
         onViewSale={(appt) => {
           handleViewSale(appt);
         }}
