@@ -674,3 +674,33 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Verify that all 13 protected tracked files remain untouched.
 - [ ] 7. Dedicated Git Commit & Push to main <!-- id: p5a_res_push -->
 
+# BARSPA — Phase 5A Resource Badge Count Inconsistency
+- [x] 1. Semantics & Forensic Audit <!-- id: p5a_badge_audit -->
+  - Trace `InteractiveDrawers.tsx`, `ResourceBadge.tsx`, `POST /api/v1/tenant/resources/batch-check`, and `resourceRequirementResolver.js`.
+  - Document precise semantics for Catalogue service badge vs Queued-service badge.
+  - Determine candidate start & end timestamps, chained vs slot start times, staged allocations passed, self-conflict evaluation, and out-of-order/stale handling.
+  - Inspect why Moroccan massage, Thai therapy, and sauna showed different counts (`1/2` vs `2/2`) despite the `Massage rooms` label.
+- [x] 2. Implementation Fixes <!-- id: p5a_badge_fixes -->
+  - Enforce half-open interval overlap rule: `allocationStart < candidateEnd && allocationEnd > candidateStart` (2:20 PM end does not conflict with 2:20 PM start).
+  - Ensure queued-service badge excludes own staged allocation while including other overlapping staged demands.
+  - Ensure catalogue service badge checks against all simulated staged allocations at the candidate's intended start time (active participant chained start time or selected slot).
+  - Guard against stale / out-of-order async responses in `InteractiveDrawers.tsx` / `ResourceBadge.tsx`.
+- [x] 3. Comprehensive Regression Tests <!-- id: p5a_badge_tests -->
+  - Authoritative two-room fixture covering:
+    1. One queued massage at 1:20 PM for 60 min.
+    2. Second massage starting at 2:20 PM for 30 min (sequential reuse: 2/2 available).
+    3. New candidate overlapping first service (1:40 PM: 1/2 available).
+    4. Third simultaneous one-room demand when both rooms occupied (0/2 conflict).
+    5. Variants sharing displayed resource label but different configured requirements/durations.
+    6. Adding, removing, and changing the time of queued items.
+    7. Delayed or out-of-order batch-check responses.
+- [x] 4. Verification Gates, Typecheck & Builds <!-- id: p5a_badge_verify -->
+  - Run backend Jest test suites (20/20 PASS in `tenantResourceAvailability.test.js`, 20/20 PASS in regression suites).
+  - Run frontend test suite (20/20 PASS in `resourceBadges.test.ts`).
+  - Run `Tenant-v2` `npm run lint` (`tsc --noEmit`) (0 errors) and `npm run build` (built in 7.95s).
+  - Verify that all 13 protected tracked files remain untouched.
+- [x] 5. Commit, Push & Final Report <!-- id: p5a_badge_push -->
+  - Commit and push confirmed fix to `main`.
+  - Document root cause, timestamp-and-capacity breakdown, files changed, test results, commit SHA.
+
+

@@ -538,4 +538,252 @@ describe('Authoritative Batch Resource Availability & Badges (Phase 5A)', () => 
             expect(catMassage3.requirements[0].totalActive).toBe(2);
         });
     });
+
+    describe('9. Authoritative Two-Room Fixture & Screenshot A/B Scenarios (Inconsistency Regression)', () => {
+        const TYPE_MASSAGE_ROOM = 'type-massage-room';
+        const SRV_MOROCCAN = 'srv-moroccan-massage';
+        const SRV_THAI = 'srv-thai-therapy';
+        const SRV_SAUNA = 'srv-sauna-session';
+
+        beforeEach(() => {
+            // Salon has exactly two physical massage rooms
+            jest.spyOn(db.Resource, 'findAll').mockResolvedValue([
+                { id: 'res-room-1', resourceTypeId: TYPE_MASSAGE_ROOM, name_en: 'Massage Room 1', name_ar: 'غرفة مساج 1', is_active: true },
+                { id: 'res-room-2', resourceTypeId: TYPE_MASSAGE_ROOM, name_en: 'Massage Room 2', name_ar: 'غرفة مساج 2', is_active: true }
+            ]);
+
+            jest.spyOn(db.ServiceResourceRequirement, 'findAll').mockImplementation(async ({ where }) => {
+                // All three services require 1 massage room
+                if ([SRV_MOROCCAN, SRV_THAI, SRV_SAUNA].includes(where.serviceId)) {
+                    return [{
+                        resourceTypeId: TYPE_MASSAGE_ROOM,
+                        quantity: 1,
+                        variantId: null,
+                        resourceType: { id: TYPE_MASSAGE_ROOM, name_en: 'Massage rooms', name_ar: 'غرف مساج', is_active: true }
+                    }];
+                }
+                return [];
+            });
+        });
+
+        test('Case 1: Screenshot A — One queued service at 1:20 PM for 60m (queued: 2/2, candidate at 2:20 PM: 2/2)', async () => {
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'queue-1', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'cat-candidate-220', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T14:20:00.000Z', duration: 60 }
+                ]
+            });
+
+            // Queued-service badge: excludes own staged allocation -> 2/2 available
+            expect(res.results['queue-1'].isAvailable).toBe(true);
+            expect(res.results['queue-1'].requirements[0].availableQuantity).toBe(2);
+            expect(res.results['queue-1'].requirements[0].totalActive).toBe(2);
+
+            // Catalogue candidate at 2:20 PM: queue-1 ends at 2:20 PM. Half-open rule: 14:20 < 14:20 is FALSE.
+            // Queue-1 does not consume capacity at 2:20 PM -> 2/2 available
+            expect(res.results['cat-candidate-220'].isAvailable).toBe(true);
+            expect(res.results['cat-candidate-220'].requirements[0].availableQuantity).toBe(2);
+            expect(res.results['cat-candidate-220'].requirements[0].totalActive).toBe(2);
+        });
+
+        test('Case 2: Screenshot B — Sequential queued services (1:20-2:20 and 2:20-2:50) reuse physical room (both 2/2)', async () => {
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'queue-1', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 },
+                    { id: 'queue-2', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T14:20:00.000Z', duration: 30 }
+                ]
+            });
+
+            // Service 1 [13:20, 14:20): excludes self; other item starts at 14:20 (no overlap) -> 2/2 available
+            expect(res.results['queue-1'].isAvailable).toBe(true);
+            expect(res.results['queue-1'].requirements[0].availableQuantity).toBe(2);
+            expect(res.results['queue-1'].requirements[0].totalActive).toBe(2);
+
+            // Service 2 [14:20, 14:50): excludes self; other item ends at 14:20 (no overlap) -> 2/2 available
+            expect(res.results['queue-2'].isAvailable).toBe(true);
+            expect(res.results['queue-2'].requirements[0].availableQuantity).toBe(2);
+            expect(res.results['queue-2'].requirements[0].totalActive).toBe(2);
+        });
+
+        test('Case 3: Candidate overlapping first service (1:40 PM) receives 1/2 available', async () => {
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'queue-1', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'cat-overlap', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:40:00.000Z', duration: 60 }
+                ]
+            });
+
+            // Candidate at 1:40 PM overlaps 1:20-2:20 PM -> 1 room consumed -> 1/2 available
+            expect(res.results['cat-overlap'].isAvailable).toBe(true);
+            expect(res.results['cat-overlap'].requirements[0].availableQuantity).toBe(1);
+            expect(res.results['cat-overlap'].requirements[0].totalActive).toBe(2);
+        });
+
+        test('Case 4: Third simultaneous one-room demand detects conflict (0/2 available)', async () => {
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'queue-1', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 },
+                    { id: 'queue-2', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'cat-simultaneous', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 }
+                ]
+            });
+
+            // Each queued item excludes self and sees the other -> 1/2 available
+            expect(res.results['queue-1'].requirements[0].availableQuantity).toBe(1);
+            expect(res.results['queue-2'].requirements[0].availableQuantity).toBe(1);
+
+            // Candidate sees BOTH rooms occupied -> 0/2 available, conflict
+            expect(res.results['cat-simultaneous'].isAvailable).toBe(false);
+            expect(res.results['cat-simultaneous'].requirements[0].availableQuantity).toBe(0);
+            expect(res.results['cat-simultaneous'].requirements[0].totalActive).toBe(2);
+            expect(res.results['cat-simultaneous'].requirements[0].reason).toBe('RESOURCE_OCCUPIED');
+        });
+
+        test('Case 5: Variants with differing durations (Moroccan 60m vs Sauna 30m) when a 3:20 PM booking exists (1/2 vs 2/2)', async () => {
+            // DB has an appointment in Room 1 from 3:20 PM to 4:20 PM (15:20 to 16:20)
+            const apptStart = new Date('2026-10-15T15:20:00.000Z');
+            const apptEnd = new Date('2026-10-15T16:20:00.000Z');
+
+            jest.spyOn(db.AppointmentResource, 'findAll').mockImplementation(async (options) => {
+                const apptWhere = options?.include?.[0]?.where;
+                const ltEnd = apptWhere?.startTime?.[db.Sequelize.Op.lt];
+                const gtStart = apptWhere?.endTime?.[db.Sequelize.Op.gt];
+                // Overlaps if apptStart < end && apptEnd > start
+                if (ltEnd && gtStart && apptStart < ltEnd && apptEnd > gtStart) {
+                    return [
+                        {
+                            resourceId: 'res-room-1',
+                            appointment: {
+                                startTime: apptStart,
+                                endTime: apptEnd
+                            }
+                        }
+                    ];
+                }
+                return [];
+            });
+
+            // Both staged services end at 2:50 PM (14:50)
+            // Candidate probe time is 2:50 PM (14:50)
+            const res = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'queue-1', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 },
+                    { id: 'queue-2', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T14:20:00.000Z', duration: 30 }
+                ],
+                catalogueItems: [
+                    // Moroccan 60m: [14:50, 15:50) -> overlaps DB booking at 15:20 -> 1/2 available!
+                    { id: 'cat-moroccan', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T14:50:00.000Z', duration: 60 },
+                    // Thai 60m: [14:50, 15:50) -> overlaps DB booking at 15:20 -> 1/2 available!
+                    { id: 'cat-thai', serviceId: SRV_THAI, startTime: '2026-10-15T14:50:00.000Z', duration: 60 },
+                    // Sauna 30m: [14:50, 15:20) -> ends at 15:20. 15:20 < 15:20 is FALSE -> NO overlap with DB booking -> 2/2 available!
+                    { id: 'cat-sauna', serviceId: SRV_SAUNA, startTime: '2026-10-15T14:50:00.000Z', duration: 30 }
+                ]
+            });
+
+            // Moroccan: 1 room occupied by DB appointment -> 1/2 available
+            expect(res.results['cat-moroccan'].isAvailable).toBe(true);
+            expect(res.results['cat-moroccan'].requirements[0].availableQuantity).toBe(1);
+            expect(res.results['cat-moroccan'].requirements[0].totalActive).toBe(2);
+
+            // Thai: 1 room occupied by DB appointment -> 1/2 available
+            expect(res.results['cat-thai'].isAvailable).toBe(true);
+            expect(res.results['cat-thai'].requirements[0].availableQuantity).toBe(1);
+            expect(res.results['cat-thai'].requirements[0].totalActive).toBe(2);
+
+            // Sauna: ends before DB appointment starts -> 2/2 available!
+            expect(res.results['cat-sauna'].isAvailable).toBe(true);
+            expect(res.results['cat-sauna'].requirements[0].availableQuantity).toBe(2);
+            expect(res.results['cat-sauna'].requirements[0].totalActive).toBe(2);
+        });
+
+        test('Case 6: Adding, removing, and changing the time of queued items dynamically updates availability', async () => {
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            // Step 1: Initial state - 1 queued item at 1:20 PM
+            const state1 = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'q1', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'probe-1320', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 }
+                ]
+            });
+            expect(state1.results['probe-1320'].requirements[0].availableQuantity).toBe(1);
+
+            // Step 2: Change time of queued item to 3:00 PM (15:00)
+            const state2 = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [
+                    { id: 'q1', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T15:00:00.000Z', duration: 60 }
+                ],
+                catalogueItems: [
+                    { id: 'probe-1320', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 }
+                ]
+            });
+            // At 13:20, both rooms are now free!
+            expect(state2.results['probe-1320'].requirements[0].availableQuantity).toBe(2);
+
+            // Step 3: Remove queued item entirely
+            const state3 = await batchCheckResourceAvailability({
+                tenantId: TENANT_ID,
+                stagedItems: [],
+                catalogueItems: [
+                    { id: 'probe-1320', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 }
+                ]
+            });
+            expect(state3.results['probe-1320'].requirements[0].availableQuantity).toBe(2);
+        });
+
+        test('Case 7: Controller integration endpoint correctly processes batchCheckResourceAvailability', async () => {
+            jest.spyOn(db.AppointmentResource, 'findAll').mockResolvedValue([]);
+
+            const req = {
+                tenantId: TENANT_ID,
+                body: {
+                    stagedItems: [
+                        { id: 'queue-1', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T13:20:00.000Z', duration: 60 }
+                    ],
+                    catalogueItems: [
+                        { id: 'cat-cand', serviceId: SRV_MOROCCAN, startTime: '2026-10-15T14:20:00.000Z', duration: 60 }
+                    ]
+                }
+            };
+            const jsonMock = jest.fn();
+            const res = {
+                status: jest.fn().mockReturnThis(),
+                json: jsonMock
+            };
+
+            await tenantResourceController.batchCheckResourceAvailability(req, res);
+
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                success: true,
+                results: expect.objectContaining({
+                    'queue-1': expect.objectContaining({ isAvailable: true }),
+                    'cat-cand': expect.objectContaining({ isAvailable: true })
+                })
+            }));
+        });
+    });
 });
+

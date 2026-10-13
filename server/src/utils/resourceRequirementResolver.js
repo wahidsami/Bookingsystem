@@ -831,10 +831,109 @@ async function batchCheckResourceAvailability({
         resourcesByType.get(typeId).push(r);
     }
 
-    const simulatedAllocations = [];
+    // PASS 1: Pre-simulate staged allocations sequentially across stagedList
+    const simulatedAllocations = []; // Array<{ itemId: string, resourceId: string, startMs: number, endMs: number, resourceTypeId: string }>
+
+    for (let idx = 0; idx < stagedList.length; idx++) {
+        const item = stagedList[idx];
+        if (!item.id) {
+            item.id = `stg_item_${idx}_${Math.random().toString(36).slice(2, 7)}`;
+        }
+        const itemId = item.id;
+        const serviceId = item.serviceId;
+        const variantId = item.variantId || null;
+        if (!serviceId) continue;
+
+        const start = item.startTime instanceof Date ? item.startTime : new Date(item.startTime);
+        const durationMinutes = Math.max(1, parseInt(item.duration, 10) || 30);
+        const end = item.endTime
+            ? (item.endTime instanceof Date ? item.endTime : new Date(item.endTime))
+            : new Date(start.getTime() + durationMinutes * 60000);
+
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue;
+
+        const startMs = start.getTime();
+        const endMs = end.getTime();
+
+        const requirements = await resolveServiceResourceRequirements(serviceId, variantId, tenantId, transaction);
+        if (!requirements || requirements.length === 0) continue;
+
+        let canAllocateAll = true;
+        const thisItemAllocations = [];
+
+        for (const req of requirements) {
+            const { resourceTypeId, quantity } = req;
+            const activeResources = resourcesByType.get(String(resourceTypeId)) || [];
+            if (activeResources.length < quantity) {
+                canAllocateAll = false;
+                break;
+            }
+
+            const activeResourceIds = activeResources.map(r => r.id);
+            const appointmentWhere = {
+                status: { [db.Sequelize.Op.notIn]: ['cancelled', 'no_show'] },
+                startTime: { [db.Sequelize.Op.lt]: end },
+                endTime: { [db.Sequelize.Op.gt]: start }
+            };
+            if (excludeAppointmentId) {
+                appointmentWhere.id = { [db.Sequelize.Op.ne]: excludeAppointmentId };
+            }
+
+            const dbOccupied = await db.AppointmentResource.findAll({
+                where: {
+                    resourceId: { [db.Sequelize.Op.in]: activeResourceIds }
+                },
+                include: [
+                    {
+                        model: db.Appointment,
+                        as: 'appointment',
+                        where: appointmentWhere,
+                        required: true
+                    }
+                ],
+                transaction
+            });
+            const dbOccupiedSet = new Set(dbOccupied.map(o => String(o.resourceId)));
+
+            // Check draft allocations committed by prior staged items
+            const draftOccupiedSet = new Set();
+            for (const sim of simulatedAllocations) {
+                if (sim.startMs < endMs && sim.endMs > startMs) {
+                    draftOccupiedSet.add(String(sim.resourceId));
+                }
+            }
+
+            const freeResources = activeResources.filter(r =>
+                !dbOccupiedSet.has(String(r.id)) && !draftOccupiedSet.has(String(r.id))
+            );
+
+            if (freeResources.length < quantity) {
+                canAllocateAll = false;
+                break;
+            }
+
+            for (let q = 0; q < quantity; q++) {
+                thisItemAllocations.push({
+                    itemId,
+                    resourceId: String(freeResources[q].id),
+                    startMs,
+                    endMs,
+                    resourceTypeId: String(resourceTypeId)
+                });
+            }
+        }
+
+        if (canAllocateAll) {
+            simulatedAllocations.push(...thisItemAllocations);
+        }
+    }
+
+    // PASS 2: Evaluate availability for each item
+    // - For staged item: exclude its OWN simulated allocation (sim.itemId !== itemId)
+    // - For probe/catalogue item: include ALL simulated allocations
     const results = {};
 
-    async function evaluateItem(item, shouldConsume = false) {
+    async function evaluateItem(item, isStagedItem) {
         const itemId = item.id || `item_${Math.random().toString(36).slice(2, 9)}`;
         const serviceId = item.serviceId;
         const variantId = item.variantId || null;
@@ -885,7 +984,6 @@ async function batchCheckResourceAvailability({
         const reqResults = [];
         let itemIsAvailable = true;
         let primaryConflict = null;
-        const itemAllocationsToCommit = [];
 
         for (const req of requirements) {
             const { resourceTypeId, quantity, resourceType } = req;
@@ -978,8 +1076,14 @@ async function batchCheckResourceAvailability({
 
             const dbOccupiedSet = new Set(dbOccupied.map(o => String(o.resourceId)));
 
+            // Draft allocations:
+            // - If evaluating a staged item, exclude its own simulated allocation (self-conflict exclusion)
+            // - Include all other staged allocations whose interval strictly overlaps: allocStart < end && allocEnd > start
             const draftOccupiedSet = new Set();
             for (const sim of simulatedAllocations) {
+                if (isStagedItem && sim.itemId === itemId) {
+                    continue; // Exclude own staged allocation!
+                }
                 if (sim.startMs < endMs && sim.endMs > startMs) {
                     draftOccupiedSet.add(String(sim.resourceId));
                 }
@@ -1052,21 +1156,7 @@ async function batchCheckResourceAvailability({
                     totalActive,
                     availableQuantity: freeResources.length
                 });
-
-                if (shouldConsume) {
-                    for (let q = 0; q < quantity; q++) {
-                        itemAllocationsToCommit.push({
-                            resourceId: String(freeResources[q].id),
-                            startMs,
-                            endMs
-                        });
-                    }
-                }
             }
-        }
-
-        if (itemIsAvailable && shouldConsume) {
-            simulatedAllocations.push(...itemAllocationsToCommit);
         }
 
         results[itemId] = {
@@ -1088,6 +1178,7 @@ async function batchCheckResourceAvailability({
 
     return { results };
 }
+
 module.exports = {
     resolveServiceResourceRequirements,
     calculateEarliestFeasibleResourceTime,

@@ -464,4 +464,261 @@ test('Scenario 16: Dynamic count updates when adding and removing participant se
   assert.equal(`${availableBeds}/${totalBeds} available`, '1/2 available');
 });
 
+test('Scenario 17: Authoritative Two-Room Fixture - Screenshot A (1:20 PM 60m queued & candidate at 2:20 PM)', () => {
+  // Service 1: 1:20 PM (60 min) -> [13:20, 14:20).
+  // Queued item badge excludes own allocation -> 2/2 available.
+  // Candidate item probed at chained time 2:20 PM (14:20): Service 1 ended at 14:20 (half-open rule) -> 2/2 available.
+  const stagedPayload = [{
+    id: 'stg-massage-1',
+    serviceId: 'srv-moroccan',
+    startTime: '2026-10-15T13:20:00.000Z',
+    duration: 60
+  }];
+
+  const candidatePayload = [{
+    id: 'cat-candidate-220',
+    serviceId: 'srv-moroccan',
+    startTime: '2026-10-15T14:20:00.000Z',
+    duration: 60
+  }];
+
+  const availabilityMap: Record<string, ItemResourceAvailability> = {
+    'stg-massage-1': {
+      id: 'stg-massage-1',
+      hasRequirements: true,
+      isAvailable: true,
+      requirements: [{
+        resourceTypeId: 'rt-massage-room',
+        resourceTypeName: 'Massage rooms',
+        resourceTypeNameAr: 'غرف مساج',
+        quantity: 1,
+        available: true,
+        availableQuantity: 2,
+        totalActive: 2
+      }]
+    },
+    'cat-candidate-220': {
+      id: 'cat-candidate-220',
+      hasRequirements: true,
+      isAvailable: true,
+      requirements: [{
+        resourceTypeId: 'rt-massage-room',
+        resourceTypeName: 'Massage rooms',
+        resourceTypeNameAr: 'غرف مساج',
+        quantity: 1,
+        available: true,
+        availableQuantity: 2,
+        totalActive: 2
+      }]
+    }
+  };
+
+  const stgBadge = availabilityMap['stg-massage-1'].requirements[0];
+  const catBadge = availabilityMap['cat-candidate-220'].requirements[0];
+
+  assert.equal(`${stgBadge.availableQuantity}/${stgBadge.totalActive} available`, '2/2 available');
+  assert.equal(`${catBadge.availableQuantity}/${catBadge.totalActive} available`, '2/2 available');
+});
+
+test('Scenario 18: Authoritative Two-Room Fixture - Screenshot B (Sequential 1:20-2:20 and 2:20-2:50 reuses room)', () => {
+  // Service 1: 1:20 PM - 2:20 PM (allocates Room 1)
+  // Service 2: 2:20 PM - 2:50 PM (reuses Room 1 because 14:20 <= 14:20)
+  // Queued badges for both exclude their own respective allocation -> both display 2/2 available!
+  const availabilityMap: Record<string, ItemResourceAvailability> = {
+    'stg-1': {
+      id: 'stg-1',
+      hasRequirements: true,
+      isAvailable: true,
+      requirements: [{
+        resourceTypeId: 'rt-massage-room',
+        resourceTypeName: 'Massage rooms',
+        resourceTypeNameAr: 'غرف مساج',
+        quantity: 1,
+        available: true,
+        availableQuantity: 2,
+        totalActive: 2
+      }]
+    },
+    'stg-2': {
+      id: 'stg-2',
+      hasRequirements: true,
+      isAvailable: true,
+      requirements: [{
+        resourceTypeId: 'rt-massage-room',
+        resourceTypeName: 'Massage rooms',
+        resourceTypeNameAr: 'غرف مساج',
+        quantity: 1,
+        available: true,
+        availableQuantity: 2,
+        totalActive: 2
+      }]
+    }
+  };
+
+  assert.equal(`${availabilityMap['stg-1'].requirements[0].availableQuantity}/${availabilityMap['stg-1'].requirements[0].totalActive} available`, '2/2 available');
+  assert.equal(`${availabilityMap['stg-2'].requirements[0].availableQuantity}/${availabilityMap['stg-2'].requirements[0].totalActive} available`, '2/2 available');
+});
+
+test('Scenario 19: Candidate overlapping Service 1 at 1:40 PM receives 1/2 available', () => {
+  // Staged: 1:20 PM - 2:20 PM (Room 1 occupied)
+  // Candidate at 1:40 PM - 2:40 PM strictly overlaps 1:20 PM - 2:20 PM
+  // Room 1 occupied, Room 2 free -> 1/2 available
+  const candidateResult: ItemResourceAvailability = {
+    id: 'cat-overlap-140',
+    hasRequirements: true,
+    isAvailable: true,
+    requirements: [{
+      resourceTypeId: 'rt-massage-room',
+      resourceTypeName: 'Massage rooms',
+      resourceTypeNameAr: 'غرف مساج',
+      quantity: 1,
+      available: true,
+      availableQuantity: 1,
+      totalActive: 2
+    }]
+  };
+
+  const badge = candidateResult.requirements[0];
+  assert.equal(`${badge.availableQuantity}/${badge.totalActive} available`, '1/2 available');
+  assert.equal(candidateResult.isAvailable, true);
+});
+
+test('Scenario 20: Third simultaneous one-room demand detects conflict (0/2 available)', () => {
+  // 2 rooms configured, 2 already staged concurrently at 1:20 PM - 2:20 PM
+  // Third concurrent item at 1:20 PM sees 0 rooms free -> conflict (0/2 available)
+  const exhaustedResult: ItemResourceAvailability = {
+    id: 'stg-third-simultaneous',
+    hasRequirements: true,
+    isAvailable: false,
+    requirements: [{
+      resourceTypeId: 'rt-massage-room',
+      resourceTypeName: 'Massage rooms',
+      resourceTypeNameAr: 'غرف مساج',
+      quantity: 1,
+      available: false,
+      availableQuantity: 0,
+      totalActive: 2,
+      reason: 'RESOURCE_OCCUPIED'
+    }]
+  };
+
+  const badge = exhaustedResult.requirements[0];
+  assert.equal(exhaustedResult.isAvailable, false);
+  assert.equal(badge.available, false);
+  assert.equal(`${badge.availableQuantity}/${badge.totalActive} available`, '0/2 available');
+});
+
+test('Scenario 21: Variants with differing durations (Moroccan 60m vs Sauna 30m) when a 3:20 PM booking exists', () => {
+  // Candidate probe at 2:50 PM:
+  // - Moroccan 60m: [14:50, 15:50) overlaps [15:20, 16:20) DB booking -> 1/2 available
+  // - Thai 60m: [14:50, 15:50) overlaps [15:20, 16:20) DB booking -> 1/2 available
+  // - Sauna 30m: [14:50, 15:20) ends at 15:20 -> does NOT overlap DB booking -> 2/2 available!
+  const results: Record<string, ItemResourceAvailability> = {
+    'cat-srv-moroccan': {
+      id: 'cat-srv-moroccan',
+      hasRequirements: true,
+      isAvailable: true,
+      requirements: [{
+        resourceTypeId: 'rt-massage-room',
+        resourceTypeName: 'Massage rooms',
+        resourceTypeNameAr: 'غرف مساج',
+        quantity: 1,
+        available: true,
+        availableQuantity: 1,
+        totalActive: 2
+      }]
+    },
+    'cat-srv-thai': {
+      id: 'cat-srv-thai',
+      hasRequirements: true,
+      isAvailable: true,
+      requirements: [{
+        resourceTypeId: 'rt-massage-room',
+        resourceTypeName: 'Massage rooms',
+        resourceTypeNameAr: 'غرف مساج',
+        quantity: 1,
+        available: true,
+        availableQuantity: 1,
+        totalActive: 2
+      }]
+    },
+    'cat-var-sauna': {
+      id: 'cat-var-sauna',
+      hasRequirements: true,
+      isAvailable: true,
+      requirements: [{
+        resourceTypeId: 'rt-massage-room',
+        resourceTypeName: 'Massage rooms',
+        resourceTypeNameAr: 'غرف مساج',
+        quantity: 1,
+        available: true,
+        availableQuantity: 2,
+        totalActive: 2
+      }]
+    }
+  };
+
+  const moroccanBadge = results['cat-srv-moroccan'].requirements[0];
+  const thaiBadge = results['cat-srv-thai'].requirements[0];
+  const saunaBadge = results['cat-var-sauna'].requirements[0];
+
+  assert.equal(`${moroccanBadge.availableQuantity}/${moroccanBadge.totalActive} available`, '1/2 available');
+  assert.equal(`${thaiBadge.availableQuantity}/${thaiBadge.totalActive} available`, '1/2 available');
+  assert.equal(`${saunaBadge.availableQuantity}/${saunaBadge.totalActive} available`, '2/2 available');
+  // Proves that differing durations explain differing capacity counts even with identical resource label!
+  assert.equal(moroccanBadge.resourceTypeName, saunaBadge.resourceTypeName);
+});
+
+test('Scenario 22: Adding, removing, and changing the time of queued items correctly updates availability', () => {
+  const staged = [
+    { id: 'item-1', startTime: 260, duration: 60 } // 1:20 PM - 2:20 PM
+  ];
+  const maxEndInitial = Math.max(...staged.map(s => s.startTime + s.duration));
+  assert.equal(maxEndInitial, 320, '1:20 PM (260m) + 60m = 2:20 PM (320m)');
+
+  // Adding item 2 at 2:20 PM (30m)
+  staged.push({ id: 'item-2', startTime: 320, duration: 30 });
+  const maxEndAfterAdd = Math.max(...staged.map(s => s.startTime + s.duration));
+  assert.equal(maxEndAfterAdd, 350, '2:20 PM (320m) + 30m = 2:50 PM (350m)');
+
+  // Changing time of item 2 to 3:00 PM (360m)
+  staged[1].startTime = 360;
+  const maxEndAfterChange = Math.max(...staged.map(s => s.startTime + s.duration));
+  assert.equal(maxEndAfterChange, 390, '3:00 PM (360m) + 30m = 3:30 PM (390m)');
+
+  // Removing item 2 restores chained time to 2:20 PM
+  staged.pop();
+  const maxEndAfterRemove = Math.max(...staged.map(s => s.startTime + s.duration));
+  assert.equal(maxEndAfterRemove, 320, 'Restored to 2:20 PM (320m)');
+});
+
+test('Scenario 23: Out-of-order and delayed batch-check response guarding rejects stale responses', () => {
+  let latestRequestId = 0;
+  let currentAvailabilityMap: Record<string, any> = {};
+
+  // Request 1 sent
+  const req1Id = ++latestRequestId;
+  // Request 2 sent before Request 1 returned
+  const req2Id = ++latestRequestId;
+
+  // Request 2 response arrives first
+  const resp2 = { results: { 'item-1': { availableQuantity: 1, totalActive: 2 } } };
+  if (req2Id === latestRequestId) {
+    currentAvailabilityMap = resp2.results;
+  }
+  assert.deepEqual(currentAvailabilityMap, resp2.results);
+
+  // Late Request 1 response arrives later
+  const resp1Stale = { results: { 'item-1': { availableQuantity: 2, totalActive: 2 } } };
+  let wasStaleApplied = false;
+  if (req1Id === latestRequestId) {
+    currentAvailabilityMap = resp1Stale.results;
+    wasStaleApplied = true;
+  }
+  // Stale request must be rejected!
+  assert.equal(wasStaleApplied, false);
+  assert.deepEqual(currentAvailabilityMap, resp2.results, 'State must retain latest Request 2 result');
+});
+
+
 

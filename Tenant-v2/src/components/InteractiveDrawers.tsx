@@ -2390,12 +2390,9 @@ export default function InteractiveDrawers({
 
         const shouldChainServiceTimes = bookingRecoveryMode !== 'separate_services';
         if (shouldChainServiceTimes && participantStaged.length > 0) {
-          const lastItem = participantStaged[participantStaged.length - 1];
-          if (lastItem.packageInstanceId) {
-            const siblingItems = participantStaged.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
-            activeParticipantNextStartTime = Math.max(...siblingItems.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
-          } else {
-            activeParticipantNextStartTime = lastItem.startTime + lastItem.duration;
+          const latestEndTime = Math.max(...participantStaged.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
+          if (Number.isFinite(latestEndTime) && latestEndTime > 0) {
+            activeParticipantNextStartTime = latestEndTime;
           }
         }
 
@@ -2491,12 +2488,9 @@ export default function InteractiveDrawers({
         : stagedServices;
 
       if (shouldChainServiceTimes && participantStaged.length > 0) {
-        const lastItem = participantStaged[participantStaged.length - 1];
-        if (lastItem.packageInstanceId) {
-          const siblingItems = participantStaged.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
-          nextStartTime = Math.max(...siblingItems.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
-        } else {
-          nextStartTime = lastItem.startTime + lastItem.duration;
+        const latestEndTime = Math.max(...participantStaged.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
+        if (Number.isFinite(latestEndTime) && latestEndTime > 0) {
+          nextStartTime = latestEndTime;
         }
       }
       const nextStartTimeIso = buildIsoFromMinutes(selectedDate, nextStartTime);
@@ -2576,12 +2570,9 @@ export default function InteractiveDrawers({
         : prev;
 
       if (shouldChainServiceTimes && participantStaged.length > 0) {
-        const lastItem = participantStaged[participantStaged.length - 1];
-        if (lastItem.packageInstanceId) {
-          const siblingItems = participantStaged.filter(p => p.packageInstanceId === lastItem.packageInstanceId);
-          nextStartTime = Math.max(...siblingItems.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
-        } else {
-          nextStartTime = lastItem.startTime + lastItem.duration;
+        const latestEndTime = Math.max(...participantStaged.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
+        if (Number.isFinite(latestEndTime) && latestEndTime > 0) {
+          nextStartTime = latestEndTime;
         }
       }
 
