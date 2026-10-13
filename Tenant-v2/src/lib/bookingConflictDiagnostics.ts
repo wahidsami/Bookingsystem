@@ -235,8 +235,8 @@ export const buildConflictCard = ({
   avatar?: string | null;
   isRtl: boolean;
 }): ConflictCard => {
-  // If diagnostic is null, it means no overlapping blocker was found, so they are available for this specific slot check.
-  const normalizedReason = diagnostic === null ? 'available' : normalizeReasonType(diagnostic?.reasonType);
+  // If diagnostic is null, it means no specific blocker diagnostic was provided for this rejection card; never label it as available.
+  const normalizedReason = diagnostic === null ? 'unavailable' : normalizeReasonType(diagnostic?.reasonType);
   const resolvedName = `${staffName || diagnostic?.staffName || ''}`.trim() || (isRtl ? 'المختص' : 'Professional');
   const reasonTitles: Record<ConflictReasonType, { ar: string; en: string }> = {
     blocked_time: { ar: 'وقت محظور', en: 'Blocked Time' },
@@ -315,3 +315,242 @@ export const getConflictBadgeClasses = (reasonType: ConflictReasonType): string 
       return 'bg-slate-100 text-slate-600';
   }
 };
+
+export interface ScheduleContextItem {
+  tenantHours?: { open: string; close: string; closed: boolean } | null;
+  employeeDutyWindows?: Array<{ startTime: string; endTime: string }>;
+  breaks?: Array<{ startTime: string; endTime: string; type?: string | null; label?: string | null }>;
+  timeOff?: Array<{ startTime: string; endTime: string }>;
+  existingAppointments?: Array<{ id?: string; startTime: string; endTime: string }>;
+  bufferBefore?: number;
+  bufferAfter?: number;
+  duration?: number;
+  timezone?: string;
+}
+
+export interface EvaluateIntervalOptions {
+  serviceId?: string | null;
+  staffId?: string | null;
+  requestedStartTime: string;
+  requestedEndTime: string;
+  exactSlot?: any | null;
+  diagnostics?: AvailabilityDiagnostic[];
+  scheduleContext?: ScheduleContextItem | null;
+  priorChainAllocations?: Array<{ staffId?: string | null; startMs: number; endMs: number }>;
+}
+
+export interface IntervalEvaluationResult {
+  isValid: boolean;
+  diagnostic: AvailabilityDiagnostic | null;
+}
+
+/**
+ * Robustly evaluates whether a requested time interval is available for a staff member.
+ * Supports off-grid boundaries (e.g. 2:10 PM, 3:10 PM) by cross-checking duty windows,
+ * breaks, existing appointments, and chain allocations even when discrete candidate slot is missing.
+ */
+export const evaluateIntervalFeasibility = ({
+  serviceId,
+  staffId,
+  requestedStartTime,
+  requestedEndTime,
+  exactSlot,
+  diagnostics = [],
+  scheduleContext,
+  priorChainAllocations = []
+}: EvaluateIntervalOptions): IntervalEvaluationResult => {
+  const reqStartMs = toMs(requestedStartTime);
+  const reqEndMs = toMs(requestedEndTime);
+
+  if (reqStartMs === null || reqEndMs === null || reqEndMs <= reqStartMs) {
+    return {
+      isValid: false,
+      diagnostic: {
+        reasonType: 'unknown',
+        staffId: staffId || null,
+        serviceId: serviceId || null
+      }
+    };
+  }
+
+  // Case 1: An exact discrete slot exists
+  if (exactSlot) {
+    if (!exactSlot.available) {
+      const diagnostic = pickBestConflictDiagnostic({
+        diagnostics,
+        serviceId,
+        staffId: staffId || exactSlot.staffId,
+        requestedStartTime,
+        requestedEndTime,
+        exactSlotStartTime: exactSlot.startTime,
+        exactSlotEndTime: exactSlot.endTime
+      }) || {
+        reasonType: 'unavailable',
+        staffId: staffId || exactSlot.staffId,
+        serviceId
+      };
+      return { isValid: false, diagnostic };
+    }
+
+    // Check collision with prior chain allocations for same staff
+    const assignedStaffId = staffId || exactSlot.staffId;
+    if (assignedStaffId) {
+      const priorOverlap = priorChainAllocations.find(
+        (a) => a.staffId && `${a.staffId}` === `${assignedStaffId}` && reqStartMs < a.endMs && reqEndMs > a.startMs
+      );
+      if (priorOverlap) {
+        return {
+          isValid: false,
+          diagnostic: {
+            reasonType: 'existing_booking',
+            staffId: assignedStaffId,
+            serviceId,
+            startTime: new Date(priorOverlap.startMs).toISOString(),
+            endTime: new Date(priorOverlap.endMs).toISOString(),
+            reasonStartTime: new Date(priorOverlap.startMs).toISOString(),
+            reasonEndTime: new Date(priorOverlap.endMs).toISOString()
+          }
+        };
+      }
+    }
+
+    return { isValid: true, diagnostic: null };
+  }
+
+  // Case 2: Discrete slot does NOT exist (e.g. off-grid boundary like 2:10 PM, 3:10 PM)
+  // Check if backend returned explicit conflict diagnostic overlapping this interval
+  const conflictDiagnostic = pickBestConflictDiagnostic({
+    diagnostics,
+    serviceId,
+    staffId,
+    requestedStartTime,
+    requestedEndTime
+  });
+
+  if (conflictDiagnostic) {
+    return { isValid: false, diagnostic: conflictDiagnostic };
+  }
+
+  // Check scheduleContext (duty windows, breaks, existing appointments)
+  if (scheduleContext) {
+    const dutyWindows = scheduleContext.employeeDutyWindows || [];
+    if (Array.isArray(dutyWindows)) {
+      if (dutyWindows.length === 0) {
+        return {
+          isValid: false,
+          diagnostic: {
+            reasonType: 'outside_working_hours',
+            staffId,
+            serviceId
+          }
+        };
+      }
+
+      const coveredByShift = dutyWindows.some((w) => {
+        const wStartMs = toMs(w.startTime);
+        const wEndMs = toMs(w.endTime);
+        return wStartMs !== null && wEndMs !== null && wStartMs <= reqStartMs && wEndMs >= reqEndMs;
+      });
+
+      if (!coveredByShift) {
+        return {
+          isValid: false,
+          diagnostic: {
+            reasonType: 'outside_working_hours',
+            staffId,
+            serviceId,
+            workingHoursEnd: dutyWindows[0]?.endTime
+          }
+        };
+      }
+    }
+
+    const breaks = scheduleContext.breaks || [];
+    const breakOverlap = breaks.find((b) => {
+      const bStartMs = toMs(b.startTime);
+      const bEndMs = toMs(b.endTime);
+      return bStartMs !== null && bEndMs !== null && reqStartMs < bEndMs && reqEndMs > bStartMs;
+    });
+    if (breakOverlap) {
+      return {
+        isValid: false,
+        diagnostic: {
+          reasonType: 'staff_break',
+          staffId,
+          serviceId,
+          startTime: breakOverlap.startTime,
+          endTime: breakOverlap.endTime,
+          reasonStartTime: breakOverlap.startTime,
+          reasonEndTime: breakOverlap.endTime
+        }
+      };
+    }
+
+    const timeOff = scheduleContext.timeOff || [];
+    const timeOffOverlap = timeOff.find((t) => {
+      const tStartMs = toMs(t.startTime);
+      const tEndMs = toMs(t.endTime);
+      return tStartMs !== null && tEndMs !== null && reqStartMs < tEndMs && reqEndMs > tStartMs;
+    });
+    if (timeOffOverlap) {
+      return {
+        isValid: false,
+        diagnostic: {
+          reasonType: 'time_off',
+          staffId,
+          serviceId,
+          startTime: timeOffOverlap.startTime,
+          endTime: timeOffOverlap.endTime,
+          reasonStartTime: timeOffOverlap.startTime,
+          reasonEndTime: timeOffOverlap.endTime
+        }
+      };
+    }
+
+    const existingAppointments = scheduleContext.existingAppointments || [];
+    const apptOverlap = existingAppointments.find((a) => {
+      const aStartMs = toMs(a.startTime);
+      const aEndMs = toMs(a.endTime);
+      return aStartMs !== null && aEndMs !== null && reqStartMs < aEndMs && reqEndMs > aStartMs;
+    });
+    if (apptOverlap) {
+      return {
+        isValid: false,
+        diagnostic: {
+          reasonType: 'existing_booking',
+          staffId,
+          serviceId,
+          startTime: apptOverlap.startTime,
+          endTime: apptOverlap.endTime,
+          reasonStartTime: apptOverlap.startTime,
+          reasonEndTime: apptOverlap.endTime
+        }
+      };
+    }
+  }
+
+  // Check collision with prior chain allocations for same staff
+  if (staffId) {
+    const priorOverlap = priorChainAllocations.find(
+      (a) => a.staffId && `${a.staffId}` === `${staffId}` && reqStartMs < a.endMs && reqEndMs > a.startMs
+    );
+    if (priorOverlap) {
+      return {
+        isValid: false,
+        diagnostic: {
+          reasonType: 'existing_booking',
+          staffId,
+          serviceId,
+          startTime: new Date(priorOverlap.startMs).toISOString(),
+          endTime: new Date(priorOverlap.endMs).toISOString(),
+          reasonStartTime: new Date(priorOverlap.startMs).toISOString(),
+          reasonEndTime: new Date(priorOverlap.endMs).toISOString()
+        }
+      };
+    }
+  }
+
+  // No blockers identified, interval is feasible!
+  return { isValid: true, diagnostic: null };
+};
+

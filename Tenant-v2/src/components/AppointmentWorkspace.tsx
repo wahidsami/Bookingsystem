@@ -18,7 +18,7 @@ import EmployeeWeeklyScheduleEditor from './EmployeeWeeklyScheduleEditor';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { TransactionDetailsDrawer } from './TransactionDetailsDrawer';
 import SchedulerGrid, { SchedulerColumn, SchedulerEvent, SchedulerSlot } from './SchedulerGrid';
-import { resolveEmployeeDutyIntervals, type StaffShiftRecord } from '../lib/employeeDutyHours';
+import { resolveEmployeeDutyIntervals, getOffDutySlotMessage, type StaffShiftRecord } from '../lib/employeeDutyHours';
 import { resolveEmployeeImageUrl } from '../lib/employeeImage';
 import { resolveProductImageUrl } from '../lib/productContract';
 import { getServiceCategoryKey, getServiceCategoryLabel, normalizeServiceRecord } from '../lib/serviceContract';
@@ -47,6 +47,7 @@ import {
   formatConflictTime,
   getConflictBadgeClasses,
   pickBestConflictDiagnostic,
+  evaluateIntervalFeasibility,
   type AvailabilityDiagnostic,
   type ConflictCard
 } from '../lib/bookingConflictDiagnostics';
@@ -3314,6 +3315,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
   const fetchAvailabilityLayers = async (currentItems: any[], dateString: string) => {
       const layers: import('../utils/bookingChains').BookingSlot[][] = [];
       const diagnosticsByLayer: AvailabilityDiagnostic[][] = [];
+      const scheduleContextsByLayer: any[] = [];
       let anyFailed = false;
       for (let i = 0; i < currentItems.length; i++) {
         const item = currentItems[i];
@@ -3322,6 +3324,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         if (!targetServiceId && !targetPackageId) {
           layers.push([]);
           diagnosticsByLayer.push([]);
+          scheduleContextsByLayer.push(null);
           continue;
         }
         const searchResp = await tenantApiAdapter.searchAvailability({
@@ -3334,13 +3337,15 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         if (searchResp?.success && searchResp.slots) {
           layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: targetServiceId || targetPackageId })));
           diagnosticsByLayer.push(Array.isArray(searchResp.diagnostics) ? searchResp.diagnostics : []);
+          scheduleContextsByLayer.push(searchResp.scheduleContext || null);
         } else {
           layers.push([]);
           diagnosticsByLayer.push([]);
+          scheduleContextsByLayer.push(null);
           anyFailed = true;
         }
       }
-      return { layers, diagnosticsByLayer, anyFailed };
+      return { layers, diagnosticsByLayer, scheduleContextsByLayer, anyFailed };
   };
 
   const handleSearchDate = async (dateStr: string) => {
@@ -3660,7 +3665,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       const preflightMultiServiceChain = async (currentItems: any[], isRetry = false) => {
         try {
           const requestedStartISO = currentItems[0].startTimeIso || currentItems[0].startTime || buildIsoFromMinutes(getSelectedDateKey(), earliestStartTime);
-          const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getSelectedDateKey());
+          const { layers, diagnosticsByLayer, scheduleContextsByLayer, anyFailed } = await fetchAvailabilityLayers(currentItems, getSelectedDateKey());
 
           let isRequestedChainValid = true;
           const discoveredStaffIds: string[] = [];
@@ -3676,60 +3681,64 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
               reasonDescription: isRtl ? 'تعذر التحقق من الإتاحة لهذه الخدمة في الوقت الحالي.' : 'Could not verify availability for this service right now.'
             });
           } else {
+            const priorAllocations: Array<{ staffId?: string | null; startMs: number; endMs: number }> = [];
+
             for (let i = 0; i < currentItems.length; i++) {
               const item = currentItems[i];
-              const layerSlots = layers[i];
+              const layerSlots = layers[i] || [];
               const diagnostics = diagnosticsByLayer[i] || [];
+              const scheduleContext = scheduleContextsByLayer?.[i] || null;
               const requestStartIso = typeof item.startTimeIso === 'string' && item.startTimeIso.includes('T')
                 ? item.startTimeIso
                 : typeof item.startTime === 'string' && item.startTime.includes('T')
                   ? item.startTime
                   : buildIsoFromMinutes(getSelectedDateKey(), Number(item.startTime || earliestStartTime));
-              const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || currentDuration || 0) * 60000).toISOString();
+              const itemDuration = Number(item.duration || currentDuration || 0) || 60;
               const reqTimeMs = new Date(requestStartIso).getTime();
+              const reqEndMs = reqTimeMs + itemDuration * 60000;
+              const requestEndIso = new Date(reqEndMs).toISOString();
 
-              const exactSlot = layerSlots.find((s: any) => new Date(s.startTime).getTime() === reqTimeMs);
+              const normalizedStaffId = item.requestedStaffId || item.staffId || null;
+              const exactSlot = layerSlots.find((s: any) => {
+                const slotMs = new Date(s.startTime).getTime();
+                return slotMs === reqTimeMs && (!normalizedStaffId || `${s.staffId}` === `${normalizedStaffId}`);
+              });
 
-              const staff = liveStylists.find(s => s.id === item.requestedStaffId) || liveStylists.find(s => s.id === exactSlot?.staffId);
+              const staff = liveStylists.find(s => s.id === item.requestedStaffId)
+                || liveStylists.find(s => s.id === exactSlot?.staffId)
+                || liveStylists.find(s => s.id === item.staffId);
+              const resolvedStaffId = staff?.id || item.requestedStaffId || exactSlot?.staffId || item.staffId || '';
               const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : 'المختص';
               const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
 
-              if (exactSlot && !exactSlot.available) {
+              const evaluation = evaluateIntervalFeasibility({
+                serviceId: item.serviceId,
+                staffId: resolvedStaffId,
+                requestedStartTime: requestStartIso,
+                requestedEndTime: requestEndIso,
+                exactSlot,
+                diagnostics,
+                scheduleContext,
+                priorChainAllocations: priorAllocations
+              });
+
+              if (!evaluation.isValid) {
                 isRequestedChainValid = false;
-                const diagnostic = pickBestConflictDiagnostic({
-                  diagnostics,
-                  serviceId: item.serviceId,
-                  staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-                  requestedStartTime: requestStartIso,
-                  requestedEndTime: requestEndIso,
-                  exactSlotStartTime: exactSlot.startTime,
-                  exactSlotEndTime: exactSlot.endTime
-                });
                 conflictCards.push(buildConflictCard({
-                  diagnostic,
-                  staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
-                  staffName,
-                  avatar,
-                  isRtl
-                }));
-              } else if (!exactSlot) {
-                isRequestedChainValid = false;
-                const diagnostic = pickBestConflictDiagnostic({
-                  diagnostics,
-                  serviceId: item.serviceId,
-                  staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-                  requestedStartTime: requestStartIso,
-                  requestedEndTime: requestEndIso
-                });
-                conflictCards.push(buildConflictCard({
-                  diagnostic,
-                  staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
+                  diagnostic: evaluation.diagnostic,
+                  staffId: resolvedStaffId,
                   staffName,
                   avatar,
                   isRtl
                 }));
               } else {
-                discoveredStaffIds.push(exactSlot.staffId);
+                const chosenStaffId = resolvedStaffId || exactSlot?.staffId || '';
+                discoveredStaffIds.push(chosenStaffId);
+                priorAllocations.push({
+                  staffId: chosenStaffId,
+                  startMs: reqTimeMs,
+                  endMs: reqEndMs
+                });
               }
             }
           }
@@ -4539,6 +4548,20 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
     handleContextMenu(event, targetStaffId, slot.startMinutes, undefined, slot.dateKey);
   };
 
+  const handleOffDutySlotClick = useCallback((slot: SchedulerSlot, column: SchedulerColumn) => {
+    const staffId = column.resourceId || slot.employeeId || parseSchedulerColumnResourceId(column.id);
+    const staff = liveStylists.find(s => s.id === staffId);
+    const employeeName = (isRtl ? staff?.nameAr : staff?.nameEn) || column.title || (isRtl ? 'الموظف' : 'Staff');
+    const slotMinuteOfDay = (schedulerConfig.startHour * 60) + slot.startMinutes;
+    const dutyIntervals = column.dutyIntervals;
+    const info = getOffDutySlotMessage({
+      employeeName,
+      slotMinuteOfDay,
+      dutyIntervals,
+      isRtl
+    });
+    addLocalToast(info.messageAr, info.messageEn, 'info');
+  }, [liveStylists, isRtl, schedulerConfig.startHour, addLocalToast]);
 
   const handleSchedulerSlotDrop = (slot: SchedulerSlot, draggedEventId: string) => {
     if (!isBoardEditable) {
@@ -5606,6 +5629,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                   onColumnHeaderClick={(e, colId) => handleColumnHeaderClick(e, colId)}
                   onColumnHeaderContextMenu={(e, colId) => handleColumnHeaderContextMenu(e, colId)}
                   onSlotContextMenu={handleSchedulerSlotContextMenu}
+                  onOffDutySlotClick={handleOffDutySlotClick}
                   onSlotDrop={handleSchedulerSlotDrop}
                   onSlotRangeSelect={handleSchedulerSlotRangeSelect}
                   onEventClick={handleSchedulerEventClick}

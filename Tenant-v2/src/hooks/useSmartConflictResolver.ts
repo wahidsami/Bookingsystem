@@ -1,7 +1,12 @@
 import { useState, useCallback } from 'react';
 import { fetchAvailabilityLayers } from '../services/availabilityService';
 import { calculateAllValidChains } from '../utils/bookingChains';
-import { pickBestConflictDiagnostic, buildConflictCard, ConflictCard } from '../lib/bookingConflictDiagnostics';
+import {
+  pickBestConflictDiagnostic,
+  buildConflictCard,
+  evaluateIntervalFeasibility,
+  ConflictCard
+} from '../lib/bookingConflictDiagnostics';
 
 export type BookingRecoveryMode = 'chain' | 'modify_professionals' | 'separate_services';
 export type ChainConflictView = 'explanation' | 'time-selection' | 'confirmation';
@@ -50,7 +55,7 @@ export const useSmartConflictResolver = ({
     dateKey: string,
     isRetry = false
   ) => {
-    const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers({
+    const { layers, diagnosticsByLayer, scheduleContextsByLayer, anyFailed } = await fetchAvailabilityLayers({
       tenantId,
       items: currentItems,
       dateKey,
@@ -85,51 +90,64 @@ export const useSmartConflictResolver = ({
       });
     } else {
       let currentCalculatedStart = new Date(currentItems[0].startTime).getTime();
+      const priorAllocations: Array<{ staffId?: string | null; startMs: number; endMs: number }> = [];
 
       for (let i = 0; i < currentItems.length; i++) {
         const item = currentItems[i];
         const layerSlots = layers[i] || [];
         const diagnostics = diagnosticsByLayer[i] || [];
+        const scheduleContext = scheduleContextsByLayer?.[i] || null;
         const durationForSlot = durations[i] || 60;
 
-        const requestStartIso = new Date(currentCalculatedStart).toISOString();
-        const requestEndIso = new Date(currentCalculatedStart + durationForSlot * 60000).toISOString();
         const reqTimeMs = currentCalculatedStart;
+        const reqEndMs = reqTimeMs + durationForSlot * 60000;
+        const requestStartIso = new Date(reqTimeMs).toISOString();
+        const requestEndIso = new Date(reqEndMs).toISOString();
         discoveredStartTimes.push(requestStartIso);
 
-        const exactSlot = layerSlots.find((s: any) => new Date(s.startTime).getTime() === reqTimeMs);
+        const normalizedStaffId = item.requestedStaffId || item.staffId || null;
+        const exactSlot = layerSlots.find((s: any) => {
+          const slotMs = new Date(s.startTime).getTime();
+          return slotMs === reqTimeMs && (!normalizedStaffId || `${s.staffId}` === `${normalizedStaffId}`);
+        });
 
-        const staff = stylists.find(s => s.id === item.requestedStaffId) || stylists.find(s => s.id === exactSlot?.staffId);
+        const staff = stylists.find(s => s.id === item.requestedStaffId)
+          || stylists.find(s => s.id === exactSlot?.staffId)
+          || stylists.find(s => s.id === item.staffId);
+        const resolvedStaffId = staff?.id || item.requestedStaffId || exactSlot?.staffId || item.staffId || '';
         const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : (isRtl ? 'مهني' : 'Professional');
         const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
 
-        if (exactSlot && !exactSlot.available) {
+        const evaluation = evaluateIntervalFeasibility({
+          serviceId: item.serviceId,
+          staffId: resolvedStaffId,
+          requestedStartTime: requestStartIso,
+          requestedEndTime: requestEndIso,
+          exactSlot,
+          diagnostics,
+          scheduleContext,
+          priorChainAllocations: priorAllocations
+        });
+
+        if (!evaluation.isValid) {
           isRequestedChainValid = false;
-          const diagnostic = pickBestConflictDiagnostic({
-            diagnostics,
-            serviceId: item.serviceId,
-            staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-            requestedStartTime: requestStartIso,
-            requestedEndTime: requestEndIso,
-            exactSlotStartTime: exactSlot.startTime,
-            exactSlotEndTime: exactSlot.endTime
-          });
-          conflictCards.push(buildConflictCard({ diagnostic, staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '', staffName, avatar, isRtl }));
-          currentCalculatedStart += durationForSlot * 60000;
-        } else if (!exactSlot) {
-          isRequestedChainValid = false;
-          const diagnostic = pickBestConflictDiagnostic({
-            diagnostics,
-            serviceId: item.serviceId,
-            staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-            requestedStartTime: requestStartIso,
-            requestedEndTime: requestEndIso
-          });
-          conflictCards.push(buildConflictCard({ diagnostic, staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '', staffName, avatar, isRtl }));
+          conflictCards.push(buildConflictCard({
+            diagnostic: evaluation.diagnostic,
+            staffId: resolvedStaffId,
+            staffName,
+            avatar,
+            isRtl
+          }));
           currentCalculatedStart += durationForSlot * 60000;
         } else {
-          discoveredStaffIds.push(exactSlot.staffId);
-          currentCalculatedStart = new Date(exactSlot.endTime).getTime();
+          const chosenStaffId = resolvedStaffId || exactSlot?.staffId || '';
+          discoveredStaffIds.push(chosenStaffId);
+          priorAllocations.push({
+            staffId: chosenStaffId,
+            startMs: reqTimeMs,
+            endMs: reqEndMs
+          });
+          currentCalculatedStart = exactSlot ? new Date(exactSlot.endTime).getTime() : reqEndMs;
         }
       }
     }
@@ -176,7 +194,7 @@ export const useSmartConflictResolver = ({
       const requestEndIso = new Date(new Date(requestStartIso).getTime() + Number(item.duration || 0) * 60000).toISOString();
       const requestDate = requestStartIso.includes('T') ? requestStartIso.split('T')[0] : dateKey;
 
-      const { layers, diagnosticsByLayer, anyFailed } = await fetchAvailabilityLayers({
+      const { layers, diagnosticsByLayer, scheduleContextsByLayer, anyFailed } = await fetchAvailabilityLayers({
         tenantId,
         items: [item],
         dateKey: requestDate,
@@ -185,6 +203,7 @@ export const useSmartConflictResolver = ({
 
       const layerSlots = layers[0] || [];
       const diagnostics = diagnosticsByLayer[0] || [];
+      const scheduleContext = scheduleContextsByLayer?.[0] || null;
       const reqTimeMs = new Date(requestStartIso).getTime();
       const normalizedStaffId = `${item.requestedStaffId || item.staffId || ''}`.trim();
 
@@ -196,24 +215,37 @@ export const useSmartConflictResolver = ({
 
       const staff = stylists.find((candidate) => `${candidate.id || ''}`.trim() === normalizedStaffId)
         || stylists.find((candidate) => `${candidate.id || ''}`.trim() === `${exactSlot?.staffId || ''}`.trim());
+      const resolvedStaffId = staff?.id || normalizedStaffId || exactSlot?.staffId || '';
       const staffName = staff ? (isRtl ? staff.nameAr : staff.nameEn) : (isRtl ? 'مهني' : 'Professional');
       const avatar = staff?.avatar || staff?.photo || staff?.profileImage;
 
-      if (anyFailed || !exactSlot || !exactSlot.available) {
+      if (anyFailed) {
         allItemsValid = false;
-        const diagnostic = pickBestConflictDiagnostic({
-          diagnostics,
-          serviceId: item.serviceId,
-          staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || null,
-          requestedStartTime: requestStartIso,
-          requestedEndTime: requestEndIso,
-          exactSlotStartTime: exactSlot?.startTime,
-          exactSlotEndTime: exactSlot?.endTime
-        });
-
         conflictCards.push(buildConflictCard({
-          diagnostic,
-          staffId: staff?.id || exactSlot?.staffId || item.requestedStaffId || '',
+          diagnostic: { reasonType: 'unknown', staffId: resolvedStaffId, serviceId: item.serviceId },
+          staffId: resolvedStaffId,
+          staffName,
+          avatar,
+          isRtl
+        }));
+        continue;
+      }
+
+      const evaluation = evaluateIntervalFeasibility({
+        serviceId: item.serviceId,
+        staffId: resolvedStaffId,
+        requestedStartTime: requestStartIso,
+        requestedEndTime: requestEndIso,
+        exactSlot,
+        diagnostics,
+        scheduleContext
+      });
+
+      if (!evaluation.isValid) {
+        allItemsValid = false;
+        conflictCards.push(buildConflictCard({
+          diagnostic: evaluation.diagnostic,
+          staffId: resolvedStaffId,
           staffName,
           avatar,
           isRtl
@@ -221,7 +253,7 @@ export const useSmartConflictResolver = ({
       } else {
         validatedItems.push({
           ...item,
-          staffId: exactSlot.staffId || item.staffId,
+          staffId: resolvedStaffId || exactSlot?.staffId || item.staffId,
           assignmentMode: item.requestedStaffId ? 'tenant_reassigned' : 'auto_assigned'
         });
       }

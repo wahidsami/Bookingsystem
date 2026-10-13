@@ -217,3 +217,101 @@ export function isSlotOnDuty(
     interval => slotStartMinutes < interval.endMinutes && slotEndMinutes > interval.startMinutes
   );
 }
+
+/**
+ * Formats minutes from midnight into 12-hour clock label (e.g. "2:00 PM" / "2:00 م").
+ */
+export function formatMinutesToClockLabel(minutesFromMidnight: number, isRtl = false): string {
+  const safeMinutes = Math.max(0, Math.min(1440, Math.round(minutesFromMidnight)));
+  let hours = Math.floor(safeMinutes / 60);
+  const minutes = safeMinutes % 60;
+  const ampm = hours >= 12 ? (isRtl ? 'م' : 'PM') : (isRtl ? 'ص' : 'AM');
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const minStr = minutes < 10 ? `0${minutes}` : `${minutes}`;
+  return `${hours}:${minStr} ${ampm}`;
+}
+
+export interface OffDutySlotMessageResult {
+  messageEn: string;
+  messageAr: string;
+  type: 'pre_shift' | 'post_shift' | 'split_shift_gap' | 'off_day';
+}
+
+/**
+ * Calculates a localized, informative status message based on the employee's actual shift data:
+ * - Before the first shift: "[Name]'s duty starts at 2:00 PM." / "تبدأ مناوبة [الاسم] في الساعة 2:00 م"
+ * - After the final shift: "[Name]'s duty ended at 9:00 PM." / "انتهت مناوبة [الاسم] في الساعة 9:00 م"
+ * - Between split shifts: "[Name]'s next duty starts at 5:00 PM." / "تبدأ المناوبة التالية لـ [الاسم] في الساعة 5:00 م"
+ * - On a day with no applicable shift: "[Name] is not scheduled to work today." / "[الاسم] ليس لديه دوام اليوم"
+ */
+export function getOffDutySlotMessage({
+  employeeName,
+  slotMinuteOfDay,
+  dutyIntervals,
+  isRtl = false
+}: {
+  employeeName: string;
+  slotMinuteOfDay: number;
+  dutyIntervals?: DutyInterval[] | null;
+  isRtl?: boolean;
+}): OffDutySlotMessageResult {
+  const name = employeeName.trim() || (isRtl ? 'الموظف' : 'Staff member');
+
+  if (!dutyIntervals || dutyIntervals.length === 0) {
+    return {
+      type: 'off_day',
+      messageEn: `${name} is not scheduled to work today.`,
+      messageAr: `${name} ليس لديه دوام اليوم.`
+    };
+  }
+
+  const sorted = [...dutyIntervals].sort((a, b) => a.startMinutes - b.startMinutes);
+  const firstShift = sorted[0];
+  const lastShift = sorted[sorted.length - 1];
+
+  // 1. Before first shift
+  if (slotMinuteOfDay < firstShift.startMinutes) {
+    const timeEn = formatMinutesToClockLabel(firstShift.startMinutes, false);
+    const timeAr = formatMinutesToClockLabel(firstShift.startMinutes, true);
+    return {
+      type: 'pre_shift',
+      messageEn: `${name}'s duty starts at ${timeEn}.`,
+      messageAr: `تبدأ مناوبة ${name} في الساعة ${timeAr}.`
+    };
+  }
+
+  // 2. After last shift
+  if (slotMinuteOfDay >= lastShift.endMinutes) {
+    const timeEn = formatMinutesToClockLabel(lastShift.endMinutes, false);
+    const timeAr = formatMinutesToClockLabel(lastShift.endMinutes, true);
+    return {
+      type: 'post_shift',
+      messageEn: `${name}'s duty ended at ${timeEn}.`,
+      messageAr: `انتهت مناوبة ${name} في الساعة ${timeAr}.`
+    };
+  }
+
+  // 3. Between split shifts (gap)
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const currentShift = sorted[i];
+    const nextShift = sorted[i + 1];
+    if (slotMinuteOfDay >= currentShift.endMinutes && slotMinuteOfDay < nextShift.startMinutes) {
+      const nextTimeEn = formatMinutesToClockLabel(nextShift.startMinutes, false);
+      const nextTimeAr = formatMinutesToClockLabel(nextShift.startMinutes, true);
+      return {
+        type: 'split_shift_gap',
+        messageEn: `${name}'s next duty starts at ${nextTimeEn}.`,
+        messageAr: `تبدأ المناوبة التالية لـ ${name} في الساعة ${nextTimeAr}.`
+      };
+    }
+  }
+
+  // Default fallback if somehow in a gap not covered
+  return {
+    type: 'off_day',
+    messageEn: `${name} is not on duty at this time.`,
+    messageAr: `${name} ليس في وقت دوامه حالياً.`
+  };
+}
+

@@ -736,5 +736,35 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Verify all 13 protected tracked files remain untouched.
 - [x] 6. Commit, Push & Final Report <!-- id: prefresha_push -->
 
+# BARSPA — Critical Audit: Multi-Service Consecutive Booking & Duty-Time Shading
+- [x] 1. Deep Pipeline Audit & Root Cause Isolation <!-- id: audit_pipeline -->
+  - Trace `InteractiveDrawers.tsx` submission flow, `useSmartConflictResolver.ts`, and backend `bookingService.js`.
+  - Identify root cause: Preflight checks `layerSlots.find(s => s.startTime === reqTimeMs)`. When appointment starts on non-15m boundary (e.g. 2:10 PM / 14:10, 3:10 PM / 15:10), `exactSlot` is undefined.
+  - Document why Fatima is displayed as "Available" in the error modal: `diagnostic === null` defaults to `reasonType: 'available'`.
+  - Reconcile with backend authoritative validation (`evaluateSchedulingRequest` and `createBookingSession`), which supports arbitrary minute boundaries and half-open intervals.
+- [x] 2. Reproduction Tests & Regression Fixtures <!-- id: reg_tests -->
+  - Add backend and frontend tests replicating Thursday 15 Oct 2026, Fatima (14:00-21:00), Moroccan massage (14:10-15:10), variant (15:10-15:40).
+  - Verify boundary half-open intervals `[14:10, 15:10)` and `[15:10, 15:40)`.
+  - Verify conflict detection remains authoritative on genuine overlaps, off-shift, breaks, and resource exhaustion.
+- [x] 3. Fix Multi-Service Preflight Chain & Availability Evaluation <!-- id: fix_multi_service -->
+  - Update `useSmartConflictResolver.ts` and `AppointmentWorkspace.tsx` to validate intervals against duty windows and conflicts rather than demanding strict `slotInterval` grid alignment.
+  - Ensure preflight and backend final validation agree on identical fixtures.
+  - Clean up misleading "Available" error card mapping when an unknown/unexpected failure occurs.
+- [x] 4. Secondary UI Refinement: Employee Duty-Time Shading & Slot Click Messages <!-- id: duty_shading_refine -->
+  - Darken off-duty slot background slightly in `SchedulerGrid.tsx` for clear distinction while preserving timeline visibility.
+  - In `onSlotClick`, suppress drawer opening on off-duty slots.
+  - Show localized shift information toast:
+    - Pre-shift: `"[Name]'s duty starts at 2:00 PM"` / `"تبدأ مناوبة [الاسم] في الساعة 2:00 م"`
+    - Post-shift: `"[Name]'s duty ended at 9:00 PM"` / `"انتهت مناوبة [الاسم] في الساعة 9:00 م"`
+    - Split-shift gap: `"[Name]'s next duty starts at 5:00 PM"` / `"تبدأ المناوبة التالية لـ [الاسم] في الساعة 5:00 م"`
+    - Off day: `"[Name] is not scheduled to work today"` / `"[الاسم] ليس لديه دوام اليوم"`
+  - Add unit tests for boundary clicks, pre-shift, post-shift, split-gap, and off-day toasts.
+- [x] 5. Verification & Safety Checks <!-- id: verify_and_push -->
+  - Run all backend and frontend tests.
+  - Run `Tenant-v2` `npm run lint` (`tsc --noEmit`) and `npm run build`.
+  - Verify 13 protected tracked files remain untouched.
+  - Commit and push to `main` without automatic deployment.
+
+
 
 

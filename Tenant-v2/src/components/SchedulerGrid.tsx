@@ -102,6 +102,7 @@ export interface SchedulerGridProps {
   showStaffPhotos?: boolean;
   showAppointmentStatusBadges?: boolean;
   onSlotContextMenu?: (event: React.MouseEvent, slot: SchedulerSlot) => void;
+  onOffDutySlotClick?: (slot: SchedulerSlot, column: SchedulerColumn) => void;
   onSlotDrop?: (slot: SchedulerSlot, draggedEventId: string) => void;
   onSlotRangeSelect?: (range: SchedulerSlotRange) => void;
   onEventClick?: (event: SchedulerEvent) => void;
@@ -394,6 +395,7 @@ export default function SchedulerGrid({
   showStaffPhotos = true,
   showAppointmentStatusBadges = true,
   onSlotContextMenu,
+  onOffDutySlotClick,
   onSlotDrop,
   onEventClick,
   onEventContextMenu,
@@ -898,7 +900,7 @@ export default function SchedulerGrid({
                 const slotEndMinuteOfDay = slotMinuteOfDay + slotMinutes;
                 const isOnDuty = isSlotOnDuty(slotMinuteOfDay, slotEndMinuteOfDay, column.dutyIntervals);
                 const laneShade = !isOnDuty
-                  ? 'bg-slate-100/80 text-slate-400'
+                  ? 'bg-slate-200/70 text-slate-400'
                   : isExtendedHourRow
                   ? (columnIndex % 2 === 0 ? 'bg-slate-100/80' : 'bg-slate-50/80')
                   : (columnIndex % 2 === 0 ? 'bg-slate-50/70' : 'bg-white');
@@ -916,6 +918,7 @@ export default function SchedulerGrid({
                     aria-label={`${column.title} ${formatSlotTime(slot.startMinutes, startHour, isRtl)}`}
                     onMouseDown={(event) => {
                       if (!isEditable || event.button !== 0) return;
+                      if (!isOnDuty) return;
                       setSelectionAnchor(slot);
                       setSelectionFocus(slot);
                       onAddSlotHover?.(slot);
@@ -941,6 +944,7 @@ export default function SchedulerGrid({
                     }}
                     onMouseUp={() => {
                       if (!isEditable) return;
+                      if (!isOnDuty) return;
                       commitSelection();
                     }}
                     onMouseLeave={() => {
@@ -950,6 +954,12 @@ export default function SchedulerGrid({
                     }}
                     onClick={(event) => {
                       if (!isEditable) return;
+                      if (!isOnDuty) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onOffDutySlotClick?.(slot, column);
+                        return;
+                      }
                       if (suppressNextClickRef.current) {
                         suppressNextClickRef.current = false;
                         event.preventDefault();
@@ -964,6 +974,10 @@ export default function SchedulerGrid({
                       if (!isEditable) return;
                       event.preventDefault();
                       event.stopPropagation();
+                      if (!isOnDuty) {
+                        onOffDutySlotClick?.(slot, column);
+                        return;
+                      }
                       onSlotContextMenu?.(event, slot);
                     }}
                   />

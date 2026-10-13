@@ -18,6 +18,7 @@ export interface AvailabilityLayerConfig {
 export interface AvailabilityLayerResult {
   layers: any[][];
   diagnosticsByLayer: AvailabilityDiagnostic[][];
+  scheduleContextsByLayer: any[];
   anyFailed: boolean;
 }
 
@@ -33,10 +34,11 @@ export const fetchAvailabilityLayers = async ({
 }: AvailabilityLayerConfig): Promise<AvailabilityLayerResult> => {
   const layers: any[][] = [];
   const diagnosticsByLayer: AvailabilityDiagnostic[][] = [];
+  const scheduleContextsByLayer: any[] = [];
   let anyFailed = false;
 
   if (!tenantId || !dateKey || !Array.isArray(items) || items.length === 0) {
-    return { layers: [], diagnosticsByLayer: [], anyFailed: false };
+    return { layers: [], diagnosticsByLayer: [], scheduleContextsByLayer: [], anyFailed: false };
   }
 
   for (let i = 0; i < items.length; i++) {
@@ -47,6 +49,7 @@ export const fetchAvailabilityLayers = async ({
     if (!targetServiceId && !targetPackageId) {
       layers.push([]);
       diagnosticsByLayer.push([]);
+      scheduleContextsByLayer.push(null);
       continue;
     }
 
@@ -63,17 +66,21 @@ export const fetchAvailabilityLayers = async ({
       if (searchResp?.success && searchResp.slots) {
         layers.push(searchResp.slots.map((s: any) => ({ ...s, serviceId: targetServiceId || targetPackageId })));
         diagnosticsByLayer.push(Array.isArray(searchResp.diagnostics) ? searchResp.diagnostics : []);
+        scheduleContextsByLayer.push(searchResp.scheduleContext || null);
       } else {
         layers.push([]);
         diagnosticsByLayer.push([]);
+        scheduleContextsByLayer.push(null);
         anyFailed = true;
       }
     } catch (err) {
       anyFailed = true;
       layers.push([]);
       diagnosticsByLayer.push([]);
+      scheduleContextsByLayer.push(null);
     }
   }
 
-  return { layers, diagnosticsByLayer, anyFailed };
+  return { layers, diagnosticsByLayer, scheduleContextsByLayer, anyFailed };
 };
+
