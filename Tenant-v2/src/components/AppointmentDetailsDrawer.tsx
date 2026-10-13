@@ -287,62 +287,63 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
         onClick={(e) => e.stopPropagation()}
       >
         {/* STICKY TOP APP BAR */}
-        <header className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-[#E7DDFC] px-4 py-3 flex items-center justify-between shrink-0 shadow-2xs z-20">
+        <header className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-[#E7DDFC] px-4 py-3 flex items-center justify-between gap-3 shrink-0 shadow-2xs z-20">
           <div className="flex items-center gap-2.5 min-w-0">
-            <span className="p-2 bg-[#1D035F] text-white rounded-xl shadow-2xs shrink-0">
-              <CheckCircle2 size={16} />
+            <span className="p-2.5 bg-[#1D035F] text-white rounded-xl shadow-2xs shrink-0">
+              <CheckCircle2 size={17} />
             </span>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-black text-[#1D035F] tracking-wide font-sans">
-                  {isRtl ? 'تفاصيل الموعد' : 'APPOINTMENT DETAILS'}
-                </span>
-
-                {/* Compact Interactive Header Status Control */}
-                <div className="relative inline-flex items-center">
-                  <select
-                    value={normalizedStatus}
-                    disabled={readOnly || isStatusTransitioning || normalizedStatus === 'completed'}
-                    onChange={async (e) => {
-                      const next = e.target.value;
-                      if (next !== normalizedStatus) {
-                        await handleTransitionStatus(next);
-                      }
-                    }}
-                    aria-label={isRtl ? 'حالة الموعد' : 'Appointment Status'}
-                    className={`appearance-none text-[10px] font-bold py-0.5 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#6537C0] transition-all ${isRtl ? 'ps-2 pe-5' : 'ps-2 pe-5'} ${statusMeta.cls} ${isStatusTransitioning ? 'opacity-60 cursor-wait' : ''}`}
-                  >
-                    <option value={normalizedStatus} className="bg-white text-slate-800 font-medium">
-                      {isRtl ? statusMeta.labelAr : statusMeta.labelEn}
-                    </option>
-                    {(VALID_STATUS_TRANSITIONS[normalizedStatus] || [])
-                      .filter((targetStatus) => targetStatus !== normalizedStatus)
-                      .map((targetStatus) => {
-                        const targetMeta = STATUS_META[targetStatus] || { labelEn: targetStatus, labelAr: targetStatus };
-                        return (
-                          <option key={targetStatus} value={targetStatus} className="bg-white text-slate-800 font-medium">
-                            {isRtl ? targetMeta.labelAr : targetMeta.labelEn}
-                          </option>
-                        );
-                      })}
-                  </select>
-                  <ChevronDown size={11} className={`absolute ${isRtl ? 'left-1.5' : 'right-1.5'} pointer-events-none opacity-60`} />
-                </div>
-              </div>
-              <p className="text-[10px] text-[#A379E2] font-semibold mt-0.5 truncate font-mono">
+              <h2 className="text-xs font-black text-[#1D035F] tracking-wide font-sans truncate">
+                {isRtl ? 'تفاصيل الموعد' : 'APPOINTMENT DETAILS'}
+              </h2>
+              <p className="text-[11px] text-[#A379E2] font-semibold mt-0.5 truncate font-mono">
                 {isRtl ? `مرجع: ${appointment.id.slice(0, 8).toUpperCase()}` : `REF: ${appointment.id.slice(0, 8).toUpperCase()}`}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Prominent Interactive Header Status Dropdown */}
+            <div className="relative inline-flex items-center">
+              <select
+                value={normalizedStatus}
+                disabled={readOnly || isStatusTransitioning || normalizedStatus === 'completed'}
+                onChange={async (e) => {
+                  const next = e.target.value;
+                  if (next !== normalizedStatus) {
+                    await handleTransitionStatus(next);
+                  }
+                }}
+                aria-label={isRtl ? 'حالة الموعد' : 'Appointment Status'}
+                className={`appearance-none h-[38px] sm:h-[40px] min-w-[130px] sm:min-w-[140px] text-[13.5px] sm:text-[14px] font-bold rounded-xl border shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-[#6537C0] focus:ring-offset-1 focus:border-[#6537C0] ${isRtl ? 'ps-3.5 pe-8 text-right' : 'ps-3.5 pe-8 text-left'} ${statusMeta.cls} ${isStatusTransitioning ? 'opacity-60 cursor-wait' : ''} ${normalizedStatus === 'completed' ? 'cursor-default opacity-90' : 'cursor-pointer hover:border-[#6537C0]/40'}`}
+              >
+                <option value={normalizedStatus} className="bg-white text-slate-800 font-medium">
+                  {isRtl ? statusMeta.labelAr : statusMeta.labelEn}
+                </option>
+                {(VALID_STATUS_TRANSITIONS[normalizedStatus] || [])
+                  .filter((targetStatus) => targetStatus !== normalizedStatus)
+                  .map((targetStatus) => {
+                    const targetMeta = STATUS_META[targetStatus] || { labelEn: targetStatus, labelAr: targetStatus };
+                    return (
+                      <option key={targetStatus} value={targetStatus} className="bg-white text-slate-800 font-medium">
+                        {isRtl ? targetMeta.labelAr : targetMeta.labelEn}
+                      </option>
+                    );
+                  })}
+              </select>
+              <ChevronDown 
+                size={15} 
+                className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'left-2.5' : 'right-2.5'} pointer-events-none opacity-70 transition-opacity`} 
+              />
+            </div>
+
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-xl bg-[#F3EDFC] text-[#1D035F] hover:bg-[#E7DDFC] transition-colors cursor-pointer"
+              className="h-[38px] w-[38px] sm:h-[40px] sm:w-[40px] flex items-center justify-center rounded-xl bg-[#F3EDFC] text-[#1D035F] hover:bg-[#E7DDFC] transition-colors cursor-pointer shrink-0"
               title={isRtl ? 'إغلاق' : 'Close'}
             >
-              <X size={16} />
+              <X size={17} />
             </button>
           </div>
         </header>
