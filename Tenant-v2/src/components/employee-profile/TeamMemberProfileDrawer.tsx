@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Loader2, User } from 'lucide-react';
 import { tenantApiAdapter } from '../../lib/tenantApiAdapter';
@@ -13,6 +13,7 @@ import {
 } from '../../lib/employeeHelpers';
 
 interface TeamMemberProfileDrawerProps {
+  key?: React.Key;
   staffId: string;
   onClose: () => void;
   isRtl: boolean;
@@ -27,15 +28,23 @@ export default function TeamMemberProfileDrawer({ staffId, onClose, isRtl, onRef
   const [isSaving, setIsSaving] = useState(false);
   const [internalToast, setInternalToast] = useState<{ en: string; ar: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
 
+  const requestIdRef = useRef(0);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const onToastRef = useRef(onToast);
+  onToastRef.current = onToast;
+
   const notify = (en: string, ar: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
-    if (onToast) {
-      onToast(en, ar, type);
+    if (onToastRef.current) {
+      onToastRef.current(en, ar, type);
     }
     setInternalToast({ en, ar, type });
   };
 
   useEffect(() => {
     let mounted = true;
+    const currentRequestId = ++requestIdRef.current;
+
     const fetchEmployee = async () => {
       try {
         setIsLoading(true);
@@ -49,13 +58,15 @@ export default function TeamMemberProfileDrawer({ staffId, onClose, isRtl, onRef
             
         const found = employeesList.find((e: any) => e.id === staffId);
         
+        if (!mounted || currentRequestId !== requestIdRef.current) return;
+
         if (!found) {
           notify(
             'Employee not found',
             'لم يتم العثور على بيانات الموظف',
             'error'
           );
-          onClose();
+          onCloseRef.current();
           return;
         }
 
@@ -65,32 +76,35 @@ export default function TeamMemberProfileDrawer({ staffId, onClose, isRtl, onRef
           tenantApiAdapter.getEmployeePermissions(staffId).catch(() => null)
         ]);
 
-        if (!mounted) return;
+        if (!mounted || currentRequestId !== requestIdRef.current) return;
 
-        const mapped = mapApiEmployeeToTeamMember(found, scheduleRes.schedule);
+        const mapped = mapApiEmployeeToTeamMember(found, scheduleRes.schedule, scheduleRes.scheduleMeta);
         setEmployeeData(mapped);
 
         if (permRes?.permissions) {
           setPermissions((prev) => ({ ...prev, ...permRes.permissions }));
         }
       } catch (err) {
+        if (!mounted || currentRequestId !== requestIdRef.current) return;
         console.error(err);
         notify(
           'Failed to load employee details',
           'فشل تحميل بيانات الموظف',
           'error'
         );
-        onClose();
+        onCloseRef.current();
       } finally {
-        if (mounted) {
+        if (mounted && currentRequestId === requestIdRef.current) {
           setIsLoading(false);
         }
       }
     };
 
     fetchEmployee();
-    return () => { mounted = false; };
-  }, [staffId, isRtl, onClose]);
+    return () => {
+      mounted = false;
+    };
+  }, [staffId]);
 
   const handleSave = async (data: TeamMemberData, file?: File | null, appPermissions?: Record<StaffAppPermissionKey, boolean>) => {
     // 1. Validate employee identity requirements

@@ -1990,6 +1990,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
 
   // View Team Member Drawer State
   const [viewTeamMemberStaffId, setViewTeamMemberStaffId] = useState<string | null>(null);
+  const handleCloseTeamMemberDrawer = useCallback(() => {
+    setViewTeamMemberStaffId(null);
+  }, []);
 
   // Drag State Tracker for Vertical Resizing
   const [dragState, setDragState] = useState<{
@@ -8295,8 +8298,9 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       <AnimatePresence>
         {viewTeamMemberStaffId && (
           <TeamMemberProfileDrawer
+            key={viewTeamMemberStaffId}
             staffId={viewTeamMemberStaffId}
-            onClose={() => setViewTeamMemberStaffId(null)}
+            onClose={handleCloseTeamMemberDrawer}
             isRtl={isRtl}
             onRefreshBoard={() => {
                 // To force a refresh, we could trigger a re-fetch of master data.

@@ -111,12 +111,127 @@ export const normalizeShiftsToSchedule = (shifts: any[]): TeamMemberData['schedu
   });
 };
 
+export const normalizeWorkingHoursSchedule = (workingHours: any): TeamMemberData['schedule'] => {
+  if (!workingHours || typeof workingHours !== 'object') {
+    return [];
+  }
+
+  return WEEKDAY_ROWS.map((day) => {
+    const keyLower = day.dayEn.toLowerCase();
+    const keyUpper = day.dayEn;
+    const dayHours =
+      workingHours[keyLower] ??
+      workingHours[keyUpper] ??
+      workingHours[day.dayOfWeek] ??
+      workingHours[String(day.dayOfWeek)];
+
+    const isOpen = Boolean(dayHours?.isOpen);
+    const rawOpen = dayHours?.open ?? dayHours?.start ?? dayHours?.startTime ?? '';
+    const rawClose = dayHours?.close ?? dayHours?.end ?? dayHours?.endTime ?? '';
+    const open = formatScheduleTime(String(rawOpen));
+    const close = formatScheduleTime(String(rawClose));
+
+    const isWorking = isOpen && Boolean(open) && Boolean(close);
+    const hours = isWorking ? `${open} - ${close}` : 'Day Off';
+
+    return {
+      dayEn: day.dayEn,
+      dayAr: day.dayAr,
+      hours,
+      status: isWorking ? 'working' : 'off',
+      slots: [],
+      subShifts: []
+    };
+  });
+};
+
 export const buildScheduleFromWorkingData = (employee: any, shifts: any[]): TeamMemberData['schedule'] => {
   if (Array.isArray(shifts) && shifts.length > 0) {
     return normalizeShiftsToSchedule(shifts);
   }
 
+  if (employee?.workingHours && typeof employee.workingHours === 'object') {
+    return normalizeWorkingHoursSchedule(employee.workingHours);
+  }
+
   return [];
+};
+
+export interface ScheduleMeta {
+  scheduleStartDate?: string;
+  scheduleEndDate?: string;
+  scheduleContinues: boolean;
+}
+
+export const extractScheduleMetaFromShifts = (shifts: any[]): ScheduleMeta => {
+  if (!Array.isArray(shifts) || shifts.length === 0) {
+    return {
+      scheduleStartDate: undefined,
+      scheduleEndDate: '',
+      scheduleContinues: true
+    };
+  }
+
+  const normalizeDateStr = (val: any): string | null => {
+    if (!val) return null;
+    if (typeof val === 'string') {
+      const trimmed = val.trim().split('T')[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    }
+    if (val instanceof Date && !Number.isNaN(val.getTime())) {
+      return val.toISOString().split('T')[0];
+    }
+    return null;
+  };
+
+  const getMode = (arr: string[]): string | undefined => {
+    if (arr.length === 0) return undefined;
+    const counts = new Map<string, number>();
+    let maxCount = 0;
+    let modeVal = arr[0];
+    for (const item of arr) {
+      const c = (counts.get(item) || 0) + 1;
+      counts.set(item, c);
+      if (c > maxCount) {
+        maxCount = c;
+        modeVal = item;
+      }
+    }
+    return modeVal;
+  };
+
+  // Authoritative pool: prioritize active recurring shifts (dayOfWeek != null, no specificDate)
+  const activeRecurring = shifts.filter(
+    (s) => s && s.isActive !== false && s.isRecurring !== false && !s.specificDate && s.dayOfWeek !== null && s.dayOfWeek !== undefined
+  );
+
+  const targetPool = activeRecurring.length > 0
+    ? activeRecurring
+    : shifts.filter((s) => s && s.isActive !== false);
+
+  if (targetPool.length === 0) {
+    return {
+      scheduleStartDate: undefined,
+      scheduleEndDate: '',
+      scheduleContinues: true
+    };
+  }
+
+  const startDates = targetPool.map((s) => normalizeDateStr(s.startDate)).filter(Boolean) as string[];
+  const authoritativeStartDate = getMode(startDates);
+
+  const endDates = targetPool.map((s) => normalizeDateStr(s.endDate)).filter(Boolean) as string[];
+
+  // If recurring shifts have no non-null endDate, or less than half have an endDate, it's continuous
+  const hasAuthoritativeEnd = endDates.length > 0 && endDates.length >= targetPool.length / 2;
+  const authoritativeEndDate = hasAuthoritativeEnd ? getMode(endDates) : '';
+  const scheduleContinues = !hasAuthoritativeEnd;
+
+  return {
+    scheduleStartDate: authoritativeStartDate,
+    scheduleEndDate: authoritativeEndDate,
+    scheduleContinues
+  };
 };
 
 export const cloneScheduleDays = (schedule: TeamMemberData['schedule']) => {
@@ -136,20 +251,32 @@ export const fetchEmployeeSchedule = async (employeeId: string, employeeFallback
         ? response.data.shifts
         : [];
 
+    const scheduleMeta = extractScheduleMetaFromShifts(shifts);
+
     return {
       schedule: buildScheduleFromWorkingData(employeeFallback || null, shifts),
+      scheduleMeta,
       error: null
     };
   } catch (err) {
     console.warn('Failed to load employee shifts:', err);
     return {
       schedule: buildScheduleFromWorkingData(employeeFallback || null, []),
+      scheduleMeta: {
+        scheduleStartDate: undefined,
+        scheduleEndDate: '',
+        scheduleContinues: true
+      },
       error: err instanceof Error ? err.message : 'Failed to fetch employee shifts'
     };
   }
 };
 
-export const mapApiEmployeeToTeamMember = (emp: any, schedule: TeamMemberData['schedule'] = []): TeamMemberData => {
+export const mapApiEmployeeToTeamMember = (
+  emp: any,
+  schedule: TeamMemberData['schedule'] = [],
+  scheduleMeta?: ScheduleMeta
+): TeamMemberData => {
   const role = getRoleLabel(emp.position);
   return {
     id: emp.id,
@@ -181,6 +308,9 @@ export const mapApiEmployeeToTeamMember = (emp: any, schedule: TeamMemberData['s
     productCommissionEnabled: Boolean(emp.productCommissionEnabled),
     scheduleVisibilityWeeks: parseInt(emp.scheduleVisibilityWeeks || 2),
     schedule: schedule.length > 0 ? schedule : buildScheduleFromWorkingData(emp, []),
+    scheduleStartDate: scheduleMeta?.scheduleStartDate ?? emp.scheduleStartDate ?? emp.createdAt?.split('T')[0] ?? new Date().toISOString().split('T')[0],
+    scheduleEndDate: scheduleMeta?.scheduleEndDate ?? emp.scheduleEndDate ?? '',
+    scheduleContinues: scheduleMeta !== undefined ? scheduleMeta.scheduleContinues : (emp.scheduleContinues !== undefined ? Boolean(emp.scheduleContinues) : true),
     bookingsCount: parseInt(emp.totalBookings || 0),
     utilizationRate: 100,
     retentionRate: 100,
