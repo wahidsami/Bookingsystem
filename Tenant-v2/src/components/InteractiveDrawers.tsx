@@ -2659,6 +2659,7 @@ export default function InteractiveDrawers({
         ...current,
         [service.id]: false
       }));
+    } else {
       const resolvedVariant = variantOverride || null;
       const nextStartTime = activeParticipantNextStartTime;
       const nextStartTimeIso = buildIsoFromMinutes(selectedDate, nextStartTime);
