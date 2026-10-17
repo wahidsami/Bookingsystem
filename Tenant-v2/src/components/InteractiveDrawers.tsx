@@ -1217,6 +1217,21 @@ export default function InteractiveDrawers({
       : (p?.name || `${isRtl ? 'مشارك' : 'Participant'} ${idx + 1}`);
   }, [groupParticipants, activeParticipantId, isRtl]);
 
+  const activeParticipantCleanName = useMemo(() => {
+    const p = groupParticipants.find(part => part.id === activeParticipantId) || groupParticipants[0];
+    const idx = groupParticipants.findIndex(part => part.id === activeParticipantId);
+    return p?.name?.trim() || (idx === 0 ? (isRtl ? 'المنظم' : 'Organizer') : `${isRtl ? 'مشارك' : 'Participant'} ${idx + 1}`);
+  }, [groupParticipants, activeParticipantId, isRtl]);
+
+  const activeParticipantIndex = useMemo(() => {
+    const idx = groupParticipants.findIndex(part => part.id === activeParticipantId);
+    return idx >= 0 ? idx : 0;
+  }, [groupParticipants, activeParticipantId]);
+
+  const isActiveParticipantOrganizer = useMemo(() => {
+    return activeParticipantIndex === 0;
+  }, [activeParticipantIndex]);
+
   const activeParticipantItemsCount = useMemo(() => {
     if (bookingScope !== 'group') return stagedServices.length;
     return stagedServices.filter(s => (s.participantId || groupParticipants[0]?.id) === activeParticipantId).length;
@@ -4076,158 +4091,20 @@ export default function InteractiveDrawers({
                           </button>
                         </div>
 
-                        {/* Group Booking Configuration & Payment Arrangement */}
-                        {bookingScope === 'group' && (
-                          <div className="rounded-[20px] border border-purple-200 bg-purple-50/40 p-4 shadow-2xs space-y-3">
-                            <div className="flex items-center justify-between border-b border-purple-100 pb-2.5">
-                              <div className="flex items-center gap-2">
-                                <Users className="w-4 h-4 text-[#6537C0]" />
-                                <span className="text-xs font-bold text-slate-900">
-                                  {isRtl ? 'إعدادات الحجز الجماعي' : 'Group Booking Settings'}
-                                </span>
-                              </div>
-                              <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full font-mono">
-                                {groupParticipants.length} {isRtl ? 'مشاركين' : 'Participants'}
-                              </span>
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-600 mb-1">
-                                {isRtl ? 'اسم المجموعة / المناسبة' : 'Group / Occasion Name'}
-                              </label>
-                              <input
-                                type="text"
-                                value={groupName}
-                                onChange={(e) => setGroupName(e.target.value)}
-                                placeholder={isRtl ? 'مثال: حفل زفاف سارة، عائلة الخالد...' : 'e.g. Bridal Party, Family...'}
-                                className="w-full rounded-xl border border-purple-200 bg-white p-2.5 text-xs font-medium text-slate-900 outline-none focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]"
-                              />
-                            </div>
-
-                            <div className="bg-[#FAF7FD] border border-[#E7DDFC] rounded-xl p-2.5 flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-base">👥</span>
-                                <div>
-                                  <span className="block text-xs font-bold text-[#1D035F]">
-                                    {isRtl ? 'نظام الحساب الجماعي الموحد' : 'Unified Group Payment Workflow'}
-                                  </span>
-                                  <p className="text-[10px] text-slate-500 font-normal">
-                                    {isRtl ? 'فاتورة موحدة وتحصيل دفع شامل لكافة المشاركين' : 'Single consolidated invoice & checkout for all participants'}
-                                  </p>
-                                </div>
-                              </div>
-                              <span className="text-[10px] font-bold text-[#6537C0] bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200 shrink-0">
-                                {isRtl ? 'حساب موحد' : 'Unified'}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Group Participant Management & Tab Switcher */}
-                        {bookingScope === 'group' && (
-                          <div className="rounded-[20px] border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                {isRtl ? 'المشاركون في الحجز' : 'Participants'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={handleAddGroupParticipant}
-                                className="inline-flex items-center gap-1 text-xs font-bold text-[#6537C0] hover:text-[#532ab0] px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 transition cursor-pointer"
-                              >
-                                <PlusCircle className="w-3.5 h-3.5" />
-                                <span>{isRtl ? 'إضافة مشارك' : 'Add Participant'}</span>
-                              </button>
-                            </div>
-
-                            {/* Participant selection tabs */}
-                            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                              {groupParticipants.map((participant, pIdx) => {
-                                const isActive = activeParticipantId === participant.id;
-                                const pServices = stagedServices.filter(s => (s.participantId || groupParticipants[0].id) === participant.id);
-                                const displayName = pIdx === 0
-                                  ? (participant.name || (isRtl ? 'المنظم' : 'Organizer'))
-                                  : (participant.name || `${isRtl ? 'مشارك' : 'Participant'} ${pIdx + 1}`);
-
-                                return (
-                                  <div
-                                    key={participant.id}
-                                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition shrink-0 cursor-pointer ${
-                                      isActive
-                                        ? 'border-[#6537C0] bg-purple-50 text-[#6537C0] shadow-2xs'
-                                        : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:bg-slate-100'
-                                    }`}
-                                    onClick={() => setActiveParticipantId(participant.id)}
-                                  >
-                                    <span>{pIdx === 0 ? '👑 ' : ''}{displayName}</span>
-                                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                                      isActive ? 'bg-[#6537C0] text-white' : 'bg-slate-200 text-slate-700'
-                                    }`}>
-                                      {pServices.length}
-                                    </span>
-                                    {pIdx > 0 && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleRemoveGroupParticipant(participant.id);
-                                        }}
-                                        className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer ms-1"
-                                        title={isRtl ? 'حذف المشارك' : 'Remove participant'}
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </button>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            {/* Non-organizer quick profile editor */}
-                            {activeParticipantId !== groupParticipants[0].id && (() => {
-                              const activePart = groupParticipants.find(p => p.id === activeParticipantId);
-                              if (!activePart) return null;
-                              return (
-                                <div className="pt-2 border-t border-slate-100 space-y-2 text-xs">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    <div>
-                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                                        {isRtl ? 'اسم المشارك' : 'Participant Name'}
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={activePart.name}
-                                        onChange={(e) => handleUpdateGroupParticipant(activePart.id, { name: e.target.value })}
-                                        placeholder={isRtl ? 'اسم الضيف...' : 'Guest Name...'}
-                                        className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 outline-none focus:border-[#6537C0]"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                                        {isRtl ? 'رقم الجوال (اختياري)' : 'Phone (Optional)'}
-                                      </label>
-                                      <input
-                                        type="tel"
-                                        value={activePart.phone || ''}
-                                        onChange={(e) => handleUpdateGroupParticipant(activePart.id, { phone: e.target.value })}
-                                        placeholder="05XXXXXXXX"
-                                        className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs font-mono text-slate-900 outline-none focus:border-[#6537C0]"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        )}
-
-                        {/* 1. Customer Identification Card */}
+                        {/* Step A: Customer Identification Card (Single Client or Group Organizer) */}
                         <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
                           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                              {isRtl ? (bookingScope === 'group' ? '👑 بيانات منظم الحجز (المشارك 1)' : 'بيانات العميل') : (bookingScope === 'group' ? '👑 Booking Organizer Profile (Participant 1)' : 'Client Profile')}
-                            </span>
-                            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+                            <div>
+                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                {isRtl ? (bookingScope === 'group' ? '👑 بيانات منظم الحجز (المشارك 1)' : 'بيانات العميل') : (bookingScope === 'group' ? '👑 Booking Organizer Profile (Participant 1)' : 'Client Profile')}
+                              </span>
+                              {bookingScope === 'group' && (
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  {isRtl ? 'المنظم هو العميل الأساسي الذي يقود المجموعة وتصدر الفاتورة باسمه' : 'Primary customer leading the group and billed for the session'}
+                                </p>
+                              )}
+                            </div>
+                            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5 shrink-0">
                               {([
                                 { key: 'existing', icon: User, labelEn: 'Registered', labelAr: 'مسجل' },
                                 { key: 'walkin', icon: Users, labelEn: 'Walk-in', labelAr: 'زائر' }
@@ -4260,13 +4137,23 @@ export default function InteractiveDrawers({
                                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-3 min-w-0">
                                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-emerald-200 text-sm font-black text-emerald-700 shadow-2xs">
-                                        {`${selectedRegisteredCustomer.name || 'U'}`.trim().charAt(0).toUpperCase()}
+                                        {bookingScope === 'group' ? '👑' : `${selectedRegisteredCustomer.name || 'U'}`.trim().charAt(0).toUpperCase()}
                                       </div>
                                       <div className="min-w-0">
-                                        <p className="truncate text-sm font-bold text-slate-900">
-                                          {selectedRegisteredCustomer.name}
-                                        </p>
-                                        <p className="truncate text-xs font-mono text-slate-600">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <p className="truncate text-sm font-bold text-slate-900">
+                                            {selectedRegisteredCustomer.name}
+                                          </p>
+                                          {bookingScope === 'group' && (
+                                            <span className="text-[10px] font-bold text-purple-700 bg-purple-100 border border-purple-200 px-1.5 py-0.2 rounded-md">
+                                              {isRtl ? '👑 منظم الحجز' : '👑 Organizer'}
+                                            </span>
+                                          )}
+                                          <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-md">
+                                            {isRtl ? 'عميل مسجل' : 'Registered'}
+                                          </span>
+                                        </div>
+                                        <p className="truncate text-xs font-mono text-slate-600 mt-0.5">
                                           {selectedRegisteredCustomer.phone || selectedRegisteredCustomer.email || (isRtl ? 'عميل مسجل' : 'Registered customer')}
                                         </p>
                                       </div>
@@ -4296,7 +4183,7 @@ export default function InteractiveDrawers({
                                       type="text"
                                       value={customerSearch}
                                       onChange={(e) => setCustomerSearch(e.target.value)}
-                                      placeholder={isRtl ? 'ابحث باسم العميل أو رقم الجوال...' : 'Search by name or phone...'}
+                                      placeholder={isRtl ? (bookingScope === 'group' ? 'ابحث عن منظم الحجز بالاسم أو رقم الجوال...' : 'ابحث باسم العميل أو رقم الجوال...') : (bookingScope === 'group' ? 'Search organizer by name or phone...' : 'Search by name or phone...')}
                                       className={`w-full rounded-xl border border-slate-200 bg-white py-2 text-xs font-medium text-slate-900 outline-none transition focus:border-[#6537C0] focus:ring-2 focus:ring-[#6537C0]/15 ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
                                     />
                                   </div>
@@ -4327,7 +4214,7 @@ export default function InteractiveDrawers({
                                   {identityValidationError && !selectedCustId && (
                                     <p className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
                                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                      <span>{isRtl ? 'يرجى اختيار عميل من القائمة أو التبديل إلى زائر.' : 'Please select a customer or switch to Walk-in.'}</span>
+                                      <span>{isRtl ? (bookingScope === 'group' ? 'يرجى اختيار منظم الحجز للمتابعة أو التبديل إلى زائر.' : 'يرجى اختيار عميل من القائمة أو التبديل إلى زائر.') : (bookingScope === 'group' ? 'Please select a booking organizer or switch to Walk-in.' : 'Please select a customer or switch to Walk-in.')}</span>
                                     </p>
                                   )}
                                 </div>
@@ -4340,10 +4227,10 @@ export default function InteractiveDrawers({
                                 <div className="min-w-0">
                                   <p className="text-xs font-bold text-violet-900 flex items-center gap-1">
                                     <span>⚡</span>
-                                    <span>{isRtl ? 'تسجيل زائر سريع' : 'Fast Walk-In Active'}</span>
+                                    <span>{isRtl ? (bookingScope === 'group' ? 'منظم حجز زائر سريع' : 'تسجيل زائر سريع') : (bookingScope === 'group' ? 'Walk-in Organizer Active' : 'Fast Walk-In Active')}</span>
                                   </p>
                                   <p className="text-[11px] text-violet-700/80">
-                                    {isRtl ? 'الاسم والجوال اختياريان؛ سيتم استخدام عميل افتراضي.' : 'Name & phone optional; default profile created.'}
+                                    {isRtl ? 'الاسم والجوال اختياريان؛ سيتم استخدام ملف افتراضي للمنظم.' : 'Name & phone optional; default profile created.'}
                                   </p>
                                 </div>
                               </div>
@@ -4358,7 +4245,7 @@ export default function InteractiveDrawers({
                                     type="text"
                                     value={walkinFullName}
                                     onChange={(e) => setWalkinFullName(e.target.value)}
-                                    placeholder={isRtl ? 'عميل زائر' : 'Walk-in Customer'}
+                                    placeholder={isRtl ? (bookingScope === 'group' ? 'منظم الحجز' : 'عميل زائر') : (bookingScope === 'group' ? 'Group Organizer' : 'Walk-in Customer')}
                                     className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-[#6537C0] ${isRtl ? 'text-right' : 'text-left'}`}
                                   />
                                 </div>
@@ -4389,7 +4276,181 @@ export default function InteractiveDrawers({
                               </label>
                             </div>
                           )}
+
+                          {/* Secondary Group Occasion Name Setting */}
+                          {bookingScope === 'group' && (
+                            <div className="pt-2.5 border-t border-slate-100 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <label className="block text-[10px] font-bold text-slate-600">
+                                  {isRtl ? 'اسم المجموعة / المناسبة (اختياري)' : 'Group / Occasion Name (Optional)'}
+                                </label>
+                                <span className="text-[10px] font-bold text-[#6537C0] bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+                                  {isRtl ? 'حساب جماعي موحد' : 'Unified Billing'}
+                                </span>
+                              </div>
+                              <input
+                                type="text"
+                                value={groupName}
+                                onChange={(e) => setGroupName(e.target.value)}
+                                placeholder={isRtl ? 'مثال: حفل زفاف سارة، عائلة الخالد...' : 'e.g. Bridal Party, Family...'}
+                                className="w-full rounded-xl border border-purple-200 bg-white p-2.5 text-xs font-medium text-slate-900 outline-none focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]"
+                              />
+                            </div>
+                          )}
                         </div>
+
+                        {/* Step B: Group Participant Management List */}
+                        {bookingScope === 'group' && (
+                          <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <Users className="w-4 h-4 text-[#6537C0]" />
+                                  <span className="text-xs font-black text-slate-900">
+                                    {isRtl ? 'قائمة المشاركين في الحجز' : 'Group Participants List'}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-0.5">
+                                  {isRtl
+                                    ? `إجمالي ${groupParticipants.length} مشاركين — اضغط على مشارك لإضافة خدماته`
+                                    : `Total ${groupParticipants.length} participants — click a participant to assign services`}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleAddGroupParticipant}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-[#6537C0] hover:bg-[#532ab0] px-3 py-1.5 rounded-xl transition shadow-xs cursor-pointer shrink-0"
+                              >
+                                <PlusCircle className="w-3.5 h-3.5" />
+                                <span>{isRtl ? '+ إضافة مشارك' : '+ Add Participant'}</span>
+                              </button>
+                            </div>
+
+                            {/* Participant Rows */}
+                            <div className="space-y-2">
+                              {groupParticipants.map((participant, pIdx) => {
+                                const isActive = activeParticipantId === participant.id;
+                                const isOrganizer = pIdx === 0;
+                                const pServices = stagedServices.filter(s => (s.participantId || groupParticipants[0].id) === participant.id);
+                                const pBreakdown = groupFinancialSummary?.participantBreakdowns?.find(pb => pb.participantId === participant.id);
+                                const displayName = isOrganizer
+                                  ? (participant.name || (isRtl ? 'منظم الحجز' : 'Organizer'))
+                                  : (participant.name || `${isRtl ? 'مشارك' : 'Participant'} ${pIdx + 1}`);
+
+                                return (
+                                  <div
+                                    key={participant.id}
+                                    className={`rounded-2xl transition border overflow-hidden ${
+                                      isActive
+                                        ? 'border-2 border-[#6537C0] bg-[#FAF7FD] shadow-xs ring-2 ring-[#6537C0]/10'
+                                        : 'border-slate-200 bg-white hover:border-purple-200 hover:bg-slate-50/70'
+                                    }`}
+                                  >
+                                    <div
+                                      onClick={() => setActiveParticipantId(participant.id)}
+                                      className="p-3 flex items-center justify-between gap-3 cursor-pointer"
+                                    >
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                                          isOrganizer
+                                            ? 'bg-gradient-to-br from-[#1D035F] to-[#6537C0] text-white shadow-2xs'
+                                            : isActive
+                                              ? 'bg-[#6537C0] text-white'
+                                              : 'bg-purple-100 text-[#6537C0]'
+                                        }`}>
+                                          {isOrganizer ? '👑' : pIdx + 1}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className={`text-xs font-bold truncate ${isActive ? 'text-[#1D035F]' : 'text-slate-900'}`}>
+                                              {displayName}
+                                            </span>
+                                            <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-bold shrink-0 ${
+                                              isOrganizer
+                                                ? 'bg-purple-100 text-[#6537C0] border border-purple-200'
+                                                : 'bg-slate-100 text-slate-600'
+                                            }`}>
+                                              {isOrganizer ? (isRtl ? '👑 المنظم' : '👑 Organizer') : (isRtl ? 'مشارك' : 'Participant')}
+                                            </span>
+                                            {isActive && (
+                                              <span className="text-[10px] font-bold text-[#6537C0] bg-purple-50 px-1.5 py-0.2 rounded-md">
+                                                {isRtl ? '● محدد حالياً' : '● Active'}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+                                            <span>
+                                              {pServices.length} {pServices.length === 1 ? (isRtl ? 'خدمة' : 'service') : (isRtl ? 'خدمات' : 'services')}
+                                            </span>
+                                            {pBreakdown && (
+                                              <>
+                                                <span>•</span>
+                                                <span className="font-mono font-bold text-slate-700">
+                                                  {(pBreakdown.total || 0).toFixed(2)} SAR
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        {!isOrganizer && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleRemoveGroupParticipant(participant.id);
+                                            }}
+                                            className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                                            title={isRtl ? 'حذف المشارك' : 'Remove participant'}
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
+                                        <span className={`text-xs ${isActive ? 'text-[#6537C0] font-black' : 'text-slate-300'}`}>
+                                          {isRtl ? '←' : '→'}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Quick inline editor for active non-organizer participant */}
+                                    {isActive && !isOrganizer && (
+                                      <div className="px-3 pb-3 pt-1 border-t border-purple-100 bg-white/70 space-y-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                          <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                                              {isRtl ? 'اسم المشارك' : 'Participant Name'}
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={participant.name}
+                                              onChange={(e) => handleUpdateGroupParticipant(participant.id, { name: e.target.value })}
+                                              placeholder={isRtl ? `مشارك ${pIdx + 1}...` : `Participant ${pIdx + 1}...`}
+                                              className="w-full rounded-lg border border-purple-200 bg-white p-2 text-xs font-semibold text-slate-900 outline-none focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                                              {isRtl ? 'رقم الجوال (اختياري)' : 'Phone (Optional)'}
+                                            </label>
+                                            <input
+                                              type="tel"
+                                              value={participant.phone || ''}
+                                              onChange={(e) => handleUpdateGroupParticipant(participant.id, { phone: e.target.value })}
+                                              placeholder="05XXXXXXXX"
+                                              className="w-full rounded-lg border border-purple-200 bg-white p-2 text-xs font-mono text-slate-900 outline-none focus:border-[#6537C0] focus:ring-1 focus:ring-[#6537C0]"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
 
                         {/* 2. Queued / Staged Services Section */}
                         <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
@@ -4397,7 +4458,7 @@ export default function InteractiveDrawers({
                             <div className="flex items-center gap-2">
                               <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
                                 {bookingScope === 'group'
-                                  ? (isRtl ? `الخدمات المحددة لـ: ${activeParticipantName}` : `Queued Services: ${activeParticipantName}`)
+                                  ? (isRtl ? `الخدمات المحددة لـ: ${activeParticipantCleanName}` : `Queued Services: ${activeParticipantCleanName}`)
                                   : (isRtl ? 'الخدمات المحددة في الجلسة' : 'Queued Services')}
                               </h4>
                               <span className="rounded-full bg-[#6537C0]/10 px-2 py-0.5 text-[10px] font-black text-[#6537C0]">
@@ -4494,7 +4555,7 @@ export default function InteractiveDrawers({
                               </div>
                               <p className="text-xs font-bold text-slate-700">
                                 {bookingScope === 'group'
-                                  ? (isRtl ? `لم يتم اختيار أي خدمات لـ ${activeParticipantName} بعد` : `No services queued for ${activeParticipantName} yet`)
+                                  ? (isRtl ? `لم يتم اختيار أي خدمات لـ ${activeParticipantCleanName} بعد` : `No services queued for ${activeParticipantCleanName} yet`)
                                   : (isRtl ? 'لم يتم اختيار أي خدمات بعد' : 'No services queued yet')}
                               </p>
                               <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
@@ -4866,9 +4927,12 @@ export default function InteractiveDrawers({
                               </span>
                             </div>
                             <div className="space-y-1 pt-1 border-t border-purple-200/60 max-h-28 overflow-y-auto pr-1">
-                              {(groupFinancialSummary.participantBreakdowns || groupFinancialSummary.participants || []).map((p) => (
+                              {(groupFinancialSummary.participantBreakdowns || groupFinancialSummary.participants || []).map((p, idx) => (
                                 <div key={p.participantId} className="flex items-center justify-between text-[11px] text-slate-700">
                                   <div className="flex items-center gap-1.5 truncate">
+                                    <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-1 py-0.2 rounded shrink-0">
+                                      {idx === 0 ? '👑' : idx + 1}
+                                    </span>
                                     <span className="font-semibold truncate">{p.participantName || p.name}</span>
                                     <span className="text-[10px] text-slate-400 shrink-0">
                                       ({p.itemsCount ?? p.serviceCount ?? 0} {isRtl ? 'خدمات' : 'items'})
@@ -4953,6 +5017,36 @@ export default function InteractiveDrawers({
                     <div className={`flex-1 min-w-0 flex flex-col h-full bg-white overflow-hidden ${
                       mobileDrawerTab !== 'catalogue' ? 'hidden lg:flex' : 'flex'
                     }`}>
+                      {/* Step C: Active Participant Catalogue Connection Banner */}
+                      {bookingScope === 'group' && (
+                        <div className="p-3.5 mx-4 mt-4 rounded-2xl bg-gradient-to-r from-[#1D035F] to-[#6537C0] text-white shadow-sm flex items-center justify-between gap-3 shrink-0">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold text-sm shrink-0">
+                              {isActiveParticipantOrganizer ? '👑' : activeParticipantIndex + 1}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-black truncate">
+                                  {isRtl ? `إضافة خدمات إلى: ${activeParticipantCleanName}` : `Add services for: ${activeParticipantCleanName}`}
+                                </span>
+                                <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0">
+                                  {isActiveParticipantOrganizer ? (isRtl ? 'المنظم' : 'Organizer') : `${isRtl ? 'مشارك' : 'Participant'} ${activeParticipantIndex + 1}`}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-purple-200 truncate mt-0.5">
+                                {isRtl
+                                  ? `سيتم ربط أي خدمة تختارها أدناه بـ (${activeParticipantCleanName})`
+                                  : `Any service selected below will be assigned to (${activeParticipantCleanName})`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-1.5 bg-white/15 px-2.5 py-1 rounded-xl text-xs font-mono font-bold">
+                            <span>{activeParticipantItemsCount}</span>
+                            <span className="text-[10px] font-sans font-normal opacity-90">{isRtl ? 'خدمات' : 'services'}</span>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Search Bar & Category Filter Pills */}
                       <div className="p-4 border-b border-slate-200 bg-white space-y-3 shrink-0">
                         <div className="relative">
