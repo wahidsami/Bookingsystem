@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { differenceInCalendarDays } from 'date-fns';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useLanguage } from '../../src/context/LanguageContext';
 import { useTranslation } from 'react-i18next';
 import { canMarkNoShow, canRequestTimeOff, canStartService, canViewBookingNotes, canViewClients } from '../../src/utils/capabilities';
 import { Appointment, getAppointmentsForDate, updateAppointmentStatus } from '../../src/services/appointments';
@@ -37,6 +38,7 @@ import {
     getRiyadhWeekStartKey,
     parseRiyadhDateKey,
 } from '../../src/utils/riyadhDate';
+import { BARSPA_COLORS } from '../../constants/theme';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -46,11 +48,15 @@ const getAppointmentGroupKey = (appointment: Appointment) =>
 const getAppointmentPrice = (appointment: Appointment) =>
     Number(appointment.service?.finalPrice || appointment.service?.basePrice || appointment.price || 0);
 
-const getAppointmentServiceLabel = (appointment: Appointment) =>
-    appointment.service?.name_en || appointment.service?.name_ar || 'Service';
+const getAppointmentServiceLabel = (appointment: Appointment, language: string = 'en') =>
+    language === 'ar'
+        ? (appointment.service?.name_ar || appointment.service?.name_en || 'خدمة')
+        : (appointment.service?.name_en || appointment.service?.name_ar || 'Service');
 
-const getAppointmentCardLabel = (appointment: Appointment, groupCount: number) =>
-    groupCount > 1 ? `${groupCount} services` : getAppointmentServiceLabel(appointment);
+const getAppointmentCardLabel = (appointment: Appointment, groupCount: number, language: string = 'en') =>
+    groupCount > 1
+        ? (language === 'ar' ? `${groupCount} خدمات` : `${groupCount} services`)
+        : getAppointmentServiceLabel(appointment, language);
 
 const parseClockToMinutes = (value?: string | null): number | null => {
     if (!value) return null;
@@ -79,7 +85,7 @@ const minutesBetween = (startTime: string, endTime: string) => {
     return endMinutes - startMinutes;
 };
 
-const formatClock = (timeString: string) => {
+const formatClock = (timeString: string, language: string = 'en') => {
     const minutesTotal = parseClockToMinutes(timeString);
     if (minutesTotal === null) {
         return '--:--';
@@ -87,31 +93,33 @@ const formatClock = (timeString: string) => {
 
     const hour24 = Math.floor(minutesTotal / 60);
     const minute = minutesTotal % 60;
-    const ampm = hour24 >= 12 ? 'PM' : 'AM';
+    const isPM = hour24 >= 12;
+    const ampm = language === 'ar' ? (isPM ? 'م' : 'ص') : (isPM ? 'PM' : 'AM');
     const formattedH = hour24 % 12 || 12;
     return `${formattedH}:${minute.toString().padStart(2, '0')} ${ampm}`;
 };
 
 const formatDurationHours = (minutes: number) => `${(minutes / 60).toFixed(minutes % 60 === 0 ? 0 : 1)}h`;
 
-const getAppointmentStatusLabel = (status?: string) => {
+const getAppointmentStatusLabel = (status?: string, t?: any) => {
     const normalized = `${status || ''}`.trim().toLowerCase();
     switch (normalized) {
         case 'pending':
-            return 'Unconfirmed';
+            return t ? t('status.pending') : 'Pending';
         case 'confirmed':
-            return 'Confirmed';
+            return t ? t('status.confirmed') : 'Confirmed';
         case 'checked_in':
-            return 'Arrived';
+        case 'arrived':
+            return t ? (t('status.confirmed') || 'Arrived') : 'Arrived';
         case 'in_service':
         case 'started':
-            return 'In Service';
+            return t ? t('schedule.inService') : 'In Service';
         case 'completed':
-            return 'Completed';
+            return t ? t('status.completed') : 'Completed';
         case 'cancelled':
-            return 'Cancelled';
+            return t ? t('status.cancelled') : 'Cancelled';
         case 'no_show':
-            return 'No Show';
+            return t ? t('status.noShow') : 'No Show';
         default:
             return String(status || 'Pending').replace(/_/g, ' ');
     }
@@ -122,23 +130,23 @@ const getAppointmentStatusColors = (status?: string) => {
     switch (normalized) {
         case 'pending':
         case 'booked':
-            return { bg: '#fffbeb', text: '#d97706' };
+            return BARSPA_COLORS.status.pending;
         case 'confirmed':
-            return { bg: '#ecfdf5', text: '#059669' };
+            return BARSPA_COLORS.status.confirmed;
         case 'arrived':
         case 'checked_in':
-            return { bg: '#eff6ff', text: '#2563eb' };
+            return { bg: '#F6F3FE', text: '#6537C0', border: '#E7DDFC' };
         case 'in_service':
         case 'started':
-            return { bg: '#faf5ff', text: '#9333ea' };
+            return BARSPA_COLORS.status.inService;
         case 'completed':
-            return { bg: '#f4f4f5', text: '#52525b' };
+            return BARSPA_COLORS.status.completed;
         case 'cancelled':
-            return { bg: '#fff1f2', text: '#e11d48' };
+            return BARSPA_COLORS.status.cancelled;
         case 'no_show':
-            return { bg: '#fef2f2', text: '#dc2626' };
+            return BARSPA_COLORS.status.noShow;
         default:
-            return { bg: '#f3f4f6', text: '#6b7280' };
+            return { bg: '#F3F4F6', text: '#6B7280', border: '#E5E7EB' };
     }
 };
 
@@ -160,6 +168,7 @@ const getDateSpanDays = (startDate: string, endDate: string) => {
 export default function ScheduleScreen() {
     const { user } = useAuth();
     const { t } = useTranslation();
+    const { language, isRTL } = useLanguage();
     const { width: viewportWidth } = useWindowDimensions();
     const weekGridScrollRef = useRef<ScrollView | null>(null);
     const { alert: appointmentAlert, clearAlert, syncAppointments } = useAppointmentArrivalAlert();
@@ -543,7 +552,7 @@ export default function ScheduleScreen() {
         return 'off';
     };
 
-    const formatTime = (value: string) => formatRiyadhTime(value);
+    const formatTime = (value: string) => formatRiyadhTime(value, language);
 
     const getUrgencyInfo = (item: Appointment): { label: string; color: string; background: string; priority: number } => {
         if (item.status === 'started') {
@@ -698,7 +707,7 @@ export default function ScheduleScreen() {
 
                                                 {hasDayTimeOff ? (
                                                     <View style={styles.gridTimeOffOverlay}>
-                                                        <Text style={styles.gridTimeOffOverlayText}>Time Off</Text>
+                                                        <Text style={styles.gridTimeOffOverlayText}>{t('schedule.timeOff')}</Text>
                                                     </View>
                                                 ) : null}
 
@@ -717,9 +726,9 @@ export default function ScheduleScreen() {
                                                     const isStarted = appointment.status === 'started';
                                                     const isCompleted = appointment.status === 'completed' || appointment.status === 'no_show' || appointment.status === 'cancelled';
                                                     const customerInitial = appointment.user?.firstName?.charAt(0)?.toUpperCase() || appointment.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
-                                                    const serviceLabel = getAppointmentServiceLabel(appointment);
-                                                    const customerLabel = `${appointment.user?.firstName || ''} ${appointment.user?.lastName || ''}`.trim() || 'Client';
-                                                    const compactHeader = `${formatTime(appointment.startTime)} • ${isStarted ? 'In Service' : 'Upcoming'}`;
+                                                    const serviceLabel = getAppointmentServiceLabel(appointment, language);
+                                                    const customerLabel = `${appointment.user?.firstName || ''} ${appointment.user?.lastName || ''}`.trim() || t('common.client', 'Client');
+                                                    const compactHeader = `${formatTime(appointment.startTime)} • ${isStarted ? t('schedule.inService') : t('schedule.upcoming')}`;
                                                     const group = appointmentGroups.find((item) => item.items.some((entry) => entry.id === appointment.id));
                                                     const groupCount = group?.count || 1;
 
@@ -778,7 +787,7 @@ export default function ScheduleScreen() {
                                                                                 {customerLabel}
                                                                             </Text>
                                                                             <Text style={[styles.gridAppointmentMeta, compactGridCards && styles.gridAppointmentMetaCompact]} numberOfLines={1}>
-                                                                                {getAppointmentStatusLabel(appointment.status)}{appointment.paymentStatus ? ` • ${appointment.paymentStatus.replace(/_/g, ' ')}` : ''}
+                                                                                {getAppointmentStatusLabel(appointment.status, t)}{appointment.paymentStatus ? ` • ${appointment.paymentStatus.replace(/_/g, ' ')}` : ''}
                                                                             </Text>
                                                                         </View>
                                                                     </View>
@@ -786,7 +795,7 @@ export default function ScheduleScreen() {
                                                                     {!compactGridCards ? (
                                                                         <View style={styles.gridAppointmentFooter}>
                                                                             <Text style={[styles.gridAppointmentAction, compactGridCards && styles.gridAppointmentActionCompact, isStarted && { color: '#047857' }]} numberOfLines={1}>
-                                                                                {groupCount > 1 ? `${groupCount} services` : (isStarted ? 'In Service' : 'Upcoming')}
+                                                                                {groupCount > 1 ? t('schedule.servicesCount', { count: groupCount }) : (isStarted ? t('schedule.inService') : t('schedule.upcoming'))}
                                                                             </Text>
                                                                         </View>
                                                                     ) : null}
@@ -821,7 +830,7 @@ export default function ScheduleScreen() {
                                                             <View style={styles.gridBreakDot} />
                                                             <View style={{ flex: 1 }}>
                                                                 <Text style={styles.gridBreakLabel} numberOfLines={1}>
-                                                                    {breakItem.label || 'Blocked time'}
+                                                                    {breakItem.label || t('schedule.blockedTime')}
                                                                 </Text>
                                                                 <Text style={styles.gridBreakTime} numberOfLines={1}>
                                                                     {formatTime(breakItem.startTime)} - {formatTime(breakItem.endTime)}
@@ -838,7 +847,7 @@ export default function ScheduleScreen() {
                         </ScrollView>
                     {isGridLoading ? (
                         <View style={styles.gridLoadingOverlay}>
-                            <ActivityIndicator size="small" color="#8B5ADF" />
+                            <ActivityIndicator size="small" color="#6537C0" />
                             <Text style={styles.gridLoadingText}>Updating calendar...</Text>
                         </View>
                     ) : null}
@@ -858,7 +867,7 @@ export default function ScheduleScreen() {
         if (loading) {
             return (
                 <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color="#8B5ADF" />
+                    <ActivityIndicator size="large" color={BARSPA_COLORS.royalPurple} />
                 </View>
             );
         }
@@ -884,16 +893,16 @@ export default function ScheduleScreen() {
                         <View style={styles.shiftTopRow}>
                             <View>
                                 <Text style={styles.shiftTime}>
-                                    {formatClock(shift.startTime)} - {formatClock(shift.endTime)}
+                                    {formatClock(shift.startTime, language)} - {formatClock(shift.endTime, language)}
                                 </Text>
                                 <Text style={styles.shiftLabel}>
-                                    {shift.label || 'Regular Working Hours'}
+                                    {shift.label || t('schedule.regularHours')}
                                 </Text>
                             </View>
                             <View style={styles.shiftBadges}>
                                 <View style={[styles.badge, shift.type === 'specific' ? styles.badgeSpecific : styles.badgeRecurring]}>
                                     <Text style={[styles.badgeText, shift.type === 'specific' ? styles.badgeSpecificText : styles.badgeRecurringText]}>
-                                        {shift.type === 'specific' ? 'Override' : 'Recurring'}
+                                        {shift.type === 'specific' ? t('schedule.override') : t('schedule.recurring')}
                                     </Text>
                                 </View>
                                 <View style={styles.hoursBadge}>
@@ -906,14 +915,14 @@ export default function ScheduleScreen() {
 
                 {breaksForSelectedDate.length > 0 ? (
                     <View style={styles.breaksCard}>
-                        <Text style={styles.sectionTitle}>Breaks</Text>
+                        <Text style={styles.sectionTitle}>{t('schedule.breaks')}</Text>
                         {breaksForSelectedDate.map((item) => (
                             <View key={item.id} style={styles.breakRow}>
                                 <View style={styles.breakDot} />
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.breakLabel}>{item.label || 'Break'}</Text>
+                                    <Text style={styles.breakLabel}>{item.label || t('schedule.breakLabel')}</Text>
                                     <Text style={styles.breakTime}>
-                                        {formatClock(item.startTime)} - {formatClock(item.endTime)} ({formatDurationHours(minutesBetween(item.startTime, item.endTime))})
+                                        {formatClock(item.startTime, language)} - {formatClock(item.endTime, language)} ({formatDurationHours(minutesBetween(item.startTime, item.endTime))})
                                     </Text>
                                 </View>
                             </View>
@@ -923,7 +932,7 @@ export default function ScheduleScreen() {
 
                 {timeOffForSelectedDate.length > 0 ? (
                     <View style={styles.timeOffSection}>
-                        <Text style={styles.sectionTitle}>Time Off</Text>
+                        <Text style={styles.sectionTitle}>{t('schedule.timeOff')}</Text>
                         {timeOffForSelectedDate.map((item) => (
                             <View key={item.id} style={styles.timeOffCard}>
                                 <View style={styles.timeOffHeader}>
@@ -931,7 +940,7 @@ export default function ScheduleScreen() {
                                         <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
                                     </View>
                                     <Text style={[styles.timeOffStatusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
-                                        {item.isApproved ? 'APPROVED' : 'PENDING'}
+                                        {item.isApproved ? t('schedule.approved').toUpperCase() : t('schedule.pendingReview').toUpperCase()}
                                     </Text>
                                 </View>
                                 <Text style={styles.shiftLabel}>{item.startDate} to {item.endDate}</Text>
@@ -942,10 +951,10 @@ export default function ScheduleScreen() {
                 ) : null}
 
                 <View style={styles.appointmentsSection}>
-                    <Text style={styles.sectionTitle}>Appointments</Text>
+                    <Text style={styles.sectionTitle}>{t('schedule.appointments')}</Text>
                     {appointmentsLoading ? (
                         <View style={styles.infoCard}>
-                            <ActivityIndicator size="small" color="#8B5ADF" />
+                            <ActivityIndicator size="small" color="#6537C0" />
                             <Text style={styles.infoCardText}>Loading appointments for this day...</Text>
                         </View>
                     ) : appointmentGroups.length === 0 ? (
@@ -980,7 +989,7 @@ export default function ScheduleScreen() {
                                             </View>
                                             <View style={[styles.statusBadge, { backgroundColor: getAppointmentStatusColors(appointment.status).bg }]}>
                                                 <Text style={[styles.appointmentStatusText, { color: getAppointmentStatusColors(appointment.status).text }]}>
-                                                    {getAppointmentStatusLabel(appointment.status)}
+                                                    {getAppointmentStatusLabel(appointment.status, t)}
                                                 </Text>
                                             </View>
                                         </View>
@@ -1006,11 +1015,11 @@ export default function ScheduleScreen() {
                                         </View>
 
                                         <Text style={styles.appointmentServiceName} numberOfLines={1}>
-                                            {getAppointmentCardLabel(appointment, groupedCount)}
+                                            {getAppointmentCardLabel(appointment, groupedCount, language)}
                                         </Text>
                                         {groupedCount > 1 ? (
                                             <Text style={styles.appointmentServiceHint} numberOfLines={1}>
-                                                Tap for full service breakdown
+                                                {t('schedule.multiServiceHint')}
                                             </Text>
                                         ) : null}
 
@@ -1028,7 +1037,7 @@ export default function ScheduleScreen() {
                                             <View style={styles.appointmentMetaBadge}>
                                                 <Ionicons name={appointment.assignmentMode === 'customer_selected' ? 'person-circle-outline' : 'sparkles-outline'} size={13} color="#6b7280" />
                                                 <Text style={styles.appointmentMetaBadgeText}>
-                                                    {appointment.assignmentMode === 'customer_selected' ? 'Customer picked staff' : 'Auto-assigned'}
+                                                    {appointment.assignmentMode === 'customer_selected' ? t('schedule.customerPickedStaff') : t('schedule.autoAssigned')}
                                                 </Text>
                                             </View>
                                         </View>
@@ -1045,8 +1054,8 @@ export default function ScheduleScreen() {
                                                 style={styles.appointmentClientButton}
                                                 onPress={() => router.push((`/client/${appointment.user?.id}` as any))}
                                             >
-                                                <Ionicons name="person-circle-outline" size={16} color="#6d28d9" style={styles.appointmentClientButtonIcon} />
-                                                <Text style={styles.appointmentClientButtonText}>View Client</Text>
+                                                <Ionicons name="person-circle-outline" size={16} color="#6537C0" style={styles.appointmentClientButtonIcon} />
+                                                <Text style={styles.appointmentClientButtonText}>{t('schedule.viewClient')}</Text>
                                             </TouchableOpacity>
                                         ) : null}
                                     </View>
@@ -1062,7 +1071,7 @@ export default function ScheduleScreen() {
                                                     {updatingId === appointment.id
                                                         ? <ActivityIndicator size="small" color="#ffffff" style={styles.btnIcon} />
                                                         : <Ionicons name="play" size={16} color="#ffffff" style={styles.btnIcon} />}
-                                                    <Text style={styles.btnTextWhite}>Start</Text>
+                                                    <Text style={styles.btnTextWhite}>{t('schedule.start')}</Text>
                                                 </TouchableOpacity>
                                             ) : isStarted ? (
                                                 <TouchableOpacity
@@ -1073,7 +1082,7 @@ export default function ScheduleScreen() {
                                                     {updatingId === appointment.id
                                                         ? <ActivityIndicator size="small" color="#ffffff" style={styles.btnIcon} />
                                                         : <Ionicons name="checkmark-done" size={16} color="#ffffff" style={styles.btnIcon} />}
-                                                    <Text style={styles.btnTextWhite}>Complete</Text>
+                                                    <Text style={styles.btnTextWhite}>{t('schedule.complete')}</Text>
                                                 </TouchableOpacity>
                                             ) : null}
 
@@ -1083,7 +1092,7 @@ export default function ScheduleScreen() {
                                                     onPress={() => handleAppointmentStatusUpdate(appointment.id, 'no-show')}
                                                     disabled={!!updatingId}
                                                 >
-                                                    <Text style={styles.btnTextGray}>No Show</Text>
+                                                    <Text style={styles.btnTextGray}>{t('schedule.noShow')}</Text>
                                                 </TouchableOpacity>
                                             ) : null}
                                         </View>
@@ -1103,7 +1112,7 @@ export default function ScheduleScreen() {
             {items.length === 0 ? (
                 <View style={styles.infoCard}>
                     <Ionicons name="calendar-clear-outline" size={18} color="#6b7280" />
-                    <Text style={styles.infoCardText}>No items in this section.</Text>
+                    <Text style={styles.infoCardText}>{t('schedule.noItems')}</Text>
                 </View>
             ) : (
                 items.map((item) => (
@@ -1117,7 +1126,7 @@ export default function ScheduleScreen() {
                             </Text>
                         </View>
                         <Text style={styles.shiftLabel}>
-                            {item.startDate} to {item.endDate} • {getDateSpanDays(item.startDate, item.endDate) ?? '-'} day(s)
+                            {item.startDate} to {item.endDate} • {t('schedule.daySpan', { days: getDateSpanDays(item.startDate, item.endDate) ?? '-' })}
                         </Text>
                         {item.reason ? <Text style={styles.notesText}>{item.reason}</Text> : null}
                         {allowCancel ? (
@@ -1126,7 +1135,7 @@ export default function ScheduleScreen() {
                                 onPress={() => handleCancelTimeOff(item.id)}
                             >
                                 <Ionicons name="close-circle-outline" size={16} color="#ef4444" style={{ marginRight: 6 }} />
-                                <Text style={styles.cancelButtonText}>Cancel Request</Text>
+                                <Text style={styles.cancelButtonText}>{t('schedule.cancelRequest')}</Text>
                             </TouchableOpacity>
                         ) : null}
                     </View>
@@ -1155,7 +1164,7 @@ export default function ScheduleScreen() {
                 <Pressable style={styles.modalBackdrop} onPress={() => setActiveAppointment(null)}>
                     <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Appointment</Text>
+                            <Text style={styles.modalTitle}>{t('schedule.appointment')}</Text>
                             <TouchableOpacity onPress={() => setActiveAppointment(null)}>
                                 <Ionicons name="close" size={22} color="#6b7280" />
                             </TouchableOpacity>
@@ -1196,7 +1205,7 @@ export default function ScheduleScreen() {
                         </View>
 
                         <Text style={styles.appointmentServiceName}>
-                            {getAppointmentServiceLabel(appointment)}
+                            {getAppointmentServiceLabel(appointment, language)}
                         </Text>
 
                         {(() => {
@@ -1208,11 +1217,11 @@ export default function ScheduleScreen() {
                             return (
                                 <View style={styles.groupSummaryCard}>
                                     <Text style={styles.groupSummaryTitle}>
-                                        {group.count} services in this booking
+                                        {t('schedule.servicesCount', { count: group.count })}
                                     </Text>
                                     {group.items.map((item) => (
                                         <View key={item.id} style={styles.groupServiceRow}>
-                                            <Text style={styles.groupServiceRowTitle}>{getAppointmentServiceLabel(item)}</Text>
+                                            <Text style={styles.groupServiceRowTitle}>{getAppointmentServiceLabel(item, language)}</Text>
                                             <Text style={styles.groupServiceRowMeta}>
                                                 {formatTime(item.startTime)} - {formatTime(item.endTime)}
                                             </Text>
@@ -1237,14 +1246,14 @@ export default function ScheduleScreen() {
                                     router.push((`/client/${appointment.user?.id}` as any));
                                 }}
                             >
-                                <Ionicons name="person-circle-outline" size={16} color="#6d28d9" style={styles.appointmentClientButtonIcon} />
-                                <Text style={styles.appointmentClientButtonText}>Appointment Details</Text>
+                                <Ionicons name="person-circle-outline" size={16} color="#6537C0" style={styles.appointmentClientButtonIcon} />
+                                <Text style={styles.appointmentClientButtonText}>{t('schedule.appointmentDetails')}</Text>
                             </TouchableOpacity>
                         ) : null}
 
                         {appointment.bookingSessionId || appointment.bookingReference ? (
                             <View style={styles.bookingSessionInfoCard}>
-                                <Text style={styles.bookingSessionInfoLabel}>Booking session</Text>
+                                <Text style={styles.bookingSessionInfoLabel}>{t('schedule.bookingSession')}</Text>
                                 <Text style={styles.bookingSessionInfoValue}>
                                     {appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8)}
                                 </Text>
@@ -1306,12 +1315,12 @@ export default function ScheduleScreen() {
         <SafeAreaView style={styles.container} edges={['top']}>
             <ScrollView
                 contentContainerStyle={styles.content}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8B5ADF']} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BARSPA_COLORS.royalPurple]} />}
             >
                 {appointmentAlert && (
                     <TouchableOpacity style={styles.alertBanner} activeOpacity={0.9} onPress={clearAlert}>
                         <View style={styles.alertIconWrap}>
-                            <Ionicons name="notifications-outline" size={18} color="#7c3aed" />
+                            <Ionicons name="notifications-outline" size={18} color="#6537C0" />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.alertTitle}>{appointmentAlert.title}</Text>
@@ -1331,14 +1340,34 @@ export default function ScheduleScreen() {
 
                     <View style={styles.primaryDayController}>
                         <TouchableOpacity
-                            style={[styles.weekNavButton, dayScopeMode === 'week' ? (!canGoPrev && styles.weekNavButtonDisabled) : (!canGoPrevDay && styles.weekNavButtonDisabled)]}
-                            onPress={() => dayScopeMode === 'week' ? (canGoPrev && setWeekOffset((current) => current - 1)) : moveSelectedDay(-1)}
-                            disabled={dayScopeMode === 'week' ? !canGoPrev : !canGoPrevDay}
+                            style={[
+                                styles.weekNavButton,
+                                dayScopeMode === 'week'
+                                    ? (isRTL ? !canGoNext : !canGoPrev) && styles.weekNavButtonDisabled
+                                    : (isRTL ? !canGoNextDay : !canGoPrevDay) && styles.weekNavButtonDisabled
+                            ]}
+                            onPress={() => {
+                                const step = isRTL ? 1 : -1;
+                                if (dayScopeMode === 'week') {
+                                    if (isRTL) {
+                                        canGoNext && setWeekOffset((current) => current + 1);
+                                    } else {
+                                        canGoPrev && setWeekOffset((current) => current - 1);
+                                    }
+                                } else {
+                                    moveSelectedDay(step as -1 | 1);
+                                }
+                            }}
+                            disabled={dayScopeMode === 'week' ? (isRTL ? !canGoNext : !canGoPrev) : (isRTL ? !canGoNextDay : !canGoPrevDay)}
                         >
                             <Ionicons
-                                name="chevron-back"
+                                name={isRTL ? "chevron-forward" : "chevron-back"}
                                 size={18}
-                                color={dayScopeMode === 'week' ? (canGoPrev ? '#6d28d9' : '#9ca3af') : (canGoPrevDay ? '#6d28d9' : '#9ca3af')}
+                                color={
+                                    (dayScopeMode === 'week' ? (isRTL ? canGoNext : canGoPrev) : (isRTL ? canGoNextDay : canGoPrevDay))
+                                        ? BARSPA_COLORS.royalPurple
+                                        : '#9ca3af'
+                                }
                             />
                         </TouchableOpacity>
 
@@ -1350,14 +1379,34 @@ export default function ScheduleScreen() {
                         </View>
 
                         <TouchableOpacity
-                            style={[styles.weekNavButton, dayScopeMode === 'week' ? (!canGoNext && styles.weekNavButtonDisabled) : (!canGoNextDay && styles.weekNavButtonDisabled)]}
-                            onPress={() => dayScopeMode === 'week' ? (canGoNext && setWeekOffset((current) => current + 1)) : moveSelectedDay(1)}
-                            disabled={dayScopeMode === 'week' ? !canGoNext : !canGoNextDay}
+                            style={[
+                                styles.weekNavButton,
+                                dayScopeMode === 'week'
+                                    ? (isRTL ? !canGoPrev : !canGoNext) && styles.weekNavButtonDisabled
+                                    : (isRTL ? !canGoPrevDay : !canGoNextDay) && styles.weekNavButtonDisabled
+                            ]}
+                            onPress={() => {
+                                const step = isRTL ? -1 : 1;
+                                if (dayScopeMode === 'week') {
+                                    if (isRTL) {
+                                        canGoPrev && setWeekOffset((current) => current - 1);
+                                    } else {
+                                        canGoNext && setWeekOffset((current) => current + 1);
+                                    }
+                                } else {
+                                    moveSelectedDay(step as -1 | 1);
+                                }
+                            }}
+                            disabled={dayScopeMode === 'week' ? (isRTL ? !canGoPrev : !canGoNext) : (isRTL ? !canGoPrevDay : !canGoNextDay)}
                         >
                             <Ionicons
-                                name="chevron-forward"
+                                name={isRTL ? "chevron-back" : "chevron-forward"}
                                 size={18}
-                                color={dayScopeMode === 'week' ? (canGoNext ? '#6d28d9' : '#9ca3af') : (canGoNextDay ? '#6d28d9' : '#9ca3af')}
+                                color={
+                                    (dayScopeMode === 'week' ? (isRTL ? canGoPrev : canGoNext) : (isRTL ? canGoPrevDay : canGoNextDay))
+                                        ? BARSPA_COLORS.royalPurple
+                                        : '#9ca3af'
+                                }
                             />
                         </TouchableOpacity>
                     </View>
@@ -1437,11 +1486,11 @@ export default function ScheduleScreen() {
 
                 <View style={styles.timeOffSection}>
                     <View style={styles.timeOffHeaderRow}>
-                        <Text style={styles.sectionTitle}>Time Off Requests</Text>
+                        <Text style={styles.sectionTitle}>{t('schedule.timeOffRequests')}</Text>
                         {timeOffEnabled ? (
                             <TouchableOpacity style={styles.requestButton} onPress={() => router.push('/(modals)/request-time-off')}>
                                 <Ionicons name="add" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                                <Text style={styles.requestButtonText}>Request Time Off</Text>
+                                <Text style={styles.requestButtonText}>{t('schedule.requestTimeOff')}</Text>
                             </TouchableOpacity>
                         ) : null}
                     </View>
@@ -1450,7 +1499,7 @@ export default function ScheduleScreen() {
                         <View style={styles.infoCard}>
                             <Ionicons name="information-circle-outline" size={18} color="#6b7280" />
                             <Text style={styles.infoCardText}>
-                                Time off requests are not enabled for this account yet. Please contact your salon manager.
+                                {t('schedule.timeOffDisabled')}
                             </Text>
                         </View>
                     ) : (
@@ -1472,13 +1521,13 @@ export default function ScheduleScreen() {
                 <Pressable style={styles.settingsBackdrop} onPress={() => setSettingsOpen(false)}>
                     <Pressable style={styles.settingsPanel} onPress={(event) => event.stopPropagation()}>
                         <View style={styles.settingsHeader}>
-                            <Text style={styles.settingsTitle}>Schedule Settings</Text>
+                            <Text style={styles.settingsTitle}>{t('schedule.settings')}</Text>
                             <TouchableOpacity onPress={() => setSettingsOpen(false)}>
                                 <Ionicons name="close" size={22} color="#6b7280" />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.settingsSectionTitle}>Calendar Grid Size</Text>
+                        <Text style={styles.settingsSectionTitle}>{t('schedule.gridSize')}</Text>
                         <View
                             style={styles.customSliderTrack}
                             onLayout={(event) => setSettingsSliderWidth(event.nativeEvent.layout.width)}
@@ -1490,9 +1539,9 @@ export default function ScheduleScreen() {
                             <View style={[styles.customSliderFill, { width: `${gridScalePercent}%` }]} />
                             <View style={[styles.customSliderThumb, { left: `${gridScalePercent}%` }]} />
                         </View>
-                        <Text style={styles.settingsHint}>Scale: {gridScalePercent}%</Text>
+                        <Text style={styles.settingsHint}>{t('schedule.scale', { percent: gridScalePercent })}</Text>
 
-                        <Text style={styles.settingsSectionTitle}>Visible Range</Text>
+                        <Text style={styles.settingsSectionTitle}>{t('schedule.visibleRange')}</Text>
                         <View style={styles.optionRow}>
                             {[1, 2, 3, 4].map((weekCount) => {
                                 const disabled = weekCount > scheduleVisibilityWeeks;
@@ -1514,37 +1563,37 @@ export default function ScheduleScreen() {
                                 );
                             })}
                         </View>
-                        <Text style={styles.settingsHint}>Admin limit: {scheduleVisibilityWeeks} week(s)</Text>
+                        <Text style={styles.settingsHint}>{t('schedule.adminLimit', { weeks: scheduleVisibilityWeeks })}</Text>
 
-                        <Text style={styles.settingsSectionTitle}>Show Scope</Text>
+                        <Text style={styles.settingsSectionTitle}>{t('schedule.showScope')}</Text>
                         <View style={styles.optionRow}>
                             <TouchableOpacity
                                 style={[styles.optionChip, dayScopeMode === 'day' && styles.optionChipActive]}
                                 onPress={() => setDayScopeMode('day')}
                             >
-                                <Text style={[styles.optionChipText, dayScopeMode === 'day' && styles.optionChipTextActive]}>Selected Day</Text>
+                                <Text style={[styles.optionChipText, dayScopeMode === 'day' && styles.optionChipTextActive]}>{t('schedule.selectedDay')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.optionChip, dayScopeMode === 'week' && styles.optionChipActive]}
                                 onPress={() => setDayScopeMode('week')}
                             >
-                                <Text style={[styles.optionChipText, dayScopeMode === 'week' && styles.optionChipTextActive]}>Entire Week</Text>
+                                <Text style={[styles.optionChipText, dayScopeMode === 'week' && styles.optionChipTextActive]}>{t('schedule.entireWeek')}</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.settingsSectionTitle}>Layout</Text>
+                        <Text style={styles.settingsSectionTitle}>{t('schedule.layout')}</Text>
                         <View style={styles.optionRow}>
                             <TouchableOpacity
                                 style={[styles.optionChip, scheduleViewMode === 'grid' && styles.optionChipActive]}
                                 onPress={() => setScheduleViewMode('grid')}
                             >
-                                <Text style={[styles.optionChipText, scheduleViewMode === 'grid' && styles.optionChipTextActive]}>Grid (Default)</Text>
+                                <Text style={[styles.optionChipText, scheduleViewMode === 'grid' && styles.optionChipTextActive]}>{t('schedule.gridLayout')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.optionChip, scheduleViewMode === 'cards' && styles.optionChipActive]}
                                 onPress={() => setScheduleViewMode('cards')}
                             >
-                                <Text style={[styles.optionChipText, scheduleViewMode === 'cards' && styles.optionChipTextActive]}>Cards</Text>
+                                <Text style={[styles.optionChipText, scheduleViewMode === 'cards' && styles.optionChipTextActive]}>{t('schedule.cardsLayout')}</Text>
                             </TouchableOpacity>
                         </View>
                     </Pressable>
@@ -1626,9 +1675,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        backgroundColor: '#f5f3ff',
+        backgroundColor: '#FAF8FC',
         borderWidth: 1,
-        borderColor: '#ddd6fe',
+        borderColor: '#E7DDFC',
         borderRadius: 16,
         padding: 14,
         marginBottom: 18,
@@ -1639,12 +1688,12 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#ede9fe',
+        backgroundColor: '#E7DDFC',
     },
     alertTitle: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#4c1d95',
+        color: '#1D035F',
         marginBottom: 2,
     },
     alertBody: {
@@ -1695,14 +1744,14 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#f5f3ff',
+        backgroundColor: '#FAF8FC',
     },
     weekNavButtonDisabled: {
         backgroundColor: '#f3f4f6',
     },
     viewModeSwitcher: {
         flexDirection: 'row',
-        backgroundColor: '#ede9fe',
+        backgroundColor: '#E7DDFC',
         borderRadius: 999,
         padding: 4,
         marginBottom: 18,
@@ -1729,7 +1778,7 @@ const styles = StyleSheet.create({
         color: '#6b7280',
     },
     viewModeButtonTextActive: {
-        color: '#6d28d9',
+        color: '#6537C0',
     },
     statCard: {
         width: '48%',
@@ -1745,7 +1794,7 @@ const styles = StyleSheet.create({
     statValue: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#6d28d9',
+        color: '#6537C0',
         marginBottom: 4,
     },
     statLabel: {
@@ -1772,7 +1821,7 @@ const styles = StyleSheet.create({
         elevation: 1,
     },
     dayCardSelected: {
-        backgroundColor: '#8B5ADF',
+        backgroundColor: '#6537C0',
     },
     dayCardWorking: {
         backgroundColor: '#eff6ff',
@@ -1964,9 +2013,9 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 8,
         right: 8,
-        backgroundColor: '#f5f3ff',
+        backgroundColor: '#FAF8FC',
         borderWidth: 1,
-        borderColor: '#ddd6fe',
+        borderColor: '#E7DDFC',
         borderRadius: 14,
         padding: 10,
         overflow: 'hidden',
@@ -2029,7 +2078,7 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: '#ede9fe',
+        backgroundColor: '#E7DDFC',
         overflow: 'hidden',
         alignItems: 'center',
         justifyContent: 'center',
@@ -2041,7 +2090,7 @@ const styles = StyleSheet.create({
     gridAppointmentAvatarInitial: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#6d28d9',
+        color: '#6537C0',
     },
     gridAppointmentCustomerName: {
         fontSize: 13,
@@ -2068,7 +2117,7 @@ const styles = StyleSheet.create({
     gridAppointmentPrice: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#4c1d95',
+        color: '#1D035F',
     },
     gridAppointmentPriceCompact: {
         fontSize: 11,
@@ -2076,7 +2125,7 @@ const styles = StyleSheet.create({
     gridAppointmentAction: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#6d28d9',
+        color: '#6537C0',
     },
     gridAppointmentActionCompact: {
         fontSize: 10,
@@ -2143,7 +2192,7 @@ const styles = StyleSheet.create({
         gap: 6,
         backgroundColor: 'rgba(255,255,255,0.92)',
         borderWidth: 1,
-        borderColor: '#ddd6fe',
+        borderColor: '#E7DDFC',
         borderRadius: 999,
         paddingVertical: 6,
         paddingHorizontal: 10,
@@ -2151,7 +2200,7 @@ const styles = StyleSheet.create({
     },
     gridLoadingText: {
         fontSize: 12,
-        color: '#6d28d9',
+        color: '#6537C0',
         fontWeight: '700',
     },
     gridInlineEmptyState: {
@@ -2178,7 +2227,7 @@ const styles = StyleSheet.create({
     dayOverviewValue: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#6d28d9',
+        color: '#6537C0',
     },
     dayOverviewLabel: {
         fontSize: 12,
@@ -2235,7 +2284,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f3e8ff',
     },
     badgeSpecificText: {
-        color: '#7c3aed',
+        color: '#6537C0',
     },
     badgeText: {
         fontSize: 12,
@@ -2274,7 +2323,7 @@ const styles = StyleSheet.create({
         width: 10,
         height: 10,
         borderRadius: 5,
-        backgroundColor: '#8B5ADF',
+        backgroundColor: '#6537C0',
         marginTop: 6,
         marginRight: 10,
     },
@@ -2325,7 +2374,7 @@ const styles = StyleSheet.create({
     },
     requestButton: {
         flexDirection: 'row',
-        backgroundColor: '#8B5ADF',
+        backgroundColor: '#6537C0',
         borderRadius: 12,
         paddingVertical: 12,
         paddingHorizontal: 14,
@@ -2343,7 +2392,7 @@ const styles = StyleSheet.create({
         padding: 16,
         marginBottom: 12,
         borderLeftWidth: 4,
-        borderLeftColor: '#8B5ADF',
+        borderLeftColor: '#6537C0',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
@@ -2422,7 +2471,7 @@ const styles = StyleSheet.create({
     appointmentTime: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#8B5ADF',
+        color: '#6537C0',
         marginBottom: 4,
     },
     appointmentDuration: {
@@ -2445,7 +2494,7 @@ const styles = StyleSheet.create({
         width: 42,
         height: 42,
         borderRadius: 21,
-        backgroundColor: '#ede9fe',
+        backgroundColor: '#E7DDFC',
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
@@ -2458,7 +2507,7 @@ const styles = StyleSheet.create({
     appointmentAvatarInitial: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#6d28d9',
+        color: '#6537C0',
     },
     appointmentCustomerMeta: {
         flex: 1,
@@ -2498,21 +2547,21 @@ const styles = StyleSheet.create({
         marginTop: 10,
         padding: 12,
         borderRadius: 12,
-        backgroundColor: '#f5f3ff',
+        backgroundColor: '#FAF8FC',
         borderWidth: 1,
-        borderColor: '#ddd6fe',
+        borderColor: '#E7DDFC',
     },
     groupSummaryTitle: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#6d28d9',
+        color: '#6537C0',
         marginBottom: 8,
     },
     groupServiceRow: {
         paddingTop: 8,
         marginTop: 8,
         borderTopWidth: 1,
-        borderTopColor: '#ede9fe',
+        borderTopColor: '#E7DDFC',
     },
     groupServiceRowTitle: {
         fontSize: 13,
@@ -2586,7 +2635,7 @@ const styles = StyleSheet.create({
         marginTop: 12,
         paddingVertical: 8,
         paddingHorizontal: 12,
-        backgroundColor: '#f5f3ff',
+        backgroundColor: '#FAF8FC',
         borderRadius: 999,
     },
     appointmentClientButtonIcon: {
@@ -2595,7 +2644,7 @@ const styles = StyleSheet.create({
     appointmentClientButtonText: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#6d28d9',
+        color: '#6537C0',
     },
     appointmentActions: {
         flexDirection: 'row',
@@ -2613,7 +2662,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     startBtn: {
-        backgroundColor: '#8B5ADF',
+        backgroundColor: '#6537C0',
     },
     completeBtn: {
         backgroundColor: '#10b981',
@@ -2692,7 +2741,7 @@ const styles = StyleSheet.create({
     customSliderTrack: {
         height: 34,
         borderRadius: 999,
-        backgroundColor: '#ede9fe',
+        backgroundColor: '#E7DDFC',
         justifyContent: 'center',
         position: 'relative',
         overflow: 'visible',
@@ -2702,7 +2751,7 @@ const styles = StyleSheet.create({
         left: 0,
         top: 0,
         bottom: 0,
-        backgroundColor: '#8B5ADF',
+        backgroundColor: '#6537C0',
         borderRadius: 999,
     },
     customSliderThumb: {
@@ -2715,7 +2764,7 @@ const styles = StyleSheet.create({
         borderRadius: 11,
         backgroundColor: '#ffffff',
         borderWidth: 2,
-        borderColor: '#6d28d9',
+        borderColor: '#6537C0',
     },
     optionRow: {
         flexDirection: 'row',
@@ -2732,8 +2781,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
     },
     optionChipActive: {
-        backgroundColor: '#ede9fe',
-        borderColor: '#8B5ADF',
+        backgroundColor: '#E7DDFC',
+        borderColor: '#6537C0',
     },
     optionChipDisabled: {
         backgroundColor: '#f3f4f6',
@@ -2745,7 +2794,7 @@ const styles = StyleSheet.create({
         color: '#4b5563',
     },
     optionChipTextActive: {
-        color: '#5b21b6',
+        color: '#1D035F',
     },
     optionChipTextDisabled: {
         color: '#9ca3af',

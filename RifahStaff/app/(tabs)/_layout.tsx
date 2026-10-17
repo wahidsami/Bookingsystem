@@ -22,7 +22,7 @@ export default function TabLayout() {
     <Tabs
       initialRouteName="schedule"
       screenOptions={{
-        tabBarActiveTintColor: '#8B5ADF',
+        tabBarActiveTintColor: '#6537C0',
         tabBarInactiveTintColor: colorScheme === 'dark' ? '#9ca3af' : '#6b7280',
         headerShown: true,
         header: () => <StaffHeader />,

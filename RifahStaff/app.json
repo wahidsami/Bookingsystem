@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Refah Staff",
+    "name": "BARSPA Staff",
     "slug": "RefahStaff",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -51,9 +51,9 @@
           "image": "./assets/images/LogoColor.png",
           "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#8B5ADF",
+          "backgroundColor": "#6537C0",
           "dark": {
-            "backgroundColor": "#8B5ADF"
+            "backgroundColor": "#1D035F"
           }
         }
       ],

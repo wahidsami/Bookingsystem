@@ -79,10 +79,10 @@ export const getRiyadhWeekStartKey = (date = new Date()): string => {
     return addRiyadhDays(dateKey, -(dayIndex - 1 + 7) % 7);
 };
 
-export const formatRiyadhDayLabel = (dateKey: string): string => {
+export const formatRiyadhDayLabel = (dateKey: string, locale: string = 'en'): string => {
     const date = parseRiyadhDateKey(dateKey);
     if (!isValidDate(date)) return '--';
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
         timeZone: RIYADH_TIME_ZONE,
         weekday: 'short',
         month: 'short',
@@ -90,10 +90,10 @@ export const formatRiyadhDayLabel = (dateKey: string): string => {
     }).format(date);
 };
 
-export const formatRiyadhLongDate = (dateKey: string): string => {
+export const formatRiyadhLongDate = (dateKey: string, locale: string = 'en'): string => {
     const date = parseRiyadhDateKey(dateKey);
-    if (!isValidDate(date)) return 'Invalid date';
-    return new Intl.DateTimeFormat('en-US', {
+    if (!isValidDate(date)) return locale === 'ar' ? 'تاريخ غير صالح' : 'Invalid date';
+    return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
         timeZone: RIYADH_TIME_ZONE,
         weekday: 'long',
         month: 'long',
@@ -101,31 +101,31 @@ export const formatRiyadhLongDate = (dateKey: string): string => {
     }).format(date);
 };
 
-export const formatRiyadhWeekdayShort = (dateKey: string): string => {
+export const formatRiyadhWeekdayShort = (dateKey: string, locale: string = 'en'): string => {
     const date = parseRiyadhDateKey(dateKey);
     if (!isValidDate(date)) return '--';
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
         timeZone: RIYADH_TIME_ZONE,
         weekday: 'short',
     }).format(date);
 };
 
-export const formatRiyadhMonthDay = (dateKey: string): string => {
+export const formatRiyadhMonthDay = (dateKey: string, locale: string = 'en'): string => {
     const date = parseRiyadhDateKey(dateKey);
     if (!isValidDate(date)) return '--';
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
         timeZone: RIYADH_TIME_ZONE,
         month: 'short',
         day: 'numeric',
     }).format(date);
 };
 
-export const formatRiyadhDateTime = (value: string | Date): string => {
+export const formatRiyadhDateTime = (value: string | Date, locale: string = 'en'): string => {
     const date = typeof value === 'string' ? new Date(value) : value;
     if (Number.isNaN(date.getTime())) {
         return '-';
     }
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
         timeZone: RIYADH_TIME_ZONE,
         year: 'numeric',
         month: 'short',
@@ -135,7 +135,7 @@ export const formatRiyadhDateTime = (value: string | Date): string => {
     }).format(date);
 };
 
-export const formatRiyadhTime = (value?: string | null): string => {
+export const formatRiyadhTime = (value?: string | null, locale: string = 'en'): string => {
     if (!value) return '--:--';
     const trimmed = `${value}`.trim();
 
@@ -151,7 +151,8 @@ export const formatRiyadhTime = (value?: string | null): string => {
             minutes >= 0 &&
             minutes <= 59
         ) {
-            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const isPM = hours >= 12;
+            const ampm = locale === 'ar' ? (isPM ? 'م' : 'ص') : (isPM ? 'PM' : 'AM');
             const normalizedHour = hours % 12 || 12;
             return `${normalizedHour}:${minutes.toString().padStart(2, '0')} ${ampm}`;
         }
@@ -162,7 +163,7 @@ export const formatRiyadhTime = (value?: string | null): string => {
         return '--:--';
     }
 
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
         timeZone: RIYADH_TIME_ZONE,
         hour: 'numeric',
         minute: '2-digit',

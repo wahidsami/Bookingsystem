@@ -67,7 +67,7 @@ export function StaffHeader() {
           style={styles.iconButton}
           onPress={() => router.push('/(tabs)/notifications')}
         >
-          <Ionicons name="notifications-outline" size={24} color="#161741" />
+          <Ionicons name="notifications-outline" size={24} color="#6537C0" />
           {unreadCount > 0 ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -85,22 +85,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingBottom: 16,
-    backgroundColor: '#FAF8FC', // light theme background
+    backgroundColor: '#FAF8FC', // BARSPA neutralBg
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: '#E7DDFC',
   },
   textContainer: {
     flex: 1,
   },
   welcomeLabel: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#6537C0',
+    fontWeight: '600',
     marginBottom: 2,
   },
   userName: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1f2937',
+    color: '#1D035F',
   },
   iconButton: {
     width: 44,
@@ -110,7 +111,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#E7DDFC',
     position: 'relative',
   },
   badge: {

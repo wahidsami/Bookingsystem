@@ -65,10 +65,10 @@ export default function LoginScreen() {
             style={styles.container}
         >
             <LinearGradient
-                colors={['#8B5ADF', '#683AB7']}
+                colors={['#1D035F', '#6537C0']}
                 style={styles.header}
             >
-                <Text style={styles.headerTitle}>Refah Staff</Text>
+                <Text style={styles.headerTitle}>BARSPA Staff</Text>
                 <Text style={styles.headerSubtitle}>{t('auth.subtitle')}</Text>
             </LinearGradient>
 
@@ -189,17 +189,17 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     forgotPasswordText: {
-        color: '#8B5ADF',
+        color: '#6537C0',
         fontWeight: '600',
         fontSize: 14,
     },
     loginButton: {
-        backgroundColor: '#8B5ADF',
+        backgroundColor: '#6537C0',
         borderRadius: 10,
         padding: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#8B5ADF',
+        shadowColor: '#6537C0',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 5,

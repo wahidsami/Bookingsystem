@@ -1,3 +1,115 @@
+# BARSPA Staff App — Technical Audit, Appointment Board Enhancement & Native Rebuild
+- [x] Phase 0: Discovery & Repository Safety <!-- id: staff_phase0 -->
+  - [x] Locate actual staff mobile app (`RifahStaff`) vs legacy/client apps (`staff-app`, `RifahMobile`).
+  - [x] Record Git status, branches, commits, and preserve untouched files (`Tenant-v2` landing files, etc.).
+- [x] Phase 1: Complete Technical & Functional Audit <!-- id: staff_phase1 -->
+  - [x] 1.1 Architecture & dependencies audit (Expo 54, React 19, React Native 0.81, Expo Router 6).
+  - [x] 1.2 Screen inventory (all routes, auth, tabs, modals, detail views).
+  - [x] 1.3 Authentication, session tokens, tenant context, and secure storage.
+  - [x] 1.4 API data flow, base URLs, endpoints, serialization, timezone handling.
+  - [x] 1.5 Arabic RTL & English LTR audit, typography, brand alignment.
+  - [x] 1.6 Security, permissions, performance, and memory leaks.
+- [x] Phase 2: Appointment Board Functional & UX Assessment <!-- id: staff_phase2 -->
+  - [x] 2.1 Presentation & visual hierarchy (BARSPA brand palette `#6537C0`, `#1D035F`, `#A379E2`, `#E7DDFC`).
+  - [x] 2.2 Appointment details & lifecycle transitions (check-in, start, complete, no-show, cancel).
+  - [x] 2.3 Availability & scheduling contract alignment (shifts, breaks, duty boundaries).
+  - [x] 2.4 Status synchronization, optimistic locking, and refresh mechanisms.
+  - [x] 2.5 Notification handling & navigation.
+- [x] Phase 3: Implement Focused Appointment Board Enhancements <!-- id: staff_phase3 -->
+  - [x] 3.1 Polish appointment card and list presentation with BARSPA palette & Cairo typography.
+  - [x] 3.2 Improve date navigation, quick filters, and pull-to-refresh UX.
+  - [x] 3.3 Refine appointment status actions, modal dialogs, and error feedback.
+  - [x] 3.4 Enhance empty, loading, error, and offline recovery states.
+  - [x] 3.5 Ensure perfect Arabic RTL & English LTR mirroring and layout stability.
+- [x] Phase 4: Regression Testing <!-- id: staff_phase4 -->
+  - [x] 4.1 Automated test suite for appointment board & scheduling logic.
+  - [x] 4.2 Typecheck (`npx tsc --noEmit`) and linting verification.
+  - [x] 4.3 Auth & session restoration verification.
+  - [x] 4.4 Status transition & duplicate-submit prevention verification.
+- [x] Phase 5 & 6: Native Build Verification (Android & iOS) <!-- id: staff_phase5_6 -->
+  - [x] 5.1 Android build configuration audit (SDK, package name, signing, release profiles).
+  - [x] 5.2 Test Android build / export artifact via toolchain.
+  - [x] 6.1 iOS build configuration audit (bundle ID, deployment target, info.plist, plugins).
+  - [x] 6.2 Assess iOS build feasibility on Windows host; document exact remaining steps.
+- [x] Phase 7 & 8: Build Readiness Quality Gate, Report & Delivery <!-- id: staff_phase7_8 -->
+  - [x] 7.1 Verify release endpoints (no localhost/dev endpoints).
+  - [x] 7.2 Run quality gate across all checks (PASS/FAIL/BLOCKED).
+  - [x] 8.1 Deliver comprehensive report: `barspa_staff_app_audit_and_mobile_build_report.md`.
+  - [x] 8.2 Review diff, stage authorized changes, commit and push to `origin/main` (no store submission or production deploy).
+
+# BARSPA Tenant-v2 — Availability-Aware Service Provider Selection
+- [ ] Task 1: Architectural Audit of Provider/Stylist Selection & Availability Engine <!-- id: av_audit -->
+  - [ ] Inspect where provider dropdown is rendered in `InteractiveDrawers.tsx` and child components.
+  - [ ] Trace how `availableStylists` or staff options are populated, qualified, and filtered.
+  - [ ] Inspect existing availability evaluation (`smartAvailabilityService.ts`, shifts, booked intervals, backend conflict rules).
+  - [ ] Identify root cause of why Sally (starts at 12:00 PM) was selectable for an earlier appointment.
+- [ ] Task 2: Provider Eligibility & Availability Resolution Engine <!-- id: av_engine -->
+  - [ ] Compute eligible providers for each appointment interval based on date, start time, service duration, qualifications, shift working hours, and overlapping bookings.
+  - [ ] Support both single-booking and group-booking contexts (participant-specific intervals).
+  - [ ] Provide clear loading and no-availability states ("لا يوجد مقدم خدمة متاح لهذا الموعد. اختر وقتًا آخر أو غيّر الخدمة.").
+  - [ ] Invalidate / clear invalid provider selections when time/service changes cause conflicts.
+- [ ] Task 3: UI Integration in Create Appointment Drawer <!-- id: av_ui -->
+  - [ ] Filter provider dropdown in service cards to show only available and qualified staff for that specific item's time window.
+  - [ ] Ensure switching group participants recalculates and presents provider options for the active participant.
+  - [ ] Provide localized empty/warning state when no provider is available.
+- [ ] Task 4: Regression Testing & Local Build <!-- id: av_testing -->
+  - [ ] Add unit & integration tests covering shift boundaries, qualifications, overlapping bookings, participant isolation, and invalid selection clearing.
+  - [ ] Run `npx tsc --noEmit` and `npm run build`.
+  - [ ] Run automated test suite (all tests passing).
+- [ ] Task 5: Commit, Push & Deployment Handover <!-- id: av_push -->
+  - [ ] Verify git status and stage only authorized files.
+  - [ ] Commit with message: `feat(tenant-v2): availability-aware service provider selection`.
+  - [ ] Push to `origin main` and provide Coolify redeployment instructions.
+
+# BARSPA Tenant-v2 — Group Booking UI/UX Simplification (Participant-First Experience)
+- [x] Task 1: Audit and State Mapping <!-- id: gb_audit -->
+  - [x] Map existing organizer selection, participant state, service tagging, and group pricing in `InteractiveDrawers.tsx`.
+  - [x] Verify existing single-booking isolation to prevent regressions.
+- [x] Task 2: Step A — Organizer Selection First & Compact Summary <!-- id: gb_organizer -->
+  - [x] Make main customer / organizer selection the natural first step.
+  - [x] Render compact organizer card with name, phone, customer badge, and change button.
+  - [x] Make group occasion/name compact and secondary without blocking participant selection.
+  - [x] Ensure organizer is strictly Participant 1 without creating phantom guests.
+- [x] Task 3: Step B — Clean Participant Management List <!-- id: gb_participants -->
+  - [x] Replace cluttered cards-in-cards with a clear participant list.
+  - [x] Display organizer and participant rows with role badges, assigned service counts, and individual subtotals.
+  - [x] Provide prominent `+ إضافة مشارك` (`+ Add Participant`) action.
+  - [x] Support quick inline editing and deletion for additional participants.
+  - [x] Make active participant visually obvious with high-contrast BARSPA purple styling (`#6537C0`).
+- [x] Task 4: Step C — Participant-Specific Service Catalogue Connection <!-- id: gb_catalogue -->
+  - [x] Add prominent localized banner above catalogue: `إضافة خدمات إلى: [الاسم]` / `Add services for: [Name]`.
+  - [x] Ensure catalogue Add/Remove buttons and resource checks react dynamically to active participant.
+  - [x] Ensure switching participants seamlessly updates queued services without state leakage.
+- [x] Task 5: Step D & E — Compact Group Review & Unified Checkout <!-- id: gb_checkout -->
+  - [x] Provide concise participant breakdown in invoice summary.
+  - [x] Preserve unified group session checkout and payment arrangement.
+  - [x] Verify single-client booking remains 100% intact.
+- [x] Task 6: Testing, Build, & Report <!-- id: gb_verification -->
+  - [x] Run existing tests (`groupBooking.test.ts`, `appointmentDraftIsolation.test.ts`).
+  - [x] Add or update focused tests for participant-first group booking (`groupBookingParticipantExperience.test.ts`).
+  - [x] Run `npx tsc --noEmit` (0 errors).
+  - [x] Run `npm run build` in `Tenant-v2` (Vite + esbuild clean build).
+  - [x] Generate `barspa_group_booking_ui_refinement_report.md`.
+
+
+- [x] Task 1: Fix Drawer Stability & Stale Rerender Loops <!-- id: fix_drawer_loop -->
+  - [x] Wrap drawer close callback in `useCallback` in `AppointmentWorkspace.tsx`.
+  - [x] Stabilize `useEffect` dependencies in `TeamMemberProfileDrawer.tsx` (depend strictly on `staffId`, use ref for `onClose`, ignore language flips).
+  - [x] Guard against race conditions and stale async responses with request-id tracking.
+- [x] Task 2: Fix Schedule Date Hydration from Shift Rows <!-- id: fix_date_hydration -->
+  - [x] Extract authoritative `startDate`, `endDate`, and `continuous` state in `fetchEmployeeSchedule` from recurring shifts using mode/majority logic.
+  - [x] Map schedule dates into `TeamMemberData` in `mapApiEmployeeToTeamMember`.
+  - [x] Wire hydrated dates into `TeamMemberProfileDrawer.tsx`.
+- [x] Task 3: Restore Legacy `workingHours` Fallback <!-- id: fix_working_hours -->
+  - [x] Restore `normalizeWorkingHoursSchedule` in `employeeHelpers.ts`.
+  - [x] Integrate fallback when `shifts` array is empty but `employee.workingHours` exists.
+- [x] Task 4: Regression Tests & Build Verification <!-- id: fix_verification -->
+  - [x] Write unit & regression tests covering scenarios 1 to 7 (`employeeProfileLifecycleFixes.test.ts`).
+  - [x] Run `npx tsc --noEmit` (0 errors).
+  - [x] Run `npm run build` in `Tenant-v2` (Vite + server.cjs bundle succeeded).
+  - [x] Run full automated test suite (35/35 tests passing across 4 suites).
+  - [x] Deliver detailed completion report.
+
 # BARSPA Tenant-v2 — Phase 2 Employee Profile UI Refinement (Option A)
 - [x] Phase 2.1: Basic Identity Section Refinement (`BasicIdentitySection.tsx`) <!-- id: p2_identity -->
   - [x] Remove non-persistent `roleAr` and `roleEn` text inputs.

@@ -5,25 +5,47 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+export const BARSPA_COLORS = {
+  royalPurple: '#6537C0',
+  deepViolet: '#1D035F',
+  lavender: '#A379E2',
+  softLilac: '#E7DDFC',
+  lilacSurface: '#F6F3FE',
+  white: '#FFFFFF',
+  cardBorder: '#E7DDFC',
+  cardBg: '#FFFFFF',
+  textPrimary: '#1D035F',
+  textSecondary: '#4B5563',
+  textMuted: '#9CA3AF',
+  neutralBg: '#FAF8FC',
+  neutralSurface: '#F3F4F6',
+  // Operational status colors
+  status: {
+    confirmed: { bg: '#ECFDF5', text: '#059669', border: '#A7F3D0' },
+    inService: { bg: '#F6F3FE', text: '#6537C0', border: '#E7DDFC' },
+    completed: { bg: '#F3F4F6', text: '#4B5563', border: '#E5E7EB' },
+    cancelled: { bg: '#FFF1F2', text: '#E11D48', border: '#FECDD3' },
+    noShow: { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' },
+    pending: { bg: '#FFFBEB', text: '#D97706', border: '#FDE68A' },
+  },
+} as const;
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: '#1D035F',
+    background: '#FAF8FC',
+    tint: BARSPA_COLORS.royalPurple,
+    icon: '#6537C0',
+    tabIconDefault: '#9CA3AF',
+    tabIconSelected: BARSPA_COLORS.royalPurple,
   },
   dark: {
     text: '#ECEDEE',
     background: '#151718',
-    tint: tintColorDark,
+    tint: BARSPA_COLORS.lavender,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    tabIconSelected: BARSPA_COLORS.lavender,
   },
 };
 
