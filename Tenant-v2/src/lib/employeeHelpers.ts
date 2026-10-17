@@ -165,8 +165,8 @@ export const mapApiEmployeeToTeamMember = (emp: any, schedule: TeamMemberData['s
     joinedDate: emp.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
     bioEn: emp.bio || '',
     bioAr: emp.bio || '',
-    experienceEn: '',
-    experienceAr: '',
+    experienceEn: emp.experience || '',
+    experienceAr: emp.experience || '',
     nationalityAr: emp.nationality || '',
     nationalityEn: emp.nationality || '',
     gender: emp.gender === 'male' ? 'male' : 'female',
@@ -198,6 +198,206 @@ export const mapApiEmployeeToTeamMember = (emp: any, schedule: TeamMemberData['s
       ...(emp.dashboardPermissions || {})
     },
     reviewsList: []
+  };
+};
+
+export interface ScheduleValidationResult {
+  isValid: boolean;
+  errorEn?: string;
+  errorAr?: string;
+}
+
+export function validateWeeklySchedule(schedule: TeamMemberData['schedule']): ScheduleValidationResult {
+  if (!Array.isArray(schedule) || schedule.length === 0) {
+    return { isValid: true };
+  }
+
+  for (let i = 0; i < schedule.length; i++) {
+    const day = schedule[i];
+    if (day.status !== 'working') {
+      continue;
+    }
+
+    const dayNameAr = day.dayAr || `اليوم ${i + 1}`;
+    const dayNameEn = day.dayEn || `Day ${i + 1}`;
+
+    const hasSubShifts = Array.isArray(day.subShifts) && day.subShifts.length > 0;
+
+    if (hasSubShifts) {
+      for (const sub of day.subShifts!) {
+        const start = to24HourTime(sub.startTime);
+        const end = to24HourTime(sub.endTime);
+        if (!start || !end) {
+          return {
+            isValid: false,
+            errorEn: `Missing or invalid shift times for ${dayNameEn}`,
+            errorAr: `أوقات الشيفت غير مكتملة أو غير صالحة ليوم ${dayNameAr}`
+          };
+        }
+        if (start === end) {
+          return {
+            isValid: false,
+            errorEn: `Shift start and end time cannot be identical for ${dayNameEn}`,
+            errorAr: `وقت بداية ونهاية الشيفت لا يمكن أن يكونا متطابقين ليوم ${dayNameAr}`
+          };
+        }
+      }
+    } else {
+      const { startTime, endTime } = parseScheduleRange(day.hours);
+      if (!startTime || !endTime) {
+        return {
+          isValid: false,
+          errorEn: `Please set working hours for active working day: ${dayNameEn}`,
+          errorAr: `يرجى تحديد ساعات العمل ليوم العمل النشط: ${dayNameAr}`
+        };
+      }
+      if (startTime === endTime) {
+        return {
+          isValid: false,
+          errorEn: `Working hours start and end time cannot be identical for ${dayNameEn}`,
+          errorAr: `وقت بداية ونهاية ساعات العمل لا يمكن أن يكونا متطابقين ليوم ${dayNameAr}`
+        };
+      }
+    }
+  }
+
+  return { isValid: true };
+}
+
+export function isScheduleEqual(
+  a: TeamMemberData['schedule'] | undefined,
+  b: TeamMemberData['schedule'] | undefined
+): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+
+  return a.every((dayA, i) => {
+    const dayB = b[i];
+    if (!dayB) return false;
+    if (dayA.status !== dayB.status) return false;
+    if (dayA.hours !== dayB.hours) return false;
+
+    const subsA = dayA.subShifts || [];
+    const subsB = dayB.subShifts || [];
+    if (subsA.length !== subsB.length) return false;
+
+    return subsA.every((sA, j) => {
+      const sB = subsB[j];
+      return (
+        sB &&
+        to24HourTime(sA.startTime) === to24HourTime(sB.startTime) &&
+        to24HourTime(sA.endTime) === to24HourTime(sB.endTime) &&
+        (sA.label || '') === (sB.label || '')
+      );
+    });
+  });
+}
+
+export interface PersistScheduleResult {
+  savedCount: number;
+  deletedCount: number;
+}
+
+export const persistEmployeeSchedule = async (
+  employeeId: string,
+  schedule: TeamMemberData['schedule'],
+  scheduleStartDate?: string,
+  scheduleEndDate?: string,
+  scheduleContinues?: boolean
+): Promise<PersistScheduleResult> => {
+  if (!employeeId) {
+    throw new Error('Employee ID is required to persist schedule');
+  }
+
+  const existingResponse = await tenantApiAdapter.getEmployeeShifts(employeeId);
+  const existingShifts = Array.isArray(existingResponse?.shifts)
+    ? existingResponse.shifts
+    : Array.isArray(existingResponse?.data?.shifts)
+      ? existingResponse.data.shifts
+      : [];
+
+  const recurringStart = scheduleStartDate || new Date().toISOString().split('T')[0];
+  const recurringEnd = scheduleContinues ? null : (scheduleEndDate || null);
+
+  const saveTasks: Array<() => Promise<any>> = [];
+
+  schedule.forEach((day, index) => {
+    if (day.status !== 'working') {
+      return;
+    }
+
+    const dayOfWeek = WEEKDAY_ROWS[index]?.dayOfWeek ?? (index >= 0 && index <= 6 ? index : null);
+    const hasSubShifts = Array.isArray(day.subShifts) && day.subShifts.length > 0;
+    const { startTime: baseStart, endTime: baseEnd } = parseScheduleRange(day.hours);
+
+    if (hasSubShifts) {
+      const hasBaseInSubShifts = day.subShifts!.some(
+        (sub) => to24HourTime(sub.startTime) === baseStart && to24HourTime(sub.endTime) === baseEnd
+      );
+
+      if (baseStart && baseEnd && !hasBaseInSubShifts) {
+        saveTasks.push(() =>
+          tenantApiAdapter.createEmployeeShift(employeeId, {
+            dayOfWeek,
+            specificDate: null,
+            startTime: baseStart,
+            endTime: baseEnd,
+            isRecurring: true,
+            startDate: recurringStart,
+            endDate: recurringEnd,
+            label: `${day.dayEn} Shift`
+          })
+        );
+      }
+
+      day.subShifts!.forEach((subShift) => {
+        const start = to24HourTime(subShift.startTime);
+        const end = to24HourTime(subShift.endTime);
+        if (start && end) {
+          saveTasks.push(() =>
+            tenantApiAdapter.createEmployeeShift(employeeId, {
+              dayOfWeek,
+              specificDate: null,
+              startTime: start,
+              endTime: end,
+              isRecurring: true,
+              startDate: recurringStart,
+              endDate: recurringEnd,
+              label: subShift.label || 'Sub Shift'
+            })
+          );
+        }
+      });
+    } else {
+      if (baseStart && baseEnd) {
+        saveTasks.push(() =>
+          tenantApiAdapter.createEmployeeShift(employeeId, {
+            dayOfWeek,
+            specificDate: null,
+            startTime: baseStart,
+            endTime: baseEnd,
+            isRecurring: true,
+            startDate: recurringStart,
+            endDate: recurringEnd,
+            label: `${day.dayEn} Shift`
+          })
+        );
+      }
+    }
+  });
+
+  // Delete previous shifts
+  await Promise.allSettled(
+    existingShifts.map((shift: any) => tenantApiAdapter.deleteEmployeeShift(employeeId, shift.id))
+  );
+
+  // Execute all creations
+  await Promise.all(saveTasks.map((task) => task()));
+
+  return {
+    savedCount: saveTasks.length,
+    deletedCount: existingShifts.length
   };
 };
 

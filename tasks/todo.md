@@ -1,3 +1,146 @@
+# BARSPA Tenant-v2 — Phase 2 Employee Profile UI Refinement (Option A)
+- [x] Phase 2.1: Basic Identity Section Refinement (`BasicIdentitySection.tsx`) <!-- id: p2_identity -->
+  - [x] Remove non-persistent `roleAr` and `roleEn` text inputs.
+  - [x] Retain functional `position` dropdown with clean bilingual labels.
+  - [x] Replace editable joined date input with read-only "Account Created" badge.
+  - [x] Consolidate nationality into a single clean input bound to persisted field.
+  - [x] Preserve gender selector with clear styling.
+- [x] Phase 2.2: Bio, Specialties & Experience Refinement (`BioSpecialtiesSection.tsx`) <!-- id: p2_bio -->
+  - [x] Consolidate dual bios into a single prominent biography textarea.
+  - [x] Embed AI Assist button directly alongside the biography textarea.
+  - [x] Consolidate experience into a single clean input.
+  - [x] Refine tag badges and avatar upload with BARSPA purple design system.
+- [x] Phase 2.3: Finance Rules Section Refinement (`FinanceRulesSection.tsx`) <!-- id: p2_finance -->
+  - [x] Apply BARSPA purple branding to active toggles and summary cards.
+  - [x] Fix `%` symbol alignment in RTL to prevent digit overlap.
+  - [x] Fully localize card helper text and WPS descriptions into Arabic and English.
+- [x] Phase 2.4: Schedule Matrix Section Unification (`ShiftMatrixSection.tsx`) <!-- id: p2_schedule -->
+  - [x] Unify visual styling with `EmployeeWeeklyScheduleEditor.tsx`.
+  - [x] Fix arrow direction in RTL (`isRtl ? ArrowLeft : ArrowRight`).
+  - [x] Apply `text-neutral-900 font-bold [color-scheme:light]` for high-contrast time inputs.
+  - [x] Fix nested sub-shift border to `border-s-2 border-purple-200` for RTL.
+- [x] Phase 2.5: Access & Security Section Refinement (`AccessSecuritySection.tsx`) <!-- id: p2_access -->
+  - [x] Replace harsh zinc surfaces with clean BARSPA purple toggle cards.
+  - [x] Replace raw `alert()`/`confirm()` with in-app notification toasts.
+  - [x] Consolidate duplicated invite/reset action blocks.
+  - [x] Fully localize permission descriptions into Arabic and English.
+- [x] Phase 2.6: Editor & Drawer Shell Polish (`EmployeeProfileEditor.tsx` & `TeamMemberProfileDrawer.tsx`) <!-- id: p2_shell -->
+  - [x] Eliminate double-header redundancy when editor is rendered in drawer.
+  - [x] Replace `bg-zinc-950` with BARSPA royal purple gradient (`#1D035F` to `#6537C0`).
+  - [x] Polish step navigation sidebar and footer actions.
+- [x] Phase 2.7: Verification & Build <!-- id: p2_verify -->
+  - [x] Run `npx tsc --noEmit` (0 errors).
+  - [x] Run `npm run build` in `Tenant-v2` (clean build).
+  - [x] Run full automated test suite (28/28 passed).
+  - [x] Deliver comprehensive Phase 2 completion report.
+
+# BARSPA Tenant-v2 — Phase 1 Employee Profile Remediation
+- [x] Phase 1: Investigation & Contract Verification <!-- id: rem_audit -->
+  - [x] Check Git status and working-tree cleanliness.
+  - [x] Trace backend API contracts (`/tenant/employees`, `/tenant/employees/:id/shifts`) for nationality, gender, bio, custom role, joinedDate, and experience.
+  - [x] Inspect existing `persistEmployeeSchedule` in `TeamsWorkspace.tsx` and design equivalent for `TeamMemberProfileDrawer.tsx`.
+- [x] Phase 2: Schedule Persistence in Drawer <!-- id: rem_drawer_sched -->
+  - [x] Add `persistEmployeeSchedule` call to `TeamMemberProfileDrawer.tsx` `handleSave`.
+  - [x] Add pre-save validation and proper partial-failure toast handling (ensure schedule failures aren't masked as successes).
+- [x] Phase 3: Add Nationality & Gender Inputs <!-- id: rem_nat_gender -->
+  - [x] Add Nationality dropdown/input and Gender selector in `BasicIdentitySection.tsx`.
+  - [x] Support permitted values (`female`, `male`, country list/text) with Arabic & English labels.
+  - [x] Verify serialization, persistence, and reload in both `TeamsWorkspace.tsx` and `TeamMemberProfileDrawer.tsx`.
+- [x] Phase 4: Job Title, Joining Date & Bio Persistence <!-- id: rem_fields -->
+  - [x] Trace how `roleAr`, `roleEn`, `joinedDate` can be preserved (e.g. metadata/notes/position mapping or dedicated fields).
+  - [x] Fix biography serialization in `TeamMemberProfileDrawer.tsx` and `TeamsWorkspace.tsx` to preserve Arabic (`bioAr`) and English (`bioEn`).
+  - [x] Fix `employeeHelpers.ts` `mapApiEmployeeToTeamMember` to hydrate `experience` from `emp.experience`.
+- [x] Phase 5: Targeted Regression Tests & Verification <!-- id: rem_verify -->
+  - [x] Run `npx tsc --noEmit` (0 errors).
+  - [x] Run `npm run build` in `Tenant-v2` (clean build in 4.90s).
+  - [x] Run/create automated tests for regression scenarios (12/12 passed in `employeePersistencePhase1.test.ts`).
+  - [x] Deliver comprehensive Phase 1 completion report.
+
+# BARSPA Tenant-v2 — Complete Employee Profile Audit (ملف الموظف)
+- [x] Phase 1: Working Tree & Component Hierarchy Discovery <!-- id: emp_audit_discovery -->
+  - [x] Check Git status and working-tree cleanliness.
+  - [x] Trace entry points for Employee Profile across Tenant-v2 (AppointmentWorkspace, TeamsWorkspace).
+  - [x] Map complete component hierarchy, modals, drawers, tabs, and step wizards.
+- [x] Phase 2: In-Depth Section-by-Section Inventory & Analysis <!-- id: emp_audit_sections -->
+  - [x] Section A: الهوية والاتصال (BasicIdentitySection.tsx)
+  - [x] Section B: النبذة والخبرات (BioSpecialtiesSection.tsx)
+  - [x] Section C: قواعد المستحقات والرواتب (FinanceRulesSection.tsx)
+  - [x] Section D: جدول العمل والشيفتات (ShiftMatrixSection.tsx)
+  - [x] Section E: الأمن والوصول (AccessSecuritySection.tsx)
+  - [x] Section F: Additional tabs/subforms/drawers/modal actions.
+- [x] Phase 3: Visual, UX, and Design System Audit <!-- id: emp_audit_ux -->
+  - [x] Assess against BARSPA visual guidelines (#6537C0, #1D035F, #A379E2, #E7DDFC, Cairo/Montserrat).
+  - [x] Audit hierarchy, density, borders, nesting, typography, RTL/LTR consistency.
+- [x] Phase 4: Functional & Technical Audit <!-- id: emp_audit_tech -->
+  - [x] Trace data flow, state management, persistence APIs, validation rules.
+  - [x] Classify findings by severity (P0, P1, P2, P3).
+- [x] Phase 5: Deliver Comprehensive Report <!-- id: emp_audit_report -->
+  - [x] Compile full inventory table and prioritized recommendations into `barspa_employee_profile_audit.md`.
+  - [x] STOP without modifying source code, database, or deploying.
+
+# BARSPA Tenant-v2 — Appointment Schedule Settings UI Refinement
+- [x] Phase 1: Audit & Root-Cause Confirmation <!-- id: sched_audit -->
+  - [x] Identify exact component (`EmployeeWeeklyScheduleEditor.tsx`).
+  - [x] Pinpoint root cause for Thursday/Thu in Arabic (`DEFAULT_WEEKLY_DAYS` dayOfWeek 4 had `dayAr: 'Thursday'`).
+  - [x] Pinpoint root cause for arrow direction in RTL (hardcoded `"→"` instead of RTL-aware leftward arrow `←`).
+  - [x] Pinpoint root cause for pale/invisible time text (missing text color classes and styling on time inputs).
+- [x] Phase 2: Implementation of UI Refinements <!-- id: sched_impl -->
+  - [x] Fix `DEFAULT_WEEKLY_DAYS` Thursday Arabic translation (`dayAr: 'الخميس'`).
+  - [x] Implement RTL-aware arrow (`isRtl ? ArrowLeft : ArrowRight`) for primary shifts and sub-shifts.
+  - [x] Fix time input styling: `#171717` / `text-neutral-900`, `[color-scheme:light]`, font-bold, clear subtle borders, legible clock icons.
+  - [x] Refine header & summary cards: sleek BARSPA purple branding, cleaner ID pill, unified summary metrics cards.
+  - [x] Refine weekday schedule rows: clean compact cards, subtle borders, consistent purple action buttons, clear active/inactive visual states.
+- [x] Phase 3: Local Verification & Quality Assurance <!-- id: sched_verify -->
+  - [x] Run TypeScript checks (`npx tsc --noEmit` passed with 0 errors).
+  - [x] Run Vite production build (`npm run build` passed cleanly in 5.86s).
+  - [x] Confirm zero functional regressions in shift calculations, overnight shifts, save/cancel actions.
+- [x] Phase 4: Final Reporting <!-- id: sched_report -->
+  - [x] Document before-and-after results, modified files, and test findings.
+  - [x] STOP without committing, pushing, or deploying.
+
+# BARSPA Tenant-v2 — B2B-Only Landing Page Redesign (Corrected Direction)
+- [/] Phase A: Architectural Scope & Cleanup Plan <!-- id: b2b_audit -->
+  - [x] Identify consumer marketplace elements to remove: treatment cards, service price tags, category filters, customer booking timeline, consumer CTAs.
+  - [x] Define new focused 5-6 B2B sections: Navigation, B2B Hero, Platform & Capabilities, Authentic Product Showcase, Join BarSpa (Partner Conversion), and B2B Footer.
+  - [x] Ensure zero dead anchors, zero orphaned components, and zero fabricated claims/metrics.
+- [ ] Phase B: Implementation of B2B-Only Sections <!-- id: b2b_impl -->
+  - [ ] Update `landing.types.ts`: Define B2B component keys (`'b2b-hero'`, `'platform-capabilities'`, `'product-showcase'`, `'partner-cta'`, `'b2b-footer'`).
+  - [ ] Update `landing.config.ts`: Clean sequence of 5 focused B2B sections for both `ar` and `en`.
+  - [ ] Implement `landing.sections.tsx`: Rich, image-led, authentic B2B copy and visuals targeting salon and spa operators.
+  - [ ] Update `PublicExperience.tsx`: B2B Navigation with Home, Platform, Features, For Businesses, Language Switcher, Login (`/login`), and Partner CTA (`/register`).
+- [ ] Phase C: Verification & Quality Assurance <!-- id: b2b_verify -->
+  - [ ] Run `npx tsc --noEmit` in `Tenant-v2` (0 errors).
+  - [ ] Run `npx vite build` in `Tenant-v2` (clean build).
+  - [ ] Test in browser (Arabic RTL Cairo & English LTR Montserrat, desktop and mobile 390px).
+  - [ ] Verify no consumer marketplace traces, no fake metrics, and working `/register` and `/login` routes.
+- [ ] Phase D: Documentation & Reporting <!-- id: b2b_report -->
+  - [ ] Deliver complete B2B redesign summary with screenshots and audit results.
+  - [ ] STOP without committing, pushing, or deploying.
+
+# BARSPA — Premium Landing Page Enhancement (3.8)
+- [x] Phase A: Audit & Architecture Review <!-- id: landing_audit -->
+  - [x] Inspect existing public components (`PublicExperience.tsx`, `LandingFramework.tsx`, `landing.sections.tsx`, `landing.config.ts`, `landing.types.ts`).
+  - [x] Verify brand palette, fonts (`Cairo` for AR, `Montserrat` for EN), and assets (`barspa_logo.png`, `barspa_app_icon.png`).
+  - [x] Verify existing routing (`/`, `/login`, `/register`, etc.) and bilingual toggle state flow.
+- [x] Phase B: Implementation of 10 Core Sections <!-- id: landing_impl -->
+  - [x] Section 1: Responsive Navigation with Logo, Home, Services, For Business, How It Works, Why BarSpa, Lang Switcher, Login, Book Now CTA, and Mobile Drawer.
+  - [x] Section 2: Large-format Hero Slider (3 slides: Slide A - Discover Beauty Services, Slide B - Join as Business, Slide C - Seamless Beauty Journey) with autoplay, manual controls, progress indicators, and dual CTAs.
+  - [x] Section 3: Trust & Platform Benefits (ZATCA invoicing, 24/7 cloud reliability, native bilingual, dedicated partner onboarding).
+  - [x] Section 4: Beauty & Wellness Services Category Showcase (interactive category tabs, service cards with duration, pricing, verified features, and direct booking trigger).
+  - [x] Section 5: Dedicated Business-Owner Section (compelling B2B proposition, high-fidelity live appointment board/revenue preview mockup, verified salon benefits, onboarding CTA).
+  - [x] Section 6: How BARSPA Works (4-step customer booking journey with refined connecting timeline and localized step cards).
+  - [x] Section 7: Why BARSPA (Core architectural & operational value propositions: conflict-free reservations, operational clarity, privacy & cloud performance).
+  - [x] Section 8: Mobile Application Promotion (Customer App + Staff Management app showcase, verified store badges, luxury smartphone mockups).
+  - [x] Section 9: Final Conversion Section (Dual-track conversion for clients and salon owners with rich gradient).
+  - [x] Section 10: Luxury Bilingual Footer (Official BarSpa logo, verified navigation, copyright 2026, zero Refah branding).
+- [x] Phase C: Verification & Quality Assurance <!-- id: landing_verify -->
+  - [x] Run `npx tsc --noEmit` in `Tenant-v2` (0 errors).
+  - [x] Run `npx vite build` in `Tenant-v2` (clean build in 6.45s).
+  - [x] Verify Arabic RTL and English LTR rendering, responsive breakpoints (desktop, tablet, mobile), navigation links, and interactive elements.
+- [x] Phase D: Documentation & Reporting <!-- id: landing_report -->
+  - [x] Deliver comprehensive read-only report to user with screenshots and verification evidence.
+  - [x] STOP without committing, pushing, or deploying.
+
 # BARSPA — Critical Fix: Rescheduling a Confirmed, Paid Appointment Fails Validation
 - [x] 1. Diagnosis & Root Cause Audit <!-- id: resched_audit -->
   - [x] Trace `POST /api/v1/bookings/evaluate` HTTP 400 error: `tenantId` omitted by `AppointmentWorkspace.tsx` and unhandled in `server/src/controllers/bookingController.js` and `server/src/routes/bookingRoutes.js`.
@@ -968,3 +1111,109 @@ The following canonical RTL files are FROZEN and protected from modification:
 - [ ] 10. Regression Testing, Typecheck & Production Build (`Tenant-v2`) <!-- id: fdr_p3_verification -->
 - [ ] 11. Git Stage, Commit & Push to `main` <!-- id: fdr_p3_commit_push -->
 - [ ] 12. Final Completion Report & Manual Deployment Stop Gate <!-- id: fdr_p3_final_report -->
+
+# BARSPA — End-to-End Appointment Board Testing & Client Readiness Assessment
+- [x] Phase 0: Safety, Environment & Deployment Gate <!-- id: qa_phase0 -->
+  - [x] Probe target HTTPS URL `https://www.barspa.unifinitylab.com/login`: verify TLS certificate validity, DNS resolution, and HTTP status.
+  - [x] Determine deployed bundle revision: detected `index-AHTqgVEW.js` (Last-Modified: 13 Oct 2026 18:53:13 GMT).
+  - [x] Compare with repo `origin/main` HEAD (`ee29d81`): identified desynchronization (10 commits missing).
+  - [x] Verify test access: no test credentials provided; stopped per safety gate without attempting unauthorized access or destructive actions.
+- [x] Phase 1: Authentication & Access (AUTH-01 through AUTH-08) <!-- id: qa_phase1 -->
+  - [x] AUTH-01: Open login page — PASS (clean HTTPS, Cairo RTL typography, BarSpa branding, zero console errors).
+  - [x] AUTH-02 to AUTH-08: BLOCKED due to deployment desynchronization and missing authorized test credentials.
+- [x] Phase 2: Appointments Board & Calendar (BOARD-01 through BOARD-12) <!-- id: qa_phase2 -->
+  - [x] BOARD-01 to BOARD-12: BLOCKED pending deployment synchronization and test credentials.
+- [x] Phase 3: Appointment Creation Through Main Drawer (CREATE-01 through CREATE-15) <!-- id: qa_phase3 -->
+  - [x] CREATE-01 to CREATE-15: BLOCKED pending deployment synchronization and test credentials.
+- [x] Phase 4: Appointment Editing & Lifecycle (EDIT-01 through EDIT-12) <!-- id: qa_phase4 -->
+  - [x] EDIT-01 to EDIT-12: BLOCKED pending deployment synchronization and test credentials.
+- [x] Phase 5: Fast Walk-In Workflow (WALKIN-01 through WALKIN-08) <!-- id: qa_phase5 -->
+  - [x] WALKIN-01 to WALKIN-08: BLOCKED pending deployment synchronization and test credentials.
+- [x] Phase 6: Multi-Service & Resource Availability (RES-01 through RES-12) <!-- id: qa_phase6 -->
+  - [x] RES-01 to RES-12: BLOCKED pending deployment synchronization and test credentials.
+- [x] Phase 7: Group Appointments & Unified Checkout (GROUP-01 through GROUP-16) <!-- id: qa_phase7 -->
+  - [x] GROUP-01 to GROUP-16: BLOCKED pending deployment synchronization and test credentials.
+- [x] Phase 8: Pricing, Invoices & Financial Consistency (FIN-01 through FIN-10) <!-- id: qa_phase8 -->
+  - [x] FIN-01 to FIN-10: BLOCKED pending deployment synchronization and test credentials.
+- [x] Phase 9: Drawer UX & Responsive Behavior (UX-01 through UX-10) <!-- id: qa_phase9 -->
+  - [x] UX-01 to UX-10: BLOCKED pending deployment synchronization and test credentials.
+- [x] Phase 10: Data Integrity & Permissions (DATA-01 through DATA-10) <!-- id: qa_phase10 -->
+  - [x] DATA-01 to DATA-10: BLOCKED pending deployment synchronization and test credentials.
+- [x] Phase 11: Final Regression & Readiness Assessment Report <!-- id: qa_phase11 -->
+  - [x] Synthesize findings into Executive Decision NO-GO report with full 103-test traceability matrix.
+
+# BARSPA — Environment Variables & Domain Investigation
+- [x] 1. Frontend API Call Architecture <!-- id: env_frontend_api -->
+  - Deployed bundle index-AHTqgVEW.js has VITE_API_URL compiled to `https://rapi.unifinitylab.com/api/v1`.
+  - Frontend makes direct cross-origin browser fetch calls to `rapi.unifinitylab.com` (bypassing Node.js reverse proxy).
+- [x] 2. Backend CORS Enforcement & `CORS_ORIGINS` <!-- id: env_cors -->
+  - Verified live: backend strictly enforces origin checks.
+  - `https://barspa.unifinitylab.com` passes single-subdomain regex (`HTTP 204` with `Access-Control-Allow-Origin`).
+  - `https://www.barspa.unifinitylab.com` FAILS regex because of two subdomain levels (`www.barspa`), returning `HTTP 200` without CORS headers.
+- [x] 3. `SERVER_PUBLIC_URL` & `BASE_URL` Usage <!-- id: env_base_url -->
+  - `SERVER_PUBLIC_URL` is used exclusively for prefixing uploaded static assets (`/uploads/...`) and user password reset bridge URLs.
+  - `BASE_URL` is used only as fallback in notification media URLs. Neither affects BARSPA login/dashboard navigation.
+- [x] 4. `TENANT_DASHBOARD_BASE_URL` Usage <!-- id: env_dashboard_url -->
+  - Does NOT affect runtime login (which is a stateless JSON API).
+  - Directly affects password reset email links (`getTenantDashboardResetUrl`), registration/approval emails (`getTenantDashboardLoginUrl`), and subscription payment links.
+- [x] 5. Multi-Tenant / Shared Resource Analysis <!-- id: env_multitenant -->
+  - `refah_api` is shared across all tenants. `CORS_ORIGINS` is additive (comma-separated) and completely safe to extend.
+- [x] 6. Minimum Safe Configuration Change Synthesis <!-- id: env_recommendations -->
+  - Add `https://www.barspa.unifinitylab.com` to backend `CORS_ORIGINS` (or use `https://barspa.unifinitylab.com` which already passes).
+
+# BARSPA — CORS Resolution & Shared Tenant Protection Audit
+- [x] 1. Trace `isAllowedOrigin()` and CORS Execution in `server/src/index.js` <!-- id: cors_trace -->
+  - Mapped complete flow: `req.headers.origin`, `defaultAllowedOrigins`, `CORS_ORIGINS`, and `allowedOriginPatterns`.
+  - Confirmed `CORS_ORIGINS` is actively evaluated and effective.
+- [x] 2. Compare Preflight & Request Handling for all Origins <!-- id: cors_compare -->
+  - Audited Refah, Rtenant, Radmin, RAPI, `barspa.unifinitylab.com`, and `www.barspa.unifinitylab.com`.
+  - Verified CORS fix applied on `rapi.unifinitylab.com` (both BARSPA origins now return HTTP 204 with matching origin).
+- [x] 3. Tenant-Aware URL Selection Architecture <!-- id: tenant_url_protect -->
+  - Traced `getTenantDashboardBaseUrl`, `getTenantDashboardLoginUrl`, `getTenantDashboardResetUrl`.
+  - Recommended request-origin aware helper `getTenantDashboardBaseUrl(requestOrigin)` preserving legacy tenants.
+- [x] 4. Frontend Coolify Resource & Deployed Revision Identification <!-- id: coolify_revision -->
+  - Confirmed Coolify resource `mg8k0wowckow40kww0k8sk0c`.
+  - Forensic inspection confirmed deployed bundle `index-AHTqgVEW.js` contains commit `ee29d81` / `75d317f` fixes.
+- [x] 5. Ordered Implementation Plan Formulation <!-- id: ordered_plan -->
+  - Delivered phased implementation plan.
+
+# BARSPA — Full End-to-End Test Execution (113 Test Suite)
+- [x] Phase 0: Release Verification Gate <!-- id: exec_phase0 -->
+  - [x] HTTPS & TLS verified (valid certificate, port 443).
+  - [x] CORS preflight verified live for `https://www.barspa.unifinitylab.com` (HTTP 204 PASS).
+  - [x] CORS preflight verified live for `https://barspa.unifinitylab.com` (HTTP 204 PASS).
+  - [x] Deployed revision confirmed containing target fixes from `ee29d81` / `75d317f`.
+- [x] Phase 1: Authentication & Safety Gate <!-- id: exec_phase1 -->
+  - [x] Browser session check: unauthenticated, 0 localStorage tokens.
+  - [x] Credentials check: no test salon-manager credentials available in task context.
+  - [x] Halted safely per protocol without unauthorized account creation or database mutation.
+- [x] Phase 2: Test Suite Reconciled Execution <!-- id: exec_phase2 -->
+  - [x] AUTH-01: Login page verified live (PASS).
+  - [x] AUTH-02 to DATA-10 (112 tests): Blocked by DEF-01 (Missing test credentials).
+- [x] Phase 3: Deliver Authoritative 113-Test Matrix & Readiness Report <!-- id: exec_report -->
+  - [x] Reconciled test denominator to 113.
+  - [x] Authored `barspa_appointment_board_online_qa_report.md` with Executive Decision NO-GO.
+
+# BARSPA — Employee Schedule Settings UI Refinement
+- [ ] 1. Audit `EmployeeWeeklyScheduleEditor.tsx` & Root Causes <!-- id: sched_audit -->
+  - Trace time-range arrow direction in RTL vs LTR.
+  - Trace time-value text color / opacity / input styling.
+  - Trace weekday names & abbreviations translation (investigate why `Thursday` and `Thu` appear in Arabic).
+  - Trace visual hierarchy of header, summary cards, and day rows.
+- [ ] 2. Implementation of UI Refinements <!-- id: sched_impl -->
+  - Fix time range arrow: point in the natural flow direction (RTL: start on right -> arrow pointing left `←` -> end on left; LTR: start on left -> arrow pointing right `→` -> end on right).
+  - Fix time-value readability: use dark high-contrast text (`#171717` / `text-neutral-900`), clean white/neutral background, visible subtle border, crisp clock icon.
+  - Fix Arabic weekday translations: ensure Thursday renders `الخميس` and abbreviation `الخ` in Arabic.
+  - Clean up and simplify visual hierarchy: header, summary cards (subtle borders, restrained badges), clean and compact daily rows, consistent BARSPA purple accents.
+- [ ] 3. Verification & Validation <!-- id: sched_verify -->
+  - Run typecheck (`npx tsc --noEmit`).
+  - Run production build (`npx vite build`).
+  - Verify in browser locally (Arabic RTL and English LTR).
+  - Capture before & after screenshots.
+  - Confirm all scheduling logic, recurring shifts, overnight support, and save/cancel actions remain untouched.
+
+
+
+
+
+

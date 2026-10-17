@@ -3,6 +3,7 @@ import EmployeeProfileEditor from './employee-profile/EmployeeProfileEditor';
 import { motion, AnimatePresence } from 'motion/react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { DEFAULT_EMPLOYEE_AVATAR, resolveEmployeeImageUrl } from '../lib/employeeImage';
+import { persistEmployeeSchedule, validateWeeklySchedule, isScheduleEqual } from '../lib/employeeHelpers';
 import { useTenantAuth } from '../contexts/TenantAuthContext';
 import { getTenantBusinessHours, normalizeTimeInput, type WorkingHoursDayKey } from '../lib/tenantWorkingHours';
 import { 
@@ -641,66 +642,14 @@ export default function TeamsWorkspace({
     }
   };
 
-  const persistEmployeeSchedule = async (
+  const persistEmployeeScheduleLocal = async (
     employeeId: string,
     schedule: TeamMemberData['schedule'],
     scheduleStartDate: string,
     scheduleEndDate: string,
     scheduleContinues: boolean
   ) => {
-    const existingResponse = await tenantApiAdapter.getEmployeeShifts(employeeId);
-    const existingShifts = Array.isArray(existingResponse?.shifts)
-      ? existingResponse.shifts
-      : Array.isArray(existingResponse?.data?.shifts)
-        ? existingResponse.data.shifts
-        : [];
-
-    await Promise.allSettled(
-      existingShifts.map((shift: any) => tenantApiAdapter.deleteEmployeeShift(employeeId, shift.id))
-    );
-
-    const saveTasks: Promise<any>[] = [];
-    const recurringStart = scheduleStartDate || new Date().toISOString().split('T')[0];
-    const recurringEnd = scheduleContinues ? null : (scheduleEndDate || null);
-
-    schedule.forEach((day, index) => {
-      if (day.status !== 'working') {
-        return;
-      }
-
-      const hasSubShifts = day.subShifts && day.subShifts.length > 0;
-
-      if (hasSubShifts) {
-        day.subShifts!.forEach((subShift) => {
-          saveTasks.push(tenantApiAdapter.createEmployeeShift(employeeId, {
-            dayOfWeek: WEEKDAY_ROWS[index]?.dayOfWeek ?? null,
-            specificDate: null,
-            startTime: to24HourTime(subShift.startTime),
-            endTime: to24HourTime(subShift.endTime),
-            isRecurring: true,
-            startDate: recurringStart,
-            endDate: recurringEnd,
-            label: subShift.label || 'Sub Shift'
-          }));
-        });
-      } else {
-        const { startTime, endTime } = parseScheduleRange(day.hours);
-        if (startTime && endTime) {
-          saveTasks.push(tenantApiAdapter.createEmployeeShift(employeeId, {
-            dayOfWeek: WEEKDAY_ROWS[index]?.dayOfWeek ?? null,
-            specificDate: null,
-            startTime,
-            endTime,
-            isRecurring: true,
-            startDate: recurringStart,
-            endDate: recurringEnd,
-            label: `${day.dayEn} Shift`
-          }));
-        }
-      }
-    });
-
-    await Promise.all(saveTasks);
+    return persistEmployeeSchedule(employeeId, schedule, scheduleStartDate, scheduleEndDate, scheduleContinues);
   };
 
   const syncSelectedMemberSchedule = async (employeeId: string) => {
@@ -1009,26 +958,39 @@ export default function TeamsWorkspace({
       return;
     }
 
+    const scheduleValidation = validateWeeklySchedule(submittedData.schedule);
+    if (!scheduleValidation.isValid) {
+      triggerToast(
+        scheduleValidation.errorEn || 'Please verify shift working hours',
+        scheduleValidation.errorAr || 'تأكد من صحة أوقات الشيفتات المحددة',
+        'error'
+      );
+      return;
+    }
+
     try {
       setIsSaving(true);
       const payload = new FormData();
       const canonicalPosition = canonicalEmployeePosition(submittedData.position);
       const primaryBio = isRtl ? submittedData.bioAr || submittedData.bioEn : submittedData.bioEn || submittedData.bioAr;
       const primaryExperience = isRtl ? submittedData.experienceAr || submittedData.experienceEn : submittedData.experienceEn || submittedData.experienceAr;
+      const primaryNationality = isRtl
+        ? submittedData.nationalityAr?.trim() || submittedData.nationalityEn?.trim()
+        : submittedData.nationalityEn?.trim() || submittedData.nationalityAr?.trim();
       const isServiceProvider = canonicalPosition === 'service_provider';
       let savedEmployeeId = submittedData.id;
 
-      payload.append('name', submittedData.nameEn || submittedData.nameAr);
+      payload.append('name', isRtl ? (submittedData.nameAr || submittedData.nameEn) : (submittedData.nameEn || submittedData.nameAr));
       if (submittedData.email.trim()) {
         payload.append('email', submittedData.email.trim());
       }
       if (submittedData.phone.trim()) {
         payload.append('phone', submittedData.phone.trim());
       }
-      if (submittedData.nationalityEn.trim() || submittedData.nationalityAr.trim()) {
-        payload.append('nationality', submittedData.nationalityEn || submittedData.nationalityAr);
+      if (primaryNationality) {
+        payload.append('nationality', primaryNationality);
       }
-      payload.append('gender', submittedData.gender);
+      payload.append('gender', submittedData.gender || 'female');
       payload.append('position', canonicalPosition);
       payload.append('bio', primaryBio || '');
       payload.append('experience', primaryExperience || '');
@@ -1068,7 +1030,16 @@ export default function TeamsWorkspace({
         );
       }
 
-      if (savedEmployeeId) {
+      const activeOriginal = teamMembers.find((m) => m.id === submittedData.id);
+      const scheduleChanged =
+        formMode === 'add' ||
+        !activeOriginal ||
+        !isScheduleEqual(activeOriginal.schedule, submittedData.schedule) ||
+        activeOriginal.scheduleStartDate !== submittedData.scheduleStartDate ||
+        activeOriginal.scheduleEndDate !== submittedData.scheduleEndDate ||
+        Boolean(activeOriginal.scheduleContinues) !== Boolean(submittedData.scheduleContinues);
+
+      if (scheduleChanged && savedEmployeeId) {
         try {
           await persistEmployeeSchedule(
             savedEmployeeId,
