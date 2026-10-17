@@ -1,3 +1,9 @@
+import {
+  resolveEmployeeDutyIntervals,
+  formatMinutesToClockLabel,
+  type StaffShiftRecord
+} from './employeeDutyHours';
+
 // Use a local interface that extends StagedService with optional fields needed by the engine
 export interface StagedServiceWithAssignment {
   id: string;
@@ -10,6 +16,7 @@ export interface StagedServiceWithAssignment {
   itemType?: 'service' | 'package';
   packageId?: string;
   packageInstanceId?: string;
+  participantId?: string;
 }
 
 export interface StaffAssignmentResolution {
@@ -21,6 +28,203 @@ export interface StaffAssignmentResolution {
   conflictingStaffId?: string;
   messageEn?: string;
   messageAr?: string;
+}
+
+export interface StylistAvailabilityCheckParams {
+  stylist: any;
+  service?: any;
+  item: {
+    id: string;
+    startTime: number; // Board minutes from boardStartHour
+    duration: number; // in minutes
+    participantId?: string;
+  };
+  selectedDate: string | Date;
+  boardStartHour?: number;
+  tenantShifts?: StaffShiftRecord[] | null;
+  appointments?: any[] | null;
+  stagedServices?: any[] | null;
+}
+
+export interface StylistAvailabilityResult {
+  available: boolean;
+  reason?:
+    | 'not_qualified'
+    | 'status_off'
+    | 'no_duty'
+    | 'before_shift'
+    | 'after_shift'
+    | 'shift_gap'
+    | 'overlapping_booking'
+    | 'overlapping_staged';
+  earliestStart?: number;
+  latestEnd?: number;
+  messageEn?: string;
+  messageAr?: string;
+}
+
+/**
+ * Checks whether a specific stylist is eligible and available to perform a service item
+ * at the requested date, start time, and duration.
+ */
+export function isStylistAvailableForServiceItem(
+  params: StylistAvailabilityCheckParams
+): StylistAvailabilityResult {
+  const {
+    stylist,
+    service,
+    item,
+    selectedDate,
+    boardStartHour = 9,
+    tenantShifts,
+    appointments,
+    stagedServices
+  } = params;
+
+  if (!stylist) {
+    return {
+      available: false,
+      reason: 'not_qualified',
+      messageEn: 'Specialist not found.',
+      messageAr: 'لم يتم العثور على المختص.'
+    };
+  }
+
+  // 1. Status Check
+  const status = `${stylist?.status || ''}`.toLowerCase();
+  if (status === 'off' || stylist?.isActive === false) {
+    return {
+      available: false,
+      reason: 'status_off',
+      messageEn: `${stylist.nameEn || 'Specialist'} is currently inactive.`,
+      messageAr: `${stylist.nameAr || 'المختص'} غير متاح حالياً.`
+    };
+  }
+
+  // 2. Qualification Check
+  if (service && !isStaffQualifiedForService(service, stylist.id)) {
+    return {
+      available: false,
+      reason: 'not_qualified',
+      messageEn: `${stylist.nameEn || 'Specialist'} is not qualified for this service.`,
+      messageAr: `${stylist.nameAr || 'المختص'} غير مؤهل لتقديم هذه الخدمة.`
+    };
+  }
+
+  // 3. Resolve date string YYYY-MM-DD
+  const dateKey = typeof selectedDate === 'string'
+    ? selectedDate
+    : `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+
+  // 4. Duty Hours / Shifts Check
+  const startHour = Number(boardStartHour ?? 9);
+  const itemStartOfDay = (startHour * 60) + Math.max(0, Number(item.startTime || 0));
+  const itemEndOfDay = itemStartOfDay + Math.max(1, Number(item.duration || 0));
+
+  const dutyIntervals = resolveEmployeeDutyIntervals({
+    staffId: String(stylist.id),
+    dateKey,
+    shifts: tenantShifts,
+    fallbackSchedule: stylist.schedule
+  });
+
+  if (dutyIntervals.length === 0) {
+    return {
+      available: false,
+      reason: 'no_duty',
+      messageEn: `${stylist.nameEn || 'Specialist'} has no scheduled duty on this date.`,
+      messageAr: `${stylist.nameAr || 'المختص'} ليس لديه دوام في هذا اليوم.`
+    };
+  }
+
+  const fits = dutyIntervals.some(
+    interval => itemStartOfDay >= interval.startMinutes && itemEndOfDay <= interval.endMinutes
+  );
+
+  if (!fits) {
+    const earliestStart = Math.min(...dutyIntervals.map(i => i.startMinutes));
+    const latestEnd = Math.max(...dutyIntervals.map(i => i.endMinutes));
+    if (itemStartOfDay < earliestStart) {
+      return {
+        available: false,
+        reason: 'before_shift',
+        earliestStart,
+        messageEn: `${stylist.nameEn || 'Specialist'} starts at ${formatMinutesToClockLabel(earliestStart, false)}. Please select a different time or employee.`,
+        messageAr: `يبدأ دوام ${stylist.nameAr || 'المختص'} في الساعة ${formatMinutesToClockLabel(earliestStart, true)}. يرجى اختيار وقت آخر أو موظف مختلف.`
+      };
+    }
+    if (itemEndOfDay > latestEnd) {
+      return {
+        available: false,
+        reason: 'after_shift',
+        latestEnd,
+        messageEn: `${stylist.nameEn || 'Specialist'}'s working hours end at ${formatMinutesToClockLabel(latestEnd, false)}, but this service would finish at ${formatMinutesToClockLabel(itemEndOfDay, false)}.`,
+        messageAr: `ينتهي دوام ${stylist.nameAr || 'المختص'} في الساعة ${formatMinutesToClockLabel(latestEnd, true)}، بينما تنتهي هذه الخدمة في ${formatMinutesToClockLabel(itemEndOfDay, true)}.`
+      };
+    }
+    return {
+      available: false,
+      reason: 'shift_gap',
+      messageEn: `${stylist.nameEn || 'Specialist'} is on break or between shifts at this time.`,
+      messageAr: `${stylist.nameAr || 'المختص'} في فترة استراحة بين الفترات في هذا الوقت.`
+    };
+  }
+
+  // 5. Existing Board Appointments & Breaks Check
+  if (Array.isArray(appointments) && appointments.length > 0) {
+    const overlappingBooking = appointments.find(apt => {
+      if (String(apt.staffId) !== String(stylist.id)) return false;
+      if (apt.status === 'cancelled' || apt.status === 'no_show') return false;
+      if (apt.date && apt.date !== dateKey) return false;
+      return areServicesOverlapping(item.startTime, item.duration, apt.startTime, apt.duration);
+    });
+
+    if (overlappingBooking) {
+      return {
+        available: false,
+        reason: 'overlapping_booking',
+        messageEn: `${stylist.nameEn || 'Specialist'} has another appointment or scheduled break at this time.`,
+        messageAr: `${stylist.nameAr || 'المختص'} لديه موعد آخر أو فترة راحة مجدولة في هذا الوقت.`
+      };
+    }
+  }
+
+  // 6. Current Booking Staged Services Check
+  if (Array.isArray(stagedServices) && stagedServices.length > 0) {
+    const overlappingStaged = stagedServices.find(other => {
+      if (other.id === item.id) return false;
+      if (String(other.staffId) !== String(stylist.id)) return false;
+      if (!other.isExplicitStaff) return false;
+      return areServicesOverlapping(item.startTime, item.duration, other.startTime, other.duration);
+    });
+
+    if (overlappingStaged) {
+      return {
+        available: false,
+        reason: 'overlapping_staged',
+        messageEn: `${stylist.nameEn || 'Specialist'} is already assigned to another overlapping service in this booking.`,
+        messageAr: `${stylist.nameAr || 'المختص'} مخصص بالفعل لخدمة أخرى متزامنة في هذا الحجز.`
+      };
+    }
+  }
+
+  return { available: true };
+}
+
+/**
+ * Filters the list of stylists to only those eligible and available for the given service item.
+ */
+export function getEligibleStylistsForServiceItem(
+  params: Omit<StylistAvailabilityCheckParams, 'stylist'> & { stylists: any[] }
+): any[] {
+  const { stylists, ...checkParams } = params;
+  return (stylists || []).filter(stylist => {
+    const res = isStylistAvailableForServiceItem({
+      ...checkParams,
+      stylist
+    });
+    return res.available;
+  });
 }
 
 function makeFailure(
@@ -56,6 +260,13 @@ export function isStaffQualifiedForService(
   return assignments.includes(String(staffId));
 }
 
+export interface StaffAssignmentContext {
+  selectedDate?: string | Date;
+  boardStartHour?: number;
+  tenantShifts?: StaffShiftRecord[] | null;
+  appointments?: any[] | null;
+}
+
 /**
  * Resolves staffing assignments for a list of staged services.
  * Respects:
@@ -64,11 +275,13 @@ export function isStaffQualifiedForService(
  * 3. Service capability (employeeAssignments)
  * 4. Time overlaps & parallel bundle sibling conflicts
  * 5. Uses MRV (Minimum Remaining Values) heuristic to avoid premature starvation
+ * 6. (Optional) duty hours and existing board appointments when context is provided
  */
 export function resolveCompatibleStaffAssignments(
   stagedServices: StagedServiceWithAssignment[],
   availableStylists: any[],
-  canonicalServices: any[]
+  canonicalServices: any[],
+  context?: StaffAssignmentContext
 ): StaffAssignmentResolution {
   const resolvedStaffMap = new Map<string, string>();
   if (!stagedServices || stagedServices.length === 0) {
@@ -97,6 +310,38 @@ export function resolveCompatibleStaffAssignments(
           messageAr: `الموظف المحدد غير مؤهل لتقديم خدمة "${srvNameAr}".`
         });
       }
+
+      // If availability context is provided, validate duty hours, shift start/end, and appointments
+      if (context?.selectedDate) {
+        const staffObj = availableStylists.find(s => String(s.id) === String(item.staffId));
+        const availCheck = isStylistAvailableForServiceItem({
+          stylist: staffObj,
+          service: srv,
+          item: {
+            id: item.id,
+            startTime: item.startTime,
+            duration: item.duration,
+            participantId: item.participantId
+          },
+          selectedDate: context.selectedDate,
+          boardStartHour: context.boardStartHour,
+          tenantShifts: context.tenantShifts,
+          appointments: context.appointments,
+          stagedServices: stagedServices as any[]
+        });
+
+        if (!availCheck.available) {
+          return makeFailure({
+            reason: 'no_qualified_staff',
+            conflictingItemId: item.id,
+            conflictingServiceId: item.serviceId,
+            conflictingStaffId: item.staffId,
+            messageEn: availCheck.messageEn || `Specialist is not available for service "${srvName}".`,
+            messageAr: availCheck.messageAr || `المختص غير متاح لخدمة "${srvNameAr}".`
+          });
+        }
+      }
+
       fixedAssignments.set(item.id, String(item.staffId));
       resolvedStaffMap.set(item.id, String(item.staffId));
     } else {
@@ -159,12 +404,35 @@ export function resolveCompatibleStaffAssignments(
       });
     }
 
-    // Filter out stylists who are already explicitly booked in overlapping fixed items
+    // Filter out stylists who are already explicitly booked in overlapping fixed items,
+    // or who fail duty hours/appointments if context is provided
     const availableForSlot = qualifiedStylists.filter(s => {
       const sId = String(s.id);
-      return !fixedEntries.some(fixed => {
+      const isFixedOverlapping = fixedEntries.some(fixed => {
         return fixed.staffId === sId && areServicesOverlapping(item.startTime, item.duration, fixed.item.startTime, fixed.item.duration);
       });
+      if (isFixedOverlapping) return false;
+
+      if (context?.selectedDate) {
+        const check = isStylistAvailableForServiceItem({
+          stylist: s,
+          service: srv,
+          item: {
+            id: item.id,
+            startTime: item.startTime,
+            duration: item.duration,
+            participantId: item.participantId
+          },
+          selectedDate: context.selectedDate,
+          boardStartHour: context.boardStartHour,
+          tenantShifts: context.tenantShifts,
+          appointments: context.appointments,
+          stagedServices: stagedServices as any[]
+        });
+        if (!check.available) return false;
+      }
+
+      return true;
     });
 
     if (availableForSlot.length === 0) {

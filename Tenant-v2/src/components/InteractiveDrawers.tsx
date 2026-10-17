@@ -77,8 +77,14 @@ import {
   isBookingTooSoonError,
   type BookingDialogCopy
 } from '../lib/bookingUiDialogs';
+import {
+  resolveCompatibleStaffAssignments,
+  isStylistAvailableForServiceItem,
+  getEligibleStylistsForServiceItem,
+  type StaffAssignmentResolution
+} from '../lib/staffAssignmentEngine';
+import { type StaffShiftRecord } from '../lib/employeeDutyHours';
 import { buildEmptyAppointmentDraftSnapshot, isAppointmentDraftContent } from '../lib/appointmentDraftState';
-import { resolveCompatibleStaffAssignments, type StaffAssignmentResolution } from '../lib/staffAssignmentEngine';
 
 const toMoney = (value: any) => {
   const numeric = Number(value);
@@ -149,6 +155,7 @@ interface InteractiveDrawersProps {
   products: any[];
   giftCardPackages?: GiftCardPackage[];
   stylists: any[];
+  tenantShifts?: StaffShiftRecord[];
   onBoardChanged?: () => Promise<void> | void;
   existingBreak?: {
     id: string;
@@ -432,6 +439,7 @@ export default function InteractiveDrawers({
   products,
   giftCardPackages = [],
   stylists,
+  tenantShifts = [],
   onBoardChanged,
   existingBreak,
   tenantTimezone,
@@ -611,8 +619,8 @@ export default function InteractiveDrawers({
   } | null>(null);
 
   useEffect(() => {
-    if (availableStylists.length > 0 && !availableStylists.some((stylist) => stylist.id === currentStaffId)) {
-      setCurrentStaffId(availableStylists[0].id);
+    if (currentStaffId && availableStylists.length > 0 && !availableStylists.some((stylist) => stylist.id === currentStaffId)) {
+      setCurrentStaffId('');
     }
   }, [availableStylists, currentStaffId, setCurrentStaffId]);
 
@@ -1251,6 +1259,38 @@ export default function InteractiveDrawers({
       return (raw?.participantId || groupParticipants[0]?.id) === activeParticipantId;
     });
   }, [bookingScope, appointmentInvoiceSummary.standaloneCartItems, stagedServices, groupParticipants, activeParticipantId]);
+
+  const hasUnavailableStagedService = useMemo(() => {
+    if (stagedServices.length === 0) return false;
+    return stagedServices.some(item => {
+      const srv = canonicalServices.find(s => s.id === item.serviceId);
+      const eligible = getEligibleStylistsForServiceItem({
+        stylists: availableStylists,
+        service: srv,
+        item: {
+          id: item.id,
+          startTime: item.startTime,
+          duration: item.duration,
+          participantId: item.participantId
+        },
+        selectedDate: smartAvailabilityDate || selectedDate,
+        boardStartHour,
+        tenantShifts,
+        appointments,
+        stagedServices
+      });
+      return eligible.length === 0;
+    });
+  }, [
+    stagedServices,
+    canonicalServices,
+    availableStylists,
+    smartAvailabilityDate,
+    selectedDate,
+    boardStartHour,
+    tenantShifts,
+    appointments
+  ]);
 
   useEffect(() => {
     if (createStep === 3 && stagedServices.length === 0) {
@@ -2291,7 +2331,61 @@ export default function InteractiveDrawers({
     });
   };
 
-  // Phase 3: Smart Availability Operations
+  // Invalidate assigned stylists if they become unavailable due to date/time/service updates
+  useEffect(() => {
+    if (!isCreateDrawerOpen || stagedServices.length === 0) return;
+
+    let hasInvalidation = false;
+    const updatedServices = stagedServices.map(item => {
+      if (!item.staffId || !item.isExplicitStaff) return item;
+
+      const srv = canonicalServices.find(s => s.id === item.serviceId);
+      const targetStylist = availableStylists.find(s => String(s.id) === String(item.staffId));
+
+      const isStillAvailable = isStylistAvailableForServiceItem({
+        stylist: targetStylist,
+        service: srv,
+        item: {
+          id: item.id,
+          startTime: item.startTime,
+          duration: item.duration,
+          participantId: item.participantId
+        },
+        selectedDate: smartAvailabilityDate || selectedDate,
+        boardStartHour,
+        tenantShifts,
+        appointments,
+        stagedServices
+      }).available;
+
+      if (!isStillAvailable) {
+        hasInvalidation = true;
+        return {
+          ...item,
+          staffId: '',
+          isExplicitStaff: false
+        };
+      }
+      return item;
+    });
+
+    if (hasInvalidation) {
+      setStagedServices(updatedServices);
+      addLocalToast(
+        'المختص المحدد لم يعد متاحاً في الوقت المحدث وتم إلغاء تحديده.',
+        'The assigned specialist is no longer available at this updated time and has been cleared.',
+        'warning'
+      );
+    }
+  }, [
+    isCreateDrawerOpen,
+    smartAvailabilityDate,
+    selectedDate,
+    boardStartHour,
+    tenantShifts,
+    appointments,
+    stagedServices.map(s => `${s.id}:${s.startTime}:${s.duration}:${s.staffId}:${s.isExplicitStaff}`).join('|')
+  ]);
   const loadSmartAvailability = useCallback(async (
     targetDate: Date,
     checkAll: boolean
@@ -2565,11 +2659,30 @@ export default function InteractiveDrawers({
         ...current,
         [service.id]: false
       }));
-    } else {
       const resolvedVariant = variantOverride || null;
       const nextStartTime = activeParticipantNextStartTime;
       const nextStartTimeIso = buildIsoFromMinutes(selectedDate, nextStartTime);
+      const resolvedDuration = resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration);
 
+      // Verify whether currentStaffId is actually available for this specific service item interval
+      const targetStylist = currentStaffId ? availableStylists.find(s => String(s.id) === String(currentStaffId)) : null;
+      const isCurrentStaffAvailable = targetStylist ? isStylistAvailableForServiceItem({
+        stylist: targetStylist,
+        service,
+        item: {
+          id: 'new-staged-check',
+          startTime: nextStartTime,
+          duration: resolvedDuration,
+          participantId: bookingScope === 'group' ? activeParticipantId : undefined
+        },
+        selectedDate: smartAvailabilityDate || selectedDate,
+        boardStartHour,
+        tenantShifts,
+        appointments,
+        stagedServices
+      }).available : false;
+
+      const initialStaffId = isCurrentStaffAvailable ? currentStaffId : '';
       const basePrice = toMoney(resolvedVariant?.finalPrice ?? resolvedVariant?.price ?? service.finalPrice ?? service.price ?? 0);
 
       const newItem: StagedService = {
@@ -2578,11 +2691,11 @@ export default function InteractiveDrawers({
         serviceId: service.id,
         variantId: resolvedVariant?.id || undefined,
         serviceCategory: service.category,
-        staffId: currentStaffId || '',
-        isExplicitStaff: Boolean(currentStaffId),
+        staffId: initialStaffId,
+        isExplicitStaff: Boolean(initialStaffId),
         startTime: nextStartTime,
         startTimeIso: nextStartTimeIso,
-        duration: resolveBookingDuration(undefined, resolvedVariant?.duration, service.duration),
+        duration: resolvedDuration,
         discountType: 'none',
         discountValue: 0,
         notes: '',
@@ -3021,22 +3134,65 @@ export default function InteractiveDrawers({
       return;
     }
 
-    // Pre-validate staged services and guest services staff assignment using compatible staff resolver
-    const staffResolution = resolveCompatibleStaffAssignments(finalStaged, availableStylists, canonicalServices);
+    // Pre-validate staged services and guest services staff assignment using compatible staff resolver with full availability context
+    const staffResolution = resolveCompatibleStaffAssignments(
+      finalStaged,
+      availableStylists,
+      canonicalServices,
+      {
+        selectedDate: smartAvailabilityDate || selectedDate,
+        boardStartHour,
+        tenantShifts,
+        appointments
+      }
+    );
     if (!staffResolution.success) {
       showBookingErrorDialog({
         titleAr: staffResolution.reason === 'explicit_overlap'
           ? 'تعارض في تعيين المختصين'
           : staffResolution.reason === 'no_qualified_staff'
-          ? 'لا يوجد موظف مؤهل'
+          ? 'لا يوجد موظف متاح'
           : 'تعارض في توفر الموظفين للباقة المتزامنة',
         titleEn: staffResolution.reason === 'explicit_overlap'
           ? 'Specialist Scheduling Conflict'
           : staffResolution.reason === 'no_qualified_staff'
-          ? 'No Qualified Professional'
+          ? 'No Available Professional'
           : 'Parallel Bundle Specialist Conflict',
         bodyAr: staffResolution.messageAr || 'تعذر إيجاد مختصين متاحين لجميع الخدمات في الوقت المحدد.',
         bodyEn: staffResolution.messageEn || 'Could not find compatible available professionals for all services at the selected time.'
+      });
+      return;
+    }
+
+    // Verify each staged item has at least one eligible and available provider
+    const unavailableStagedItem = finalStaged.find(item => {
+      const srv = canonicalServices.find(s => s.id === item.serviceId);
+      const eligible = getEligibleStylistsForServiceItem({
+        stylists: availableStylists,
+        service: srv,
+        item: {
+          id: item.id,
+          startTime: item.startTime,
+          duration: item.duration,
+          participantId: item.participantId
+        },
+        selectedDate: smartAvailabilityDate || selectedDate,
+        boardStartHour,
+        tenantShifts,
+        appointments,
+        stagedServices: finalStaged
+      });
+      return eligible.length === 0;
+    });
+
+    if (unavailableStagedItem) {
+      const srv = canonicalServices.find(s => s.id === unavailableStagedItem.serviceId);
+      const srvName = isRtl ? (srv?.nameAr || 'الخدمة') : (srv?.nameEn || 'Service');
+      showBookingErrorDialog({
+        titleAr: 'لا يوجد مقدم خدمة متاح',
+        titleEn: 'No Service Provider Available',
+        bodyAr: `لا يوجد مقدم خدمة متاح لخدمة "${srvName}". اختر وقتاً آخر أو غيّر الخدمة.`,
+        bodyEn: `No service provider is available for service "${srvName}". Choose another time or service.`
       });
       return;
     }
@@ -4635,10 +4791,22 @@ export default function InteractiveDrawers({
                                     <div className="space-y-2 pt-1">
                                       {pkgItem.childItems.map((cItem) => {
                                         const cSrv = canonicalServices.find(s => s.id === cItem.serviceId);
-                                        const cStylists = availableStylists.filter(s => {
-                                          const assignments = cSrv?.employeeAssignments || [];
-                                          return assignments.length === 0 || assignments.map(String).includes(String(s.id));
+                                        const cStylists = getEligibleStylistsForServiceItem({
+                                          stylists: availableStylists,
+                                          service: cSrv,
+                                          item: {
+                                            id: cItem.id,
+                                            startTime: cItem.startTime,
+                                            duration: cItem.duration,
+                                            participantId: cItem.participantId
+                                          },
+                                          selectedDate: smartAvailabilityDate || selectedDate,
+                                          boardStartHour,
+                                          tenantShifts,
+                                          appointments,
+                                          stagedServices
                                         });
+                                        const hasNoAvailableStylist = cStylists.length === 0;
 
                                         return (
                                           <div key={cItem.id} className="rounded-lg bg-white border border-purple-100 p-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -4658,39 +4826,60 @@ export default function InteractiveDrawers({
                                                 compact
                                               />
                                             </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                              <div className="flex items-center gap-1">
-                                                <Clock className="w-3 h-3 text-purple-500" />
+                                            <div className="flex flex-col gap-1 shrink-0">
+                                              <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1">
+                                                  <Clock className="w-3 h-3 text-purple-500" />
+                                                  <select
+                                                    value={formatBlockStartClockValue(cItem.startTime)}
+                                                    onChange={(e) => {
+                                                      const offset = convertBlockClockToOffset(e.target.value);
+                                                      handleUpdateStagedService(cItem.id, { startTime: offset });
+                                                    }}
+                                                    className="rounded border border-purple-200 bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-purple-900 outline-none"
+                                                    title={isRtl ? 'تعديل وقت بدء الخدمة' : 'Edit service start time'}
+                                                  >
+                                                    {blockStartTimeOptions.map(opt => (
+                                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                    ))}
+                                                  </select>
+                                                </div>
                                                 <select
-                                                  value={formatBlockStartClockValue(cItem.startTime)}
+                                                  disabled={hasNoAvailableStylist}
+                                                  value={hasNoAvailableStylist ? '' : (cItem.staffId || '')}
                                                   onChange={(e) => {
-                                                    const offset = convertBlockClockToOffset(e.target.value);
-                                                    handleUpdateStagedService(cItem.id, { startTime: offset });
+                                                    const newStaff = e.target.value;
+                                                    handleUpdateStagedService(cItem.id, {
+                                                      staffId: newStaff,
+                                                      isExplicitStaff: Boolean(newStaff)
+                                                    });
                                                   }}
-                                                  className="rounded border border-purple-200 bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-purple-900 outline-none"
-                                                  title={isRtl ? 'تعديل وقت بدء الخدمة' : 'Edit service start time'}
+                                                  className={`rounded border px-2 py-1 text-[11px] font-bold outline-none ${
+                                                    hasNoAvailableStylist
+                                                      ? 'border-amber-300 bg-amber-50 text-amber-700 cursor-not-allowed opacity-80'
+                                                      : 'border-slate-200 bg-white text-slate-700'
+                                                  }`}
                                                 >
-                                                  {blockStartTimeOptions.map(opt => (
-                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                  <option value="">
+                                                    {hasNoAvailableStylist
+                                                      ? (isRtl ? 'لا يوجد مقدم خدمة متاح' : 'No provider available')
+                                                      : (isRtl ? 'أي مختص متاح' : 'Any Stylist')}
+                                                  </option>
+                                                  {cStylists.map(st => (
+                                                    <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
                                                   ))}
                                                 </select>
                                               </div>
-                                              <select
-                                                value={cItem.staffId || ''}
-                                                onChange={(e) => {
-                                                  const newStaff = e.target.value;
-                                                  handleUpdateStagedService(cItem.id, {
-                                                    staffId: newStaff,
-                                                    isExplicitStaff: Boolean(newStaff)
-                                                  });
-                                                }}
-                                                className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 outline-none"
-                                              >
-                                                <option value="">{isRtl ? 'أي مختص متاح' : 'Any Stylist'}</option>
-                                                {cStylists.map(st => (
-                                                  <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
-                                                ))}
-                                              </select>
+                                              {hasNoAvailableStylist && (
+                                                <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-medium">
+                                                  <AlertTriangle className="w-3 h-3 shrink-0 text-amber-600" />
+                                                  <span>
+                                                    {isRtl
+                                                      ? 'لا يوجد مقدم خدمة متاح لهذا الموعد. اختر وقتًا آخر أو غيّر الخدمة.'
+                                                      : 'No service provider is available for this appointment. Choose another time or service.'}
+                                                  </span>
+                                                </div>
+                                              )}
                                             </div>
                                           </div>
                                         );
@@ -4703,10 +4892,22 @@ export default function InteractiveDrawers({
                               {/* Standalone Staged Services */}
                               {displayedStandaloneCartItems.map((item) => {
                                 const srv = canonicalServices.find(s => s.id === item.serviceId);
-                                const validStylists = availableStylists.filter(s => {
-                                  const assignments = srv?.employeeAssignments || [];
-                                  return assignments.length === 0 || assignments.map(String).includes(String(s.id));
+                                const validStylists = getEligibleStylistsForServiceItem({
+                                  stylists: availableStylists,
+                                  service: srv,
+                                  item: {
+                                    id: item.id,
+                                    startTime: item.startTime,
+                                    duration: item.duration,
+                                    participantId: item.participantId
+                                  },
+                                  selectedDate: smartAvailabilityDate || selectedDate,
+                                  boardStartHour,
+                                  tenantShifts,
+                                  appointments,
+                                  stagedServices
                                 });
+                                const hasNoAvailableStylist = validStylists.length === 0;
                                 const isConfiguring = configuredServiceId === item.id;
 
                                 return (
@@ -4780,7 +4981,8 @@ export default function InteractiveDrawers({
                                           {isRtl ? 'المختص:' : 'Stylist:'}
                                         </span>
                                         <select
-                                          value={item.staffId || ''}
+                                          disabled={hasNoAvailableStylist}
+                                          value={hasNoAvailableStylist ? '' : (item.staffId || '')}
                                           onChange={(e) => {
                                             const newStaff = e.target.value;
                                             handleUpdateStagedService(item.id, {
@@ -4788,9 +4990,17 @@ export default function InteractiveDrawers({
                                               isExplicitStaff: Boolean(newStaff)
                                             });
                                           }}
-                                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none max-w-[150px] truncate"
+                                          className={`rounded-lg border px-2 py-1 text-[11px] font-semibold outline-none max-w-[150px] truncate ${
+                                            hasNoAvailableStylist
+                                              ? 'border-amber-300 bg-amber-50 text-amber-700 cursor-not-allowed opacity-80'
+                                              : 'border-slate-200 bg-white text-slate-700'
+                                          }`}
                                         >
-                                          <option value="">{isRtl ? 'أي مختص متاح' : 'Any Stylist'}</option>
+                                          <option value="">
+                                            {hasNoAvailableStylist
+                                              ? (isRtl ? 'لا يوجد مقدم خدمة متاح' : 'No provider available')
+                                              : (isRtl ? 'أي مختص متاح' : 'Any Stylist')}
+                                          </option>
                                           {validStylists.map(st => (
                                             <option key={st.id} value={st.id}>{isRtl ? st.nameAr : st.nameEn}</option>
                                           ))}
@@ -4813,6 +5023,18 @@ export default function InteractiveDrawers({
                                         </select>
                                       </div>
                                     </div>
+
+                                    {/* No available stylist warning badge */}
+                                    {hasNoAvailableStylist && (
+                                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium mt-1">
+                                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                                        <span>
+                                          {isRtl
+                                            ? 'لا يوجد مقدم خدمة متاح لهذا الموعد. اختر وقتًا آخر أو غيّر الخدمة.'
+                                            : 'No service provider is available for this appointment. Choose another time or service.'}
+                                        </span>
+                                      </div>
+                                    )}
 
                                     {/* Inline Service Configuration Drawer (Discount & Notes) */}
                                     {isConfiguring && (
@@ -4977,6 +5199,7 @@ export default function InteractiveDrawers({
                             stagedServices.length === 0 ||
                             (bookingScope === 'single' && custMode === 'existing' && !selectedCustId) ||
                             (bookingScope === 'group' && !groupParticipants[0]?.name?.trim() && custMode === 'existing' && !selectedCustId) ||
+                            hasUnavailableStagedService ||
                             isSubmitting
                           }
                           onClick={() => handleConfirmAppointmentCreation()}
@@ -4984,6 +5207,7 @@ export default function InteractiveDrawers({
                             stagedServices.length === 0 ||
                             (bookingScope === 'single' && custMode === 'existing' && !selectedCustId) ||
                             (bookingScope === 'group' && !groupParticipants[0]?.name?.trim() && custMode === 'existing' && !selectedCustId) ||
+                            hasUnavailableStagedService ||
                             isSubmitting
                               ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                               : 'bg-[#6537C0] hover:bg-[#532ab0] text-white shadow-purple-500/20'
@@ -4998,6 +5222,8 @@ export default function InteractiveDrawers({
                             <span>{isRtl ? 'أضف خدمات للمتابعة 🗓️' : 'Add services to schedule 🗓️'}</span>
                           ) : (bookingScope === 'single' && custMode === 'existing' && !selectedCustId) ? (
                             <span>{isRtl ? 'اختر عميلاً لتأكيد الحجز 👤' : 'Select a customer to schedule 👤'}</span>
+                          ) : hasUnavailableStagedService ? (
+                            <span>{isRtl ? 'لا يوجد مقدم خدمة متاح لبعض الخدمات ⚠️' : 'Provider unavailable for some services ⚠️'}</span>
                           ) : bookingScope === 'group' ? (
                             <span>
                               {isRtl

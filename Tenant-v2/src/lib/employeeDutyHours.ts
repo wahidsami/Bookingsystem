@@ -96,6 +96,23 @@ export interface ResolveDutyIntervalsParams {
 }
 
 /**
+ * Computes previous date key (YYYY-MM-DD) for overnight shift boundary checking.
+ */
+export function getPreviousDateKey(dateKey: string): string {
+  const parts = dateKey.split('-').map(Number);
+  if (parts.length === 3 && !parts.some(Number.isNaN)) {
+    const utcDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] - 1));
+    const year = utcDate.getUTCFullYear();
+    const month = String(utcDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(utcDate.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  const d = new Date(dateKey);
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
  * Resolves authoritative duty intervals (in minutes from midnight) for an employee on a given date.
  * Returns empty array if employee is off or has no duty hours on that date.
  */
@@ -108,6 +125,9 @@ export function resolveEmployeeDutyIntervals({
   if (!staffId || !dateKey) return [];
 
   const targetDayOfWeek = getDayOfWeekFromDateKey(dateKey);
+  const prevDayOfWeek = (targetDayOfWeek + 6) % 7;
+  const prevDateKey = getPreviousDateKey(dateKey);
+
   const staffShifts = (shifts || []).filter(
     s => s.staffId === staffId && s.isActive !== false
   );
@@ -116,17 +136,38 @@ export function resolveEmployeeDutyIntervals({
   const dateSpecificShifts = staffShifts.filter(
     s => s.specificDate === dateKey || (!s.isRecurring && s.specificDate === dateKey)
   );
+  const prevDateSpecificShifts = staffShifts.filter(
+    s => s.specificDate === prevDateKey || (!s.isRecurring && s.specificDate === prevDateKey)
+  );
 
-  if (dateSpecificShifts.length > 0) {
+  if (dateSpecificShifts.length > 0 || prevDateSpecificShifts.some(s => parseTimeToMinutes(s.endTime) <= parseTimeToMinutes(s.startTime) && parseTimeToMinutes(s.endTime) > 0)) {
     const rawIntervals: DutyInterval[] = [];
+
+    // Today's date-specific shifts
     for (const s of dateSpecificShifts) {
       const startMinutes = parseTimeToMinutes(s.startTime);
       const endMinutes = parseTimeToMinutes(s.endTime);
       if (endMinutes > startMinutes) {
         rawIntervals.push({ startMinutes, endMinutes });
+      } else if (endMinutes <= startMinutes && endMinutes > 0) {
+        // Overnight segment for today: startMinutes until midnight (1440)
+        rawIntervals.push({ startMinutes, endMinutes: 1440 });
       }
     }
-    return normalizeDutyIntervals(rawIntervals);
+
+    // Previous day's overnight date-specific shifts extending into today
+    for (const s of prevDateSpecificShifts) {
+      const startMinutes = parseTimeToMinutes(s.startTime);
+      const endMinutes = parseTimeToMinutes(s.endTime);
+      if (endMinutes <= startMinutes && endMinutes > 0) {
+        // Morning segment for today: midnight (0) until endMinutes
+        rawIntervals.push({ startMinutes: 0, endMinutes });
+      }
+    }
+
+    if (rawIntervals.length > 0) {
+      return normalizeDutyIntervals(rawIntervals);
+    }
   }
 
   // 2. Evaluate recurring shifts
@@ -141,36 +182,66 @@ export function resolveEmployeeDutyIntervals({
     return true;
   });
 
-  if (recurringShifts.length > 0) {
+  const prevRecurringShifts = staffShifts.filter(s => {
+    if (s.isRecurring === false) return false;
+    if (typeof s.dayOfWeek !== 'number' || s.dayOfWeek !== prevDayOfWeek) return false;
+
+    if (s.startDate && prevDateKey < s.startDate) return false;
+    if (s.endDate && prevDateKey > s.endDate) return false;
+
+    return true;
+  });
+
+  if (recurringShifts.length > 0 || prevRecurringShifts.some(s => parseTimeToMinutes(s.endTime) <= parseTimeToMinutes(s.startTime) && parseTimeToMinutes(s.endTime) > 0)) {
     const rawIntervals: DutyInterval[] = [];
+
     for (const s of recurringShifts) {
       const startMinutes = parseTimeToMinutes(s.startTime);
       const endMinutes = parseTimeToMinutes(s.endTime);
       if (endMinutes > startMinutes) {
         rawIntervals.push({ startMinutes, endMinutes });
+      } else if (endMinutes <= startMinutes && endMinutes > 0) {
+        rawIntervals.push({ startMinutes, endMinutes: 1440 });
       }
     }
-    return normalizeDutyIntervals(rawIntervals);
+
+    for (const s of prevRecurringShifts) {
+      const startMinutes = parseTimeToMinutes(s.startTime);
+      const endMinutes = parseTimeToMinutes(s.endTime);
+      if (endMinutes <= startMinutes && endMinutes > 0) {
+        rawIntervals.push({ startMinutes: 0, endMinutes });
+      }
+    }
+
+    if (rawIntervals.length > 0) {
+      return normalizeDutyIntervals(rawIntervals);
+    }
   }
 
   // 3. Fallback to weekly schedule model if shifts table has no records for this staff
   if (Array.isArray(fallbackSchedule) && fallbackSchedule.length > 0) {
     const DAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const targetDayName = DAYS_EN[targetDayOfWeek];
+    const prevDayName = DAYS_EN[prevDayOfWeek];
 
     const daySchedule = fallbackSchedule.find(
       (d: any) => d.dayOfWeek === targetDayOfWeek || d.dayEn?.toLowerCase() === targetDayName.toLowerCase()
     );
+    const prevSchedule = fallbackSchedule.find(
+      (d: any) => d.dayOfWeek === prevDayOfWeek || d.dayEn?.toLowerCase() === prevDayName.toLowerCase()
+    );
+
+    const rawIntervals: DutyInterval[] = [];
 
     if (daySchedule && daySchedule.status === 'working') {
-      const rawIntervals: DutyInterval[] = [];
-
       // Primary shift window
       if (daySchedule.startTime && daySchedule.endTime) {
         const startMinutes = parseTimeToMinutes(daySchedule.startTime);
         const endMinutes = parseTimeToMinutes(daySchedule.endTime);
         if (endMinutes > startMinutes) {
           rawIntervals.push({ startMinutes, endMinutes });
+        } else if (endMinutes <= startMinutes && endMinutes > 0) {
+          rawIntervals.push({ startMinutes, endMinutes: 1440 });
         }
       }
 
@@ -182,11 +253,37 @@ export function resolveEmployeeDutyIntervals({
             const endMinutes = parseTimeToMinutes(sub.endTime);
             if (endMinutes > startMinutes) {
               rawIntervals.push({ startMinutes, endMinutes });
+            } else if (endMinutes <= startMinutes && endMinutes > 0) {
+              rawIntervals.push({ startMinutes, endMinutes: 1440 });
             }
           }
         }
       }
+    }
 
+    // Check if yesterday's schedule in fallbackSchedule had an overnight shift extending into today
+    if (prevSchedule && prevSchedule.status === 'working') {
+      if (prevSchedule.startTime && prevSchedule.endTime) {
+        const startMinutes = parseTimeToMinutes(prevSchedule.startTime);
+        const endMinutes = parseTimeToMinutes(prevSchedule.endTime);
+        if (endMinutes <= startMinutes && endMinutes > 0) {
+          rawIntervals.push({ startMinutes: 0, endMinutes });
+        }
+      }
+      if (Array.isArray(prevSchedule.subShifts)) {
+        for (const sub of prevSchedule.subShifts) {
+          if (sub.startTime && sub.endTime) {
+            const startMinutes = parseTimeToMinutes(sub.startTime);
+            const endMinutes = parseTimeToMinutes(sub.endTime);
+            if (endMinutes <= startMinutes && endMinutes > 0) {
+              rawIntervals.push({ startMinutes: 0, endMinutes });
+            }
+          }
+        }
+      }
+    }
+
+    if (rawIntervals.length > 0) {
       return normalizeDutyIntervals(rawIntervals);
     }
   }

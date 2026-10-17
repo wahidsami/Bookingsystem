@@ -7234,6 +7234,7 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         setCurrentStaffId={setCurrentStaffId}
         initialDuration={currentDuration}
         stylists={liveStylists}
+        tenantShifts={tenantShifts}
         initialCreateMode={initialCreateMode}
         initialCartTab={initialCartTab}
         selectedDate={selectedDate}
