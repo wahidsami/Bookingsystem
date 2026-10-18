@@ -13,6 +13,7 @@ const {
     isValidAppointmentStatus,
     normalizeAppointmentStatus
 } = require('../utils/appointmentStatus');
+const { sanitizeReviewCustomerIdentity } = require('./reviewController');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -475,14 +476,24 @@ const getReviews = async (req, res) => {
                 tenantId: req.tenantId,
                 staffId: req.staffId
             },
+            include: [
+                {
+                    model: db.PlatformUser,
+                    as: 'platformUser',
+                    attributes: ['id', 'firstName', 'lastName'],
+                    required: false
+                }
+            ],
             order: [['createdAt', 'DESC']]
         });
 
-        const avgRating = reviews.length > 0
-            ? (reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length).toFixed(1)
+        const sanitizedReviews = reviews.map(sanitizeReviewCustomerIdentity);
+
+        const avgRating = sanitizedReviews.length > 0
+            ? (sanitizedReviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / sanitizedReviews.length).toFixed(1)
             : null;
 
-        const distribution = reviews.reduce((acc, review) => {
+        const distribution = sanitizedReviews.reduce((acc, review) => {
             const rating = Number(review.rating || 0);
             if (rating >= 1 && rating <= 5) {
                 acc[rating] = (acc[rating] || 0) + 1;
@@ -493,10 +504,10 @@ const getReviews = async (req, res) => {
         res.json({
             success: true,
             data: {
-                reviews,
+                reviews: sanitizedReviews,
                 avgRating,
                 distribution,
-                total: reviews.length
+                total: sanitizedReviews.length
             }
         });
     } catch (error) {
