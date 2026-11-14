@@ -166,10 +166,27 @@ exports.checkResourceLimit = (resourceType) => {
                     limitField: 'maxProducts',
                     displayName: 'Products',
                     getCurrentUsage: () => db.Product.count({ where: { tenantId } })
+                },
+                'package': {
+                    limitField: 'maxPackages',
+                    displayName: 'Packages',
+                    getCurrentUsage: () => db.ServicePackage.count({ where: { tenantId } })
                 }
             };
             
-            const config = limitMap[resourceType];
+            const RESOURCE_ALIASES = {
+                'maxServices': 'service',
+                'maxStaff': 'staff',
+                'maxProducts': 'product',
+                'maxPackages': 'package',
+                'packages': 'package',
+                'services': 'service',
+                'staff': 'staff',
+                'products': 'product',
+                'bookings': 'booking'
+            };
+            const canonicalKey = RESOURCE_ALIASES[resourceType] || resourceType;
+            const config = limitMap[canonicalKey];
             if (!config) {
                 return next(); // Unknown resource type, skip check
             }

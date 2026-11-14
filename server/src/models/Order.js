@@ -239,5 +239,11 @@ module.exports = (sequelize, DataTypes) => {
         }
     });
 
+    Order.addHook('beforeValidate', async (order) => {
+        if (!order.orderNumber) {
+            order.orderNumber = await Order.generateOrderNumber();
+        }
+    });
+
     return Order;
 };

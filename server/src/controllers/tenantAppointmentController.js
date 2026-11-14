@@ -2597,6 +2597,18 @@ exports.updateAppointmentStatus = async (req, res) => {
         const isSettledByStatus = isAppointmentFullyPaid(appointment.paymentStatus) || `${appointment.paymentStatus || ''}`.trim().toLowerCase() === 'paid';
         const previousStatus = appointment.status;
 
+        if (normalizedStatus === 'cancelled') {
+            const { isBookingLocked } = require('../utils/appointmentPaymentStatus');
+            if (isBookingLocked(appointment)) {
+                await transaction.rollback();
+                return res.status(423).json({
+                    success: false,
+                    code: 'BOOKING_LOCKED_FULLY_PAID',
+                    message: 'This booking is fully paid and locked. Ordinary cancellation is restricted. Exceptional adjustments must be processed via authorized financial operations.'
+                });
+            }
+        }
+
         if (normalizedStatus === 'completed' && appointment.status !== 'completed' && !isSettledByAmount && !isSettledByStatus) {
             console.log('[TRACE] Validation failed: payment status for completion (Payment required)');
             await transaction.rollback();
@@ -3096,6 +3108,16 @@ const _reassignAppointmentStaff = async (req, res) => {
             });
         }
 
+        const { isBookingLocked } = require('../utils/appointmentPaymentStatus');
+        if (isBookingLocked(appointment)) {
+            await transaction.rollback();
+            return res.status(423).json({
+                success: false,
+                code: 'BOOKING_LOCKED_FULLY_PAID',
+                message: 'This booking is fully paid and locked. Ordinary staff reassignment is restricted.'
+            });
+        }
+
         if (['completed', 'cancelled', 'no_show'].includes(appointment.status)) {
             await transaction.rollback();
             return res.status(400).json({
@@ -3328,6 +3350,16 @@ exports.rescheduleAppointment = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: 'Appointment not found'
+            });
+        }
+
+        const { isBookingLocked } = require('../utils/appointmentPaymentStatus');
+        if (isBookingLocked(appointment)) {
+            await transaction.rollback();
+            return res.status(423).json({
+                success: false,
+                code: 'BOOKING_LOCKED_FULLY_PAID',
+                message: 'This booking is fully paid and locked. Ordinary rescheduling is restricted. Exceptional adjustments must be handled via authorized financial operations.'
             });
         }
 
@@ -3639,6 +3671,16 @@ exports.reassignRescheduleAppointment = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: 'Appointment not found'
+            });
+        }
+
+        const { isBookingLocked } = require('../utils/appointmentPaymentStatus');
+        if (isBookingLocked(appointment)) {
+            await transaction.rollback();
+            return res.status(423).json({
+                success: false,
+                code: 'BOOKING_LOCKED_FULLY_PAID',
+                message: 'This booking is fully paid and locked. Ordinary drag-and-drop rescheduling is restricted.'
             });
         }
 

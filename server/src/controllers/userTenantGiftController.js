@@ -224,7 +224,7 @@ const createPaymentTransaction = async ({
 exports.purchaseForSelf = async (req, res) => {
     const senderId = req.userId;
     const { tenantId, packageId } = req.body || {};
-    const idempotencyKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_HEADER] || req.body?.idempotencyKey);
+    const idempotencyKey = normalizeIdempotencyKey(req.headers?.[IDEMPOTENCY_HEADER] || req.body?.idempotencyKey);
     let idempotencyRecord = null;
 
     try {
@@ -343,14 +343,15 @@ exports.purchaseForSelf = async (req, res) => {
 
 exports.sendGift = async (req, res) => {
     const senderId = req.userId;
-    const { tenantId, packageId, recipientEmail, recipientPhone, message } = req.body || {};
-    const idempotencyKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_HEADER] || req.body?.idempotencyKey);
+    const { tenantId, packageId, recipientName, recipientEmail, recipientPhone, message } = req.body || {};
+    const idempotencyKey = normalizeIdempotencyKey(req.headers?.[IDEMPOTENCY_HEADER] || req.body?.idempotencyKey);
     let idempotencyRecord = null;
 
     try {
         const paymentPayload = validateGiftPaymentPayload(req.body || {});
         const email = normalize(recipientEmail).toLowerCase();
         const phone = normalizePhone(recipientPhone);
+        const name = normalize(recipientName);
         if (!tenantId || !packageId) throw new Error('tenantId and packageId are required');
         if (!email && !phone) throw new Error('recipientEmail or recipientPhone is required');
 
@@ -408,40 +409,43 @@ exports.sendGift = async (req, res) => {
             });
 
             const isRecipientRegistered = !!recipient?.id;
-            if (!isRecipientRegistered && !email) {
-                throw new Error('Recipient email is required for users without an account');
+            if (!isRecipientRegistered && !email && !phone) {
+                throw new Error('Recipient mobile phone or email is required');
             }
             let createdGiftCode = null;
-            if (!isRecipientRegistered) {
-                for (let attempt = 0; attempt < 5; attempt += 1) {
-                    const candidate = generateGiftCode('TN');
-                    const exists = await db.GiftCardCode.findOne({ where: { code: candidate }, transaction: tx });
-                    if (!exists) {
-                        createdGiftCode = await db.GiftCardCode.create({
-                            code: candidate,
-                            scopeType: 'tenant_scoped',
-                            tenantId,
-                            sourceGiftCardTransactionId: null,
-                            sourceTenantGiftCardTransactionId: null,
-                            initialAmount: totalCredit,
-                            remainingAmount: totalCredit,
-                            currency: 'SAR',
-                            recipientEmail: email || null,
-                            recipientPhone: phone || null,
-                            status: 'issued',
-                            expiresAt,
-                            metadata: {
-                                packageId: giftPackage.id,
-                                packageTitle,
-                                senderPlatformUserId: senderId
-                            }
-                        }, { transaction: tx });
-                        break;
-                    }
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+                const candidate = generateGiftCode('TN');
+                const exists = await db.GiftCardCode.findOne({ where: { code: candidate }, transaction: tx });
+                if (!exists) {
+                    createdGiftCode = await db.GiftCardCode.create({
+                        code: candidate,
+                        scopeType: 'tenant_scoped',
+                        tenantId,
+                        sourceGiftCardTransactionId: null,
+                        sourceTenantGiftCardTransactionId: null,
+                        initialAmount: totalCredit,
+                        remainingAmount: totalCredit,
+                        currency: 'SAR',
+                        recipientName: name || (recipient ? `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() : null),
+                        recipientEmail: email || recipient?.email || null,
+                        recipientPhone: phone || recipient?.phone || null,
+                        voucherType: giftPackage.voucherType || 'monetary',
+                        serviceId: giftPackage.serviceId || null,
+                        servicePackageId: giftPackage.servicePackageId || null,
+                        giftMessage: normalize(message) || null,
+                        status: 'issued',
+                        expiresAt,
+                        metadata: {
+                            packageId: giftPackage.id,
+                            packageTitle,
+                            senderPlatformUserId: senderId
+                        }
+                    }, { transaction: tx });
+                    break;
                 }
-                if (!createdGiftCode) {
-                    throw new Error('Failed to generate unique tenant gift code');
-                }
+            }
+            if (!createdGiftCode) {
+                throw new Error('Failed to generate unique tenant gift code');
             }
 
             const giftTx = await db.TenantGiftCardTransaction.create({
@@ -449,8 +453,13 @@ exports.sendGift = async (req, res) => {
                 packageId: giftPackage.id,
                 senderPlatformUserId: senderId,
                 recipientPlatformUserId: recipient?.id || null,
-                recipientEmail: email || null,
-                recipientPhone: phone || null,
+                recipientName: name || (recipient ? `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() : null),
+                voucherType: giftPackage.voucherType || 'monetary',
+                serviceId: giftPackage.serviceId || null,
+                servicePackageId: giftPackage.servicePackageId || null,
+                giftMessage: normalize(message) || null,
+                recipientEmail: email || recipient?.email || null,
+                recipientPhone: phone || recipient?.phone || null,
                 purchaseAmount: giftPackage.priceAmount,
                 creditAmount: giftPackage.walletCreditAmount,
                 bonusAmount: giftPackage.bonusAmount,

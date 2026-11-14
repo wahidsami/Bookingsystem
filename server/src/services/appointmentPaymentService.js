@@ -157,15 +157,23 @@ async function processAppointmentPayment({
             );
         }
 
+        const batchTxs = createdPaymentBatch?.paymentTransactions || [];
+        const verifiedTxs = batchTxs.filter(tx => (!tx.verificationStatus || tx.verificationStatus === 'verified') && tx.status === 'completed');
+        const pendingTxs = batchTxs.filter(tx => tx.verificationStatus === 'pending_verification');
+
+        const verifiedAmount = roundMoney(verifiedTxs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0));
+        const pendingAmount = roundMoney(pendingTxs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0));
+
         const targetPreviousPaid = roundMoney(targetAppointment.totalPaid ?? 0);
         const targetTotalPrice = roundMoney(targetAppointment.price ?? 0);
-        const nextTotalPaid = roundMoney(targetPreviousPaid + targetPaidAmount);
+        const nextTotalPaid = roundMoney(targetPreviousPaid + verifiedAmount);
         
         const { calculateAppointmentFinancialState } = require('../utils/appointmentPaymentStatus');
         const financialState = calculateAppointmentFinancialState({
             price: targetTotalPrice,
             totalPaid: nextTotalPaid,
-            depositAmount: targetAppointment.depositAmount ?? 0
+            depositAmount: targetAppointment.depositAmount ?? 0,
+            pendingTransferAmount: pendingAmount
         });
 
         Object.assign(targetAppointment, financialState);
@@ -174,7 +182,7 @@ async function processAppointmentPayment({
             targetAppointment.paidAt = targetAppointment.paidAt || new Date();
         }
         
-        if (targetAppointment.status === 'pending') {
+        if (targetAppointment.status === 'pending' && (verifiedAmount > 0 || financialState.depositPaid)) {
             targetAppointment.status = 'confirmed';
         }
         await targetAppointment.save({ transaction });

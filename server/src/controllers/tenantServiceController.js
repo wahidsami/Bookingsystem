@@ -606,10 +606,13 @@ exports.createService = async (req, res) => {
             });
         }
 
+        const incomingPrice = req.body.price;
         const targetGenderValue = normalizeServiceTargetGender(targetGender);
         const priceTypeValue = normalizeServicePriceType(priceType);
         const rawPriceValue = rawPrice !== undefined && `${rawPrice}`.trim() !== '' ? parseFloat(rawPrice) : null;
-        const finalPriceValue = finalPrice !== undefined && `${finalPrice}`.trim() !== '' ? parseFloat(finalPrice) : null;
+        let finalPriceValue = finalPrice !== undefined && `${finalPrice}`.trim() !== '' 
+            ? parseFloat(finalPrice) 
+            : (incomingPrice !== undefined && `${incomingPrice}`.trim() !== '' ? parseFloat(incomingPrice) : null);
         const hasValidRawPrice = rawPriceValue !== null && !Number.isNaN(rawPriceValue) && rawPriceValue >= 0;
         const hasValidFinalPrice = finalPriceValue !== null && !Number.isNaN(finalPriceValue) && finalPriceValue >= 0;
 
@@ -876,11 +879,16 @@ exports.updateService = async (req, res) => {
         const finalTaxRate = tenantSettings.taxRate;
         const finalCommissionRate = tenantSettings.commissionRate;
 
+        const incomingPrice = req.body.price;
         const targetGenderValue = normalizeServiceTargetGender(targetGender || service.targetGender || 'all');
         const priceTypeValue = normalizeServicePriceType(priceType || service.priceType || 'fixed');
 
         const rawPriceValue = rawPrice !== undefined && `${rawPrice}`.trim() !== '' ? parseFloat(rawPrice) : null;
-        const finalPriceValue = finalPrice !== undefined && `${finalPrice}`.trim() !== '' ? parseFloat(finalPrice) : null;
+        let finalPriceValue = finalPrice !== undefined && `${finalPrice}`.trim() !== '' 
+            ? parseFloat(finalPrice) 
+            : (incomingPrice !== undefined && `${incomingPrice}`.trim() !== '' 
+                ? parseFloat(incomingPrice) 
+                : (service.finalPrice !== undefined && service.finalPrice !== null ? parseFloat(service.finalPrice) : null));
         const hasValidRawPrice = rawPriceValue !== null && !Number.isNaN(rawPriceValue) && rawPriceValue >= 0;
         const hasValidFinalPrice = finalPriceValue !== null && !Number.isNaN(finalPriceValue) && finalPriceValue >= 0;
 

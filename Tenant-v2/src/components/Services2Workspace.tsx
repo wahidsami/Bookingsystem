@@ -2240,7 +2240,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                             {isRtl ? 'فئة الخدمة الرئيسية *' : 'Service Main Category *'}
                           </label>
                           <select
-                            value={formData.category || categories[1]?.slug || categories[0]?.slug || 'general'}
+                            value={formData.category || categories[0]?.slug || 'general'}
                             onChange={e => {
                               const val = e.target.value;
                               const matched = categories.find(c => c.id === val || c.slug === val || c.labelEn === val || c.labelAr === val);
@@ -2253,7 +2253,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                             }}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-indigo-500 text-neutral-800 cursor-pointer"
                           >
-                            {categories.slice(1).map(c => (
+                            {categories.filter(c => c.slug !== 'all' && c.id !== 'all').map(c => (
                               <option key={c.slug || c.id} value={c.slug || c.id}>{isRtl ? c.labelAr : c.labelEn}</option>
                             ))}
                           </select>

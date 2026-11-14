@@ -457,6 +457,9 @@ exports.updatePackage = async (req, res) => {
     if (payload.displayOrder !== undefined) item.displayOrder = Number(payload.displayOrder || 0);
     if (payload.bonusAmount !== undefined) item.bonusAmount = Number(payload.bonusAmount || 0);
     if (payload.isActive !== undefined) item.isActive = payload.isActive !== false;
+    if (payload.voucherType !== undefined) item.voucherType = payload.voucherType;
+    if (payload.serviceId !== undefined) item.serviceId = payload.serviceId || null;
+    if (payload.servicePackageId !== undefined) item.servicePackageId = payload.servicePackageId || null;
 
     const text = resolveGiftCardPackageText(payload, item);
     if (payload.title !== undefined || payload.title_en !== undefined || payload.title_ar !== undefined) {

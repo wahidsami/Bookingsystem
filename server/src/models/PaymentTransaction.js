@@ -31,6 +31,20 @@ module.exports = (sequelize, DataTypes) => {
         isRefunded() {
             return this.status === 'refunded';
         }
+
+        /**
+         * Check if transaction is verified (non-transfer methods are always verified)
+         */
+        isVerified() {
+            return !this.verificationStatus || this.verificationStatus === 'verified';
+        }
+
+        /**
+         * Check if transaction is pending verification
+         */
+        isPendingVerification() {
+            return this.verificationStatus === 'pending_verification';
+        }
     }
 
     PaymentTransaction.init({
@@ -129,6 +143,37 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.TEXT,
             allowNull: true,
             comment: 'Admin/staff notes about this transaction'
+        },
+
+        // Bank-Transfer Verification Lifecycle
+        verificationStatus: {
+            type: DataTypes.STRING(32),
+            allowNull: false,
+            defaultValue: 'verified',
+            validate: {
+                isIn: [['pending_verification', 'verified', 'rejected']]
+            },
+            comment: 'Verification lifecycle: pending_verification, verified, rejected'
+        },
+        verifiedBy: {
+            type: DataTypes.UUID,
+            allowNull: true,
+            comment: 'Staff or user ID who verified or rejected this transaction'
+        },
+        verifiedAt: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'Timestamp when verification or rejection took place'
+        },
+        rejectionReason: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+            comment: 'Audited reason for rejecting bank transfer'
+        },
+        proofAttachmentUrl: {
+            type: DataTypes.STRING(1024),
+            allowNull: true,
+            comment: 'URL/path to bank transfer slip or payment proof'
         }
     }, {
         sequelize,
@@ -180,7 +225,8 @@ module.exports = (sequelize, DataTypes) => {
 
             if (transaction.appointmentId) {
                 const appointment = await sequelize.models.Appointment.findByPk(transaction.appointmentId, {
-                    include: [{ model: sequelize.models.BookingSession, as: 'bookingSession' }]
+                    include: [{ model: sequelize.models.BookingSession, as: 'bookingSession' }],
+                    transaction: options?.transaction
                 });
                 if (appointment) {
                     tenantId = appointment.tenantId;
@@ -189,7 +235,9 @@ module.exports = (sequelize, DataTypes) => {
                     entityId = appointment.id;
                 }
             } else if (transaction.orderId) {
-                const order = await sequelize.models.Order.findByPk(transaction.orderId);
+                const order = await sequelize.models.Order.findByPk(transaction.orderId, {
+                    transaction: options?.transaction
+                });
                 if (order) {
                     tenantId = order.tenantId;
                     customerId = order.platformUserId || order.customerId || null;
@@ -206,7 +254,8 @@ module.exports = (sequelize, DataTypes) => {
                 }
             }
 
-            if (tenantId && entityType && entityId) {
+            const isConfirmedRevenue = transaction.status === 'completed' && (!transaction.verificationStatus || transaction.verificationStatus === 'verified');
+            if (tenantId && entityType && entityId && isConfirmedRevenue) {
                 await FinancialLedgerService.recordRevenue({
                     tenantId,
                     customerId,
@@ -237,6 +286,59 @@ module.exports = (sequelize, DataTypes) => {
             } else {
                 console.error('Failed to create FinancialLedgerEntry in PaymentTransaction hook', error);
             }
+            throw error;
+        }
+    });
+
+
+    PaymentTransaction.addHook('afterUpdate', async (transaction, options) => {
+        try {
+            if (transaction.changed('verificationStatus') && transaction.verificationStatus === 'verified' && transaction.status === 'completed') {
+                const FinancialLedgerService = require('../services/financialLedgerService');
+                let tenantId = null;
+                let customerId = null;
+                let entityType = null;
+                let entityId = null;
+
+                if (transaction.appointmentId) {
+                    const appointment = await sequelize.models.Appointment.findByPk(transaction.appointmentId, {
+                        include: [{ model: sequelize.models.BookingSession, as: 'bookingSession' }],
+                        transaction: options?.transaction
+                    });
+                    if (appointment) {
+                        tenantId = appointment.tenantId;
+                        customerId = appointment.platformUserId || appointment.customerId || appointment.bookingSession?.customerId || null;
+                        entityType = 'Booking';
+                        entityId = appointment.id;
+                    }
+                } else if (transaction.orderId) {
+                    const order = await sequelize.models.Order.findByPk(transaction.orderId, {
+                        transaction: options?.transaction
+                    });
+                    if (order) {
+                        tenantId = order.tenantId;
+                        customerId = order.platformUserId || order.customerId || null;
+                        entityType = order.orderType === 'pos' ? 'PosReceipt' : 'Order';
+                        entityId = order.id;
+                    }
+                }
+
+                if (tenantId && entityType && entityId) {
+                    await FinancialLedgerService.recordRevenue({
+                        tenantId,
+                        customerId,
+                        entityType,
+                        entityId,
+                        amount: transaction.type === 'refund' ? -Math.abs(transaction.amount) : Math.abs(transaction.amount),
+                        currency: transaction.currency,
+                        paymentMethod: transaction.paymentMethod,
+                        status: transaction.status,
+                        description: transaction.notes || `Verified payment ${transaction.type}`
+                    }, options?.transaction);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to create FinancialLedgerEntry in PaymentTransaction afterUpdate hook', error);
             throw error;
         }
     });

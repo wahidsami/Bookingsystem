@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreVertical, Calendar, RotateCcw, Printer, Share2, AlertOctagon, XCircle, UserX, Clock } from 'lucide-react';
+import { MoreVertical, Calendar, RotateCcw, Printer, Share2, XCircle, UserX, Clock, Lock, ShieldAlert } from 'lucide-react';
 
 export interface AppointmentActionMenuProps {
   isRtl: boolean;
   appointmentStatus: string;
   isGroupBooking?: boolean;
   readOnly?: boolean;
+  isFullyPaid?: boolean;
   onReschedule?: () => void;
   onRebook?: () => void;
   onLateCancel?: () => void;
@@ -13,6 +14,7 @@ export interface AppointmentActionMenuProps {
   onCancel?: () => void;
   onPrint?: () => void;
   onShare?: () => void;
+  onFinancialException?: () => void;
 }
 
 export const AppointmentActionMenu: React.FC<AppointmentActionMenuProps> = ({
@@ -20,6 +22,7 @@ export const AppointmentActionMenu: React.FC<AppointmentActionMenuProps> = ({
   appointmentStatus,
   isGroupBooking = false,
   readOnly = false,
+  isFullyPaid = false,
   onReschedule,
   onRebook,
   onLateCancel,
@@ -27,6 +30,7 @@ export const AppointmentActionMenu: React.FC<AppointmentActionMenuProps> = ({
   onCancel,
   onPrint,
   onShare,
+  onFinancialException,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -61,12 +65,23 @@ export const AppointmentActionMenu: React.FC<AppointmentActionMenuProps> = ({
 
       {isOpen && (
         <div
-          className={`absolute bottom-full mb-2 ${isRtl ? 'left-0' : 'right-0'} w-52 bg-white rounded-2xl shadow-xl border border-[#E7DDFC] py-2 z-40 animate-fadeIn divide-y divide-slate-100`}
+          className={`absolute bottom-full mb-2 ${isRtl ? 'left-0' : 'right-0'} w-60 bg-white rounded-2xl shadow-xl border border-[#E7DDFC] py-2 z-40 animate-fadeIn divide-y divide-slate-100`}
         >
           {/* Section 1: Scheduling & Operational Actions */}
           <div className="py-1">
-            {/* Reschedule applies ONLY to active/upcoming visits (strictly forbidden on completed) */}
-            {!isCancelled && !isCompleted && !readOnly && onReschedule && (
+            {/* If Fully Paid and Locked: Rescheduling is restricted */}
+            {isFullyPaid && !isCancelled && !isCompleted && (
+              <div
+                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-400 bg-slate-50/80"
+                title={isRtl ? 'الموعد مدفوع بالكامل ومغلق ضد التعديل' : 'Booking is fully paid and locked'}
+              >
+                <Lock size={14} className="text-amber-500 shrink-0" />
+                <span>{isRtl ? 'إعادة الجدولة مقيدة (مدفوع)' : 'Reschedule Locked (Paid)'}</span>
+              </div>
+            )}
+
+            {/* Reschedule applies ONLY to active/upcoming visits when NOT fully paid */}
+            {!isFullyPaid && !isCancelled && !isCompleted && !readOnly && onReschedule && (
               <button
                 type="button"
                 onClick={() => {
@@ -127,7 +142,23 @@ export const AppointmentActionMenu: React.FC<AppointmentActionMenuProps> = ({
           {/* Section 2: Destructive / Exception Actions */}
           {!isCancelled && !readOnly && (
             <div className="py-1">
-              {onLateCancel && (
+              {/* Authorized financial exception workflow for paid bookings */}
+              {isFullyPaid && onFinancialException && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onFinancialException();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-[#6537C0] hover:bg-[#F3EDFC] transition-colors text-left cursor-pointer"
+                >
+                  <ShieldAlert size={14} className="text-[#6537C0]" />
+                  <span>{isRtl ? 'استثناء مالي / إلغاء مع استرداد...' : 'Authorized Refund / Exception...'}</span>
+                </button>
+              )}
+
+              {/* Ordinary late cancel and no show when NOT fully paid */}
+              {!isFullyPaid && onLateCancel && (
                 <button
                   type="button"
                   onClick={() => {
@@ -141,7 +172,7 @@ export const AppointmentActionMenu: React.FC<AppointmentActionMenuProps> = ({
                 </button>
               )}
 
-              {onNoShow && !isCompleted && (
+              {!isFullyPaid && onNoShow && !isCompleted && (
                 <button
                   type="button"
                   onClick={() => {
@@ -155,7 +186,8 @@ export const AppointmentActionMenu: React.FC<AppointmentActionMenuProps> = ({
                 </button>
               )}
 
-              {onCancel && (
+              {/* Ordinary cancel is blocked for fully paid bookings */}
+              {!isFullyPaid && onCancel && (
                 <button
                   type="button"
                   onClick={() => {

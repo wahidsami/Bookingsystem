@@ -3,12 +3,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, CheckCircle2, Clock, Calendar as CalendarIcon, User, Users,
   CreditCard, Sparkles, AlertTriangle, ArrowRight, Share2, 
-  Printer, Split, FileText, ChevronRight, ChevronLeft, ChevronDown, Receipt
+  Printer, Split, FileText, ChevronRight, ChevronLeft, ChevronDown, Receipt, Lock, ShieldAlert, Check, Ban, AlertCircle
 } from 'lucide-react';
 import { AppointmentClientHeader } from './AppointmentClientHeader';
 import { AppointmentServiceCard, AppointmentServiceItem } from './AppointmentServiceCard';
 import { AppointmentServiceEditor, StylistOption } from './AppointmentServiceEditor';
 import { AppointmentActionMenu } from './AppointmentActionMenu';
+import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 import { AppointmentCheckoutOverlay, CheckoutLineItem, SplitAllocations } from './AppointmentCheckoutOverlay';
 
 export const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -414,6 +415,18 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
           <div className="flex items-center gap-2 shrink-0">
             {/* Prominent Interactive Header Status Dropdown */}
             <div className="relative inline-flex items-center">
+              {isPaid && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-black shadow-2xs mr-2 ml-2">
+                  <Lock size={13} className="text-emerald-600 shrink-0" />
+                  <span>{isRtl ? 'مدفوع ومغلق' : 'Paid & Locked'}</span>
+                </div>
+              )}
+              {!isPaid && Number(appointment.pendingTransferAmount || 0) > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-black shadow-2xs mr-2 ml-2">
+                  <Clock size={13} className="text-amber-600 shrink-0" />
+                  <span>{isRtl ? 'بانتظار تدقيق التحويل' : 'Awaiting Transfer'}</span>
+                </div>
+              )}
               <select
                 value={normalizedStatus}
                 disabled={readOnly || isStatusTransitioning || normalizedStatus === 'completed'}
@@ -656,6 +669,28 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
                 <span>{isRtl ? 'المبلغ الإجمالي' : 'Total Price'}</span>
                 <span className="font-mono text-[#6537C0]">{totalAmountDue.toFixed(2)} {isRtl ? 'ر.س' : 'SAR'}</span>
               </div>
+
+              <div className="flex justify-between text-xs text-emerald-700 pt-1.5 border-t border-slate-100 font-bold">
+                <span>{isRtl ? 'المبلغ المؤكد تحصيله (Confirmed Paid)' : 'Confirmed Paid'}</span>
+                <span className="font-mono font-black">{totalPaid.toFixed(2)} {isRtl ? 'ر.س' : 'SAR'}</span>
+              </div>
+
+              {Number(appointment.pendingTransferAmount || 0) > 0 && (
+                <div className="flex items-center justify-between text-xs text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200 font-bold">
+                  <span className="flex items-center gap-1">
+                    <Clock size={13} className="text-amber-600" />
+                    <span>{isRtl ? 'تحويل بنكي قيد التدقيق (Pending Transfer)' : 'Pending Bank Transfer'}</span>
+                  </span>
+                  <span className="font-mono font-black">{Number(appointment.pendingTransferAmount).toFixed(2)} {isRtl ? 'ر.س' : 'SAR'}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between text-sm font-black text-slate-900 pt-1.5 border-t border-[#E7DDFC]">
+                <span>{isRtl ? 'الرصيد المتبقي المستحق' : 'Remaining Due Balance'}</span>
+                <span className={`font-mono ${remainingDue <= 0.01 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {remainingDue.toFixed(2)} {isRtl ? 'ر.س' : 'SAR'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -741,6 +776,8 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
               appointmentStatus={normalizedStatus}
               isGroupBooking={Boolean(isGroupSession || appointment.isGroupBooking)}
               readOnly={readOnly}
+              isFullyPaid={isPaid}
+              onFinancialException={() => setIsExceptionModalOpen(true)}
               onReschedule={() => {
                 if (isAppointmentCompleted || isCancelled) return;
                 const firstEditable = serviceItems.find(s => s.status !== 'completed' && s.status !== 'cancelled');

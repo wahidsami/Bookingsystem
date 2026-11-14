@@ -20,6 +20,8 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'recipientPlatformUserId',
                 as: 'recipient'
             });
+            TenantGiftCardTransaction.belongsTo(models.Service, { foreignKey: 'serviceId', as: 'service' });
+            TenantGiftCardTransaction.belongsTo(models.ServicePackage, { foreignKey: 'servicePackageId', as: 'servicePackage' });
             TenantGiftCardTransaction.hasOne(models.TenantGiftCardSettlement, {
                 foreignKey: 'transactionId',
                 as: 'settlement'
@@ -43,7 +45,7 @@ module.exports = (sequelize, DataTypes) => {
         },
         packageId: {
             type: DataTypes.UUID,
-            allowNull: false
+            allowNull: true
         },
         senderPlatformUserId: {
             type: DataTypes.UUID,
@@ -51,6 +53,27 @@ module.exports = (sequelize, DataTypes) => {
         },
         recipientPlatformUserId: {
             type: DataTypes.UUID,
+            allowNull: true
+        },
+        recipientName: {
+            type: DataTypes.STRING(255),
+            allowNull: true
+        },
+        voucherType: {
+            type: DataTypes.STRING(32),
+            allowNull: false,
+            defaultValue: 'monetary'
+        },
+        serviceId: {
+            type: DataTypes.UUID,
+            allowNull: true
+        },
+        servicePackageId: {
+            type: DataTypes.UUID,
+            allowNull: true
+        },
+        giftMessage: {
+            type: DataTypes.TEXT,
             allowNull: true
         },
         recipientEmail: {

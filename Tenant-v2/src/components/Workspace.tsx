@@ -95,6 +95,8 @@ export default function Workspace({
   const [posSuccess, setPosSuccess] = useState<string | null>(null);
   const [posPaymentMethod, setPosPaymentMethod] = useState<'mada' | 'cash' | 'card'>('mada');
   const [posIsSubmitting, setPosIsSubmitting] = useState(false);
+  const [posReceiptData, setPosReceiptData] = useState<any | null>(null);
+  const [posCatalogFilter, setPosCatalogFilter] = useState<'all' | 'services' | 'products'>('all');
 
   // Local state for Saved Views Input
   const [newViewName, setNewViewName] = useState('');
@@ -230,7 +232,7 @@ export default function Workspace({
     return Math.max(0, sub - posDiscount);
   };
 
-  const handleCompletePayment = () => {
+  const handleCompletePayment = async () => {
     if (posCart.length === 0) {
       setPosError(isRtl ? 'السلة فارغة! يرجى إضافة عناصر أولاً.' : 'POS cart is empty! Please add items first.');
       return;
@@ -238,14 +240,41 @@ export default function Workspace({
     setPosIsSubmitting(true);
     setPosError(null);
     setPosSuccess(null);
-    setTimeout(() => {
+    try {
+      const itemsPayload = posCart.map(i => ({
+        id: i.item.id,
+        type: i.item.type as 'product' | 'service',
+        quantity: i.quantity,
+        price: i.item.price
+      }));
+
+      const res = await tenantApiAdapter.checkoutPos({
+        items: itemsPayload,
+        paymentMethod: posPaymentMethod,
+        discount: posDiscount,
+        notes: isRtl ? 'عملية بيع سريعة عبر نقطة البيع' : 'POS walk-in retail & service sale'
+      });
+
+      if (res && res.success) {
+        setPosReceiptData(res.data);
+        const receiptNo = res.data?.receiptNumber || '';
+        const orderPart = res.data?.order?.orderNumber ? ` | ${isRtl ? 'طلب' : 'Order'} ${res.data.order.orderNumber}` : '';
+        const apptCount = res.data?.appointments?.length ? ` | ${res.data.appointments.length} ${isRtl ? 'خدمات مجدولة' : 'service(s)'}` : '';
+        setPosSuccess(
+          isRtl
+            ? `تم إتمام عملية الدفع بنجاح! رقم الإيصال: ${receiptNo}${orderPart}${apptCount}`
+            : `Checkout completed successfully! Receipt: ${receiptNo}${orderPart}${apptCount}`
+        );
+        setPosCart([]);
+        setPosDiscount(0);
+      } else {
+        throw new Error(res?.message || 'Failed to complete POS checkout');
+      }
+    } catch (err: any) {
+      setPosError(err?.message || (isRtl ? 'حدث خطأ أثناء معالجة نقطة البيع' : 'Error processing POS checkout'));
+    } finally {
       setPosIsSubmitting(false);
-      setPosSuccess(
-        isRtl
-          ? `تم تجهيز الفاتورة بمبلغ ${getPosTotal()} ر.س وطريقة الدفع (${posPaymentMethod === 'mada' ? 'مدى' : posPaymentMethod === 'cash' ? 'نقدي' : 'بطاقة ائتمان'}). ملاحظة: الربط البرمجي لنقاط البيع مع الخادم (POST /tenant/pos/checkout) غير متوفر حالياً.`
-          : `POS receipt prepared for ${getPosTotal()} SAR (${posPaymentMethod.toUpperCase()}). Note: Backend POS checkout integration (POST /tenant/pos/checkout) is not yet available in the API.`
-      );
-    }, 400);
+    }
   };
 
   // Reorder Dashboard Widget Logic
@@ -904,10 +933,35 @@ export default function Workspace({
           <div className={`lg:col-span-2 p-6 rounded-2xl border transition-colors space-y-4 ${
             darkMode ? 'bg-zinc-900 border-zinc-850 text-zinc-100' : 'bg-white border-neutral-100 shadow-xs'
           }`}>
-            <h3 className="font-bold text-base">{isRtl ? 'سلة الخدمات والمنتجات السريعة' : 'Interactive Checkout POS Catalog'}</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h3 className="font-bold text-base">{isRtl ? 'سلة الخدمات والمنتجات السريعة' : 'Interactive Checkout POS Catalog'}</h3>
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-neutral-100 dark:bg-zinc-800 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPosCatalogFilter('all')}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all ${posCatalogFilter === 'all' ? 'bg-[#1D035F] text-white shadow-xs' : 'text-neutral-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'}`}
+                >
+                  {isRtl ? 'الكل' : 'All'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPosCatalogFilter('services')}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all ${posCatalogFilter === 'services' ? 'bg-[#1D035F] text-white shadow-xs' : 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30'}`}
+                >
+                  {isRtl ? 'الخدمات' : 'Services'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPosCatalogFilter('products')}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all ${posCatalogFilter === 'products' ? 'bg-[#1D035F] text-white shadow-xs' : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}
+                >
+                  {isRtl ? 'المنتجات' : 'Products'}
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {mockServices.map(srv => (
+              {(posCatalogFilter === 'all' || posCatalogFilter === 'services') && mockServices.map(srv => (
                 <div
                   key={srv.id}
                   onClick={() => handleAddToPosCart({ id: srv.id, nameAr: srv.nameAr, nameEn: srv.nameEn, price: srv.price, type: 'service' })}
@@ -923,7 +977,7 @@ export default function Workspace({
                 </div>
               ))}
 
-              {liveProducts.length > 0 ? liveProducts.map(prd => (
+              {(posCatalogFilter === 'all' || posCatalogFilter === 'products') && (liveProducts.length > 0 ? liveProducts.map(prd => (
                 <div
                   key={prd.id}
                   onClick={() => prd.stock > 0 && handleAddToPosCart({ id: prd.id, nameAr: prd.nameAr, nameEn: prd.nameEn, price: prd.price, type: 'product' })}
@@ -943,7 +997,7 @@ export default function Workspace({
                 <div className={`col-span-2 p-5 rounded-xl border text-center text-xs ${darkMode ? 'border-zinc-800 bg-zinc-900/60 text-zinc-400' : 'border-neutral-100 bg-neutral-50 text-neutral-500'}`}>
                   {isRtl ? 'لا توجد منتجات مضافة بعد.' : 'No live products are available yet.'}
                 </div>
-              )}
+              ))}
             </div>
           </div>
 
@@ -974,7 +1028,54 @@ export default function Workspace({
                 </div>
               )}
 
-              {posCart.length === 0 ? (
+              {posReceiptData && posCart.length === 0 ? (
+                <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-3">
+                  <div className="flex items-center justify-between border-b border-emerald-200/60 dark:border-emerald-800/40 pb-2">
+                    <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">{isRtl ? 'إيصال دفع معتمد' : 'Verified Payment Receipt'}</span>
+                    <span className="text-xs font-mono font-black text-emerald-700 dark:text-emerald-400">{posReceiptData.receiptNumber}</span>
+                  </div>
+                  {posReceiptData.order && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-neutral-500">{isRtl ? 'طلب التجزئة (منتجات)' : 'Retail Product Order'}</span>
+                      <button
+                        type="button"
+                        onClick={() => onSelectView?.('orders')}
+                        className="font-mono font-bold text-brand-600 dark:text-brand-400 hover:underline"
+                      >
+                        {posReceiptData.order.orderNumber} ↗
+                      </button>
+                    </div>
+                  )}
+                  {Array.isArray(posReceiptData.appointments) && posReceiptData.appointments.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-xs text-neutral-500">{isRtl ? 'حجوزات الخدمات' : 'Service Appointments'}</span>
+                      <div className="flex flex-wrap gap-1">
+                        {posReceiptData.appointments.map((a: any) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => onSelectView?.('appointments')}
+                            className="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 hover:underline font-bold"
+                          >
+                            {a.bookingNumber} ↗
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40 flex justify-between items-center text-xs font-bold">
+                    <span>{isRtl ? 'الإجمالي المدفوع' : 'Total Settled'}</span>
+                    <span className="font-mono text-emerald-800 dark:text-emerald-300 text-sm">{posReceiptData.totals?.totalAmount} {t.riyal}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setPosReceiptData(null); setPosSuccess(null); }}
+                    className="w-full mt-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs"
+                  >
+                    {isRtl ? 'بدء فاتورة جديدة' : 'New Checkout'}
+                  </button>
+                </div>
+              ) : posCart.length === 0 ? (
                 <div className="text-center py-12 text-neutral-400">
                   <ShoppingBag size={32} className="mx-auto text-neutral-300 dark:text-zinc-700 mb-2 stroke-[1.5]" />
                   <p className="text-xs">{isRtl ? 'اختر خدمات أو منتجات لبدء الفاتورة السريعة' : 'Select items to build ticket'}</p>

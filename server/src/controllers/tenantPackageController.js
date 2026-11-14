@@ -1,9 +1,23 @@
 const db = require('../models');
-const { ServicePackage, ServicePackageItem, Service, Staff } = db;
+const { ServicePackage, ServicePackageItem, Service, Staff, Appointment } = db;
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+
+function parseItemsPayload(rawItems) {
+    if (!rawItems) return [];
+    if (Array.isArray(rawItems)) return rawItems;
+    if (typeof rawItems === 'string') {
+        try {
+            const parsed = JSON.parse(rawItems);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+    return [];
+}
 
 // Setup multer for image upload (using standard pattern)
 const storage = multer.diskStorage({
@@ -138,7 +152,8 @@ exports.getPackage = async (req, res) => {
 exports.createPackage = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
-        const { name_en, name_ar, items, tenantServiceCategoryId, tenantCategoryId } = req.body;
+        const { name_en, name_ar, tenantServiceCategoryId, tenantCategoryId } = req.body;
+        const items = parseItemsPayload(req.body.items);
         let image = req.body.image;
         if (req.file) {
             image = req.file.path.replace(/\\/g, '/').split('uploads/')[1];
@@ -254,7 +269,9 @@ exports.updatePackage = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
         const packageId = req.params.id;
-        const { name_en, name_ar, image, items, tenantServiceCategoryId, tenantCategoryId } = req.body;
+        const { name_en, name_ar, image, tenantServiceCategoryId, tenantCategoryId } = req.body;
+        const rawItems = req.body.items;
+        const items = rawItems !== undefined ? parseItemsPayload(rawItems) : undefined;
 
         const pkg = await ServicePackage.findOne({
             where: {
@@ -298,10 +315,9 @@ exports.updatePackage = async (req, res) => {
         if (name_ar !== undefined) pkg.name_ar = name_ar;
         if (image !== undefined) pkg.image = image;
 
-        // If items are provided, replace them entirely
-        if (Array.isArray(items)) {
-            // First destroy old items
-            await ServicePackageItem.destroy({
+        // If items are provided, reconcile them in-place to protect foreign key constraints
+        if (Array.isArray(items) && items.length > 0) {
+            const existingItems = await ServicePackageItem.findAll({
                 where: { packageId: pkg.id },
                 transaction
             });
@@ -312,7 +328,8 @@ exports.updatePackage = async (req, res) => {
             
             const serviceIds = items.map(item => item.serviceId);
             const services = await Service.findAll({
-                where: { id: serviceIds, tenantId: req.tenantId }
+                where: { id: serviceIds, tenantId: req.tenantId },
+                transaction
             });
             
             const serviceMap = services.reduce((acc, srv) => {
@@ -320,7 +337,7 @@ exports.updatePackage = async (req, res) => {
                 return acc;
             }, {});
 
-            const packageItems = [];
+            const matchedExistingIds = new Set();
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 const srv = serviceMap[item.serviceId];
@@ -332,7 +349,7 @@ exports.updatePackage = async (req, res) => {
                     });
                 }
                 
-                let itemPrice = parseFloat(srv.finalPrice || srv.calculateFinalPrice());
+                let itemPrice = parseFloat(srv.finalPrice || (typeof srv.calculateFinalPrice === 'function' ? srv.calculateFinalPrice() : srv.rawPrice || 0));
                 let itemDuration = parseInt(srv.duration, 10) || 0;
                 
                 if (item.variantId && srv.variants && Array.isArray(srv.variants)) {
@@ -346,19 +363,46 @@ exports.updatePackage = async (req, res) => {
                 totalPrice += itemPrice;
                 totalDuration += itemDuration;
 
-                packageItems.push({
-                    packageId: pkg.id,
-                    serviceId: item.serviceId,
-                    variantId: item.variantId || null,
-                    defaultStaffId: item.defaultStaffId || null,
-                    sequenceOrder: item.sequenceOrder !== undefined ? item.sequenceOrder : i
-                });
+                const existing = (item.id && existingItems.find(e => e.id === item.id)) ||
+                    existingItems.find(e => !matchedExistingIds.has(e.id) && e.serviceId === item.serviceId && (e.variantId || null) === (item.variantId || null));
+
+                if (existing) {
+                    matchedExistingIds.add(existing.id);
+                    await existing.update({
+                        serviceId: item.serviceId,
+                        variantId: item.variantId || null,
+                        defaultStaffId: item.defaultStaffId || null,
+                        sequenceOrder: item.sequenceOrder !== undefined ? item.sequenceOrder : i,
+                        isActive: item.isActive !== false
+                    }, { transaction });
+                } else {
+                    await ServicePackageItem.create({
+                        packageId: pkg.id,
+                        serviceId: item.serviceId,
+                        variantId: item.variantId || null,
+                        defaultStaffId: item.defaultStaffId || null,
+                        sequenceOrder: item.sequenceOrder !== undefined ? item.sequenceOrder : i,
+                        isActive: item.isActive !== false
+                    }, { transaction });
+                }
+            }
+
+            for (const existing of existingItems) {
+                if (!matchedExistingIds.has(existing.id)) {
+                    const apptCount = await Appointment.count({
+                        where: { packageItemId: existing.id },
+                        transaction
+                    });
+                    if (apptCount === 0) {
+                        await existing.destroy({ transaction });
+                    } else {
+                        await existing.update({ isActive: false }, { transaction });
+                    }
+                }
             }
 
             pkg.totalPrice = totalPrice;
             pkg.totalDuration = totalDuration;
-
-            await ServicePackageItem.bulkCreate(packageItems, { transaction });
         }
 
         await pkg.save({ transaction });

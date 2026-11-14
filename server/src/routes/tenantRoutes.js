@@ -140,7 +140,7 @@ router.get('/services/:id', tenantServiceController.getService);
 router.post(
     '/services',
     requireActiveSubscription,
-    checkResourceLimit('maxServices'),
+    checkResourceLimit('service'),
     tenantServiceController.uploadImage,
     tenantServiceController.createService
 );
@@ -262,6 +262,7 @@ router.get('/pos/closing', tenantPosController.getClosingSummary);
 router.get('/pos/closing/export', tenantPosController.exportClosingSummaryCsv);
 router.get('/pos/gift-cards/validate', giftCardValidateLimiter, tenantPosController.validateGiftCardForPos);
 router.post('/pos/gift-cards/redeem', giftCardRedeemLimiter, tenantPosController.redeemGiftCardForPos);
+router.post('/pos/checkout', tenantPosController.checkoutPos);
 
 // Messaging
 router.get('/messages', checkTenantFeature('hasInternalMessaging'), tenantMessagesController.getMessages);
