@@ -8,6 +8,8 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'tenantId',
                 as: 'tenant'
             });
+            TenantGiftCardPackage.belongsTo(models.Service, { foreignKey: 'serviceId', as: 'service' });
+            TenantGiftCardPackage.belongsTo(models.ServicePackage, { foreignKey: 'servicePackageId', as: 'servicePackage' });
             TenantGiftCardPackage.hasMany(models.TenantGiftCardTransaction, {
                 foreignKey: 'packageId',
                 as: 'transactions'
@@ -24,6 +26,19 @@ module.exports = (sequelize, DataTypes) => {
         tenantId: {
             type: DataTypes.UUID,
             allowNull: false
+        },
+        voucherType: {
+            type: DataTypes.STRING(32),
+            allowNull: false,
+            defaultValue: 'monetary'
+        },
+        serviceId: {
+            type: DataTypes.UUID,
+            allowNull: true
+        },
+        servicePackageId: {
+            type: DataTypes.UUID,
+            allowNull: true
         },
         title: {
             type: DataTypes.STRING,

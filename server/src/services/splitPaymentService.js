@@ -471,12 +471,21 @@ const createAppointmentPaymentTransactions = async ({
         } else if (allocation.paymentMethod === 'gift_card_code') {
             await decrementGiftCardBalance(appointment.tenantId, appointment.id, allocation.amount, allocation.giftCardCode || notes, transaction);
         }
+        const isBankTransfer = allocation.paymentMethod === 'bank_transfer';
+        const isExplicitlyVerified = allocation.verificationStatus === 'verified' || allocation.verified === true;
+        const resolvedVerificationStatus = isBankTransfer ? (isExplicitlyVerified ? 'verified' : 'pending_verification') : 'verified';
+        const resolvedStatus = (isBankTransfer && !isExplicitlyVerified) ? 'pending' : 'completed';
+
         const created = await createAppointmentTransaction({
             appointmentId: appointment.id,
             type,
             amount: allocation.amount,
             paymentMethod: allocation.paymentMethod,
-            status: 'completed',
+            status: resolvedStatus,
+            verificationStatus: resolvedVerificationStatus,
+            verifiedBy: isExplicitlyVerified ? (allocation.verifiedBy || processedBy) : null,
+            verifiedAt: isExplicitlyVerified ? new Date() : null,
+            proofAttachmentUrl: allocation.proofAttachmentUrl || null,
             transactionRef: allocations.length > 1 ? `${baseReference}-${index + 1}` : baseReference,
             processedBy,
             processedAt: new Date(),
@@ -485,7 +494,9 @@ const createAppointmentPaymentTransactions = async ({
                 source,
                 paymentAllocation: allocation,
                 paymentAllocations: allocations,
-                paymentSummaryMethod: allocations.length > 1 ? 'split' : allocation.paymentMethod
+                paymentSummaryMethod: allocations.length > 1 ? 'split' : allocation.paymentMethod,
+                isBankTransfer,
+                isExplicitlyVerified
             }
         }, { transaction, forensicTrace });
         if (created?.id) {

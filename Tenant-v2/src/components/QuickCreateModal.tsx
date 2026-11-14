@@ -94,10 +94,13 @@ export default function QuickCreateModal({
         if (!serviceForm.nameAr.trim() && !serviceForm.nameEn.trim()) {
           throw new Error(lang === 'ar' ? 'يرجى إدخال اسم الخدمة' : 'Service name required');
         }
+        const numericPrice = Number(serviceForm.price) || 0;
         await tenantApiAdapter.createService({
           name_ar: serviceForm.nameAr.trim() || serviceForm.nameEn.trim(),
           name_en: serviceForm.nameEn.trim() || serviceForm.nameAr.trim(),
-          price: Number(serviceForm.price) || 0,
+          price: numericPrice,
+          finalPrice: numericPrice,
+          rawPrice: parseFloat((numericPrice / 1.15).toFixed(2)),
           duration: Number(serviceForm.duration) || 60,
           category: serviceForm.category || 'hair',
           isActive: true

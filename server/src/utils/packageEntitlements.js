@@ -17,8 +17,9 @@ const FEATURE_ALIASES = {
     reports: ['reports', 'hasAdvancedReports', 'advancedAnalytics'],
     payroll: ['payroll', 'hasPayroll'],
     publicPageCustomization: ['publicPageCustomization', 'hasCustomBranding', 'whiteLabel'],
-    hasServicePackages: ['hasServicePackages', 'servicePackages'],
-    maxPackages: ['maxPackages', 'packages']
+    hasServicePackages: ['hasServicePackages', 'servicePackages', 'maxPackages'],
+    servicePackages: ['servicePackages', 'hasServicePackages', 'maxPackages'],
+    maxPackages: ['maxPackages', 'packages', 'hasServicePackages', 'servicePackages']
 };
 
 const getFeatureKeys = (feature) => FEATURE_ALIASES[feature] || [feature];

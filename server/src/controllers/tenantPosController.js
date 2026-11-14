@@ -412,33 +412,94 @@ const loadPosEntityForRedeem = async (tenantId, entityType, entityId, transactio
     return null;
 };
 
-const isGiftCodeRedeemable = (giftCode, tenantId) => {
+const isGiftCodeRedeemable = (giftCode, tenantId, entityType = null, entity = null) => {
     if (!giftCode) return { ok: false, reason: 'Gift card code not found' };
 
+    // 1. Tenant Scope Guard
     if (giftCode.scopeType === 'tenant_scoped' && giftCode.tenantId !== tenantId) {
         return { ok: false, reason: 'This gift card can only be used in the issuing center' };
     }
 
-    if (giftCode.status === 'cancelled') {
+    // 2. Status Whitelist & Failsafe Check
+    const normalizedStatus = `${giftCode.status || ''}`.trim().toLowerCase();
+    if (normalizedStatus === 'cancelled') {
         return { ok: false, reason: 'Gift card is cancelled' };
     }
-    if (giftCode.status === 'redeemed') {
+    if (normalizedStatus === 'redeemed') {
         return { ok: false, reason: 'Gift card is already redeemed' };
     }
-    if (giftCode.status === 'expired') {
+    if (normalizedStatus === 'expired') {
         return { ok: false, reason: 'Gift card is expired' };
     }
+    if (normalizedStatus === 'revoked') {
+        return { ok: false, reason: 'Gift card is revoked' };
+    }
+    if (!['active', 'issued'].includes(normalizedStatus)) {
+        return { ok: false, reason: `Gift card status is invalid: ${giftCode.status || 'unknown'}` };
+    }
+
+    // 3. Expiration Check
     if (giftCode.expiresAt && new Date(giftCode.expiresAt).getTime() < Date.now()) {
         return { ok: false, reason: 'Gift card is expired' };
     }
 
+    // 4. Exhaustion / Remaining Balance Check
     const remainingAmount = parseFloat(giftCode.remainingAmount || 0);
     if (!Number.isFinite(remainingAmount) || remainingAmount <= 0) {
         return { ok: false, reason: 'Gift card has no remaining balance' };
     }
 
+    // 5. Cross-Tenant Entity Isolation
+    if (entity) {
+        if (entity.tenantId && entity.tenantId !== tenantId) {
+            return { ok: false, reason: 'Cross-tenant gift card redemption is not permitted' };
+        }
+        if (giftCode.tenantId && entity.tenantId && giftCode.tenantId !== entity.tenantId) {
+            return { ok: false, reason: 'Gift card does not belong to the target appointment tenant' };
+        }
+    }
+
+    // 6. Strict Entitlement Safeguard for Service & Package Experiences (Fails Closed)
+    if (giftCode.voucherType === 'service_experience') {
+        if (entityType && entityType !== 'appointment') {
+            return { ok: false, reason: 'This service experience voucher can only be redeemed for salon service appointments, not retail product orders.' };
+        }
+
+        if (entity) {
+            if (entityType !== 'appointment') {
+                return { ok: false, reason: 'This service experience voucher can only be redeemed for salon service appointments, not retail product orders.' };
+            }
+
+            // Enforce Service ID: A missing entity identifier must NEVER bypass matching requirements
+            if (giftCode.serviceId) {
+                if (!entity.serviceId) {
+                    return { ok: false, reason: 'Appointment lacks the required service identifier for this experience voucher.' };
+                }
+                if (entity.serviceId !== giftCode.serviceId) {
+                    return { ok: false, reason: 'This gift voucher is valid only for its designated service experience.' };
+                }
+                if (entity.service && entity.service.tenantId && entity.service.tenantId !== tenantId) {
+                    return { ok: false, reason: 'Target salon does not own the designated service experience.' };
+                }
+            }
+
+            // Enforce Package ID: A missing entity identifier must NEVER bypass matching requirements
+            if (giftCode.servicePackageId) {
+                const apptPackageId = entity.servicePackageId || entity.packageId;
+                if (!apptPackageId) {
+                    return { ok: false, reason: 'Appointment lacks the required package identifier for this experience voucher.' };
+                }
+                if (apptPackageId !== giftCode.servicePackageId) {
+                    return { ok: false, reason: 'This gift voucher is valid only for its designated package experience.' };
+                }
+            }
+        }
+    }
+
     return { ok: true, reason: null };
 };
+
+exports.isGiftCodeRedeemable = isGiftCodeRedeemable;
 
 exports.validateGiftCardForPos = async (req, res) => {
     try {
@@ -467,6 +528,12 @@ exports.validateGiftCardForPos = async (req, res) => {
         if (!entityScope?.entity) {
             logGiftCardAudit('validate_failed', { tenantId, code, entityType, entityId, reason: 'entity_not_found' });
             return res.status(404).json({ success: false, message: 'POS item not found for this tenant' });
+        }
+
+        const entitlementCheck = isGiftCodeRedeemable(giftCode, tenantId, entityType, entityScope.entity);
+        if (!entitlementCheck.ok) {
+            logGiftCardAudit('validate_failed', { tenantId, code, entityType, entityId, reason: entitlementCheck.reason });
+            return res.status(400).json({ success: false, message: entitlementCheck.reason });
         }
 
         const dueAmount = computeEntityDueAmount(entityType, entityScope.entity);
@@ -540,6 +607,13 @@ exports.redeemGiftCardForPos = async (req, res) => {
             await transaction.rollback();
             logGiftCardAudit('redeem_failed', { tenantId, code, entityType, entityId, reason: 'entity_not_found' });
             return res.status(404).json({ success: false, message: 'POS item not found for this tenant' });
+        }
+
+        const entitlementCheck = isGiftCodeRedeemable(giftCode, tenantId, entityType, entityScope.entity);
+        if (!entitlementCheck.ok) {
+            await transaction.rollback();
+            logGiftCardAudit('redeem_failed', { tenantId, code, entityType, entityId, reason: entitlementCheck.reason });
+            return res.status(400).json({ success: false, message: entitlementCheck.reason });
         }
 
         const dueAmount = computeEntityDueAmount(entityType, entityScope.entity);
@@ -2042,6 +2116,359 @@ exports.exportClosingSummaryCsv = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to export POS closing summary',
+            error: error.message
+        });
+    }
+};
+exports.checkoutPos = async (req, res) => {
+    const transaction = await db.sequelize.transaction();
+    try {
+        const tenantId = req.tenantId;
+        if (!tenantId) {
+            await transaction.rollback();
+            return res.status(401).json({ success: false, message: 'Tenant context required' });
+        }
+
+        const {
+            customer: customerInput,
+            items,
+            paymentMethod = 'cash',
+            discount = 0,
+            notes = null
+        } = req.body || {};
+
+        if (!Array.isArray(items) || items.length === 0) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'POS checkout requires at least one item' });
+        }
+
+        // 1. Resolve Customer (PlatformUser)
+        let customer = null;
+        if (customerInput?.platformUserId) {
+            customer = await db.PlatformUser.findByPk(customerInput.platformUserId, { transaction });
+        }
+        if (!customer && (customerInput?.phone || customerInput?.email || customerInput?.firstName)) {
+            const userService = require('../services/userService');
+            customer = await userService.findOrCreatePlatformUser({
+                phone: customerInput.phone,
+                email: customerInput.email,
+                firstName: customerInput.firstName || 'Walk-in',
+                lastName: customerInput.lastName || 'Customer'
+            }, { transaction });
+        }
+        if (!customer) {
+            customer = await db.PlatformUser.findOne({
+                where: { phone: '+966500000000' },
+                transaction
+            });
+            if (!customer) {
+                customer = await db.PlatformUser.create({
+                    firstName: 'Walk-in',
+                    lastName: 'Customer',
+                    phone: '+966500000000',
+                    email: `walkin.${tenantId.slice(0, 8)}@barspa.internal`,
+                    isVerified: true
+                }, { transaction });
+            }
+        }
+
+        // Normalize payment method for ledger and transaction records
+        let txPaymentMethod = 'cash';
+        const rawMethod = `${paymentMethod || ''}`.trim().toLowerCase();
+        if (['card_pos', 'mada', 'card', 'pos', 'credit_card', 'debit_card'].includes(rawMethod)) {
+            txPaymentMethod = 'card_pos';
+        } else if (['cash'].includes(rawMethod)) {
+            txPaymentMethod = 'cash';
+        } else if (['online'].includes(rawMethod)) {
+            txPaymentMethod = 'online';
+        } else if (['wallet'].includes(rawMethod)) {
+            txPaymentMethod = 'wallet';
+        } else if (['bank_transfer'].includes(rawMethod)) {
+            txPaymentMethod = 'bank_transfer';
+        }
+
+        const productItems = items.filter(i => (i.type || i.itemType) === 'product');
+        const serviceItems = items.filter(i => (i.type || i.itemType) === 'service');
+
+        if (productItems.length === 0 && serviceItems.length === 0) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Items must have type "product" or "service"' });
+        }
+
+        let createdOrder = null;
+        const createdAppointments = [];
+        let grandSubtotal = 0;
+        let grandTax = 0;
+        let grandTotal = 0;
+
+        // 2. Process Products (Retail Sales)
+        if (productItems.length > 0) {
+            let orderSubtotal = 0;
+            let orderTax = 0;
+            const validatedProductItems = [];
+
+            for (const item of productItems) {
+                const productId = item.id || item.productId;
+                const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
+
+                const product = await db.Product.findOne({
+                    where: { id: productId, tenantId },
+                    lock: transaction.LOCK.UPDATE,
+                    transaction
+                });
+
+                if (!product) {
+                    await transaction.rollback();
+                    return res.status(404).json({
+                        success: false,
+                        message: `Product not found: ${productId}`
+                    });
+                }
+
+                if (product.stock < quantity) {
+                    await transaction.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: `Insufficient stock for product "${product.name_en || product.name_ar}". Available: ${product.stock}, requested: ${quantity}`
+                    });
+                }
+
+                // Decrement stock and increment soldCount
+                product.stock = product.stock - quantity;
+                product.soldCount = (product.soldCount || 0) + quantity;
+                await product.save({ transaction });
+
+                const unitPrice = parseFloat(product.price);
+                const lineTotal = parseFloat((unitPrice * quantity).toFixed(2));
+                const taxRate = parseFloat(product.taxRate ?? 15);
+                const lineTax = parseFloat((lineTotal - (lineTotal / (1 + (taxRate / 100)))).toFixed(2));
+
+                orderSubtotal += lineTotal;
+                orderTax += lineTax;
+
+                validatedProductItems.push({
+                    product,
+                    productId: product.id,
+                    quantity,
+                    unitPrice,
+                    lineTotal,
+                    taxAmount: lineTax
+                });
+            }
+
+            const orderTotal = parseFloat(orderSubtotal.toFixed(2));
+            const orderTaxTotal = parseFloat(orderTax.toFixed(2));
+
+            // Create Order
+            createdOrder = await db.Order.create({
+                tenantId,
+                platformUserId: customer.id,
+                status: 'completed',
+                paymentStatus: 'paid',
+                paymentMethod: 'pay_on_visit',
+                deliveryType: 'pickup',
+                subtotal: parseFloat((orderTotal - orderTaxTotal).toFixed(2)),
+                taxAmount: orderTaxTotal,
+                totalAmount: orderTotal,
+                deliveredAt: new Date(),
+                notes: notes ? `[POS Walk-in] ${notes}` : '[POS Walk-in Checkout]'
+            }, { transaction });
+
+            // Create Order Items
+            for (const vItem of validatedProductItems) {
+                await db.OrderItem.create({
+                    orderId: createdOrder.id,
+                    productId: vItem.productId,
+                    productName: vItem.product.name_en || vItem.product.name_ar || 'Product',
+                    productNameAr: vItem.product.name_ar || vItem.product.name_en || 'منتج',
+                    productPrice: vItem.unitPrice,
+                    productImage: vItem.product.image || (Array.isArray(vItem.product.images) ? vItem.product.images[0] : null) || null,
+                    productSku: vItem.product.sku || null,
+                    quantity: vItem.quantity,
+                    unitPrice: vItem.unitPrice,
+                    totalPrice: vItem.lineTotal
+                }, { transaction });
+            }
+
+            // Create PaymentTransaction for Order
+            await createOrderTransaction({
+                orderId: createdOrder.id,
+                type: 'full',
+                amount: orderTotal,
+                paymentMethod: txPaymentMethod,
+                status: 'completed',
+                transactionRef: `POS-ORD-${createdOrder.orderNumber || createdOrder.id.slice(0, 8).toUpperCase()}`,
+                processedBy: req.staffId || null,
+                processedAt: new Date(),
+                notes: 'POS Retail product sale',
+                metadata: {
+                    source: 'pos_checkout',
+                    posStaffId: req.staffId || null
+                }
+            }, { transaction });
+
+            // Ensure Order Customer Invoice
+            try {
+                await ensureOrderInvoice(createdOrder.id, { transaction, triggerSource: 'pos_checkout' });
+            } catch (invoiceErr) {
+                console.warn('POS invoice generation warning for order:', invoiceErr.message);
+            }
+
+            grandSubtotal += parseFloat((orderTotal - orderTaxTotal).toFixed(2));
+            grandTax += orderTaxTotal;
+            grandTotal += orderTotal;
+        }
+
+        // 3. Process Services (Salon Delivered Services)
+        if (serviceItems.length > 0) {
+            let defaultStaff = null;
+            if (req.staffId) {
+                defaultStaff = await db.Staff.findOne({ where: { id: req.staffId, tenantId }, transaction });
+            }
+            if (!defaultStaff) {
+                defaultStaff = await db.Staff.findOne({ where: { tenantId, isActive: true }, transaction });
+            }
+            if (!defaultStaff) {
+                defaultStaff = await db.Staff.findOne({ where: { tenantId }, transaction });
+            }
+
+            for (const item of serviceItems) {
+                const serviceId = item.id || item.serviceId;
+                const service = await db.Service.findOne({
+                    where: { id: serviceId, tenantId },
+                    transaction
+                });
+
+                if (!service) {
+                    await transaction.rollback();
+                    return res.status(404).json({
+                        success: false,
+                        message: `Service not found: ${serviceId}`
+                    });
+                }
+
+                const assignedStaffId = item.staffId || defaultStaff?.id;
+                if (!assignedStaffId) {
+                    await transaction.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: `No active staff member available to assign service: ${service.name_en || service.name_ar}`
+                    });
+                }
+
+                const duration = parseInt(service.duration, 10) || 60;
+                const startTime = new Date();
+                const endTime = new Date(startTime.getTime() + duration * 60000);
+
+                const finalPrice = parseFloat(service.finalPrice || service.price || item.price || 0);
+                const rawPrice = parseFloat(service.rawPrice || (finalPrice / 1.15).toFixed(2));
+                const taxAmount = parseFloat((finalPrice - rawPrice).toFixed(2));
+                const platformFee = parseFloat((finalPrice * 0.10).toFixed(2));
+                const tenantRevenue = parseFloat((finalPrice - platformFee).toFixed(2));
+
+                const appointment = await db.Appointment.create({
+                    tenantId,
+                    platformUserId: customer.id,
+                    serviceId: service.id,
+                    staffId: assignedStaffId,
+                    startTime,
+                    endTime,
+                    status: 'completed',
+                    paymentStatus: APPOINTMENT_PAYMENT_STATUS.FULLY_PAID,
+                    price: finalPrice,
+                    rawPrice,
+                    taxAmount,
+                    platformFee,
+                    tenantRevenue,
+                    totalPaid: finalPrice,
+                    depositPaid: true,
+                    remainderAmount: 0,
+                    remainderPaid: true,
+                    paidAt: new Date(),
+                    paymentMethod: txPaymentMethod,
+                    notes: notes ? `[POS Walk-in] ${notes}` : '[POS Walk-in Service Checkout]'
+                }, { transaction });
+
+                // Create PaymentTransaction for Appointment
+                await createAppointmentTransaction({
+                    appointmentId: appointment.id,
+                    type: 'full',
+                    amount: finalPrice,
+                    paymentMethod: txPaymentMethod,
+                    status: 'completed',
+                    transactionRef: `POS-APT-${appointment.bookingNumber || appointment.id.slice(0, 8).toUpperCase()}`,
+                    processedBy: req.staffId || null,
+                    processedAt: new Date(),
+                    notes: 'POS Service sale',
+                    metadata: {
+                        source: 'pos_checkout',
+                        posStaffId: req.staffId || null
+                    }
+                }, { transaction });
+
+                // Ensure Appointment Customer Invoice
+                try {
+                    await ensureAppointmentInvoice(appointment.id, { transaction, triggerSource: 'pos_checkout' });
+                } catch (invoiceErr) {
+                    console.warn('POS invoice generation warning for appointment:', invoiceErr.message);
+                }
+
+                createdAppointments.push(appointment);
+                grandSubtotal += rawPrice;
+                grandTax += taxAmount;
+                grandTotal += finalPrice;
+            }
+        }
+
+        // Apply discount if provided
+        const numericDiscount = Math.max(0, parseFloat(discount) || 0);
+        const finalPayable = Math.max(0, parseFloat((grandTotal - numericDiscount).toFixed(2)));
+
+        await transaction.commit();
+
+        const receiptNumber = `POS-${Date.now().toString().slice(-8)}`;
+
+        return res.json({
+            success: true,
+            message: 'POS checkout completed successfully',
+            data: {
+                receiptNumber,
+                order: createdOrder ? {
+                    id: createdOrder.id,
+                    orderNumber: createdOrder.orderNumber,
+                    subtotal: createdOrder.subtotal,
+                    taxAmount: createdOrder.taxAmount,
+                    totalAmount: createdOrder.totalAmount,
+                    itemCount: productItems.length
+                } : null,
+                appointments: createdAppointments.map(a => ({
+                    id: a.id,
+                    bookingNumber: a.bookingNumber,
+                    serviceId: a.serviceId,
+                    staffId: a.staffId,
+                    price: a.price,
+                    status: a.status
+                })),
+                totals: {
+                    subtotal: parseFloat(grandSubtotal.toFixed(2)),
+                    taxAmount: parseFloat(grandTax.toFixed(2)),
+                    discount: numericDiscount,
+                    totalAmount: finalPayable
+                },
+                paymentMethod: txPaymentMethod,
+                customer: {
+                    id: customer.id,
+                    name: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.phone || 'Walk-in Customer',
+                    phone: customer.phone || null
+                }
+            }
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('POS Checkout error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to process POS checkout',
             error: error.message
         });
     }

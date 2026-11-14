@@ -2378,6 +2378,14 @@ class BookingService {
             throw new Error('Appointment already cancelled');
         }
 
+        const { isBookingLocked } = require('../utils/appointmentPaymentStatus');
+        if (isBookingLocked(appointment)) {
+            const err = new Error('This booking is fully paid and locked. Ordinary cancellation is not permitted. Please contact the salon for assistance.');
+            err.statusCode = 423;
+            err.code = 'BOOKING_LOCKED_FULLY_PAID';
+            throw err;
+        }
+
         const noteTransform = typeof options.noteTransform === 'function' ? options.noteTransform : null;
         const nextNotes = noteTransform ? noteTransform(appointment.notes) : appointment.notes;
         await appointment.update({

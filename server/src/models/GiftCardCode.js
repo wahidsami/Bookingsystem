@@ -16,6 +16,8 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: 'tenantId',
                 as: 'tenant'
             });
+            GiftCardCode.belongsTo(models.Service, { foreignKey: 'serviceId', as: 'service' });
+            GiftCardCode.belongsTo(models.ServicePackage, { foreignKey: 'servicePackageId', as: 'servicePackage' });
             GiftCardCode.hasMany(models.GiftCardCodeRedemption, {
                 foreignKey: 'giftCardCodeId',
                 as: 'redemptions'
@@ -65,6 +67,27 @@ module.exports = (sequelize, DataTypes) => {
         },
         recipientEmail: {
             type: DataTypes.STRING(255),
+            allowNull: true
+        },
+        recipientName: {
+            type: DataTypes.STRING(255),
+            allowNull: true
+        },
+        voucherType: {
+            type: DataTypes.STRING(32),
+            allowNull: false,
+            defaultValue: 'monetary'
+        },
+        serviceId: {
+            type: DataTypes.UUID,
+            allowNull: true
+        },
+        servicePackageId: {
+            type: DataTypes.UUID,
+            allowNull: true
+        },
+        giftMessage: {
+            type: DataTypes.TEXT,
             allowNull: true
         },
         recipientPhone: {

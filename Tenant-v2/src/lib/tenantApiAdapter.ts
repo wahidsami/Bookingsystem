@@ -1293,14 +1293,15 @@ class TenantApiAdapter {
 
   async createService(data: any): Promise<any> {
     if (data instanceof FormData) {
-      const response = await fetch(`${this.baseUrl}/tenant/services`, {
+      const response = await this.request('/tenant/services', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.getToken()}`
-        },
         body: data
       });
-      return this.handleResponse(response);
+      const json = await response.json();
+      return {
+        ...json,
+        service: json?.service ? normalizeServiceRecord(json.service) : json?.service
+      };
     }
     const response = await this.post('/tenant/services', data);
     return {
@@ -1311,14 +1312,15 @@ class TenantApiAdapter {
 
   async updateService(id: string, data: any): Promise<any> {
     if (data instanceof FormData) {
-      const response = await fetch(`${this.baseUrl}/tenant/services/${id}`, {
+      const response = await this.request(`/tenant/services/${id}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${this.getToken()}`
-        },
         body: data
       });
-      return this.handleResponse(response);
+      const json = await response.json();
+      return {
+        ...json,
+        service: json?.service ? normalizeServiceRecord(json.service) : json?.service
+      };
     }
     const response = await this.put(`/tenant/services/${id}`, data);
     return {
@@ -1342,28 +1344,22 @@ class TenantApiAdapter {
 
   async createPackage(data: FormData | Record<string, any>): Promise<any> {
     if (data instanceof FormData) {
-      const response = await this.fetchImpl(`${this.baseUrl}/tenant/packages`, {
+      const response = await this.request('/tenant/packages', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.getToken()}`
-        },
         body: data
       });
-      return this.handleResponse(response);
+      return response.json();
     }
     return this.post('/tenant/packages', data);
   }
 
   async updatePackage(id: string, data: FormData | Record<string, any>): Promise<any> {
     if (data instanceof FormData) {
-      const response = await this.fetchImpl(`${this.baseUrl}/tenant/packages/${id}`, {
+      const response = await this.request(`/tenant/packages/${id}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${this.getToken()}`
-        },
         body: data
       });
-      return this.handleResponse(response);
+      return response.json();
     }
     return this.put(`/tenant/packages/${id}`, data);
   }
@@ -1427,28 +1423,22 @@ class TenantApiAdapter {
 
   async createServices2Bundle(data: FormData | Record<string, any>): Promise<{ success: boolean; bundle: any; message?: string }> {
     if (data instanceof FormData) {
-      const response = await this.fetchImpl(`${this.baseUrl}/tenant/services2/bundles`, {
+      const response = await this.request('/tenant/services2/bundles', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.getToken()}`
-        },
         body: data
       });
-      return this.handleResponse(response);
+      return response.json();
     }
     return this.post('/tenant/services2/bundles', data);
   }
 
   async updateServices2Bundle(id: string, data: FormData | Record<string, any>): Promise<{ success: boolean; bundle: any; message?: string }> {
     if (data instanceof FormData) {
-      const response = await this.fetchImpl(`${this.baseUrl}/tenant/services2/bundles/${id}`, {
+      const response = await this.request(`/tenant/services2/bundles/${id}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${this.getToken()}`
-        },
         body: data
       });
-      return this.handleResponse(response);
+      return response.json();
     }
     return this.put(`/tenant/services2/bundles/${id}`, data);
   }
@@ -1815,6 +1805,16 @@ class TenantApiAdapter {
   }
 
   // --- POS & Cart Checkout ---
+  async checkoutPos(payload: {
+    customer?: { platformUserId?: string; phone?: string; firstName?: string; lastName?: string };
+    items: Array<{ id: string; type: 'product' | 'service'; quantity: number; price?: number; staffId?: string }>;
+    paymentMethod?: string;
+    discount?: number;
+    notes?: string;
+  }): Promise<any> {
+    return this.post('/tenant/pos/checkout', payload);
+  }
+
   async checkoutProducts(payload: any): Promise<any> {
     return this.post('/tenant/cart/products/purchase', payload);
   }
@@ -1836,6 +1836,33 @@ class TenantApiAdapter {
     payload: { amount: number; reason?: string; paymentMethod?: string }
   ): Promise<any> {
     return this.post(`/tenant/appointments/${id}/refund`, payload);
+  }
+
+  async listBankTransfers(appointmentId: string): Promise<any> {
+    return this.get(`/tenant/appointments/${appointmentId}/bank-transfers`);
+  }
+
+  async verifyBankTransfer(
+    appointmentId: string,
+    transactionId: string,
+    payload: { notes?: string; proofAttachmentUrl?: string } = {}
+  ): Promise<any> {
+    return this.post(`/tenant/appointments/${appointmentId}/bank-transfers/${transactionId}/verify`, payload);
+  }
+
+  async rejectBankTransfer(
+    appointmentId: string,
+    transactionId: string,
+    payload: { reason: string }
+  ): Promise<any> {
+    return this.post(`/tenant/appointments/${appointmentId}/bank-transfers/${transactionId}/reject`, payload);
+  }
+
+  async applyFinancialException(
+    appointmentId: string,
+    payload: { action: string; amount?: number; reason: string; paymentMethod?: string; reference?: string }
+  ): Promise<any> {
+    return this.post(`/tenant/appointments/${appointmentId}/financial-exception`, payload);
   }
 
   async getAuditLogs(params: Record<string, any> = {}): Promise<TenantApiResponse<any>> {

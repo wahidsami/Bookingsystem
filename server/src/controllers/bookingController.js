@@ -935,10 +935,12 @@ const cancelBooking = async (req, res) => {
 
     } catch (error) {
         console.error('Cancel booking error:', error);
-        const statusCode = error.message.includes('Unauthorized') ? 403 :
-                          error.message.includes('not found') ? 404 : 500;
+        const statusCode = error.statusCode ||
+                          (error.message.includes('Unauthorized') ? 403 :
+                          error.message.includes('not found') ? 404 : 500);
         res.status(statusCode).json({
             success: false,
+            code: error.code || undefined,
             message: error.message
         });
     }
@@ -1102,6 +1104,16 @@ const rescheduleBooking = async (req, res) => {
         if (!appointment) {
             await transaction.rollback();
             return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+
+        const { isBookingLocked } = require('../utils/appointmentPaymentStatus');
+        if (isBookingLocked(appointment)) {
+            await transaction.rollback();
+            return res.status(423).json({
+                success: false,
+                code: 'BOOKING_LOCKED_FULLY_PAID',
+                message: 'This booking is fully paid and locked. Ordinary rescheduling is not permitted. Please contact the salon.'
+            });
         }
 
         if (!['pending', 'confirmed'].includes(appointment.status)) {

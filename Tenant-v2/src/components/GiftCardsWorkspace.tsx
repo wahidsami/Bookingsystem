@@ -16,6 +16,10 @@ interface GiftCardsWorkspaceProps {
 
 interface GiftCardPackage {
   id: string;
+  voucherType?: 'monetary' | 'service_experience';
+  serviceId?: string | null;
+  servicePackageId?: string | null;
+  service?: any;
   title: string;
   description: string;
   displayOrder: number;
@@ -91,6 +95,10 @@ const normalizeGiftCardPackage = (item: any): GiftCardPackage => {
 
   return {
     id: String(item?.id || ''),
+    voucherType: item?.voucherType || 'monetary',
+    serviceId: item?.serviceId || null,
+    servicePackageId: item?.servicePackageId || null,
+    service: item?.service || null,
     title,
     description,
     displayOrder: Number(item?.displayOrder || 0),
@@ -167,6 +175,9 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
 
   // Builder Form States
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formVoucherType, setFormVoucherType] = useState<'monetary' | 'service_experience'>('monetary');
+  const [formServiceId, setFormServiceId] = useState<string | null>(null);
+  const [availableServices, setAvailableServices] = useState<any[]>([]);
   const [formTitle, setFormTitle] = useState<string>('');
   const [formDescription, setFormDescription] = useState<string>('');
   const [formDisplayOrder, setFormDisplayOrder] = useState<number>(1);
@@ -195,6 +206,12 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
     try {
       setLoading(true);
       setError(null);
+
+      // Load services for experience gifting
+      try {
+        const srvRes = await tenantApiAdapter.getServices();
+        setAvailableServices(Array.isArray(srvRes) ? srvRes : []);
+      } catch (_srvErr) {}
 
       // Load packages
       const pkgData = await tenantApiAdapter.get('/tenant/gift-cards/packages');
@@ -246,6 +263,8 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
   // Form Reset
   const resetForm = () => {
     setEditingId(null);
+    setFormVoucherType('monetary');
+    setFormServiceId(null);
     setFormTitle('');
     setFormDescription('');
     setFormDisplayOrder(1);
@@ -262,6 +281,8 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
   // Preset fill helper
   const loadPackageIntoForm = (pkg: GiftCardPackage) => {
     setEditingId(pkg.id);
+    setFormVoucherType(pkg.voucherType || 'monetary');
+    setFormServiceId(pkg.serviceId || null);
     setFormTitle(pkg.title);
     setFormDescription(pkg.description);
     setFormDisplayOrder(pkg.displayOrder);
@@ -354,6 +375,8 @@ export default function GiftCardsWorkspace({ lang, darkMode = false, quickLaunch
     try {
       setLoading(true);
       const payload = {
+        voucherType: formVoucherType,
+        serviceId: formServiceId || null,
         title: formTitle,
         title_en: formTitle,
         title_ar: formTitle,
