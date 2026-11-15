@@ -3540,7 +3540,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
       return;
     }
 
-    if (normalizedNext === 'completed' && paymentDueAmount > 0) {
+    const allowCompletionWithOutstandingBalance = Boolean(tenantSettings?.bookingSettings?.allowCompletionWithOutstandingBalance);
+    if (normalizedNext === 'completed' && paymentDueAmount > 0 && !allowCompletionWithOutstandingBalance) {
       addLocalToast(
         isRtl ? 'لا يمكنك تغيير الحالة إلى مكتمل إلا بعد سداد مبلغ الحجز بالكامل.' : 'You can not change to completed unless the booking amount is paid.',
         isRtl ? 'You can not change to completed unless the booking amount is paid.' : 'لا يمكنك تغيير الحالة إلى مكتمل إلا بعد سداد مبلغ الحجز بالكامل.',
@@ -5858,12 +5859,12 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
                         const statusBadgeColor =
                           apt.status === 'confirmed' ? 'bg-amber-100 text-amber-700 border-amber-200/60' :
                           apt.status === 'checked_in' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                          apt.status === 'completed' ? 'bg-zinc-100 text-zinc-700 border-zinc-200' : 'bg-rose-100 text-rose-700 border-rose-200';
+                          apt.status === 'completed' ? (Number(apt.remainderAmount ?? apt.outstandingAmount ?? 0) > 0.009 ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-zinc-100 text-zinc-700 border-zinc-200') : 'bg-rose-100 text-rose-700 border-rose-200';
 
                         const statusText =
                           apt.status === 'confirmed' ? t.confirmed :
                           apt.status === 'checked_in' ? t.arrived :
-                          apt.status === 'completed' ? t.completed : (isRtl ? 'ملغي' : 'Cancelled');
+                          apt.status === 'completed' ? (Number(apt.remainderAmount ?? apt.outstandingAmount ?? 0) > 0.009 ? (isRtl ? 'مكتمل (رصيد مستحق)' : 'Completed (Balance Due)') : t.completed) : (isRtl ? 'ملغي' : 'Cancelled');
 
                         return (
                           <div
@@ -6492,7 +6493,8 @@ export default function AppointmentWorkspace({ lang, onQuickAction, quickLaunchR
         formatMinutesToTime={formatMinutesToTime}
         onClose={() => setDrawerOpen(false)}
         onStatusChange={async (newStatus) => {
-          if (newStatus === 'completed' && activeAppointment?.paymentStatus !== 'paid') {
+          const allowCompletionWithOutstandingBalance = Boolean(tenantSettings?.bookingSettings?.allowCompletionWithOutstandingBalance);
+          if (newStatus === 'completed' && activeAppointment?.paymentStatus !== 'paid' && !allowCompletionWithOutstandingBalance) {
             setShowPaymentRequiredDialog(true);
             return;
           }

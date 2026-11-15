@@ -1,3 +1,537 @@
+# BARSPA — Tenant-Configurable Appointment Completion Policy (BARSPA-APPOINTMENT-POLICY-01)
+- [x] 1. Architecture Investigation <!-- id: policy_investigation -->
+  - [x] 1.1 Inspect Tenant model, settings storage (`TenantSettings`, `settings` JSON, etc.), and migrations
+  - [x] 1.2 Inspect Tenant-v2 settings endpoints, UI components, and API adapter
+  - [x] 1.3 Inspect backend controllers `tenantAppointmentController.js` and `staffAppController.js`
+  - [x] 1.4 Inspect RifahStaff auth/session and config hydration
+- [x] 2. Settings Architecture & Migration <!-- id: policy_storage_migration -->
+  - [x] 2.1 Determine canonical storage location for `allowCompletionWithOutstandingBalance`
+  - [x] 2.2 Author backward-compatible migration with default `false`
+- [x] 3. Backend Enforcement & Financial Integrity <!-- id: policy_backend_impl -->
+  - [x] 3.1 Update `tenantAppointmentController.js` with policy resolution (unpaid & partially paid)
+  - [x] 3.2 Update `staffAppController.js` with policy resolution
+  - [x] 3.3 Expose policy in tenant config / staff hydration
+  - [x] 3.4 Ensure financial status, balances, and payment integrity are strictly preserved
+- [x] 4. Tenant-v2 Configuration UI & Indicators <!-- id: policy_tenant_v2_ui -->
+  - [x] 4.1 Add bilingual toggle in booking/appointment settings with RBAC & audit logging
+  - [x] 4.2 Add outstanding-balance indicator for completed appointments
+  - [x] 4.3 Verify Tenant-v2 build (`npm run build`)
+- [x] 5. RifahStaff Mobile UX <!-- id: policy_rifah_staff_ux -->
+  - [x] 5.1 Add non-blocking warning banner on completion with outstanding balance
+  - [x] 5.2 Verify RifahStaff TypeScript check (`npx tsc --noEmit`)
+- [x] 6. Comprehensive Test Coverage (20 Scenarios) <!-- id: policy_tests -->
+  - [x] 6.1 Author `tenantCompletionPolicy.test.js` covering all 20 required scenarios
+  - [x] 6.2 Run all financial test suites (all passing)
+- [x] 7. Deliverable & Release Preparation <!-- id: policy_report_delivery -->
+  - [x] 7.1 Author `BARSPA_TENANT_CONFIGURABLE_COMPLETION_POLICY_REPORT.md` with verdicts
+  - [x] 7.2 Stage authorized files, commit to `main`, and report Coolify deployment safety
+
+# BARSPA — Normal Main-Branch Release & Customer Gift Card Forensic Audit (BARSPA-FIN-OPS-MAIN-01)
+- [x] 1. Existing Git & Release Workflow on Main <!-- id: main_git_workflow -->
+  - [x] 1.1 Run baseline Git inspections (`git branch`, `git status`, `git remote`, `git log`, `git show e487da8`)
+  - [x] 1.2 Verify authorized files in working tree vs commit `e487da8`
+  - [x] 1.3 Investigate Coolify deployment safety (auto-deployment risk on main push)
+  - [x] 1.4 Selectively stage authorized files on `main` (exclude mobile, public, landing, scratch)
+  - [x] 1.5 Review `git diff --cached --stat` and perform commit on `main`
+  - [x] 1.6 Push to `origin main` or pause for deployment safety based on Coolify check
+- [x] 2. RifahMobile Customer Gift Card Forensic Audit <!-- id: mobile_gift_audit -->
+  - [x] 2.1 Map gift entry points, routes, and active tenant parameter passing
+  - [x] 2.2 Audit GiftsScreen layout, tabs (`أرصدتي` vs `إهداء باقة`), controls, and AR/EN strings
+  - [x] 2.3 Analyze gift catalogue (monetary voucher vs wallet top-up vs promotional bonus vs service experience)
+  - [x] 2.4 Trace purchaser/recipient data, Saudi phone normalization, and registered vs unregistered branches
+  - [x] 2.5 Trace recipient verification endpoint `GET /users/tenant-gifts/recipient-check`
+  - [x] 2.6 Trace simulated payment checkout (`fake_gateway_card`, idempotency, atomicity)
+  - [x] 2.7 Trace gift issuance and database records across both recipient branches
+  - [x] 2.8 Document sharing mechanisms (`wa.me`, `sms:`) and recipient experience
+  - [x] 2.9 Trace redemption and expiry logic in POS and customer app
+- [x] 3. Comparison with Owner Requirements & Fresha Benchmark <!-- id: owner_req_comparison -->
+  - [x] 3.1 Answer all 9 specific owner questions in structured comparison table
+  - [x] 3.2 Benchmark against Fresha customer gifting journey
+- [x] 4. Report Delivery & Acceptance Verdicts <!-- id: main_report_delivery -->
+  - [x] 4.1 Author `RifahMobile/CUSTOMER_GIFT_CARD_COMPLETE_JOURNEY_AUDIT.md`
+  - [x] 4.2 Provide Arabic executive summary for salon owner
+  - [x] 4.3 Report 7 mandatory verdicts
+
+# BARSPA-FIN-OPS-01 — Release Scope Correction & Selective Commit Preparation
+- [x] 1. Audit Existing RifahMobile Gifting Experience <!-- id: prep_audit_mobile_gift -->
+  - [x] 1.1 Trace entry points, navigation, monetary & experience voucher selection in `GiftsScreen.tsx`
+  - [x] 1.2 Trace purchaser/recipient data, Saudi phone validation, and instant voucher issuance
+  - [x] 1.3 Trace payment gateway integration (mocked vs sandbox vs live gateway) and error recovery
+  - [x] 1.4 Trace manual WhatsApp/SMS share behavior
+- [x] 2. Clarify PublicPage Scope & Exclude from Current Release <!-- id: prep_clarify_public_page -->
+  - [x] 2.1 Investigate PublicPage architectural role, routing, and deployment history
+  - [x] 2.2 Exclude PublicPage gift additions from the selective test commit; keep workspace files untouched
+- [x] 3. Verify Product/Service Sales Separation Requirement <!-- id: prep_verify_sales_separation -->
+  - [x] 3.1 Audit approved business requirement for separate operational sales experiences
+  - [x] 3.2 Evaluate Tenant-v2 POS screen (`Workspace.tsx`) tabs vs distinct views
+  - [x] 3.3 Ensure smallest UI adjustment if needed or document compliance
+- [x] 4. Confirm Remaining Business Policy <!-- id: prep_confirm_policy -->
+  - [x] 4.1 Confirm strict partially paid booking completion policy remains in place pending owner sign-off
+- [x] 5. Prepare Selective Commits for Dashboard Testing <!-- id: prep_selective_commits -->
+  - [x] 5.1 Audit all modified files across repository (`git status`, `git diff`)
+  - [x] 5.2 Identify exact authorized changes for dashboard/backend testing
+  - [x] 5.3 Exclude PublicPage, mobile apps, unrelated tasks, local scratch/env files
+  - [x] 5.4 Stage only authorized files/hunks and commit to test branch
+  - [x] 5.5 Push test branch to remote (`origin`) without automatic deployment
+- [x] 6. Migration and Dashboard Test Preparation <!-- id: prep_migrations_and_checklist -->
+  - [x] 6.1 Review required migrations, backward compatibility, and execution order
+  - [x] 6.2 Prepare test deployment checklist and verification steps
+- [x] 7. Compile Final Report <!-- id: prep_final_report -->
+  - [x] 7.1 Author `BARSPA_FIN_OPS_TEST_RELEASE_PREPARATION.md` with verdicts
+
+# BARSPA — Financial Operations Final Closure & Public Gift Commerce (BARSPA-FIN-OPS-CLOSURE)
+- [x] 1. Public Website Gift Purchasing Implementation (`PublicPage`) <!-- id: closure_public_gift -->
+  - [x] 1.1 Add API client methods in `PublicPage/src/lib/api.ts` (`getGiftPackages`, `purchaseGiftCard`, `getServices`)
+  - [x] 1.2 Author `PublicPage/src/components/GiftsPage.tsx` supporting Monetary & Experience gifts, Saudi phone-first recipient, bilingual AR/EN, payment checkout, and shareable voucher code confirmation
+  - [x] 1.3 Register `/gifts` route in `PublicPage/src/App.tsx`
+  - [x] 1.4 Add Gifts navigation links to desktop and mobile navigation in `PublicPage/src/components/Header.tsx`
+  - [x] 1.5 Verify `PublicPage` build (`npm run build`)
+- [x] 2. Strict Gift-Entitlement Validation in POS <!-- id: closure_pos_entitlement -->
+  - [x] 2.1 Refactor `isGiftCodeRedeemable` in `tenantPosController.js` to fail closed on missing/mismatched serviceId, packageId, cross-tenant, and invalid statuses
+  - [x] 2.2 Add unit and regression tests in `server/src/services/__tests__/giftCommerce.test.js` validating fail-closed behavior
+  - [x] 2.3 Run backend tests to verify 100% pass rate
+- [x] 3. Financial Accounting Terminology & Revenue Recognition Analysis <!-- id: closure_accounting_analysis -->
+  - [x] 3.1 Investigate `FinancialLedgerEntry`, `PaymentTransaction`, and `financialLedgerService.js` (cash-collection subledger vs revenue vs double-entry)
+  - [x] 3.2 Document cash collections vs earned revenue vs outstanding receivables vs unearned gift liabilities under IFRS 15 / SOCPA
+  - [x] 3.3 Analyze why partially paid future bookings record ledger entries at deposit time
+  - [x] 3.4 Provide representative reconciliations for reporting
+- [x] 4. Mixed POS Payment Integrity Verification <!-- id: closure_pos_mixed_integrity -->
+  - [x] 4.1 Execute runtime test of SAR 270 mixed POS transaction (SAR 150 products + SAR 120 services)
+  - [x] 4.2 Verify single payment capture, non-duplicate ledger entries, order vs appointment allocation, inventory decrement, VAT breakdown, and atomic failure rollback
+- [x] 5. Messaging Delivery Verification (SMS & WhatsApp) <!-- id: closure_messaging_audit -->
+  - [x] 5.1 Audit codebase for SMS / WhatsApp integrations and classify each channel (Automated, Manual share, SMS composer, Not implemented)
+  - [x] 5.2 Verify app and documentation copy alignment with real capabilities
+- [x] 6. Partially Paid Booking Completion Policy Analysis <!-- id: closure_completion_policy -->
+  - [x] 6.1 Document current backend behavior, affected roles, and operational consequences
+  - [x] 6.2 Document 3 recommended owner alternatives (allow completion with receivable, require settlement, configurable policy)
+- [x] 7. Comprehensive Verification & Final Report Delivery <!-- id: closure_final_report -->
+  - [x] 7.1 Run full backend test suites (`npx jest`)
+  - [x] 7.2 Run frontend and mobile builds (`PublicPage`, `Tenant-v2`, `RifahMobile`, `RifahStaff`)
+  - [x] 7.3 Author `BARSPA_FIN_OPS_FINAL_CLOSURE_REPORT.md`
+  - [x] 7.4 Preserve git working tree integrity
+
+# BARSPA Financial Operations, Payment Control, Sales Separation & Gift Commerce (BARSPA-FIN-OPS-01)
+- [x] Phase 0: Baseline & Forensic Architecture Audit <!-- id: fin_ops_phase0 -->
+  - [x] 0.1 Database and Financial Data Model Mapping (Bookings, Payments, Invoices, Ledgers, VAT/ZATCA)
+  - [x] 0.2 Payment Calculation & Balance Tracing (Authoritative Booking Total, Confirmed Paid, Outstanding)
+  - [x] 0.3 Trace Sales Workflows (Tenant-v2, RifahStaff Sales tab, Backend POS/Orders, Commissions, Inventory)
+  - [x] 0.4 Existing Gift Card Architecture & Ocean Spa Reference Flow Comparison
+  - [x] 0.5 Reproduce Service & Package Creation Defects
+  - [x] 0.6 Produce Architectural Baseline, Risk Analysis & Handover Report
+- [x] Phase 1: Financial Foundation, Bank Transfer Verification & Fully Paid Booking Lock <!-- id: fin_ops_phase1 -->
+  - [x] 1.1 Backend Authoritative Financial Calculation (Confirmed Paid vs Pending vs Outstanding)
+  - [x] 1.2 Bank-Transfer Verification Lifecycle (Submitted -> Pending Verification -> Verified / Rejected with Audit)
+  - [x] 1.3 Fully Paid Booking Lock on Backend Mutation Endpoints
+  - [x] 1.4 Frontend UI Statuses, Balances & Locked State Indication (Tenant-v2, RifahStaff)
+  - [x] 1.5 Authorized Auditable Exception/Adjustment Workflow
+  - [x] 1.6 Automated Backend Tests for Payment Integrity & Booking Lock
+- [x] Phase 2: Product Sales & Service Sales Separation <!-- id: fin_ops_phase2 -->
+  - [x] 2.1 Backend POS Walk-in Checkout Endpoint (`POST /tenant/pos/checkout`)
+    - [x] Atomically handle product purchases: create `Order`, `OrderItem`s, decrement stock, increment soldCount, create `PaymentTransaction` with `orderId`, ledger entry, and invoice.
+    - [x] Atomically handle service purchases: create `Appointment`, create `PaymentTransaction` with `appointmentId`, ledger entry, and invoice.
+    - [x] Atomically handle mixed purchases: produce unified receipt while strictly maintaining underlying separate entity transactions.
+    - [x] Mount route in `server/src/routes/tenantRoutes.js`.
+  - [x] 2.2 Tenant-v2 POS Operational Screen & Adapter Integration
+    - [x] Add `checkoutPos` method to `Tenant-v2/src/lib/tenantApiAdapter.ts`.
+    - [x] Replace mock `setTimeout` alert in `Tenant-v2/src/components/Workspace.tsx` with live `tenantApiAdapter.checkoutPos`.
+    - [x] Add catalog filter tabs (All / Services / Products) and display real receipt breakdown with direct links to Orders and Appointments.
+  - [x] 2.3 Clarify & Guard RifahStaff Specialist Sales Section
+    - [x] Update `RifahStaff/app/(tabs)/pos.tsx` with localized notice clarifying POS role (cashier/admin in Tenant-v2) and redirecting specialists to Schedule and Earnings.
+  - [x] 2.4 Verify & Protect Financial Reporting Separation
+    - [x] Verify `tenantFinancialController.js` (`/financial/services` vs `/financial/products`) and `tenantBiSalesOverviewService.js` preserve strict category separation.
+    - [x] Create automated integration test `server/src/services/__tests__/salesSeparation.test.js` validating inventory deduction, ledger separation, and combined receipting.
+  - [x] 2.5 Verification & Quality Gate for Phase 2
+    - [x] Run `npx jest server/src/services/__tests__/salesSeparation.test.js`.
+    - [x] Run `npx jest server/src/services/__tests__/paymentAndPaidBookingLock.test.js`.
+    - [x] Run `npm run build` in `Tenant-v2`.
+    - [x] Run typecheck in `RifahStaff`.
+- [x] Phase 3: Gift Commerce System (Monetary & Service/Package) <!-- id: fin_ops_phase3 -->
+  - [x] 3.1 Backend Data Model & Controller Enhancements (Monetary & Service Experience)
+    - [x] Applied migration `20261114110000-add-gift-voucher-types-and-phone-gifting.js` (voucherType, recipientName, serviceId, servicePackageId, giftMessage).
+    - [x] Update `userTenantGiftController.js`: remove forced email requirement; allow phone-only gifting; always generate `GiftCardCode`.
+    - [x] Update `publicTenantGiftController.js`: implement `purchasePublicTenantGiftCard` (`POST /public/tenant/:tenantId/gift-cards/purchase`).
+    - [x] Update `tenantGiftCardController.js`: support `voucherType`, `serviceId`, `servicePackageId` in package management.
+  - [x] 3.2 Tenant-v2 Owner & Accountant Gift Administration
+    - [x] Update `GiftCardsWorkspace.tsx` to support both Monetary Vouchers and Service Experience Gifts with service catalogue picker.
+  - [x] 3.3 RifahMobile Customer Gifting Screen
+    - [x] Update `RifahMobile/src/screens/GiftsScreen.tsx`: remove blocking email alert; enable phone-only Saudi gifting with instant digital voucher generation.
+  - [x] 3.4 Automated Regression Tests for Gift Commerce
+    - [x] Create `server/src/services/__tests__/giftCommerce.test.js` and verify all tests pass.
+- [x] Phase 4: Service & Package Creation Repair <!-- id: fin_ops_phase4 -->
+  - [x] 4.1 Fix Service Creation Failure & Validate Full Persistence/Reload
+  - [x] 4.2 Fix Package Creation Failure & Validate Full Persistence/Reload
+  - [x] 4.3 Automated Regression Tests for Service & Package Creation
+- [x] Phase 5: Consolidated Verification, Reconciliation & Final Report <!-- id: fin_ops_phase5 -->
+  - [x] 5.1 Run Full Test Suites Across Backend & Frontend Modules
+  - [x] 5.2 Financial Ledger Reconciliation & Verification Scenarios
+  - [x] 5.3 Author BARSPA_FINANCIAL_OPERATIONS_AND_GIFT_COMMERCE_AUDIT.md
+
+# BARSPA-FIN-OPS-01 — Final Financial Acceptance & Edge-Case Verification
+- [x] 1. Fully Paid Appointment Operational Lifecycle Audit <!-- id: final_audit_area1 -->
+  - [x] 1.1 Verify lock prevents ordinary edit, reschedule, and cancellation (backend & frontend)
+  - [x] 1.2 Verify authorized Unlock & Adjust works with audit trail
+  - [x] 1.3 Audit specialist operational service lifecycle (Arrived, In Service, Completed) on fully paid appointments — ensure delivery is NOT blocked
+  - [x] 1.4 Inspect group bookings and linked items for consistent locking
+- [x] 2. Complete Gift Purchasing Audit & Public Web Interface <!-- id: final_audit_area2 -->
+  - [x] 2.1 Audit customer-facing public website gift purchase interface (existence vs gaps)
+  - [x] 2.2 Trace monetary gift lifecycle (selection -> payment -> voucher issuance -> delivery -> administration)
+  - [x] 2.3 Trace service/package experience gift lifecycle & entitlement restriction on redemption
+  - [x] 2.4 Verify edge cases: failed payment, duplicate callbacks, delivery failure, repeated redemption, unregistered recipient phone-first flow, and activation timing
+- [x] 3. Payment Ledger Completeness & Settlement Audit <!-- id: final_audit_area3 -->
+  - [x] 3.1 Trace all payment methods (cash, POS card, online gateway, bank transfer) to `FinancialLedgerEntry`
+  - [x] 3.2 Inspect database records for default `verificationStatus` and existing transactions
+  - [x] 3.3 Verify pending bank transfers do not count toward confirmed revenue or reduce outstanding balance
+  - [x] 3.4 Test duplicate webhook/callback and refund/reversal scenarios
+- [x] 4. Product / Service Sales Separation Audit <!-- id: final_audit_area4 -->
+  - [x] 4.1 Verify owner/accountant UI experience across operational sales screens and categories
+  - [x] 4.2 Document exact role and transition of former RifahStaff Sales tab
+  - [x] 4.3 Trace mixed POS walk-in transaction (Order vs Appointment, inventory, VAT, invoice, single payment non-double-counting)
+- [x] 5. Comprehensive Financial & Gift Reconciliation Scenarios <!-- id: final_audit_area5 -->
+  - [x] 5.1 Scenario 1: Fully paid service booking
+  - [x] 5.2 Scenario 2: Partially paid booking
+  - [x] 5.3 Scenario 3: Pending bank transfer
+  - [x] 5.4 Scenario 4: Verified bank deposit
+  - [x] 5.5 Scenario 5: Monetary gift voucher sold (unredeemed)
+  - [x] 5.6 Scenario 6: Partially redeemed monetary voucher
+  - [x] 5.7 Scenario 7: Service/package gift purchased & redeemed
+  - [x] 5.8 Scenario 8: Mixed product/service POS transaction
+- [x] 6. Final Acceptance Report Delivery (`BARSPA_FINANCIAL_FINAL_ACCEPTANCE_REPORT.md`) <!-- id: final_audit_report -->
+  - [x] 6.1 Compile all forensic findings, code paths, test outputs, and DB evidence
+  - [x] 6.2 Render explicit PASS / FAIL / NOT IMPLEMENTED verdicts for all required categories
+
+# BARSPA RifahMobile — Runtime Acceptance of Tenant-Scoped Cart Fix
+- [ ] 1. Environment & Runtime Device Setup <!-- id: runtime_setup -->
+  - [ ] Prepare test device / Android emulator
+  - [ ] Bundle / serve current customer app codebase with new cart exit guard
+- [ ] 2. Execute 9 Acceptance Journeys <!-- id: runtime_journeys -->
+  - [ ] Journey 1: Discard and switch tenants
+  - [ ] Journey 2: Continue booking
+  - [ ] Journey 3: Cancel exit dialog (dismiss modal)
+  - [ ] Journey 4: Internal booking navigation
+  - [ ] Journey 5: Alternative tenant entry points
+  - [ ] Journey 6: Persistent-state recovery across app restarts
+  - [ ] Journey 7: Safe booking completion / non-interference
+  - [ ] Journey 8: Platform navigation (in-app vs Android hardware Back vs iOS limitation)
+  - [ ] Journey 9: Localization (Arabic RTL vs English LTR)
+- [ ] 3. Automated Tests & Typecheck Re-verification <!-- id: runtime_verify -->
+  - [ ] Run focused cart regression suite (18 scenarios)
+  - [ ] Run `npm run typecheck` (`tsc --noEmit`)
+- [ ] 4. Report & Verdict Delivery <!-- id: runtime_report -->
+  - [ ] Update `CUSTOMER_TENANT_SCOPED_CART_EXIT_GUARD_REPORT.md` with runtime results, evidence, and GO/NO-GO verdict
+
+# BARSPA Customer App — Tenant-Scoped Cart, Exit Confirmation & Cross-Tenant Booking Fix
+- [x] 1. Root Cause Reproduction & Architecture Investigation <!-- id: cart_investigation -->
+  - [x] Search and map all cart stores, contexts, reducers, hooks, and AsyncStorage keys
+  - [x] Trace TenantScreen, BookingJourneyScreen, CartScreen navigation and state passing
+  - [x] Reproduce the exact failure scenario (Tenant A services lingering into Tenant B)
+  - [x] Identify responsible components, route params, API payloads, and listeners
+- [x] 2. Fresha Reference Verification <!-- id: cart_fresha_ref -->
+  - [x] Fetch & review Fresha documented customer booking flow
+  - [x] Document observed vs inferred Fresha behaviors on back navigation & incomplete bookings
+- [x] 3. Tenant-Scoped Cart Ownership & Exit Guard Implementation <!-- id: cart_impl -->
+  - [x] Associate pending cart/draft strictly with canonical tenantId
+  - [x] Prevent cross-tenant service contamination at state and API boundaries
+  - [x] Implement localized, accessible leave-booking confirmation modal (AR RTL / EN LTR)
+  - [x] Intercept all exit paths: in-app back, hardware back, header back, Home tab, tenant switch
+  - [x] Implement clean discard lifecycle (clear in-memory draft + persisted storage, cancel stale async)
+  - [x] Ensure internal booking step navigation does not trigger discard warning
+- [x] 4. Automated Regression Tests <!-- id: cart_tests -->
+  - [x] Add tests for all 18+ required scenarios (empty cart, continue, discard, tenant switch, hardware back, etc.)
+  - [x] Run `npx tsx --test` and `npm run typecheck` in RifahMobile
+- [x] 5. Manual End-to-End Acceptance & Report <!-- id: cart_report -->
+  - [x] Trace and record Journeys A, B, C, D, E
+  - [x] Author `RifahMobile/CUSTOMER_TENANT_SCOPED_CART_EXIT_GUARD_REPORT.md` with explicit verdicts
+
+# RifahMobile — Customer Registration Simplification & Al Saud Placeholder Removal
+- [x] 1. API & Registration Flow Investigation <!-- id: reg_investigation -->
+  - [x] Inspect `RegisterScreen.tsx`, `SessionManager.ts`, and backend contract
+  - [x] Inspect database column nullability (`platform_users`) in PostgreSQL
+  - [x] Identify minimal safe backend contract update for phone-only registration
+- [x] 2. Backend Contract Support for Phone Registration <!-- id: reg_backend -->
+  - [x] Apply migration making `email` and `firstName` nullable in `platform_users`
+  - [x] Update `PlatformUser.js` model definition
+  - [x] Update `userAuthController.js` and `userAuthService.js` for optional email/name & phone login
+  - [x] Run backend automated tests for phone registration & login
+- [x] 3. RifahMobile Registration Simplification <!-- id: reg_mobile_ui -->
+  - [x] Remove firstName, lastName, email fields from `RegisterScreen.tsx`
+  - [x] Remove `Ahmed`, `Al-Saud`, `ahmed@example.com` placeholders
+  - [x] Keep phone-number input, Saudi format hint, and validation
+  - [x] Update `LoginScreen.tsx` and `ForgotPasswordScreen.tsx` placeholders
+  - [x] Update `SessionManager.ts` registration payload
+- [x] 4. Search Verification & Placeholder Removal <!-- id: reg_search_verify -->
+  - [x] Search entire `RifahMobile/` for any remaining occurrences of targeted terms
+- [x] 5. Verification & Testing <!-- id: reg_tests -->
+  - [x] Add unit tests for simplified registration & payload
+  - [x] Run `npm run typecheck` in `RifahMobile`
+  - [x] Run `npx tsx --test` in `RifahMobile`
+- [x] 6. Final Report Delivery <!-- id: reg_report -->
+  - [x] Author completion report with findings, changes, search results, and test outputs
+
+# RifahMobile — iOS EAS Build & TestFlight Delivery
+- [x] 1. Environment & Build History Inspection <!-- id: rifah_mobile_env -->
+  - [x] Check repository status, current commit, and working tree
+  - [x] Inspect customer app files in `RifahMobile`
+  - [x] Inspect EAS CLI setup (`eas whoami`, `eas project:info`, `expo config`)
+  - [x] Inspect build history: compare working Android APK build with failed iOS builds
+- [x] 2. Root Cause Investigation <!-- id: rifah_mobile_rca -->
+  - [x] Check `RifahMobile/package.json` in git history (commit `a0222b4` vs working revisions)
+  - [x] Inspect EAS hooks, scripts, `.easignore`, and monorepo/working directory config
+  - [x] Run archive inspection (`eas build:inspect`) to see actual archive structure
+- [x] 3. Apply Minimal Fix & Verify Archive <!-- id: rifah_mobile_fix -->
+  - [x] Apply targeted fix to archive/project configuration
+  - [x] Re-inspect archive to confirm `package.json` is at expected path
+  - [x] Run non-destructive checks (`npx expo config`, typecheck, etc.)
+- [x] 4. Execute Cloud iOS Build & Verify Artifact <!-- id: rifah_mobile_build -->
+  - [x] Trigger `eas build --platform ios --profile production`
+  - [x] Monitor build, capture build ID, dashboard URL, bundle ID, version/build number
+- [x] 5. TestFlight Submission & Verification <!-- id: rifah_mobile_submit -->
+  - [x] Attempt automated submission and diagnose authentication requirement
+  - [x] Verify .ipa artifact URL and provide interactive submission command
+- [x] 6. Comprehensive Completion Report <!-- id: rifah_mobile_report -->
+  - [x] Author `RifahMobile/IOS_EAS_BUILD_ROOT_CAUSE_AND_TESTFLIGHT_REPORT.md`
+
+# BARSPA — Backend Reviewer Identity Fix (Authorized)
+- [x] 1. Architecture & Baseline Verification <!-- id: backend_id_baseline -->
+  - [x] Record working-tree git status and verify boundaries
+  - [x] Inspect `Review` model associations and `PlatformUser` alias in `server/src/models/Review.js`
+  - [x] Inspect existing `sanitizeReviewCustomerIdentity` in `server/src/controllers/reviewController.js` and verify no circular imports
+- [x] 2. Implement Minimal Endpoint Correction in `staffAppController.js` <!-- id: backend_id_impl -->
+  - [x] Add `PlatformUser` include with attributes `['id', 'firstName', 'lastName']`
+  - [x] Apply `sanitizeReviewCustomerIdentity` to map reviews
+  - [x] Preserve tenant and staff isolation filters, descending order, pagination, and permissions
+- [x] 3. Automated Backend Tests & Regression Protection <!-- id: backend_id_tests -->
+  - [x] Test Case A: Historical placeholder with real associated customer resolves to real name
+  - [x] Test Case B: Arabic customer names preserved without corruption
+  - [x] Test Case C: No usable customer name retains generic fallback
+  - [x] Test Case D: Privacy restriction (no email, phone, or internal ID exposure)
+  - [x] Test Case E: Tenant and staff isolation strictly preserved
+  - [x] Test Case F: Existing review fields (rating, comment, reply, dates) remain compatible
+  - [x] Test Case G: Review replies endpoint and permissions untouched
+- [x] 4. Verification & Implementation Report <!-- id: backend_id_report -->
+  - [x] Run automated tests in `server`
+  - [x] Deliver `server/BACKEND_REVIEWER_IDENTITY_IMPLEMENTATION_REPORT.md`
+  - [x] Provide final readiness recommendation
+
+# BARSPA Business Staff App — Review Customer Identity & Staff Avatar Investigation
+- [x] 1. Baseline & Repository Integrity Check <!-- id: id_avatar_baseline -->
+  - [x] Record working-tree git status and verify boundaries
+  - [x] Run baseline tests (56/56 passing), TypeScript check (0 errors), and lint check (0 errors)
+- [x] 2. Issue 1: Review Customer Identity Investigation <!-- id: id_review_investigation -->
+  - [x] Trace review API endpoints, interfaces, data transformation, and model fields
+  - [x] Inspect `app/(tabs)/reviews.tsx` and child card rendering logic
+  - [x] Identify root cause for fallback to "Verified Customer"
+  - [x] Implement targeted fix in `RifahStaff` while strictly preserving review-reply behavior
+- [x] 3. Issue 2: Service Provider Avatar Investigation <!-- id: id_avatar_investigation -->
+  - [x] Trace logged-in service provider profile data, avatar URL origin, and hydration
+  - [x] Inspect `app/(tabs)/account.tsx`, `app/(tabs)/profile.tsx`, and `StaffHeader.tsx`
+  - [x] Identify root cause for rendering only first-letter fallback
+  - [x] Implement targeted fix in `RifahStaff` with graceful image loading and error fallback
+- [x] 4. Regression Protection & Test Suite Updates <!-- id: id_avatar_tests -->
+  - [x] Add/update unit tests for reviewer display name and staff avatar resolution
+  - [x] Verify review-reply feature, permissions, and Cairo typography remain intact
+  - [x] Run test suite, TypeScript check, and lint check
+- [x] 5. Completion Report & Build Recommendation <!-- id: id_avatar_report -->
+  - [x] Author `REVIEW_IDENTITY_AND_AVATAR_REPORT.md` inside `RifahStaff`
+  - [x] Document root causes, data flows, before/after behavior, and build recommendation
+
+# BARSPA Business Staff App — Cairo Typography Remediation
+- [x] 1. Establish Baseline & Inspect Working Tree <!-- id: cairo_baseline -->
+  - [x] Record git status and verify working tree modifications
+  - [x] Run existing tests, TypeScript check, and lint check to establish baseline
+- [x] 2. Phase A: Correct Typography Foundation & Theme Tokens <!-- id: cairo_foundation -->
+  - [x] Update `constants/theme.ts` & `src/utils/typography.ts` with platform-aware typography helper
+  - [x] Ensure `fontWeight` is stripped or omitted on Android when Cairo font asset is used to prevent `ReactFontManager` fallback
+- [x] 3. Phase B: Remediate Missing Cairo Assignments & Weight Collisions <!-- id: cairo_remediation -->
+  - [x] `app/client/[id].tsx` (32 rules)
+  - [x] `app/(tabs)/pos.tsx` (4 rules)
+  - [x] `app/(tabs)/customers.tsx` (4 rules)
+  - [x] `app/(modals)/edit-profile.tsx` (5 rules)
+  - [x] `app/(auth)/reset-password.tsx` (5 rules)
+  - [x] `src/components/AppErrorBoundary.tsx` (7 rules)
+  - [x] `app/(tabs)/schedule.tsx` (missing & collisions)
+  - [x] `app/(tabs)/earnings.tsx` (missing & collisions)
+  - [x] `app/(tabs)/reviews.tsx` (missing & collisions)
+  - [x] `app/(tabs)/notifications.tsx` (missing & collisions)
+  - [x] `app/(tabs)/messages.tsx` & `app/message/[id].tsx` (missing & collisions)
+  - [x] `app/(tabs)/account.tsx` & `app/(tabs)/profile.tsx` (missing & collisions)
+  - [x] `app/(modals)/request-time-off.tsx` (missing & collisions)
+  - [x] `app/(auth)/login.tsx`, `forgot-password.tsx`, `change-password.tsx` (missing & collisions)
+- [x] 4. Phase C: Remediate Shared Components & Navigation Chrome <!-- id: cairo_chrome -->
+  - [x] `app/(tabs)/_layout.tsx` (tab bar label style)
+  - [x] `src/components/StaffHeader.tsx`, `AppHeader.tsx`, `LanguageSelectorModal.tsx`
+  - [x] `components/themed-text.tsx`
+- [x] 5. Phase D: Regression Protection & Test Suite Updates <!-- id: cairo_tests -->
+  - [x] Add/update focused unit test for Cairo typography tokens and screen font consistency
+  - [x] Run existing tests and compare against baseline
+  - [x] Run TypeScript check and lint check
+- [x] 6. Final Report & Verification <!-- id: cairo_report -->
+  - [x] Produce `CAIRO_TYPOGRAPHY_REMEDIATION_REPORT.md`
+  - [x] Verify zero regressions in working tree and strict adherence to boundaries
+
+# BARSPA Business Staff App — Critical Stabilization Batch
+
+- [ ] Workstream 1: P0 — Authentication & Session Persistence (Root Cause & Robust Lifecycle) <!-- id: p0_auth -->
+  - [ ] Inspect auth endpoints in `src/services/auth.ts`, `src/services/api.ts`, `src/context/AuthContext.tsx`.
+  - [ ] Inspect server routes in `server/src/routes/authRoutes.js` (read-only) to verify refresh token contracts and expiry.
+  - [ ] Implement refresh token queue / mutex in `src/services/api.ts` to prevent race conditions during token refresh.
+  - [ ] Implement session restoration, resume from background, and graceful session expiration with UI feedback.
+  - [ ] Add unit tests for token refresh, 401 handling, concurrent requests, and session restoration.
+- [ ] Workstream 2: P1 — Restore Language Selection & Splash Relaunch <!-- id: p1_lang_splash -->
+  - [ ] Audit Git history and existing i18n configs for previously supported languages (`en`, `ar`, `ur`, etc.).
+  - [ ] Restore multi-language picker in Account screen showing all supported languages.
+  - [ ] Ensure language selection persists in SecureStore and does not invalidate auth tokens.
+  - [ ] Fix splash screen assets and reload behavior to ensure BARSPA branding displays cleanly without old Refah imagery.
+- [ ] Workstream 3: P1 — Finish Cairo Typography Correction Across All Remaining Paths <!-- id: p1_cairo_finish -->
+  - [ ] Schedule screen: Arabic title `عرض اليوم`, month title `أكتوبر`, weekday names & numbers, Day/Week controls, timeline labels, appointments & blocked labels, metrics.
+  - [ ] Schedule settings drawer: drawer title & section headings, `حجم شبكة الجدول`, slider labels and values, visual-range choices, week duration choices, display options.
+  - [ ] Account screen: card titles, section headings, employee identity & role, settings-row titles/subtitles, language selector, status indicators.
+  - [ ] Reviews screen: screen title, page headings, rating summaries, filter chips, search fields, empty states, review cards & labels.
+  - [ ] Request Time Off: Arabic section headings, labels, chips, date fields, placeholders, buttons, status pills, empty states.
+  - [ ] Notifications and Messages: titles, subjects, metadata, filter chips, detail headers, notification body templates.
+- [ ] Workstream 4: P1 — Schedule Settings Persistence <!-- id: p1_sched_settings -->
+  - [ ] Trace Schedule Settings drawer: grid size slider (`حجم شبكة الجدول`), visual range, week duration, display options.
+  - [ ] Persist settings using AsyncStorage/SecureStore scoped to staff context.
+  - [ ] Hydrate on launch/reload and dynamically synchronize slider with grid layout.
+  - [ ] Add automated tests for settings persistence and boundary handling.
+- [ ] Workstream 5: P1 — Remove Service Prices from Staff Appointment Cards & Action Sheets <!-- id: p1_hide_prices -->
+  - [ ] Inspect appointment cards in `schedule.tsx` and appointment actions bottom sheet.
+  - [ ] Remove visible price amounts (`SAR 200.00`) from staff appointment cards and action sheet presentation.
+  - [ ] Preserve billing records, invoices, calculations, and separate financial screens.
+- [ ] Workstream 6: P1 — Notification Detail Redesign & Localized Notification Templates <!-- id: p1_notif_detail -->
+  - [ ] Redesign `app/message/[id].tsx` for notification view mode to match BARSPA theme (typography, colors, header, safe area).
+  - [ ] Implement locale-aware templates for system notifications (Arabic/English) preserving variable parameters.
+  - [ ] Fall back safely to raw content for unknown types; maintain one-way notification model.
+- [ ] Workstream 7: P1 — Internal Message Detail UI Redesign (Preserve Admin Message Content) <!-- id: p1_msg_detail -->
+  - [ ] Redesign Internal Message Detail UI matching BARSPA theme.
+  - [ ] Ensure admin message body & subject remain strictly un-translated and un-mutated.
+- [ ] Workstream 8: P1 — Reviews Screen Navy Bar Investigation & Root Cause Fix <!-- id: p1_reviews_navy -->
+  - [ ] Trace source of unexpected navy bar at top of Reviews screen (`(tabs)/reviews.tsx` / `SafeAreaView` / `AppHeader`).
+  - [ ] Eliminate dark strip and align with clean light BARSPA palette and Cairo fonts.
+- [ ] Workstream 9: P2 — Request Time Off Arabic Localization <!-- id: p2_timeoff_ar -->
+  - [ ] Audit all remaining English headings/labels in `request-time-off.tsx`.
+  - [ ] Ensure all section titles, status pills, empty states, chips, and date labels display proper Arabic when in Arabic mode.
+- [ ] Workstream 10: Consolidated Verification, Test Suite & Local Build <!-- id: p1_verification_build -->
+  - [ ] Run `npm test` (all suites passing).
+  - [ ] Run `npx tsc --noEmit` (0 errors).
+  - [ ] Run `npm run lint` (0 errors, 0 warnings).
+  - [ ] Build local Android release APK (`./gradlew assembleRelease`).
+  - [ ] Install on `emulator-5554` and capture visual proof for all screens in Arabic and English.
+  - [ ] Deliver comprehensive report and await user review.
+
+# BARSPA Business Staff App — Typography Consistency & Schedule Week Direction Fix
+- [x] Task 1: Audit Cairo Typography, Font Loading, and Token Configuration <!-- id: cairo_audit -->
+  - [x] Inspect existing Cairo fonts and `@expo-google-fonts/cairo` loading in `app/_layout.tsx`.
+  - [x] Inspect `LanguageContext.tsx` defaultProps and RTL/LTR font assignment.
+  - [x] Audit `constants/theme.ts`, `ThemedText.tsx`, `Text`/`TextInput` usage across all screens and components.
+- [x] Task 2: Implement Centralized Cairo Typography System <!-- id: cairo_impl -->
+  - [x] Load `Cairo_400Regular`, `Cairo_500Medium`, `Cairo_600SemiBold`, `Cairo_700Bold` in `app/_layout.tsx`.
+  - [x] Establish centralized font tokens & weight resolver in `constants/theme.ts` / `src/components/ThemedText.tsx`.
+  - [x] Eliminate dead `Text.defaultProps` and ensure Cairo is applied for both Arabic and English across all weights.
+  - [x] Standardize navigation headers, tab labels, modals, forms, buttons, inputs, cards, and badges.
+- [x] Task 3: Audit & Correct Schedule Week Direction <!-- id: sched_week_fix -->
+  - [x] Trace `weekDays` calculation and rendering in `app/(tabs)/schedule.tsx` (7-day strip, Day/Week toggle, Week columns).
+  - [x] Fix visual direction: English (earliest on left -> latest on right) vs Arabic (earliest on right -> latest on left).
+  - [x] Ensure date-selection, activity indicators, appointments, and navigation (prev/next/today) align with correct dates.
+- [x] Task 4: Automated Testing & Compatibility Gates <!-- id: sched_cairo_tests -->
+  - [x] Add unit tests for week array ordering, locale direction, and typography resolvers.
+  - [x] Run `npm test` in `RifahStaff` (16/16 tests passing).
+  - [x] Run `npx tsc --noEmit` in `RifahStaff` (0 errors).
+  - [x] Run `npm run lint` in `RifahStaff` (0 errors, 0 warnings).
+- [x] Task 5: Local Native Rebuild & Authenticated Visual Verification <!-- id: sched_cairo_verify -->
+  - [x] Build local Android release APK if required for JavaScript/font asset updates.
+  - [x] Install on `emulator-5554` and verify with authenticated staff account Talia.
+  - [x] Capture English and Arabic screenshots for Schedule Day, Schedule Week, Date strip, Appointment card & action sheet, Account/Profile, Notifications & Messages, and Forms.
+- [x] Task 6: Verification Report Delivery <!-- id: sched_cairo_report -->
+  - [x] Deliver detailed verification report with root causes, before/after evidence, test results, and protected boundaries confirmation.
+
+# BARSPA Business Staff App — Priority Bug Fix: Notifications & Internal Messages Separation
+- [x] Task 1: Trace Both Features End-to-End & Identify Root Cause <!-- id: notif_msg_audit -->
+  - [x] Inspect `app/(tabs)/notifications.tsx`, `app/(tabs)/messages.tsx`, `app/message/[id].tsx`, `src/components/StaffHeader.tsx`.
+  - [x] Trace backend endpoints `/staff/messages`, `/staff/me/notifications`, data models, and migrations.
+  - [x] Analyze Git history for regression source (Commit `4e71266` introduced broken `senderType !== 'admin'` assumption).
+- [x] Task 2: Implement Robust Separation Architecture <!-- id: notif_msg_arch -->
+  - [x] Add canonical `isSystemNotification` and `isInternalAdminMessage` classifiers in `src/services/messages.ts`.
+  - [x] Update `getNotifications()` and `getInternalAdminMessages()` to use supported `/staff/messages` source without 404s.
+  - [x] Update `src/components/StaffHeader.tsx` to compute bell unread count exclusively from system notifications.
+  - [x] Update `app/(tabs)/notifications.tsx` to load and render real system notifications, handle real read states, and display proper error/loading/empty states.
+  - [x] Update `app/(tabs)/messages.tsx` to display administrator-authored messages only, keeping one-way announcement model intact.
+  - [x] Update `app/message/[id].tsx` to respect navigation fallback route and display proper detail context.
+- [x] Task 3: Quality Gates & Verification <!-- id: notif_msg_verify -->
+  - [x] Add unit tests for notification vs internal message classification and separation rules (`src/__tests__/notificationsAndMessages.test.ts`).
+  - [x] Run `npm test` in `RifahStaff` (11/11 tests pass across both suites).
+  - [x] Run `npx tsc --noEmit` in `RifahStaff` (0 errors).
+  - [x] Run `npm run lint` in `RifahStaff` (0 errors, 0 warnings).
+- [x] Task 4: Root-Cause & Verification Report Delivery <!-- id: notif_msg_report -->
+  - [x] Present comprehensive report detailing root cause, regression, files changed, data sources, test results, and next steps.
+
+# BARSPA Business Staff App — Batch UI Implementation (10/18 Threshold)
+- [x] Milestone: Implement >= 10 of 18 Stitch Screen Designs (14/18 Implemented, 77.8%) <!-- id: batch_ui_milestone -->
+  - [x] Design 1: Schedule Board (`2985f6999e274b7289c572f3ab40c4a0`) — Implemented, locally verified <!-- id: stitch_01_sched -->
+  - [x] Design 2: Appointment Actions Modal (`e21caf2d58c64eb3bce4551d76694ebc`) — Implemented, locally verified <!-- id: stitch_02_modal -->
+  - [x] Design 3: Startup Splash (`8f96abf2`) — Implemented, locally verified <!-- id: stitch_03_splash -->
+  - [x] Design 4: Login (`15_Login_b8b7768b`) — Implemented, runtime verified <!-- id: stitch_04_login -->
+  - [x] Design 5: Forgot Password (`02_Forgot_Password_ce905f77`) — Implemented, runtime verified <!-- id: stitch_05_forgot -->
+  - [x] Design 6: Reset Password (`12_Reset_Password_1d7a3085`) — Implemented, runtime verified <!-- id: stitch_06_reset -->
+  - [x] Design 7: Change Password (`13_Change_Password_ca903358`) — Implemented, verified <!-- id: stitch_07_change -->
+  - [x] Design 8: Account Tab (`08_Account_3d34b665`) — Implemented, verified <!-- id: stitch_08_account -->
+  - [x] Design 9: Profile Screen (`17_Profile_0170ac58`) — Implemented, verified <!-- id: stitch_09_profile -->
+  - [x] Design 10: Earnings Screen (`11_Earnings_c8c82129`) — Implemented, verified <!-- id: stitch_10_earnings -->
+  - [x] Design 11: Reviews Screen (`06_Reviews_8e733cf0`) — Implemented, verified <!-- id: stitch_11_reviews -->
+  - [x] Design 12: Notifications Screen (`09_Notifications_7fceee86`) — Implemented, verified <!-- id: stitch_12_notifs -->
+  - [x] Design 13: Request Time Off Modal (`05_Time_Off_37bc5f76`) — Implemented, verified <!-- id: stitch_13_timeoff -->
+  - [x] Design 14: Client Profile (`10_Client_Profile_f8b53790`) — Implemented, verified <!-- id: stitch_14_client -->
+- [x] Milestone: Consolidated Local Android Release APK Assembly & Emulator Verification <!-- id: batch_apk_milestone -->
+
+# BARSPA Business Staff App — Phase 1 UI Redesign: Schedule / Appointment Board
+- [x] Task 1: Audit & Component Mapping for Schedule Screen <!-- id: stitch_sched_audit -->
+  - [x] Map Stitch screen `2985f6999e274b7289c572f3ab40c4a0` and modal `e21caf2d58c64eb3bce4551d76694ebc` to `schedule.tsx`.
+  - [x] Verify preservation of Riyadh date/time logic, multi-service aggregation, capability guards, and API lifecycle.
+- [x] Task 2: Implement Stitch Compact Date & Calendar Navigation Strip <!-- id: stitch_sched_calendar -->
+  - [x] Row 1: Nav buttons, localized formatted date, "Today" pill badge, and Day/Week segmented toggle.
+  - [x] Row 2: 7-day micro strip with weekday, day number, and appointment activity dots.
+- [x] Task 3: Implement Stitch Operational Quick Metric Bar <!-- id: stitch_sched_metrics -->
+  - [x] Render bookings count with purple dot, blocks/breaks count with gray dot, and provider name badge.
+- [x] Task 4: Implement Stitch Appointment Cards & Blocked Intervals <!-- id: stitch_sched_cards -->
+  - [x] Redesign appointment cards matching Stitch hierarchy: vertical accent stripe, customer title, duration pill, status pill, service details, time range, staff/suite, bold purple price.
+  - [x] Redesign blocked / break intervals with textured background, lock/clock icon, and "Blocked" tag.
+- [x] Task 5: Implement Stitch Appointment Actions Modal <!-- id: stitch_sched_modal -->
+  - [x] Redesign bottom sheet with rounded top corners, drag anchor, initials avatar, status badge, clickable phone.
+  - [x] Implement service detail card, multi-service breakdown, 3-column micro-strip (Time, Staff, Room).
+  - [x] Implement special instructions card and action buttons (Start / Complete, Mark as No Show).
+- [x] Task 6: Local Verification & Quality Gate <!-- id: stitch_sched_verify -->
+  - [x] Run `npm test` inside `RifahStaff` (7/7 tests pass).
+  - [x] Run `npx tsc --noEmit` inside `RifahStaff` (0 errors).
+  - [x] Run `npm run lint` inside `RifahStaff` (0 errors, 0 warnings in schedule.tsx).
+  - [x] Run live verification on Android emulator (native launch, branding, build assembly, and unauthenticated boundary verified; authenticated flow distinguished per instruction).
+- [x] Task 7: Completion Report & Review Handover <!-- id: stitch_sched_report -->
+  - [x] Deliver comprehensive report with diffs, preserved contracts, and screenshots.
+
+# BARSPA Staff App — Native Splash & Navigation Corrections
+- [x] Task 1: Audit & Identify Root Cause of Old Splash Branding <!-- id: splash_audit -->
+  - [x] Inspect `RifahStaff/app.json`, `app.config.*`, splash plugins, native Android and iOS splash resources.
+  - [x] Inspect React Native startup & loading states (`app/_layout.tsx`, `Cairo` font loader, auth/language loader).
+  - [x] Identify exact source of old Refah Staff text or imagery during launch (`assets/images/LogoColor.png` containing literal "Refah staff" text).
+- [x] Task 2: Implement BARSPA Business Native Splash & Startup Branding <!-- id: splash_fix -->
+  - [x] Configure `app.json` splash configuration (`image: ./assets/barspa-business-icon.png`, `backgroundColor: "#FAF8FC"`, `resizeMode: "contain"`, `imageWidth: 200`).
+  - [x] Update / verify native splash assets in `android/app/src/main/res/` (synchronized via `expo prebuild --platform android`) and verified uncropped, centered logo.
+  - [x] Overwrite `assets/images/LogoColor.png` with BARSPA emblem for backwards safety.
+  - [x] Update React Native initial loading screen (`RootNavigator` in `app/_layout.tsx`) with BARSPA branding and color scheme (`#FAF8FC`).
+  - [x] Update stray strings in `app/(auth)/login.tsx` ("BarSpa Business") and `app/(tabs)/profile.tsx` ("BarSpa Business v1.0.0").
+- [x] Task 3: Audit & Enforce Reliable Back Navigation Across All Routes <!-- id: nav_audit_fix -->
+  - [x] Audit every pushed screen, detail view, modal, and drawer in `RifahStaff`.
+  - [x] Enhance `AppHeader.tsx` with resilient `router.canGoBack()` check and configurable `fallbackRoute`.
+  - [x] Add `AppHeader` with visible back buttons and fallbacks to auxiliary tab screens hidden from bottom bar (`earnings`, `reviews`, `profile`, `notifications`).
+  - [x] Fix trapped iOS screens: `(auth)/change-password.tsx`, `app/client/[id].tsx`, `app/message/[id].tsx`.
+  - [x] Ensure root tabs (`schedule`, `messages`, `account`) preserve bottom tab navigation without misleading back buttons.
+  - [x] Validate RTL/LTR chevron orientation and accessible labels across all headers.
+- [x] Task 4: Local Verification & Quality Gate <!-- id: splash_nav_verify -->
+  - [x] Run `npm test` inside `RifahStaff` (7/7 tests passed).
+  - [x] Run `npx tsc --noEmit` inside `RifahStaff` (0 errors).
+  - [x] Run `npm run lint` inside `RifahStaff` (0 errors).
+  - [x] Validate Expo config and native build sync.
+- [x] Task 5: Final Report Delivery <!-- id: splash_nav_report -->
+  - [x] Deliver comprehensive report with root causes, exact files modified, navigation paths checked, and verification evidence.
+
 # BARSPA Staff App — Technical Audit, Appointment Board Enhancement & Native Rebuild
 - [x] Phase 0: Discovery & Repository Safety <!-- id: staff_phase0 -->
   - [x] Locate actual staff mobile app (`RifahStaff`) vs legacy/client apps (`staff-app`, `RifahMobile`).
@@ -1324,8 +1858,26 @@ The following canonical RTL files are FROZEN and protected from modification:
   - Capture before & after screenshots.
   - Confirm all scheduling logic, recurring shifts, overnight support, and save/cancel actions remain untouched.
 
+# BARSPA Staff App — Batch 2: Hardcoded Text, Cairo Typography and Arabic Schedule Localization
+- [x] Task 1: Source-Level Audit of Hardcoded UI Text and Font Assignments <!-- id: batch2_audit -->
+- [x] Task 2: Locale Dictionary Enhancements (`ar.ts`, `en.ts`) <!-- id: batch2_locales -->
+- [x] Task 3: Schedule Screen Arabic Localization (`app/(tabs)/schedule.tsx`) <!-- id: batch2_schedule_loc -->
+- [x] Task 4: Cairo Typography Corrections Across Target Screens <!-- id: batch2_cairo_screens -->
+- [x] Task 5: Arabic & English Week View Layout & Date Mapping Verification <!-- id: batch2_week_view -->
+- [x] Task 6: Unit Testing & Quality Gates (`npm test`, `npx tsc --noEmit`, `npm run lint`, `npx expo config --type public`) <!-- id: batch2_quality_gates -->
+- [x] Task 7: Final Batch 2 Report & Handover <!-- id: batch2_report -->
 
+# BARSPA Staff App — Batch 3: Fix Schedule Settings Slider Behavior
+- [x] Task 1: Audit Schedule Settings Slider Implementation & Root Cause Analysis <!-- id: batch3_slider_audit -->
+- [x] Task 2: Implement Predictable, High-Precision Slider Control & On-Release Persistence <!-- id: batch3_slider_impl -->
+- [x] Task 3: Regression Test Suite for Schedule Preferences & Slider Behavior <!-- id: batch3_slider_tests -->
+- [x] Task 4: Quality Gates Verification (`npm test`, `npx tsc --noEmit`, `npm run lint`, `npx expo config --type public`) <!-- id: batch3_quality_gates -->
+- [x] Task 5: Final Batch 3 Report & Handover <!-- id: batch3_report -->
 
-
-
-
+# BARSPA Staff App — Batch 4: Schedule Current-Time Indicator
+- [x] Task 1: Inspect Schedule Grid Architecture & Time Calculations <!-- id: batch4_grid_audit -->
+- [x] Task 2: Implement Current-Time Indicator & Periodic Lifecycle Timer <!-- id: batch4_indicator_impl -->
+- [x] Task 3: Add Locale Dictionary Strings (`now` / `الآن`) in `ar.ts` and `en.ts` <!-- id: batch4_locales -->
+- [x] Task 4: Unit & Regression Tests for Current-Time Indicator <!-- id: batch4_indicator_tests -->
+- [x] Task 5: Quality Gates Verification (`npm test`, `npx tsc --noEmit`, `npm run lint`, `npx expo config --type public`) <!-- id: batch4_quality_gates -->
+- [x] Task 6: Final Batch 4 Report & Handover <!-- id: batch4_report -->

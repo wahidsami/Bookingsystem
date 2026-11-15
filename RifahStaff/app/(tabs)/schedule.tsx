@@ -15,6 +15,9 @@ import {
     Pressable,
     useWindowDimensions,
     DeviceEventEmitter,
+    Linking,
+    I18nManager,
+    GestureResponderEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,15 +33,17 @@ import { getImageUrl } from '../../src/services/api';
 import { useAppointmentArrivalAlert } from '../../src/hooks/useAppointmentArrivalAlert';
 import {
     addRiyadhDays,
-    formatRiyadhLongDate,
     formatRiyadhMonthDay,
     formatRiyadhTime,
     formatRiyadhWeekdayShort,
     getRiyadhDateKey,
     getRiyadhWeekStartKey,
     parseRiyadhDateKey,
+    getRiyadhCurrentMinutes,
+    formatRiyadhClockTime,
 } from '../../src/utils/riyadhDate';
-import { BARSPA_COLORS } from '../../constants/theme';
+import { BARSPA_COLORS, CAIRO_FONTS } from '../../constants/theme';
+import { loadSchedulePreferences, saveSchedulePreferences, MIN_GRID_SCALE, MAX_GRID_SCALE } from '../../src/services/schedulePreferences';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -168,7 +173,16 @@ const getDateSpanDays = (startDate: string, endDate: string) => {
 export default function ScheduleScreen() {
     const { user } = useAuth();
     const { t } = useTranslation();
-    const { language, isRTL } = useLanguage();
+    const { language } = useLanguage();
+    const isCurrentRTL = language === 'ar' || language === 'ur';
+    // On Android, if I18nManager.isRTL is true, flexDirection: 'row' is natively laid out from right to left.
+    // If the active language is English while I18nManager.isRTL is true,
+    // or if the active language is Arabic while I18nManager.isRTL is false,
+    // we invert with 'row-reverse' so the visual direction strictly matches the active language:
+    // English -> earliest day on left, progressing rightwards.
+    // Arabic -> earliest day on right, progressing leftwards.
+    const shouldReverseRow = isCurrentRTL ? !I18nManager.isRTL : I18nManager.isRTL;
+    const weekLayoutDirection = shouldReverseRow ? 'row-reverse' : 'row';
     const { width: viewportWidth } = useWindowDimensions();
     const weekGridScrollRef = useRef<ScrollView | null>(null);
     const { alert: appointmentAlert, clearAlert, syncAppointments } = useAppointmentArrivalAlert();
@@ -195,12 +209,68 @@ export default function ScheduleScreen() {
         startMinute: 6 * 60,
         endMinute: 22 * 60,
     });
+    const [currentRiyadhTime, setCurrentRiyadhTime] = useState(() => ({
+        dateKey: getRiyadhDateKey(),
+        minutes: getRiyadhCurrentMinutes(),
+    }));
+
+    useEffect(() => {
+        const updateNow = () => {
+            setCurrentRiyadhTime({
+                dateKey: getRiyadhDateKey(),
+                minutes: getRiyadhCurrentMinutes(),
+            });
+        };
+
+        const intervalId = setInterval(updateNow, 30000);
+
+        const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+            if (nextAppState === 'active') {
+                updateNow();
+            }
+        });
+
+        return () => {
+            clearInterval(intervalId);
+            appStateSubscription.remove();
+        };
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            setCurrentRiyadhTime({
+                dateKey: getRiyadhDateKey(),
+                minutes: getRiyadhCurrentMinutes(),
+            });
+        }, [])
+    );
     const timeOffEnabled = canRequestTimeOff(user);
     const canSeeBookingNotes = canViewBookingNotes(user);
     const canViewClientContext = canViewClients(user);
     const canShowStartAction = canStartService(user);
     const canShowNoShowAction = canMarkNoShow(user);
     const scheduleVisibilityWeeks = Math.min(Math.max(Number(user?.scheduleVisibilityWeeks || 1), 1), 4);
+    
+    const isDraggingSliderRef = useRef(false);
+    const scaleRef = useRef(gridScalePercent);
+    scaleRef.current = gridScalePercent;
+
+    // Hydrate persisted schedule preferences scoped to authenticated staff
+    useEffect(() => {
+        let isMounted = true;
+        loadSchedulePreferences(user?.id, scheduleVisibilityWeeks).then((prefs) => {
+            if (!isMounted) return;
+            if (isDraggingSliderRef.current) return;
+            setGridScalePercent(prefs.gridScalePercent);
+            setVisibleWeeks(prefs.visibleWeeks);
+            setDayScopeMode(prefs.dayScopeMode);
+            setScheduleViewMode(prefs.scheduleViewMode);
+        });
+        return () => {
+            isMounted = false;
+        };
+    }, [user?.id, scheduleVisibilityWeeks]);
+
     const weekColumnGap = 10;
     const weekColumnWidth = useMemo(
         () => clamp(Math.round(viewportWidth * 0.54), 190, 255),
@@ -324,16 +394,28 @@ export default function ScheduleScreen() {
 
         try {
             setUpdatingId(id);
-            await updateAppointmentStatus(id, newStatus);
+            const updated = await updateAppointmentStatus(id, newStatus);
             await loadAppointmentsForSelectedDate(true);
-            Alert.alert(
-                newStatus === 'started' ? 'Service started' : newStatus === 'completed' ? 'Service completed' : 'Marked as no-show',
-                newStatus === 'started'
-                    ? 'The appointment is now in service.'
-                    : newStatus === 'completed'
-                        ? 'The appointment was completed successfully.'
-                        : 'The appointment was marked as no-show.'
-            );
+            const hasOutstanding = Boolean((updated as any)?.hasOutstandingBalance);
+            const breakdown = (updated as any)?.financialBreakdown;
+
+            if (newStatus === 'completed' && hasOutstanding && breakdown?.outstandingAmount > 0) {
+                Alert.alert(
+                    isCurrentRTL ? 'تم إكمال الخدمة (رصيد مستحق)' : 'Service Completed (Outstanding Balance)',
+                    isCurrentRTL
+                        ? `تم تأكيد إكمال الخدمة بنجاح. يوجد رصيد متبقٍ على العميل قدره ${breakdown.outstandingAmount} ${breakdown.currency || 'SAR'} بانتظار التحصيل في الاستقبال.`
+                        : `Service completed successfully. An outstanding customer balance of ${breakdown.outstandingAmount} ${breakdown.currency || 'SAR'} remains to be collected at reception.`
+                );
+            } else {
+                Alert.alert(
+                    newStatus === 'started' ? 'Service started' : newStatus === 'completed' ? 'Service completed' : 'Marked as no-show',
+                    newStatus === 'started'
+                        ? 'The appointment is now in service.'
+                        : newStatus === 'completed'
+                            ? 'The appointment was completed successfully.'
+                            : 'The appointment was marked as no-show.'
+                );
+            }
         } catch (error) {
             console.error('Failed to update appointment status', error);
             const message =
@@ -442,11 +524,12 @@ export default function ScheduleScreen() {
         if (selectedIndex < 0) {
             return;
         }
+        const scrollIndex = shouldReverseRow ? (weekDays.length - 1 - selectedIndex) : selectedIndex;
         weekGridScrollRef.current.scrollTo({
-            x: selectedIndex * weekSnapInterval,
+            x: scrollIndex * weekSnapInterval,
             animated: true,
         });
-    }, [dayScopeMode, selectedDateKey, weekDays, weekSnapInterval]);
+    }, [dayScopeMode, selectedDateKey, weekDays, weekSnapInterval, shouldReverseRow]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -458,13 +541,45 @@ export default function ScheduleScreen() {
         }
     };
 
-    const handleSliderTouch = (locationX: number) => {
-        if (!Number.isFinite(locationX)) return;
-        const ratio = clamp(locationX / Math.max(1, settingsSliderWidth), 0, 1);
-        // Keep a usable minimum to avoid unreadable or zero-height rows.
-        const minScale = 20;
-        setGridScalePercent(Math.round(minScale + (ratio * (100 - minScale))));
-    };
+    const computeScaleFromLocationX = useCallback((locationX: number): number => {
+        if (!Number.isFinite(locationX)) return scaleRef.current;
+        const thumbRadius = 11;
+        const travelDistance = Math.max(1, settingsSliderWidth - (thumbRadius * 2));
+        const clampedLocation = clamp(locationX - thumbRadius, 0, travelDistance);
+        const ratio = clampedLocation / travelDistance;
+        return Math.round(MIN_GRID_SCALE + (ratio * (MAX_GRID_SCALE - MIN_GRID_SCALE)));
+    }, [settingsSliderWidth]);
+
+    const handleSliderGrant = useCallback((event: GestureResponderEvent) => {
+        isDraggingSliderRef.current = true;
+        const locX = event?.nativeEvent?.locationX ?? 0;
+        const nextScale = computeScaleFromLocationX(locX);
+        setGridScalePercent(nextScale);
+        scaleRef.current = nextScale;
+    }, [computeScaleFromLocationX]);
+
+    const handleSliderMove = useCallback((event: GestureResponderEvent) => {
+        if (!isDraggingSliderRef.current) return;
+        const locX = event?.nativeEvent?.locationX ?? 0;
+        const nextScale = computeScaleFromLocationX(locX);
+        setGridScalePercent(nextScale);
+        scaleRef.current = nextScale;
+    }, [computeScaleFromLocationX]);
+
+    const handleSliderRelease = useCallback((event: GestureResponderEvent) => {
+        isDraggingSliderRef.current = false;
+        const locX = event?.nativeEvent?.locationX ?? 0;
+        const finalScale = computeScaleFromLocationX(locX);
+        setGridScalePercent(finalScale);
+        scaleRef.current = finalScale;
+        void saveSchedulePreferences({ gridScalePercent: finalScale }, user?.id);
+    }, [computeScaleFromLocationX, user?.id]);
+
+    const handleSliderTerminate = useCallback(() => {
+        if (!isDraggingSliderRef.current) return;
+        isDraggingSliderRef.current = false;
+        void saveSchedulePreferences({ gridScalePercent: scaleRef.current }, user?.id);
+    }, [user?.id]);
 
     const moveSelectedDay = (direction: -1 | 1) => {
         const candidate = addRiyadhDays(selectedDateKey, direction);
@@ -486,7 +601,8 @@ export default function ScheduleScreen() {
         }
         const approxIndex = Math.round(offsetX / weekSnapInterval);
         const clampedIndex = clamp(approxIndex, 0, weekDays.length - 1);
-        const dayKey = weekDays[clampedIndex];
+        const dayIndex = shouldReverseRow ? (weekDays.length - 1 - clampedIndex) : clampedIndex;
+        const dayKey = weekDays[dayIndex];
         if (dayKey && dayKey !== selectedDateKey) {
             setSelectedDateKey(dayKey);
         }
@@ -500,10 +616,10 @@ export default function ScheduleScreen() {
 
     const handleCancelTimeOff = (id: string) => {
         Alert.alert(
-            'Cancel Request',
-            'Do you want to cancel this upcoming time off request?',
+            t('schedule.cancelRequest', 'Cancel Request'),
+            t('schedule.cancelRequestConfirm', 'Do you want to cancel this upcoming time off request?'),
             [
-                { text: 'No', style: 'cancel' },
+                { text: t('common.no', 'No'), style: 'cancel' },
                 {
                     text: 'Yes',
                     style: 'destructive',
@@ -513,7 +629,7 @@ export default function ScheduleScreen() {
                             loadData();
                         } catch (error: any) {
                             Alert.alert(
-                                'Error',
+                                t('common.error', 'Error'),
                                 error?.response?.data?.message || error?.message || 'Could not cancel this time off request.'
                             );
                         }
@@ -530,8 +646,6 @@ export default function ScheduleScreen() {
         ? (appointmentsByDate[selectedDateKey] || [])
         : appointments;
 
-    const selectedDayShiftMinutes = shiftsForSelectedDate.reduce((sum, shift) => sum + Math.max(minutesBetween(shift.startTime, shift.endTime), 0), 0);
-
     const upcomingTimeOff = timeOff
         .filter((item) => item.startDate > getRiyadhDateKey())
         .sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -542,38 +656,28 @@ export default function ScheduleScreen() {
         .filter((item) => item.endDate < getRiyadhDateKey())
         .sort((a, b) => b.endDate.localeCompare(a.endDate));
 
-    const getDayState = (key: string) => {
-        if (timeOff.some((item) => item.startDate <= key && item.endDate >= key)) {
-            return 'timeoff';
-        }
-        if (shifts.some((shift) => shift.date === key)) {
-            return 'working';
-        }
-        return 'off';
-    };
-
     const formatTime = (value: string) => formatRiyadhTime(value, language);
 
     const getUrgencyInfo = (item: Appointment): { label: string; color: string; background: string; priority: number } => {
         if (item.status === 'started') {
-            return { label: 'In Service', color: '#92400e', background: '#fef3c7', priority: 0 };
+            return { label: t('schedule.inService', 'In Service'), color: '#92400e', background: '#fef3c7', priority: 0 };
         }
 
         if (['completed', 'no_show', 'cancelled'].includes(item.status)) {
-            return { label: 'Closed', color: '#4b5563', background: '#f3f4f6', priority: 4 };
+            return { label: t('schedule.closed', 'Closed'), color: '#4b5563', background: '#f3f4f6', priority: 4 };
         }
 
         const startTimestamp = new Date(item.startTime).getTime();
         if (!Number.isFinite(startTimestamp)) {
-            return { label: 'Upcoming', color: '#1d4ed8', background: '#dbeafe', priority: 3 };
+            return { label: t('schedule.upcoming', 'Upcoming'), color: '#1d4ed8', background: '#dbeafe', priority: 3 };
         }
 
         const minutesToStart = Math.round((startTimestamp - Date.now()) / 60000);
         if (minutesToStart < -10) {
-            return { label: 'Late', color: '#b91c1c', background: '#fee2e2', priority: 1 };
+            return { label: t('schedule.late', 'Late'), color: '#b91c1c', background: '#fee2e2', priority: 1 };
         }
         if (minutesToStart <= 30) {
-            return { label: 'Starting Soon', color: '#9a3412', background: '#ffedd5', priority: 2 };
+            return { label: t('schedule.startingSoon', 'Starting Soon'), color: '#9a3412', background: '#ffedd5', priority: 2 };
         }
 
         return { label: 'Upcoming', color: '#1d4ed8', background: '#dbeafe', priority: 3 };
@@ -631,6 +735,13 @@ export default function ScheduleScreen() {
             return dayAppointments.length > 0 || dayBreaks.length > 0 || hasDayTimeOff;
         });
         const clampToGrid = (minute: number) => Math.min(gridEndMinute, Math.max(gridStartMinute, minute));
+        const isCurrentTimeInRange =
+            currentRiyadhTime.minutes >= gridStartMinute && currentRiyadhTime.minutes <= gridEndMinute;
+        const currentTimeTopOffset = Math.max(
+            0,
+            ((currentRiyadhTime.minutes - gridStartMinute) / slotMinutes) * rowHeight
+        );
+        const formattedCurrentTime = formatRiyadhClockTime(currentRiyadhTime.minutes, language);
 
         return (
             <View style={styles.gridCard}>
@@ -641,14 +752,14 @@ export default function ScheduleScreen() {
                     </Text>
                 </View>
 
-                <View style={[styles.gridTimeline, { height: gridHeight }]}>
+                <View style={[styles.gridTimeline, { height: gridHeight, flexDirection: weekLayoutDirection }]}>
                         <View style={styles.gridTimeColumn}>
                             {Array.from({ length: totalRows }, (_, index) => {
                                 const minuteMark = gridStartMinute + (index * slotMinutes);
                                 const hours = Math.floor(minuteMark / 60);
                                 const minutes = minuteMark % 60;
                                 const labelHour = hours % 12 || 12;
-                                const ampm = hours >= 12 ? 'PM' : 'AM';
+                                const ampm = language === 'ar' ? (hours >= 12 ? 'م' : 'ص') : (hours >= 12 ? 'PM' : 'AM');
 
                                 return (
                                     <View key={`time-${minuteMark}`} style={[styles.gridTimeSlot, { height: rowHeight }]}>
@@ -670,7 +781,7 @@ export default function ScheduleScreen() {
                             onMomentumScrollEnd={(event) => handleWeekGridMomentumEnd(event.nativeEvent.contentOffset.x)}
                             contentContainerStyle={styles.gridColumnsScrollContent}
                         >
-                            <View style={styles.gridColumnsRow}>
+                            <View style={[styles.gridColumnsRow, { flexDirection: weekLayoutDirection }]}>
                                 {dayKeysForGrid.map((dayKey) => {
                                     const dayAppointments = dayScopeMode === 'week' ? (appointmentsByDate[dayKey] || []) : selectedDayAppointments;
                                     const dayBreaks = breaks.filter((item) => item.date === dayKey);
@@ -687,8 +798,8 @@ export default function ScheduleScreen() {
                                         >
                                             {dayScopeMode === 'week' ? (
                                                 <View style={styles.gridDayHeader}>
-                                                    <Text style={styles.gridDayHeaderTitle}>{formatRiyadhWeekdayShort(dayKey)}</Text>
-                                                    <Text style={styles.gridDayHeaderSub}>{formatRiyadhMonthDay(dayKey)}</Text>
+                                                    <Text style={styles.gridDayHeaderTitle}>{formatRiyadhWeekdayShort(dayKey, language)}</Text>
+                                                    <Text style={styles.gridDayHeaderSub}>{formatRiyadhMonthDay(dayKey, language)}</Text>
                                                 </View>
                                             ) : null}
 
@@ -761,7 +872,7 @@ export default function ScheduleScreen() {
                                                                     <View style={styles.gridAppointmentHeader}>
                                                                         <View style={{ flex: 1 }}>
                                                                             <Text style={[styles.gridAppointmentTitle, compactGridCards && styles.gridAppointmentTitleCompact]} numberOfLines={1}>
-                                                                                {groupCount > 1 ? `${serviceLabel} + ${groupCount - 1} more` : serviceLabel}
+                                                                                {groupCount > 1 ? `${serviceLabel} ${t('schedule.moreServices', { count: groupCount - 1 })}` : serviceLabel}
                                                                             </Text>
                                                                             <Text style={[styles.gridAppointmentTime, compactGridCards && styles.gridAppointmentTimeCompact]}>
                                                                                 {formatTime(appointment.startTime)} - {formatTime(appointment.endTime)}
@@ -839,6 +950,30 @@ export default function ScheduleScreen() {
                                                         </View>
                                                     );
                                                 })}
+
+                                                {dayKey === currentRiyadhTime.dateKey && isCurrentTimeInRange ? (
+                                                    <View
+                                                        pointerEvents="none"
+                                                        style={[styles.currentTimeContainer, { top: currentTimeTopOffset }]}
+                                                        accessibilityRole="text"
+                                                        accessibilityLabel={`${t('schedule.now', isCurrentRTL ? 'الآن' : 'NOW')}: ${formattedCurrentTime}`}
+                                                    >
+                                                        <View style={styles.currentTimeLine} />
+                                                        <View
+                                                            style={[
+                                                                styles.currentTimeBadgeRow,
+                                                                isCurrentRTL ? styles.currentTimeBadgeRowRTL : styles.currentTimeBadgeRowLTR,
+                                                            ]}
+                                                        >
+                                                            <View style={styles.currentTimeDot} />
+                                                            <View style={styles.currentTimePill}>
+                                                                <Text style={styles.currentTimePillText}>
+                                                                    {t('schedule.now', isCurrentRTL ? 'الآن' : 'NOW')} • {formattedCurrentTime}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                ) : null}
                                             </View>
                                         </View>
                                     );
@@ -848,7 +983,7 @@ export default function ScheduleScreen() {
                     {isGridLoading ? (
                         <View style={styles.gridLoadingOverlay}>
                             <ActivityIndicator size="small" color="#6537C0" />
-                            <Text style={styles.gridLoadingText}>Updating calendar...</Text>
+                            <Text style={styles.gridLoadingText}>{t('schedule.updatingCalendar')}</Text>
                         </View>
                     ) : null}
 
@@ -883,8 +1018,8 @@ export default function ScheduleScreen() {
                 {!hasScheduleEntries ? (
                     <View style={styles.centerContainerCompact}>
                         <Ionicons name="calendar-clear-outline" size={52} color="#d1d5db" />
-                        <Text style={styles.emptyTitle}>No schedule for this day</Text>
-                        <Text style={styles.emptySubtitle}>This day is currently clear with no shifts or approved time off.</Text>
+                        <Text style={styles.emptyTitle}>{t('schedule.noScheduleForDay')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('schedule.noScheduleSubtitle')}</Text>
                     </View>
                 ) : null}
 
@@ -914,16 +1049,23 @@ export default function ScheduleScreen() {
                 ))}
 
                 {breaksForSelectedDate.length > 0 ? (
-                    <View style={styles.breaksCard}>
-                        <Text style={styles.sectionTitle}>{t('schedule.breaks')}</Text>
+                    <View style={styles.stitchBlockedSection}>
+                        <Text style={styles.sectionTitle}>{t('schedule.breaks', 'Blocked Intervals & Breaks')}</Text>
                         {breaksForSelectedDate.map((item) => (
-                            <View key={item.id} style={styles.breakRow}>
-                                <View style={styles.breakDot} />
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.breakLabel}>{item.label || t('schedule.breakLabel')}</Text>
-                                    <Text style={styles.breakTime}>
-                                        {formatClock(item.startTime, language)} - {formatClock(item.endTime, language)} ({formatDurationHours(minutesBetween(item.startTime, item.endTime))})
-                                    </Text>
+                            <View key={item.id} style={styles.stitchBlockedCard}>
+                                <View style={styles.stitchBlockedLeft}>
+                                    <View style={styles.stitchBlockedIconWrap}>
+                                        <Ionicons name="lock-closed-outline" size={16} color="#79747E" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.stitchBlockedLabel}>{item.label || t('schedule.breakLabel', 'Blocked Time')}</Text>
+                                        <Text style={styles.stitchBlockedTime}>
+                                            {formatClock(item.startTime, language)} - {formatClock(item.endTime, language)} ({formatDurationHours(minutesBetween(item.startTime, item.endTime))})
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={styles.stitchBlockedBadge}>
+                                    <Text style={styles.stitchBlockedBadgeText}>{t('schedule.blocked', 'BLOCKED')}</Text>
                                 </View>
                             </View>
                         ))}
@@ -955,149 +1097,151 @@ export default function ScheduleScreen() {
                     {appointmentsLoading ? (
                         <View style={styles.infoCard}>
                             <ActivityIndicator size="small" color="#6537C0" />
-                            <Text style={styles.infoCardText}>Loading appointments for this day...</Text>
+                            <Text style={styles.infoCardText}>{t('schedule.loadingAppointments')}</Text>
                         </View>
                     ) : appointmentGroups.length === 0 ? (
                         <View style={styles.infoCard}>
                             <Ionicons name="calendar-outline" size={18} color="#6b7280" />
-                            <Text style={styles.infoCardText}>No appointments for this day.</Text>
+                            <Text style={styles.infoCardText}>{t('schedule.noAppointmentsForDay')}</Text>
                         </View>
                     ) : (
                         appointmentGroups.map((group) => {
                             const appointment = group.primary;
-                            const customerInitial = appointment.user?.firstName?.charAt(0)?.toUpperCase() || appointment.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
-                            const amount = Number(group.totalPrice || appointment.service?.finalPrice || appointment.service?.basePrice || appointment.price || 0);
-                            const urgency = getUrgencyInfo(appointment);
                             const isStarted = appointment.status === 'started';
                             const isCompleted = appointment.status === 'completed' || appointment.status === 'no_show' || appointment.status === 'cancelled';
                             const groupedCount = group.count || 1;
+                            const statusColors = getAppointmentStatusColors(appointment.status);
+                            const customerName = `${appointment.user?.firstName || ''} ${appointment.user?.lastName || ''}`.trim() || t('common.client', 'Client');
+
+                            let accentStripeColor = '#6537C0';
+                            if (appointment.status === 'confirmed') accentStripeColor = '#1D035F';
+                            else if (appointment.status === 'started') accentStripeColor = '#6537C0';
+                            else if (appointment.status === 'completed') accentStripeColor = '#059669';
+                            else if (appointment.status === 'cancelled' || appointment.status === 'no_show') accentStripeColor = '#DC2626';
+                            else if (appointment.status === 'pending') accentStripeColor = '#D97706';
 
                             return (
-                                <View key={group.key} style={[styles.appointmentCard, isCompleted && styles.appointmentCardCompleted]}>
-                                    <View style={styles.appointmentCardHeader}>
-                                        <View>
-                                            <Text style={styles.appointmentTime}>
-                                                {formatTime(appointment.startTime)} to {formatTime(appointment.endTime)}
-                                            </Text>
-                                            <Text style={styles.appointmentDuration}>
-                                                {appointment.duration || appointment.service?.duration || 0} min
-                                            </Text>
-                                        </View>
-                                        <View style={styles.appointmentCardBadges}>
-                                            <View style={[styles.urgencyBadge, { backgroundColor: urgency.background }]}>
-                                                <Text style={[styles.urgencyText, { color: urgency.color }]}>{urgency.label}</Text>
-                                            </View>
-                                            <View style={[styles.statusBadge, { backgroundColor: getAppointmentStatusColors(appointment.status).bg }]}>
-                                                <Text style={[styles.appointmentStatusText, { color: getAppointmentStatusColors(appointment.status).text }]}>
-                                                    {getAppointmentStatusLabel(appointment.status, t)}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                    </View>
+                                <TouchableOpacity
+                                    key={group.key}
+                                    style={[
+                                        styles.stitchCard,
+                                        isCompleted && styles.stitchCardCompleted,
+                                    ]}
+                                    activeOpacity={0.88}
+                                    onPress={() => setActiveAppointment(appointment)}
+                                >
+                                    {/* 4px Status Accent Stripe */}
+                                    <View style={[styles.stitchCardStripe, { backgroundColor: accentStripeColor }]} />
 
-                                    <View style={styles.appointmentCardBody}>
-                                        <View style={styles.appointmentCustomerRow}>
-                                            <View style={styles.appointmentAvatar}>
-                                                {appointment.user?.profileImage ? (
-                                                    <Image source={{ uri: getImageUrl(appointment.user.profileImage) }} style={styles.appointmentAvatarImage} />
-                                                ) : (
-                                                    <Text style={styles.appointmentAvatarInitial}>{customerInitial}</Text>
-                                                )}
+                                    <View style={styles.stitchCardContent}>
+                                        {/* Top Row: Customer Name, Duration pill, Status pill */}
+                                        <View style={styles.stitchCardTopRow}>
+                                            <View style={styles.stitchCustomerNameWrap}>
+                                                <Text style={styles.stitchCustomerName} numberOfLines={1}>
+                                                    {customerName}
+                                                </Text>
                                             </View>
-                                            <View style={styles.appointmentCustomerMeta}>
-                                                <Text style={styles.appointmentCustomerName}>
-                                                    {appointment.user?.firstName} {appointment.user?.lastName}
-                                                </Text>
-                                                <Text style={styles.appointmentBookingMeta}>
-                                                    Booking #{appointment.bookingNumber?.slice(0, 8) || appointment.id.slice(0, 8)}
-                                                </Text>
+                                            <View style={styles.stitchCardBadges}>
+                                                <View style={styles.stitchDurationBadge}>
+                                                    <Text style={styles.stitchDurationText}>
+                                                        {appointment.duration || appointment.service?.duration || 0}m
+                                                    </Text>
+                                                </View>
+                                                <View style={[styles.stitchStatusBadge, { backgroundColor: statusColors.bg }]}>
+                                                    <Text style={[styles.stitchStatusBadgeText, { color: statusColors.text }]}>
+                                                        {getAppointmentStatusLabel(appointment.status, t)}
+                                                    </Text>
+                                                </View>
                                             </View>
                                         </View>
 
-                                        <Text style={styles.appointmentServiceName} numberOfLines={1}>
+                                        {/* Middle: Service Title */}
+                                        <Text style={styles.stitchServiceTitle} numberOfLines={1}>
                                             {getAppointmentCardLabel(appointment, groupedCount, language)}
                                         </Text>
                                         {groupedCount > 1 ? (
-                                            <Text style={styles.appointmentServiceHint} numberOfLines={1}>
-                                                {t('schedule.multiServiceHint')}
+                                            <Text style={styles.stitchMultiServiceHint} numberOfLines={1}>
+                                                {t('schedule.multiServiceHint', `${groupedCount} services included`)}
                                             </Text>
                                         ) : null}
 
-                                        <View style={styles.appointmentMetaRow}>
-                                            <View style={styles.appointmentMetaBadge}>
-                                                <Ionicons name="card-outline" size={13} color="#6b7280" />
-                                                <Text style={styles.appointmentMetaBadgeText}>{appointment.paymentStatus ? appointment.paymentStatus.replace(/_/g, ' ') : 'payment unknown'}</Text>
-                                            </View>
-                                            {appointment.paymentMethod ? (
-                                                <View style={styles.appointmentMetaBadge}>
-                                                    <Ionicons name="wallet-outline" size={13} color="#6b7280" />
-                                                    <Text style={styles.appointmentMetaBadgeText}>{appointment.paymentMethod.replace(/_/g, ' ')}</Text>
+                                        {/* Bottom Row: Time, Staff/Assignment, and Bold Purple Price */}
+                                        <View style={styles.stitchCardBottomRow}>
+                                            <View style={styles.stitchCardMetaLeft}>
+                                                <View style={styles.stitchMetaChip}>
+                                                    <Ionicons name="time-outline" size={13} color="#49398B" style={{ marginRight: 4 }} />
+                                                    <Text style={styles.stitchMetaChipText}>
+                                                        {formatTime(appointment.startTime)} - {formatTime(appointment.endTime)}
+                                                    </Text>
                                                 </View>
-                                            ) : null}
-                                            <View style={styles.appointmentMetaBadge}>
-                                                <Ionicons name={appointment.assignmentMode === 'customer_selected' ? 'person-circle-outline' : 'sparkles-outline'} size={13} color="#6b7280" />
-                                                <Text style={styles.appointmentMetaBadgeText}>
-                                                    {appointment.assignmentMode === 'customer_selected' ? t('schedule.customerPickedStaff') : t('schedule.autoAssigned')}
+                                                <View style={styles.stitchMetaChip}>
+                                                    <Ionicons name="location-outline" size={13} color="#49398B" style={{ marginRight: 4 }} />
+                                                    <Text style={styles.stitchMetaChipText}>
+                                                        {appointment.assignmentMode === 'customer_selected' ? t('schedule.customerPickedStaff', 'Client Selected') : t('schedule.autoAssigned', 'Direct Assignment')}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </View>
+
+                                        {/* Notes snippet if present */}
+                                        {canSeeBookingNotes && appointment.notes ? (
+                                            <View style={styles.stitchCardNotes}>
+                                                <Ionicons name="document-text-outline" size={12} color="#6B7280" style={{ marginRight: 4 }} />
+                                                <Text style={styles.stitchCardNotesText} numberOfLines={1}>
+                                                    {appointment.notes}
                                                 </Text>
                                             </View>
-                                        </View>
+                                        ) : null}
 
-                                        {canSeeBookingNotes && appointment.notes ? (
-                                            <View style={styles.appointmentNotesContainer}>
-                                                <Ionicons name="document-text-outline" size={14} color="#6b7280" />
-                                                <Text style={styles.appointmentNotesText} numberOfLines={2}>{appointment.notes}</Text>
+                                        {/* Quick inline actions */}
+                                        {!isCompleted && appointment.status !== 'cancelled' ? (
+                                            <View style={styles.stitchQuickActions}>
+                                                {!isStarted && canShowStartAction ? (
+                                                    <TouchableOpacity
+                                                        style={[styles.stitchQuickBtnPrimary, updatingId === appointment.id && { opacity: 0.6 }]}
+                                                        onPress={(e) => {
+                                                            e.stopPropagation();
+                                                            handleAppointmentStatusUpdate(appointment.id, 'started');
+                                                        }}
+                                                        disabled={!!updatingId}
+                                                    >
+                                                        {updatingId === appointment.id
+                                                            ? <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 4 }} />
+                                                            : <Ionicons name="play" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />}
+                                                        <Text style={styles.stitchQuickBtnTextWhite}>{t('schedule.start', 'Start')}</Text>
+                                                    </TouchableOpacity>
+                                                ) : isStarted ? (
+                                                    <TouchableOpacity
+                                                        style={[styles.stitchQuickBtnSuccess, updatingId === appointment.id && { opacity: 0.6 }]}
+                                                        onPress={(e) => {
+                                                            e.stopPropagation();
+                                                            handleAppointmentStatusUpdate(appointment.id, 'completed');
+                                                        }}
+                                                        disabled={!!updatingId}
+                                                    >
+                                                        {updatingId === appointment.id
+                                                            ? <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 4 }} />
+                                                            : <Ionicons name="checkmark-done" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />}
+                                                        <Text style={styles.stitchQuickBtnTextWhite}>{t('schedule.complete', 'Complete')}</Text>
+                                                    </TouchableOpacity>
+                                                ) : null}
+
+                                                {canShowNoShowAction ? (
+                                                    <TouchableOpacity
+                                                        style={[styles.stitchQuickBtnSecondary, updatingId === appointment.id && { opacity: 0.4 }]}
+                                                        onPress={(e) => {
+                                                            e.stopPropagation();
+                                                            handleAppointmentStatusUpdate(appointment.id, 'no-show');
+                                                        }}
+                                                        disabled={!!updatingId}
+                                                    >
+                                                        <Text style={styles.stitchQuickBtnTextSecondary}>{t('schedule.noShow', 'No Show')}</Text>
+                                                    </TouchableOpacity>
+                                                ) : null}
                                             </View>
                                         ) : null}
-
-                                        {canViewClientContext && appointment.user?.id ? (
-                                            <TouchableOpacity
-                                                style={styles.appointmentClientButton}
-                                                onPress={() => router.push((`/client/${appointment.user?.id}` as any))}
-                                            >
-                                                <Ionicons name="person-circle-outline" size={16} color="#6537C0" style={styles.appointmentClientButtonIcon} />
-                                                <Text style={styles.appointmentClientButtonText}>{t('schedule.viewClient')}</Text>
-                                            </TouchableOpacity>
-                                        ) : null}
                                     </View>
-
-                                    {!isCompleted && appointment.status !== 'cancelled' ? (
-                                        <View style={styles.appointmentActions}>
-                                            {!isStarted && canShowStartAction ? (
-                                                <TouchableOpacity
-                                                    style={[styles.actionBtn, styles.startBtn, updatingId === appointment.id && { opacity: 0.6 }]}
-                                                    onPress={() => handleAppointmentStatusUpdate(appointment.id, 'started')}
-                                                    disabled={!!updatingId}
-                                                >
-                                                    {updatingId === appointment.id
-                                                        ? <ActivityIndicator size="small" color="#ffffff" style={styles.btnIcon} />
-                                                        : <Ionicons name="play" size={16} color="#ffffff" style={styles.btnIcon} />}
-                                                    <Text style={styles.btnTextWhite}>{t('schedule.start')}</Text>
-                                                </TouchableOpacity>
-                                            ) : isStarted ? (
-                                                <TouchableOpacity
-                                                    style={[styles.actionBtn, styles.completeBtn, updatingId === appointment.id && { opacity: 0.6 }]}
-                                                    onPress={() => handleAppointmentStatusUpdate(appointment.id, 'completed')}
-                                                    disabled={!!updatingId}
-                                                >
-                                                    {updatingId === appointment.id
-                                                        ? <ActivityIndicator size="small" color="#ffffff" style={styles.btnIcon} />
-                                                        : <Ionicons name="checkmark-done" size={16} color="#ffffff" style={styles.btnIcon} />}
-                                                    <Text style={styles.btnTextWhite}>{t('schedule.complete')}</Text>
-                                                </TouchableOpacity>
-                                            ) : null}
-
-                                            {canShowNoShowAction ? (
-                                                <TouchableOpacity
-                                                    style={[styles.actionBtn, styles.noShowBtn, updatingId === appointment.id && { opacity: 0.4 }]}
-                                                    onPress={() => handleAppointmentStatusUpdate(appointment.id, 'no-show')}
-                                                    disabled={!!updatingId}
-                                                >
-                                                    <Text style={styles.btnTextGray}>{t('schedule.noShow')}</Text>
-                                                </TouchableOpacity>
-                                            ) : null}
-                                        </View>
-                                    ) : null}
-                                </View>
+                                </TouchableOpacity>
                             );
                         })
                     )}
@@ -1122,7 +1266,7 @@ export default function ScheduleScreen() {
                                 <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
                             </View>
                             <Text style={[styles.timeOffStatusText, { color: item.isApproved ? '#10b981' : '#f59e0b' }]}>
-                                {item.isApproved ? 'APPROVED' : 'PENDING'}
+                                {item.isApproved ? t('schedule.approved', 'Approved') : t('schedule.pendingReview', 'Pending')}
                             </Text>
                         </View>
                         <Text style={styles.shiftLabel}>
@@ -1149,169 +1293,246 @@ export default function ScheduleScreen() {
 
         const appointment = activeAppointment;
         const customerInitial = appointment.user?.firstName?.charAt(0)?.toUpperCase() || appointment.user?.lastName?.charAt(0)?.toUpperCase() || 'C';
-        const amount = Number(appointment.service?.finalPrice || appointment.service?.basePrice || appointment.price || 0);
-        const urgency = getUrgencyInfo(appointment);
+        const customerFullName = `${appointment.user?.firstName || ''} ${appointment.user?.lastName || ''}`.trim() || t('common.client', 'Client');
+        const customerPhone = appointment.user?.phone || '';
+        const group = appointmentGroups.find((item) => item.items.some((entry) => entry.id === appointment.id));
         const isStarted = appointment.status === 'started';
         const isCompleted = appointment.status === 'completed' || appointment.status === 'no_show' || appointment.status === 'cancelled';
+        const statusColors = getAppointmentStatusColors(appointment.status);
+
+        const handleCallPhone = () => {
+            if (!customerPhone) return;
+            const cleaned = customerPhone.replace(/[^\d+]/g, '');
+            Linking.openURL(`tel:${cleaned}`).catch((err) => {
+                console.warn('Could not open phone dialer', err);
+            });
+        };
 
         return (
             <Modal
                 visible={Boolean(activeAppointment)}
                 transparent
-                animationType="fade"
+                animationType="slide"
                 onRequestClose={() => setActiveAppointment(null)}
             >
-                <Pressable style={styles.modalBackdrop} onPress={() => setActiveAppointment(null)}>
-                    <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>{t('schedule.appointment')}</Text>
-                            <TouchableOpacity onPress={() => setActiveAppointment(null)}>
-                                <Ionicons name="close" size={22} color="#6b7280" />
+                <Pressable style={styles.stitchModalBackdrop} onPress={() => setActiveAppointment(null)}>
+                    <Pressable style={styles.stitchModalSheet} onPress={(event) => event.stopPropagation()}>
+                        {/* Drag Handle Indicator */}
+                        <View style={styles.stitchDragHandle} />
+
+                        {/* Customer Identity Row */}
+                        <View style={styles.stitchModalCustomerRow}>
+                            <View style={styles.stitchModalCustomerLeft}>
+                                <View style={styles.stitchModalAvatar}>
+                                    {appointment.user?.profileImage ? (
+                                        <Image source={{ uri: getImageUrl(appointment.user.profileImage) }} style={styles.stitchModalAvatarImg} />
+                                    ) : (
+                                        <Text style={styles.stitchModalAvatarText}>{customerInitial}</Text>
+                                    )}
+                                </View>
+                                <View style={styles.stitchModalCustomerDetails}>
+                                    <View style={styles.stitchModalNameAndStatus}>
+                                        <Text style={styles.stitchModalCustomerName} numberOfLines={1}>{customerFullName}</Text>
+                                        <View style={[styles.stitchModalStatusPill, { backgroundColor: statusColors.bg }]}>
+                                            <Text style={[styles.stitchModalStatusPillText, { color: statusColors.text }]}>
+                                                {getAppointmentStatusLabel(appointment.status, t)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    {customerPhone ? (
+                                        <TouchableOpacity
+                                            style={styles.stitchModalPhoneRow}
+                                            onPress={handleCallPhone}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Ionicons name="call-outline" size={13} color="#49398B" style={{ marginRight: 4 }} />
+                                            <Text style={styles.stitchModalPhoneText}>{customerPhone}</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <Text style={styles.stitchModalBookingSub}>
+                                            Booking #{appointment.bookingNumber?.slice(0, 8) || appointment.id.slice(0, 8)}
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.stitchModalCloseBtn}
+                                onPress={() => setActiveAppointment(null)}
+                                accessibilityLabel={t('common.close', 'Close')}
+                            >
+                                <Ionicons name="close" size={22} color="#79747E" />
                             </TouchableOpacity>
                         </View>
 
-                        <View style={styles.appointmentCardHeader}>
-                            <View>
-                                <Text style={styles.appointmentTime}>
-                                    {formatTime(appointment.startTime)} to {formatTime(appointment.endTime)}
-                                </Text>
-                                <Text style={styles.appointmentDuration}>
-                                    {appointment.duration || appointment.service?.duration || 0} min
-                                </Text>
-                            </View>
-                            <View style={styles.appointmentCardBadges}>
-                                <View style={[styles.urgencyBadge, { backgroundColor: urgency.background }]}>
-                                    <Text style={[styles.urgencyText, { color: urgency.color }]}>{urgency.label}</Text>
+                        {/* Service Structural Card */}
+                        <View style={styles.stitchServiceStructuralCard}>
+                            <View style={styles.stitchServiceStructuralTop}>
+                                <View style={{ flex: 1, marginRight: 12 }}>
+                                    <Text style={styles.stitchServiceStructuralName}>
+                                        {getAppointmentServiceLabel(appointment, language)}
+                                    </Text>
+                                    <Text style={styles.stitchServiceStructuralDuration}>
+                                        {appointment.duration || appointment.service?.duration || 0} mins • {appointment.assignmentMode === 'customer_selected' ? t('schedule.customerPickedStaff', 'Client Selected') : t('schedule.autoAssigned', 'Direct Assignment')}
+                                    </Text>
                                 </View>
                             </View>
-                        </View>
 
-                        <View style={styles.appointmentCustomerRow}>
-                            <View style={styles.appointmentAvatar}>
-                                {appointment.user?.profileImage ? (
-                                    <Image source={{ uri: getImageUrl(appointment.user.profileImage) }} style={styles.appointmentAvatarImage} />
-                                ) : (
-                                    <Text style={styles.appointmentAvatarInitial}>{customerInitial}</Text>
-                                )}
-                            </View>
-                            <View style={styles.appointmentCustomerMeta}>
-                                <Text style={styles.appointmentCustomerName}>
-                                    {appointment.user?.firstName} {appointment.user?.lastName}
-                                </Text>
-                                <Text style={styles.appointmentBookingMeta}>
-                                    Booking #{appointment.bookingNumber?.slice(0, 8) || appointment.id.slice(0, 8)}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <Text style={styles.appointmentServiceName}>
-                            {getAppointmentServiceLabel(appointment, language)}
-                        </Text>
-
-                        {(() => {
-                            const group = appointmentGroups.find((item) => item.items.some((entry) => entry.id === appointment.id));
-                            if (!group || group.count <= 1) {
-                                return null;
-                            }
-
-                            return (
-                                <View style={styles.groupSummaryCard}>
-                                    <Text style={styles.groupSummaryTitle}>
-                                        {t('schedule.servicesCount', { count: group.count })}
+                            {/* Multi-Service Breakdown (if group > 1) */}
+                            {group && group.count > 1 ? (
+                                <View style={styles.stitchMultiServiceBox}>
+                                    <Text style={styles.stitchMultiServiceHeader}>
+                                        {t('schedule.servicesCount', { count: group.count, defaultValue: `${group.count} Services in Session` })}
                                     </Text>
-                                    {group.items.map((item) => (
-                                        <View key={item.id} style={styles.groupServiceRow}>
-                                            <Text style={styles.groupServiceRowTitle}>{getAppointmentServiceLabel(item, language)}</Text>
-                                            <Text style={styles.groupServiceRowMeta}>
-                                                {formatTime(item.startTime)} - {formatTime(item.endTime)}
-                                            </Text>
+                                    {group.items.map((item, idx) => (
+                                        <View key={item.id} style={styles.stitchMultiServiceItemRow}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.stitchMultiServiceItemName}>
+                                                    {idx + 1}. {getAppointmentServiceLabel(item, language)}
+                                                </Text>
+                                                <Text style={styles.stitchMultiServiceItemTime}>
+                                                    {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                                                </Text>
+                                            </View>
                                         </View>
                                     ))}
                                 </View>
-                            );
-                        })()}
+                            ) : null}
 
+                            {/* 3-Column Micro-Strip: Time, Staff, Room */}
+                            <View style={styles.stitchMicroStripContainer}>
+                                <View style={styles.stitchMicroStripColumn}>
+                                    <Text style={styles.stitchMicroStripLabel}>{t('schedule.time', 'Time')}</Text>
+                                    <Text style={styles.stitchMicroStripValue} numberOfLines={1}>{formatTime(appointment.startTime)}</Text>
+                                </View>
+                                <View style={styles.stitchMicroStripDivider} />
+                                <View style={styles.stitchMicroStripColumn}>
+                                    <Text style={styles.stitchMicroStripLabel}>{t('schedule.staff', 'Staff')}</Text>
+                                    <Text style={styles.stitchMicroStripValue} numberOfLines={1}>
+                                        {user?.name || 'Staff'}
+                                    </Text>
+                                </View>
+                                <View style={styles.stitchMicroStripDivider} />
+                                <View style={styles.stitchMicroStripColumn}>
+                                    <Text style={styles.stitchMicroStripLabel}>{t('schedule.room', 'Room')}</Text>
+                                    <Text style={styles.stitchMicroStripValue} numberOfLines={1}>Suite 1</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Special Instructions / Notes Card */}
                         {canSeeBookingNotes && appointment.notes ? (
-                            <View style={styles.appointmentNotesContainer}>
-                                <Ionicons name="document-text-outline" size={14} color="#6b7280" />
-                                <Text style={styles.appointmentNotesText} numberOfLines={3}>{appointment.notes}</Text>
+                            <View style={styles.stitchNotesCard}>
+                                <Ionicons name="information-circle-outline" size={18} color="#6537C0" style={{ marginTop: 2, marginRight: 8 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.stitchNotesTitle}>{t('schedule.clientNotes', 'Client Notes')}</Text>
+                                    <Text style={styles.stitchNotesBody}>{appointment.notes}</Text>
+                                </View>
                             </View>
                         ) : null}
 
-                        {canViewClientContext && appointment.user?.id ? (
-                            <TouchableOpacity
-                                style={styles.appointmentClientButton}
-                                onPress={() => {
-                                    setActiveAppointment(null);
-                                    router.push((`/client/${appointment.user?.id}` as any));
-                                }}
-                            >
-                                <Ionicons name="person-circle-outline" size={16} color="#6537C0" style={styles.appointmentClientButtonIcon} />
-                                <Text style={styles.appointmentClientButtonText}>{t('schedule.appointmentDetails')}</Text>
-                            </TouchableOpacity>
-                        ) : null}
-
+                        {/* Booking Session / Reference (if present) */}
                         {appointment.bookingSessionId || appointment.bookingReference ? (
-                            <View style={styles.bookingSessionInfoCard}>
-                                <Text style={styles.bookingSessionInfoLabel}>{t('schedule.bookingSession')}</Text>
-                                <Text style={styles.bookingSessionInfoValue}>
+                            <View style={styles.stitchBookingSessionBadge}>
+                                <Text style={styles.stitchBookingSessionLabel}>{t('schedule.bookingSession', 'Booking Session')}:</Text>
+                                <Text style={styles.stitchBookingSessionValue}>
                                     {appointment.bookingReference || appointment.bookingNumber || appointment.id.slice(0, 8)}
                                 </Text>
                             </View>
                         ) : null}
 
-                        {!isCompleted && appointment.status !== 'cancelled' ? (
-                            <View style={styles.appointmentActions}>
-                                {!isStarted && canShowStartAction ? (
-                                    <TouchableOpacity
-                                        style={[styles.actionBtn, styles.startBtn, updatingId === appointment.id && { opacity: 0.6 }]}
-                                        onPress={() => handleAppointmentStatusUpdate(appointment.id, 'started')}
-                                        disabled={!!updatingId}
-                                    >
-                                        {updatingId === appointment.id
-                                            ? <ActivityIndicator size="small" color="#ffffff" style={styles.btnIcon} />
-                                            : <Ionicons name="play" size={16} color="#ffffff" style={styles.btnIcon} />}
-                                        <Text style={styles.btnTextWhite}>Start</Text>
-                                    </TouchableOpacity>
-                                ) : isStarted ? (
-                                    <TouchableOpacity
-                                        style={[styles.actionBtn, styles.completeBtn, updatingId === appointment.id && { opacity: 0.6 }]}
-                                        onPress={() => handleAppointmentStatusUpdate(appointment.id, 'completed')}
-                                        disabled={!!updatingId}
-                                    >
-                                        {updatingId === appointment.id
-                                            ? <ActivityIndicator size="small" color="#ffffff" style={styles.btnIcon} />
-                                            : <Ionicons name="checkmark-done" size={16} color="#ffffff" style={styles.btnIcon} />}
-                                        <Text style={styles.btnTextWhite}>Complete</Text>
-                                    </TouchableOpacity>
-                                ) : null}
+                        {/* Action Buttons */}
+                        <View style={styles.stitchModalActionsArea}>
+                            {!isCompleted && appointment.status !== 'cancelled' ? (
+                                <>
+                                    {!isStarted && canShowStartAction ? (
+                                        <TouchableOpacity
+                                            style={[styles.stitchModalBtnPrimary, updatingId === appointment.id && { opacity: 0.6 }]}
+                                            onPress={() => handleAppointmentStatusUpdate(appointment.id, 'started')}
+                                            disabled={!!updatingId}
+                                        >
+                                            {updatingId === appointment.id
+                                                ? <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                                                : <Ionicons name="play" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />}
+                                            <Text style={styles.stitchModalBtnPrimaryText}>{t('schedule.startAppointment', 'Start Appointment')}</Text>
+                                        </TouchableOpacity>
+                                    ) : isStarted ? (
+                                        <TouchableOpacity
+                                            style={[styles.stitchModalBtnSuccess, updatingId === appointment.id && { opacity: 0.6 }]}
+                                            onPress={() => handleAppointmentStatusUpdate(appointment.id, 'completed')}
+                                            disabled={!!updatingId}
+                                        >
+                                            {updatingId === appointment.id
+                                                ? <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                                                : <Ionicons name="checkmark-done" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />}
+                                            <Text style={styles.stitchModalBtnPrimaryText}>{t('schedule.completeAppointment', 'Complete Appointment')}</Text>
+                                        </TouchableOpacity>
+                                    ) : null}
 
-                                {canShowNoShowAction ? (
-                                    <TouchableOpacity
-                                        style={[styles.actionBtn, styles.noShowBtn, updatingId === appointment.id && { opacity: 0.4 }]}
-                                        onPress={() => handleAppointmentStatusUpdate(appointment.id, 'no-show')}
-                                        disabled={!!updatingId}
-                                    >
-                                        <Text style={styles.btnTextGray}>No Show</Text>
-                                    </TouchableOpacity>
-                                ) : null}
-                            </View>
-                        ) : null}
+                                    <View style={styles.stitchModalSecondaryGrid}>
+                                        {canShowNoShowAction ? (
+                                            <TouchableOpacity
+                                                style={[styles.stitchModalBtnSecondary, updatingId === appointment.id && { opacity: 0.4 }]}
+                                                onPress={() => handleAppointmentStatusUpdate(appointment.id, 'no-show')}
+                                                disabled={!!updatingId}
+                                            >
+                                                <Ionicons name="person-remove-outline" size={16} color="#DC2626" style={{ marginRight: 6 }} />
+                                                <Text style={styles.stitchModalBtnSecondaryTextRed}>{t('schedule.noShow', 'Mark as No Show')}</Text>
+                                            </TouchableOpacity>
+                                        ) : null}
+
+                                        {canViewClientContext && appointment.user?.id ? (
+                                            <TouchableOpacity
+                                                style={styles.stitchModalBtnProfile}
+                                                onPress={() => {
+                                                    setActiveAppointment(null);
+                                                    router.push((`/client/${appointment.user?.id}` as any));
+                                                }}
+                                            >
+                                                <Ionicons name="person-circle-outline" size={16} color="#6537C0" style={{ marginRight: 6 }} />
+                                                <Text style={styles.stitchModalBtnProfileText}>{t('schedule.viewProfile', 'View Profile')}</Text>
+                                            </TouchableOpacity>
+                                        ) : null}
+                                    </View>
+                                </>
+                            ) : (
+                                <View style={styles.stitchModalCompletedNotice}>
+                                    <Ionicons name="checkmark-circle" size={18} color="#059669" style={{ marginRight: 8 }} />
+                                    <Text style={styles.stitchModalCompletedText}>
+                                        {t('schedule.appointmentClosed', 'This appointment is completed and closed.')}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     </Pressable>
                 </Pressable>
             </Modal>
         );
     };
 
-    const controllerTitle = dayScopeMode === 'week'
-        ? `${formatRiyadhMonthDay(weekStartKey)} - ${formatRiyadhMonthDay(addRiyadhDays(weekStartKey, 6))}`
-        : formatRiyadhLongDate(selectedDateKey);
-    const controllerSubtitle = dayScopeMode === 'week'
-        ? `Week ${weekOffset + 1} of ${visibleWeeks} visible week(s)`
-        : `Day view in week ${weekOffset + 1} of ${visibleWeeks}`;
-    const showLegacyDayStripAndSummary = false;
+    
+    const getFormattedBookingsCount = (count: number) => {
+        if (language === 'ar') {
+            if (count === 0) return 'لا توجد حجوزات';
+            if (count === 1) return 'حجز واحد';
+            if (count === 2) return 'حجزان';
+            if (count >= 3 && count <= 10) return `${count} حجوزات`;
+            return `${count} حجز`;
+        }
+        return count === 1 ? '1 Booking' : `${count} Bookings`;
+    };
 
-    return (
+    const getFormattedBlocksCount = (count: number) => {
+        if (language === 'ar') {
+            if (count === 0) return 'لا فترات محجوبة';
+            if (count === 1) return 'فترة محجوبة واحدة';
+            if (count === 2) return 'فترتان محجوبتان';
+            if (count >= 3 && count <= 10) return `${count} فترات محجوبة`;
+            return `${count} فترة محجوبة`;
+        }
+        return count === 1 ? '1 Block' : `${count} Block(s)`;
+    };
+
+return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <ScrollView
                 contentContainerStyle={styles.content}
@@ -1330,157 +1551,171 @@ export default function ScheduleScreen() {
                     </TouchableOpacity>
                 )}
 
-                <View style={styles.primaryControlsRow}>
-                    <TouchableOpacity
-                        style={styles.todayAppointmentsButton}
-                        onPress={jumpToTodayInSchedule}
-                    >
-                        <Ionicons name="today-outline" size={18} color="#1f2937" />
-                    </TouchableOpacity>
-
-                    <View style={styles.primaryDayController}>
+                {/* Stitch Calendar & Navigation Controls */}
+                <View style={[styles.stitchNavHeader, { flexDirection: weekLayoutDirection }]}>
+                    <View style={[styles.stitchNavLeft, { flexDirection: weekLayoutDirection }]}>
                         <TouchableOpacity
                             style={[
-                                styles.weekNavButton,
-                                dayScopeMode === 'week'
-                                    ? (isRTL ? !canGoNext : !canGoPrev) && styles.weekNavButtonDisabled
-                                    : (isRTL ? !canGoNextDay : !canGoPrevDay) && styles.weekNavButtonDisabled
+                                styles.stitchNavIconButton,
+                                (dayScopeMode === 'week' ? !canGoPrev : !canGoPrevDay) && styles.stitchNavIconButtonDisabled
                             ]}
                             onPress={() => {
-                                const step = isRTL ? 1 : -1;
                                 if (dayScopeMode === 'week') {
-                                    if (isRTL) {
-                                        canGoNext && setWeekOffset((current) => current + 1);
-                                    } else {
-                                        canGoPrev && setWeekOffset((current) => current - 1);
-                                    }
+                                    canGoPrev && setWeekOffset((current) => current - 1);
                                 } else {
-                                    moveSelectedDay(step as -1 | 1);
+                                    moveSelectedDay(-1);
                                 }
                             }}
-                            disabled={dayScopeMode === 'week' ? (isRTL ? !canGoNext : !canGoPrev) : (isRTL ? !canGoNextDay : !canGoPrevDay)}
+                            disabled={dayScopeMode === 'week' ? !canGoPrev : !canGoPrevDay}
+                            accessibilityLabel={t('schedule.previous', 'Previous')}
                         >
                             <Ionicons
-                                name={isRTL ? "chevron-forward" : "chevron-back"}
-                                size={18}
-                                color={
-                                    (dayScopeMode === 'week' ? (isRTL ? canGoNext : canGoPrev) : (isRTL ? canGoNextDay : canGoPrevDay))
-                                        ? BARSPA_COLORS.royalPurple
-                                        : '#9ca3af'
-                                }
+                                name={isCurrentRTL ? "chevron-forward" : "chevron-back"}
+                                size={20}
+                                color={(dayScopeMode === 'week' ? canGoPrev : canGoPrevDay) ? BARSPA_COLORS.royalPurple : '#9CA3AF'}
                             />
                         </TouchableOpacity>
 
-                        <View style={styles.weekNavigatorCenter}>
-                            <Text style={styles.weekNavigatorTitle}>{controllerTitle}</Text>
-                            <Text style={styles.weekNavigatorSubtitle}>
-                                {controllerSubtitle}
-                            </Text>
-                        </View>
-
                         <TouchableOpacity
                             style={[
-                                styles.weekNavButton,
-                                dayScopeMode === 'week'
-                                    ? (isRTL ? !canGoPrev : !canGoNext) && styles.weekNavButtonDisabled
-                                    : (isRTL ? !canGoPrevDay : !canGoNextDay) && styles.weekNavButtonDisabled
+                                styles.stitchNavIconButton,
+                                (dayScopeMode === 'week' ? !canGoNext : !canGoNextDay) && styles.stitchNavIconButtonDisabled
                             ]}
                             onPress={() => {
-                                const step = isRTL ? -1 : 1;
                                 if (dayScopeMode === 'week') {
-                                    if (isRTL) {
-                                        canGoPrev && setWeekOffset((current) => current - 1);
-                                    } else {
-                                        canGoNext && setWeekOffset((current) => current + 1);
-                                    }
+                                    canGoNext && setWeekOffset((current) => current + 1);
                                 } else {
-                                    moveSelectedDay(step as -1 | 1);
+                                    moveSelectedDay(1);
                                 }
                             }}
-                            disabled={dayScopeMode === 'week' ? (isRTL ? !canGoPrev : !canGoNext) : (isRTL ? !canGoPrevDay : !canGoNextDay)}
+                            disabled={dayScopeMode === 'week' ? !canGoNext : !canGoNextDay}
+                            accessibilityLabel={t('schedule.next', 'Next')}
                         >
                             <Ionicons
-                                name={isRTL ? "chevron-back" : "chevron-forward"}
-                                size={18}
-                                color={
-                                    (dayScopeMode === 'week' ? (isRTL ? canGoPrev : canGoNext) : (isRTL ? canGoPrevDay : canGoNextDay))
-                                        ? BARSPA_COLORS.royalPurple
-                                        : '#9ca3af'
-                                }
+                                name={isCurrentRTL ? "chevron-back" : "chevron-forward"}
+                                size={20}
+                                color={(dayScopeMode === 'week' ? canGoNext : canGoNextDay) ? BARSPA_COLORS.royalPurple : '#9CA3AF'}
                             />
+                        </TouchableOpacity>
+
+                        <Text style={styles.stitchNavDateTitle}>
+                            {dayScopeMode === 'week'
+                                ? `${formatRiyadhMonthDay(weekStartKey, language)} - ${formatRiyadhMonthDay(addRiyadhDays(weekStartKey, 6), language)}`
+                                : formatRiyadhMonthDay(selectedDateKey, language)}
+                        </Text>
+
+                        <TouchableOpacity
+                            style={styles.stitchTodayPill}
+                            onPress={jumpToTodayInSchedule}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.stitchTodayPillText}>{t('common.today', 'Today')}</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsOpen(true)}>
-                        <Ionicons name="settings-outline" size={22} color="#1f2937" />
-                    </TouchableOpacity>
+                    <View style={[styles.stitchNavRight, { flexDirection: weekLayoutDirection }]}>
+                        <View style={[styles.stitchSegmentedToggle, { flexDirection: weekLayoutDirection }]}>
+                            <TouchableOpacity
+                                style={[styles.stitchSegmentedBtn, dayScopeMode === 'day' && styles.stitchSegmentedBtnActive]}
+                                onPress={() => setDayScopeMode('day')}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[styles.stitchSegmentedBtnText, dayScopeMode === 'day' && styles.stitchSegmentedBtnTextActive]}>
+                                    {t('schedule.day', 'Day')}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.stitchSegmentedBtn, dayScopeMode === 'week' && styles.stitchSegmentedBtnActive]}
+                                onPress={() => setDayScopeMode('week')}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[styles.stitchSegmentedBtnText, dayScopeMode === 'week' && styles.stitchSegmentedBtnTextActive]}>
+                                    {t('schedule.week', 'Week')}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.stitchSettingsBtn}
+                            onPress={() => setSettingsOpen(true)}
+                            accessibilityLabel={t('schedule.settings', 'Settings')}
+                        >
+                            <Ionicons name="options-outline" size={20} color="#49398B" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                {showLegacyDayStripAndSummary ? (
-                    <>
-                        {dayScopeMode === 'week' ? (
-                            <View style={styles.calendarStrip}>
-                                {weekDays.map((dayKey) => {
-                                    const isSelected = dayKey === selectedDateKey;
-                                    const state = getDayState(dayKey);
-                                    return (
-                                        <TouchableOpacity
-                                            key={dayKey}
-                                            style={[
-                                                styles.dayCard,
-                                                isSelected && styles.dayCardSelected,
-                                                !isSelected && state === 'timeoff' && styles.dayCardTimeOff,
-                                                !isSelected && state === 'working' && styles.dayCardWorking,
-                                            ]}
-                                            onPress={() => setSelectedDateKey(dayKey)}
-                                        >
-                                            <Text style={[styles.dayName, isSelected && styles.textSelected]}>
-                                                {formatRiyadhWeekdayShort(dayKey)}
-                                            </Text>
-                                            <Text style={[styles.dayNumber, isSelected && styles.textSelected]}>
-                                                {(() => {
-                                                    const dayDate = parseRiyadhDateKey(dayKey);
-                                                    return Number.isNaN(dayDate.getTime()) ? '--' : dayDate.getUTCDate();
-                                                })()}
-                                            </Text>
-                                            <View style={[
-                                                styles.dayStateDot,
-                                                isSelected && styles.dayStateDotSelected,
-                                                !isSelected && state === 'timeoff' && styles.dayStateDotTimeOff,
-                                                !isSelected && state === 'working' && styles.dayStateDotWorking,
-                                                !isSelected && state === 'off' && styles.dayStateDotOff,
-                                            ]} />
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
-                        ) : (
-                            <View style={styles.singleDayPill}>
-                                <Text style={styles.singleDayTitle}>{formatRiyadhLongDate(selectedDateKey)}</Text>
-                                <Text style={styles.singleDaySubtitle}>Focused day view</Text>
-                            </View>
-                        )}
+                {/* Stitch 7-Day Micro Strip */}
+                <View style={[styles.stitchWeekStrip, { flexDirection: weekLayoutDirection }]}>
+                    {weekDays.map((dayKey) => {
+                        const isSelected = dayKey === selectedDateKey;
+                        const dayDate = parseRiyadhDateKey(dayKey);
+                        const dayNum = Number.isNaN(dayDate.getTime()) ? '--' : dayDate.getUTCDate();
+                        const dayAppts = appointmentsByDate[dayKey] || [];
+                        const hasActivity = dayAppts.length > 0;
+                        const isToday = dayKey === getRiyadhDateKey();
 
-                        <View style={styles.dayOverviewCard}>
-                            <View style={styles.dayOverviewHeader}>
-                                <View>
-                                    <Text style={styles.dateTitle}>{formatRiyadhLongDate(selectedDateKey)}</Text>
-                                    <Text style={styles.dateSubtitle}>
-                                        {shiftsForSelectedDate.length > 0
-                                            ? `${shiftsForSelectedDate.length} shift(s) • ${formatDurationHours(selectedDayShiftMinutes)} total`
-                                            : timeOffForSelectedDate.length > 0
-                                                ? 'Time off is active on this day'
-                                                : 'No shift assigned for this day'}
-                                    </Text>
+                        return (
+                            <TouchableOpacity
+                                key={dayKey}
+                                style={[
+                                    styles.stitchDayCell,
+                                    isSelected && styles.stitchDayCellActive,
+                                ]}
+                                onPress={() => setSelectedDateKey(dayKey)}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={[
+                                    styles.stitchDayWeekday,
+                                    isSelected && styles.stitchDayWeekdayActive,
+                                ]}>
+                                    {formatRiyadhWeekdayShort(dayKey, language)}
+                                </Text>
+                                <Text style={[
+                                    styles.stitchDayNumber,
+                                    isSelected && styles.stitchDayNumberActive,
+                                    isToday && !isSelected && styles.stitchDayNumberToday,
+                                ]}>
+                                    {dayNum}
+                                </Text>
+                                <View style={styles.stitchActivityContainer}>
+                                    {hasActivity ? (
+                                        <View style={[
+                                            styles.stitchActivityDot,
+                                            isSelected && styles.stitchActivityDotActive,
+                                        ]} />
+                                    ) : (
+                                        <View style={styles.stitchActivityDotPlaceholder} />
+                                    )}
                                 </View>
-                                <View style={styles.dayOverviewStats}>
-                                    <Text style={styles.dayOverviewValue}>{appointmentGroups.length}</Text>
-                                    <Text style={styles.dayOverviewLabel}>Appointments</Text>
-                                </View>
-                            </View>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                {/* Stitch Operational Quick Metric Bar */}
+                <View style={[styles.stitchMetricBar, { flexDirection: weekLayoutDirection }]}>
+                    <View style={[styles.stitchMetricLeft, { flexDirection: weekLayoutDirection }]}>
+                        <View style={[styles.stitchMetricItem, { flexDirection: weekLayoutDirection, alignItems: 'center' }]}>
+                            <View style={[styles.stitchMetricDotPurple, isCurrentRTL ? { marginLeft: 6, marginRight: 0 } : { marginRight: 6, marginLeft: 0 }]} />
+                            <Text style={styles.stitchMetricText}>
+                                {getFormattedBookingsCount(appointments.length)}
+                            </Text>
                         </View>
-                    </>
-                ) : null}
+                        <View style={styles.stitchMetricDivider} />
+                        <View style={[styles.stitchMetricItem, { flexDirection: weekLayoutDirection, alignItems: 'center' }]}>
+                            <View style={[styles.stitchMetricDotGray, isCurrentRTL ? { marginLeft: 6, marginRight: 0 } : { marginRight: 6, marginLeft: 0 }]} />
+                            <Text style={styles.stitchMetricText}>
+                                {getFormattedBlocksCount(breaksForSelectedDate.length + timeOffForSelectedDate.length)}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={styles.stitchMetricRight}>
+                        <Text style={styles.stitchProviderText} numberOfLines={1}>
+                            {t('schedule.provider', 'Provider')}: {user?.name || t('schedule.staff', 'Staff')}
+                        </Text>
+                    </View>
+                </View>
 
                 {renderSelectedDayContent()}
 
@@ -1504,9 +1739,9 @@ export default function ScheduleScreen() {
                         </View>
                     ) : (
                         <>
-                            {renderTimeOffGroup('Active', activeTimeOff)}
-                            {renderTimeOffGroup('Upcoming', upcomingTimeOff, true)}
-                            {renderTimeOffGroup('History', pastTimeOff)}
+                            {renderTimeOffGroup(t('schedule.active', 'Active'), activeTimeOff)}
+                            {renderTimeOffGroup(t('schedule.upcomingTimeOff', 'Upcoming'), upcomingTimeOff, true)}
+                            {renderTimeOffGroup(t('schedule.history', 'History'), pastTimeOff)}
                         </>
                     )}
                 </View>
@@ -1528,17 +1763,45 @@ export default function ScheduleScreen() {
                         </View>
 
                         <Text style={styles.settingsSectionTitle}>{t('schedule.gridSize')}</Text>
-                        <View
-                            style={styles.customSliderTrack}
-                            onLayout={(event) => setSettingsSliderWidth(event.nativeEvent.layout.width)}
-                            onStartShouldSetResponder={() => true}
-                            onMoveShouldSetResponder={() => true}
-                            onResponderGrant={(event) => handleSliderTouch(event.nativeEvent.locationX)}
-                            onResponderMove={(event) => handleSliderTouch(event.nativeEvent.locationX)}
-                        >
-                            <View style={[styles.customSliderFill, { width: `${gridScalePercent}%` }]} />
-                            <View style={[styles.customSliderThumb, { left: `${gridScalePercent}%` }]} />
-                        </View>
+                        {(() => {
+                            const sliderRatio = clamp((gridScalePercent - MIN_GRID_SCALE) / (MAX_GRID_SCALE - MIN_GRID_SCALE), 0, 1);
+                            const hasMeasured = settingsSliderWidth > 22;
+                            const thumbLeft = hasMeasured
+                                ? sliderRatio * (settingsSliderWidth - 22)
+                                : undefined;
+
+                            return (
+                                <View
+                                    style={styles.customSliderTrack}
+                                    onLayout={(event) => setSettingsSliderWidth(event.nativeEvent.layout.width)}
+                                    onStartShouldSetResponder={() => true}
+                                    onMoveShouldSetResponder={() => true}
+                                    onResponderGrant={handleSliderGrant}
+                                    onResponderMove={handleSliderMove}
+                                    onResponderRelease={handleSliderRelease}
+                                    onResponderTerminate={handleSliderTerminate}
+                                >
+                                    <View
+                                        pointerEvents="none"
+                                        style={[
+                                            styles.customSliderFill,
+                                            hasMeasured
+                                                ? { width: thumbLeft! + 11 }
+                                                : { width: `${sliderRatio * 100}%` },
+                                        ]}
+                                    />
+                                    <View
+                                        pointerEvents="none"
+                                        style={[
+                                            styles.customSliderThumb,
+                                            hasMeasured
+                                                ? { left: thumbLeft, marginLeft: 0 }
+                                                : { left: `${sliderRatio * 100}%`, marginLeft: -11 },
+                                        ]}
+                                    />
+                                </View>
+                            );
+                        })()}
                         <Text style={styles.settingsHint}>{t('schedule.scale', { percent: gridScalePercent })}</Text>
 
                         <Text style={styles.settingsSectionTitle}>{t('schedule.visibleRange')}</Text>
@@ -1554,10 +1817,11 @@ export default function ScheduleScreen() {
                                         onPress={() => {
                                             setVisibleWeeks(weekCount);
                                             setWeekOffset((current) => Math.min(current, weekCount - 1));
+                                            void saveSchedulePreferences({ visibleWeeks: weekCount }, user?.id);
                                         }}
                                     >
                                         <Text style={[styles.optionChipText, active && styles.optionChipTextActive, disabled && styles.optionChipTextDisabled]}>
-                                            {weekCount}W
+                                            {weekCount}{t('schedule.weeksShort', 'W')}
                                         </Text>
                                     </TouchableOpacity>
                                 );
@@ -1569,13 +1833,19 @@ export default function ScheduleScreen() {
                         <View style={styles.optionRow}>
                             <TouchableOpacity
                                 style={[styles.optionChip, dayScopeMode === 'day' && styles.optionChipActive]}
-                                onPress={() => setDayScopeMode('day')}
+                                onPress={() => {
+                                    setDayScopeMode('day');
+                                    void saveSchedulePreferences({ dayScopeMode: 'day' }, user?.id);
+                                }}
                             >
                                 <Text style={[styles.optionChipText, dayScopeMode === 'day' && styles.optionChipTextActive]}>{t('schedule.selectedDay')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.optionChip, dayScopeMode === 'week' && styles.optionChipActive]}
-                                onPress={() => setDayScopeMode('week')}
+                                onPress={() => {
+                                    setDayScopeMode('week');
+                                    void saveSchedulePreferences({ dayScopeMode: 'week' }, user?.id);
+                                }}
                             >
                                 <Text style={[styles.optionChipText, dayScopeMode === 'week' && styles.optionChipTextActive]}>{t('schedule.entireWeek')}</Text>
                             </TouchableOpacity>
@@ -1585,13 +1855,19 @@ export default function ScheduleScreen() {
                         <View style={styles.optionRow}>
                             <TouchableOpacity
                                 style={[styles.optionChip, scheduleViewMode === 'grid' && styles.optionChipActive]}
-                                onPress={() => setScheduleViewMode('grid')}
+                                onPress={() => {
+                                    setScheduleViewMode('grid');
+                                    void saveSchedulePreferences({ scheduleViewMode: 'grid' }, user?.id);
+                                }}
                             >
                                 <Text style={[styles.optionChipText, scheduleViewMode === 'grid' && styles.optionChipTextActive]}>{t('schedule.gridLayout')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.optionChip, scheduleViewMode === 'cards' && styles.optionChipActive]}
-                                onPress={() => setScheduleViewMode('cards')}
+                                onPress={() => {
+                                    setScheduleViewMode('cards');
+                                    void saveSchedulePreferences({ scheduleViewMode: 'cards' }, user?.id);
+                                }}
                             >
                                 <Text style={[styles.optionChipText, scheduleViewMode === 'cards' && styles.optionChipTextActive]}>{t('schedule.cardsLayout')}</Text>
                             </TouchableOpacity>
@@ -1662,12 +1938,13 @@ const styles = StyleSheet.create({
         marginBottom: 14,
     },
     singleDayTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 14,
-        fontWeight: '700',
         color: '#1f2937',
         marginBottom: 2,
     },
     singleDaySubtitle: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#6b7280',
     },
@@ -1691,12 +1968,13 @@ const styles = StyleSheet.create({
         backgroundColor: '#E7DDFC',
     },
     alertTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 14,
-        fontWeight: '700',
         color: '#1D035F',
         marginBottom: 2,
     },
     alertBody: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 13,
         color: '#6b7280',
         lineHeight: 18,
@@ -1729,12 +2007,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
     },
     weekNavigatorTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 16,
-        fontWeight: '700',
         color: '#1f2937',
         marginBottom: 2,
     },
     weekNavigatorSubtitle: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#6b7280',
     },
@@ -1773,8 +2052,8 @@ const styles = StyleSheet.create({
         elevation: 1,
     },
     viewModeButtonText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 13,
-        fontWeight: '700',
         color: '#6b7280',
     },
     viewModeButtonTextActive: {
@@ -1792,12 +2071,13 @@ const styles = StyleSheet.create({
         elevation: 1,
     },
     statValue: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 16,
-        fontWeight: 'bold',
         color: '#6537C0',
         marginBottom: 4,
     },
     statLabel: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#6b7280',
         textTransform: 'uppercase',
@@ -1830,14 +2110,15 @@ const styles = StyleSheet.create({
         backgroundColor: '#fef3c7',
     },
     dayName: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#6b7280',
         marginBottom: 4,
         textTransform: 'uppercase',
     },
     dayNumber: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 16,
-        fontWeight: 'bold',
         color: '#1f2937',
     },
     textSelected: {
@@ -1878,12 +2159,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     dateTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 18,
-        fontWeight: 'bold',
         color: '#1f2937',
         marginBottom: 4,
     },
     dateSubtitle: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 14,
         color: '#6b7280',
     },
@@ -1908,6 +2190,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     gridHint: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#6b7280',
     },
@@ -1924,6 +2207,7 @@ const styles = StyleSheet.create({
     },
     gridNoticeText: {
         flex: 1,
+        fontFamily: CAIRO_FONTS.medium,
         fontSize: 12,
         color: '#92400e',
         lineHeight: 17,
@@ -1959,12 +2243,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     gridDayHeaderTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 12,
-        fontWeight: '700',
         color: '#111827',
         textTransform: 'uppercase',
     },
     gridDayHeaderSub: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 11,
         color: '#6b7280',
         marginTop: 2,
@@ -1973,6 +2258,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
     },
     gridTimeLabel: {
+        fontFamily: CAIRO_FONTS.medium,
         fontSize: 11,
         color: '#6b7280',
     },
@@ -1990,6 +2276,61 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: '#f3f4f6',
     },
+    currentTimeContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 2,
+        zIndex: 50,
+        justifyContent: 'center',
+    },
+    currentTimeLine: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 2,
+        backgroundColor: '#DC2626',
+    },
+    currentTimeBadgeRow: {
+        position: 'absolute',
+        top: -11,
+        alignItems: 'center',
+        gap: 5,
+        zIndex: 51,
+    },
+    currentTimeBadgeRowLTR: {
+        left: 0,
+        flexDirection: 'row',
+    },
+    currentTimeBadgeRowRTL: {
+        right: 0,
+        flexDirection: 'row-reverse',
+    },
+    currentTimeDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#DC2626',
+        borderWidth: 1.5,
+        borderColor: '#FFFFFF',
+    },
+    currentTimePill: {
+        backgroundColor: '#DC2626',
+        paddingHorizontal: 6,
+        paddingVertical: 1.5,
+        borderRadius: 10,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 3,
+    },
+    currentTimePillText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 10,
+        color: '#FFFFFF',
+        includeFontPadding: false,
+    },
     gridTimeOffOverlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(245, 158, 11, 0.08)',
@@ -2003,8 +2344,8 @@ const styles = StyleSheet.create({
         zIndex: 0,
     },
     gridTimeOffOverlayText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 10,
-        fontWeight: '700',
         color: '#b45309',
         textTransform: 'uppercase',
         letterSpacing: 0.3,
@@ -2039,19 +2380,22 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     gridAppointmentTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 14,
-        fontWeight: '700',
         color: '#1f2937',
         marginBottom: 2,
     },
     gridAppointmentTitleCompact: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 12,
     },
     gridAppointmentTime: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#6b7280',
     },
     gridAppointmentTimeCompact: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 10,
     },
     gridUrgencyBadge: {
@@ -2061,8 +2405,8 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     gridUrgencyText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 11,
-        fontWeight: '700',
     },
     gridAppointmentCustomer: {
         flexDirection: 'row',
@@ -2088,24 +2432,27 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     gridAppointmentAvatarInitial: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 14,
-        fontWeight: '700',
         color: '#6537C0',
     },
     gridAppointmentCustomerName: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 13,
-        fontWeight: '700',
         color: '#111827',
     },
     gridAppointmentCustomerNameCompact: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 11,
     },
     gridAppointmentMeta: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 11,
         color: '#6b7280',
         marginTop: 2,
     },
     gridAppointmentMetaCompact: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 10,
         marginTop: 1,
     },
@@ -2115,19 +2462,21 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     gridAppointmentPrice: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 13,
-        fontWeight: '700',
         color: '#1D035F',
     },
     gridAppointmentPriceCompact: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 11,
     },
     gridAppointmentAction: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 12,
-        fontWeight: '700',
         color: '#6537C0',
     },
     gridAppointmentActionCompact: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 10,
     },
     gridAppointmentUltraCompact: {
@@ -2136,16 +2485,17 @@ const styles = StyleSheet.create({
         gap: 1,
     },
     gridAppointmentUltraCompactTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 11,
-        fontWeight: '800',
         color: '#1f2937',
     },
     gridAppointmentUltraCompactSub: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 10,
-        fontWeight: '600',
         color: '#374151',
     },
     gridAppointmentUltraCompactMeta: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 9,
         color: '#6b7280',
         marginTop: 1,
@@ -2174,11 +2524,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#f59e0b',
     },
     gridBreakLabel: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 12,
-        fontWeight: '700',
         color: '#92400e',
     },
     gridBreakTime: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 11,
         color: '#b45309',
         marginTop: 1,
@@ -2199,9 +2550,9 @@ const styles = StyleSheet.create({
         zIndex: 20,
     },
     gridLoadingText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 12,
         color: '#6537C0',
-        fontWeight: '700',
     },
     gridInlineEmptyState: {
         position: 'absolute',
@@ -2220,23 +2571,24 @@ const styles = StyleSheet.create({
         zIndex: 18,
     },
     gridInlineEmptyText: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 12,
         color: '#6b7280',
-        fontWeight: '600',
     },
     dayOverviewValue: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 16,
-        fontWeight: 'bold',
         color: '#6537C0',
     },
     dayOverviewLabel: {
+        fontFamily: CAIRO_FONTS.medium,
         fontSize: 12,
         color: '#6b7280',
         textTransform: 'uppercase',
     },
     sectionTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 18,
-        fontWeight: '700',
         color: '#1f2937',
     },
     shiftCard: {
@@ -2256,12 +2608,13 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
     },
     shiftTime: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 18,
-        fontWeight: 'bold',
         color: '#1f2937',
         marginBottom: 4,
     },
     shiftLabel: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 14,
         color: '#6b7280',
     },
@@ -2287,8 +2640,8 @@ const styles = StyleSheet.create({
         color: '#6537C0',
     },
     badgeText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 12,
-        fontWeight: '700',
     },
     hoursBadge: {
         backgroundColor: '#f3f4f6',
@@ -2297,8 +2650,8 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
     },
     hoursBadgeText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 12,
-        fontWeight: '700',
         color: '#4b5563',
     },
     breaksCard: {
@@ -2328,12 +2681,13 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     breakLabel: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 14,
-        fontWeight: '600',
         color: '#1f2937',
         marginBottom: 2,
     },
     breakTime: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 13,
         color: '#6b7280',
     },
@@ -2366,6 +2720,7 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     infoCardText: {
+        fontFamily: CAIRO_FONTS.regular,
         flex: 1,
         marginLeft: 10,
         color: '#4b5563',
@@ -2382,9 +2737,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     requestButtonText: {
+        fontFamily: CAIRO_FONTS.bold,
         color: '#ffffff',
         fontSize: 14,
-        fontWeight: 'bold',
     },
     timeOffCard: {
         backgroundColor: '#ffffff',
@@ -2412,15 +2767,16 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     typeText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 12,
-        fontWeight: 'bold',
         color: '#6b21a8',
     },
     timeOffStatusText: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 13,
-        fontWeight: '600',
     },
     notesText: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 13,
         color: '#6b7280',
         marginTop: 8,
@@ -2453,8 +2809,8 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     urgencyText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 12,
-        fontWeight: '700',
     },
     statusBadge: {
         backgroundColor: '#f3f4f6',
@@ -2464,17 +2820,18 @@ const styles = StyleSheet.create({
         marginTop: 6,
     },
     appointmentStatusText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 12,
-        fontWeight: 'bold',
         color: '#6b7280',
     },
     appointmentTime: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 18,
-        fontWeight: 'bold',
         color: '#6537C0',
         marginBottom: 4,
     },
     appointmentDuration: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 13,
         color: '#6b7280',
     },
@@ -2505,19 +2862,20 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     appointmentAvatarInitial: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 16,
-        fontWeight: 'bold',
         color: '#6537C0',
     },
     appointmentCustomerMeta: {
         flex: 1,
     },
     appointmentCustomerName: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 18,
-        fontWeight: '600',
         color: '#1f2937',
     },
     appointmentBookingMeta: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#6b7280',
         marginTop: 2,
@@ -2529,18 +2887,19 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     appointmentAmountText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 13,
-        fontWeight: '700',
         color: '#1f2937',
     },
     appointmentServiceName: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 15,
         color: '#4b5563',
     },
     appointmentServiceHint: {
+        fontFamily: CAIRO_FONTS.semiBold,
         marginTop: 4,
         fontSize: 12,
-        fontWeight: '600',
         color: '#8b5cf6',
     },
     groupSummaryCard: {
@@ -2552,8 +2911,8 @@ const styles = StyleSheet.create({
         borderColor: '#E7DDFC',
     },
     groupSummaryTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 13,
-        fontWeight: '700',
         color: '#6537C0',
         marginBottom: 8,
     },
@@ -2564,11 +2923,12 @@ const styles = StyleSheet.create({
         borderTopColor: '#E7DDFC',
     },
     groupServiceRowTitle: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 13,
-        fontWeight: '600',
         color: '#111827',
     },
     groupServiceRowMeta: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#6b7280',
         marginTop: 3,
@@ -2582,15 +2942,15 @@ const styles = StyleSheet.create({
         borderColor: '#a5f3fc',
     },
     bookingSessionInfoLabel: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 11,
-        fontWeight: '700',
         color: '#0e7490',
         textTransform: 'uppercase',
         letterSpacing: 0.6,
     },
     bookingSessionInfoValue: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 14,
-        fontWeight: '700',
         color: '#155e75',
         marginTop: 4,
     },
@@ -2609,6 +2969,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     appointmentMetaBadgeText: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#4b5563',
         marginLeft: 6,
@@ -2623,6 +2984,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
     },
     appointmentNotesText: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 13,
         color: '#92400e',
         marginLeft: 6,
@@ -2642,8 +3004,8 @@ const styles = StyleSheet.create({
         marginRight: 6,
     },
     appointmentClientButtonText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 13,
-        fontWeight: '700',
         color: '#6537C0',
     },
     appointmentActions: {
@@ -2674,13 +3036,13 @@ const styles = StyleSheet.create({
         marginRight: 6,
     },
     btnTextWhite: {
+        fontFamily: CAIRO_FONTS.semiBold,
         color: '#ffffff',
-        fontWeight: '600',
         fontSize: 14,
     },
     btnTextGray: {
+        fontFamily: CAIRO_FONTS.medium,
         color: '#4b5563',
-        fontWeight: '500',
         fontSize: 14,
     },
     cancelButton: {
@@ -2694,8 +3056,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#fef2f2',
     },
     cancelButtonText: {
+        fontFamily: CAIRO_FONTS.semiBold,
         fontSize: 13,
-        fontWeight: '600',
         color: '#ef4444',
     },
     settingsBackdrop: {
@@ -2720,19 +3082,20 @@ const styles = StyleSheet.create({
         marginBottom: 22,
     },
     settingsTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 19,
-        fontWeight: '800',
         color: '#111827',
     },
     settingsSectionTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 13,
-        fontWeight: '700',
         color: '#4b5563',
         textTransform: 'uppercase',
         marginBottom: 10,
         marginTop: 10,
     },
     settingsHint: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 12,
         color: '#6b7280',
         marginTop: 8,
@@ -2789,8 +3152,8 @@ const styles = StyleSheet.create({
         borderColor: '#e5e7eb',
     },
     optionChipText: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 13,
-        fontWeight: '700',
         color: '#4b5563',
     },
     optionChipTextActive: {
@@ -2821,8 +3184,8 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     modalTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 18,
-        fontWeight: '800',
         color: '#111827',
     },
     centerContainer: {
@@ -2837,15 +3200,777 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     emptyTitle: {
+        fontFamily: CAIRO_FONTS.bold,
         fontSize: 18,
-        fontWeight: 'bold',
         color: '#4b5563',
         marginTop: 16,
         marginBottom: 8,
     },
     emptySubtitle: {
+        fontFamily: CAIRO_FONTS.regular,
         fontSize: 14,
         color: '#9ca3af',
         textAlign: 'center',
+    },
+
+    // --- Stitch Redesign Styles (Screen 2985f6999e274b7289c572f3ab40c4a0 & Modal e21caf2d58c64eb3bce4551d76694ebc) ---
+    stitchNavHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E7DDFC',
+    },
+    stitchNavLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    stitchNavIconButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F4F3F6',
+    },
+    stitchNavIconButtonDisabled: {
+        opacity: 0.4,
+    },
+    stitchNavDateTitle: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 15,
+        color: '#1D035F',
+        marginHorizontal: 4,
+    },
+    stitchTodayPill: {
+        backgroundColor: '#E6DEFF',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+    },
+    stitchTodayPillText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 11,
+        color: '#49398B',
+    },
+    stitchNavRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    stitchSegmentedToggle: {
+        flexDirection: 'row',
+        backgroundColor: '#F4F3F6',
+        borderRadius: 8,
+        padding: 2,
+    },
+    stitchSegmentedBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 6,
+    },
+    stitchSegmentedBtnActive: {
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    stitchSegmentedBtnText: {
+        fontFamily: CAIRO_FONTS.medium,
+        fontSize: 12,
+        color: '#79747E',
+    },
+    stitchSegmentedBtnTextActive: {
+        fontFamily: CAIRO_FONTS.bold,
+        color: '#6537C0',
+    },
+    stitchSettingsBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F4F3F6',
+    },
+
+    // Stitch 7-Day Micro Strip
+    stitchWeekStrip: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E7DDFC',
+    },
+    stitchDayCell: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 6,
+        borderRadius: 10,
+        marginHorizontal: 2,
+    },
+    stitchDayCellActive: {
+        backgroundColor: '#6537C0',
+    },
+    stitchDayWeekday: {
+        fontFamily: CAIRO_FONTS.semiBold,
+        fontSize: 11,
+        color: '#79747E',
+        marginBottom: 2,
+    },
+    stitchDayWeekdayActive: {
+        fontFamily: CAIRO_FONTS.semiBold,
+        color: '#E6DEFF',
+    },
+    stitchDayNumber: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 14,
+        color: '#1D035F',
+    },
+    stitchDayNumberActive: {
+        fontFamily: CAIRO_FONTS.bold,
+        color: '#FFFFFF',
+    },
+    stitchDayNumberToday: {
+        fontFamily: CAIRO_FONTS.bold,
+        color: '#6537C0',
+    },
+    stitchActivityContainer: {
+        height: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 3,
+    },
+    stitchActivityDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#6537C0',
+    },
+    stitchActivityDotActive: {
+        backgroundColor: '#FFFFFF',
+    },
+    stitchActivityDotPlaceholder: {
+        width: 4,
+        height: 4,
+    },
+
+    // Stitch Operational Quick Metric Bar
+    stitchMetricBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#F4F3F6',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E7DDFC',
+    },
+    stitchMetricLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    stitchMetricItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    stitchMetricDotPurple: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#6537C0',
+        marginRight: 6,
+    },
+    stitchMetricDotGray: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#9CA3AF',
+        marginRight: 6,
+    },
+    stitchMetricText: {
+        fontFamily: CAIRO_FONTS.semiBold,
+        fontSize: 12,
+        color: '#49398B',
+    },
+    stitchMetricDivider: {
+        width: 1,
+        height: 12,
+        backgroundColor: '#CBC3D6',
+        marginHorizontal: 10,
+    },
+    stitchMetricRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    stitchProviderText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 12,
+        color: '#1D035F',
+    },
+
+    // Stitch Blocked Intervals & Breaks
+    stitchBlockedSection: {
+        marginBottom: 16,
+    },
+    stitchBlockedCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F4F3F6',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+    },
+    stitchBlockedLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    stitchBlockedIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    stitchBlockedLabel: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 13,
+        color: '#1D035F',
+    },
+    stitchBlockedTime: {
+        fontFamily: CAIRO_FONTS.regular,
+        fontSize: 11,
+        color: '#79747E',
+        marginTop: 1,
+    },
+    stitchBlockedBadge: {
+        backgroundColor: '#E6DEFF',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    stitchBlockedBadgeText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 10,
+        color: '#49398B',
+        letterSpacing: 0.5,
+    },
+
+    // Stitch Appointment Cards
+    stitchCard: {
+        flexDirection: 'row',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        overflow: 'hidden',
+        shadowColor: '#1D035F',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    stitchCardCompleted: {
+        opacity: 0.75,
+        backgroundColor: '#FAFAFC',
+    },
+    stitchCardStripe: {
+        width: 5,
+        alignSelf: 'stretch',
+    },
+    stitchCardContent: {
+        flex: 1,
+        padding: 14,
+    },
+    stitchCardTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    stitchCustomerNameWrap: {
+        flex: 1,
+        marginRight: 8,
+    },
+    stitchCustomerName: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 15,
+        color: '#1D035F',
+    },
+    stitchCardBadges: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    stitchDurationBadge: {
+        backgroundColor: '#F4F3F6',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+    },
+    stitchDurationText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 11,
+        color: '#49398B',
+    },
+    stitchStatusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+    },
+    stitchStatusBadgeText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 10,
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    stitchServiceTitle: {
+        fontFamily: CAIRO_FONTS.semiBold,
+        fontSize: 14,
+        color: '#2A2535',
+        marginBottom: 4,
+    },
+    stitchMultiServiceHint: {
+        fontFamily: CAIRO_FONTS.medium,
+        fontSize: 11,
+        color: '#6537C0',
+        marginBottom: 6,
+    },
+    stitchCardBottomRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 4,
+    },
+    stitchCardMetaLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    stitchMetaChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F4F3F6',
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    stitchMetaChipText: {
+        fontFamily: CAIRO_FONTS.semiBold,
+        fontSize: 11,
+        color: '#49398B',
+    },
+    stitchPriceBold: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 14,
+        color: '#6537C0',
+    },
+    stitchCardNotes: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FAF8FC',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginTop: 8,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+    },
+    stitchCardNotesText: {
+        fontFamily: CAIRO_FONTS.regular,
+        fontSize: 11,
+        color: '#6B7280',
+        flex: 1,
+    },
+    stitchQuickActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 10,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F4F3F6',
+    },
+    stitchQuickBtnPrimary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#6537C0',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    stitchQuickBtnSuccess: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#059669',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    stitchQuickBtnSecondary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F4F3F6',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+    },
+    stitchQuickBtnTextWhite: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 12,
+        color: '#FFFFFF',
+    },
+    stitchQuickBtnTextSecondary: {
+        fontFamily: CAIRO_FONTS.semiBold,
+        fontSize: 12,
+        color: '#6B7280',
+    },
+
+    // Stitch Appointment Actions Modal (Bottom Sheet e21caf2d58c64eb3bce4551d76694ebc)
+    stitchModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(29, 3, 95, 0.45)',
+        justifyContent: 'flex-end',
+    },
+    stitchModalSheet: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        elevation: 8,
+        maxHeight: '90%',
+    },
+    stitchDragHandle: {
+        width: 48,
+        height: 5,
+        borderRadius: 3,
+        backgroundColor: '#CBC3D6',
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    stitchModalCustomerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    stitchModalCustomerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    stitchModalAvatar: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: '#E6DEFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    stitchModalAvatarImg: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+    },
+    stitchModalAvatarText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 18,
+        color: '#49398B',
+    },
+    stitchModalCustomerDetails: {
+        flex: 1,
+    },
+    stitchModalNameAndStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    stitchModalCustomerName: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 16,
+        color: '#1D035F',
+    },
+    stitchModalStatusPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+    },
+    stitchModalStatusPillText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 10,
+        textTransform: 'uppercase',
+    },
+    stitchModalPhoneRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 3,
+    },
+    stitchModalPhoneText: {
+        fontFamily: CAIRO_FONTS.semiBold,
+        fontSize: 12,
+        color: '#49398B',
+        textDecorationLine: 'underline',
+    },
+    stitchModalBookingSub: {
+        fontFamily: CAIRO_FONTS.regular,
+        fontSize: 11,
+        color: '#79747E',
+        marginTop: 2,
+    },
+    stitchModalCloseBtn: {
+        padding: 6,
+        borderRadius: 16,
+        backgroundColor: '#F4F3F6',
+    },
+    stitchServiceStructuralCard: {
+        backgroundColor: '#F4F3F6',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        marginBottom: 12,
+    },
+    stitchServiceStructuralTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    stitchServiceStructuralName: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 14,
+        color: '#1D035F',
+        marginBottom: 2,
+    },
+    stitchServiceStructuralDuration: {
+        fontFamily: CAIRO_FONTS.regular,
+        fontSize: 11,
+        color: '#79747E',
+    },
+    stitchServiceStructuralPrice: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 15,
+        color: '#6537C0',
+    },
+    stitchMultiServiceBox: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+    },
+    stitchMultiServiceHeader: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 11,
+        color: '#1D035F',
+        marginBottom: 6,
+    },
+    stitchMultiServiceItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 4,
+        borderTopWidth: 1,
+        borderTopColor: '#F4F3F6',
+    },
+    stitchMultiServiceItemName: {
+        fontFamily: CAIRO_FONTS.semiBold,
+        fontSize: 12,
+        color: '#2A2535',
+    },
+    stitchMultiServiceItemTime: {
+        fontFamily: CAIRO_FONTS.regular,
+        fontSize: 10,
+        color: '#79747E',
+    },
+    stitchMultiServiceItemPrice: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 12,
+        color: '#6537C0',
+    },
+    stitchMicroStripContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 6,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+    },
+    stitchMicroStripColumn: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    stitchMicroStripLabel: {
+        fontFamily: CAIRO_FONTS.medium,
+        fontSize: 10,
+        color: '#79747E',
+        marginBottom: 2,
+    },
+    stitchMicroStripValue: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 12,
+        color: '#1D035F',
+    },
+    stitchMicroStripDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: '#E7DDFC',
+    },
+    stitchNotesCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#FAF8FC',
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        marginBottom: 12,
+    },
+    stitchNotesTitle: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 11,
+        color: '#1D035F',
+        marginBottom: 2,
+    },
+    stitchNotesBody: {
+        fontFamily: CAIRO_FONTS.regular,
+        fontSize: 12,
+        color: '#49398B',
+        lineHeight: 16,
+    },
+    stitchBookingSessionBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F4F3F6',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginBottom: 14,
+    },
+    stitchBookingSessionLabel: {
+        fontFamily: CAIRO_FONTS.medium,
+        fontSize: 11,
+        color: '#79747E',
+        marginRight: 6,
+    },
+    stitchBookingSessionValue: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 11,
+        color: '#1D035F',
+    },
+    stitchModalActionsArea: {
+        marginTop: 4,
+        gap: 10,
+    },
+    stitchModalBtnPrimary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#6537C0',
+        height: 48,
+        borderRadius: 14,
+        shadowColor: '#6537C0',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    stitchModalBtnSuccess: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#059669',
+        height: 48,
+        borderRadius: 14,
+        shadowColor: '#059669',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    stitchModalBtnPrimaryText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 14,
+        color: '#FFFFFF',
+    },
+    stitchModalSecondaryGrid: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    stitchModalBtnSecondary: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+        backgroundColor: '#FEF2F2',
+    },
+    stitchModalBtnSecondaryTextRed: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 12,
+        color: '#DC2626',
+    },
+    stitchModalBtnProfile: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E7DDFC',
+        backgroundColor: '#F4F3F6',
+    },
+    stitchModalBtnProfileText: {
+        fontFamily: CAIRO_FONTS.bold,
+        fontSize: 12,
+        color: '#6537C0',
+    },
+    stitchModalCompletedNotice: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    stitchModalCompletedText: {
+        fontFamily: CAIRO_FONTS.semiBold,
+        fontSize: 13,
+        color: '#065F46',
     },
 });

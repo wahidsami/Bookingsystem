@@ -67,7 +67,8 @@ module.exports = (sequelize, DataTypes) => {
                 requirePhoneVerification: false, // Future
                 allowWalkInBooking: true, // Tenant can create booking from dashboard
                 cancellationWindow: 24, // hours before appointment (future)
-                noShowPolicy: 'warn' // 'warn', 'penalty', 'ban' (future)
+                noShowPolicy: 'warn', // 'warn', 'penalty', 'ban' (future)
+                allowCompletionWithOutstandingBalance: false // Allow service completion with outstanding customer balance
             },
             comment: 'Booking preferences: slot interval, buffers, policies, etc.'
         },

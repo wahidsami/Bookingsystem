@@ -900,7 +900,7 @@ function buildGroupBookingSummary({ session, appointments = [], groupMetadata = 
 exports.createAppointment = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
         const dashboardOverridePaymentMethod = 'at-center';
         const {
             serviceId,
@@ -1752,7 +1752,7 @@ exports.createAppointment = async (req, res) => {
  */
 exports.getAppointments = async (req, res) => {
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
 
         // Auto mark past appointments as no-show
         const now = new Date();
@@ -1866,7 +1866,7 @@ exports.getAppointments = async (req, res) => {
  */
 exports.getCalendarAppointments = async (req, res) => {
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
         const { startDate, endDate, staffId } = req.query;
 
         const where = {};
@@ -1937,7 +1937,7 @@ exports.getCalendarAppointments = async (req, res) => {
  */
 exports.getAppointmentsBoard = async (req, res) => {
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
 
         // TEMP UAT DEBUG — REMOVE AFTER AVAILABILITY ROOT CAUSE IS CONFIRMED
         console.info('liveRoomStatusEntry', { tenantId, boardDate: req.query.date, timezone: req.query.timezone });
@@ -2150,7 +2150,7 @@ exports.getAppointmentsBoard = async (req, res) => {
  */
 exports.searchDashboard = async (req, res) => {
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
         const search = `${req.query.search || ''}`.trim();
         const safeLimit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 10, 25));
 
@@ -2488,7 +2488,7 @@ exports.updateAppointmentStatus = async (req, res) => {
     let appointment = null;
     const transaction = await db.sequelize.transaction();
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
         const { id } = req.params;
         const { status, notes } = req.body;
         const normalizedStatus = normalizeAppointmentStatus(status);
@@ -2553,7 +2553,7 @@ exports.updateAppointmentStatus = async (req, res) => {
 
         const tenantSettings = await db.TenantSettings.findOne({
             where: { tenantId },
-            attributes: ['id', 'cancellationHours'],
+            attributes: ['id', 'cancellationHours', 'bookingSettings'],
             transaction
         });
 
@@ -2609,7 +2609,9 @@ exports.updateAppointmentStatus = async (req, res) => {
             }
         }
 
-        if (normalizedStatus === 'completed' && appointment.status !== 'completed' && !isSettledByAmount && !isSettledByStatus) {
+        const allowCompletionWithOutstandingBalance = Boolean(tenantSettings?.bookingSettings?.allowCompletionWithOutstandingBalance);
+
+        if (normalizedStatus === 'completed' && appointment.status !== 'completed' && !isSettledByAmount && !isSettledByStatus && !allowCompletionWithOutstandingBalance) {
             console.log('[TRACE] Validation failed: payment status for completion (Payment required)');
             await transaction.rollback();
             return res.status(400).json({
@@ -2876,10 +2878,19 @@ exports.updateAppointmentStatus = async (req, res) => {
             ]
         });
 
+        const hasOutstandingBalance = !isSettledByAmount && !isSettledByStatus;
+
         res.json({
             success: true,
             message: 'Appointment status updated successfully',
-            appointment
+            appointment,
+            hasOutstandingBalance,
+            financialBreakdown: {
+                totalPrice: appointmentTotalPrice,
+                totalPaid: currentPaid,
+                outstandingAmount,
+                currency: appointment.currency || 'SAR'
+            }
         });
     } catch (error) {
         try { if (transaction && !transaction.finished) await transaction.rollback(); } catch (_) {}
@@ -2915,7 +2926,7 @@ exports.updatePaymentStatus = async (req, res) => {
     forensicTrace.log('BEGIN transaction', { scope: 'updatePaymentStatus' });
     const transaction = await db.sequelize.transaction({ logging: forensicTrace.sqlLogger });
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
         const { id } = req.params;
         const { paymentStatus, paymentMethod, amount, paymentAllocations, transactionRef, notes, scope } = req.body;
         
@@ -3057,7 +3068,7 @@ exports.reassignAppointmentStaff = async (req, res) => {
 const _reassignAppointmentStaff = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
         const { id } = req.params;
         const { staffId } = req.body;
         const requestId = `reassign_${Date.now()}_${id}`;
@@ -3298,7 +3309,7 @@ const _reassignAppointmentStaff = async (req, res) => {
 exports.rescheduleAppointment = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
         const { id } = req.params;
         const { startTime, staffId } = req.body;
         const requestId = `reschedule_${Date.now()}_${id}`;
@@ -3920,7 +3931,7 @@ exports.reassignRescheduleAppointment = async (req, res) => {
  */
 exports.getAppointmentStats = async (req, res) => {
     try {
-        const tenantId = req.tenantId;
+        const tenantId = req.tenantId || req.tenant?.id;
         const { startDate, endDate } = req.query;
 
         const where = {};

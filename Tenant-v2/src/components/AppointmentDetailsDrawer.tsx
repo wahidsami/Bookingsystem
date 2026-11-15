@@ -421,6 +421,12 @@ export const AppointmentDetailsDrawer: React.FC<AppointmentDetailsDrawerProps> =
                   <span>{isRtl ? 'مدفوع ومغلق' : 'Paid & Locked'}</span>
                 </div>
               )}
+              {isAppointmentCompleted && !isPaid && remainingDue > 0.01 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-black shadow-2xs mr-2 ml-2">
+                  <AlertTriangle size={13} className="text-amber-600 shrink-0" />
+                  <span>{isRtl ? 'مكتمل مع رصيد مستحق' : 'Completed (Balance Due)'}</span>
+                </div>
+              )}
               {!isPaid && Number(appointment.pendingTransferAmount || 0) > 0 && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-black shadow-2xs mr-2 ml-2">
                   <Clock size={13} className="text-amber-600 shrink-0" />

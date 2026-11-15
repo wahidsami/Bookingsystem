@@ -5,6 +5,7 @@
 
 const db = require('../models');
 const { Op } = require('sequelize');
+const AuditService = require('../services/auditService');
 const { checkResourceLimit } = require('../utils/tenantLimitsUtil');
 const { ACTIVE_SUBSCRIPTION_STATUSES, getActiveSubscriptionForTenant } = require('../services/tenantSubscriptionService');
 const { normalizePackageEntitlements } = require('../utils/packageEntitlements');
@@ -387,7 +388,8 @@ exports.updateBookingSettings = async (req, res) => {
             allowWalkInBooking,
             minimumAdvanceBookingMinutes,
             schedulerBoard,
-            rescheduleHours
+            rescheduleHours,
+            allowCompletionWithOutstandingBalance
         } = req.body;
 
         let [settings] = await db.TenantSettings.findOrCreate({
@@ -456,6 +458,10 @@ exports.updateBookingSettings = async (req, res) => {
             newBookingSettings.rescheduleHours = parsedReschedule;
         }
 
+        if (allowCompletionWithOutstandingBalance !== undefined) {
+            newBookingSettings.allowCompletionWithOutstandingBalance = Boolean(allowCompletionWithOutstandingBalance);
+        }
+
         if (schedulerBoard !== undefined) {
             newBookingSettings.schedulerBoard = normalizeSchedulerBoardSettings({
                 ...(currentBookingSettings.schedulerBoard || {}),
@@ -466,6 +472,29 @@ exports.updateBookingSettings = async (req, res) => {
         updateData.bookingSettings = newBookingSettings;
 
         await settings.update(updateData);
+
+        if (allowCompletionWithOutstandingBalance !== undefined && Boolean(currentBookingSettings.allowCompletionWithOutstandingBalance) !== Boolean(newBookingSettings.allowCompletionWithOutstandingBalance)) {
+            try {
+                await AuditService.logActivity({
+                    tenantId,
+                    entityType: 'tenant_settings',
+                    entityId: settings.id,
+                    action: 'update_booking_policy',
+                    performedByType: req.user?.role || 'tenant_admin',
+                    performedById: req.user?.id || req.userId || null,
+                    performedByName: req.user ? `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() : null,
+                    details: {
+                        setting: 'allowCompletionWithOutstandingBalance',
+                        previousValue: Boolean(currentBookingSettings.allowCompletionWithOutstandingBalance),
+                        newValue: Boolean(newBookingSettings.allowCompletionWithOutstandingBalance)
+                    },
+                    previousValue: { allowCompletionWithOutstandingBalance: Boolean(currentBookingSettings.allowCompletionWithOutstandingBalance) },
+                    newValue: { allowCompletionWithOutstandingBalance: Boolean(newBookingSettings.allowCompletionWithOutstandingBalance) }
+                }, { request: req });
+            } catch (auditErr) {
+                console.warn('Audit log for booking settings update failed:', auditErr.message);
+            }
+        }
 
         res.json({
             success: true,

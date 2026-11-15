@@ -182,7 +182,7 @@ const buildStaffFeatureFlags = (packageLimits = {}) => {
 };
 
 const buildStaffPayload = async (staff, staffUser = null) => {
-    const [tenant, permissionRecord, subscriptionResult] = await Promise.all([
+    const [tenant, permissionRecord, subscriptionResult, tenantSettings] = await Promise.all([
         db.Tenant.findByPk(staff.tenantId, {
             attributes: ['id', 'name', 'name_en', 'name_ar', 'businessType', 'city', 'logo']
         }),
@@ -190,7 +190,11 @@ const buildStaffPayload = async (staff, staffUser = null) => {
             where: { staffId: staff.id },
             attributes: ['permissions']
         }),
-        getActiveSubscriptionForTenant(staff.tenantId)
+        getActiveSubscriptionForTenant(staff.tenantId),
+        db.TenantSettings.findOne({
+            where: { tenantId: staff.tenantId },
+            attributes: ['bookingSettings']
+        })
     ]);
 
     const permissions = {
@@ -224,7 +228,8 @@ const buildStaffPayload = async (staff, staffUser = null) => {
             businessName: tenant.name_ar || tenant.name_en || tenant.name,
             businessType: tenant.businessType,
             city: tenant.city,
-            logo: tenant.logo
+            logo: tenant.logo,
+            allowCompletionWithOutstandingBalance: Boolean(tenantSettings?.bookingSettings?.allowCompletionWithOutstandingBalance)
         } : null
     };
 };
@@ -1245,6 +1250,42 @@ const updateAppointmentStatus = async (req, res) => {
             }
         }
 
+        if (normalizedStatus === 'completed') {
+            const price = Number(appointment.price ?? 0);
+            const totalPaid = Number(appointment.totalPaid ?? 0);
+            const remainder = Number(appointment.remainderAmount ?? (price - totalPaid));
+            const isSettled = remainder <= 0.009 || `${appointment.paymentStatus || ''}`.trim().toLowerCase() === 'fully_paid';
+            if (!isSettled) {
+                const tenantSettings = await db.TenantSettings.findOne({
+                    where: { tenantId: appointment.tenantId || req.staffUser?.tenantId },
+                    attributes: ['bookingSettings'],
+                    transaction
+                });
+                const allowCompletionWithOutstandingBalance = Boolean(tenantSettings?.bookingSettings?.allowCompletionWithOutstandingBalance);
+
+                if (!allowCompletionWithOutstandingBalance) {
+                    await transaction.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        code: 'APPOINTMENT_PAYMENT_REQUIRED',
+                        message: 'Cannot complete appointment until payment has been fully settled at reception.'
+                    });
+                }
+            }
+        }
+
+        if (normalizedStatus === 'cancelled') {
+            const { isBookingLocked } = require('../utils/appointmentPaymentStatus');
+            if (isBookingLocked(appointment)) {
+                await transaction.rollback();
+                return res.status(423).json({
+                    success: false,
+                    code: 'BOOKING_LOCKED_FULLY_PAID',
+                    message: 'This appointment is fully paid and locked. Staff cannot cancel paid bookings.'
+                });
+            }
+        }
+
         appointment.status = normalizedStatus;
         if (notes !== undefined) {
             appointment.notes = notes;
@@ -1282,10 +1323,22 @@ const updateAppointmentStatus = async (req, res) => {
             console.warn('Staff booking status notification warning:', notificationError.message);
         }
 
+        const apptPrice = Number(appointment.price ?? 0);
+        const apptPaid = Number(appointment.totalPaid ?? 0);
+        const apptOutstanding = Math.max(0, Number(appointment.remainderAmount ?? (apptPrice - apptPaid)));
+        const isSettled = apptOutstanding <= 0.009 || `${appointment.paymentStatus || ''}`.trim().toLowerCase() === 'fully_paid';
+
         res.json({
             success: true,
             message: 'Appointment status updated successfully',
-            appointment
+            appointment,
+            hasOutstandingBalance: !isSettled,
+            financialBreakdown: {
+                totalPrice: apptPrice,
+                totalPaid: apptPaid,
+                outstandingAmount: apptOutstanding,
+                currency: appointment.currency || 'SAR'
+            }
         });
     } catch (error) {
         await transaction.rollback();

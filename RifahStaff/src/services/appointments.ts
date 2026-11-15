@@ -125,7 +125,10 @@ export const updateAppointmentStatus = async (
         });
 
         if (response.data.success) {
-            return normalizeAppointment(response.data.appointment);
+            const normalized = normalizeAppointment(response.data.appointment);
+            (normalized as any).hasOutstandingBalance = Boolean(response.data.hasOutstandingBalance);
+            (normalized as any).financialBreakdown = response.data.financialBreakdown;
+            return normalized;
         }
         throw new Error(response.data.message || 'Failed to update status');
     } catch (error) {
