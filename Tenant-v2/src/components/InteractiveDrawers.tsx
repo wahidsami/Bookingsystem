@@ -4358,11 +4358,11 @@ export default function InteractiveDrawers({
                                             <p className="font-bold text-slate-900 truncate">{customer.name}</p>
                                             <p className="text-[11px] font-mono text-slate-500 truncate">{customer.phone}</p>
                                           </div>
-                                          <Check className="h-3.5 w-3.5 text-slate-300" />
+                                          <Check className="h-3.5 w-3.5 text-slate-500" />
                                         </button>
                                       ))
                                     ) : (
-                                      <p className="p-3 text-center text-xs text-slate-400">
+                                      <p className="p-3 text-center text-xs text-slate-500">
                                         {isRtl ? 'لا توجد نتائج مطابقة.' : 'No matching customers found.'}
                                       </p>
                                     )}
@@ -4559,13 +4559,13 @@ export default function InteractiveDrawers({
                                               e.stopPropagation();
                                               handleRemoveGroupParticipant(participant.id);
                                             }}
-                                            className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                                            className="text-slate-500 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
                                             title={isRtl ? 'حذف المشارك' : 'Remove participant'}
                                           >
                                             <X className="w-3.5 h-3.5" />
                                           </button>
                                         )}
-                                        <span className={`text-xs ${isActive ? 'text-[#6537C0] font-black' : 'text-slate-300'}`}>
+                                        <span className={`text-xs ${isActive ? 'text-brand-500 font-black' : 'text-slate-500 font-bold'}`}>
                                           {isRtl ? '←' : '→'}
                                         </span>
                                       </div>
@@ -5949,12 +5949,12 @@ export default function InteractiveDrawers({
                 {/* Cart sidebar portion */}
                 <div className="w-5/12 bg-slate-50 flex flex-col justify-between h-full overflow-hidden border-s border-slate-200">
                   <div className="flex-1 p-3 flex flex-col overflow-hidden">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-2">{isRtl ? 'سلة المشتريات' : 'POS Checkout Items'}</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-2">{isRtl ? 'سلة المشتريات' : 'POS Checkout Items'}</span>
 
                     <div className="flex-1 overflow-y-auto space-y-1.5 mb-3">
                       {cartItems.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-xs">
-                          <ShoppingBag size={20} className="mb-1 text-slate-300" />
+                        <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 text-xs">
+                          <ShoppingBag size={20} className="mb-1 text-slate-500" />
                           <span>سلة المبيعات الرقمية فارغة</span>
                         </div>
                       ) : (
@@ -5963,13 +5963,13 @@ export default function InteractiveDrawers({
                             <div className="min-w-0 flex-1 pr-1">
                               <span className="text-[8px] font-mono bg-[#F3EDFC] text-[#6537C0] px-1 rounded block w-fit">{item.skuOrCode}</span>
                               <h5 className="font-bold truncate mt-0.5">{isRtl ? item.nameAr : item.nameEn}</h5>
-                              <p className="text-[9px] text-slate-400">{item.price} SAR</p>
+                              <p className="text-[9px] text-slate-600 font-medium">{item.price} SAR</p>
                             </div>
                             <div className="flex items-center gap-1">
                               <button onClick={() => handleUpdateCartItemQty(item.id, item.quantity - 1)} className="px-1 text-slate-500 hover:bg-slate-100 font-bold">-</button>
                               <span className="font-mono text-slate-800 px-1 font-bold text-[10px]">{item.quantity}</span>
                               <button disabled={item.type === 'giftcard'} onClick={() => handleUpdateCartItemQty(item.id, item.quantity + 1)} className="px-1 text-slate-500 hover:bg-slate-100 font-bold disabled:opacity-40">+</button>
-                              <button onClick={() => handleUpdateCartItemQty(item.id, 0)} className="text-slate-300 hover:text-rose-500 ml-1"><Trash size={11} /></button>
+                              <button onClick={() => handleUpdateCartItemQty(item.id, 0)} className="text-slate-500 hover:text-rose-500 ml-1"><Trash size={11} /></button>
                             </div>
                           </div>
                         ))

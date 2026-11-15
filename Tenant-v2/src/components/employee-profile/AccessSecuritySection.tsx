@@ -414,7 +414,7 @@ export default function AccessSecuritySection({
                     {isChecked ? (
                       <CheckSquare size={15} className="text-[#6537C0] shrink-0" />
                     ) : (
-                      <Square size={15} className="text-neutral-300 shrink-0" />
+                      <Square size={15} className="text-slate-600 dark:text-zinc-400 shrink-0" />
                     )}
                   </button>
                 );

@@ -518,24 +518,24 @@ export default function CustomerPushNotificationsWorkspace({ lang, darkMode = fa
           </div>
 
           <div className="flex flex-wrap gap-4">
-            <div className={`p-3 rounded-xl border text-center min-w-[100px] ${darkMode ? 'bg-zinc-950 border-zinc-850' : 'bg-neutral-50 border-neutral-150'}`}>
-              <span className="text-[10px] text-zinc-400 block">{isRtl ? 'معدل التسليم' : 'Delivery rate'}</span>
-              <span className="text-base font-black text-emerald-500 font-mono mt-0.5 block">{usage.deliverySuccessRate}%</span>
+            <div className={`p-3 rounded-xl border text-center min-w-[100px] transition-colors ${darkMode ? 'bg-zinc-950 border-zinc-850' : 'bg-slate-50 border-slate-200'}`}>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold block">{isRtl ? 'معدل التسليم' : 'Delivery rate'}</span>
+              <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono mt-0.5 block">{usage.deliverySuccessRate}%</span>
             </div>
-            <div className={`p-3 rounded-xl border text-center min-w-[100px] ${darkMode ? 'bg-zinc-950 border-zinc-850' : 'bg-neutral-50 border-neutral-150'}`}>
-              <span className="text-[10px] text-zinc-400 block">{isRtl ? 'المتبقي' : 'Remaining'}</span>
+            <div className={`p-3 rounded-xl border text-center min-w-[100px] transition-colors ${darkMode ? 'bg-zinc-950 border-zinc-850' : 'bg-slate-50 border-slate-200'}`}>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold block">{isRtl ? 'المتبقي' : 'Remaining'}</span>
               <span className="text-base font-black text-brand-500 font-mono mt-0.5 block">{usage.remaining.toLocaleString()}</span>
             </div>
-            <div className={`p-3 rounded-xl border text-center min-w-[100px] ${darkMode ? 'bg-zinc-950 border-zinc-850' : 'bg-neutral-50 border-neutral-150'}`}>
-              <span className="text-[10px] text-zinc-400 block">{isRtl ? 'المرسلة' : 'Sent'}</span>
-              <span className="text-base font-black text-zinc-300 font-mono mt-0.5 block">{usage.sent.toLocaleString()}</span>
+            <div className={`p-3 rounded-xl border text-center min-w-[100px] transition-colors ${darkMode ? 'bg-zinc-950 border-zinc-850' : 'bg-slate-50 border-slate-200'}`}>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold block">{isRtl ? 'المرسلة' : 'Sent'}</span>
+              <span className="text-base font-black text-slate-900 dark:text-zinc-100 font-mono mt-0.5 block">{usage.sent.toLocaleString()}</span>
             </div>
           </div>
         </div>
 
         {/* Progress Bar */}
         <div className="mt-6 space-y-2">
-          <div className="flex justify-between text-[11px] text-zinc-400">
+          <div className="flex justify-between text-[11px] text-slate-600 dark:text-zinc-400 font-medium">
             <span>
               {isRtl
                 ? `تم استخدام ${usage.sent.toLocaleString()} من أصل ${formatTenantPlanLimit(usage.limit, 'ar')}`

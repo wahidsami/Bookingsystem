@@ -1470,7 +1470,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                               <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-full bg-zinc-800 shrink-0" />
                                 <div className="min-w-0">
-                                  <span className="text-neutral-300 block font-bold text-xs truncate">
+                                  <span className="text-slate-800 dark:text-zinc-200 block font-bold text-xs truncate">
                                     {isRtl ? selectedMessage.recipientNameAr : selectedMessage.recipientNameEn}
                                   </span>
                                 </div>

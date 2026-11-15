@@ -269,11 +269,11 @@ export const CustomerBookingHistory: React.FC<CustomerBookingHistoryProps> = ({
                     {/* Top row: Date, Time & Status */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                         <span>{dateText}</span>
                         {timeText && (
                           <>
-                            <span className="text-slate-300">•</span>
+                            <span className="text-slate-500">•</span>
                             <span className="text-slate-500 font-mono text-[11px]">{timeText}</span>
                           </>
                         )}
@@ -312,7 +312,7 @@ export const CustomerBookingHistory: React.FC<CustomerBookingHistoryProps> = ({
 
                       {staffName && (
                         <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
-                          <User className="w-3 h-3 text-slate-400 shrink-0" />
+                          <User className="w-3 h-3 text-slate-500 shrink-0" />
                           <span>{isRtl ? 'الموظف السابق:' : 'Previous staff:'}</span>
                           <span className="font-semibold text-slate-700">{staffName}</span>
                         </div>
@@ -328,7 +328,7 @@ export const CustomerBookingHistory: React.FC<CustomerBookingHistoryProps> = ({
                             <span className="font-bold text-slate-700">{refPrice.toFixed(2)} SAR</span>
                           </span>
                         ) : (
-                          <span className="text-slate-400">
+                          <span className="text-slate-500">
                             {isRtl ? 'السعر يُحسب وفق التعرفة الحالية' : 'Priced at current rates'}
                           </span>
                         )}

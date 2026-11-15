@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode, type FormEvent } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowRight,
   Globe,
@@ -9,9 +9,13 @@ import {
   Unlock,
   ChevronLeft,
   KeyRound,
-  CheckCircle2
-  ,
-  LoaderCircle
+  CheckCircle2,
+  LoaderCircle,
+  Menu,
+  X,
+  CalendarDays,
+  Phone,
+  User
 } from 'lucide-react';
 import type { Language } from '../types';
 import TenantLoginScreen from './TenantLoginScreen';
@@ -777,46 +781,150 @@ export default function PublicExperience({
     return <RegistrationSuccessScreen lang={lang} onToggleLang={onToggleLang} onNavigate={onNavigate} />;
   }
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isRtl = lang === 'ar';
+
+  const navLinks = [
+    { id: 'hero', href: '#hero', labelAr: 'الرئيسية', labelEn: 'Home' },
+    { id: 'platform', href: '#platform', labelAr: 'المنصة', labelEn: 'Platform' },
+    { id: 'features', href: '#features', labelAr: 'المزايا', labelEn: 'Features' },
+    { id: 'join', href: '#join', labelAr: 'لأصحاب المراكز', labelEn: 'For Businesses' }
+  ];
+
+  const handleNavScroll = (href: string) => {
+    setMobileMenuOpen(false);
+    if (typeof window !== 'undefined') {
+      const el = document.querySelector(href);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
+
   return (
-    <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen relative overflow-x-hidden bg-[#FAF7FD] text-[#1D035F] selection:bg-[#E7DDFC] selection:text-[#1D035F]">
+    <div dir={isRtl ? 'rtl' : 'ltr'} className="min-h-screen relative overflow-x-hidden bg-[#FAF7FD] text-[#1D035F] selection:bg-[#E7DDFC] selection:text-[#1D035F]">
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(231,221,252,0.6),_transparent_50%),radial-gradient(circle_at_bottom_right,_rgba(163,121,226,0.08),_transparent_40%)]" />
       <div className="relative z-10 min-h-screen flex flex-col">
-        <header className="px-4 py-4 md:px-8">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-[#E7DDFC] bg-white/90 px-6 py-3.5 backdrop-blur-md shadow-xs">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('/')}>
-              <img src={barspaLogo} alt="BarSpa" className="h-9 w-auto object-contain" />
+        {/* Section A: Polished B2B Responsive Navigation */}
+        <header className="sticky top-0 z-40 px-4 py-3 md:px-8 bg-[#FAF7FD]/85 backdrop-blur-md border-b border-[#E7DDFC]/60 transition-all">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+            {/* Logo */}
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleNavScroll('#hero')}>
+              <img src={barspaLogo} alt="BarSpa" className="h-9 md:h-10 w-auto object-contain transition hover:opacity-90" />
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Desktop Navigation Links */}
+            <nav className="hidden lg:flex items-center gap-7">
+              {navLinks.map((link) => (
+                <button
+                  key={link.id}
+                  type="button"
+                  onClick={() => handleNavScroll(link.href)}
+                  className="text-xs md:text-sm font-bold text-slate-600 hover:text-[#6537C0] transition-colors cursor-pointer"
+                >
+                  {isRtl ? link.labelAr : link.labelEn}
+                </button>
+              ))}
+            </nav>
+
+            {/* Actions: Lang Switcher, Login, Partner Join CTA */}
+            <div className="flex items-center gap-2.5">
+              {/* Language Switcher */}
               <button
                 type="button"
                 onClick={onToggleLang}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#E7DDFC] bg-[#FAF7FD] px-3.5 py-2 text-xs font-bold text-[#1D035F] transition hover:bg-[#F3EDFC] cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#E7DDFC] bg-white px-3 py-2 text-xs font-bold text-[#1D035F] shadow-2xs hover:bg-[#FAF7FD] transition cursor-pointer"
+                aria-label="Toggle Language"
               >
-                <Globe size={15} />
-                <span>{lang === 'ar' ? 'EN' : 'العربية'}</span>
+                <Globe size={14} className="text-[#6537C0]" />
+                <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
               </button>
+
+              {/* Portal Login Button */}
               <button
                 type="button"
                 onClick={() => onNavigate('/login')}
-                className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-[#E7DDFC] bg-white px-4 py-2 text-xs font-bold text-[#1D035F] transition hover:bg-[#FAF7FD] cursor-pointer"
+                className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-[#E7DDFC] bg-white px-3.5 py-2 text-xs font-bold text-[#1D035F] shadow-2xs hover:bg-[#FAF7FD] transition cursor-pointer"
               >
-                <span>{lang === 'ar' ? 'تسجيل الدخول' : 'Sign in'}</span>
+                <span>{isRtl ? 'تسجيل الدخول' : 'Sign In'}</span>
               </button>
+
+              {/* Primary B2B Partner CTA */}
               <button
                 type="button"
                 onClick={() => onNavigate('/register')}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#6537C0] px-4 py-2 text-xs font-bold text-white shadow-sm shadow-[#6537C0]/25 transition hover:bg-[#1D035F] cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#6537C0] hover:bg-[#1D035F] px-4 py-2 text-xs font-bold text-white shadow-sm shadow-[#6537C0]/25 transition-all hover:-translate-y-0.5 cursor-pointer"
               >
-                <span>{lang === 'ar' ? 'ابدأ الآن' : 'Get started'}</span>
-                <ArrowRight size={14} className={lang === 'ar' ? 'rotate-180' : ''} />
+                <span>{isRtl ? 'انضم إلى بارسبا' : 'Become a Partner'}</span>
+                <ArrowRight size={13} className={isRtl ? 'rotate-180' : ''} />
+              </button>
+
+              {/* Mobile Menu Hamburger Button */}
+              <button
+                type="button"
+                aria-label="Open Mobile Menu"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-xl border border-[#E7DDFC] bg-white text-[#1D035F] shadow-2xs hover:bg-[#FAF7FD] transition cursor-pointer"
+              >
+                {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
             </div>
           </div>
+
+          {/* Mobile Navigation Drawer Overlay */}
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="lg:hidden mt-3 pt-3 border-t border-[#E7DDFC] space-y-3 pb-4"
+              >
+                <nav className="flex flex-col space-y-2">
+                  {navLinks.map((link) => (
+                    <button
+                      key={link.id}
+                      type="button"
+                      onClick={() => handleNavScroll(link.href)}
+                      className="text-start py-2 px-3 rounded-lg text-sm font-bold text-[#1D035F] hover:bg-[#FAF7FD] hover:text-[#6537C0] transition cursor-pointer"
+                    >
+                      {isRtl ? link.labelAr : link.labelEn}
+                    </button>
+                  ))}
+                </nav>
+
+                <div className="pt-2 flex flex-col gap-2 border-t border-[#E7DDFC]/60">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onNavigate('/register');
+                    }}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#6537C0] px-4 py-2.5 text-xs font-bold text-white shadow-sm"
+                  >
+                    <span>{isRtl ? 'انضم إلى بارسبا كشريك' : 'Become a BARSPA Partner'}</span>
+                    <ArrowRight size={14} className={isRtl ? 'rotate-180' : ''} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onNavigate('/login');
+                    }}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-[#E7DDFC] bg-white px-4 py-2 text-xs font-bold text-[#1D035F]"
+                  >
+                    <span>{isRtl ? 'تسجيل دخول المشغلين' : 'Sign In to Portal'}</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </header>
 
-        <main className="flex-1 px-4 pb-12 pt-2 md:px-8">
-          <div className="mx-auto max-w-7xl space-y-10">
+        {/* Main Landing Sections Framework */}
+        <main className="flex-1 px-4 pb-12 pt-4 md:px-8">
+          <div className="mx-auto max-w-7xl space-y-12">
             <PublicLandingFramework lang={lang} onNavigate={onNavigate} />
           </div>
         </main>

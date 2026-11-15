@@ -407,7 +407,7 @@ export default function Workspace({
             <button
               onClick={() => onToggleFavoritePage && onToggleFavoritePage(view)}
               className={`p-1.5 rounded-lg transition-all hover:scale-105 cursor-pointer ${
-                isFavorited ? 'text-amber-500 hover:text-amber-600' : 'text-slate-300 hover:text-slate-500 dark:text-zinc-600 dark:hover:text-zinc-400'
+                isFavorited ? 'text-amber-500 hover:text-amber-600' : 'text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
               }`}
               title={isFavorited ? (isRtl ? 'إزالة من المفضلة' : 'Remove from Favorites') : (isRtl ? 'إضافة للمفضلة' : 'Save to Favorites')}
             >
@@ -550,14 +550,14 @@ export default function Workspace({
               if (widgetId === 'revenue') {
                 return (
                   <div key="revenue" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-2xs' : 'bg-white border-slate-200/90 shadow-2xs hover:border-slate-300'
                   }`}>
                     <div className="space-y-1.5">
-                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                      <span className="text-xs text-slate-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
                         {isRtl ? 'إجمالي المبيعات اليوم' : 'Today\'s Total Revenue'}
                       </span>
-                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
-                        {(dashboardStats?.todaysRevenue || 0).toLocaleString()} <span className="text-base font-bold text-neutral-500 dark:text-zinc-400 font-sans">{t.riyal}</span>
+                      <p className="text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
+                        {(dashboardStats?.todaysRevenue || 0).toLocaleString()} <span className="text-base font-bold text-slate-500 dark:text-zinc-400 font-sans">{t.riyal}</span>
                       </p>
                       <div className="pt-1">
                         <span className="text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border bg-emerald-50 text-emerald-950 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800">
@@ -574,8 +574,8 @@ export default function Workspace({
 
                       {/* Widget Reordering buttons */}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -584,13 +584,13 @@ export default function Workspace({
               if (widgetId === 'bookings') {
                 return (
                   <div key="bookings" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-2xs' : 'bg-white border-slate-200/90 shadow-2xs hover:border-slate-300'
                   }`}>
                     <div className="space-y-1.5">
-                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                      <span className="text-xs text-slate-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
                         {isRtl ? 'حجوزات اليوم' : 'Today\'s Bookings'}
                       </span>
-                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
+                      <p className="text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
                         {(dashboardStats?.todaysBookings || 0).toLocaleString()}
                       </p>
                       <div className="pt-1">
@@ -607,8 +607,8 @@ export default function Workspace({
                       </span>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -617,13 +617,13 @@ export default function Workspace({
               if (widgetId === 'customers') {
                 return (
                   <div key="customers" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-2xs' : 'bg-white border-slate-200/90 shadow-2xs hover:border-slate-300'
                   }`}>
                     <div className="space-y-1.5">
-                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                      <span className="text-xs text-slate-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
                         {isRtl ? 'إجمالي العملاء' : 'Total Customers'}
                       </span>
-                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
+                      <p className="text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
                         {(dashboardStats?.totalCustomers || 0).toLocaleString()}
                       </p>
                       <div className="pt-1">
@@ -639,8 +639,8 @@ export default function Workspace({
                       </span>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -649,13 +649,13 @@ export default function Workspace({
               if (widgetId === 'occupancy') {
                 return (
                   <div key="occupancy" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-2xs' : 'bg-white border-slate-200/90 shadow-2xs hover:border-slate-300'
                   }`}>
                     <div className="space-y-1.5">
-                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                      <span className="text-xs text-slate-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
                         {isRtl ? 'فريق العمل النشط' : 'Active Team Members'}
                       </span>
-                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
+                      <p className="text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
                         {(dashboardStats?.activeEmployees || 0).toLocaleString()}
                       </p>
                       <div className="pt-1">
@@ -677,8 +677,8 @@ export default function Workspace({
                       </span>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -687,13 +687,13 @@ export default function Workspace({
               if (widgetId === 'packages') {
                 return (
                   <div key="packages" className={`p-5 rounded-2xl border flex justify-between items-start relative group transition-all duration-200 ${
-                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-sm' : 'bg-white border-neutral-200/80 shadow-xs hover:border-neutral-300'
+                    darkMode ? 'bg-zinc-900 border-zinc-800 shadow-2xs' : 'bg-white border-slate-200/90 shadow-2xs hover:border-slate-300'
                   }`}>
                     <div className="space-y-1.5">
-                      <span className="text-xs text-neutral-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
+                      <span className="text-xs text-slate-500 dark:text-zinc-400 font-semibold tracking-wide uppercase block">
                         {isRtl ? 'الباقات النشطة' : 'Active Packages'}
                       </span>
-                      <p className="text-3xl font-black font-mono tracking-tight text-neutral-900 dark:text-white">
+                      <p className="text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
                         {packageLimit === null ? '—' : packageLimit === -1 ? '∞' : packageLimit.toLocaleString()}
                       </p>
                       <div className="pt-1">
@@ -710,13 +710,13 @@ export default function Workspace({
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2.5">
-                      <span className="w-10 h-10 flex items-center justify-center bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 rounded-xl border border-amber-100 dark:border-amber-900/40 shrink-0">
+                      <span className="w-10 h-10 flex items-center justify-center bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 rounded-xl border border-amber-100 dark:border-brand-900/40 shrink-0">
                         <Package size={20} />
                       </span>
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
-                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-neutral-100 dark:hover:bg-zinc-800 rounded text-neutral-400" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'left')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === 0} title={isRtl ? 'تحريك للخلف' : 'Move left'}><ArrowLeft size={11} /></button>
+                        <button onClick={() => moveWidget(index, 'right')} className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200" disabled={index === widgetOrder.length - 1} title={isRtl ? 'تحريك للأمام' : 'Move right'}><ArrowRight size={11} /></button>
                       </div>
                     </div>
                   </div>
@@ -1008,25 +1008,25 @@ export default function Workspace({
           }`}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <h3 className="font-bold text-base">{isRtl ? 'سلة الخدمات والمنتجات السريعة' : 'Interactive Checkout POS Catalog'}</h3>
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-neutral-100 dark:bg-zinc-800 text-xs">
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-zinc-800 text-xs">
                 <button
                   type="button"
                   onClick={() => setPosCatalogFilter('all')}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all ${posCatalogFilter === 'all' ? 'bg-[#1D035F] text-white shadow-xs' : 'text-neutral-600 dark:text-zinc-400 hover:text-black dark:hover:text-white'}`}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all ${posCatalogFilter === 'all' ? 'bg-brand-500 text-white shadow-xs' : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'}`}
                 >
                   {isRtl ? 'الكل' : 'All'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPosCatalogFilter('services')}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all ${posCatalogFilter === 'services' ? 'bg-[#1D035F] text-white shadow-xs' : 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30'}`}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all ${posCatalogFilter === 'services' ? 'bg-brand-500 text-white shadow-xs' : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'}`}
                 >
                   {isRtl ? 'الخدمات' : 'Services'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPosCatalogFilter('products')}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all ${posCatalogFilter === 'products' ? 'bg-[#1D035F] text-white shadow-xs' : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all ${posCatalogFilter === 'products' ? 'bg-brand-500 text-white shadow-xs' : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'}`}
                 >
                   {isRtl ? 'المنتجات' : 'Products'}
                 </button>
@@ -1202,10 +1202,10 @@ export default function Workspace({
                         key={method}
                         type="button"
                         onClick={() => setPosPaymentMethod(method)}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
+                        className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center cursor-pointer ${
                           posPaymentMethod === method
-                            ? 'bg-[#1D035F] text-white border-[#1D035F] shadow-xs'
-                            : 'bg-neutral-50 dark:bg-zinc-800 text-neutral-600 dark:text-zinc-300 border-neutral-200 dark:border-zinc-700 hover:bg-neutral-100'
+                            ? 'bg-brand-500 text-white border-brand-500 shadow-xs'
+                            : 'bg-slate-50 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-700'
                         }`}
                       >
                         {method === 'mada' ? (isRtl ? 'مدى' : 'Mada') : method === 'cash' ? (isRtl ? 'نقدي' : 'Cash') : (isRtl ? 'بطاقة' : 'Card')}
@@ -1214,15 +1214,15 @@ export default function Workspace({
                   </div>
                 </div>
 
-                <div className="flex justify-between text-sm md:text-base font-black pt-2 border-t border-dashed border-neutral-100 dark:border-zinc-800">
+                <div className="flex justify-between text-sm md:text-base font-black pt-2 border-t border-dashed border-slate-200 dark:border-zinc-800">
                   <span>{isRtl ? 'الصافي النهائي للمدفوع' : 'Total Net Payable'}</span>
-                  <span className="font-mono text-[#1D035F] dark:text-[#A78BFA]">{getPosTotal()} {t.riyal}</span>
+                  <span className="font-mono text-brand-600 dark:text-brand-400">{getPosTotal()} {t.riyal}</span>
                 </div>
 
                 <button
                   onClick={handleCompletePayment}
                   disabled={posIsSubmitting}
-                  className="w-full py-2.5 rounded-xl bg-[#1D035F] hover:bg-[#280580] text-white font-bold text-xs md:text-sm text-center shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="w-full py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-xs md:text-sm text-center shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {posIsSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
                   <span>

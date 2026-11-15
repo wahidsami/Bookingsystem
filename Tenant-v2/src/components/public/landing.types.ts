@@ -7,13 +7,11 @@ export interface PublicLandingSectionProps {
 }
 
 export type PublicLandingSectionComponentKey =
-  | 'hero'
-  | 'trust'
-  | 'capabilities'
-  | 'value-props'
-  | 'experience-flow'
-  | 'cta-banner'
-  | 'footer';
+  | 'b2b-hero'
+  | 'platform-capabilities'
+  | 'product-showcase'
+  | 'partner-cta'
+  | 'b2b-footer';
 
 export interface LandingSectionConfig {
   id: string;
@@ -28,4 +26,3 @@ export type PublicLandingSectionComponentMap = Record<
   PublicLandingSectionComponentKey,
   ComponentType<PublicLandingSectionProps>
 >;
-

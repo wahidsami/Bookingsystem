@@ -1,423 +1,443 @@
-import { motion } from 'motion/react';
+import { useState, type ComponentType } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
   Sparkles,
-  Star,
   ShieldCheck,
   Award,
   Users,
-  TrendingUp,
-  Scissors,
   Receipt,
   Gift,
   Clock,
-  ChevronRight,
   Layers,
-  HeartHandshake
+  HeartHandshake,
+  Building2,
+  ChevronRight,
+  CreditCard,
+  LayoutDashboard,
+  Check,
+  BadgeCheck,
+  Sparkle
 } from 'lucide-react';
 import barspaLogo from '../../assets/barspa_logo.png';
 import barspaIcon from '../../assets/barspa_app_icon.png';
 import type { PublicLandingSectionComponentMap, PublicLandingSectionProps } from './landing.types';
 
-const text = {
+// Helper for smooth anchor scrolling
+function scrollToAnchor(anchor: string) {
+  if (typeof window === 'undefined') return;
+  const element = document.querySelector(anchor);
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// ==========================================
+// B2B BILINGUAL MARKETING DICTIONARY
+// ==========================================
+
+const b2bCopy = {
   ar: {
     hero: {
-      badge: 'منصة سحابية متقدمة لإدارة صالونات وسبا النخبة',
-      title: 'ارتقِ بإدارة صالونك الفاخر وتجربة عملائك مع بارسبا',
-      subtitle:
-        'منظومة متكاملة لجدولة المواعيد، الفوترة، نقاط البيع، وإدارة ولاء العملاء في المملكة العربية السعودية.',
-      primary: 'ابدأ التسجيل الآن',
-      secondary: 'تسجيل الدخول للمنشأة',
-      mockup: {
-        liveStatus: 'لوحة التحكم التفاعلية',
-        activeBookings: 'حجوزات اليوم',
-        totalRevenue: 'إجمالي المبيعات اليومية',
-        amount: '24,850 ر.س',
-        specialist: 'سارة العتيبي — خبيرة عناية بالبشرة',
-        session: 'جلسة هيدرافاشيال ملكية VIP',
-        time: '04:30 مساءً',
-        eInvoicingLabel: 'فوترة إلكترونية مبسطة',
-        satisfaction: 'خدمة متميزة'
+      badge: 'المنصة السحابية المتقدمة لصالونات ومراكز التجميل والسبا',
+      title: 'ارتقِ بإدارة مركزك مع بارسبا',
+      subtitle: 'منصة متكاملة تساعد صالونات التجميل والسبا ومراكز العناية على تنظيم عملياتها، جدولة مواعيدها، وإدارة أعمالها من مكان واحد بكل وضوح وسهولة.',
+      primaryCta: 'انضم إلى بارسبا',
+      secondaryCta: 'اكتشف المنصة',
+      preview: {
+        windowTitle: 'لوحة التحكم والعمليات اليومية — نظام بارسبا السحابي',
+        liveStatus: 'النظام متصل ونشط',
+        todayRoster: 'فريق العمل في الخدمة',
+        rosterActive: '5 أخصائيات معتمدات',
+        scheduleMetric: 'جدول المواعيد المجدولة',
+        scheduleDesc: 'تنظيم لحظي يمنع تعارض المواعيد',
+        posMetric: 'نقاط البيع والتحصيل',
+        posDesc: 'فوترة إلكترونية مبسطة متوافقة',
+        recentActionLabel: 'سير العمليات المباشر',
+        sampleSlot1: 'جلسة عناية — غرفة الاسترخاء 1 (مشغولة)',
+        sampleSlot2: 'موعد تصفيف — محطة العناية 2 (مؤكد)',
+        sampleSlot3: 'فحص متاح — غرفة الاستراحة 2 (شاغرة)'
       }
     },
-    trust: [
-      { title: 'فوترة ضريبية مبسطة', subtitle: 'إصدار فواتير ضريبية تدعم رمز الاستجابة السريعة (QR) وطباعة الإيصالات', icon: ShieldCheck },
-      { title: 'بنية سحابية موثوقة', subtitle: 'أداء فائق واستقرار تشغيلي مصمم لتلبية متطلبات منشأتك على مدار الساعة', icon: Award },
-      { title: 'دعم ومساندة مخصصة', subtitle: 'فريق متخصص لمساندة منشأتك ومساعدتك في الإعداد والتشغيل بكل سلاسة', icon: HeartHandshake },
-      { title: 'ثنائية لغوية أصيلة', subtitle: 'واجهة عربية أصيلة مع دعم كامل وسلس للغة الإنجليزية', icon: Sparkles }
-    ],
     capabilities: {
-      title: 'إمكانيات متكاملة لإدارة الصالونات ومراكز السبا',
-      subtitle: 'صُممت كل ميزة في بارسبا لتلبي أدق تفاصيل العمليات اليومية في صالونات ومراكز التجميل الراقية.',
+      badge: 'المنظومة التشغيلية',
+      title: 'كل ما تحتاجه لإدارة منشأتك بكفاءة واحترافية',
+      subtitle: 'أدوات متخصصة صُممت بدقة لتلبية أدق تفاصيل العمل اليومي في صالونات ومراكز التجميل والاستجمام الراقية.',
       items: [
         {
-          title: 'جدولة ذكية للمواعيد',
-          desc: 'تنظيم مواعيد الحجوزات وتوزيع الكراسي والمختصات بكفاءة مع إشعارات تذكير تلقائية للعميلات.',
+          id: 'cap-scheduling',
           icon: CalendarDays,
+          title: 'جدولة ذكية للمواعيد والتقويم',
+          desc: 'تنظيم المواعيد اليومية والأسبوعية بمرونة تامة، وتوزيع أوقات الخدمات على الأخصائيات لمنع أي تعارض تشغيلي.',
           tag: 'تنظيم آلي'
         },
         {
-          title: 'نقاط بيع وفوترة إلكترونية',
-          desc: 'إصدار الفواتير الضريبية المبسطة فوراً مع طباعة الإيصالات وتعدد خيارات الدفع بكل سهولة.',
-          icon: Receipt,
-          tag: 'فوترة فورية'
-        },
-        {
-          title: 'إدارة الفريق والعمولات',
-          desc: 'تنظيم جداول دوام الأخصائيات والإجازات ومتابعة أداء الفريق والعمولات بكل وضوح.',
+          id: 'cap-roster',
           icon: Users,
-          tag: 'كفاءة تشغيلية'
+          title: 'إدارة الكادر والمناوبات والموارد',
+          desc: 'ضبط جداول دوام الموظفات، فترات الاستراحة، وحجز الغرف الفيزيائية ومحطات الخدمة بكفاءة عالية.',
+          tag: 'كفاءة الفريق'
         },
         {
-          title: 'العروض وبطاقات الهدايا',
-          desc: 'تنشيط المبيعات عبر باقات الهدايا الرقمية، العروض الحصرية، وإشعارات التواصل المباشر.',
+          id: 'cap-pos',
+          icon: Receipt,
+          title: 'نقاط البيع والفوترة المبسطة',
+          desc: 'إصدار سريع للفواتير الضريبية الداعمة لرمز الاستجابة السريعة (QR)، دعم وسائل الدفع المتعددة، وطباعة الإيصالات.',
+          tag: 'تحصيل فوري'
+        },
+        {
+          id: 'cap-marketing',
           icon: Gift,
-          tag: 'تنشيط المبيعات'
+          title: 'بطاقات الهدايا الرقمية والباقات',
+          desc: 'تنشيط مبيعات صالونك من خلال باقات الخدمات المتكاملة وبطاقات الهدايا الإلكترونية التي تدعم ولاء العملاء.',
+          tag: 'تنمية المبيعات'
         }
       ]
     },
-    values: {
-      title: 'لماذا تختار صالونات النخبة منصة بارسبا؟',
-      subtitle: 'تحكم كامل ومرن في تجربة العميل والعمليات التشغيلية لمنشأتك.',
-      cards: [
-        {
-          title: 'تجربة ضيافة راقية لعميلاتك',
-          desc: 'من لحظة حجز الموعد حتى إنهاء الخدمة، تحظى عميلتك بتجربة استثنائية وسلسة تعزز ولاءها المستمر.',
-          metric: 'تجربة ضيافة مميزة'
+    showcase: {
+      badge: 'واجهة النظام التشغيلية',
+      title: 'رؤية تشغيلية واضحة ومصممة لدقة التفاصيل',
+      subtitle: 'صُممت واجهات بارسبا لتمنح مسؤولي الصالون والمشرفين تحكماً كاملاً وسلساً في جدول اليوم وسير الخدمات.',
+      tabs: [
+        { id: 'board', label: 'لوحة المواعيد والتقويم' },
+        { id: 'pos', label: 'نقاط البيع والتحصيلات' },
+        { id: 'staff', label: 'إدارة الفريق والموارد' }
+      ],
+      previews: {
+        board: {
+          title: 'جدول المواعيد والخدمات اللحظي',
+          desc: 'متابعة بصرية فورية لكل مقعد وغرفة خدمة مع تصنيف واضح لحالات المواعيد (مؤكد، قيد التنفيذ، مكتمل).',
+          col1Title: 'المواعيد المؤكدة',
+          col1Desc: 'توزيع دقيق للجلسات بحسب الأخصائية والغرفة المخصصة.',
+          col2Title: 'فترات التجهيز والتعقيم',
+          col2Desc: 'احتساب تلقائي للمدد بين الخدمات لضمان أعلى معايير الجاهزية.',
+          col3Title: 'التنسيق الشامل',
+          col3Desc: 'عزل المواعيد الفردية والجماعية وتفادي أي حجز مزدوج.'
         },
-        {
-          title: 'توفير الجهد والوقت الإداري',
-          desc: 'أتمتة تنظيم المواعيد والعمليات اليومية يمنح فريقك وقتاً أطول للتركيز على جودة الخدمة وراحة العميلات.',
-          metric: 'كفاءة تشغيلية أعلى'
+        pos: {
+          title: 'شاشة التحصيل ونقاط البيع السريعة',
+          desc: 'تسجيل عمليات البيع، قبول المدفوعات المجزأة، وإصدار الفواتير الضريبية المبسطة المتوافقة في ثوانٍ معدودة.',
+          col1Title: 'خيارات دفع متعددة',
+          col1Desc: 'دعم مدى، البطاقات الائتمانية، أبل باي، والنقد.',
+          col2Title: 'فواتير ضريبية معتمدة',
+          col2Desc: 'إصدار الفواتير بترميز QR متوافق وطباعة حرارية فورية.',
+          col3Title: 'تسوية وإغلاق اليومية',
+          col3Desc: 'مطابقة دقيقة للمقبوضات والتحصيلات مع نهاية كل مناوبة.'
         },
-        {
-          title: 'رؤية مالية وتحليلية فورية',
-          desc: 'تقارير بيع لحظية، مراقبة المخزون، وتحليل المنتجات والخدمات الأكثر طلباً لاتخاذ قرارات دقيقة.',
-          metric: 'وضوح مالي شامل'
+        staff: {
+          title: 'جدولة الفريق والمناوبات وحساب العمولات',
+          desc: 'إدارة متكاملة لبيانات الأخصائيات، تحديد ساعات العمل وأيام العطل، ومتابعة نسب الإنجاز بشفافية.',
+          col1Title: 'جداول المناوبات المرنة',
+          col1Desc: 'تحديد أوقات الحضور والانصراف وفترات الراحة لكل مختصة.',
+          col2Title: 'تخصيص الخدمات',
+          col2Desc: 'ربط كل أخصائية بالخدمات المؤهلة لتقديمها بدقة.',
+          col3Title: 'متابعة الأداء',
+          col3Desc: 'تقارير واضحة لساعات العمل وعدد الخدمات المنجزة.'
         }
-      ]
-    },
-    flow: {
-      title: 'انضم إلى بارسبا في 3 خطوات بسيطة',
-      subtitle: 'خطوات إعداد سهلة وواضحة لتجهيز صالونك وبدء العمل.',
-      steps: [
-        { step: '01', title: 'سجّل بيانات منشأتك', desc: 'أدخل معلومات الصالون وبيانات التواصل في خطوات ميسرة ومحمية.' },
-        { step: '02', title: 'خصّص القوائم والخدمات', desc: 'أضف الأخصائيات، الخدمات، الأسعار، ومواعيد العمل الخاصة بك.' },
-        { step: '03', title: 'انطلق واستقبل الحجوزات', desc: 'ابدأ إدارة المواعيد وإصدار الفواتير الفورية بكل سهولة وثقة.' }
-      ]
+      }
     },
     cta: {
-      title: 'جاهز لنقل صالونك إلى مستوى جديد من الفخامة؟',
-      subtitle: 'انضم الآن إلى شبكة صالونات وسبا بارسبا واستمتع بتجربة إدارة حديثة وموثوقة.',
-      button: 'ابدأ التسجيل الآن'
+      title: 'جاهز لنقل إدارة صالونك إلى مستوى جديد من الاحترافية؟',
+      subtitle: 'انضم إلى شبكة الصالونات ومراكز التجميل والاستجمام المتميزة التي تعتمد على بارسبا في تنظيم عملياتها اليومية.',
+      primaryButton: 'انضم إلى بارسبا كشريك',
+      secondaryButton: 'تسجيل دخول المنشأة'
     },
     footer: {
-      description: 'بارسبا — منصة سحابية متقدمة لإدارة صالونات ومراكز التجميل والاستجمام في المملكة العربية السعودية.',
-      rights: 'جميع الحقوق محفوظة © 2026 بارسبا (BarSpa).'
+      tagline: 'المنصة السحابية المتقدمة لإدارة عمليات صالونات ومراكز التجميل والسبا في المملكة العربية السعودية.',
+      platformTitle: 'المنصة',
+      home: 'الرئيسية',
+      capabilities: 'المنظومة والمزايا',
+      features: 'واجهات النظام',
+      join: 'انضم إلى بارسبا',
+      businessTitle: 'بوابات الدخول',
+      register: 'تسجيل منشأة جديدة',
+      login: 'تسجيل دخول المشغلين',
+      trustTitle: 'الأمان والمساعدة',
+      privacy: 'سياسة الخصوصية',
+      terms: 'الشروط والأحكام',
+      contact: 'فريق المساندة والدعم',
+      rights: 'جميع الحقوق محفوظة © 2026 بارسبا (BarSpa). منصة إدارة سحابية متقدمة.'
     }
   },
   en: {
     hero: {
       badge: 'Advanced Cloud Platform for Luxury Salons & Spas',
-      title: 'Elevate Your Luxury Salon & Spa Operations with BarSpa',
-      subtitle:
-        'A comprehensive cloud solution for smart scheduling, invoicing, POS, staff management, and VIP client loyalty across Saudi Arabia.',
-      primary: 'Start Registration',
-      secondary: 'Sign In to Portal',
-      mockup: {
-        liveStatus: 'Interactive Dashboard Preview',
-        activeBookings: "Today's Appointments",
-        totalRevenue: 'Daily Sales Overview',
-        amount: '24,850 SAR',
-        specialist: 'Sarah Al-Otaibi — Senior Aesthetician',
-        session: 'Royal VIP Hydrafacial Treatment',
-        time: '04:30 PM',
-        eInvoicingLabel: 'Simplified E-Invoicing',
-        satisfaction: 'Top Rated Service'
+      title: 'Run Your Beauty Business with BARSPA',
+      subtitle: 'One connected platform designed to help salons, spas, and wellness centers coordinate operations, schedule appointments, and manage daily business from a single place.',
+      primaryCta: 'Become a BARSPA Partner',
+      secondaryCta: 'Explore the Platform',
+      preview: {
+        windowTitle: 'Daily Operations & Scheduling Workspace — BarSpa Cloud',
+        liveStatus: 'System Connected & Active',
+        todayRoster: 'Active Staff on Duty',
+        rosterActive: '5 Certified Specialists',
+        scheduleMetric: 'Real-Time Schedule Flow',
+        scheduleDesc: 'Dynamic coordination preventing conflicts',
+        posMetric: 'POS & Payment Collections',
+        posDesc: 'Compliant simplified e-invoicing',
+        recentActionLabel: 'Live Operational Feed',
+        sampleSlot1: 'Wellness Session — Suite 1 (Occupied)',
+        sampleSlot2: 'Hair Styling — Station 2 (Confirmed)',
+        sampleSlot3: 'Available Window — Suite 2 (Free)'
       }
     },
-    trust: [
-      { title: 'Simplified E-Invoicing', subtitle: 'Issue tax invoices supporting QR codes, receipt printing, and multiple payment modes', icon: ShieldCheck },
-      { title: 'High-Reliability Cloud', subtitle: 'Dependable performance and secure infrastructure tailored for uninterrupted operations', icon: Award },
-      { title: 'Dedicated Partner Support', subtitle: 'Specialized team available to guide your onboarding and day-to-day operations', icon: HeartHandshake },
-      { title: 'Native Bilingual Design', subtitle: 'Built from the ground up for authentic Arabic and modern English', icon: Sparkles }
-    ],
     capabilities: {
-      title: 'Comprehensive Capabilities Built for Beauty & Wellness',
-      subtitle: 'Every feature in BarSpa is thoughtfully designed to streamline the daily operations of premier salons and spas.',
+      badge: 'Operational Architecture',
+      title: 'Everything You Need to Manage Your Center with Confidence',
+      subtitle: 'Engineered specifically to address the daily operational nuances of premier salons, spas, and aesthetic centers.',
       items: [
         {
-          title: 'Intelligent Scheduling',
-          desc: 'Streamlined booking flow that prevents overlap, organizes staff allocation, and sends automated reminders.',
+          id: 'cap-scheduling',
           icon: CalendarDays,
-          tag: 'Smart Booking'
+          title: 'Intelligent Scheduling & Calendar Workspace',
+          desc: 'Flexible daily and weekly booking coordination, distributing client visits across staff and service rooms seamlessly.',
+          tag: 'Smart Scheduling'
         },
         {
-          title: 'POS & Invoicing',
-          desc: 'Instantly generate simplified invoices, print receipts, and accept multiple payment methods.',
-          icon: Receipt,
-          tag: 'Quick Checkout'
-        },
-        {
-          title: 'Specialists & Commissions',
-          desc: 'Organize team schedules, track service commissions, and manage shifts with complete transparency.',
+          id: 'cap-roster',
           icon: Users,
+          title: 'Staff Roster & Resource Allocation',
+          desc: 'Manage specialist duty shifts, planned breaks, and assign physical treatment rooms and styling chairs efficiently.',
           tag: 'Team Operations'
         },
         {
-          title: 'Marketing & Digital Gifts',
-          desc: 'Engage clients with branded digital gift cards, exclusive promotions, and real-time announcements.',
+          id: 'cap-pos',
+          icon: Receipt,
+          title: 'POS & Simplified Invoicing',
+          desc: 'Fast checkout supporting QR-coded tax invoices, split tenders, and immediate thermal receipt generation.',
+          tag: 'Fast Checkout'
+        },
+        {
+          id: 'cap-marketing',
           icon: Gift,
+          title: 'Digital Gift Cards & Service Packages',
+          desc: 'Boost salon revenue and customer retention with bundled packages, promotions, and electronic gift cards.',
           tag: 'Revenue Growth'
         }
       ]
     },
-    values: {
-      title: 'Why Salons Choose BarSpa',
-      subtitle: 'Intuitive operational control and complete visibility over your business.',
-      cards: [
-        {
-          title: 'Prestige Hospitality for Guests',
-          desc: 'From online booking to final checkout, offer clients a smooth, elegant experience that fosters long-term loyalty.',
-          metric: 'VIP Client Care'
+    showcase: {
+      badge: 'Platform Experience',
+      title: 'A Clear, Intuitive Interface Built for Detail',
+      subtitle: 'BarSpa is designed to give salon managers and front-desk coordinators immediate visibility over daily schedules and checkout flows.',
+      tabs: [
+        { id: 'board', label: 'Appointment Workspace' },
+        { id: 'pos', label: 'POS & Collections' },
+        { id: 'staff', label: 'Staff & Shift Management' }
+      ],
+      previews: {
+        board: {
+          title: 'Live Appointment Board & Treatment Scheduling',
+          desc: 'Instant visual overview of every chair and room with clear appointment states (Confirmed, In-Service, Completed).',
+          col1Title: 'Confirmed Appointments',
+          col1Desc: 'Accurate scheduling tied directly to staff and room allocations.',
+          col2Title: 'Turnaround & Preparation',
+          col2Desc: 'Automated buffers between services to ensure continuous readiness.',
+          col3Title: 'Conflict Prevention',
+          col3Desc: 'Structured scheduling preventing overlapping bookings.'
         },
-        {
-          title: 'Save Time on Admin Work',
-          desc: 'Automating routine appointment coordination and calculations lets your team focus entirely on client hospitality.',
-          metric: 'Operational Efficiency'
+        pos: {
+          title: 'Speed-Optimized Point of Sale & Checkout',
+          desc: 'Log sales, accept multi-tender payments, and issue compliant simplified tax invoices in seconds.',
+          col1Title: 'Multiple Payment Methods',
+          col1Desc: 'Support for Mada, major debit/credit cards, Apple Pay, and cash.',
+          col2Title: 'Compliant Tax Receipts',
+          col2Desc: 'Instant invoices with compliant QR codes and thermal receipt layouts.',
+          col3Title: 'Shift Closing & Summary',
+          col3Desc: 'Accurate balance reconciliation and collection audits at shift end.'
         },
-        {
-          title: 'Real-Time Operational Clarity',
-          desc: 'Monitor daily sales trends, track popular services, and manage resources with confidence.',
-          metric: 'Complete Visibility'
+        staff: {
+          title: 'Staff Rosters, Service Assignments & Commissions',
+          desc: 'Comprehensive employee profiles, working hours, break periods, and transparent performance tracking.',
+          col1Title: 'Flexible Work Shifts',
+          col1Desc: 'Set standard shift hours, days off, and custom break times.',
+          col2Title: 'Qualified Services',
+          col2Desc: 'Map specialists only to treatments they are certified to deliver.',
+          col3Title: 'Performance Reports',
+          col3Desc: 'Clear summaries of completed treatments and active working hours.'
         }
-      ]
-    },
-    flow: {
-      title: 'Get Started with BarSpa in 3 Simple Steps',
-      subtitle: 'A straightforward onboarding journey to configure your salon and launch.',
-      steps: [
-        { step: '01', title: 'Register Your Business', desc: 'Submit your salon profile and contact details through a secure guided workflow.' },
-        { step: '02', title: 'Configure Services & Team', desc: 'Add your specialists, services, custom pricing, and business operating hours.' },
-        { step: '03', title: 'Launch & Accept Bookings', desc: 'Start managing appointments and issuing receipts with ease and confidence.' }
-      ]
+      }
     },
     cta: {
-      title: 'Ready to Elevate Your Salon Experience?',
-      subtitle: 'Join beauty and wellness centers powered by the modern BarSpa platform.',
-      button: 'Start Registration Today'
+      title: 'Ready to Elevate Your Salon Operations?',
+      subtitle: 'Join premier salons, spas, and wellness destinations that rely on BarSpa to coordinate their daily operations.',
+      primaryButton: 'Become a BARSPA Partner',
+      secondaryButton: 'Sign In to Portal'
     },
     footer: {
-      description: 'BarSpa — A modern cloud management platform for salons and wellness centers across Saudi Arabia.',
-      rights: 'All rights reserved © 2026 BarSpa.'
+      tagline: 'The modern cloud management platform for luxury salons and wellness centers across Saudi Arabia.',
+      platformTitle: 'Platform',
+      home: 'Home',
+      capabilities: 'Capabilities',
+      features: 'System Experience',
+      join: 'Join BarSpa',
+      businessTitle: 'Portals',
+      register: 'Register New Business',
+      login: 'Operator Sign In',
+      trustTitle: 'Security & Legal',
+      privacy: 'Privacy Policy',
+      terms: 'Terms of Service',
+      contact: 'Support & Onboarding',
+      rights: 'All rights reserved © 2026 BarSpa. Cloud Operations Platform.'
     }
   }
 } as const;
 
-// 1. HERO SECTION
-function HeroSection({ lang, onNavigate }: PublicLandingSectionProps) {
-  const copy = text[lang].hero;
+// ==========================================
+// 1. SECTION B — B2B HERO SECTION
+// ==========================================
+
+function B2BHeroSection({ lang, onNavigate }: PublicLandingSectionProps) {
   const isRtl = lang === 'ar';
+  const copy = b2bCopy[lang].hero;
 
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="relative overflow-hidden rounded-[2.5rem] border border-[#E7DDFC] bg-gradient-to-b from-white via-[#FAF7FD] to-[#F3EDFC] p-8 md:p-14 lg:p-16 shadow-xl shadow-[#6537C0]/5"
-    >
-      {/* Subtle decorative glowing background layers */}
-      <div className="absolute top-0 right-1/4 -z-0 h-96 w-96 rounded-full bg-[#E7DDFC]/40 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-1/4 -z-0 h-96 w-96 rounded-full bg-[#D0BFF8]/30 blur-3xl pointer-events-none" />
+    <section id="hero" className="relative overflow-hidden rounded-[2.5rem] border border-[#E7DDFC] bg-gradient-to-b from-white via-[#FAF7FD] to-[#F3EDFC] p-6 sm:p-10 md:p-14 lg:p-16 shadow-xl shadow-[#6537C0]/5">
+      {/* Decorative luxury radial background glows */}
+      <div className="absolute top-0 end-1/4 -z-0 h-96 w-96 rounded-full bg-[#E7DDFC]/50 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 start-1/4 -z-0 h-96 w-96 rounded-full bg-[#D0BFF8]/40 blur-3xl pointer-events-none" />
 
       <div className="relative z-10 max-w-5xl mx-auto flex flex-col items-center text-center space-y-8">
-        
         {/* Brand Badge */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.15 }}
-          className="inline-flex items-center gap-2.5 rounded-full border border-[#D0BFF8] bg-white/90 px-4 py-2 shadow-xs backdrop-blur-md"
-        >
-          <img src={barspaIcon} alt="BarSpa Icon" className="h-4 w-4 object-contain" />
-          <span className="text-xs font-bold text-[#6537C0] font-sans tracking-wide">
+        <div className="inline-flex items-center gap-2.5 rounded-full border border-[#D0BFF8] bg-white/95 px-4 py-2 shadow-xs backdrop-blur-md">
+          <img src={barspaIcon} alt="BarSpa" className="h-4 w-4 object-contain" />
+          <span className="text-xs font-bold text-[#6537C0] tracking-wide">
             {copy.badge}
           </span>
-        </motion.div>
+        </div>
 
-        {/* Main Headline */}
-        <motion.h1
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1D035F] leading-[1.2] tracking-tight font-sans max-w-4xl"
-        >
+        {/* Headline */}
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-[#1D035F] leading-[1.2] tracking-tight max-w-4xl">
           {copy.title}
-        </motion.h1>
+        </h1>
 
         {/* Subtitle */}
-        <motion.p
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="text-base md:text-xl text-slate-600 leading-relaxed max-w-3xl font-sans"
-        >
+        <p className="text-sm sm:text-base md:text-lg lg:text-xl text-slate-600 leading-relaxed max-w-3xl">
           {copy.subtitle}
-        </motion.p>
+        </p>
 
         {/* Dual Primary & Secondary CTAs */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-          className="flex flex-col sm:flex-row items-center gap-4 pt-3 w-full justify-center"
-        >
+        <div className="flex flex-col sm:flex-row items-center gap-4 pt-2 w-full justify-center">
           <button
             type="button"
             onClick={() => onNavigate('/register')}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-3 rounded-2xl bg-[#6537C0] hover:bg-[#1D035F] px-8 py-4 text-base font-bold text-white shadow-lg shadow-[#6537C0]/25 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-3 rounded-2xl bg-[#6537C0] hover:bg-[#1D035F] px-8 py-4 text-sm sm:text-base font-bold text-white shadow-lg shadow-[#6537C0]/25 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
           >
-            <span>{copy.primary}</span>
+            <span>{copy.primaryCta}</span>
             <ArrowRight size={18} className={isRtl ? 'rotate-180' : ''} />
           </button>
+
           <button
             type="button"
-            onClick={() => onNavigate('/login')}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-[#E7DDFC] bg-white hover:bg-[#FAF7FD] px-8 py-4 text-base font-bold text-[#1D035F] shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+            onClick={() => scrollToAnchor('#platform')}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-[#E7DDFC] bg-white hover:bg-[#FAF7FD] px-8 py-4 text-sm sm:text-base font-bold text-[#1D035F] shadow-xs transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
           >
-            <span>{copy.secondary}</span>
+            <span>{copy.secondaryCta}</span>
           </button>
-        </motion.div>
+        </div>
 
-        {/* Hero Interactive Preview Mockup (Replacing wallethero.jpg completely) */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55, duration: 0.6 }}
-          className="w-full mt-6 rounded-3xl border border-[#E7DDFC] bg-white/95 p-6 md:p-8 shadow-2xl shadow-[#6537C0]/10 text-start relative overflow-hidden backdrop-blur-md"
-        >
-          {/* Top Status Strip */}
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#E7DDFC] pb-5">
+        {/* B2B Operational Preview Showcase */}
+        <div className="w-full mt-6 rounded-3xl border border-[#E7DDFC] bg-white/95 p-6 md:p-8 shadow-xl shadow-[#6537C0]/10 text-start backdrop-blur-md">
+          {/* Top Window Strip */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#E7DDFC] pb-4">
             <div className="flex items-center gap-3">
               <span className="flex h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-bold text-[#1D035F] tracking-wide uppercase">
-                {copy.mockup.liveStatus}
+              <span className="text-xs sm:text-sm font-bold text-[#1D035F]">
+                {copy.preview.windowTitle}
               </span>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-[#FAF7FD] border border-[#E7DDFC] px-3 py-1">
               <ShieldCheck size={14} className="text-[#6537C0]" />
               <span className="text-xs font-semibold text-[#1D035F]">
-                {copy.mockup.eInvoicingLabel}
+                {copy.preview.liveStatus}
               </span>
             </div>
           </div>
 
-          {/* Core Mockup Widgets Grid */}
-          <div className="grid gap-5 md:grid-cols-3 pt-5">
-            {/* Widget 1: Revenue Snapshot */}
-            <div className="rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] p-4 flex flex-col justify-between">
+          {/* Operational Metrics Grid */}
+          <div className="grid gap-4 sm:grid-cols-3 pt-5">
+            <div className="rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] p-4 space-y-1">
               <span className="text-xs font-semibold text-slate-500">
-                {copy.mockup.totalRevenue}
+                {copy.preview.todayRoster}
               </span>
-              <div className="mt-2">
-                <p className="text-2xl md:text-3xl font-black text-[#1D035F] font-mono">
-                  {copy.mockup.amount}
-                </p>
-                <p className="text-xs text-emerald-600 font-bold mt-1">
-                  {isRtl ? '• تحديث لحظي للمبيعات' : '• Live sales updates'}
-                </p>
-              </div>
+              <p className="text-base font-bold text-[#1D035F]">
+                {copy.preview.rosterActive}
+              </p>
             </div>
 
-            {/* Widget 2: Live VIP Booking */}
-            <div className="rounded-2xl border border-[#E7DDFC] bg-white p-4 shadow-xs md:col-span-2 flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#6537C0]">
-                  {copy.mockup.activeBookings}
-                </span>
-                <span className="rounded-full bg-[#E7DDFC]/60 text-[#1D035F] px-2.5 py-0.5 text-[11px] font-bold">
-                  {copy.mockup.time}
-                </span>
-              </div>
-              <div className="mt-2">
-                <h4 className="text-sm md:text-base font-bold text-[#1D035F]">
-                  {copy.mockup.session}
-                </h4>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {copy.mockup.specialist}
-                </p>
-              </div>
-              <div className="mt-3 flex items-center justify-between pt-2 border-t border-[#E7DDFC]/60 text-xs text-slate-500">
-                <span className="flex items-center gap-1 text-amber-600 font-bold">
-                  <Star size={13} className="fill-amber-500 text-amber-500" />
-                  {copy.mockup.satisfaction}
-                </span>
-                <span className="font-semibold text-[#6537C0]">
-                  {isRtl ? 'الدخول للوحة التحكم →' : 'Enter Portal →'}
-                </span>
-              </div>
+            <div className="rounded-2xl border border-[#E7DDFC] bg-white p-4 shadow-xs space-y-1">
+              <span className="text-xs font-semibold text-slate-500">
+                {copy.preview.scheduleMetric}
+              </span>
+              <p className="text-base font-bold text-[#6537C0]">
+                {copy.preview.scheduleDesc}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] p-4 space-y-1">
+              <span className="text-xs font-semibold text-slate-500">
+                {copy.preview.posMetric}
+              </span>
+              <p className="text-base font-bold text-[#1D035F]">
+                {copy.preview.posDesc}
+              </p>
             </div>
           </div>
-        </motion.div>
 
+          {/* Neutral Illustrative Live Room & Chair Status */}
+          <div className="mt-4 pt-4 border-t border-[#E7DDFC]/60 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+            <span className="font-semibold text-slate-500">
+              {copy.preview.recentActionLabel}:
+            </span>
+            <span className="rounded-md bg-[#FAF7FD] border border-[#E7DDFC] px-2.5 py-1">
+              {copy.preview.sampleSlot1}
+            </span>
+            <span className="rounded-md bg-[#FAF7FD] border border-[#E7DDFC] px-2.5 py-1">
+              {copy.preview.sampleSlot2}
+            </span>
+            <span className="rounded-md bg-[#FAF7FD] border border-[#E7DDFC] px-2.5 py-1 text-emerald-700">
+              {copy.preview.sampleSlot3}
+            </span>
+          </div>
+        </div>
       </div>
-    </motion.section>
-  );
-}
-
-// 2. TRUST STRIP SECTION
-function TrustStripSection({ lang }: PublicLandingSectionProps) {
-  const items = text[lang].trust;
-
-  return (
-    <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {items.map((item) => {
-        const Icon = item.icon;
-        return (
-          <div
-            key={item.title}
-            className="rounded-2xl border border-[#E7DDFC] bg-white p-5 shadow-xs transition hover:shadow-md hover:border-[#D0BFF8]"
-          >
-            <div className="inline-flex rounded-xl bg-[#FAF7FD] border border-[#E7DDFC] p-2.5 text-[#6537C0] mb-3">
-              <Icon size={20} />
-            </div>
-            <h3 className="text-sm font-bold text-[#1D035F] mb-1">
-              {item.title}
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              {item.subtitle}
-            </p>
-          </div>
-        );
-      })}
     </section>
   );
 }
 
-// 3. CAPABILITIES SECTION
-function CapabilitiesSection({ lang }: PublicLandingSectionProps) {
-  const data = text[lang].capabilities;
+// ==========================================
+// 2. SECTION C — PLATFORM CAPABILITIES
+// ==========================================
+
+function PlatformCapabilitiesSection({ lang }: PublicLandingSectionProps) {
+  const copy = b2bCopy[lang].capabilities;
 
   return (
-    <section className="rounded-[2.5rem] border border-[#E7DDFC] bg-white p-8 md:p-12 shadow-sm space-y-8">
-      <div className="text-center max-w-2xl mx-auto space-y-3">
-        <h2 className="text-2xl md:text-3xl font-black text-[#1D035F] tracking-tight">
-          {data.title}
+    <section id="platform" className="rounded-[2.5rem] border border-[#E7DDFC] bg-white p-6 sm:p-10 md:p-14 shadow-sm space-y-10">
+      {/* Header */}
+      <div className="text-center max-w-3xl mx-auto space-y-3">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#D0BFF8] bg-[#FAF7FD] px-3.5 py-1.5 text-xs font-bold text-[#6537C0]">
+          <Layers size={14} />
+          <span>{copy.badge}</span>
+        </div>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#1D035F] tracking-tight">
+          {copy.title}
         </h2>
         <p className="text-sm md:text-base text-slate-600 leading-relaxed">
-          {data.subtitle}
+          {copy.subtitle}
         </p>
       </div>
 
+      {/* 4 Core Pillars Grid */}
       <div className="grid gap-6 md:grid-cols-2">
-        {data.items.map((item) => {
+        {copy.items.map((item) => {
           const Icon = item.icon;
           return (
             <div
-              key={item.title}
-              className="rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] p-6 hover:bg-[#F3EDFC]/50 transition-colors duration-200 flex flex-col justify-between"
+              key={item.id}
+              className="rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] p-6 hover:bg-[#F3EDFC]/50 hover:border-[#D0BFF8] transition-all duration-200 flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -428,10 +448,10 @@ function CapabilitiesSection({ lang }: PublicLandingSectionProps) {
                     {item.tag}
                   </span>
                 </div>
-                <h3 className="text-base md:text-lg font-bold text-[#1D035F] mb-2">
+                <h3 className="text-base sm:text-lg font-bold text-[#1D035F] mb-2">
                   {item.title}
                 </h3>
-                <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   {item.desc}
                 </p>
               </div>
@@ -443,109 +463,138 @@ function CapabilitiesSection({ lang }: PublicLandingSectionProps) {
   );
 }
 
-// 4. VALUE PROPS SECTION
-function ValuePropsSection({ lang }: PublicLandingSectionProps) {
-  const data = text[lang].values;
+// ==========================================
+// 3. SECTION D — AUTHENTIC PRODUCT SHOWCASE
+// ==========================================
+
+function ProductShowcaseSection({ lang }: PublicLandingSectionProps) {
+  const copy = b2bCopy[lang].showcase;
+  const isRtl = lang === 'ar';
+  const [activeTab, setActiveTab] = useState<'board' | 'pos' | 'staff'>('board');
+
+  const currentPreview = copy.previews[activeTab];
 
   return (
-    <section className="space-y-8">
-      <div className="text-center max-w-2xl mx-auto space-y-3">
-        <h2 className="text-2xl md:text-3xl font-black text-[#1D035F] tracking-tight">
-          {data.title}
+    <section id="features" className="rounded-[2.5rem] border border-[#E7DDFC] bg-gradient-to-b from-[#FAF7FD] via-white to-[#F3EDFC] p-6 sm:p-10 md:p-14 shadow-sm space-y-8">
+      {/* Header */}
+      <div className="text-center max-w-3xl mx-auto space-y-3">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#D0BFF8] bg-white px-3.5 py-1.5 text-xs font-bold text-[#6537C0]">
+          <LayoutDashboard size={14} />
+          <span>{copy.badge}</span>
+        </div>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#1D035F] tracking-tight">
+          {copy.title}
         </h2>
         <p className="text-sm md:text-base text-slate-600 leading-relaxed">
-          {data.subtitle}
+          {copy.subtitle}
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {data.cards.map((card) => (
-          <div
-            key={card.title}
-            className="rounded-2xl border border-[#E7DDFC] bg-white p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between"
+      {/* Switcher Tabs */}
+      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+        {copy.tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id as 'board' | 'pos' | 'staff')}
+            className={`rounded-xl px-5 py-2.5 text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
+              activeTab === tab.id
+                ? 'bg-[#6537C0] text-white shadow-md shadow-[#6537C0]/20'
+                : 'border border-[#E7DDFC] bg-white text-slate-600 hover:bg-[#FAF7FD] hover:text-[#1D035F]'
+            }`}
           >
-            <div>
-              <span className="inline-block px-3 py-1 rounded-full bg-[#FAF7FD] border border-[#E7DDFC] text-xs font-bold text-[#6537C0] mb-4">
-                {card.metric}
-              </span>
-              <h3 className="text-base font-bold text-[#1D035F] mb-2">
-                {card.title}
-              </h3>
-              <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
-                {card.desc}
-              </p>
-            </div>
-          </div>
+            {tab.label}
+          </button>
         ))}
+      </div>
+
+      {/* Showcase Card Frame */}
+      <div className="rounded-3xl border border-[#E7DDFC] bg-white p-6 sm:p-8 shadow-xl shadow-[#6537C0]/5 space-y-6">
+        <div className="space-y-2 border-b border-[#E7DDFC] pb-5">
+          <h3 className="text-lg sm:text-xl font-bold text-[#1D035F]">
+            {currentPreview.title}
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            {currentPreview.desc}
+          </p>
+        </div>
+
+        {/* 3 Detail Columns */}
+        <div className="grid gap-5 md:grid-cols-3">
+          <div className="rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] p-5 space-y-2">
+            <h4 className="text-sm font-bold text-[#1D035F] flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-[#6537C0]" />
+              {currentPreview.col1Title}
+            </h4>
+            <p className="text-xs text-slate-600 leading-relaxed ps-6">
+              {currentPreview.col1Desc}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] p-5 space-y-2">
+            <h4 className="text-sm font-bold text-[#1D035F] flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-[#6537C0]" />
+              {currentPreview.col2Title}
+            </h4>
+            <p className="text-xs text-slate-600 leading-relaxed ps-6">
+              {currentPreview.col2Desc}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-[#E7DDFC] bg-[#FAF7FD] p-5 space-y-2">
+            <h4 className="text-sm font-bold text-[#1D035F] flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-[#6537C0]" />
+              {currentPreview.col3Title}
+            </h4>
+            <p className="text-xs text-slate-600 leading-relaxed ps-6">
+              {currentPreview.col3Desc}
+            </p>
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
-// 5. EXPERIENCE FLOW SECTION
-function ExperienceFlowSection({ lang }: PublicLandingSectionProps) {
-  const data = text[lang].flow;
+// ==========================================
+// 4. SECTION E — PARTNER CONVERSION CTA
+// ==========================================
 
-  return (
-    <section className="rounded-[2.5rem] border border-[#E7DDFC] bg-[#FAF7FD] p-8 md:p-12 space-y-8">
-      <div className="text-center max-w-2xl mx-auto space-y-3">
-        <h2 className="text-2xl md:text-3xl font-black text-[#1D035F] tracking-tight">
-          {data.title}
-        </h2>
-        <p className="text-sm md:text-base text-slate-600 leading-relaxed">
-          {data.subtitle}
-        </p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        {data.steps.map((step) => (
-          <div
-            key={step.step}
-            className="rounded-2xl border border-[#E7DDFC] bg-white p-6 shadow-xs relative overflow-hidden"
-          >
-            <span className="text-4xl font-black text-[#D0BFF8]/40 font-mono absolute top-4 end-4">
-              {step.step}
-            </span>
-            <div className="relative z-10">
-              <span className="inline-block px-3 py-1 rounded-full bg-[#6537C0]/10 text-xs font-bold text-[#6537C0] mb-3">
-                {lang === 'ar' ? `المرحلة ${step.step}` : `Step ${step.step}`}
-              </span>
-              <h3 className="text-base font-bold text-[#1D035F] mb-2">
-                {step.title}
-              </h3>
-              <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
-                {step.desc}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// 6. SECONDARY CONVERSION CTA BANNER
-function CtaBannerSection({ lang, onNavigate }: PublicLandingSectionProps) {
-  const copy = text[lang].cta;
+function PartnerCtaSection({ lang, onNavigate }: PublicLandingSectionProps) {
+  const copy = b2bCopy[lang].cta;
   const isRtl = lang === 'ar';
 
   return (
-    <section className="rounded-[2.5rem] bg-gradient-to-br from-[#1D035F] via-[#2A0878] to-[#6537C0] p-8 md:p-14 text-white text-center shadow-xl shadow-[#1D035F]/20 relative overflow-hidden">
-      <div className="max-w-2xl mx-auto space-y-6 relative z-10">
-        <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+    <section id="join" className="rounded-[2.5rem] bg-gradient-to-br from-[#1D035F] via-[#2A0878] to-[#6537C0] p-8 sm:p-12 md:p-16 text-white text-center shadow-xl shadow-[#1D035F]/20 relative overflow-hidden">
+      {/* Decorative background glows */}
+      <div className="absolute top-0 end-0 h-96 w-96 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 start-0 h-96 w-96 rounded-full bg-[#A379E2]/20 blur-3xl pointer-events-none" />
+
+      <div className="max-w-3xl mx-auto space-y-6 relative z-10">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-tight">
           {copy.title}
         </h2>
-        <p className="text-sm md:text-base text-purple-100/90 leading-relaxed">
+
+        <p className="text-sm md:text-base text-purple-100/90 leading-relaxed max-w-2xl mx-auto">
           {copy.subtitle}
         </p>
-        <div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
           <button
             type="button"
             onClick={() => onNavigate('/register')}
-            className="inline-flex items-center gap-3 rounded-2xl bg-white text-[#1D035F] hover:bg-[#FAF7FD] px-8 py-4 text-base font-bold shadow-lg transition-all hover:-translate-y-0.5 cursor-pointer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-3 rounded-2xl bg-white text-[#1D035F] hover:bg-[#FAF7FD] px-8 py-4 text-sm sm:text-base font-bold shadow-lg transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
           >
-            <span>{copy.button}</span>
+            <span>{copy.primaryButton}</span>
             <ArrowRight size={18} className={isRtl ? 'rotate-180' : ''} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate('/login')}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/10 hover:bg-white/20 px-8 py-4 text-sm sm:text-base font-bold text-white backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+          >
+            <span>{copy.secondaryButton}</span>
           </button>
         </div>
       </div>
@@ -553,30 +602,142 @@ function CtaBannerSection({ lang, onNavigate }: PublicLandingSectionProps) {
   );
 }
 
-// 7. FOOTER SECTION
-function FooterSection({ lang }: PublicLandingSectionProps) {
-  const copy = text[lang].footer;
+// ==========================================
+// 5. SECTION F — B2B FOOTER
+// ==========================================
+
+function B2BFooterSection({ lang, onNavigate }: PublicLandingSectionProps) {
+  const copy = b2bCopy[lang].footer;
+  const isRtl = lang === 'ar';
 
   return (
-    <footer className="pt-8 pb-4 border-t border-[#E7DDFC] flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-      <div className="flex items-center gap-3">
-        <img src={barspaLogo} alt="BarSpa" className="h-7 w-auto object-contain" />
-        <span className="hidden sm:inline text-slate-400">|</span>
-        <span className="hidden sm:inline max-w-md truncate">{copy.description}</span>
+    <footer className="pt-12 pb-6 border-t border-[#E7DDFC] space-y-8 text-xs text-slate-500">
+      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Col 1: Brand & Tagline */}
+        <div className="space-y-4">
+          <img
+            src={barspaLogo}
+            alt="BarSpa"
+            className="h-9 w-auto object-contain cursor-pointer"
+            onClick={() => scrollToAnchor('#hero')}
+          />
+          <p className="text-xs text-slate-500 leading-relaxed">
+            {copy.tagline}
+          </p>
+        </div>
+
+        {/* Col 2: Platform Links */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[#1D035F]">
+            {copy.platformTitle}
+          </h4>
+          <ul className="space-y-2 text-xs">
+            <li>
+              <button
+                type="button"
+                onClick={() => scrollToAnchor('#hero')}
+                className="hover:text-[#6537C0] transition cursor-pointer"
+              >
+                {copy.home}
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                onClick={() => scrollToAnchor('#platform')}
+                className="hover:text-[#6537C0] transition cursor-pointer"
+              >
+                {copy.capabilities}
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                onClick={() => scrollToAnchor('#features')}
+                className="hover:text-[#6537C0] transition cursor-pointer"
+              >
+                {copy.features}
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                onClick={() => scrollToAnchor('#join')}
+                className="hover:text-[#6537C0] transition cursor-pointer"
+              >
+                {copy.join}
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        {/* Col 3: Business Entry Points */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[#1D035F]">
+            {copy.businessTitle}
+          </h4>
+          <ul className="space-y-2 text-xs">
+            <li>
+              <button
+                type="button"
+                onClick={() => onNavigate('/register')}
+                className="hover:text-[#6537C0] transition cursor-pointer"
+              >
+                {copy.register}
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                onClick={() => onNavigate('/login')}
+                className="hover:text-[#6537C0] transition cursor-pointer"
+              >
+                {copy.login}
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        {/* Col 4: Trust & Contacts */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[#1D035F]">
+            {copy.trustTitle}
+          </h4>
+          <ul className="space-y-2 text-xs">
+            <li>
+              <span className="text-slate-500">{copy.privacy}</span>
+            </li>
+            <li>
+              <span className="text-slate-500">{copy.terms}</span>
+            </li>
+            <li>
+              <span className="text-slate-500">{copy.contact}</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <div>
+
+      {/* Bottom Copyright Strip */}
+      <div className="border-t border-[#E7DDFC]/60 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
         <span>{copy.rights}</span>
+        <div className="flex items-center gap-3">
+          <span className="rounded-full bg-[#E7DDFC]/50 px-2.5 py-0.5 text-[#1D035F] font-bold">
+            {isRtl ? 'المملكة العربية السعودية 🇸🇦' : 'Saudi Arabia 🇸🇦'}
+          </span>
+        </div>
       </div>
     </footer>
   );
 }
 
+// ==========================================
+// REGISTRY EXPORTS
+// ==========================================
+
 export const landingSectionRegistry: PublicLandingSectionComponentMap = {
-  hero: HeroSection,
-  trust: TrustStripSection,
-  capabilities: CapabilitiesSection,
-  'value-props': ValuePropsSection,
-  'experience-flow': ExperienceFlowSection,
-  'cta-banner': CtaBannerSection,
-  footer: FooterSection
+  'b2b-hero': B2BHeroSection,
+  'platform-capabilities': PlatformCapabilitiesSection,
+  'product-showcase': ProductShowcaseSection,
+  'partner-cta': PartnerCtaSection,
+  'b2b-footer': B2BFooterSection
 };

@@ -347,7 +347,7 @@ export default function TeamMemberProfileDrawer({ staffId, onClose, isRtl, onRef
             />
           ) : (
             <div className="text-center text-slate-500 py-10">
-              <User size={48} className="mx-auto mb-4 text-slate-300" />
+              <User size={48} className="mx-auto mb-4 text-slate-500 dark:text-zinc-400" />
               <p>{isRtl ? 'لم يتم العثور على الموظف' : 'Employee not found.'}</p>
             </div>
           )}

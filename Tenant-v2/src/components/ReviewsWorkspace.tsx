@@ -205,16 +205,16 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
   // Render stars helper
   const renderStars = (rating: number, size = 14) => {
     return (
-      <div className="flex gap-0.5 text-amber-500">
+      <div className="flex gap-0.5 text-amber-600 dark:text-amber-400">
         {Array.from({ length: 5 }).map((_, i) => {
           const isFilled = i < Math.floor(rating);
           const isHalf = !isFilled && i < rating;
           if (isFilled) {
             return <Star key={i} size={size} fill="currentColor" stroke="none" />;
           } else if (isHalf) {
-            return <StarHalf key={i} size={size} fill="currentColor" className="text-amber-500" />;
+            return <StarHalf key={i} size={size} fill="currentColor" className="text-amber-600 dark:text-amber-400" />;
           } else {
-            return <Star key={i} size={size} className="text-zinc-600" />;
+            return <Star key={i} size={size} className="text-slate-400 dark:text-zinc-600" />;
           }
         })}
       </div>
@@ -295,22 +295,22 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         
         {/* Statistics Card 1: Average Rating */}
-        <div className={`p-6 rounded-2xl border text-start flex flex-col justify-between relative overflow-hidden ${
-          darkMode ? 'bg-zinc-900/60 border-zinc-850' : 'bg-white border-neutral-150 shadow-xs'
+        <div className={`p-6 rounded-2xl border text-start flex flex-col justify-between relative overflow-hidden transition-all duration-200 ${
+          darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200/90 shadow-2xs'
         }`}>
           <div className="space-y-1">
-            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
               {isRtl ? 'متوسط تقييم الخدمة' : 'Average Rating'}
             </span>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-black font-mono text-amber-500">{averageRating}</span>
-              <span className="text-xs text-zinc-400">/ 5.0</span>
+              <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">/ 5.0</span>
             </div>
             <div className="pt-1">
               {renderStars(averageRating, 16)}
             </div>
           </div>
-          <p className="text-[10px] text-zinc-500 mt-4">
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-4">
             {isRtl ? 'محسوب من إجمالي الآراء والمشاركات.' : 'Aggregated score from real client visits.'}
           </p>
           <div className="absolute right-3 bottom-3 opacity-10">
@@ -319,19 +319,19 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
         </div>
 
         {/* Statistics Card 2: Total Reviews */}
-        <div className={`p-6 rounded-2xl border text-start flex flex-col justify-between relative overflow-hidden ${
-          darkMode ? 'bg-zinc-900/60 border-zinc-850' : 'bg-white border-neutral-150 shadow-xs'
+        <div className={`p-6 rounded-2xl border text-start flex flex-col justify-between relative overflow-hidden transition-all duration-200 ${
+          darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200/90 shadow-2xs'
         }`}>
           <div className="space-y-1">
-            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
               {isRtl ? 'إجمالي المراجعات المستلمة' : 'Total Reviews'}
             </span>
             <p className="text-3xl font-black font-mono text-brand-500">{totalReviewsCount}</p>
-            <span className="text-[10px] text-emerald-500 font-bold block">
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block">
               {reviews.filter(r => r.rating >= 4).length} {isRtl ? 'تقييمات ممتازة (٤-٥ نجمة)' : 'High scores (4-5 ★)'}
             </span>
           </div>
-          <p className="text-[10px] text-zinc-500 mt-4">
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-4">
             {isRtl ? 'الآراء الموثقة عبر نظام الحجوزات الذكي.' : 'Verified customer ratings logged via booking client.'}
           </p>
           <div className="absolute right-3 bottom-3 opacity-10">
@@ -340,26 +340,26 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
         </div>
 
         {/* Statistics Card 3: Visible vs Hidden Reviews */}
-        <div className={`p-6 rounded-2xl border text-start flex flex-col justify-between relative overflow-hidden ${
-          darkMode ? 'bg-zinc-900/60 border-zinc-850' : 'bg-white border-neutral-150 shadow-xs'
+        <div className={`p-6 rounded-2xl border text-start flex flex-col justify-between relative overflow-hidden transition-all duration-200 ${
+          darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200/90 shadow-2xs'
         }`}>
           <div className="space-y-1">
-            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
               {isRtl ? 'حالة النشر والظهور العام' : 'Visibility Control'}
             </span>
             <div className="flex items-baseline gap-4">
               <div>
-                <span className="text-2xl font-black font-mono text-emerald-500">{visibleReviewsCount}</span>
-                <span className="text-[10px] text-zinc-400 block">{isRtl ? 'منشور للعامة' : 'Published'}</span>
+                <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">{visibleReviewsCount}</span>
+                <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">{isRtl ? 'منشور للعامة' : 'Published'}</span>
               </div>
-              <div className="border-s border-zinc-800 h-8 self-center px-1"></div>
+              <div className="border-s border-slate-200 dark:border-zinc-800 h-8 self-center px-1"></div>
               <div>
-                <span className="text-2xl font-black font-mono text-rose-500">{hiddenReviewsCount}</span>
-                <span className="text-[10px] text-zinc-400 block">{isRtl ? 'محجوب / قيد المراجعة' : 'Hidden / Auditing'}</span>
+                <span className="text-2xl font-black font-mono text-rose-600 dark:text-rose-400">{hiddenReviewsCount}</span>
+                <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">{isRtl ? 'محجوب / قيد المراجعة' : 'Hidden / Auditing'}</span>
               </div>
             </div>
           </div>
-          <p className="text-[10px] text-zinc-500 mt-4">
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-4">
             {isRtl ? 'تحكم فوري في جودة المحتوى المعروض على الموقع.' : 'Real-time visibility adjustment on brand public page.'}
           </p>
           <div className="absolute right-3 bottom-3 opacity-10">
@@ -370,19 +370,19 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
       </div>
 
       {/* FILTER TABS (All, Visible, Hidden) */}
-      <div className="border-b border-zinc-800/40 flex justify-between items-center flex-wrap gap-4">
+      <div className="border-b border-slate-200 dark:border-zinc-800/40 flex justify-between items-center flex-wrap gap-4">
         <div className="flex gap-4">
           <button
             onClick={() => { setActiveTab('all'); }}
             className={`pb-3 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
               activeTab === 'all' 
                 ? 'border-brand-500 text-brand-500' 
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                : 'border-transparent text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
             <MessageSquare size={14} />
             {isRtl ? 'جميع المراجعات' : 'All Reviews'}
-            <span className="text-[10px] font-mono px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded-full font-bold">{totalReviewsCount}</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded-full font-bold">{totalReviewsCount}</span>
           </button>
 
           <button
@@ -390,12 +390,12 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
             className={`pb-3 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
               activeTab === 'visible' 
                 ? 'border-brand-500 text-brand-500' 
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                : 'border-transparent text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
             <CheckCircle size={14} className="text-emerald-500" />
             {isRtl ? 'المنشورة علناً' : 'Published & Visible'}
-            <span className="text-[10px] font-mono px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-full font-bold">{visibleReviewsCount}</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 rounded-full font-bold">{visibleReviewsCount}</span>
           </button>
 
           <button
@@ -403,12 +403,12 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
             className={`pb-3 text-xs md:text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
               activeTab === 'hidden' 
                 ? 'border-brand-500 text-brand-500' 
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                : 'border-transparent text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
             <EyeOff size={14} className="text-rose-500" />
             {isRtl ? 'المخفية والموقوفة' : 'Hidden & Audited'}
-            <span className="text-[10px] font-mono px-1.5 py-0.5 bg-rose-500/10 text-rose-400 rounded-full font-bold">{hiddenReviewsCount}</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 rounded-full font-bold">{hiddenReviewsCount}</span>
           </button>
         </div>
 
@@ -422,28 +422,28 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
       </div>
 
       {/* ADVANCED FILTERS CARD */}
-      <div className={`p-5 rounded-2xl border text-start space-y-4 ${
-        darkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-neutral-150 shadow-xs'
+      <div className={`p-5 rounded-2xl border text-start space-y-4 transition-all duration-200 ${
+        darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200/90 shadow-2xs'
       }`}>
-        <div className="flex items-center gap-2 border-b border-zinc-800/60 pb-2">
+        <div className="flex items-center gap-2 border-b border-slate-100 dark:border-zinc-800/60 pb-2">
           <Filter size={14} className="text-brand-500" />
-          <h4 className="font-extrabold text-xs uppercase tracking-wider">{isRtl ? 'محرك تصفية متقدم للبحث والمطابقة' : 'Advanced Targeting & Search Filters'}</h4>
+          <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 dark:text-zinc-100">{isRtl ? 'محرك تصفية متقدم للبحث والمطابقة' : 'Advanced Targeting & Search Filters'}</h4>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
           
           {/* Search bar */}
           <div className="space-y-1.5">
-            <label className="font-bold text-zinc-400 block">{isRtl ? 'بحث حر (العميل أو التعليق)' : 'Free Search (Client / Comment)'}</label>
+            <label className="font-bold text-slate-600 dark:text-zinc-400 block">{isRtl ? 'بحث حر (العميل أو التعليق)' : 'Free Search (Client / Comment)'}</label>
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-3 text-zinc-500" />
+              <Search size={14} className="absolute left-3 top-3 text-slate-400 dark:text-zinc-500" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={isRtl ? 'ابحث عن اسم، كلمة مفتاحية...' : 'Keyword, customer name...'}
-                className={`w-full pl-9 pr-3 py-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden font-bold transition-all ${
-                  darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200 text-neutral-850'
+                className={`w-full pl-9 pr-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none font-bold transition-all ${
+                  darkMode ? 'bg-zinc-950 border-zinc-800 text-white placeholder:text-zinc-500' : 'bg-slate-50/70 border-slate-200 text-slate-900 placeholder:text-slate-400 hover:bg-white focus:bg-white'
                 }`}
               />
             </div>
@@ -451,12 +451,12 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
 
           {/* Rated Staff */}
           <div className="space-y-1.5">
-            <label className="font-bold text-zinc-400 block">{isRtl ? 'فلترة حسب الموظف المقيّم' : 'Assigned Stylist / Staff'}</label>
+            <label className="font-bold text-slate-600 dark:text-zinc-400 block">{isRtl ? 'فلترة حسب الموظف المقيّم' : 'Assigned Stylist / Staff'}</label>
             <select
               value={selectedStaff}
               onChange={(e) => setSelectedStaff(e.target.value)}
-              className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden font-bold cursor-pointer transition-all ${
-                darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200 text-neutral-850'
+              className={`w-full p-2.5 rounded-xl border focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none font-bold cursor-pointer transition-all ${
+                darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50/70 border-slate-200 text-slate-900 hover:bg-white focus:bg-white'
               }`}
             >
               <option value="all">{isRtl ? '-- جميع الموظفين --' : '-- All Staff --'}</option>
@@ -468,12 +468,12 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
 
           {/* Stars Rating select */}
           <div className="space-y-1.5">
-            <label className="font-bold text-zinc-400 block">{isRtl ? 'فلترة حسب عدد النجوم' : 'Stars score'}</label>
+            <label className="font-bold text-slate-600 dark:text-zinc-400 block">{isRtl ? 'فلترة حسب عدد النجوم' : 'Stars score'}</label>
             <select
               value={selectedRating}
               onChange={(e) => setSelectedRating(e.target.value)}
-              className={`w-full p-2.5 rounded-lg border focus:ring-1 focus:ring-brand-500 outline-hidden font-bold cursor-pointer transition-all ${
-                darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200 text-neutral-850'
+              className={`w-full p-2.5 rounded-xl border focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none font-bold cursor-pointer transition-all ${
+                darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50/70 border-slate-200 text-slate-900 hover:bg-white focus:bg-white'
               }`}
             >
               <option value="all">{isRtl ? '-- الكل --' : '-- All Stars --'}</option>
@@ -487,14 +487,14 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
 
           {/* Date range inputs */}
           <div className="space-y-1.5">
-            <label className="font-bold text-zinc-400 block">{isRtl ? 'تاريخ البداية والنهاية' : 'Created Date Range'}</label>
+            <label className="font-bold text-slate-600 dark:text-zinc-400 block">{isRtl ? 'تاريخ البداية والنهاية' : 'Created Date Range'}</label>
             <div className="flex gap-2">
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className={`p-2 rounded-lg border text-[11px] focus:ring-1 focus:ring-brand-500 outline-hidden flex-1 ${
-                  darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200 text-neutral-850'
+                className={`p-2 rounded-xl border text-[11px] focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none flex-1 ${
+                  darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50/70 border-slate-200 text-slate-900 hover:bg-white focus:bg-white'
                 }`}
                 title={isRtl ? 'تاريخ البداية' : 'Start Date'}
               />
@@ -502,8 +502,8 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className={`p-2 rounded-lg border text-[11px] focus:ring-1 focus:ring-brand-500 outline-hidden flex-1 ${
-                  darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-neutral-200 text-neutral-855'
+                className={`p-2 rounded-xl border text-[11px] focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none flex-1 ${
+                  darkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-slate-50/70 border-slate-200 text-slate-900 hover:bg-white focus:bg-white'
                 }`}
                 title={isRtl ? 'تاريخ النهاية' : 'End Date'}
               />
@@ -513,34 +513,34 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
         </div>
 
         {/* Checkboxes / Switches Row */}
-        <div className="flex flex-wrap gap-6 pt-2 border-t border-zinc-800/40 text-xs">
+        <div className="flex flex-wrap gap-6 pt-2 border-t border-slate-100 dark:border-zinc-800/40 text-xs">
           
-          <label className="flex items-center gap-2 cursor-pointer group">
+          <label className="flex items-center gap-2 cursor-pointer group select-none">
             <input
               type="checkbox"
               checked={filterNeedsReply}
               onChange={(e) => setFilterNeedsReply(e.target.checked)}
-              className="rounded border-zinc-700 text-brand-500 focus:ring-brand-500 bg-zinc-950 h-4 w-4"
+              className="rounded border-slate-300 dark:border-zinc-700 text-brand-500 focus:ring-brand-500 bg-white dark:bg-zinc-950 h-4 w-4"
             />
-            <span className="font-bold text-zinc-300 group-hover:text-white transition-colors">
+            <span className="font-bold text-slate-700 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
               {isRtl ? '⚠️ مراجعات معلقة تحتاج لرد فوري' : 'Needs Professional Reply'}
             </span>
           </label>
 
-          <label className="flex items-center gap-2 cursor-pointer group">
+          <label className="flex items-center gap-2 cursor-pointer group select-none">
             <input
               type="checkbox"
               checked={filterLowRated}
               onChange={(e) => setFilterLowRated(e.target.checked)}
-              className="rounded border-zinc-700 text-brand-500 focus:ring-brand-500 bg-zinc-950 h-4 w-4"
+              className="rounded border-slate-300 dark:border-zinc-700 text-brand-500 focus:ring-brand-500 bg-white dark:bg-zinc-950 h-4 w-4"
             />
-            <span className="font-bold text-zinc-300 group-hover:text-white transition-colors">
+            <span className="font-bold text-slate-700 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
               {isRtl ? '📉 تقييمات متدنية (٣ نجوم أو أقل)' : 'Low Rated Reviews (3★ or less)'}
             </span>
           </label>
 
           {/* Quick info counter */}
-          <div className="mr-auto text-zinc-500 text-[11px] font-bold flex items-center gap-1">
+          <div className="mr-auto text-slate-500 dark:text-zinc-400 text-[11px] font-bold flex items-center gap-1">
             <Sparkles size={11} className="text-amber-500" />
             <span>
               {isRtl 
@@ -554,23 +554,23 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
       </div>
 
       {/* REVIEWS TABLE */}
-      <div className={`rounded-2xl border overflow-hidden ${
-        darkMode ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-neutral-150 shadow-sm'
+      <div className={`rounded-2xl border overflow-hidden transition-all duration-200 ${
+        darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200/90 shadow-2xs'
       }`}>
-        <div className="p-5 border-b border-zinc-800/60 flex items-center justify-between flex-wrap gap-3">
+        <div className="p-5 border-b border-slate-100 dark:border-zinc-800/80 flex items-center justify-between flex-wrap gap-3">
           <div className="text-start">
-            <h4 className="font-extrabold text-sm flex items-center gap-2">
+            <h4 className="font-extrabold text-sm flex items-center gap-2 text-slate-900 dark:text-zinc-100">
               <MessageSquare className="text-brand-500" size={16} />
               {isRtl ? 'سجل تقييمات وآراء العملاء' : 'Guest Reviews Moderation Stream'}
             </h4>
-            <p className="text-[10px] text-zinc-400 mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
               {isRtl 
                 ? 'مراجعة الملاحظات المسجلة للتحقق من تلبيتها معايير الجودة الراقية لبارسبا.' 
                 : 'View, reply inline, and control public visibility of incoming ratings.'}
             </p>
           </div>
 
-          <span className="text-[10px] font-mono px-2 py-0.5 bg-brand-500/10 border border-brand-500/20 text-brand-500 rounded-full font-bold">
+          <span className="text-[10px] font-mono px-2.5 py-0.5 bg-brand-50 text-brand-800 border border-brand-200 dark:bg-brand-950/40 dark:text-brand-300 dark:border-brand-800 rounded-full font-bold">
             {isRtl ? `عرض ${filteredReviews.length} من أصل ${reviews.length}` : `Displaying ${filteredReviews.length} of ${reviews.length}`}
           </span>
         </div>
@@ -578,22 +578,22 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
         {loading ? (
           <div className="p-16 text-center space-y-4">
             <RefreshCw size={36} className="animate-spin text-brand-500 mx-auto" />
-            <p className="text-xs text-zinc-400">{isRtl ? 'جاري جلب الآراء وتغذية التقييمات من الخادم...' : 'Retrieving customer reviews ledger...'}</p>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">{isRtl ? 'جاري جلب الآراء وتغذية التقييمات من الخادم...' : 'Retrieving customer reviews ledger...'}</p>
           </div>
         ) : filteredReviews.length === 0 ? (
           <div className="p-16 text-center space-y-4">
-            <div className="p-4 bg-zinc-800/40 text-zinc-600 rounded-full w-fit mx-auto">
+            <div className="p-4 bg-slate-50 dark:bg-zinc-800/60 text-slate-400 dark:text-zinc-500 rounded-full w-fit mx-auto border border-slate-100 dark:border-zinc-800">
               <Filter size={32} />
             </div>
-            <h5 className="font-extrabold text-xs">{isRtl ? 'لم نعثر على أي نتائج مطابقة' : 'No records found'}</h5>
-            <p className="text-[11px] text-zinc-400 max-w-sm mx-auto">
+            <h5 className="font-extrabold text-xs text-slate-900 dark:text-zinc-100">{isRtl ? 'لم نعثر على أي نتائج مطابقة' : 'No records found'}</h5>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
               {isRtl 
                 ? 'جرب تغيير معايير التصفية أو كتابة كلمة مفتاحية مغايرة للوصول للنتائج المطلوبة.' 
                 : 'No reviews found matching the active filter parameters. Try adjusting your search query.'}
             </p>
             <button
               onClick={handleResetFilters}
-              className="text-xs bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-2 px-4 rounded-xl cursor-pointer"
+              className="text-xs bg-slate-900 hover:bg-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold py-2 px-4 rounded-xl cursor-pointer"
             >
               {isRtl ? 'تصفير الفلاتر والبحث' : 'Reset Target Criteria'}
             </button>
@@ -602,8 +602,8 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-start border-collapse">
               <thead>
-                <tr className={`border-b border-zinc-800 text-zinc-400 uppercase tracking-wider text-[10px] font-bold ${
-                  darkMode ? 'bg-zinc-950/45' : 'bg-neutral-50'
+                <tr className={`border-b border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 uppercase tracking-wider text-[10px] font-bold ${
+                  darkMode ? 'bg-zinc-950/45' : 'bg-slate-50/70'
                 }`}>
                   <th className="p-4 text-start font-black">{isRtl ? 'العميل' : 'Customer'}</th>
                   <th className="p-4 text-start font-black">{isRtl ? 'التقييم' : 'Rating'}</th>
@@ -615,26 +615,26 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                   <th className="p-4 text-center font-black">{isRtl ? 'الإجراءات والتحكم' : 'Moderation Actions'}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60">
                 {filteredReviews.map((rev) => {
                   const isReplying = editingReplyId === rev.id;
                   const hasReply = rev.reply !== null;
 
                   return (
                     <React.Fragment key={rev.id}>
-                      <tr className={`transition-colors hover:bg-zinc-800/20 ${
-                        !rev.isVisible ? 'bg-rose-500/[0.02]' : ''
+                      <tr className={`transition-colors hover:bg-slate-50/80 dark:hover:bg-zinc-800/20 ${
+                        !rev.isVisible ? 'bg-rose-500/[0.03]' : ''
                       }`}>
                         
                         {/* Customer Column */}
                         <td className="p-4 text-start">
                           <div className="flex items-center gap-2.5">
-                            <div className="h-8 w-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 font-extrabold uppercase text-[11px]">
+                            <div className="h-8 w-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-600 dark:text-brand-400 font-extrabold uppercase text-[11px]">
                               {rev.customer.charAt(0)}
                             </div>
                             <div>
-                              <p className="font-extrabold text-xs text-zinc-200">{rev.customer}</p>
-                              <span className="text-[9px] text-zinc-500 font-mono block">ID: {rev.id}</span>
+                              <p className="font-extrabold text-xs text-slate-900 dark:text-zinc-100">{rev.customer}</p>
+                              <span className="text-[9px] text-slate-400 dark:text-zinc-500 font-mono block">ID: {rev.id}</span>
                             </div>
                           </div>
                         </td>
@@ -648,20 +648,20 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                         </td>
 
                         {/* Employee Column */}
-                        <td className="p-4 text-start font-bold text-zinc-300">
+                        <td className="p-4 text-start font-bold text-slate-700 dark:text-zinc-200">
                           <div className="flex items-center gap-1.5">
-                            <User size={11} className="text-zinc-500" />
+                            <User size={11} className="text-slate-400 dark:text-zinc-500" />
                             <span>{rev.employee}</span>
                           </div>
                         </td>
 
                         {/* Comment Column */}
-                        <td className="p-4 text-start max-w-xs text-zinc-300">
+                        <td className="p-4 text-start max-w-xs text-slate-700 dark:text-zinc-300">
                           <div className="space-y-1 text-xs">
                             <p className="leading-relaxed font-sans font-medium">
                               "{isRtl ? rev.commentAr : rev.commentEn}"
                             </p>
-                            <span className="text-[9px] text-zinc-500 italic block">
+                            <span className="text-[9px] text-slate-500 dark:text-zinc-500 italic block">
                               {isRtl ? rev.commentEn : rev.commentAr}
                             </span>
                           </div>
@@ -670,34 +670,34 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                         {/* Reply Column */}
                         <td className="p-4 text-start">
                           {hasReply ? (
-                            <div className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-[10px] space-y-1">
-                              <span className="font-extrabold text-emerald-500 block uppercase tracking-wider text-[8px] flex items-center gap-1">
+                            <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 text-[10px] space-y-1">
+                              <span className="font-extrabold text-emerald-800 dark:text-emerald-300 block uppercase tracking-wider text-[8px] flex items-center gap-1">
                                 <ShieldCheck size={10} />
                                 {isRtl ? 'تم الرد' : 'Replied'}
                               </span>
-                              <p className="text-zinc-400 italic line-clamp-2">"{rev.reply}"</p>
+                              <p className="text-slate-600 dark:text-zinc-300 italic line-clamp-2">"{rev.reply}"</p>
                             </div>
                           ) : (
-                            <span className="text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-500 px-1.5 py-0.5 rounded font-extrabold">
+                            <span className="text-[10px] bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded font-extrabold">
                               {isRtl ? 'بانتظار الرد' : 'Pending reply'}
                             </span>
                           )}
                         </td>
 
                         {/* Date Column */}
-                        <td className="p-4 text-start text-[10px] font-mono text-zinc-400">
+                        <td className="p-4 text-start text-[10px] font-mono text-slate-500 dark:text-zinc-400">
                           <div className="flex items-center gap-1">
-                            <Calendar size={11} className="text-zinc-500" />
+                            <Calendar size={11} className="text-slate-400 dark:text-zinc-500" />
                             <span>{getFormattedDate(rev.date)}</span>
                           </div>
                         </td>
 
                         {/* Visibility badge */}
                         <td className="p-4 text-start">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
                             rev.isVisible 
-                              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
-                              : 'bg-rose-500/10 border-rose-500/20 text-rose-500'
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300' 
+                              : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300'
                           }`}>
                             {rev.isVisible ? (isRtl ? 'مرئي للعامة' : 'Published') : (isRtl ? 'محجوب عن الفيد' : 'Hidden')}
                           </span>
@@ -714,8 +714,8 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                               disabled={actionLoadingId === rev.id}
                               className={`p-1.5 rounded-lg border text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 ${
                                 rev.isVisible 
-                                  ? 'bg-rose-500/5 hover:bg-rose-500 text-rose-500 hover:text-white border-rose-500/20' 
-                                  : 'bg-emerald-500/5 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20'
+                                  ? 'bg-rose-50 hover:bg-rose-500 text-rose-700 hover:text-white border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-800' 
+                                  : 'bg-emerald-50 hover:bg-emerald-500 text-emerald-700 hover:text-white border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800'
                               }`}
                               title={rev.isVisible ? (isRtl ? 'حجب المراجعة عن العامة' : 'Hide from Public') : (isRtl ? 'نشر المراجعة على العام' : 'Publish to Public')}
                             >
@@ -737,8 +737,8 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                               }}
                               className={`p-1.5 rounded-lg border text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 ${
                                 isReplying 
-                                  ? 'bg-zinc-800 border-zinc-700 text-white' 
-                                  : 'bg-brand-500/5 hover:bg-brand-500 text-brand-500 hover:text-white border-brand-500/20'
+                                  ? 'bg-slate-800 border-slate-700 text-white' 
+                                  : 'bg-brand-50 hover:bg-brand-500 text-brand-700 hover:text-white border-brand-200 dark:bg-brand-950/20 dark:text-brand-400 dark:border-brand-800'
                               }`}
                             >
                               <MessageCircle size={11} />
@@ -753,7 +753,7 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                       {/* INLINE REPLY ROW DRAWER */}
                       {isReplying && (
                         <tr className={`${
-                          darkMode ? 'bg-zinc-950/70' : 'bg-neutral-50/70'
+                          darkMode ? 'bg-zinc-950/70' : 'bg-slate-50/90 border-y border-slate-200'
                         }`}>
                           <td colSpan={8} className="p-4">
                             <div className="space-y-3.5 text-start max-w-4xl mx-auto border-s-2 border-brand-500 pl-4 py-1">
@@ -780,14 +780,14 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                                 onChange={(e) => setTempReplyText(e.target.value)}
                                 placeholder={isRtl ? 'اكتب رداً مهذباً وفخماً يناسب هوية ومستوى صالون بارسبا الفخم...' : 'Draft a welcoming and prestigious response to represent BarSpa salon standards...'}
                                 rows={3}
-                                className={`w-full p-3 text-xs rounded-xl border focus:ring-1 focus:ring-brand-500 outline-hidden font-medium transition-all ${
-                                  darkMode ? 'bg-zinc-950 border-zinc-850 text-white' : 'bg-white border-neutral-250 text-neutral-800'
+                                className={`w-full p-3 text-xs rounded-xl border focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none font-medium transition-all ${
+                                  darkMode ? 'bg-zinc-950 border-zinc-800 text-white placeholder:text-zinc-500' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
                                 }`}
                               />
 
                               {/* Suggestion Chips */}
                               <div className="space-y-1.5">
-                                <span className="text-[9px] text-zinc-500 font-bold block">{isRtl ? '💡 مسودات ردود سريعة ومقترحة جاهزة للاستخدام:' : '💡 Instant prestigious suggestion chips:'}</span>
+                                <span className="text-[9px] text-slate-500 dark:text-zinc-400 font-bold block">{isRtl ? '💡 مسودات ردود سريعة ومقترحة جاهزة للاستخدام:' : '💡 Instant prestigious suggestion chips:'}</span>
                                 <div className="flex flex-wrap gap-2">
                                   {(isRtl ? quickReplySuggestionsAr : quickReplySuggestionsEn).map((suggest, sIdx) => (
                                     <button
@@ -799,7 +799,7 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                                           ? 'bg-brand-500 border-brand-500 text-white'
                                           : darkMode
                                           ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-                                          : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-800'
+                                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                                       }`}
                                     >
                                       {suggest}
@@ -816,8 +816,8 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                                     setEditingReplyId(null);
                                     setTempReplyText('');
                                   }}
-                                  className={`px-4 py-2 border rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
-                                    darkMode ? 'border-zinc-800 text-zinc-400 hover:text-white' : 'border-neutral-200 text-neutral-500 hover:text-neutral-800'
+                                  className={`px-4 py-2 border rounded-xl text-[10px] font-bold cursor-pointer transition-all ${
+                                    darkMode ? 'border-zinc-800 text-zinc-400 hover:text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                   }`}
                                 >
                                   {isRtl ? 'إلغاء' : 'Cancel'}
@@ -826,7 +826,7 @@ export default function ReviewsWorkspace({ lang, darkMode = false }: ReviewsWork
                                   type="button"
                                   onClick={() => handleSaveReply(rev.id)}
                                   disabled={actionLoadingId === rev.id || !tempReplyText.trim()}
-                                  className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:bg-neutral-600 text-white text-[10px] font-extrabold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-brand-500/10"
+                                  className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-[10px] font-extrabold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
                                 >
                                   {actionLoadingId === rev.id ? <RefreshCw size={11} className="animate-spin" /> : <CheckCircle size={11} />}
                                   {isRtl ? 'حفظ وإرسال الرد' : 'Publish Reply'}

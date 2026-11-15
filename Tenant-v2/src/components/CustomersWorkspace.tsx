@@ -1122,10 +1122,10 @@ export default function CustomersWorkspace({
                     ) : customersList.length === 0 ? (
                       // Empty State
                       <tr>
-                        <td colSpan={12} className="px-5 py-16 text-center text-neutral-400">
+                        <td colSpan={12} className="px-5 py-16 text-center text-slate-500 dark:text-zinc-400">
                           <div className="flex flex-col items-center gap-3 justify-center">
-                            <Users size={40} className="text-neutral-300" />
-                            <p className="font-extrabold text-neutral-600">{isRtl ? 'لا يوجد عملاء يطابقون خيارات البحث.' : 'No customers matched your filter options.'}</p>
+                            <Users size={40} className="text-slate-500 dark:text-zinc-400" />
+                            <p className="font-extrabold text-slate-700 dark:text-zinc-200">{isRtl ? 'لا يوجد عملاء يطابقون خيارات البحث.' : 'No customers matched your filter options.'}</p>
                             <button
                               onClick={() => {
                                 setSearchQuery('');
@@ -2070,13 +2070,13 @@ export default function CustomersWorkspace({
                               <div className="p-12 text-center text-rose-500 space-y-2 bg-rose-50/20">
                                 <AlertCircle size={24} className="mx-auto" />
                                 <h4 className="text-xs font-black">{isRtl ? 'حدث خطأ أثناء الاتصال بالخادم' : 'Error querying history'}</h4>
-                                <p className="text-[10px] text-neutral-400">{isRtl ? 'يرجى التحقق من اتصال الشبكة وإعادة المحاولة.' : 'Could not query data from server.'}</p>
+                                <p className="text-[10px] text-slate-600 dark:text-zinc-400">{isRtl ? 'يرجى التحقق من اتصال الشبكة وإعادة المحاولة.' : 'Could not query data from server.'}</p>
                               </div>
                             ) : historyData.length === 0 ? (
-                              <div className="p-16 text-center text-neutral-400 space-y-2">
-                                <Filter size={24} className="mx-auto text-neutral-300" />
-                                <h4 className="text-xs font-black text-neutral-700">{isRtl ? 'لا توجد نتائج مطابقة' : 'No records match filters'}</h4>
-                                <p className="text-[10px] text-neutral-400">
+                              <div className="p-16 text-center text-slate-500 dark:text-zinc-400 space-y-2">
+                                <Filter size={24} className="mx-auto text-slate-500 dark:text-zinc-400" />
+                                <h4 className="text-xs font-black text-slate-800 dark:text-zinc-100">{isRtl ? 'لا توجد نتائج مطابقة' : 'No records match filters'}</h4>
+                                <p className="text-[10px] text-slate-500 dark:text-zinc-400">
                                   {isRtl ? 'يرجى تعديل معايير التصفية والتواريخ المعينة.' : 'Try relaxing your status or date range bounds.'}
                                 </p>
                               </div>
@@ -2315,9 +2315,9 @@ export default function CustomersWorkspace({
                                   ))
                                 ) : (
                                   <tr>
-                                    <td colSpan={5} className="px-4 py-10 text-center text-neutral-400">
+                                    <td colSpan={5} className="px-4 py-10 text-center text-slate-500 dark:text-zinc-400">
                                       <div className="space-y-2">
-                                        <Package size={20} className="mx-auto text-neutral-300" />
+                                        <Package size={20} className="mx-auto text-slate-500 dark:text-zinc-400" />
                                         <p className="text-xs font-bold text-neutral-700">
                                           {isRtl ? 'لا توجد فواتير أو معاملات محفوظة' : 'No persisted invoices or financial transactions yet.'}
                                         </p>
@@ -2391,9 +2391,9 @@ export default function CustomersWorkspace({
                           ) : !walletHistoryData ? (
                             /* State C: Empty/Null fallback state */
                             <div className="bg-neutral-50 border border-neutral-200 border-dashed rounded-xl p-8 text-center space-y-2">
-                              <ShoppingBag className="mx-auto text-neutral-300" size={36} />
+                              <ShoppingBag className="mx-auto text-slate-500 dark:text-zinc-400" size={36} />
                               <h4 className="font-bold text-neutral-700 text-sm">{isRtl ? 'المحفظة فارغة' : 'No Financial Record'}</h4>
-                              <p className="text-xs text-neutral-400 max-w-sm mx-auto">{isRtl ? 'لم يتم العثور على أي بيانات رصيد أو قيود للعميل المحدد.' : 'No available wallet ledger or gift cards associated with this client record.'}</p>
+                              <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">{isRtl ? 'لم يتم العثور على أي بيانات رصيد أو قيود للعميل المحدد.' : 'No available wallet ledger or gift cards associated with this client record.'}</p>
                             </div>
                           ) : (
                             <>
@@ -2402,7 +2402,7 @@ export default function CustomersWorkspace({
                                 {/* Card 1: Balance */}
                                 <div className="bg-amber-500/5 hover:bg-amber-500/[0.08] transition-colors border border-amber-500/15 p-4 rounded-xl flex items-center justify-between">
                                   <div>
-                                    <p className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider">{isRtl ? 'الرصيد المتاح حالياً' : 'Current Balance'}</p>
+                                    <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-extrabold uppercase tracking-wider">{isRtl ? 'الرصيد المتاح حالياً' : 'Current Balance'}</p>
                                     <p className="text-2xl font-black text-neutral-800 font-mono mt-1">{walletHistoryData.walletBalance} ر.س</p>
                                   </div>
                                   <div className="p-2.5 bg-amber-500/10 text-amber-600 rounded-xl">
@@ -2413,7 +2413,7 @@ export default function CustomersWorkspace({
                                 {/* Card 2: Wallet entries count */}
                                 <div className="bg-neutral-50 hover:bg-neutral-100/70 transition-colors border border-neutral-200/60 p-4 rounded-xl flex items-center justify-between">
                                   <div>
-                                    <p className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider">{isRtl ? 'عدد قيود المحفظة' : 'Wallet Entries Count'}</p>
+                                    <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-extrabold uppercase tracking-wider">{isRtl ? 'عدد قيود المحفظة' : 'Wallet Entries Count'}</p>
                                     <p className="text-2xl font-black text-neutral-800 font-mono mt-1">{walletHistoryData.walletEntriesCount}</p>
                                   </div>
                                   <div className="p-2.5 bg-neutral-100 text-neutral-600 rounded-xl">
@@ -2424,7 +2424,7 @@ export default function CustomersWorkspace({
                                 {/* Card 3: Gift Cards Sent */}
                                 <div className="bg-neutral-50 hover:bg-neutral-100/70 transition-colors border border-neutral-200/60 p-4 rounded-xl flex items-center justify-between">
                                   <div>
-                                    <p className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider">{isRtl ? 'البطاقات المرسلة للآخرين' : 'Gift Cards Sent'}</p>
+                                    <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-extrabold uppercase tracking-wider">{isRtl ? 'البطاقات المرسلة للآخرين' : 'Gift Cards Sent'}</p>
                                     <p className="text-2xl font-black text-neutral-800 font-mono mt-1">{walletHistoryData.giftCardsSent}</p>
                                   </div>
                                   <div className="p-2.5 bg-neutral-100 text-neutral-600 rounded-xl">
@@ -2435,7 +2435,7 @@ export default function CustomersWorkspace({
                                 {/* Card 4: Gift Cards Received */}
                                 <div className="bg-neutral-50 hover:bg-neutral-100/70 transition-colors border border-neutral-200/60 p-4 rounded-xl flex items-center justify-between">
                                   <div>
-                                    <p className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider">{isRtl ? 'البطاقات المستلمة' : 'Gift Cards Received'}</p>
+                                    <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-extrabold uppercase tracking-wider">{isRtl ? 'البطاقات المستلمة' : 'Gift Cards Received'}</p>
                                     <p className="text-2xl font-black text-neutral-800 font-mono mt-1">{walletHistoryData.giftCardsReceived}</p>
                                   </div>
                                   <div className="p-2.5 bg-neutral-100 text-neutral-600 rounded-xl">
@@ -2448,9 +2448,9 @@ export default function CustomersWorkspace({
                               {(!walletHistoryData.walletLedger || walletHistoryData.walletLedger.length === 0) && 
                                (!walletHistoryData.giftCards || walletHistoryData.giftCards.length === 0) ? (
                                 <div className="bg-white border border-neutral-150/70 rounded-xl p-12 text-center space-y-3">
-                                  <ShoppingBag size={40} className="text-neutral-300 mx-auto" />
+                                  <ShoppingBag size={40} className="text-slate-500 dark:text-zinc-400 mx-auto" />
                                   <h4 className="font-extrabold text-neutral-800 text-sm">{isRtl ? 'سجل العمليات فارغ' : 'Wallet History Empty'}</h4>
-                                  <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+                                  <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
                                     {isRtl 
                                       ? 'لا توجد معاملات شراء أو قيد ولا توجد بطاقات هدايا مسجلة باسم هذا العميل.' 
                                       : 'No purchase ledger entries or gift cards currently exist for this client profile.'}
@@ -2915,7 +2915,7 @@ export default function CustomersWorkspace({
                     })
                   ) : (
                     <div className="rounded-xl border border-dashed border-neutral-200 p-5 text-center text-neutral-400">
-                      <Package size={18} className="mx-auto text-neutral-300" />
+                      <Package size={18} className="mx-auto text-slate-500 dark:text-zinc-400" />
                       <p className="mt-2 text-xs font-bold text-neutral-700">
                         {isRtl ? 'لا توجد منتجات محفوظة لهذه العملية' : 'No persisted product items found for this record.'}
                       </p>
@@ -2923,7 +2923,7 @@ export default function CustomersWorkspace({
                   )}
                 </div>
 
-                <div className="border-t border-neutral-100 pt-3 space-y-1.5 font-mono text-[11px] text-neutral-500">
+                <div className="border-t border-neutral-100 pt-3 space-y-1.5 font-mono text-[11px] text-slate-600 dark:text-zinc-400">
                   <div className="flex justify-between">
                     <span>{isRtl ? 'الحالة:' : 'Status:'}</span>
                     <span>{selectedOrderDetails.status || selectedOrderDetails.paymentStatus || 'completed'}</span>

@@ -1504,8 +1504,8 @@ export default function TeamsWorkspace({
                       <div className="space-y-4">
                         {activeMember.schedule.length === 0 ? (
                           <div className="text-center py-12 space-y-2">
-                            <Calendar size={32} className="text-neutral-300 mx-auto" />
-                            <p className="text-xs text-neutral-400 font-bold">{isRtl ? 'لا توجد مواعيد مجدولة أو شيفتات عمل معينة لهذا الموظف.' : 'No active shifts or scheduled bookings registered for today.'}</p>
+                            <Calendar size={32} className="text-slate-500 dark:text-zinc-400 mx-auto" />
+                            <p className="text-xs text-slate-500 dark:text-zinc-400 font-bold">{isRtl ? 'لا توجد مواعيد مجدولة أو شيفتات عمل معينة لهذا الموظف.' : 'No active shifts or scheduled bookings registered for today.'}</p>
                           </div>
                         ) : (
                           <div className="space-y-4">
@@ -1674,12 +1674,12 @@ export default function TeamsWorkspace({
                             </p>
                           </div>
                         ) : activeMember.schedule.length === 0 ? (
-                          <div className="rounded-2xl border border-slate-100 bg-white p-6 text-center space-y-2">
-                            <Calendar size={28} className="mx-auto text-neutral-300" />
-                            <p className="text-sm font-black text-neutral-700">
+                          <div className="rounded-2xl border border-slate-200/90 bg-white dark:bg-zinc-900 p-6 text-center space-y-2">
+                            <Calendar size={28} className="mx-auto text-slate-500 dark:text-zinc-400" />
+                            <p className="text-sm font-black text-slate-800 dark:text-zinc-100">
                               {isRtl ? 'لا توجد شيفتات محددة.' : 'No shifts configured.'}
                             </p>
-                            <p className="text-xs text-neutral-400">
+                            <p className="text-xs text-slate-500 dark:text-zinc-400">
                               {isRtl ? 'لم يتم العثور على جدول عمل محفوظ لهذا الموظف بعد.' : 'No working schedule has been saved for this employee yet.'}
                             </p>
                           </div>
@@ -1690,7 +1690,7 @@ export default function TeamsWorkspace({
                                 <span className="text-neutral-700">📅 {isRtl ? day.dayAr : day.dayEn}</span>
                                 <div className="flex items-center gap-2">
                                   <span className="font-mono text-neutral-500">{day.hours}</span>
-                                  <span className={`w-2 h-2 rounded-full ${day.status === 'working' ? 'bg-emerald-500' : 'bg-neutral-300'}`} />
+                                  <span className={`w-2 h-2 rounded-full ${day.status === 'working' ? 'bg-emerald-500' : 'bg-slate-500 dark:bg-zinc-500'}`} />
                                 </div>
                               </div>
                             ))}
@@ -1780,13 +1780,13 @@ export default function TeamsWorkspace({
 
                 </>
               ) : (
-                <div className="bg-white p-8 rounded-2xl border border-neutral-100 shadow-xs min-h-[350px] flex items-center justify-center text-center">
+                <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl border border-slate-200/90 dark:border-zinc-800 shadow-2xs min-h-[350px] flex items-center justify-center text-center">
                   <div className="space-y-2 max-w-sm">
-                    <UserCheck size={28} className="mx-auto text-neutral-300" />
-                    <p className="text-sm font-black text-neutral-700">
+                    <UserCheck size={28} className="mx-auto text-slate-500 dark:text-zinc-400" />
+                    <p className="text-sm font-black text-slate-800 dark:text-zinc-100">
                       {isRtl ? 'لا يوجد عضو فريق محدد بعد' : 'No team member selected yet'}
                     </p>
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">
                       {isRtl
                         ? 'اختر أحد أعضاء الفريق من القائمة لعرض التفاصيل أو أضف عضواً جديداً.'
                         : 'Select a team member from the list to view details or add a new one.'}

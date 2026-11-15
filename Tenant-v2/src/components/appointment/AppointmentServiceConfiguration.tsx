@@ -174,24 +174,24 @@ export default function AppointmentServiceConfiguration({
             <span>{serviceName}</span>
             {activeVariant ? (
               <>
-                <span className="text-slate-400 font-normal">→</span>
+                <span className="text-slate-500 font-medium">→</span>
                 <span className="text-purple-700">
                   {variantName}
                 </span>
               </>
             ) : availableVariants.length > 0 ? (
               <>
-                <span className="text-slate-400 font-normal">→</span>
+                <span className="text-slate-500 font-medium">→</span>
                 <span className="text-slate-700">
                   {isRtl ? 'الخدمة الأساسية' : 'Main Service'}
                 </span>
               </>
             ) : null}
-            <span className="text-slate-300 font-normal">•</span>
+            <span className="text-slate-500 font-medium">•</span>
             <span className="text-xs text-slate-600 font-semibold">
               {Number(draftConfig.duration || activeVariant?.duration || service?.duration || 0)} {isRtl ? 'دقيقة' : 'min'}
             </span>
-            <span className="text-slate-300 font-normal">•</span>
+            <span className="text-slate-500 font-medium">•</span>
             <span dir="ltr" className="text-xs text-slate-600 font-semibold">
               {Number(draftConfig.finalPrice ?? draftConfig.basePrice ?? activeVariant?.finalPrice ?? service?.finalPrice ?? 0).toFixed(2)} SAR
             </span>
@@ -406,7 +406,7 @@ export default function AppointmentServiceConfiguration({
                   </span>
                 )}
               </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-primary' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-primary' : ''}`} />
             </button>
 
             {/* Dropdown Options Popover */}
@@ -418,11 +418,11 @@ export default function AppointmentServiceConfiguration({
               >
                 <div className="px-2.5 py-1.5 mb-1 border-b border-slate-100 flex items-center justify-between text-[11px] font-medium text-slate-500">
                   <span className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3 text-slate-400" />
+                    <Clock className="w-3 h-3 text-slate-500" />
                     <span>{isRtl ? 'الأوقات المتاحة والمحجوزة' : 'Schedule intervals'}</span>
                   </span>
                   {availabilityLoading && (
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <span className="flex items-center gap-1 text-[10px] text-slate-500">
                       <Loader2 className="w-2.5 h-2.5 animate-spin" />
                       {isRtl ? 'تحديث...' : 'Updating...'}
                     </span>

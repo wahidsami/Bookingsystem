@@ -195,7 +195,7 @@ export default function ServiceResourceRequirementsSection({
               onClick={() => handleToggleRequiresResources(false)}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 !requiresResources
-                  ? darkMode ? 'bg-zinc-800 text-white shadow-2xs' : 'bg-slate-900 text-white shadow-2xs'
+                  ? darkMode ? 'bg-zinc-700 text-white shadow-2xs' : 'bg-white text-slate-900 border border-slate-200 shadow-2xs'
                   : darkMode ? 'text-zinc-300 hover:text-white' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >

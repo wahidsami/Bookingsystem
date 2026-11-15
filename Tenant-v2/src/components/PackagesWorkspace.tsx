@@ -216,7 +216,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
             </div>
             <button
               onClick={() => openForm('add')}
-              className="px-6 py-3 bg-zinc-950 text-white rounded-2xl font-bold shadow-lg shadow-zinc-950/30 hover:shadow-zinc-950/40 hover:-translate-y-0.5 transition flex items-center gap-2"
+              className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold shadow-xs transition flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-5 h-5" />
               <span>{isRtl ? 'إضافة باقة' : 'Add Package'}</span>
@@ -224,11 +224,11 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-20 text-slate-400">Loading packages...</div>
+            <div className="text-center py-20 text-slate-500">Loading packages...</div>
           ) : packages.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-3xl border border-slate-200">
-              <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-slate-700">{isRtl ? 'لا توجد باقات بعد' : 'No packages yet'}</h3>
+              <Package className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-slate-800">{isRtl ? 'لا توجد باقات بعد' : 'No packages yet'}</h3>
               <p className="text-slate-500 mt-2">{isRtl ? 'قم بإنشاء أول باقة للبدء' : 'Create your first package to get started'}</p>
             </div>
           ) : (
@@ -239,7 +239,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                     {pkg.image ? (
                       <img src={resolveServiceImageUrl(pkg.image)} alt="thumbnail" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-300">
+                      <div className="w-full h-full flex items-center justify-center text-slate-500">
                         <Package className="w-12 h-12" />
                       </div>
                     )}
@@ -339,7 +339,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
                   {imagePreview ? (
                     <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
-                    <ImageIcon className="w-8 h-8 text-slate-300" />
+                    <ImageIcon className="w-8 h-8 text-slate-500" />
                   )}
                   <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                 </div>
@@ -377,7 +377,7 @@ export default function PackagesWorkspace({ lang }: PackagesWorkspaceProps) {
 
                   return (
                     <div key={index} className="flex gap-4 items-start bg-slate-50 p-4 rounded-2xl border border-slate-200 group">
-                      <div className="flex flex-col gap-1 mt-2 text-slate-300 opacity-50 group-hover:opacity-100 transition">
+                      <div className="flex flex-col gap-1 mt-2 text-slate-500 group-hover:text-slate-700 transition">
                         <button onClick={() => moveItem(index, 'up')} disabled={index === 0} className="hover:text-primary disabled:opacity-30">▲</button>
                         <button onClick={() => moveItem(index, 'down')} disabled={index === items.length - 1} className="hover:text-primary disabled:opacity-30">▼</button>
                       </div>

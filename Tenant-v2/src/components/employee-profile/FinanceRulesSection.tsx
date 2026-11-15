@@ -91,14 +91,14 @@ export default function FinanceRulesSection({ formData, setFormData, isRtl }: Fi
                 {formData.serviceCommissionEnabled ? (
                   <CheckSquare size={16} className="text-[#6537C0]" />
                 ) : (
-                  <Square size={16} className="text-neutral-300" />
+                  <Square size={16} className="text-slate-600 dark:text-zinc-400" />
                 )}
               </div>
               <div className="min-w-0">
                 <p className="font-extrabold text-xs">
                   {isRtl ? 'تفعيل عمولة الخدمات الفنية' : 'Enable Service Booking Commission'}
                 </p>
-                <p className="text-[10px] text-neutral-500 font-normal mt-0.5 leading-relaxed">
+                <p className="text-[10px] text-slate-600 dark:text-zinc-400 font-normal mt-0.5 leading-relaxed">
                   {isRtl 
                     ? `تطبيق نسبة ${formData.commissionRatePct}٪ على إجمالي قيمة الخدمات المنجزة بواسطة هذا الموظف.`
                     : `Applies ${formData.commissionRatePct}% to the total gross amount of services performed by this employee.`}
@@ -120,14 +120,14 @@ export default function FinanceRulesSection({ formData, setFormData, isRtl }: Fi
                 {formData.productCommissionEnabled ? (
                   <CheckSquare size={16} className="text-[#6537C0]" />
                 ) : (
-                  <Square size={16} className="text-neutral-300" />
+                  <Square size={16} className="text-slate-600 dark:text-zinc-400" />
                 )}
               </div>
               <div className="min-w-0">
                 <p className="font-extrabold text-xs">
                   {isRtl ? 'تفعيل عمولة مبيعات التجزئة (٥٪)' : 'Enable Product Retail Commission (5%)'}
                 </p>
-                <p className="text-[10px] text-neutral-500 font-normal mt-0.5 leading-relaxed">
+                <p className="text-[10px] text-slate-600 dark:text-zinc-400 font-normal mt-0.5 leading-relaxed">
                   {isRtl 
                     ? 'منح عمولة تشجيعية بنسبة 5٪ على كافة منتجات العناية المباعة للعملاء عبر نقطة البيع.'
                     : 'Grants a 5% incentive commission on all retail beauty care products sold at checkout.'}

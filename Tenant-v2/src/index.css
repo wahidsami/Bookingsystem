@@ -3,7 +3,7 @@
 @theme {
   --font-cairo: "Cairo", Tahoma, Arial, sans-serif;
   --font-montserrat: "Montserrat", system-ui, sans-serif;
-  --font-sans: "Cairo", "Montserrat", system-ui, sans-serif;
+  --font-sans: var(--font-dynamic-sans, "Montserrat", system-ui, sans-serif);
 
   /* BarSpa Brand Purple Scale */
   --color-brand-50: #FAF7FD;
@@ -27,6 +27,7 @@
 
 @layer base {
   :root {
+    --font-dynamic-sans: "Montserrat", system-ui, -apple-system, sans-serif;
     --barspa-bg: #FFFFFF;
     --barspa-surface: #FFFFFF;
     --barspa-surface-soft: #FAF7FD;
@@ -35,6 +36,19 @@
     --barspa-text-primary: #1D035F;
     --barspa-text-secondary: #475569;
     --barspa-text-muted: #64748B;
+  }
+
+  [dir="rtl"] {
+    --font-dynamic-sans: "Cairo", Tahoma, Arial, sans-serif;
+    letter-spacing: normal;
+  }
+
+  [dir="rtl"] :not([dir="ltr"]):not(code):not(pre):not(.font-mono) {
+    letter-spacing: normal !important;
+  }
+
+  [dir="ltr"] {
+    --font-dynamic-sans: "Montserrat", system-ui, -apple-system, sans-serif;
   }
 
   .dark {
@@ -48,19 +62,49 @@
     --barspa-text-muted: #A379E2;
   }
 
-  /* Locale-aware body typography */
-  [dir="rtl"] body {
+  /* Direction-aware typography */
+  [dir="rtl"], [dir="rtl"] body {
     font-family: var(--font-cairo);
+    line-height: 1.5;
   }
 
-  [dir="ltr"] body {
+  [dir="ltr"], [dir="ltr"] body {
     font-family: var(--font-montserrat);
+    line-height: 1.42;
   }
 
   body {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Standardized BarSpa Core UI Components (Aligned with Resources Benchmark) */
+@layer components {
+  /* Canonical Card Surface */
+  .barspa-card {
+    @apply bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs transition-colors;
+  }
+
+  /* Canonical Card Header */
+  .barspa-card-header {
+    @apply p-5 border-b border-slate-100 dark:border-zinc-800/80 flex items-center justify-between flex-wrap gap-3;
+  }
+
+  /* Canonical Primary Action Button */
+  .barspa-btn-primary {
+    @apply bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold rounded-xl text-xs px-4 py-2.5 shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  /* Canonical Secondary Button */
+  .barspa-btn-secondary {
+    @apply border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700/60 text-slate-700 dark:text-zinc-200 font-bold rounded-xl text-xs px-3.5 py-2 shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer;
+  }
+
+  /* Canonical Form Input */
+  .barspa-input {
+    @apply border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-800/70 hover:bg-white dark:hover:bg-zinc-800 focus:bg-white dark:focus:bg-zinc-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 rounded-xl transition-all outline-none;
   }
 }
 

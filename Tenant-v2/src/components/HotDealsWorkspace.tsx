@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Tag, Sparkles, Plus, AlertCircle, RefreshCw, Trash2, Calendar, 
-  Percent, X, Pause, Play, Check, Upload, Image as ImageIcon, 
-  ArrowLeft, Clock, ArrowRight, Lock, CheckCircle 
+import {
+  Tag, Sparkles, Plus, AlertCircle, RefreshCw, Trash2, Calendar,
+  Percent, X, Pause, Play, Check, Upload, Image as ImageIcon,
+  ArrowLeft, Clock, ArrowRight, Lock, CheckCircle
 } from 'lucide-react';
 import { tenantApiAdapter } from '../lib/tenantApiAdapter';
 
@@ -131,7 +131,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
   const [deals, setDeals] = useState<HotDeal[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [limits, setLimits] = useState<PackageLimits | null>(null);
-  
+
   // Statuses
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -202,7 +202,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
     try {
       setLoading(true);
       setError(null);
-      
+
       const [dealsRes, limitsRes, servicesData] = await Promise.all([
         tenantApiAdapter.get('/tenant/hot-deals'),
         tenantApiAdapter.get('/tenant/hot-deals/limits'),
@@ -229,8 +229,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
       setLimits(normalizeHotDealLimits(limitsRes));
     } catch (err: any) {
       console.error(err);
-      setError(isRtl 
-        ? "فشل في مزامنة البيانات مع خادم التشغيل السحابي. يرجى التحقق من اتصال الشبكة وإعادة المحاولة." 
+      setError(isRtl
+        ? "فشل في مزامنة البيانات مع خادم التشغيل السحابي. يرجى التحقق من اتصال الشبكة وإعادة المحاولة."
         : "Failed to sync data with the cloud runtime server. Please check your network and try again.");
     } finally {
       setLoading(false);
@@ -245,11 +245,11 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
   useEffect(() => {
     if (subView === 'edit' && selectedDealId) {
       const loadDealToForm = async () => {
-      try {
-        setLoading(true);
+        try {
+          setLoading(true);
           const res = await tenantApiAdapter.get(`/tenant/hot-deals/${selectedDealId}`);
           const deal: HotDeal = normalizeHotDeal(res?.deal || res?.data || res);
-          
+
           setImage(deal.image);
           setServiceId(deal.serviceId);
           setTitleEn(deal.title);
@@ -492,7 +492,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
 
       // Reload lists & counters
       await fetchLimitsAndDeals();
-      
+
       // Navigate back
       navigateTo('/dashboard/hot-deals');
     } catch (err: any) {
@@ -516,7 +516,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
   const calculateDiscountedPrice = () => {
     const srv = getSelectedServiceDetails();
     if (!srv || discountValue === '') return null;
-    
+
     const originalPrice = srv.price;
     const value = Number(discountValue);
 
@@ -545,7 +545,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
       const srvNameEn = serviceObj?.nameEn || '';
       const q = searchQuery.toLowerCase().trim();
 
-      const matchesSearch = 
+      const matchesSearch =
         !q ||
         deal.titleAr.toLowerCase().includes(q) ||
         deal.title.toLowerCase().includes(q) ||
@@ -565,15 +565,14 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
 
   return (
     <div className="space-y-6 relative">
-      
+
       {/* Floating notifications portal */}
       <div className={`fixed bottom-6 ${isRtl ? 'left-6' : 'right-6'} z-50 flex flex-col gap-3.5 max-w-sm w-full`}>
         {notifications.map((notif) => (
           <div
             key={notif.id}
-            className={`shadow-xl p-4 rounded-xl border flex items-start gap-3 text-start relative overflow-hidden transition-all duration-300 animate-slide-in ${
-              darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100'
-            }`}
+            className={`shadow-xl p-4 rounded-xl border flex items-start gap-3 text-start relative overflow-hidden transition-all duration-300 animate-slide-in ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100'
+              }`}
           >
             <div className={`absolute top-0 bottom-0 w-1 ${isRtl ? 'right-0' : 'left-0'} ${notif.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
             <span className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${notif.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
@@ -604,9 +603,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
         </div>
       ) : error ? (
         /* ERROR VIEW */
-        <div className={`p-10 rounded-2xl border text-center max-w-xl mx-auto space-y-4 ${
-          darkMode ? 'bg-zinc-900 border-rose-950/40' : 'bg-rose-50/50 border-rose-100'
-        }`}>
+        <div className={`p-10 rounded-2xl border text-center max-w-xl mx-auto space-y-4 ${darkMode ? 'bg-zinc-900 border-rose-950/40' : 'bg-rose-50/50 border-rose-100'
+          }`}>
           <div className="p-3.5 bg-rose-500/10 text-rose-500 rounded-full w-fit mx-auto">
             <AlertCircle size={38} />
           </div>
@@ -625,7 +623,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
         /* LIST PAGE VIEW                                       */
         /* ==================================================== */
         <div className="space-y-6 animate-fade-in" id="hot-deals-list-view">
-          
+
           {/* Header Action Row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -639,7 +637,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                 {isRtl ? 'أطلقي عروضاً فورية ومؤقتة تظهر مباشرة لتعبئة فترات الحجز الخالية وزيادة الإشغال.' : 'Launch fast-acting, time-sensitive deals visible in client apps to instantly fill empty schedules.'}
               </p>
             </div>
-            
+
             <button
               onClick={() => navigateTo('/dashboard/hot-deals/new')}
               className="px-4.5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-brand-500/10 self-start"
@@ -652,11 +650,10 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
 
           {/* PACKAGE LIMITS INFO CARD */}
           {limits && (
-            <div className={`p-5 rounded-2xl border overflow-hidden relative transition-all duration-300 ${
-              darkMode 
-                ? 'bg-zinc-900/60 border-zinc-800 text-zinc-100 shadow-inner' 
+            <div className={`p-5 rounded-2xl border overflow-hidden relative transition-all duration-300 ${darkMode
+                ? 'bg-zinc-900/60 border-zinc-800 text-zinc-100 shadow-inner'
                 : 'bg-white border-slate-100 text-slate-800 shadow-sm shadow-slate-100/40'
-            }`} id="package-limits-card">
+              }`} id="package-limits-card">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start gap-3.5">
                   <div className="p-3 bg-brand-500/10 text-brand-500 rounded-xl">
@@ -670,8 +667,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                       </span>
                     </h3>
                     <p className="text-[11px] text-zinc-400 mt-1">
-                      {isRtl 
-                        ? `الحد الأقصى للعروض النشطة/المجدولة في نفس الوقت هو ${limits.maxHotDeals} عروض. متاح لك إنشاء عروض إضافية وتفعيلها.` 
+                      {isRtl
+                        ? `الحد الأقصى للعروض النشطة/المجدولة في نفس الوقت هو ${limits.maxHotDeals} عروض. متاح لك إنشاء عروض إضافية وتفعيلها.`
                         : `Your active quota allows up to ${limits.maxHotDeals} concurrent active/scheduled campaigns. Expand on demand.`}
                     </p>
                   </div>
@@ -681,10 +678,10 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                 <div className="w-full md:w-60 space-y-1.5 shrink-0">
                   <div className="flex justify-between text-xs font-bold font-mono">
                     <span className="text-zinc-400">{isRtl ? 'المستهلك:' : 'Quota Usage:'}</span>
-                            <span>{limits.currentHotDeals} / {limits.maxHotDeals}</span>
+                    <span>{limits.currentHotDeals} / {limits.maxHotDeals}</span>
                   </div>
                   <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="h-full bg-brand-500 rounded-full transition-all duration-500"
                       style={{ width: `${limits.maxHotDeals > 0 ? Math.min(100, (limits.currentHotDeals / limits.maxHotDeals) * 100) : 0}%` }}
                     />
@@ -698,9 +695,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
           )}
 
           {/* Filtering & Search HUD */}
-          <div className={`p-4 rounded-xl border flex flex-col sm:flex-row gap-4 items-center justify-between ${
-            darkMode ? 'bg-zinc-900/40 border-zinc-800/80' : 'bg-white border-slate-100 shadow-xs'
-          }`}>
+          <div className={`p-4 rounded-xl border flex flex-col sm:flex-row gap-4 items-center justify-between ${darkMode ? 'bg-zinc-900/40 border-zinc-800/80' : 'bg-white border-slate-100 shadow-xs'
+            }`}>
             {/* Search Input */}
             <div className="relative w-full sm:max-w-xs">
               <input
@@ -708,9 +704,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                 placeholder={isRtl ? "البحث باسم العرض، الخدمة..." : "Search by title, service..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full pl-9 pr-4 py-2 text-xs rounded-lg border outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                  darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200'
-                }`}
+                className={`w-full pl-9 pr-4 py-2 text-xs rounded-lg border outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200'
+                  }`}
               />
               <span className={`absolute top-2.5 ${isRtl ? 'left-3' : 'left-3'} text-zinc-400`}>
                 <Clock size={14} className="animate-pulse" />
@@ -730,13 +725,12 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    statusFilter === tab.id
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${statusFilter === tab.id
                       ? 'bg-brand-500 text-white shadow-xs shadow-brand-500/25'
                       : darkMode
-                      ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750 hover:text-zinc-200'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+                        ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-750 hover:text-zinc-200'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
                 >
                   {isRtl ? tab.ar : tab.en}
                 </button>
@@ -747,16 +741,15 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
           {/* DEAL CARDS GRID */}
           {filteredDeals.length === 0 ? (
             /* EMPTY FILTER RESULT */
-            <div className={`p-16 rounded-2xl border text-center max-w-md mx-auto space-y-4 ${
-              darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
-            }`}>
+            <div className={`p-16 rounded-2xl border text-center max-w-md mx-auto space-y-4 ${darkMode ? 'bg-zinc-900 border-zinc-850' : 'bg-white border-neutral-100 shadow-xs'
+              }`}>
               <div className="p-4 bg-brand-500/10 text-brand-500 rounded-full w-fit mx-auto">
                 <Tag size={40} />
               </div>
               <h3 className="font-extrabold text-base">{isRtl ? 'لم نعثر على أي نتائج مطابقة' : 'No Matching Deals Found'}</h3>
               <p className="text-xs text-neutral-400 leading-relaxed">
-                {isRtl 
-                  ? 'يرجى مراجعة معايير التصفية أو كلمة البحث المدخلة، أو إنشاء عرض جديد تماماً لتعبئة الجدول.' 
+                {isRtl
+                  ? 'يرجى مراجعة معايير التصفية أو كلمة البحث المدخلة، أو إنشاء عرض جديد تماماً لتعبئة الجدول.'
                   : 'Please check your filters or try search keywords, or launch a new promotional campaign.'}
               </p>
               <button
@@ -772,7 +765,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                 const srv = services.find(s => s.id === deal.serviceId);
                 const srvName = srv ? (isRtl ? srv.nameAr : srv.nameEn) : (isRtl ? "خدمة غير معروفة" : "Unknown Service");
                 const originalPrice = srv ? srv.price : 0;
-                
+
                 // Live calculation of discount
                 let discountedPrice = originalPrice;
                 let discountText = '';
@@ -788,21 +781,20 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                   <div
                     key={deal.id}
                     onClick={() => navigateTo(`/dashboard/hot-deals/${deal.id}`)}
-                    className={`border rounded-2xl flex flex-col justify-between overflow-hidden transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl cursor-pointer ${
-                      darkMode 
-                        ? 'bg-zinc-900 border-zinc-850 hover:border-brand-500/60 text-zinc-100' 
+                    className={`border rounded-2xl flex flex-col justify-between overflow-hidden transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl cursor-pointer ${darkMode
+                        ? 'bg-zinc-900 border-zinc-850 hover:border-brand-500/60 text-zinc-100'
                         : 'bg-white border-neutral-100 hover:border-brand-200/80 shadow-xs'
-                    }`}
+                      }`}
                   >
                     {/* Visual/Image Header */}
                     <div className="relative h-44 w-full bg-zinc-800 overflow-hidden">
-                      <img 
-                        src={deal.image || "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=800&auto=format&fit=crop"} 
+                      <img
+                        src={deal.image || "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=800&auto=format&fit=crop"}
                         alt={isRtl ? deal.titleAr : deal.title}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         referrerPolicy="no-referrer"
                       />
-                      
+
                       {/* Dark overlay gradients */}
                       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent" />
 
@@ -812,17 +804,16 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                       </span>
 
                       {/* Status Floating Badge */}
-                      <span className={`absolute top-3 left-3 text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full shadow-sm ${
-                        deal.status === 'active'
+                      <span className={`absolute top-3 left-3 text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full shadow-sm ${deal.status === 'active'
                           ? 'bg-emerald-500/90 text-white'
                           : deal.status === 'scheduled'
-                          ? 'bg-amber-500/90 text-white'
-                          : deal.status === 'paused'
-                          ? 'bg-slate-500/90 text-white'
-                          : deal.status === 'expired'
-                          ? 'bg-neutral-600/90 text-white'
-                          : 'bg-rose-600/90 text-white'
-                      }`}>
+                            ? 'bg-amber-500/90 text-white'
+                            : deal.status === 'paused'
+                              ? 'bg-slate-500/90 text-white'
+                              : deal.status === 'expired'
+                                ? 'bg-neutral-600/90 text-white'
+                                : 'bg-rose-600/90 text-white'
+                        }`}>
                         {deal.status === 'active' && (isRtl ? 'نشط الآن' : 'Active')}
                         {deal.status === 'scheduled' && (isRtl ? 'مجدول' : 'Scheduled')}
                         {deal.status === 'paused' && (isRtl ? 'موقوف مؤقتاً' : 'Paused')}
@@ -838,7 +829,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
 
                     {/* Deal Details Container */}
                     <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                      
+
                       {/* Service + Title block */}
                       <div className="space-y-1.5">
                         <span className="text-[10px] font-black tracking-widest text-brand-500 uppercase">
@@ -853,16 +844,15 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                       </div>
 
                       {/* COMMERCIAL PRICING BOX */}
-                      <div className={`p-3 rounded-xl flex items-center justify-between border ${
-                        darkMode ? 'bg-zinc-950/50 border-zinc-800' : 'bg-slate-50/60 border-slate-150'
-                      }`}>
+                      <div className={`p-3 rounded-xl flex items-center justify-between border ${darkMode ? 'bg-zinc-950/50 border-zinc-800' : 'bg-slate-50/60 border-slate-150'
+                        }`}>
                         <div>
                           <span className="text-[10px] text-zinc-400 block leading-none">{isRtl ? 'السعر الأصلي:' : 'Original Price:'}</span>
                           <span className="text-xs font-bold text-zinc-500 line-through font-mono mt-1 block">
                             {originalPrice} {isRtl ? 'ر.س' : 'SAR'}
                           </span>
                         </div>
-                        
+
                         <div className="text-end">
                           <span className="text-[10px] text-brand-500 block leading-none font-bold">{isRtl ? 'السعر الساخن الجديد:' : 'Special Hot Price:'}</span>
                           <span className="text-sm font-black text-emerald-500 font-mono mt-1 block">
@@ -882,22 +872,21 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                       )}
 
                       {/* STATS: EXPIRY + REDEMPTIONS */}
-                      <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex justify-between items-center text-[10px] font-mono text-zinc-400">
+                      <div className="pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex justify-between items-center text-[10px] font-mono text-slate-500 dark:text-zinc-400">
                         <span className="flex items-center gap-1">
-                          <Calendar size={11} className="text-zinc-500" />
+                          <Calendar size={11} className="text-slate-400 dark:text-zinc-500" />
                           <span>{deal.validFrom} {isRtl ? 'إلى' : 'to'} {deal.validUntil}</span>
                         </span>
-                        
-                        <span className="font-bold text-zinc-300">
+
+                        <span className="font-bold text-slate-700 dark:text-zinc-300">
                           {isRtl ? 'المحجوز:' : 'Booked:'} <strong className="text-brand-500 font-black">{deal.redemptionCount}</strong> / {deal.maxRedemptions}
                         </span>
                       </div>
                     </div>
 
                     {/* CARD HOVER INTERACTIONS BAR */}
-                    <div className={`px-5 py-3 border-t flex justify-between items-center text-xs font-bold ${
-                      darkMode ? 'bg-zinc-950/40 border-zinc-850' : 'bg-neutral-50/50 border-neutral-100'
-                    }`}>
+                    <div className={`px-5 py-3 border-t flex justify-between items-center text-xs font-bold ${darkMode ? 'bg-zinc-950/40 border-zinc-850' : 'bg-neutral-50/50 border-neutral-100'
+                      }`}>
                       <span className="text-brand-500 text-[10px] font-bold underline group-hover:text-brand-600">
                         {isRtl ? 'عرض وتعديل التفاصيل ←' : 'View & Edit Details ←'}
                       </span>
@@ -945,51 +934,48 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
         /* CREATE / EDIT PAGE VIEW                              */
         /* ==================================================== */
         <div className="space-y-6 max-w-4xl mx-auto animate-fade-in" id="hot-deals-form-view">
-          
+
           {/* Top Back Action navigation */}
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigateTo('/dashboard/hot-deals')}
-              className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                darkMode 
-                  ? 'border-zinc-800 text-zinc-300 hover:bg-zinc-900 bg-zinc-900/40' 
+              className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${darkMode
+                  ? 'border-zinc-800 text-zinc-300 hover:bg-zinc-900 bg-zinc-900/40'
                   : 'border-slate-200 text-slate-600 hover:bg-slate-50 bg-white shadow-xs'
-              }`}
+                }`}
             >
               {isRtl ? <ArrowRight size={14} /> : <ArrowLeft size={14} />}
               {isRtl ? 'الرجوع للقائمة الرئيسية' : 'Back to Hot Deals list'}
             </button>
 
             <h2 className="text-sm font-black text-brand-500 font-mono tracking-wider">
-              {subView === 'new' 
-                ? (isRtl ? 'حملة ترويجية جديدة' : 'New Promo Campaign') 
+              {subView === 'new'
+                ? (isRtl ? 'حملة ترويجية جديدة' : 'New Promo Campaign')
                 : (isRtl ? 'تعديل بيانات العرض' : 'Modify Deal Parameters')}
             </h2>
           </div>
 
           <form onSubmit={handleFormSubmit} className="space-y-6">
-            
+
             {/* Form Header Info Banner */}
-            <div className={`p-5 rounded-2xl border ${
-              darkMode ? 'bg-zinc-900/50 border-zinc-800' : 'bg-white border-slate-100 shadow-xs'
-            }`}>
+            <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-zinc-900/50 border-zinc-800' : 'bg-white border-slate-100 shadow-xs'
+              }`}>
               <h1 className="text-base md:text-lg font-extrabold flex items-center gap-2">
                 <Tag className="text-brand-500" size={18} />
-                {subView === 'new' 
-                  ? (isRtl ? 'إطلاق عرض ساخن جديد لزيادة الإشغال' : 'Launch New High-Occupancy Deal') 
+                {subView === 'new'
+                  ? (isRtl ? 'إطلاق عرض ساخن جديد لزيادة الإشغال' : 'Launch New High-Occupancy Deal')
                   : (isRtl ? 'تفاصيل وتعديل العرض الساخن' : 'Modify Existing Campaign Parameters')}
               </h1>
               <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">
-                {isRtl 
-                  ? 'يرجى استكمال الحقول المطلوبة لضمان حجز متوازن للعملاء. ستخضع التحديثات لتقييم السياسة السعرية مباشرة.' 
+                {isRtl
+                  ? 'يرجى استكمال الحقول المطلوبة لضمان حجز متوازن للعملاء. ستخضع التحديثات لتقييم السياسة السعرية مباشرة.'
                   : 'Complete all sections below to broadcast this deal. Real-time discount limits are calculated instantly.'}
               </p>
             </div>
 
             {/* SECTION 1: IMAGE UPLOAD / PRESETS */}
-            <div className={`p-6 rounded-2xl border space-y-4 ${
-              darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
-            }`} id="form-section-image">
+            <div className={`p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
+              }`} id="form-section-image">
               <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
                 <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center font-mono text-[10px] font-black">
                   1
@@ -1003,25 +989,24 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                
+
                 {/* Drag and Drop Box & File preview */}
                 <div className="md:col-span-5 space-y-3">
                   <label className="text-[11px] font-bold text-zinc-400 block">
                     {isRtl ? 'تحميل صورة مخصصة بالملفات:' : 'Upload custom salon asset file:'}
                   </label>
-                  
-                  <div 
+
+                  <div
                     onClick={() => fileInputRef.current?.click()}
-                    className={`h-40 rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-all duration-200 ${
-                      image 
-                        ? 'border-brand-500/50 bg-brand-500/5' 
-                        : darkMode 
-                        ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/40' 
-                        : 'border-slate-200 hover:border-slate-300 bg-slate-50'
-                    }`}
+                    className={`h-40 rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-all duration-200 ${image
+                        ? 'border-brand-500/50 bg-brand-500/5'
+                        : darkMode
+                          ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/40'
+                          : 'border-slate-200 hover:border-slate-300 bg-slate-50'
+                      }`}
                   >
-                    <input 
-                      type="file" 
+                    <input
+                      type="file"
                       ref={fileInputRef}
                       onChange={handleFileUpload}
                       accept="image/*"
@@ -1030,9 +1015,9 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
 
                     {image ? (
                       <div className="relative w-full h-full">
-                        <img 
-                          src={image} 
-                          alt="Custom upload" 
+                        <img
+                          src={image}
+                          alt="Custom upload"
                           className="w-full h-full object-cover rounded-lg"
                         />
                         <button
@@ -1072,17 +1057,16 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                         <div
                           key={idx}
                           onClick={() => setImage(p.url)}
-                          className={`group h-24 rounded-xl overflow-hidden relative cursor-pointer border transition-all duration-300 ${
-                            isSelected 
-                              ? 'ring-2 ring-brand-500 border-transparent scale-98' 
-                              : darkMode 
-                              ? 'border-zinc-800 bg-zinc-950/40 hover:border-zinc-700' 
-                              : 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                          }`}
+                          className={`group h-24 rounded-xl overflow-hidden relative cursor-pointer border transition-all duration-300 ${isSelected
+                              ? 'ring-2 ring-brand-500 border-transparent scale-98'
+                              : darkMode
+                                ? 'border-zinc-800 bg-zinc-950/40 hover:border-zinc-700'
+                                : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                            }`}
                         >
-                          <img 
-                            src={p.url} 
-                            alt={p.name} 
+                          <img
+                            src={p.url}
+                            alt={p.name}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                           />
                           <div className="absolute inset-0 bg-black/40 flex items-end p-1.5">
@@ -1105,9 +1089,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
             </div>
 
             {/* SECTION 2: SERVICE SELECTION */}
-            <div className={`p-6 rounded-2xl border space-y-4 ${
-              darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
-            }`} id="form-section-service">
+            <div className={`p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
+              }`} id="form-section-service">
               <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
                 <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center font-mono text-[10px] font-black">
                   2
@@ -1119,7 +1102,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-                
+
                 {/* Select dropdown */}
                 <div className="md:col-span-7 space-y-1.5">
                   <label className="text-[11px] font-bold text-zinc-400 block">
@@ -1129,9 +1112,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                     value={serviceId}
                     onChange={(e) => setServiceId(e.target.value)}
                     required
-                    className={`w-full p-3 rounded-xl border text-xs font-bold outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                      darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-700'
-                    }`}
+                    className={`w-full p-3 rounded-xl border text-xs font-bold outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
                   >
                     <option value="">-- {isRtl ? 'اختر خدمة للبدء' : 'Select Service to bind'} --</option>
                     {services.map((s) => (
@@ -1149,13 +1131,12 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                       const srv = getSelectedServiceDetails();
                       if (!srv) return null;
                       return (
-                        <div className={`p-4 rounded-xl border space-y-2 ${
-                          darkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50/60 border-slate-150'
-                        }`}>
+                        <div className={`p-4 rounded-xl border space-y-2 ${darkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-slate-50/60 border-slate-150'
+                          }`}>
                           <span className="text-[9px] font-black tracking-wider uppercase text-brand-500 block">
                             {isRtl ? 'تفاصيل الخدمة النشطة:' : 'Bound Service Specifications:'}
                           </span>
-                          
+
                           <div className="flex justify-between items-center text-xs">
                             <span className="font-bold">{isRtl ? srv.nameAr : srv.nameEn}</span>
                             <span className="font-bold text-brand-500 font-mono">{srv.price} SAR</span>
@@ -1179,9 +1160,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
             </div>
 
             {/* SECTION 3: DEAL INFORMATION */}
-            <div className={`p-6 rounded-2xl border space-y-4 ${
-              darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
-            }`} id="form-section-info">
+            <div className={`p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
+              }`} id="form-section-info">
               <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
                 <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center font-mono text-[10px] font-black">
                   3
@@ -1204,9 +1184,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                     placeholder={isRtl ? "مثال: هروب الاسترخاء الملكي بالأروما" : "e.g. Arabic Name"}
                     value={titleAr}
                     onChange={(e) => setTitleAr(e.target.value)}
-                    className={`w-full p-2.5 rounded-lg border text-xs font-medium outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                      darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
-                    }`}
+                    className={`w-full p-2.5 rounded-lg border text-xs font-medium outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
+                      }`}
                   />
                 </div>
 
@@ -1221,9 +1200,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                     placeholder={isRtl ? "e.g. Royal Aromatherapy Getaway" : "e.g. Royal Aromatherapy Getaway"}
                     value={titleEn}
                     onChange={(e) => setTitleEn(e.target.value)}
-                    className={`w-full p-2.5 rounded-lg border text-xs font-medium outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                      darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
-                    }`}
+                    className={`w-full p-2.5 rounded-lg border text-xs font-medium outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
+                      }`}
                   />
                 </div>
               </div>
@@ -1239,9 +1217,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                     placeholder={isRtl ? "استمتعي بجلسة مساج استثنائية لتهدئة الأعصاب وتجديد الطاقة بأسعار حصرية..." : "Arabic description"}
                     value={descAr}
                     onChange={(e) => setDescAr(e.target.value)}
-                    className={`w-full p-2.5 rounded-lg border text-xs font-medium outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                      darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
-                    }`}
+                    className={`w-full p-2.5 rounded-lg border text-xs font-medium outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
+                      }`}
                   />
                 </div>
 
@@ -1254,9 +1231,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                     placeholder={isRtl ? "Experience a pure sense of relief with our custom organic aromatherapy escape..." : "English description"}
                     value={descEn}
                     onChange={(e) => setDescEn(e.target.value)}
-                    className={`w-full p-2.5 rounded-lg border text-xs font-medium outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                      darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
-                    }`}
+                    className={`w-full p-2.5 rounded-lg border text-xs font-medium outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
+                      }`}
                   />
                 </div>
               </div>
@@ -1273,9 +1249,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                   min={1}
                   value={maxRedemptions}
                   onChange={(e) => setMaxRedemptions(e.target.value === '' ? '' : Number(e.target.value))}
-                  className={`w-full p-2.5 rounded-lg border text-xs font-bold font-mono outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                    darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
-                  }`}
+                  className={`w-full p-2.5 rounded-lg border text-xs font-bold font-mono outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
+                    }`}
                 />
                 <p className="text-[10px] text-zinc-500 font-sans">
                   {isRtl ? 'سيتم إغلاق العرض تلقائياً بعد استهلاك هذه الحصة.' : 'This deal closes automatically once this allocation completes.'}
@@ -1285,9 +1260,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
             </div>
 
             {/* SECTION 4: DISCOUNT SETTINGS */}
-            <div className={`p-6 rounded-2xl border space-y-4 ${
-              darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
-            }`} id="form-section-discount">
+            <div className={`p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
+              }`} id="form-section-discount">
               <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
                 <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center font-mono text-[10px] font-black">
                   4
@@ -1298,7 +1272,7 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-                
+
                 {/* Discount type toggle + inputs */}
                 <div className="md:col-span-6 space-y-4">
                   <div className="space-y-2">
@@ -1309,13 +1283,12 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                       <button
                         type="button"
                         onClick={() => { setDiscountType('percentage'); setDiscountValue(''); }}
-                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 border ${
-                          discountType === 'percentage'
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 border ${discountType === 'percentage'
                             ? 'bg-brand-500 border-transparent text-white shadow-xs'
                             : darkMode
-                            ? 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
+                              ? 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
                       >
                         <Percent size={14} />
                         {isRtl ? 'نسبة مئوية (%)' : 'Percentage (%)'}
@@ -1324,13 +1297,12 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                       <button
                         type="button"
                         onClick={() => { setDiscountType('fixed_amount'); setDiscountValue(''); }}
-                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 border ${
-                          discountType === 'fixed_amount'
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 border ${discountType === 'fixed_amount'
                             ? 'bg-brand-500 border-transparent text-white shadow-xs'
                             : darkMode
-                            ? 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
+                              ? 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
                       >
                         <Tag size={14} />
                         {isRtl ? 'مبلغ ثابت (ر.س)' : 'Fixed Amount (SAR)'}
@@ -1341,8 +1313,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                   {/* Discount input field */}
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-zinc-400 block">
-                      {discountType === 'percentage' 
-                        ? (isRtl ? 'معدل نسبة الخصم مئوية:' : 'Discount Rate (%):') 
+                      {discountType === 'percentage'
+                        ? (isRtl ? 'معدل نسبة الخصم مئوية:' : 'Discount Rate (%):')
                         : (isRtl ? 'معدل الخصم الثابت بالريال السعودي:' : 'Discount Amount (SAR):')}
                       <span className="text-rose-500 font-black ml-1">*</span>
                     </label>
@@ -1354,9 +1326,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                         placeholder={discountType === 'percentage' ? "25" : "100"}
                         value={discountValue}
                         onChange={(e) => setDiscountValue(e.target.value === '' ? '' : Number(e.target.value))}
-                        className={`w-full p-2.5 rounded-lg border text-xs font-bold font-mono outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                          darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
-                        }`}
+                        className={`w-full p-2.5 rounded-lg border text-xs font-bold font-mono outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200'
+                          }`}
                       />
                       <span className={`absolute top-2.5 ${isRtl ? 'left-3' : 'right-3'} text-[10px] font-black font-mono text-zinc-500`}>
                         {discountType === 'percentage' ? "%" : "SAR"}
@@ -1373,14 +1344,13 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                       const srv = getSelectedServiceDetails();
                       if (!res || !srv) return null;
                       return (
-                        <div className={`p-4 rounded-xl border border-dashed text-xs space-y-3 ${
-                          darkMode ? 'bg-zinc-950/20 border-brand-500/30' : 'bg-brand-500/5 border-brand-200/50'
-                        }`}>
+                        <div className={`p-4 rounded-xl border border-dashed text-xs space-y-3 ${darkMode ? 'bg-zinc-950/20 border-brand-500/30' : 'bg-brand-500/5 border-brand-200/50'
+                          }`}>
                           <h4 className="font-extrabold text-[10px] uppercase text-brand-500 tracking-wider flex items-center gap-1">
                             <Sparkles size={11} />
                             {isRtl ? 'محاكاة السعر الساخن الترويجي للعملاء:' : 'Live Promotional Pricing Simulation:'}
                           </h4>
-                          
+
                           <div className="space-y-2 font-mono">
                             <div className="flex justify-between">
                               <span className="text-zinc-400">{isRtl ? 'السعر الأصلي للكتالوج:' : 'Original Catalog Price:'}</span>
@@ -1399,8 +1369,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                           </div>
 
                           <p className="text-[10px] text-zinc-500 leading-normal font-sans">
-                            {isRtl 
-                              ? 'سيعرض هذا السعر المحدث فورياً في تطبيق الجوال للعملاء، لرفع إقبال الحجوزات السريعة.' 
+                            {isRtl
+                              ? 'سيعرض هذا السعر المحدث فورياً في تطبيق الجوال للعملاء، لرفع إقبال الحجوزات السريعة.'
                               : 'This active special pricing will be directly visible to customers on mobile apps for immediate reservation.'}
                           </p>
                         </div>
@@ -1417,9 +1387,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
             </div>
 
             {/* SECTION 5: VALIDITY PERIOD */}
-            <div className={`p-6 rounded-2xl border space-y-4 ${
-              darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
-            }`} id="form-section-validity">
+            <div className={`p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-zinc-900 border-zinc-800/80' : 'bg-white border-slate-100'
+              }`} id="form-section-validity">
               <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
                 <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-500 flex items-center justify-center font-mono text-[10px] font-black">
                   5
@@ -1441,9 +1410,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                     required
                     value={validFrom}
                     onChange={(e) => setValidFrom(e.target.value)}
-                    className={`w-full p-2.5 rounded-lg border text-xs font-bold font-mono outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                      darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-zinc-700'
-                    }`}
+                    className={`w-full p-2.5 rounded-lg border text-xs font-bold font-mono outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-zinc-700'
+                      }`}
                   />
                 </div>
 
@@ -1458,27 +1426,24 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                     required
                     value={validUntil}
                     onChange={(e) => setValidUntil(e.target.value)}
-                    className={`w-full p-2.5 rounded-lg border text-xs font-bold font-mono outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${
-                      darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-zinc-700'
-                    }`}
+                    className={`w-full p-2.5 rounded-lg border text-xs font-bold font-mono outline-hidden transition-all focus:ring-1 focus:ring-brand-500 ${darkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-zinc-700'
+                      }`}
                   />
                 </div>
               </div>
             </div>
 
             {/* SUBMIT ACTIONS BAR */}
-            <div className={`p-4 rounded-xl border flex justify-end gap-3.5 text-xs font-bold ${
-              darkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-neutral-50 border-neutral-150'
-            }`}>
+            <div className={`p-4 rounded-xl border flex justify-end gap-3.5 text-xs font-bold ${darkMode ? 'bg-zinc-950/60 border-zinc-800' : 'bg-neutral-50 border-neutral-150'
+              }`}>
               <button
                 type="button"
                 onClick={() => navigateTo('/dashboard/hot-deals')}
                 disabled={saving}
-                className={`px-5 py-2.5 rounded-xl border cursor-pointer transition-all ${
-                  darkMode 
-                    ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50' 
+                className={`px-5 py-2.5 rounded-xl border cursor-pointer transition-all ${darkMode
+                    ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50'
                     : 'border-neutral-250 text-neutral-600 hover:bg-neutral-100 disabled:opacity-50'
-                }`}
+                  }`}
               >
                 {isRtl ? 'إلغاء التغييرات' : 'Cancel Changes'}
               </button>
@@ -1490,8 +1455,8 @@ export default function HotDealsWorkspace({ lang, darkMode = false }: HotDealsWo
                 id="btn-save-hot-deal"
               >
                 {saving && <RefreshCw size={12} className="animate-spin" />}
-                {subView === 'new' 
-                  ? (isRtl ? 'إطلاق العرض الساخن للجمهور' : 'Broadcast & Launch Deal') 
+                {subView === 'new'
+                  ? (isRtl ? 'إطلاق العرض الساخن للجمهور' : 'Broadcast & Launch Deal')
                   : (isRtl ? 'حفظ وتأكيد التعديلات' : 'Commit & Save Updates')}
               </button>
             </div>
