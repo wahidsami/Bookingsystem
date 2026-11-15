@@ -1181,62 +1181,6 @@ export default function TeamsWorkspace({
 
       {activeView === 'list' ? (
         <div className="space-y-6" id="teams-directory-dashboard-view">
-          
-          {/* Subscription & Information Header Block */}
-          <div className="bg-gradient-to-r from-zinc-950 via-neutral-900 to-slate-950 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none transform translate-x-12 -translate-y-6">
-              <UserCheck size={240} />
-            </div>
-
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] uppercase font-black tracking-widest bg-amber-400/20 border border-amber-400/20 px-2.5 py-1 rounded-full text-amber-300">
-                    {isRtl ? 'باقة إدارة الكوادر المتكاملة' : 'Enterprise Team Manager Ledger'}
-                  </span>
-                  <span className="text-[10px] font-bold bg-emerald-500/30 px-2 py-0.5 rounded text-emerald-200 border border-emerald-500/20">
-                    {isRtl ? 'البرنامج موثق وممتثل للعمل' : 'Qiwa WPS Compliant'}
-                  </span>
-                </div>
-                <h2 className="text-xl md:text-2xl font-black font-sans leading-tight">
-                  {isRtl ? 'إدارة الفرق وجداول الموظفين وصلاحيات الوصول' : 'Teams Hub & Workforce Scheduler'}
-                </h2>
-                <p className="text-xs text-neutral-300 max-w-2xl">
-                  {isRtl 
-                    ? 'قم بإدارة فريق عمل الصالون الفني والوصول اللحظي ومراقبة كشوف الرواتب ومسيرات حماية الأجور المعتمدة.' 
-                    : 'Configure specialists directory, manage live rosters, dispatch staff app credentials and track Unified payroll payouts.'}
-                </p>
-              </div>
-
-              {/* Quota limit tracker */}
-              <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl border border-white/10 shrink-0 md:w-64 space-y-2">
-                <div className="flex justify-between text-xs font-black">
-                  <span>{isRtl ? 'حصة الفريق المستهلكة' : 'Teams Quota Used'}</span>
-                  <span>{teamMembers.length} / {quotaLimit ?? (subscriptionLimits.loading ? '...' : '—')}</span>
-                </div>
-                <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="bg-amber-400 h-full transition-all duration-500" 
-                    style={{
-                      width: quotaLimit && quotaLimit > 0
-                        ? `${Math.min(100, (teamMembers.length / quotaLimit) * 100)}%`
-                        : '0%'
-                    }}
-                  />
-                </div>
-                <p className="text-[9px] text-neutral-400 font-bold">
-                  {quotaLimit == null
-                    ? (isRtl ? 'جاري تحميل حدود الباقة...' : 'Loading subscription limits...')
-                    : quotaRemaining == null
-                      ? (isRtl ? 'تمت مزامنة حدود الفريق.' : 'Team limits synced.')
-                      : isRtl
-                        ? `متبقي لك تعيين ${quotaRemaining} موظفين في باقتك`
-                        : `You can add ${quotaRemaining} more specialists.`}
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Advanced Search & Directory Filters Toolbar */}
           <div className="bg-white p-4 rounded-2xl border border-neutral-100 shadow-xs flex flex-col gap-4">
             <div className="flex flex-col lg:flex-row gap-3">
@@ -1313,16 +1257,6 @@ export default function TeamsWorkspace({
                     {isRtl ? 'إعادة ضبط' : 'Reset'}
                   </button>
                 )}
-
-                {/* Onboard Team Member Button */}
-                <button
-                  type="button"
-                  onClick={handleOpenAddForm}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-950 hover:bg-neutral-900 text-white font-black text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus size={14} className="text-amber-400" />
-                  <span>{isRtl ? 'تعيين موظف جديد' : 'Add Team Member'}</span>
-                </button>
 
               </div>
             </div>

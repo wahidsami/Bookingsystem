@@ -190,6 +190,9 @@ function getSupportSenderDisplayName(message: any, lang: Language) {
 interface SupportWorkspaceProps {
   lang: Language;
   darkMode?: boolean;
+  refreshTrigger?: number;
+  newTicketTrigger?: number;
+  onRefreshingChange?: (isRefreshing: boolean) => void;
 }
 
 interface SupportTicket {
@@ -242,7 +245,13 @@ interface SupportTicket {
   createdAt?: string;
 }
 
-export default function SupportWorkspace({ lang, darkMode = false }: SupportWorkspaceProps) {
+export default function SupportWorkspace({
+  lang,
+  darkMode = false,
+  refreshTrigger,
+  newTicketTrigger,
+  onRefreshingChange
+}: SupportWorkspaceProps) {
   const isRtl = lang === 'ar';
   const { tenant, account, user } = useTenantAuth();
 
@@ -407,6 +416,28 @@ export default function SupportWorkspace({ lang, darkMode = false }: SupportWork
     void refreshAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const lastRefreshTriggerRef = useRef(refreshTrigger ?? 0);
+  const lastNewTicketTriggerRef = useRef(newTicketTrigger ?? 0);
+
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > lastRefreshTriggerRef.current) {
+      lastRefreshTriggerRef.current = refreshTrigger;
+      void refreshAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTrigger]);
+
+  useEffect(() => {
+    if (newTicketTrigger !== undefined && newTicketTrigger > lastNewTicketTriggerRef.current) {
+      lastNewTicketTriggerRef.current = newTicketTrigger;
+      setNewTicketOpen(true);
+    }
+  }, [newTicketTrigger]);
+
+  useEffect(() => {
+    onRefreshingChange?.(ticketsLoading || summaryLoading);
+  }, [ticketsLoading, summaryLoading, onRefreshingChange]);
 
   useEffect(() => {
     void loadTickets();
@@ -681,37 +712,6 @@ export default function SupportWorkspace({ lang, darkMode = false }: SupportWork
 
   return (
     <div className="space-y-6">
-      <div className={`rounded-2xl border p-6 shadow-sm ${darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-neutral-100 text-neutral-900'}`}>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-brand-600">
-              <MessageSquare size={14} />
-              <span>{supportTitle}</span>
-            </div>
-            <div className="space-y-1">
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight">{isRtl ? 'مركز المحادثات والدعم' : 'Conversation-first support workspace'}</h1>
-              <p className="text-sm text-neutral-500 max-w-2xl">{supportDescription}</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => void refreshAll()}
-              className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors ${darkMode ? 'border-zinc-700 hover:bg-zinc-800' : 'border-neutral-200 hover:bg-neutral-50'}`}
-            >
-              <RefreshCw size={14} />
-              <span>{isRtl ? 'تحديث' : 'Refresh'}</span>
-            </button>
-            <button
-              onClick={() => setNewTicketOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-xs font-bold text-white shadow-md transition-colors hover:bg-brand-700"
-            >
-              <Plus size={14} />
-              <span>{isRtl ? 'تذكرة جديدة' : 'New Ticket'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div className="flex flex-wrap gap-2">
         {sectionChips.map((chip) => (
           <button

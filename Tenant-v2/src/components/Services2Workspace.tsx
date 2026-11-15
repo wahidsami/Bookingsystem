@@ -1572,7 +1572,7 @@ export default function Services2Workspace({ lang, quickLaunchRequest }: Service
                   className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-lg shrink-0 ${
                     isLimitReached 
                       ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 shadow-none cursor-not-allowed'
-                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/15'
+                      : 'bg-brand-500 hover:bg-brand-600 text-white shadow-brand-500/15 font-bold'
                   }`}
                 >
                   <Plus size={14} />

@@ -666,15 +666,6 @@ export default function ProductsWorkspace({ lang, quickLaunchRequest }: Products
                   </select>
                 </div>
 
-                {/* Add Product Button */}
-                <button
-                  onClick={handleOpenAdd}
-                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus size={14} />
-                  <span>{isRtl ? 'إضافة منتج جديد' : 'Add New Product'}</span>
-                </button>
-
               </div>
             </div>
           </div>

@@ -3,7 +3,8 @@ import {
   TrendingUp, Users, Calendar, Sparkles, Plus, Search, MapPin,
   Clock, Check, X, ShieldAlert, Award, Star, Gift, Package,
   Receipt, ShoppingBag, CreditCard, ChevronRight, MessageSquare,
-  AlertCircle, Sparkle, ArrowLeft, ArrowRight, Save, Trash2, ShieldCheck, HelpCircle, Loader2
+  AlertCircle, Sparkle, ArrowLeft, ArrowRight, Save, Trash2, ShieldCheck, HelpCircle, Loader2,
+  Download, RefreshCw
 } from 'lucide-react';
 import { Language, ViewType, QuickLaunchRequest } from '../types';
 import { translations, navigationItems } from '../data/translations';
@@ -102,6 +103,15 @@ export default function Workspace({
   const [newViewName, setNewViewName] = useState('');
   const [showSavedViewModal, setShowSavedViewModal] = useState(false);
 
+  // Support Workspace Header Triggers
+  const [supportRefreshTrigger, setSupportRefreshTrigger] = useState(0);
+  const [supportNewTicketTrigger, setSupportNewTicketTrigger] = useState(0);
+  const [isSupportRefreshing, setIsSupportRefreshing] = useState(false);
+
+  // Customer Workspace CSV Export Triggers
+  const [customerExportTrigger, setCustomerExportTrigger] = useState(0);
+  const [isCustomerExporting, setIsCustomerExporting] = useState(false);
+
   // Real Data State
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [todaysAppointments, setTodaysAppointments] = useState<any[]>([]);
@@ -168,6 +178,7 @@ export default function Workspace({
   });
 
   const teamSeatLimit = planSummary.usage.staff?.limit ?? planSummary.packageLimits?.maxStaff ?? null;
+  const teamQuotaUsed = planSummary.usage.staff?.current ?? mockEmployees.length;
   const serviceLimit = planSummary.usage.services?.limit ?? planSummary.packageLimits?.maxServices ?? null;
   const productLimit = planSummary.usage.products?.limit ?? planSummary.packageLimits?.maxProducts ?? null;
   const marketingSmsLimit = planSummary.packageLimits?.smsMarketingCampaigns ?? null;
@@ -402,6 +413,29 @@ export default function Workspace({
             >
               <Star size={16} fill={isFavorited ? 'currentColor' : 'none'} className="stroke-[2]" />
             </button>
+
+            {/* Customers approval indicator */}
+            {view === 'customers' && (
+              <span className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center gap-1">
+                <ShieldCheck size={11} />
+                <span>VIEW_CUSTOMERS: APPROVED</span>
+              </span>
+            )}
+
+            {/* Teams quota & WPS compliance badges */}
+            {view === 'employees' && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] bg-brand-500/10 text-brand-700 dark:text-brand-300 font-bold px-2.5 py-0.5 rounded-full border border-brand-500/20">
+                  {isRtl
+                    ? `المقاعد: ${teamSeatLimit !== null ? `${teamQuotaUsed} / ${teamSeatLimit}` : `${teamQuotaUsed} مستخدم`}`
+                    : `Seats: ${teamSeatLimit !== null ? `${teamQuotaUsed} / ${teamSeatLimit}` : `${teamQuotaUsed} active`}`}
+                </span>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center gap-1">
+                  <ShieldCheck size={11} />
+                  <span>{isRtl ? 'ممتثل لحماية الأجور (WPS)' : 'Qiwa WPS Compliant'}</span>
+                </span>
+              </div>
+            )}
           </div>
 
           {view === 'dashboard' && (
@@ -409,6 +443,14 @@ export default function Workspace({
               {isRtl
                 ? 'مركز إدارة ومتابعة العمليات اليومية وحركة الحجوزات لـ BarSpa'
                 : 'BarSpa operational command & real-time monitoring center'}
+            </p>
+          )}
+
+          {view === 'support' && (
+            <p className="text-xs md:text-sm text-slate-500 dark:text-zinc-400 mt-1 font-medium">
+              {isRtl
+                ? 'مركز المحادثات والتذاكر وخدمة المستأجر الفنية'
+                : 'Helpdesk, conversation-first tickets, and tenant support'}
             </p>
           )}
         </div>
@@ -427,21 +469,47 @@ export default function Workspace({
             <span>{isRtl ? 'حفظ هذا المنظر مسبقاً' : 'Save view filter'}</span>
           </button>
 
-
-
-          {(view === 'services' || view === 'services2') && (
+          {/* Customer CSV Export Button */}
+          {view === 'customers' && (
             <button
-              onClick={() => onQuickAction('service')}
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs md:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              onClick={() => setCustomerExportTrigger(p => p + 1)}
+              disabled={isCustomerExporting}
+              className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                darkMode ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-200' : 'border-neutral-200 hover:bg-neutral-50 text-neutral-700'
+              }`}
             >
-              <Plus size={16} />
-              <span>{isRtl ? 'إضافة خدمة' : 'Add Service'}</span>
+              <Download size={13} className={isCustomerExporting ? 'animate-bounce' : ''} />
+              <span>{isCustomerExporting ? (isRtl ? 'جاري التصدير...' : 'Exporting...') : (isRtl ? 'تصدير CSV' : 'Export CSV')}</span>
             </button>
           )}
+
+          {/* Support Actions: Refresh and New Ticket */}
+          {view === 'support' && (
+            <>
+              <button
+                onClick={() => setSupportRefreshTrigger(p => p + 1)}
+                disabled={isSupportRefreshing}
+                className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  darkMode ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-200' : 'border-neutral-200 hover:bg-neutral-50 text-neutral-700'
+                }`}
+              >
+                <RefreshCw size={13} className={isSupportRefreshing ? 'animate-spin' : ''} />
+                <span>{isRtl ? 'تحديث' : 'Refresh'}</span>
+              </button>
+              <button
+                onClick={() => setSupportNewTicketTrigger(p => p + 1)}
+                className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs md:text-sm transition-all shadow-md shadow-brand-500/15 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus size={16} />
+                <span>{isRtl ? 'تذكرة جديدة' : 'New Ticket'}</span>
+              </button>
+            </>
+          )}
+
           {view === 'products' && (
             <button
               onClick={() => onQuickAction('product')}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs md:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs md:text-sm transition-all shadow-md shadow-brand-500/15 flex items-center gap-1.5 cursor-pointer"
             >
               <Plus size={16} />
               <span>{isRtl ? 'إضافة منتج' : 'Add Product'}</span>
@@ -450,7 +518,7 @@ export default function Workspace({
           {view === 'employees' && (
             <button
               onClick={() => onQuickAction('employee')}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs md:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs md:text-sm transition-all shadow-md shadow-brand-500/15 flex items-center gap-1.5 cursor-pointer"
             >
               <Plus size={16} />
               <span>{isRtl ? 'تعيين عضو فريق' : 'Add Team Member'}</span>
@@ -459,7 +527,7 @@ export default function Workspace({
           {view === 'giftcards' && (
             <button
               onClick={() => onQuickAction('giftcard')}
-              className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs md:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs md:text-sm transition-all shadow-md shadow-brand-500/15 flex items-center gap-1.5 cursor-pointer"
             >
               <Plus size={16} />
               <span>{isRtl ? 'إصدار بطاقة' : 'Issue Gift Card'}</span>
@@ -887,7 +955,12 @@ export default function Workspace({
 
       {/* 3. CUSTOMERS */}
       {view === 'customers' && (
-        <CustomersWorkspace lang={lang} quickLaunchRequest={quickLaunchRequest} />
+        <CustomersWorkspace
+          lang={lang}
+          quickLaunchRequest={quickLaunchRequest}
+          exportTrigger={customerExportTrigger}
+          onExportingChange={setIsCustomerExporting}
+        />
       )}
 
       {/* 4. EMPLOYEES */}
@@ -1312,7 +1385,13 @@ export default function Workspace({
 
       {/* SUPPORT EXPERIENCE */}
       {view === 'support' && (
-        <SupportWorkspace lang={lang} darkMode={darkMode} />
+        <SupportWorkspace
+          lang={lang}
+          darkMode={darkMode}
+          refreshTrigger={supportRefreshTrigger}
+          newTicketTrigger={supportNewTicketTrigger}
+          onRefreshingChange={setIsSupportRefreshing}
+        />
       )}
 
       {/* 10.1 HOT DEALS */}

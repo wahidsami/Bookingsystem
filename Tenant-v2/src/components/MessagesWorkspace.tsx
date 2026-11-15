@@ -749,70 +749,58 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
         </div>
       )}
 
-      {/* 2. TOP HEADER PANEL */}
-      <div className={`p-4 md:p-6 rounded-2xl border flex flex-col xl:flex-row xl:items-center justify-between gap-4 ${
-        darkMode ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white border-neutral-150 shadow-xs'
+      {/* 2. MESSAGING TOOLBAR */}
+      <div className={`p-4 md:p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+        darkMode ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white border-neutral-200/80 shadow-xs'
       }`}>
-        <div className="text-start space-y-1">
-          <h2 className="text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
-            <MessageSquare className="text-brand-500" size={22} />
-            <span>{t.title}</span>
-          </h2>
-          <p className="text-xs text-neutral-400">
-            {t.subtitle}
-          </p>
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span className="inline-flex items-center rounded-full border border-brand-500/20 bg-brand-500/10 px-2.5 py-1 text-[10px] font-bold text-brand-500">
-              {isRtl ? `الباقة الحالية: ${planSummary.planNameAr}` : `Current plan: ${planSummary.planNameEn}`}
-            </span>
-            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold ${
-              hasMessagingAccess
-                ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'
-                : 'border-amber-500/20 bg-amber-500/10 text-amber-500'
-            }`}>
-              {hasMessagingAccess
-                ? (isRtl ? 'الرسائل الداخلية مفعلة في الباقة' : 'Internal messaging included')
-                : (isRtl ? 'الرسائل الداخلية غير مفعلة' : 'Internal messaging not included')}
-            </span>
-          </div>
+        <div className="flex items-center gap-2">
+          <MessageSquare className="text-brand-500" size={18} />
+          <span className="text-xs font-bold text-neutral-700 dark:text-zinc-200">
+            {isRtl ? 'المحادثات والتعاميم التشغيلية' : 'Team Messages & Circulars'}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-brand-500/20 bg-brand-500/10 px-2.5 py-0.5 text-[10px] font-bold text-brand-600 dark:text-brand-400">
+            {isRtl ? planSummary.planNameAr : planSummary.planNameEn}
+          </span>
         </div>
 
-        {/* Search, Filters and Compose Button Wrapper */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Search, Filters, Dev Simulations, and Compose Button Wrapper */}
+        <div className="flex flex-wrap items-center gap-2.5">
           
-          {/* Simulation Tools Panel directly in header for auditor ease */}
-          <div className="flex items-center gap-1.5 p-1 px-2.5 rounded-xl bg-zinc-500/5 dark:bg-zinc-500/10 border border-neutral-200 dark:border-zinc-800 text-[11px] font-bold">
-            <span className="text-neutral-400">{t.simulations.title}:</span>
-            <button 
-              onClick={() => { setIsLoading(!isLoading); setIsError(false); }}
-              className={`px-2 py-1 rounded-md text-[10px] cursor-pointer transition-colors ${isLoading ? 'bg-brand-500 text-zinc-950' : 'bg-zinc-500/10 hover:bg-zinc-500/20'}`}
-            >
-              {t.simulations.loadingToggle}
-            </button>
-            <button 
-              onClick={() => { setIsError(!isError); setIsLoading(false); }}
-              className={`px-2 py-1 rounded-md text-[10px] cursor-pointer transition-colors ${isError ? 'bg-rose-500 text-white' : 'bg-zinc-500/10 hover:bg-zinc-500/20'}`}
-            >
-              {t.simulations.errorToggle}
-            </button>
-            <button 
-              onClick={handleResetData}
-              className="p-1 text-neutral-400 hover:text-white hover:bg-zinc-500/20 rounded-md transition-colors"
-              title={t.simulations.resetData}
-            >
-              <RefreshCw size={11} />
-            </button>
-          </div>
+          {/* Simulation Tools Panel directly in header for auditor ease (Dev only) */}
+          {import.meta.env.DEV && (
+            <div className="flex items-center gap-1.5 p-1 px-2.5 rounded-xl bg-zinc-500/5 dark:bg-zinc-500/10 border border-neutral-200 dark:border-zinc-800 text-[11px] font-bold">
+              <span className="text-neutral-400">{t.simulations.title}:</span>
+              <button 
+                onClick={() => { setIsLoading(!isLoading); setIsError(false); }}
+                className={`px-2 py-1 rounded-md text-[10px] cursor-pointer transition-colors ${isLoading ? 'bg-brand-500 text-white' : 'bg-zinc-500/10 hover:bg-zinc-500/20'}`}
+              >
+                {t.simulations.loadingToggle}
+              </button>
+              <button 
+                onClick={() => { setIsError(!isError); setIsLoading(false); }}
+                className={`px-2 py-1 rounded-md text-[10px] cursor-pointer transition-colors ${isError ? 'bg-rose-500 text-white' : 'bg-zinc-500/10 hover:bg-zinc-500/20'}`}
+              >
+                {t.simulations.errorToggle}
+              </button>
+              <button 
+                onClick={handleResetData}
+                className="p-1 text-neutral-400 hover:text-white hover:bg-zinc-500/20 rounded-md transition-colors"
+                title={t.simulations.resetData}
+              >
+                <RefreshCw size={11} />
+              </button>
+            </div>
+          )}
 
           {/* Quick Search */}
           <div className="relative w-full sm:w-56">
-            <Search className="absolute top-1/2 -translate-y-1/2 text-zinc-400 left-3" size={14} />
+            <Search className={`absolute top-1/2 -translate-y-1/2 text-zinc-400 ${isRtl ? 'right-3' : 'left-3'}`} size={14} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.search}
-              className={`w-full py-2 pl-9 pr-4 rounded-xl border text-xs focus:ring-1 focus:ring-brand-500 outline-hidden font-medium ${
+              className={`w-full py-2 ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} rounded-xl border text-xs focus:ring-1 focus:ring-brand-500 outline-hidden font-medium ${
                 darkMode ? 'bg-zinc-950 border-zinc-800 text-white placeholder-zinc-500' : 'bg-neutral-50 border-neutral-200 placeholder-neutral-400'
               }`}
             />
@@ -821,9 +809,9 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
           {/* Unread Only filter */}
           <button
             onClick={() => setFilterUnread(!filterUnread)}
-            className={`p-2 py-2 px-3 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:scale-102 ${
+            className={`py-2 px-3 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               filterUnread
-                ? 'bg-brand-500/15 border-brand-500/30 text-brand-400 font-extrabold'
+                ? 'bg-brand-500/15 border-brand-500/30 text-brand-600 dark:text-brand-300 font-extrabold'
                 : darkMode ? 'bg-zinc-950 hover:bg-zinc-800 border-zinc-800 text-zinc-200' : 'bg-white hover:bg-neutral-100 border-neutral-200 text-neutral-700'
             }`}
           >
@@ -834,7 +822,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
           {/* Compose button */}
           <button
             onClick={() => setIsComposeOpen(true)}
-            className="p-2 py-2 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-zinc-950 font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer hover:scale-102 hover:shadow-lg shadow-brand-500/10"
+            className="py-2 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-brand-500/15"
           >
             <Plus size={15} />
             <span>{t.composeBtn}</span>
@@ -891,7 +879,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
 
                     {folder.count > 0 && (
                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold ${
-                        isFolderActive ? 'bg-brand-500 text-zinc-950' : 'bg-zinc-150 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                        isFolderActive ? 'bg-brand-500 text-white font-bold' : 'bg-zinc-150 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                       }`}>
                         {folder.count}
                       </span>
@@ -910,7 +898,6 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                 <div key={member.id} className="flex items-center gap-2">
                   <div className="relative">
                     <img src={member.avatar} alt={member.nameEn} className="w-6.5 h-6.5 rounded-full object-cover border border-zinc-800/50" />
-                    <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-zinc-950" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold truncate text-neutral-700 dark:text-zinc-300">{isRtl ? member.nameAr : member.nameEn}</p>
@@ -961,10 +948,10 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
               <button
                 key={tab.id}
                 onClick={() => setActiveFilterTab(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-tight whitespace-nowrap transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold tracking-tight whitespace-nowrap transition-all cursor-pointer ${
                   activeFilterTab === tab.id
-                    ? 'bg-brand-500 text-zinc-950 shadow-sm font-extrabold scale-102'
-                    : darkMode ? 'bg-zinc-900/60 text-zinc-400 hover:text-white hover:bg-zinc-800' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-250'
+                    ? 'bg-[#1D035F] text-white shadow-xs font-bold'
+                    : darkMode ? 'bg-zinc-900/60 text-zinc-400 hover:text-white hover:bg-zinc-800' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                 }`}
               >
                 {tab.label}
@@ -1162,7 +1149,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                 </div>
                 <button
                   onClick={() => { setSearchQuery(''); setActiveFilterTab('all'); setFilterUnread(false); }}
-                  className="px-3 py-1.5 bg-brand-500 text-zinc-950 text-[10px] font-black rounded-lg hover:scale-102 transition-all cursor-pointer"
+                  className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer"
                 >
                   {isRtl ? 'إعادة تعيين الفلاتر والبحث' : 'Reset Filters & Search'}
                 </button>
@@ -1525,7 +1512,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                         className={`w-full p-2.5 rounded-xl border text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
                           isResending
                             ? 'bg-neutral-100 dark:bg-zinc-800 text-neutral-400 border-transparent cursor-wait'
-                            : 'bg-brand-500 hover:bg-brand-600 text-zinc-950 border-transparent hover:scale-101 hover:shadow-md'
+                            : 'bg-brand-500 hover:bg-brand-600 text-white font-bold border-transparent shadow-sm'
                         }`}
                       >
                         {isResending ? (
@@ -1624,7 +1611,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                           disabled={isSendingReply || !replyText.trim()}
                           className={`p-2 rounded-lg transition-all cursor-pointer ${
                             replyText.trim()
-                              ? 'bg-brand-500 text-zinc-950 font-bold hover:scale-102'
+                              ? 'bg-brand-500 hover:bg-brand-600 text-white font-bold shadow-xs'
                               : 'bg-neutral-100 dark:bg-zinc-800 text-neutral-400 dark:text-zinc-500 cursor-not-allowed'
                           }`}
                         >
@@ -1698,7 +1685,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                       onClick={() => setComposeRecipientType('all')}
                       className={`p-2.5 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         composeRecipientType === 'all'
-                          ? 'bg-brand-500 text-zinc-950 font-black border-brand-500 shadow-sm'
+                          ? 'bg-brand-500 text-white font-bold border-brand-500 shadow-sm'
                           : darkMode ? 'bg-zinc-950 hover:bg-zinc-800 border-zinc-800 text-zinc-300' : 'bg-white hover:bg-neutral-100 border-neutral-200 text-neutral-700'
                       }`}
                     >
@@ -1711,7 +1698,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                       onClick={() => setComposeRecipientType('single')}
                       className={`p-2.5 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         composeRecipientType === 'single'
-                          ? 'bg-brand-500 text-zinc-950 font-black border-brand-500 shadow-sm'
+                          ? 'bg-brand-500 text-white font-bold border-brand-500 shadow-sm'
                           : darkMode ? 'bg-zinc-950 hover:bg-zinc-800 border-zinc-800 text-zinc-300' : 'bg-white hover:bg-neutral-100 border-neutral-200 text-neutral-700'
                       }`}
                     >
@@ -1832,7 +1819,7 @@ export default function MessagesWorkspace({ lang, darkMode = false }: MessagesWo
                   disabled={!composeBody.trim()}
                   className={`px-5 py-2.5 rounded-xl font-black transition-all cursor-pointer flex items-center gap-1.5 ${
                     composeBody.trim()
-                      ? 'bg-brand-500 hover:bg-brand-600 text-zinc-950 hover:scale-102 hover:shadow-lg shadow-brand-500/10'
+                      ? 'bg-brand-500 hover:bg-brand-600 text-white font-bold shadow-md shadow-brand-500/10'
                       : 'bg-zinc-200 dark:bg-zinc-800 text-neutral-400 dark:text-zinc-600 cursor-not-allowed opacity-60'
                   }`}
                 >

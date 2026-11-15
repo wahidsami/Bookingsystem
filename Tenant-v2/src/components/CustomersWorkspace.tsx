@@ -16,6 +16,8 @@ interface CustomersWorkspaceProps {
   lang: Language;
   initialSubTab?: CustomerTab;
   quickLaunchRequest?: QuickLaunchRequest | null;
+  exportTrigger?: number;
+  onExportingChange?: (isExporting: boolean) => void;
 }
 
 type CustomerTab =
@@ -130,7 +132,13 @@ interface CustomerStats {
   avgBookings: number;
 }
 
-export default function CustomersWorkspace({ lang, initialSubTab = 'history', quickLaunchRequest }: CustomersWorkspaceProps) {
+export default function CustomersWorkspace({
+  lang,
+  initialSubTab = 'history',
+  quickLaunchRequest,
+  exportTrigger,
+  onExportingChange
+}: CustomersWorkspaceProps) {
   const isRtl = lang === 'ar';
   const { hasPermission } = useTenantAuth();
   const hasViewCustomersPermission = hasPermission('view_customers');
@@ -364,6 +372,20 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
       setIsExporting(false);
     }
   };
+
+  const lastExportTriggerRef = useRef(exportTrigger ?? 0);
+
+  useEffect(() => {
+    if (exportTrigger !== undefined && exportTrigger > lastExportTriggerRef.current) {
+      lastExportTriggerRef.current = exportTrigger;
+      void handleCSVExport();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportTrigger]);
+
+  useEffect(() => {
+    onExportingChange?.(isExporting);
+  }, [isExporting, onExportingChange]);
 
   // -------------------------------------------------------------
   // 3. INSPECTED CUSTOMER DETAIL STATE & HANDLERS
@@ -882,56 +904,6 @@ export default function CustomersWorkspace({ lang, initialSubTab = 'history', qu
             exit={{ opacity: 0, y: -10 }}
             className="space-y-6"
           >
-            {/* Header section with interactive permission control and Export Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-100 pb-5">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center text-amber-400">
-                  <Users size={18} />
-                </div>
-                <div>
-                  <h1 className="text-lg font-black text-neutral-900 tracking-tight">
-                    {isRtl ? 'إدارة قاعدة بيانات العملاء' : 'Customer CRM Directory'}
-                  </h1>
-                  <p className="text-[10px] font-medium text-neutral-400 uppercase tracking-widest mt-0.5">
-                    {isRtl ? 'عرض كبار الملاك والملفات الشخصية والأمن المالي' : 'Inspect client profiles, financial health and loyalty logs'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Permission Simulator Badge */}
-                <div className="flex items-center gap-2 bg-neutral-100/80 border border-neutral-200/60 rounded-xl px-3 py-2 text-xs">
-                  <Shield size={14} className={hasViewCustomersPermission ? "text-emerald-500 animate-pulse" : "text-rose-500"} />
-                  <span className="font-extrabold text-[10px] text-neutral-500 uppercase tracking-wider">
-                    {isRtl ? 'صلاحية العرض' : 'view_customers'}:
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded font-black text-[9px] uppercase ${
-                      hasViewCustomersPermission
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-rose-100 text-rose-800'
-                    }`}
-                  >
-                    {hasViewCustomersPermission ? (isRtl ? 'نشط' : 'Approved') : (isRtl ? 'ملغى' : 'Revoked')}
-                  </span>
-                </div>
-
-                {/* Export Button */}
-                <button
-                  onClick={handleCSVExport}
-                  disabled={isExporting || isLoadingList}
-                  className="bg-white border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 text-neutral-700 px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-                >
-                  {isExporting ? (
-                    <RefreshCw size={14} className="animate-spin text-amber-500" />
-                  ) : (
-                    <Download size={14} className="text-amber-500" />
-                  )}
-                  <span>{isRtl ? 'تصدير البيانات CSV' : 'Export current dataset'}</span>
-                </button>
-              </div>
-            </div>
-
             {/* KPI Cards section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* KPI 1: Total Customers */}
