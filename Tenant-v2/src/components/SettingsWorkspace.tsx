@@ -1039,6 +1039,27 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
               className="h-4 w-4 rounded border-neutral-300 text-brand-500 focus:ring-brand-500"
             />
           </label>
+          <div className={`md:col-span-2 flex items-start justify-between gap-4 rounded-2xl border p-4 transition ${bookingForm.allowCompletionWithOutstandingBalance ? (darkMode ? 'border-brand-500/40 bg-brand-500/15' : 'border-brand-300 bg-brand-50/80') : (darkMode ? 'border-zinc-800 bg-zinc-900/40' : 'border-neutral-200 bg-slate-50/70')}`}>
+            <div className="space-y-1">
+              <span className={`block text-sm font-bold ${darkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
+                {isRtl ? 'السماح بإكمال الخدمة مع وجود مبلغ متبقٍ' : 'Allow service completion with an outstanding balance'}
+              </span>
+              <p className={`text-xs leading-relaxed ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                {isRtl
+                  ? 'عند التفعيل، يمكن للمختصين وموظفي الاستقبال إنهاء حالة الخدمة للموعد مع بقاء المبلغ غير المسدد مستحقاً للتحصيل لاحقاً. لا يعتبر الموعد مسدداً بالكامل.'
+                  : 'When enabled, specialists and receptionists can mark an appointment service as completed before full payment is settled. The outstanding balance remains collectible.'}
+              </p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center shrink-0 mt-0.5">
+              <input
+                type="checkbox"
+                checked={bookingForm.allowCompletionWithOutstandingBalance}
+                onChange={(event) => setBookingForm((current) => ({ ...current, allowCompletionWithOutstandingBalance: event.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-500"></div>
+            </label>
+          </div>
           {false && (
             <>
               <label className="space-y-2">
@@ -1131,27 +1152,6 @@ export default function SettingsWorkspace({ lang, darkMode = false }: SettingsWo
               className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-brand-500 ${darkMode ? 'border-zinc-800 bg-zinc-950 text-zinc-100' : 'border-neutral-200 bg-white text-slate-800'}`}
             />
           </label>
-          <div className={`md:col-span-2 flex items-start justify-between gap-4 rounded-2xl border p-4 transition ${bookingForm.allowCompletionWithOutstandingBalance ? (darkMode ? 'border-amber-500/30 bg-amber-500/10' : 'border-amber-200 bg-amber-50/60') : (darkMode ? 'border-zinc-800 bg-zinc-900/40' : 'border-neutral-200 bg-slate-50/70')}`}>
-            <div className="space-y-1">
-              <span className={`block text-sm font-bold ${darkMode ? 'text-zinc-100' : 'text-slate-900'}`}>
-                {isRtl ? 'السماح بإكمال الخدمة مع وجود مبلغ متبقٍ' : 'Allow service completion with an outstanding balance'}
-              </span>
-              <p className={`text-xs leading-relaxed ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
-                {isRtl
-                  ? 'عند التفعيل، يمكن للمختصين وموظفي الاستقبال إنهاء حالة الخدمة للموعد مع بقاء المبلغ غير المسدد مستحقاً للتحصيل لاحقاً. لا يعتبر الموعد مسدداً بالكامل.'
-                  : 'When enabled, specialists and receptionists can mark an appointment service as completed before full payment is settled. The outstanding balance remains collectible.'}
-              </p>
-            </div>
-            <label className="relative inline-flex cursor-pointer items-center shrink-0 mt-0.5">
-              <input
-                type="checkbox"
-                checked={bookingForm.allowCompletionWithOutstandingBalance}
-                onChange={(event) => setBookingForm((current) => ({ ...current, allowCompletionWithOutstandingBalance: event.target.checked }))}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-            </label>
-          </div>
         </div>
       </SectionCard>
       )}
